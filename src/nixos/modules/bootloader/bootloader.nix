@@ -7,7 +7,7 @@ let
   currentSetup = {
     name = "${env.hostName}Setup";
     sortKey = "${env.hostName}";
-    limit = 10;  # Standard-Limit, könnte auch konfigurierbar sein
+    limit = 10;  
   };
 
   scripts = import ./scripts { 

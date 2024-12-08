@@ -176,15 +176,32 @@ rename_entry() {
   print_setup_summary "$SETUP_NAME" "$SORT_KEY" "$SETUP_LIMIT"
 }
 
-# Main logic with input validation
+update_all_entries() {
+  echo "Updating all boot entries..."
+  
+  # Finde alle Generationen
+  for entry in /boot/loader/entries/nixos-generation-*.conf; do
+    if [ -f "$entry" ] && [ ! -h "$entry" ]; then
+      local gen_number=$(basename "$entry" | grep -o '[0-9]\+')
+      
+      # Prüfe ob die Generation bereits im korrekten Format ist
+      if ! grep -q "^sort-key $SORT_KEY" "$entry"; then
+        echo "Updating generation $gen_number..."
+        rename_entry "$gen_number" "$SETUP_NAME"
+      else
+        echo "Generation $gen_number already updated"
+      fi
+    fi
+  done
+  
+  # Zeige Zusammenfassung
+  print_setup_summary "$SETUP_NAME" "$SORT_KEY" "$SETUP_LIMIT"
+}
+
+# Hauptlogik
 if [ $# -eq 0 ]; then
-  latest_gen=$(find_latest_generation)
-  if [ "$latest_gen" -gt 0 ]; then
-    rename_entry "$latest_gen" "${HOSTNAME}Setup"
-  else
-    echo "Error: No generations found"
-    exit 1
-  fi
+  # Aktualisiere alle existierenden Einträge (inkl. der neuesten)
+  update_all_entries
 elif [ $# -eq 2 ]; then
   rename_entry "$1" "$2"
 else

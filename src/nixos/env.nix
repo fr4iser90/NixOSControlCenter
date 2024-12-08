@@ -21,6 +21,10 @@
   enableBluetooth = false;
   enableBackup = false;
   securityHardening = false;
+  sudo = {
+    requirePassword = false;  # true für mehr Sicherheit
+    timeout = 15;            # Timeout in Minuten
+  };
   defaultShell = "zsh";
   enableBash = true; 
   enableZsh = true;  
