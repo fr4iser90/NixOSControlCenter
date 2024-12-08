@@ -2,7 +2,7 @@
 
 import logging
 from gi.repository import Gtk
-from .state_manager import StateManager
+from .state_manager.state_manager import StateManager
 
 class ContentManager:
     def __init__(self, content_stack, root, view_map):

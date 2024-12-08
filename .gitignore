@@ -24,7 +24,9 @@ Thumbs.db
 # These scripts are meant for local development and should not be included in the repository.
 setup_project.sh
 structure
-secret
+secret/
+secrets/
+*.secret
 
 # Generated documentation
 # If you generate HTML or other files during documentation generation, exclude them.

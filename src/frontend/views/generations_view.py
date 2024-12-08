@@ -145,13 +145,26 @@ class GenerationsView(Gtk.Box):
         # Generation info
         info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         
-        # Generation number and date
-        gen_label = Gtk.Label(
-            label=f"Generation #{generation['number']} - {generation['date']}"
-        )
+        # Vereinfachte Hauptinformationen: #NR TITLE BuildDate
+        main_info = f"#{generation['number']} {generation.get('title', 'NixOS')} - {generation.get('date', '')}"
+        
+        gen_label = Gtk.Label(label=main_info)
         gen_label.set_xalign(0)
-        if generation['status'] == '(current)':
+        
+        if generation.get('status') == 'current':
             gen_label.add_css_class("current-generation")
+        
+        # Ausführliche Informationen im Tooltip
+        tooltip_parts = [
+            f"NixOS Version: {generation.get('nixos_version', 'Unknown')}",
+            f"Kernel: {generation.get('kernel', 'Unknown')}",
+            f"Build Date: {generation.get('date', 'Unknown')}"
+        ]
+        
+        if 'boot_options' in generation:
+            tooltip_parts.append(f"Boot Options: {generation['boot_options']}")
+        
+        gen_label.set_tooltip_text('\n'.join(tooltip_parts))
         
         info_box.append(gen_label)
         gen_box.append(info_box)
@@ -282,7 +295,6 @@ class GenerationsView(Gtk.Box):
                 error = validate_name(new_name)
                 
                 if error is None:
-                    # Try to rename the generation
                     success = self.generation_manager.rename_generation(generation, new_name)
                     
                     if success:
@@ -296,8 +308,8 @@ class GenerationsView(Gtk.Box):
                         success_dialog.present()
                         success_dialog.connect("response", lambda d, r: d.destroy())
                         
-                        # Refresh the generations list
-                        self.fetch_generations()
+                        # Refresh only the modified generation
+                        self._update_generation_entry(generation['number'])
                     else:
                         # Show error message
                         error_dialog = Gtk.MessageDialog(
@@ -320,20 +332,47 @@ class GenerationsView(Gtk.Box):
         dialog.set_default_size(300, -1)
         dialog.present()
 
+    def _update_generation_entry(self, gen_number):
+        """Update a specific generation entry."""
+        # Get current data for this generation
+        updated_gen = None
+        for gen in self.generation_manager.get_generations():
+            if gen['number'] == gen_number:
+                updated_gen = gen
+                break
+        
+        if updated_gen:
+            # Find and replace the corresponding ListBoxRow
+            for row in self.generations_list:
+                if isinstance(row, Gtk.ListBoxRow):
+                    child = row.get_child()
+                    if hasattr(child, 'generation_number') and child.generation_number == gen_number:
+                        # Create new widget
+                        new_widget = self._create_generation_widget(updated_gen)
+                        # Replace old widget
+                        row.set_child(new_widget)
+                        break
+
     def on_lock_clicked(self, button, generation):
         """Handle lock action."""
         logger.info(f"Locking generation: {generation}")
-        # Add the logic for locking here
+        success = self.generation_manager.operation_handler.lock(generation)
+        if success:
+            self.fetch_generations()  # Aktualisiere die Ansicht
 
     def on_analyze_clicked(self, button, generation):
         """Handle analyze action."""
         logger.info(f"Analyzing generation: {generation}")
-        # Add the logic for analyzing here
+        result = self.generation_manager.operation_handler.analyze(generation)
+        if result:
+            self._show_analysis_dialog(result)
 
     def on_delete_clicked(self, button, generation):
         """Handle delete action."""
         logger.info(f"Deleting generation: {generation}")
-        # Add the logic for deleting here
+        success = self.generation_manager.operation_handler.delete(generation)
+        if success:
+            self.fetch_generations()  # Aktualisiere die Ansicht
 
     def create_generations_view(self):
         """Create the generations view with a scrollable list."""
