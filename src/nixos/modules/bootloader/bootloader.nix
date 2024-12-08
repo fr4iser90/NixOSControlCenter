@@ -2,7 +2,17 @@
 
 let
   env = import ../../env.nix;
-  scripts = import ./scripts { inherit pkgs lib env; };
+  
+  # Dynamische Setup-Konfiguration basierend auf Hostname
+  currentSetup = {
+    name = "${env.hostName}Setup";
+    sortKey = "${env.hostName}";
+    limit = 10;  # Standard-Limit, könnte auch konfigurierbar sein
+  };
+
+  scripts = import ./scripts { 
+    inherit pkgs lib env currentSetup; 
+  };
 in
 {
   boot.loader = {

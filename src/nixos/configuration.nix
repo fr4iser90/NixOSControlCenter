@@ -21,5 +21,4 @@ in {
 
   nixpkgs.config.allowUnfree = true;
   #console.keyMap = env.keyboardLayout;
-  system.stateVersion = "24.05"; 
 }

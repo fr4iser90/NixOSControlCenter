@@ -1,13 +1,8 @@
-{ pkgs, lib, env, ... }:
+{ pkgs, lib, env, currentSetup, ... }:
 
 let
   utils = import ../lib/utils.nix { inherit lib; };
-
-  # Hilfsfunktion zum Ersetzen des Hostnamens
-  replaceHostname = content: builtins.replaceStrings
-    ["${env.hostName}Setup"]
-    ["${"\${HOSTNAME}Setup"}"]
-    content;
+  entryManager = import ../lib/entries/manager.nix { inherit lib pkgs; };
 in
 {
   validateInput = pkgs.writeScriptBin "validate-boot-input" (builtins.readFile ./validateInput.sh);
@@ -17,13 +12,22 @@ in
     set -euo pipefail
 
     # Setze Umgebungsvariablen
-    HOSTNAME="${env.hostName}"
-    PATH="${lib.makeBinPath [pkgs.gnused]}:$PATH"
+    SETUP_NAME="${currentSetup.name}"
+    SORT_KEY="${currentSetup.sortKey}"
+    SETUP_LIMIT=${toString currentSetup.limit}
+    ENTRIES_FILE="${entryManager.dataPath}"
+    PATH="${lib.makeBinPath [pkgs.gnused pkgs.jq]}:$PATH"
+
+    # Initialisiere Entries-Datei
+    ${entryManager.initScript}
+
+    # Lade Hilfsfunktionen
+    ${entryManager.updateEntry}
 
     source ${./validateInput.sh}
     ${utils.validatePermissions}
 
-    ${replaceHostname (builtins.readFile ./renameEntries.sh)}
+    ${builtins.readFile ./renameEntries.sh}
   '';
 
   listBootEntries = pkgs.writeScriptBin "list-boot-entries" ''
@@ -43,5 +47,15 @@ in
     ${utils.validatePermissions}
 
     ${builtins.readFile ./resetEntry.sh}
+  '';
+
+  manageEntries = pkgs.writeScriptBin "manage-entries" ''
+    #!${pkgs.bash}/bin/bash
+    set -euo pipefail
+
+    ENTRIES_FILE="${entryManager.entriesFile}"
+    PATH="${lib.makeBinPath [pkgs.jq]}:$PATH"
+
+    ${builtins.readFile ./manageEntries.sh}
   '';
 }

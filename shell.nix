@@ -18,7 +18,6 @@ pkgs.mkShell {
     pkgs.python3Packages.pdoc  # Dokumentation
     pkgs.python3Packages.psutil  # Für Systemüberwachung
     pkgs.python312Packages.tkinter
-   # pkgs.graphene
     pkgs.gobject-introspection
     pkgs.dbus  # Kommunikation mit Systemdiensten
     pkgs.pkg-config  # Automatische Konfiguration von Compiler- und Linkerflags

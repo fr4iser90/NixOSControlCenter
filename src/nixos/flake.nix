@@ -31,6 +31,7 @@
           ./configuration.nix
           home-manager.nixosModules.home-manager
           {
+            system.stateVersion = "unstable";  # oder "24.11" wenn Sie eine spezifische Version wollen
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
             home-manager.users = lib.recursiveUpdate {

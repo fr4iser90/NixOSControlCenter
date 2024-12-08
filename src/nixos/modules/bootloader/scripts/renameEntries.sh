@@ -11,6 +11,68 @@ find_latest_generation() {
   echo "$latest"
 }
 
+count_setup_generations() {
+  local sort_key=$1
+  find /boot/loader/entries -name 'nixos-generation-*.conf' -exec grep -l "^sort-key $sort_key" {} \; | wc -l
+}
+
+update_entries_file() {
+  local gen_number=$1
+  local title=$2
+  local sort_key=$3
+
+  # Erstelle/Update Entry in JSON
+  local json_entry=$(jq --arg gen "$gen_number" \
+                       --arg title "$title" \
+                       --arg sort "$sort_key" \
+                       --arg time "$(date -Iseconds)" \
+                       '.generations[$gen] = {
+                         "title": $title,
+                         "sortKey": $sort,
+                         "lastUpdate": $time
+                       }' "$ENTRIES_FILE")
+
+  echo "$json_entry" > "$ENTRIES_FILE"
+}
+
+get_entry_from_file() {
+  local gen_number=$1
+  jq -r --arg gen "$gen_number" '.generations[$gen] // empty' "$ENTRIES_FILE"
+}
+
+print_setup_summary() {
+  local setup_name=$1
+  local sort_key=$2
+  local limit=$3
+
+  echo ""
+  echo "Boot Entry Setup Summary"
+  echo "========================"
+  echo "Setup: $setup_name"
+  echo "Sort Key: $sort_key"
+
+  # Zähle aktuelle Generationen
+  local count=$(find /boot/loader/entries -name 'nixos-generation-*.conf' -exec grep -l "^sort-key $sort_key" {} \; | wc -l)
+  echo "Generations: $count/$limit"
+
+  echo ""
+  echo "Current Generations:"
+  echo "-------------------"
+  for entry in $(find /boot/loader/entries -name 'nixos-generation-*.conf' -exec grep -l "^sort-key $sort_key" {} \; | sort -V); do
+    local gen=$(basename "$entry" | grep -o '[0-9]\+')
+    local title=$(grep "^title" "$entry" | sed 's/^title //')
+    local version=$(grep "^version" "$entry" | grep -o "Generation [0-9]\+.*")
+    echo "Gen $gen: $title ($version)"
+  done
+
+  # Warnung wenn Limit fast erreicht
+  if [ "$count" -ge "$((limit - 2))" ]; then
+    echo ""
+    echo "WARNING: Approaching generation limit ($count/$limit)"
+    echo "Consider cleaning up old generations!"
+  fi
+}
+
 rename_entry() {
   local gen_number=$1
   local new_name=$2
@@ -37,6 +99,12 @@ rename_entry() {
   if [ ! -f "$entry_file" ] || [ -h "$entry_file" ]; then
     echo "Error: Invalid boot entry file: $entry_file"
     exit 1
+  fi
+
+  # Prüfe Setup-Limit
+  local current_count=$(count_setup_generations "$SORT_KEY")
+  if [ "$current_count" -ge "$SETUP_LIMIT" ]; then
+    echo "Warning: Reached generation limit for $new_name ($SETUP_LIMIT)"
   fi
 
   echo "Debug: Reading version line"
@@ -82,6 +150,13 @@ rename_entry() {
     fi
   fi
 
+  # Update sort-key für Gruppierung
+  if ! sed -i.tmp "s/^sort-key.*/sort-key $SORT_KEY/" "$entry_file"; then
+    echo "Error: Failed to update sort-key"
+    mv "$entry_file.backup" "$entry_file"
+    exit 1
+  fi
+
   echo "Debug: Updated content:"
   echo "----------------------"
   cat "$entry_file"
@@ -90,8 +165,15 @@ rename_entry() {
   # Clean up
   rm -f "$entry_file.tmp" "$entry_file.backup"
 
+  # Update JSON-Datei
+  update_entries_file "$gen_number" "$new_name" "$SORT_KEY"
+
   echo "Successfully updated boot entry for generation $gen_number:"
   echo "  - Title: $new_name $([ -n "$nixos_version" ] && echo "($nixos_version)")"
+  echo "  - Sort Key: $SORT_KEY"
+
+  # Zeige Zusammenfassung
+  print_setup_summary "$SETUP_NAME" "$SORT_KEY" "$SETUP_LIMIT"
 }
 
 # Main logic with input validation
