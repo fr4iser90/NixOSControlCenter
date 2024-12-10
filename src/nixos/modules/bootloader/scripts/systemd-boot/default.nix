@@ -1,8 +1,9 @@
 { pkgs, lib, env, currentSetup, ... }:
 
 let
-  utils = import ../lib/utils.nix { inherit lib; };
-  entryManager = import ../lib/entries/manager.nix { inherit lib pkgs; };
+  common = import ../../lib/common.nix { inherit lib; };
+  utils = import ./lib/utils.nix { inherit lib; };
+  entryManager = import ./lib/entries/manager.nix { inherit lib pkgs; };
 in
 {
   validateInput = pkgs.writeScriptBin "validate-boot-input" (builtins.readFile ./validateInput.sh);
@@ -25,7 +26,7 @@ in
     ${entryManager.updateEntry}
 
     source ${./validateInput.sh}
-    ${utils.validatePermissions}
+    ${common.validatePermissions}
 
     ${builtins.readFile ./renameEntries.sh}
   '';
@@ -44,7 +45,7 @@ in
     PATH="${lib.makeBinPath [pkgs.gnused]}:$PATH"
 
     source ${./validateInput.sh}
-    ${utils.validatePermissions}
+    ${common.validatePermissions}
 
     ${builtins.readFile ./resetEntry.sh}
   '';
