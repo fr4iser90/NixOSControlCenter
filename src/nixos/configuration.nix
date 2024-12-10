@@ -1,78 +1,74 @@
-# /etc/nixos/config/configuration.nix
-# Root configuration file that orchestrates all system modules
+# configuration.nix
 { config, pkgs, ... }:
 
 let
-  # Import environment settings
   env = import ./env.nix;
+  profileTypes = import ./modules/profiles/types;
+  
+  # Validate system type across all categories
+  isValidType = type:
+    let
+      categories = ["server" "desktop" "hybrid"];
+      hasType = category: 
+        builtins.hasAttr type (profileTypes.systemTypes.${category} or {});
+    in builtins.any hasType categories;
 
-  # Core modules that are always required
-  coreModules = [
-    ./hardware-configuration.nix  # Hardware scan results - DO NOT MODIFY
-    ./modules/bootloader/bootloader.nix
-    ./modules/networking/networking.nix
+  # Base modules required for all systems
+  baseModules = [
+    ./hardware-configuration.nix
+    ./modules/bootloader
+    ./modules/networking
     ./modules/users/index.nix
-    ./modules/packages/packages.nix
-    ./modules/overlays/index.nix
-    ./modules/system-services/system-services.nix
+   # ./modules/security
+   # ./modules/overlays
   ];
 
-  # Optional desktop-related modules
+  # Desktop-specific modules
   desktopModules = [
     ./modules/desktop
     ./modules/sound/index.nix
   ];
 
-  # Module selection based on system type
-  activeModules = 
-    if env.setup == "server" 
-    then coreModules
-    else coreModules ++ desktopModules;
+  # Profile-specific modules
+  profileModules = [
+    ./modules/profiles
+  ];
 
-  # Validation of required modules
-  validateModules = modules:
-    let
-      checkModule = module:
-        if builtins.pathExists (toString module)
-        then true
-        else throw "Required module not found: ${toString module}";
-    in
-    map checkModule modules;
+  # Determine profile category based on system type
+  profileCategory = 
+    if builtins.hasAttr env.systemType (profileTypes.systemTypes.desktop or {}) then "desktop"
+    else if builtins.hasAttr env.systemType (profileTypes.systemTypes.server or {}) then "server"
+    else if builtins.hasAttr env.systemType (profileTypes.systemTypes.hybrid or {}) then "hybrid"
+    else throw "Unknown profile category for ${env.systemType}";
 
-  # Ensure all required modules exist
-  _ = validateModules activeModules;
+  # Load the corresponding profile configuration
+  profile = profileTypes.systemTypes.${profileCategory}.${env.systemType} or
+    (throw "Invalid system type: ${env.systemType}");
+
+  # Determine which modules to load based on profile
+  additionalModules = 
+    if profile.defaults.desktop or false
+    then desktopModules
+    else [];
 
 in {
-  # Import all active modules
-  imports = activeModules;
+  # Import all required modules based on profile
+  imports = baseModules ++ profileModules ++ additionalModules;
 
-  # Global system settings
-  nixpkgs = {
-    # Allow proprietary software
-    config.allowUnfree = true;
-
-    # System-wide overlay configurations (if needed)
-    overlays = [
-      # Add custom overlays here
-    ];
-  };
-
-  # System-wide assertions
+  # System validations
   assertions = [
     {
-      assertion = env.setup == "server" -> env.desktop == null;
-      message = "Server setup cannot include desktop environment";
+      # Ensure system type is valid
+      assertion = isValidType env.systemType;
+      message = "Invalid system type: ${env.systemType}";
     }
     {
-      assertion = env.setup != "server" -> env.desktop != null;
-      message = "Desktop setup requires desktop environment specification";
+      # Ensure desktop environment is set when required
+      assertion = (profile.defaults.desktop or false) -> (env.desktop != null);
+      message = "Desktop environment required for this system type";
     }
   ];
 
-  # Meta information about the configuration
-  meta = {
-    description = "NixOS system configuration";
-    maintainers = ["${env.mainUser}"];
-    # Add more metadata as needed
-  };
+  # Allow unfree packages globally
+  nixpkgs.config.allowUnfree = true;
 }
