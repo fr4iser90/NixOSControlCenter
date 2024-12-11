@@ -2,19 +2,6 @@
 { config, lib, pkgs, ... }:
 
 {
-  # Shell-Konfiguration mit mkForce um Konflikte zu vermeiden
-  programs = {
-    steam.enable = lib.mkDefault true;
-
-    zsh = {
-      enable = lib.mkForce true;  # Verwende mkForce
-      enableCompletion = true;
-      autosuggestions.enable = true;
-      syntaxHighlighting.enable = true;
-    };
-    fish.enable = lib.mkDefault true;
-  };
-
   # Default Shell setzen
   users.defaultUserShell = lib.mkForce pkgs.zsh;
   
@@ -24,6 +11,8 @@
     vscode
     godot_4
     code-cursor
+    git
+    git-credential-manager
 
     # Gaming
     lutris
@@ -53,4 +42,25 @@
     libvirtd.enable = true;
     docker.enable = true;
   };
+  
+    # Shell-Konfiguration mit mkForce um Konflikte zu vermeiden
+  programs = {
+    steam.enable = lib.mkDefault true;
+
+    zsh = {
+      enable = lib.mkForce true;  # Verwende mkForce
+      enableCompletion = true;
+      autosuggestions.enable = true;
+      syntaxHighlighting.enable = true;
+    };
+    fish.enable = lib.mkDefault true;
+
+    git = {
+      enable = true;
+      config = {
+        credential.helper = "manager"; 
+      };
+    };
+  };
+
 }

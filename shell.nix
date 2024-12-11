@@ -26,6 +26,7 @@ pkgs.mkShell {
     pkg-config
     glib
     git
+    git-credential-manager
     makeWrapper
     tree
     nixos-rebuild  # Wichtig für die Tests
@@ -41,6 +42,10 @@ pkgs.mkShell {
     export PYTHONPATH=$(pwd)/src:$PYTHONPATH
     echo "PYTHONPATH set to: $PYTHONPATH"
 
+    # Git Credential Manager Konfiguration
+    git config --global credential.helper manager
+    export GCM_CREDENTIAL_STORE=secretservice
+    
     # Praktische Aliase
     alias py="python3"
     alias pt="pytest tests/"

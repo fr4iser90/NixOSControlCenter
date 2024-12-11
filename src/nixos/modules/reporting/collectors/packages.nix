@@ -4,15 +4,52 @@ with lib;
 
 let
   # Hilfsfunktionen
+  safeLicenseString = license:
+    if license == null then "unknown"
+    else if isAttrs license then (
+      if license ? shortName then license.shortName
+      else if license ? fullName then license.fullName
+      else if license ? spdxId then license.spdxId
+      else "unknown"
+    )
+    else if isList license then
+      concatStringsSep ", " (map safeLicenseString license)
+    else if isString license then license
+    else "unknown";
+
+  uniquePackages = pkgs:
+    lib.unique (map (p: p.name) pkgs);
+
+  fullReport = let
+    # Limitiere auf Top 20 Pakete für bessere Übersicht
+    limitedPackages = lib.take 20 packageAnalysis.packages;
+  in ''
+    ${detailedReport}
+    echo -e "\nPackage Details (showing first 20 packages):"
+    ${concatMapStrings (p: ''
+      echo "${p.name}:"
+      echo "  Version: ${p.version}"
+      echo "  License: ${p.license}"
+      echo "  Description: ${p.description}"
+      echo ""
+    '') limitedPackages}
+    
+    echo "... and ${toString (length packageAnalysis.packages - 20)} more packages"
+  '';
+
   checkPackage = pkg: 
+    let
+      meta = if pkg ? meta then pkg.meta else {};
+      pkgLicense = if meta ? license then meta.license else null;
+    in
     if isDerivation pkg then {
       name = pkg.name or "unknown";
       exists = true;
-      isFree = !(pkg.meta.license.free or false);
-      description = pkg.meta.description or "";
-      broken = pkg.meta.broken or false;
+      isFree = if meta ? license then !(meta.license.free or false) else true;
+      description = meta.description or "";
+      broken = meta.broken or false;
       version = pkg.version or "unknown";
-      license = pkg.meta.license.shortName or "unknown";
+      license = safeLicenseString pkgLicense;
     } else {
       name = toString pkg;
       exists = false;
@@ -25,11 +62,11 @@ let
 
   # Paketanalyse
   packageAnalysis = let
-    allPackages = flatten (with config; [
+    allPackages = lib.unique (flatten (with config; [
       (environment.systemPackages or [])
       (programs.packages or [])
       (services.packages or [])
-    ]);
+    ]));
     checkedPackages = map checkPackage allPackages;
   in {
     total = length checkedPackages;
@@ -42,40 +79,29 @@ let
 
   # Reports für verschiedene Detail-Level
   minimalReport = ''
-    echo -e "${colors.blue}=== Package Analysis ===${colors.reset}"
-    echo -e "Total Packages: ${toString packageAnalysis.total}"
+    printf '%b' "${colors.cyan}=== Package Analysis ===${colors.reset}\n"
+    printf 'Total Packages: %d\n' ${toString packageAnalysis.total}
     ${optionalString (packageAnalysis.broken != []) ''
-      echo -e "${colors.red}Warning: ${toString (length packageAnalysis.broken)} broken packages${colors.reset}"
+      printf 'Warning: %d broken packages\n' ${toString (length packageAnalysis.broken)}
     ''}
   '';
 
   standardReport = ''
     ${minimalReport}
-    echo -e "${colors.green}Free Packages: ${toString (length packageAnalysis.free)}${colors.reset}"
-    echo -e "${colors.yellow}Unfree Packages: ${toString (length packageAnalysis.unfree)}${colors.reset}"
+    echo -e "Free Packages: ${toString (length packageAnalysis.free)}"
+    echo -e "Unfree Packages: ${toString (length packageAnalysis.unfree)}"
   '';
 
   detailedReport = ''
     ${standardReport}
     ${optionalString (packageAnalysis.broken != []) ''
-      echo -e "\n${colors.red}Broken Packages:${colors.reset}"
-      ${formatting.listItems colors.red (map (p: "${p.name}: ${p.description}") packageAnalysis.broken)}
+      echo -e "\nBroken Packages:"
+      ${concatMapStrings (p: "  ${p.name}: ${p.description}\n") packageAnalysis.broken}
     ''}
     ${optionalString (packageAnalysis.invalid != []) ''
-      echo -e "\n${colors.yellow}Invalid Packages:${colors.reset}"
-      ${formatting.listItems colors.yellow (map (p: p.name) packageAnalysis.invalid)}
+      echo -e "\nInvalid Packages:"
+      ${concatMapStrings (p: "  ${p.name}\n") packageAnalysis.invalid}
     ''}
-  '';
-
-  fullReport = ''
-    ${detailedReport}
-    echo -e "\n${colors.blue}Package Details:${colors.reset}"
-    ${concatMapStrings (p: ''
-      echo -e "${colors.cyan}${p.name}:${colors.reset}"
-      echo -e "  Version: ${p.version}"
-      echo -e "  License: ${p.license}"
-      echo -e "  Description: ${p.description}\n"
-    '') packageAnalysis.packages}
   '';
 
 in {

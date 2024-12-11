@@ -4,7 +4,7 @@ with lib;
 
 let
   env = import ../../../env.nix;
-  types = import ../../types;
+  types = import ../../profiles/types;
 
   systemInfo = {
     hasDesktop = env.desktop != null && env.desktop != "";

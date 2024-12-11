@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = config.system.reporting;
+  cfg = config.system.reporting or full;
   
   # Importiere gemeinsame Bibliotheken
   colors = import ./lib/colors.nix;
@@ -43,8 +43,9 @@ let
   availableCollectors = [
     "profile"
     "bootloader"
-    "packages"
+    "bootentries"
     #"desktop"
+    "packages"
     #"network"
     #"services"
     #"sound"
@@ -56,7 +57,7 @@ let
     listToAttrs (map (name: {
       inherit name;
       value = import ./collectors/${name}.nix { 
-        inherit config lib colors formatting reportLevels; 
+        inherit config lib pkgs colors formatting reportLevels; 
         currentLevel = reportLevels.${
           if cfg.collectors.${name}.detailLevel != null
           then cfg.collectors.${name}.detailLevel
@@ -72,7 +73,7 @@ in {
     
     defaultDetailLevel = mkOption {
       type = lib.types.enum (attrNames reportLevels);
-      default = "standard";
+      default = "full";
       description = "Default detail level for all reports";
     };
 
@@ -99,7 +100,6 @@ in {
     {
       system.reporting = {
         enable = mkDefault true;
-        defaultDetailLevel = mkDefault "standard";
       };
     }
 

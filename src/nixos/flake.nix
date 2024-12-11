@@ -1,4 +1,3 @@
-# /etc/nixos/flake.nix
 {
   description = "NixOS Configuration with Home Manager (Unstable Channel)";
 
@@ -9,9 +8,13 @@
 
   outputs = { self, nixpkgs, home-manager, ... }: let
     system = "x86_64-linux";
-    pkgs = import nixpkgs { inherit system; };
-    lib = pkgs.lib;
     env = import ./env.nix;
+    
+    pkgs = import nixpkgs { 
+      inherit system;
+      config.allowUnfree = env.allowUnfree or false;
+    };
+    lib = pkgs.lib;
 
     # Base modules required for all systems
     baseModules = [
@@ -19,7 +22,9 @@
       ./modules/bootloader
       ./modules/networking
       ./modules/users
-      ./modules/profiles  # Hier werden Profile geladen
+      ./modules/profiles
+      ./modules/nix
+      ./modules/reporting
     ];
 
     # Desktop-specific modules
@@ -33,7 +38,14 @@
       "${env.hostName}" = nixpkgs.lib.nixosSystem {
         inherit system;
 
-        modules = baseModules ++ [
+        modules = baseModules ++ [      
+          # Unfree Konfiguration
+          {
+            nixpkgs.config = {
+              allowUnfree = env.allowUnfree or false;
+            };
+          }
+
           # Home Manager integration
           home-manager.nixosModules.home-manager
           {
@@ -42,19 +54,18 @@
             home-manager = {
               useGlobalPkgs = true;
               useUserPackages = true;
-              
               users = lib.mapAttrs (username: userConfig: 
-                  { config, ... }: {  # Wichtig: Wir fügen hier die Modul-Argumente hinzu
+                  { config, ... }: {
                     imports = [ 
                       (import ./modules/homemanager/roles/${userConfig.role}.nix {
                         inherit pkgs lib config;
                         user = username;
                       })
                     ];
-                home = {
-                  username = username;
-                  homeDirectory = "/home/${username}";
-                };
+                    home = {
+                      username = username;
+                      homeDirectory = "/home/${username}";
+                    };
               }) env.users;
             };
           }
