@@ -1,36 +1,40 @@
 { pkgs ? import <nixpkgs> {} }:
 
+let
+  pythonEnv = pkgs.python3.withPackages (ps: with ps; [
+    pygobject3
+    flask
+    requests
+    click
+    pytest
+    flake8
+    black
+    mypy
+    pdoc
+    psutil
+    tkinter
+  ]);
+in
 pkgs.mkShell {
   name = "NixOsControlCenterEnv";
 
-  # Build Inputs: Alles, was du für Entwicklung und Tests brauchst
-  buildInputs = [
-    pkgs.python3
-    pkgs.gtk4
-    pkgs.python3Packages.pygobject3
-    pkgs.python3Packages.flask  # Für eine eventuelle Web-API
-    pkgs.python3Packages.requests  # Für REST-API-Kommunikation
-    pkgs.python3Packages.click  # Für CLI-Integration
-    pkgs.python3Packages.pytest  # Tests
-    pkgs.python3Packages.flake8  # Code-Qualität
-    pkgs.python3Packages.black  # Code-Formatierung
-    pkgs.python3Packages.mypy  # Typüberprüfung
-    pkgs.python3Packages.pdoc  # Dokumentation
-    pkgs.python3Packages.psutil  # Für Systemüberwachung
-    pkgs.python312Packages.tkinter
-    pkgs.gobject-introspection
-    pkgs.dbus  # Kommunikation mit Systemdiensten
-    pkgs.pkg-config  # Automatische Konfiguration von Compiler- und Linkerflags
-    pkgs.glib
-    pkgs.git  # Versionskontrolle
-    pkgs.makeWrapper  # Zum Erstellen von Aliases
+  packages = with pkgs; [
+    pythonEnv
+    gtk4
+    gobject-introspection
+    dbus
+    pkg-config
+    glib
+    git
+    makeWrapper
+    tree
+    nixos-rebuild  # Wichtig für die Tests
   ];
 
-  nativeBuildInputs = [
-    pkgs.pkg-config
-  ];
+  # Deaktiviere "no new privileges"
+  noNewPrivileges = false;
 
-  # Shell customizations
+  # Setze notwendige Umgebungsvariablen
   shellHook = ''
     echo "Setting up the NixOsControlCenter development environment..."
     
@@ -59,5 +63,10 @@ pkgs.mkShell {
     echo "  doc -> Generate documentation"
     echo "  sysmon -> Start system monitor module"
 
+    # Setze zusätzliche Umgebungsvariablen für sudo
+    export NIXPKGS_ALLOW_UNFREE=1
   '';
+
+  # Setze PKG_CONFIG_PATH
+  PKG_CONFIG_PATH = "${pkgs.pkg-config}/bin";
 }

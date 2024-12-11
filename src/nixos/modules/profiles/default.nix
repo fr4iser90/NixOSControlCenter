@@ -1,4 +1,3 @@
-# modules/profiles/default.nix
 { config, lib, pkgs, ... }:
 
 let
@@ -25,10 +24,10 @@ let
     (removeNulls (env.overrides or {}));
     
 in {
-  imports = [
-    # Importiere direkt das Profil aus types/
-    ./types/${profileCategory}/${env.systemType}.nix
-  ];
+  # Lade Desktop-Module wenn nötig
+  imports = if finalConfig.desktop or false 
+    then [ ../desktop ../sound/index.nix ]
+    else [];
 
   # Globale Einstellungen
   nixpkgs.config.allowUnfree = true;

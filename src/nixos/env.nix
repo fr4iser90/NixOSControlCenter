@@ -1,11 +1,18 @@
 {
   # System-Typ (bestimmt das Profil)
-  systemType = "gaming-workstation";  # server, gaming, desktop, workstation, nas, mediaserver, gaming-workstation, hybrid-gaming-server
+  systemType = "gaming-workstation";
   bootloader = "systemd-boot";
-  
-  # Benutzer-Grundeinstellungen
-  mainUser = "fr4iser";
-  guestUser = "";
+
+  # Benutzer-Konfiguration
+  users = {
+    "fr4iser" = {
+      role = "admin";
+      defaultShell = "zsh";
+      autoLogin = true;
+    };
+  };
+
+  # System-Einstellungen
   hostName = "Gaming";
   
   # Lokalisierung
@@ -15,30 +22,25 @@
   keyboardOptions = "eurosign:e";
   
   # Desktop (nur für Desktop-basierte Profile)
-  desktop = "plasma";      # plasma, gnome, xfce
-  displayManager = "sddm"; # sddm, gdm, lightdm
+  desktop = "plasma";
+  displayManager = "sddm";
   session = "plasmawayland";
-  autoLogin = true;
   darkMode = true;
 
   # Hardware
-  gpu = "amdgpu";         # amdgpu, nvidia, intel
-  audio = "pipewire";     # pipewire, pulseaudio
+  gpu = "amdgpu";
+  audio = "pipewire";
   
   # Sicherheit
   sudo = {
     requirePassword = false;
     timeout = 15;
   };
-
-  # Shell
-  defaultShell = "zsh";
+  enableFirewall = false;
   
   # Optionale Überschreibungen der Profil-Defaults
   overrides = {
-    # Nur setzen wenn vom Profil-Default abgewichen werden soll
-    enableSSH = null;        # null = use profile default
-    enableSteam = true;      # true = override profile default
-    enableFirewall = false;  # false = override profile default
+    enableSSH = null;
+    enableSteam = true;
   };
 }

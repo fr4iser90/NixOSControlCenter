@@ -1,7 +1,12 @@
-# modules/desktop/managers/display/default.nix
 { config, lib, pkgs, ... }:
 let
   env = import ../../../../env.nix;
+  
+  # Finde den Auto-Login Benutzer (wenn vorhanden)
+  autoLoginUser = lib.findFirst 
+    (user: env.users.${user}.autoLogin or false) 
+    null 
+    (builtins.attrNames env.users);
   
   # Gültige Display Manager als Set definieren
   validDisplayManagers = {
@@ -33,9 +38,9 @@ in {
   # Common display manager settings
   services.displayManager = {
     defaultSession = defaultSession;
-    autoLogin = {
-      enable = env.autoLogin;
-      user = env.mainUser;
+    autoLogin = lib.mkIf (autoLoginUser != null) {
+      enable = true;
+      user = autoLoginUser;
     };
   };
 
@@ -43,6 +48,11 @@ in {
     {
       assertion = builtins.hasAttr env.displayManager validDisplayManagers;
       message = "Invalid display manager: ${env.displayManager}";
+    }
+    {
+      assertion = lib.count (user: env.users.${user}.autoLogin or false) 
+                          (builtins.attrNames env.users) <= 1;
+      message = "Only one user can be configured for auto-login";
     }
   ];
 }
