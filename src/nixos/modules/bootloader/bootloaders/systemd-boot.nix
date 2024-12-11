@@ -1,42 +1,46 @@
-# modules/bootloader/bootloaders/systemd-boot.nix
 { config, lib, pkgs, env, ... }: 
 
 let
-  scripts = import ../scripts/systemd-boot {
-    inherit pkgs lib env;
-    currentSetup = {
-      name = "${env.hostName}Setup";
-      sortKey = "${env.hostName}";
-      limit = env.bootGenerationLimit or 5;
-    };
+  entryManager = import ../lib/entry-management/providers/systemd-boot.nix {
+    inherit config lib pkgs;
   };
 in
 {
   # Boot loader configuration
   boot.loader = {
-    # Explicitly disable GRUB as we're using systemd-boot
+    # Explicitly disable GRUB
     grub.enable = lib.mkForce false;
 
     # systemd-boot configuration
     systemd-boot = {
-      enable = true;                  # Use systemd-boot as the main bootloader
-      configurationLimit = 15;        # Maximum total boot entries to keep
-      editor = false;                 # Disable boot parameter editing for security
-      consoleMode = "auto";          # Automatically detect best console resolution
-      memtest86.enable = true;       # Include memory testing utility in boot menu
+      enable = true;
+      configurationLimit = 15;
+      editor = false;
+      consoleMode = "auto";
+      memtest86.enable = true;
     };
 
-    # EFI boot configuration
+    # EFI configuration
     efi = {
-      canTouchEfiVariables = true;   # Allow system to modify EFI boot entries
-      efiSysMountPoint = "/boot";    # Mount point for the EFI system partition
+      canTouchEfiVariables = true;
+      efiSysMountPoint = "/boot";
     };
   };
 
+  # Activation hooks
+  system.activationScripts = {
+    # Initialize JSON storage
+    bootEntryInit = lib.mkForce entryManager.activation.initializeJson;
+    
+    # Sync boot entries
+    bootEntrySync = lib.mkIf config.boot.loader.systemd-boot.enable 
+      (lib.mkForce entryManager.activation.syncEntries);
+  };
 
-  # Run boot entry renaming script after system activation
-  # Only executes if systemd-boot is enabled
-  system.activationScripts.renameBootEntries = lib.mkIf (config.boot.loader.systemd-boot.enable) ''
-    ${scripts.renameBootEntries}/bin/rename-boot-entries
-  '';
+  # Make management utilities available
+  environment.systemPackages = with entryManager.scripts; [
+    listEntries
+    renameEntry
+    resetEntry
+  ];
 }

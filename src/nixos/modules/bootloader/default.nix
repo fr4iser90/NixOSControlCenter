@@ -1,22 +1,26 @@
-# modules/bootloader/default.nix
 { config, lib, pkgs, ... }:
 
 let
   env = import ../../env.nix;
   
+  # Import core libraries
+  entryManagement = import ./lib/entry-management {
+    inherit config lib pkgs;
+  };
+  
   # Bootloader configurations
   bootloaders = {
     systemd-boot = {
       module = ./bootloaders/systemd-boot.nix;
-      scripts = ./scripts/systemd-boot;
+      provider = entryManagement.providers.systemd-boot;
     };
     grub = {
       module = ./bootloaders/grub.nix;
-      scripts = ./scripts/grub;
+      provider = entryManagement.providers.grub;
     };
     refind = {
       module = ./bootloaders/refind.nix;
-      scripts = ./scripts/refind;
+      provider = entryManagement.providers.refind;
     };
   };
 
@@ -24,19 +28,8 @@ let
   selectedLoader = bootloaders.${env.bootloader} or bootloaders.systemd-boot;
   bootloaderConfig = import selectedLoader.module {
     inherit config lib pkgs env;
+    entryManager = selectedLoader.provider;
   };
-
-  # Bootloader-specific scripts
-  scripts = if builtins.pathExists selectedLoader.scripts
-           then import selectedLoader.scripts {
-             inherit pkgs lib env;
-             currentSetup = {
-               name = "${env.hostName}Setup";
-               sortKey = "${env.hostName}";
-               limit = env.bootGenerationLimit or 5;
-             };
-           }
-           else {};
 
 in {
   imports = [ bootloaderConfig ];
@@ -51,12 +44,19 @@ in {
     };
   };
 
-  # Make bootloader-specific utilities available if they exist
-  environment.systemPackages = lib.optionals (scripts != {}) (with scripts; [
-    renameBootEntries
-    listBootEntries
-    resetBootEntry
-  ]);
+  # Make bootloader-specific utilities available
+  environment.systemPackages = with selectedLoader.provider.scripts; [
+    listEntries
+    renameEntry
+    resetEntry
+  ];
+
+  # Add common activation scripts
+  system.activationScripts = {
+    bootEntryInit = entryManagement.activation.initializeJson;
+    bootEntrySync = lib.mkIf (env.bootloader == "systemd-boot") 
+      entryManagement.activation.syncEntries;
+  };
 
   assertions = [
     {
