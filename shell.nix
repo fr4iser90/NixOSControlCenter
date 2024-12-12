@@ -7,6 +7,8 @@ let
     requests
     click
     pytest
+    pytest-sugar
+    pytest-instafail
     flake8
     black
     mypy
@@ -81,7 +83,7 @@ pkgs.mkShell {
     alias typecheck="mypy ."
     alias doc="pdoc --html --output-dir docs ."
     alias sysmon="python3 -m nixos_control_center.system_monitor"
-
+    
     # Test-Aliase
     alias pt="pytest tests/"
     alias ptc="pytest tests/core/"
@@ -90,8 +92,8 @@ pkgs.mkShell {
     alias pt-basic="pytest tests/core/config/test_basic.py"
     alias pt-profiles="pytest tests/core/config/test_profiles.py"
     alias pt-hw="pytest tests/core/config/test_hardware.py"
-    alias pt-hardware="pytest -v -m hardware"
-    alias pt-profile="pytest -v -m profile"
+    alias pt-hardware="pytest -m hardware"
+    alias pt-profile="pytest -m profile"
     alias pt-failed="pytest --lf"
     alias pt-first="pytest --ff"
     alias pt-log="pytest -s"
