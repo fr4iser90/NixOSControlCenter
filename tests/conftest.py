@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from core.utils.config_generator import ConfigGenerator
-from core.utils.env_handler import EnvHandler
+from core.utils.test_env import TestEnvironment
 from core.utils.test_validator import ConfigValidator
 
 # Basis-Fixtures
@@ -29,20 +29,18 @@ def config_generator():
     return ConfigGenerator()
 
 @pytest.fixture(scope="session")
-def env_handler(temp_dir):
-    """Umgebungs-Handler für Tests"""
-    return EnvHandler(temp_dir)
+def test_env(temp_dir):
+    """Basis Test-Umgebung"""
+    return TestEnvironment(temp_dir)
+
+@pytest.fixture
+def test_environment(test_env):
+    """Fixture für Setup und Cleanup der Testumgebung"""
+    test_env.setup_test_env()
+    yield test_env
+    test_env.cleanup()
 
 @pytest.fixture(scope="session")
 def config_validator():
     """Konfigurations-Validator"""
     return ConfigValidator()
-
-# Cleanup
-@pytest.fixture(autouse=True)
-def cleanup_temp(temp_dir):
-    """Räumt temporäre Testdateien auf"""
-    yield
-    for item in temp_dir.iterdir():
-        if item.is_file():
-            item.unlink()

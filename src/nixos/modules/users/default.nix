@@ -17,7 +17,7 @@ let
       commands = [{
         command = "ALL";
         options = if env.sudo.requirePassword or true
-          then [ "PASSWD" "TIMESTAMP_TIMEOUT=${toString (env.sudo.timeout or 15)}" ]
+          then [ "PASSWD" ]
           else [ "NOPASSWD" ];
       }];
     }]
@@ -25,7 +25,7 @@ let
       users = [ username ];
       commands = [{
         command = "ALL";
-        options = [ "PASSWD" "TIMESTAMP_TIMEOUT=5" ];
+        options = [ "PASSWD" ];
       }];
     }]
     else [];  # Keine sudo-Rechte für andere Rollen

@@ -1,6 +1,8 @@
 import pytest
+import os
 
-def test_gaming_profile(test_env, config_generator):
+@pytest.mark.profile
+def test_gaming_profile(test_environment, config_generator):
     """Test des Gaming-Profils"""
     config = {
         'systemType': 'gaming',
@@ -15,12 +17,13 @@ def test_gaming_profile(test_env, config_generator):
     }
     
     config_content = config_generator.generate_config(**config)
-    test_env.apply_test_config(config_content)
+    test_environment.apply_test_config(config_content)
     
-    is_valid, error = test_env.validate_config()
+    is_valid, error = test_environment.validate_config()
     assert is_valid, f"Gaming-Profil ungültig: {error}"
 
-def test_workstation_profile(test_env, config_generator):
+@pytest.mark.profile
+def test_workstation_profile(test_environment, config_generator):
     """Test des Workstation-Profils"""
     config = {
         'systemType': 'gaming-workstation',
@@ -34,12 +37,13 @@ def test_workstation_profile(test_env, config_generator):
     }
     
     config_content = config_generator.generate_config(**config)
-    test_env.apply_test_config(config_content)
+    test_environment.apply_test_config(config_content)
     
-    is_valid, error = test_env.validate_config()
+    is_valid, error = test_environment.validate_config()
     assert is_valid, f"Workstation-Profil ungültig: {error}"
 
-def test_headless_profile(test_env, config_generator):
+@pytest.mark.profile
+def test_headless_profile(test_environment, config_generator):
     """Test des Headless-Profils"""
     config = {
         'systemType': 'headless',
@@ -52,7 +56,7 @@ def test_headless_profile(test_env, config_generator):
     }
     
     config_content = config_generator.generate_config(**config)
-    test_env.apply_test_config(config_content)
+    test_environment.apply_test_config(config_content)
     
-    is_valid, error = test_env.validate_config()
+    is_valid, error = test_environment.validate_config()
     assert is_valid, f"Headless-Profil ungültig: {error}"

@@ -18,7 +18,7 @@
 
     # Base modules required for all systems
     baseModules = [
-      (if (!env ? testing) then ./hardware-configuration.nix else {})
+      ./hardware-configuration.nix
       ./modules/bootloader
       ./modules/networking
       ./modules/users

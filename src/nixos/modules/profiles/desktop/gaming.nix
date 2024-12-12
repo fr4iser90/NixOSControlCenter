@@ -1,38 +1,13 @@
 # modules/profiles/types/desktop/gaming.nix
-{
-  type = "gaming";
-  category = "desktop";
-  
-  # Profil-Defaults
-  defaults = {
-    desktop = true;
-    ssh = false;
-    sound = true;
-    bluetooth = true;
-    steam = true;
-    gaming-tools = true;
-    
-    # Paket-Listen
-    packages = {
-      base = [
-        "git" "wget" "tree"
-      ];
-      gaming = [
-        "steam" "lutris" "wine"
-        "discord" "mangohud" "vesktop"
-      ];
-      multimedia = [
-        "firefox" "vlc" "kitty"
-      ];
-    };
-    
-    # Service-Konfiguration
-    services = {
-      steam.enable = true;
-      pipewire = {
-        enable = true;
-        gaming = true;
-      };
-    };
+{ config, lib, pkgs, ... }:
+
+let
+  env = import ../../../env.nix;
+in {
+  config = lib.mkIf (env.systemType == "gaming") {
+    # Gaming-spezifische Konfiguration
+    programs.steam.enable = env.overrides.enableSteam or false;
+    programs.gamemode.enable = env.overrides.enableGameMode or false;
+    # ... weitere Gaming-Einstellungen
   };
 }

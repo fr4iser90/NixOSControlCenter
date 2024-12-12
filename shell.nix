@@ -38,9 +38,35 @@ pkgs.mkShell {
   # Setze notwendige Umgebungsvariablen
   shellHook = ''
     echo "Setting up the NixOsControlCenter development environment..."
-    
-    export PYTHONPATH=$(pwd)/src:$PYTHONPATH
-    echo "PYTHONPATH set to: $PYTHONPATH"
+
+    # Setze Projekt-Verzeichnisse
+    export PROJECT_ROOT=$(pwd)
+    export NIXOS_CONFIG_DIR=$PROJECT_ROOT/src/nixos
+    export BACKEND_DIR=$PROJECT_ROOT/src/backend
+    export FRONTEND_DIR=$PROJECT_ROOT/src/frontend
+    export CORE_DIR=$PROJECT_ROOT/src/core
+ 
+    export PYTHONPATH=$(pwd)/src:$(pwd)/tests:$PYTHONPATH
+    echo "PYTHONPATH includes:"
+    echo "  - Application: $(pwd)/src"
+    echo "  - Tests: $(pwd)/tests"
+    echo "  - Existing: $PYTHONPATH"
+
+
+    echo "Project directories set:"
+    echo "  - NIXOS_CONFIG_DIR: $NIXOS_CONFIG_DIR"
+    echo "  - BACKEND_DIR: $BACKEND_DIR"
+    echo "  - FRONTEND_DIR: $FRONTEND_DIR"
+    echo "  - CORE_DIR: $CORE_DIR"
+
+    # Praktische Navigations-Aliase
+    alias cdp="cd $PROJECT_ROOT"
+    alias cdsrc="cd $PROJECT_ROOT/src"
+    alias cdnix="cd $NIXOS_CONFIG_DIR"
+    alias cdback="cd $BACKEND_DIR"
+    alias cdfront="cd $FRONTEND_DIR"
+    alias cdcore="cd $CORE_DIR"
+    alias cdtest="cd $PROJECT_ROOT/tests"
 
     # Git Credential Manager Konfiguration
     git config --global credential.helper manager
