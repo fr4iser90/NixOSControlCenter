@@ -3,41 +3,56 @@ import subprocess
 from typing import Tuple
 import os
 import logging
+from rich.console import Console
+from rich.panel import Panel
 
-# Logger Setup
+# Configure logging and console
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)  # Change to INFO as default level
+logger.setLevel(logging.INFO)
+console = Console()
 
-class NixConfigBuilder:
-    """Executes NixOS build operations"""
+class NixOSBuildValidator:
+    """Validates NixOS configurations through build testing"""
     
-    def __init__(self):
+    def __init__(self, env_path: Path = None):
         self.nix_cmd = "nix"
-        logger.debug("NixConfigBuilder initialized")
+        self.env_path = env_path
+        self.current_test = None
     
-    def build_config(self, config_path: Path) -> Tuple[bool, str]:
-        """Builds the NixOS configuration"""
+    def set_current_test(self, test_name: str):
+        self.current_test = test_name
+    
+    def set_env_path(self, env_path: Path):
+        self.env_path = env_path
+        
+    def build_config(self) -> Tuple[bool, str]:
+        if not self.env_path:
+            return False, "No environment path set"
+            
         try:
-            # Detailed debugging information
-            logger.debug(f"Current directory: {os.getcwd()}")
-            logger.debug(f"Target config directory: {config_path}")
-            logger.debug(f"Files in target: {list(config_path.glob('*'))}")
-            
-            # Important operations as INFO
             original_dir = os.getcwd()
-            os.chdir(str(config_path))
-            logger.info(f"Building configuration in: {os.getcwd()}")
+            os.chdir(str(self.env_path))
             
+            # Show build start
+            console.print(Panel(
+                f"[bold yellow]Building configuration for test:[/bold yellow] {self.current_test}\n"
+                f"[cyan]Environment:[/cyan] {self.env_path}",
+                title="Build Start"
+            ))
+            
+            # Führe Build mit sichtbarer Ausgabe durch
             result = subprocess.run(
                 [
                     self.nix_cmd, "build",
-                    f"path:{config_path}#nixosConfigurations.testhost.config.system.build.toplevel",
+                    f"path:{self.env_path}#nixosConfigurations.testhost.config.system.build.toplevel",
                     "--no-link",
                     "--dry-run",
                     "--impure",
-                    "--accept-flake-config"
+                    "--accept-flake-config",
+                    "--show-trace",
                 ],
-                capture_output=True,
+                stdout=subprocess.PIPE, 
+                capture_output=False,  # Zeige Ausgabe direkt an
                 text=True,
                 timeout=60,
                 env={
@@ -46,23 +61,31 @@ class NixConfigBuilder:
                 }
             )
             
-            # Debug output only if needed
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"Command stdout: {result.stdout}")
-                logger.debug(f"Command stderr: {result.stderr}")
-                logger.debug(f"Return code: {result.returncode}")
-            
+            # Show build result
             if result.returncode == 0:
-                logger.info("Configuration build successful")
+                console.print(Panel(
+                    "[bold green]✓ Build validation successful[/bold green]",
+                    title=f"Build Complete - {self.current_test}"
+                ))
+                return True, ""
             else:
-                logger.error(f"Build failed: {result.stderr}")
-                
-            return result.returncode == 0, result.stderr
+                console.print(Panel(
+                    "[bold red]✗ Build validation failed[/bold red]",
+                    title=f"Build Failed - {self.current_test}"
+                ))
+                return False, "Build failed"
             
+        except subprocess.TimeoutExpired:
+            error_msg = f"Build timeout after 60 seconds"
+            console.print(Panel(f"[bold red]✗ {error_msg}[/bold red]", title="Build Error"))
+            return False, error_msg
+        except subprocess.CalledProcessError as e:
+            error_msg = f"Build failed with exit code {e.returncode}"
+            console.print(Panel(f"[bold red]✗ {error_msg}[/bold red]", title="Build Error"))
+            return False, error_msg
         except Exception as e:
-            logger.exception("Unexpected error during build")
-            return False, str(e)
+            error_msg = f"Build error: {str(e)}"
+            console.print(Panel(f"[bold red]✗ {error_msg}[/bold red]", title="Build Error"))
+            return False, error_msg
         finally:
-            if 'original_dir' in locals():
-                logger.debug(f"Restoring original directory: {original_dir}")
-                os.chdir(original_dir)
+            os.chdir(original_dir)

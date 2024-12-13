@@ -1,8 +1,10 @@
 import pytest
 from pathlib import Path
 
-def test_basic_config(test_environment, config_generator, run_test):
+@pytest.mark.base
+def test_basic_config(auto_environment, config_generator, run_test):
     """Tests a basic configuration"""
+    test_name = "basic_config"
     config = {
         'systemType': 'gaming-workstation',
         'bootloader': 'systemd-boot',
@@ -18,11 +20,12 @@ def test_basic_config(test_environment, config_generator, run_test):
     }
     
     config_content = config_generator.generate_config(**config)
-    test_environment.apply_test_config(config_content)
-    run_test(config_content)
+    run_test(config_content, test_name)
 
-def test_minimal_config(test_environment, config_generator, run_test):
+@pytest.mark.base
+def test_minimal_config(auto_environment, config_generator, run_test):
     """Tests a minimal configuration"""
+    test_name = "minimal_config"
     config = {
         'systemType': 'headless',
         'bootloader': 'systemd-boot',
@@ -32,5 +35,4 @@ def test_minimal_config(test_environment, config_generator, run_test):
     }
     
     config_content = config_generator.generate_config(**config)
-    test_environment.apply_test_config(config_content)
-    run_test(config_content)
+    run_test(config_content, test_name)

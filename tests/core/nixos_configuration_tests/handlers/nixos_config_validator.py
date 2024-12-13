@@ -4,31 +4,42 @@ import subprocess
 import os
 import logging
 
-# Logger Setup
+# Configure logging
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)  # Ändern auf INFO als Standard-Level
+logger.setLevel(logging.INFO)
 
-class ConfigValidator:
-    """Validiert NixOS Konfigurationen"""
+class NixOSConfigValidator:
+    """Validates NixOS configurations for correctness"""
     
     def __init__(self, env_path: Path):
+        """
+        Initialize validator with environment path
+        
+        Args:
+            env_path: Path to the test environment
+        """
         self.nix_cmd = "nix"
         self.env_path = env_path
-        logger.debug(f"Validator initialized with env_path: {env_path}")
+        self.current_test = None  # Für besseres Logging
+    
+    def set_current_test(self, test_name: str):
+        """Sets the current test name for better logging"""
+        self.current_test = test_name
+        logger.info(f"Setting current test to: {test_name}")
     
     def validate_config(self) -> Tuple[bool, str]:
-        """Validiert die NixOS Konfiguration"""
+        """
+        Validates the NixOS configuration using nix-eval
+        
+        Returns:
+            Tuple of (success: bool, error_message: str)
+        """
         try:
-            # Detaillierte Debugging-Informationen
-            logger.debug(f"Current directory: {os.getcwd()}")
-            logger.debug(f"Target config directory: {self.env_path}")
-            logger.debug(f"Files in target: {list(self.env_path.glob('*'))}")
-            
-            # Wichtige Operationen als INFO
             original_dir = os.getcwd()
             os.chdir(str(self.env_path))
-            logger.info(f"Validating configuration in: {os.getcwd()}")
+            logger.info(f"Starting configuration validation for test '{self.current_test}' in: {self.env_path}")
             
+            # Führe tatsächliche Validierung durch
             result = subprocess.run(
                 [
                     self.nix_cmd, "eval",
@@ -37,26 +48,23 @@ class ConfigValidator:
                     "--show-trace"
                 ],
                 capture_output=True,
-                text=True
+                text=True,
+                check=True  # Raise CalledProcessError if command fails
             )
-            
-            # Debug-Output nur wenn nötig
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"Command stdout: {result.stdout}")
-                logger.debug(f"Command stderr: {result.stderr}")
-                logger.debug(f"Return code: {result.returncode}")
                 
             if result.returncode != 0:
-                logger.error(f"Validation failed: {result.stderr}")
+                logger.error(f"Configuration validation failed for test '{self.current_test}'")
                 return False, result.stderr
                 
-            logger.info("Configuration validation successful")
+            logger.info(f"Configuration validation successful for test '{self.current_test}'")
             return True, ""
                 
+        except subprocess.CalledProcessError as e:
+            error_msg = f"Validation failed with exit code {e.returncode}: {e.stderr}"
+            logger.error(error_msg)
+            return False, error_msg
         except Exception as e:
-            logger.exception("Unexpected error during validation")
+            logger.error(f"Validation error in test '{self.current_test}': {str(e)}")
             return False, str(e)
         finally:
-            if 'original_dir' in locals():
-                logger.debug(f"Restoring original directory: {original_dir}")
-                os.chdir(original_dir)
+            os.chdir(original_dir)

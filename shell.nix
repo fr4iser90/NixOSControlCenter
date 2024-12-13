@@ -9,6 +9,7 @@ let
     pytest
     pytest-sugar
     pytest-instafail
+    rich
     flake8
     black
     mypy
@@ -85,15 +86,13 @@ pkgs.mkShell {
     alias sysmon="python3 -m nixos_control_center.system_monitor"
     
     # Test-Aliase
-    alias pt="pytest tests/"
-    alias ptc="pytest tests/core/"
-    alias ptv="pytest -v"
+    alias pt='pytest'
+    alias ptf='pytest --test-strategy=full'  # Full strategy
+    alias ptv='pytest --test-strategy=validate-only'  # Validate only
     alias ptvv="pytest -vv"
     alias pt-basic="pytest tests/core/config/test_basic.py"
     alias pt-profiles="pytest tests/core/config/test_profiles.py"
-    alias pt-hw="pytest tests/core/config/test_hardware.py"
-    alias pt-hardware="pytest -m hardware"
-    alias pt-profile="pytest -m profile"
+    alias pt-hardware="pytest tests/core/config/test_hardware.py"
     alias pt-failed="pytest --lf"
     alias pt-first="pytest --ff"
     alias pt-log="pytest -s"
@@ -111,7 +110,8 @@ pkgs.mkShell {
     echo "Test aliases set:"
     echo "  pt       -> Run all tests"
     echo "  ptc      -> Run core tests"
-    echo "  ptv      -> Run tests verbose"
+    echo "  ptf      -> Run tests with full strategy(Validate + Build)"
+    echo "  ptv      -> Run tests explizit validate-only"
     echo "  ptvv     -> Run tests very verbose"
     echo "  pt-basic -> Run basic tests"
     echo "  pt-profiles -> Run profile tests"

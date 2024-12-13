@@ -1,10 +1,10 @@
-class ConfigGenerator:
-    """Generator für NixOS-Konfigurationen"""
+class NixOSEnvGenerator:
+    """Generator for NixOS configurations"""
     
     def __init__(self):
-        # Alle verfügbaren Optionen mit ihren möglichen Werten
+        # Available options with their possible values
         self.available_options = {
-            # System
+            # System options
             'systemType': [
                 'gaming',
                 'gaming-workstation',
@@ -18,7 +18,7 @@ class ConfigGenerator:
             ],
             'allowUnfree': [True, False],
 
-            # User-Optionen
+            # User options
             'userRoles': [
                 'admin',
                 'guest',
@@ -34,7 +34,7 @@ class ConfigGenerator:
                 'zsh'
             ],
 
-            # Lokalisierung
+            # Localization
             'timeZones': [
                 'Europe/Berlin',
                 'Europe/London',
@@ -59,7 +59,7 @@ class ConfigGenerator:
                 'grp:alt_shift_toggle'
             ],
 
-            # Desktop
+            # Desktop environment
             'desktop': [
                 'plasma',
                 'gnome',
@@ -96,14 +96,14 @@ class ConfigGenerator:
                 'alsa'
             ],
 
-            # Sicherheit
+            # Security
             'sudoOptions': {
                 'requirePassword': [True, False],
                 'timeout': [0, 5, 15, 30, 60]
             },
             'enableFirewall': [True, False],
 
-            # Feature-Flags (Overrides)
+            # Feature flags
             'features': {
                 'enableSSH': [True, False, None],
                 'enableSteam': [True, False, None],
@@ -116,14 +116,11 @@ class ConfigGenerator:
             }
         }
         
-        # Standard-Konfiguration
+        # Base configuration
         self.base_configs = {
-            # System
             'systemType': 'gaming-workstation',
             'bootloader': 'systemd-boot',
             'allowUnfree': True,
-            
-            # User
             'users': {
                 'testuser': {
                     'role': 'admin',
@@ -131,35 +128,26 @@ class ConfigGenerator:
                     'autoLogin': False
                 }
             },
-            
-            # System Settings
             'hostName': 'testhost',
             'timeZone': 'Europe/Berlin',
             'locales': ['en_US.UTF-8'],
             'keyboardLayout': 'de',
             'keyboardOptions': 'eurosign:e',
-            
-            # Desktop
             'desktop': 'plasma',
             'displayManager': 'sddm',
             'session': 'plasmawayland',
             'darkMode': False,
-            
-            # Hardware
             'gpu': 'amdgpu',
             'audio': 'pipewire',
-            
-            # Security
             'sudo': {
                 'requirePassword': True,
                 'timeout': 15
             },
             'enableFirewall': True,
-            
-            # Testing
             'testing': True
         }
 
+        # Profile-specific defaults
         self.profile_defaults = {
             'gaming': {
                 'desktop': 'plasma',
@@ -198,7 +186,7 @@ class ConfigGenerator:
             }
         }
 
-        # Desktop-spezifische Defaults
+        # Desktop-specific defaults
         self.desktop_defaults = {
             'gnome': {
                 'darkMode': True,
@@ -214,52 +202,48 @@ class ConfigGenerator:
                 'displayManager': 'lightdm',
                 'darkMode': False
             }
-        }  
+        }
 
     def generate_test_variants(self, components=None, max_combinations=None):
-        """Generiert Testkombinationen für spezifische Komponenten"""
+        """Generates test combinations for specific components"""
         from itertools import product
 
         if components is None:
-            components = ['systemType', 'desktop', 'audio']  # Default-Komponenten
+            components = ['systemType', 'desktop', 'audio']
 
-        # Sammle die zu testenden Optionen
-        options_to_test = {
-            comp: self.available_options.get(comp, [])
-            for comp in components
-        }
+        options_to_test = {}
+        for comp in components:
+            if comp == 'displayManager':
+                options = self.available_options.get('displayManagers', [])
+            else:
+                options = self.available_options.get(comp, [])
+            options_to_test[comp] = options
 
-        # Generiere alle Kombinationen
-        combinations = product(*options_to_test.values())
-        
-        # Limitiere die Anzahl wenn gewünscht
-        if max_combinations:
-            combinations = list(combinations)[:max_combinations]
-
-        # Erstelle Konfigurationen für jede Kombination
+        combinations = list(product(*options_to_test.values()))
         test_configs = []
+        
         for values in combinations:
             config = {}
             for comp, value in zip(components, values):
                 config[comp] = value
                 
-            # Füge notwendige Basis-Konfiguration hinzu
             if 'desktop' in config and config['desktop']:
                 config['mainUser'] = 'testuser'
                 
             test_configs.append(config)
 
-        # Filtere ungültige Kombinationen
-        test_configs = [
+        valid_configs = [
             config for config in test_configs 
             if self._is_valid_combination(config)
         ]
-        
-        return test_configs[:max_combinations] if max_combinations else test_configs  
+
+        if max_combinations:
+            valid_configs = valid_configs[:max_combinations]
+
+        return valid_configs
     
     def _is_valid_combination(self, config):
-        """Prüft ob eine Konfigurationskombination gültig ist"""
-        # Beispiel-Validierungen:
+        """Validates if a configuration combination is valid"""
         if config.get('systemType') == 'headless':
             if config.get('desktop') or config.get('displayManager'):
                 return False
@@ -271,23 +255,19 @@ class ConfigGenerator:
         return True
 
     def generate_config(self, **config):
-        """Generiert vollständige env.nix"""
+        """Generates complete env.nix configuration"""
         result = self.base_configs.copy()
         
-        # Profile-Defaults anwenden
         system_type = config.get('systemType')
         if system_type in self.profile_defaults:
             result.update(self.profile_defaults[system_type])
         
-        # Desktop-Defaults anwenden
         desktop = config.get('desktop')
         if desktop in self.desktop_defaults:
             result.update(self.desktop_defaults[desktop])
         
-        # Benutzer-Konfiguration überschreiben
         result.update(config)
         
-        # Overrides zusammenführen
         if 'overrides' in config:
             result.setdefault('overrides', {})
             result['overrides'].update(config['overrides'])
@@ -295,7 +275,7 @@ class ConfigGenerator:
         return self._format_config(result)
     
     def _format_value(self, value):
-        """Formatiert einen Wert für Nix"""
+        """Formats a value for Nix"""
         if isinstance(value, bool):
             return str(value).lower()
         elif isinstance(value, (list, tuple)):
@@ -308,7 +288,7 @@ class ConfigGenerator:
             return f'"{value}"'
     
     def _format_attrs(self, attrs, indent=2):
-        """Formatiert Attribute für Nix"""
+        """Formats attributes for Nix"""
         spaces = " " * indent
         lines = ["{"]
         
@@ -320,7 +300,7 @@ class ConfigGenerator:
         return "\n".join(lines)
     
     def _format_config(self, config):
-        """Formatiert die vollständige Konfiguration"""
+        """Formats the complete configuration"""
         return f'''
 # This file is generated for testing
 {self._format_attrs(config)}

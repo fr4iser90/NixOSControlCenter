@@ -1,0 +1,39 @@
+[tool.pytest.ini_options]
+# Testpfade und Dateikonventionen
+testpaths = ["tests/core/nixos_configuration_tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+# Deine bestehenden Optionen
+addopts = [
+    "-q",                    # Quiet mode
+    "--no-header",
+    "--tb=no",              # Keine Traceback-Ausgabe
+    "-s",                    # Keine Capture
+    "-p", "no:warnings",     # Keine Warnungen
+    "--import-mode=importlib"
+]
+
+# Deine bestehenden Marker
+markers = [
+    "random: mark test as a random configuration generator",
+    "hardware: Hardware related tests",
+    "profile: Profile related tests",
+    "base: Basic configuration tests"
+]
+
+# Zusätzliche nützliche Konfigurationen
+norecursedirs = [
+    "*.egg",
+    ".git",
+    ".env",
+    ".venv",
+    "dist",
+    "build"
+]
+
+# Umgebungsvariablen
+env = [
+    "NIXOS_CONFIG_DIR"
+]

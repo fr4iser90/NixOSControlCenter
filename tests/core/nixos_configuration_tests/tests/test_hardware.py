@@ -1,9 +1,9 @@
 import pytest
-from core.nixos_configuration_tests.handlers.environment_handler import EnvironmentHandler
-from core.nixos_configuration_tests.handlers.nixos_config_generator import ConfigGenerator
 
-def test_nvidia_config(test_environment, config_generator, run_test):
+@pytest.mark.hardware
+def test_nvidia_config(auto_environment, config_generator, run_test):
     """Tests NVIDIA GPU configuration"""
+    test_name = "nvidia_config"
     config = {
         'gpu': 'nvidia',
         'overrides': {
@@ -14,11 +14,12 @@ def test_nvidia_config(test_environment, config_generator, run_test):
     }
     
     config_content = config_generator.generate_config(**config)
-    test_environment.apply_test_config(config_content)
-    run_test(config_content)
+    run_test(config_content, test_name)
 
-def test_amd_config(test_environment, config_generator, run_test):
+@pytest.mark.hardware
+def test_amd_config(auto_environment, config_generator, run_test):
     """Tests AMD GPU configuration"""
+    test_name = "amd_config"
     config = {
         'gpu': 'amdgpu',
         'overrides': {
@@ -29,11 +30,12 @@ def test_amd_config(test_environment, config_generator, run_test):
     }
     
     config_content = config_generator.generate_config(**config)
-    test_environment.apply_test_config(config_content)
-    run_test(config_content)
+    run_test(config_content, test_name)
 
-def test_pipewire_config(test_environment, config_generator):
+@pytest.mark.hardware
+def test_pipewire_config(auto_environment, config_generator, run_test):
     """Test Pipewire audio configuration"""
+    test_name = "pipewire_config"
     config = {
         'systemType': 'gaming-workstation',
         'desktop': 'plasma',
@@ -54,13 +56,12 @@ def test_pipewire_config(test_environment, config_generator):
     }
     
     config_content = config_generator.generate_config(**config)
-    test_environment.apply_test_config(config_content)
-    
-    is_valid, error = test_environment.validate_config()
-    assert is_valid, f"Invalid Pipewire configuration: {error}"
+    run_test(config_content, test_name)
 
-def test_pulseaudio_config(test_environment, config_generator):
+@pytest.mark.hardware
+def test_pulseaudio_config(auto_environment, config_generator, run_test):
     """Test PulseAudio configuration"""
+    test_name = "pulseaudio_config"
     config = {
         'systemType': 'gaming-workstation',
         'desktop': 'plasma',
@@ -81,13 +82,12 @@ def test_pulseaudio_config(test_environment, config_generator):
     }
     
     config_content = config_generator.generate_config(**config)
-    test_environment.apply_test_config(config_content)
-    
-    is_valid, error = test_environment.validate_config()
-    assert is_valid, f"Invalid PulseAudio configuration: {error}"
+    run_test(config_content, test_name)
 
-def test_alsa_config(test_environment, config_generator):
+@pytest.mark.hardware
+def test_alsa_config(auto_environment, config_generator, run_test):
     """Test ALSA configuration"""
+    test_name = "alsa_config"
     config = {
         'systemType': 'headless',
         'desktop': None,
@@ -107,19 +107,18 @@ def test_alsa_config(test_environment, config_generator):
     }
     
     config_content = config_generator.generate_config(**config)
-    test_environment.apply_test_config(config_content)
-    
-    is_valid, error = test_environment.validate_config()
-    assert is_valid, f"Invalid ALSA configuration: {error}"
+    run_test(config_content, test_name)
 
-# Optional: Platzhalter für zukünftige Audio-Tests
 @pytest.mark.skip(reason="Not implemented yet")
-def test_jack_config(test_environment, config_generator):
+@pytest.mark.hardware
+def test_jack_config(auto_environment, config_generator, run_test):
     """Test JACK audio configuration (placeholder)"""
     pass
 
-def test_peripheral_config(test_environment, config_generator):
+@pytest.mark.hardware
+def test_peripheral_config(auto_environment, config_generator, run_test):
     """Tests peripheral device configurations"""
+    test_name = "peripheral_config"
     config = {
         'overrides': {
             'enableBluetooth': True,
@@ -130,7 +129,4 @@ def test_peripheral_config(test_environment, config_generator):
     }
     
     config_content = config_generator.generate_config(**config)
-    test_environment.apply_test_config(config_content)
-    
-    is_valid, error = test_environment.validate_config()
-    assert is_valid, f"Invalid peripheral configuration: {error}"
+    run_test(config_content, test_name)

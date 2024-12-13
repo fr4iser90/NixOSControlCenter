@@ -7,7 +7,7 @@ This package contains the core handlers for testing NixOS configurations.
 Core Components:
 ---------------
 
-NixConfigBuilder:
+NixOSBuildValidator:
     Handles NixOS configuration build operations.
     
     This class provides functionality to build and test NixOS configurations
@@ -19,7 +19,7 @@ NixConfigBuilder:
             Builds a NixOS configuration using nix-build.
             Returns success status and error message if any.
 
-ConfigValidator:
+NixOSConfigValidator:
     Validates NixOS configurations for correctness.
     
     Provides validation functionality for NixOS configurations by evaluating
@@ -31,7 +31,7 @@ ConfigValidator:
             Validates the NixOS configuration using nix-eval.
             Returns validation status and error message if any.
 
-EnvironmentHandler:
+NixOSTestEnvironment:
     Manages isolated test environments for NixOS configurations.
     
     Creates and manages temporary test environments for safely testing
@@ -39,7 +39,7 @@ EnvironmentHandler:
     and cleanup operations.
     
     Methods:
-        setup_test_env() -> Path:
+        setup_test_environment() -> Path:
             Creates a new isolated test environment.
             Returns path to the created environment.
             
@@ -55,7 +55,7 @@ EnvironmentHandler:
         cleanup():
             Removes the test environment and all its contents.
 
-ConfigGenerator:
+NixOSEnvGenerator:
     Generates NixOS configurations based on provided parameters.
     
     Creates complete NixOS configurations from a set of parameters,
@@ -81,14 +81,14 @@ ConfigGenerator:
             - audio: Audio system configuration
 """
 
-from .handlers.nixos_config_builder import NixConfigBuilder
-from .handlers.nixos_config_validator import ConfigValidator
-from .handlers.environment_handler import EnvironmentHandler
-from .handlers.nixos_config_generator import ConfigGenerator
+from .handlers.nixos_config_builder import NixOSBuildValidator
+from .handlers.nixos_config_validator import NixOSConfigValidator
+from .handlers.environment_handler import NixOSTestEnvironment
+from .handlers.nixos_config_generator import NixOSEnvGenerator
 
 __all__ = [
-    'NixConfigBuilder',
-    'ConfigValidator',
-    'EnvironmentHandler',
-    'ConfigGenerator'
+    'NixOSBuildValidator',       # Executes build tests for NixOS configurations
+    'NixOSConfigValidator',      # Validates NixOS configurations for correctness
+    'NixOSTestEnvironment',      # Creates and manages isolated test environments
+    'NixOSEnvGenerator'          # Generates test environment configurations
 ]

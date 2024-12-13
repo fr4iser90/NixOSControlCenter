@@ -1,9 +1,9 @@
 import pytest
 
-
 @pytest.mark.profile
-def test_gaming_profile(test_environment, config_generator, run_test):
+def test_gaming_profile(auto_environment, config_generator, run_test):
     """Tests gaming profile configuration"""
+    test_name = "gaming_profile"
     config = {
         'systemType': 'gaming',
         'desktop': 'plasma',
@@ -17,12 +17,12 @@ def test_gaming_profile(test_environment, config_generator, run_test):
     }
     
     config_content = config_generator.generate_config(**config)
-    test_environment.apply_test_config(config_content)
-    run_test(config_content)
+    run_test(config_content, test_name)
 
 @pytest.mark.profile
-def test_workstation_profile(test_environment, config_generator):
+def test_workstation_profile(auto_environment, config_generator, run_test):  # run_test hinzugefügt
     """Test des Workstation-Profils"""
+    test_name = "workstation_profile"
     config = {
         'systemType': 'gaming-workstation',
         'desktop': 'gnome',
@@ -45,14 +45,12 @@ def test_workstation_profile(test_environment, config_generator):
     }
 
     config_content = config_generator.generate_config(**config)
-    test_environment.apply_test_config(config_content)
-
-    is_valid, error = test_environment.validate_config()
-    assert is_valid, f"Workstation-Profil ungültig: {error}"
+    run_test(config_content, test_name)
 
 @pytest.mark.profile
-def test_headless_profile(test_environment, config_generator):
+def test_headless_profile(auto_environment, config_generator, run_test):  # run_test hinzugefügt
     """Test des Headless-Profils"""
+    test_name = "headless_profile"
     config = {
         'systemType': 'headless',
         'desktop': '',
@@ -66,7 +64,4 @@ def test_headless_profile(test_environment, config_generator):
     }
     
     config_content = config_generator.generate_config(**config)
-    test_environment.apply_test_config(config_content)
-    
-    is_valid, error = test_environment.validate_config()
-    assert is_valid, f"Headless-Profil ungültig: {error}"
+    run_test(config_content, test_name)
