@@ -15,9 +15,9 @@ class NixOSTestEnvironment:
     
     def __init__(self, test_root: Path, test_strategy: str = "validate-only"):
         """Initialize test environment with root directory"""
-        self.nixos_root = Path(os.environ.get('NIXOS_CONFIG_DIR'))
+        self.nixos_root = Path(os.environ.get('PYTHON_NIXOS_CONFIG_DIR'))
         if not self.nixos_root or not self.nixos_root.exists():
-            raise ValueError("NIXOS_CONFIG_DIR environment variable not set or invalid")
+            raise ValueError("PYTHON_NIXOS_CONFIG_DIR environment variable not set or invalid")
             
         self.test_root = test_root
         self.test_strategy = test_strategy

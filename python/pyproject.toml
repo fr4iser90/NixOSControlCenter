@@ -1,6 +1,6 @@
 [tool.pytest.ini_options]
 # Testpfade und Dateikonventionen
-testpaths = ["tests/core/nixos_configuration_tests"]
+testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -17,7 +17,15 @@ addopts = [
 
 # Deine bestehenden Marker
 markers = [
-    "random: mark test as a random configuration generator",
+    # Testkategorien nach Bereich
+    "backend: Backend-related tests",
+    "frontend: Frontend-related tests",
+    "core: Core functionality tests",
+    "integration: Integration tests",
+    
+    # Spezifische Testkategorien für NixOS-Konfigurationen
+    "nixos: NixOS configuration related tests",
+    "random: Random configuration generator tests",
     "hardware: Hardware related tests",
     "profile: Profile related tests",
     "base: Basic configuration tests"
@@ -33,7 +41,11 @@ norecursedirs = [
     "build"
 ]
 
+
 # Umgebungsvariablen
 env = [
-    "NIXOS_CONFIG_DIR"
+    "PYTHON_ROOT",
+    "PYTHON_NIXOS_CONFIG_DIR",
+    "PYTHON_TEST_TMP_DIR",
+    "PYTHON_TEST_LOG_DIR",
 ]

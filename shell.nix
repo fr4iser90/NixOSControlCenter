@@ -42,64 +42,93 @@ pkgs.mkShell {
   shellHook = ''
     echo "Setting up the NixOsControlCenter development environment..."
 
-    # Setze Projekt-Verzeichnisse
+    # Projekt-Struktur
     export PROJECT_ROOT=$(pwd)
-    export NIXOS_CONFIG_DIR=$PROJECT_ROOT/src/nixos
-    export BACKEND_DIR=$PROJECT_ROOT/src/backend
-    export FRONTEND_DIR=$PROJECT_ROOT/src/frontend
-    export CORE_DIR=$PROJECT_ROOT/src/core
-    export PROJECT_TMP_DIR=$PROJECT_ROOT/.tmp
-    export PY_TEST_DIR=$PROJECT_ROOT/tests
-    export PY_TEST_TMP_DIR=$PROJECT_ROOT/tests/.tmp
- 
-    export PYTHONPATH=$(pwd)/src:$(pwd)/tests:$PYTHONPATH
+    export PYTHON_ROOT=$PROJECT_ROOT/python
+    export NIX_ROOT=$PROJECT_ROOT/nix
+    export SHARED_ROOT=$PROJECT_ROOT/shared
+
+    # Test-Environment 
+    export PYTHON_NIXOS_CONFIG_DIR=$PYTHON_ROOT/src/nixos
+    # Temporäre Verzeichnisse
+    export PROJECT_TMP_DIR=$PROJECT_ROOT/tmp
+    export PYTHON_TEST_TMP_DIR=$PYTHON_ROOT/tests/tmp
+    export PYTHON_TEST_LOG_DIR=$PYTHON_ROOT/tests/log
+
+    # Python-spezifische Pfade
+    export PYTHONPATH=$PYTHON_ROOT/src:$PYTHON_ROOT/tests:$PYTHONPATH
+    
+    # Nix-spezifische Pfade
+    export NIX_PATH=$NIX_ROOT:$NIX_PATH
+
+    # Shared Resources
+    export ASSETS_DIR=$SHARED_ROOT/assets
+    export CONSTANTS_DIR=$SHARED_ROOT/constants
+
     echo "PYTHONPATH includes:"
-    echo "  - Application: $(pwd)/src"
-    echo "  - Tests: $(pwd)/tests"
+    echo "  - Application: $PYTHON_ROOT/src"
+    echo "  - Tests: $PYTHON_ROOT/tests"
     echo "  - Existing: $PYTHONPATH"
 
-
     echo "Project directories set:"
-    echo "  - NIXOS_CONFIG_DIR: $NIXOS_CONFIG_DIR"
-    echo "  - BACKEND_DIR: $BACKEND_DIR"
-    echo "  - FRONTEND_DIR: $FRONTEND_DIR"
-    echo "  - CORE_DIR: $CORE_DIR"
+    echo "  - PYTHON_NIXOS_CONFIG_DIR: $PYTHON_NIXOS_CONFIG_DIR"
+    echo "  - NIX_ROOT: $NIX_ROOT"
+    echo "  - PYTHON_ROOT: $PYTHON_ROOT"
+    echo "  - SHARED_ROOT: $SHARED_ROOT"
+    echo "  - PROJECT_TMP_DIR: $PROJECT_TMP_DIR"
+    echo "  - PYTHON_TEST_TMP_DIR: $PYTHON_TEST_TMP_DIR"
 
-    # Praktische Navigations-Aliase
+    # Aktualisierte Navigations-Aliase
     alias cdp="cd $PROJECT_ROOT"
-    alias cdsrc="cd $PROJECT_ROOT/src"
-    alias cdnix="cd $NIXOS_CONFIG_DIR"
-    alias cdback="cd $BACKEND_DIR"
-    alias cdfront="cd $FRONTEND_DIR"
-    alias cdcore="cd $CORE_DIR"
-    alias cdtest="cd $PROJECT_ROOT/tests"
+    alias cdpy="cd $PYTHON_ROOT"
+    alias cdnix="cd $NIX_ROOT"
+    alias cdshared="cd $SHARED_ROOT"
+    alias cdsrc="cd $PYTHON_ROOT/src"
+    alias cdtest="cd $PYTHON_ROOT/tests"
+    
+    # Python Alias
+    alias py="python3"
+    
+    # Aktualisierte Run-Aliase
+    alias run="python3 $PYTHON_ROOT/main.py"
+    alias rundebug="DEBUG_MODE=1 python3 $PYTHON_ROOT/main.py"
+    
+    # Test-Funktionen für Random Tests
+    function ptr() {
+        (cd $PYTHON_ROOT && pytest tests/core/nixos_configuration_tests/tests/test_random.py -m random --random-tests=$1 --test-strategy=full && cd -)
+    }
+
+    function ptrv() {
+        (cd $PYTHON_ROOT && pytest tests/core/nixos_configuration_tests/tests/test_random.py -m random --random-tests=$1 --test-strategy=validate-only && cd -)
+    }
+
+    # Normale Test-Aliase
+    alias pt='(cd $PYTHON_ROOT && pytest && cd -)'
+    alias ptf='(cd $PYTHON_ROOT && pytest --test-strategy=full && cd -)'
+    alias ptv='(cd $PYTHON_ROOT && pytest --test-strategy=validate-only && cd -)'
+    alias ptvv="(cd $PYTHON_ROOT && pytest -vv && cd -)"
+    alias pt-basic="(cd $PYTHON_ROOT && pytest tests/core/nixos_configuration_tests/tests/test_basic.py && cd -)"
+    alias pt-profiles="(cd $PYTHON_ROOT && pytest tests/core/nixos_configuration_tests/tests/test_profiles.py && cd -)"
+    alias pt-hardware="(cd $PYTHON_ROOT && pytest tests/core/nixos_configuration_tests/tests/test_hardware.py && cd -)"
+    alias pt-failed="(cd $PYTHON_ROOT && pytest --lf && cd -)"
+    alias pt-first="(cd $PYTHON_ROOT && pytest --ff && cd -)"
+    alias pt-log="(cd $PYTHON_ROOT && pytest -s && cd -)"
+    alias pt-random="(cd $PYTHON_ROOT && pytest -m random && cd -)"
+
+    # Entwicklungs-Tools-Aliase anpassen
+    alias fmt="cd $PYTHON_ROOT && black ."
+    alias lint="cd $PYTHON_ROOT && flake8 ."
+    alias typecheck="cd $PYTHON_ROOT && mypy ."
+    alias doc="cd $PYTHON_ROOT && pdoc --html --output-dir ../docs ."
 
     # Git Credential Manager Konfiguration
     git config --global credential.helper manager
     export GCM_CREDENTIAL_STORE=secretservice
     
-    # Praktische Aliase
-    alias py="python3"
-    alias run="python3 main.py"
-    alias rundebug="DEBUG_MODE=1 python3 main.py"
-    alias fmt="black ."
-    alias lint="flake8 ."
-    alias typecheck="mypy ."
-    alias doc="pdoc --html --output-dir docs ."
+    # System Monitor Alias
     alias sysmon="python3 -m nixos_control_center.system_monitor"
     
-    # Test-Aliase
-    alias pt='pytest'
-    alias ptf='pytest --test-strategy=full'  # Full strategy
-    alias ptv='pytest --test-strategy=validate-only'  # Validate only
-    alias ptvv="pytest -vv"
-    alias pt-basic="pytest tests/core/config/test_basic.py"
-    alias pt-profiles="pytest tests/core/config/test_profiles.py"
-    alias pt-hardware="pytest tests/core/config/test_hardware.py"
-    alias pt-failed="pytest --lf"
-    alias pt-first="pytest --ff"
-    alias pt-log="pytest -s"
-
+    # Debug-Info ausgeben
     echo "Aliases set for development:"
     echo "  py   -> Python interpreter"
     echo "  run  -> Start main application"
@@ -112,18 +141,18 @@ pkgs.mkShell {
     
     echo "Test aliases set:"
     echo "  pt       -> Run all tests"
-    echo "  ptc      -> Run core tests"
     echo "  ptf      -> Run tests with full strategy(Validate + Build)"
     echo "  ptv      -> Run tests explizit validate-only"
     echo "  ptvv     -> Run tests very verbose"
     echo "  pt-basic -> Run basic tests"
     echo "  pt-profiles -> Run profile tests"
-    echo "  pt-hw    -> Run hardware tests"
-    echo "  pt-hardware -> Run hardware-marked tests"
-    echo "  pt-profile  -> Run profile-marked tests"
+    echo "  pt-hardware -> Run hardware tests"
     echo "  pt-failed   -> Run failed tests"
     echo "  pt-first    -> Run failed tests first"
     echo "  pt-log      -> Run tests with logs"
+    echo "  pt-random   -> Run marked random tests"
+    echo "  ptr N     -> Run N random tests with full strategy (example: ptr 50)"
+    echo "  ptrv N    -> Run N random tests validate-only (example: ptrv 10)"
 
     # Setze zusätzliche Umgebungsvariablen für sudo
     export NIXPKGS_ALLOW_UNFREE=1

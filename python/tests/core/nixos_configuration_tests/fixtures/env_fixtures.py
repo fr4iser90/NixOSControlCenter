@@ -10,25 +10,25 @@ from pathlib import Path
 from ..handlers.environment_handler import NixOSTestEnvironment
 
 @pytest.fixture(scope="session")
-def test_environment(temp_dir, request):
+def test_environment(test_tmp_dir, request):
     """
     Sets up the test environment with NixOS configuration directory validation.
     
     Validates:
-    - NIXOS_CONFIG_DIR environment variable
+    - PYTHON_NIXOS_CONFIG_DIR environment variable
     - Required configuration files
     - Module directory structure
     """
     # Get test strategy from command line
     test_strategy = request.config.getoption("--test-strategy")
     
-    nixos_config_dir = os.environ.get('NIXOS_CONFIG_DIR')
+    nixos_config_dir = os.environ.get('PYTHON_NIXOS_CONFIG_DIR')
     if not nixos_config_dir:
-        raise RuntimeError("NIXOS_CONFIG_DIR environment variable is not set!")
+        raise RuntimeError("PYTHON_NIXOS_CONFIG_DIR environment variable is not set!")
         
     nixos_config_path = Path(nixos_config_dir)
     if not nixos_config_path.exists():
-        raise RuntimeError(f"NIXOS_CONFIG_DIR path does not exist: {nixos_config_dir}")
+        raise RuntimeError(f"PYTHON_NIXOS_CONFIG_DIR path does not exist: {nixos_config_dir}")
     
     # Verify required files exist
     required_files = ['flake.nix', 'hardware-configuration.nix']
@@ -42,7 +42,7 @@ def test_environment(temp_dir, request):
         raise RuntimeError(f"Modules directory not found at {modules_path}")    
     
     # Pass test_strategy to NixOSTestEnvironment
-    return NixOSTestEnvironment(temp_dir, test_strategy=test_strategy)
+    return NixOSTestEnvironment(test_tmp_dir, test_strategy=test_strategy)
 
 @pytest.fixture
 def auto_environment(test_environment, request):
