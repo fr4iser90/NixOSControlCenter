@@ -56,7 +56,7 @@ def auto_environment(test_environment, request):
         env = test_environment.setup_test_environment()
         yield test_environment
     finally:
-        time.sleep(10.5)
+        time.sleep(0.5)
         test_environment.cleanup()
 
 @pytest.fixture(autouse=True)

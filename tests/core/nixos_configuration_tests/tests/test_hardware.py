@@ -2,19 +2,20 @@ import pytest
 
 @pytest.mark.hardware
 def test_nvidia_config(auto_environment, config_generator, run_test):
-    """Tests NVIDIA GPU configuration"""
-    test_name = "nvidia_config"
+    """Tests NVIDIA GPU configuration with all features"""
     config = {
         'gpu': 'nvidia',
+        'systemType': 'workstation',  # Typically needed for CUDA
         'overrides': {
             'enableNvidiaDrivers': True,
             'enableCuda': True,
-            'enableVulkan': True
+            'enableVulkan': True,
+            'enableOpenGL': True,
+            'enableComputeCapabilities': True
         }
     }
     
-    config_content = config_generator.generate_config(**config)
-    run_test(config_content, test_name)
+    run_test(config_generator.generate_config(**config), "nvidia_full_features")
 
 @pytest.mark.hardware
 def test_amd_config(auto_environment, config_generator, run_test):

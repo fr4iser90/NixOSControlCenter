@@ -3,21 +3,20 @@ import pytest
 @pytest.mark.profile
 def test_gaming_profile(auto_environment, config_generator, run_test):
     """Tests gaming profile configuration"""
-    test_name = "gaming_profile"
     config = {
         'systemType': 'gaming',
         'desktop': 'plasma',
         'gpu': 'nvidia',
+        'audio': 'pipewire',
         'overrides': {
             'enableSteam': True,
             'enableGameMode': True,
             'enableDiscord': True,
-            'enableFirewall': False
+            'enableVulkan': True
         }
     }
     
-    config_content = config_generator.generate_config(**config)
-    run_test(config_content, test_name)
+    run_test(config_generator.generate_config(**config), "gaming_profile")
 
 @pytest.mark.profile
 def test_workstation_profile(auto_environment, config_generator, run_test):  # run_test hinzugefügt
