@@ -48,6 +48,9 @@ pkgs.mkShell {
     export BACKEND_DIR=$PROJECT_ROOT/src/backend
     export FRONTEND_DIR=$PROJECT_ROOT/src/frontend
     export CORE_DIR=$PROJECT_ROOT/src/core
+    export PROJECT_TMP_DIR=$PROJECT_ROOT/.tmp
+    export PY_TEST_DIR=$PROJECT_ROOT/tests
+    export PY_TEST_TMP_DIR=$PROJECT_ROOT/tests/.tmp
  
     export PYTHONPATH=$(pwd)/src:$(pwd)/tests:$PYTHONPATH
     echo "PYTHONPATH includes:"

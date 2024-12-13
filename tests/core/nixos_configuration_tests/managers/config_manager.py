@@ -3,6 +3,7 @@ from typing import Tuple
 from ..handlers.nixos_config_validator import NixOSConfigValidator
 from ..handlers.nixos_config_builder import NixOSBuildValidator
 from ..handlers.summary_handler import NixConfigErrorHandler, SummaryHandler
+from .error_manager import ErrorManager
 
 class ConfigManager:
     """Orchestriert NixOS Konfigurationstests"""
@@ -10,13 +11,17 @@ class ConfigManager:
     def __init__(self, test_env_path: Path):
         self.test_env_path = test_env_path
         self.current_test = None
+        self.error_manager = ErrorManager()
         self.validator = NixOSConfigValidator(test_env_path)
         self.builder = NixOSBuildValidator(test_env_path)
     
     def set_current_test(self, test_name: str) -> None:
         """Setzt den Namen des aktuellen Tests"""
         self.current_test = test_name
-        # Setze auch für Validator und Builder den aktuellen Test
+        # Get error handler from manager
+        self.error_handler = self.error_manager.get_handler(test_name)
+        # Pass it to builder
+        self.builder.error_handler = self.error_handler  # Direkte Zuweisung
         self.validator.current_test = test_name
         self.builder.current_test = test_name
         
@@ -27,6 +32,14 @@ class ConfigManager:
             
         env_file = self.test_env_path / "env.nix"
         env_file.write_text(config_content)
+        
+        # Store configs in error handler
+        if self.current_test and hasattr(self, 'error_handler'):
+            self.error_handler.store_configs(
+                test_name=self.current_test,
+                python_config=self.validator._current_config if hasattr(self.validator, '_current_config') else {},
+                nix_config=config_content
+            )
     
     def validate_config(self) -> Tuple[bool, str]:
         """Delegiert Validierung an den Validator"""

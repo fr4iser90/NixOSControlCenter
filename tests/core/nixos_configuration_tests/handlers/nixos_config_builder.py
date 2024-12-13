@@ -1,10 +1,12 @@
 from pathlib import Path
 import subprocess
-from typing import Tuple
+from typing import Tuple, Union
 import os
 import logging
 from rich.console import Console
 from rich.panel import Panel
+from ..handlers.summary_handler import NixConfigErrorHandler, SummaryHandler
+import re
 
 # Configure logging and console
 logger = logging.getLogger(__name__)
@@ -18,6 +20,7 @@ class NixOSBuildValidator:
         self.nix_cmd = "nix"
         self.env_path = env_path
         self.current_test = None
+        self.error_handler = None
     
     def set_current_test(self, test_name: str):
         self.current_test = test_name
@@ -33,14 +36,12 @@ class NixOSBuildValidator:
             original_dir = os.getcwd()
             os.chdir(str(self.env_path))
             
-            # Show build start
             console.print(Panel(
                 f"[bold yellow]Building configuration for test:[/bold yellow] {self.current_test}\n"
                 f"[cyan]Environment:[/cyan] {self.env_path}",
                 title="Build Start"
             ))
             
-            # Führe Build mit sichtbarer Ausgabe durch
             result = subprocess.run(
                 [
                     self.nix_cmd, "build",
@@ -49,11 +50,9 @@ class NixOSBuildValidator:
                     "--dry-run",
                     "--impure",
                     "--accept-flake-config",
-                    "--show-trace",
                 ],
-                stdout=subprocess.PIPE, 
-                capture_output=False,  # Zeige Ausgabe direkt an
                 text=True,
+                capture_output=True,
                 timeout=60,
                 env={
                     **os.environ,
@@ -61,7 +60,6 @@ class NixOSBuildValidator:
                 }
             )
             
-            # Show build result
             if result.returncode == 0:
                 console.print(Panel(
                     "[bold green]✓ Build validation successful[/bold green]",
@@ -69,23 +67,27 @@ class NixOSBuildValidator:
                 ))
                 return True, ""
             else:
-                console.print(Panel(
-                    "[bold red]✗ Build validation failed[/bold red]",
-                    title=f"Build Failed - {self.current_test}"
-                ))
-                return False, "Build failed"
-            
-        except subprocess.TimeoutExpired:
-            error_msg = f"Build timeout after 60 seconds"
-            console.print(Panel(f"[bold red]✗ {error_msg}[/bold red]", title="Build Error"))
-            return False, error_msg
-        except subprocess.CalledProcessError as e:
-            error_msg = f"Build failed with exit code {e.returncode}"
-            console.print(Panel(f"[bold red]✗ {error_msg}[/bold red]", title="Build Error"))
-            return False, error_msg
+                error_output = result.stderr or result.stdout
+                
+                if self.error_handler:
+                    self.error_handler.add_error(error_output)
+                    error_summary = self.error_handler.get_summary(self.current_test)
+                    
+                    console.print(Panel(
+                        f"[bold red]✗ Build validation failed[/bold red]\n"
+                        f"{error_summary}",
+                        title=f"Build Failed - {self.current_test}"
+                    ))
+                
+                return False, error_output
+                
+        except subprocess.TimeoutExpired as e:
+            if self.error_handler:
+                self.error_handler.add_error(str(e))
+            return False, str(e)
         except Exception as e:
-            error_msg = f"Build error: {str(e)}"
-            console.print(Panel(f"[bold red]✗ {error_msg}[/bold red]", title="Build Error"))
-            return False, error_msg
+            if self.error_handler:
+                self.error_handler.add_error(str(e))
+            return False, str(e)
         finally:
             os.chdir(original_dir)
