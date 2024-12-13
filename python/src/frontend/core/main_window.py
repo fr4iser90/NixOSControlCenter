@@ -5,6 +5,8 @@ from .sidebar import Sidebar
 from .content_manager import ContentManager
 from src.frontend.views.dashboard_view import DashboardView
 from src.frontend.views.generations_view import GenerationsView
+from src.frontend.views.configuration_view import ConfigurationView  # Neue Zeile
+
 
 class MainWindow(Gtk.ApplicationWindow):
     def __init__(self, application):
@@ -18,6 +20,7 @@ class MainWindow(Gtk.ApplicationWindow):
         view_map = {
             "dashboard": DashboardView,
             "generation": GenerationsView,
+            "configuration": ConfigurationView,
             # Add other views here
         }
 

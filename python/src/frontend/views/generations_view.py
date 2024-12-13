@@ -1,387 +1,260 @@
-## Path: src/frontend/views/generations_view.py
-
-from gi.repository import Gtk
+from gi.repository import Gtk, GLib
 import logging
 from src.backend.services.generation_manager import GenerationManager
+from src.frontend.core.theme_manager import ThemeManager
 from datetime import datetime
 
-# Frontend logger configuration
 logger = logging.getLogger(__name__)
 
 class GenerationsView(Gtk.Box):
-    def __init__(self, root, debug_mode: bool = False):
+    def __init__(self, root):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self.root = root
+        self.root.set_title("NixOS Control Center - System Generations")
+        self.generation_manager = GenerationManager()
         
-        # Set logging level based on debug mode
-        if debug_mode:
-            logger.setLevel(logging.DEBUG)
-        else:
-            logger.setLevel(logging.INFO)
-        
-        logger.debug("Initializing GenerationsView")
-        
-        # Create a section header
-        header = Gtk.Label(label="System Generations")
-        header.set_margin_bottom(10)
-        header.set_margin_top(10)
-        header.set_justify(Gtk.Justification.CENTER)
+        # Header
+        header = Gtk.Label(label="NixOS System Generations")
+        header.get_style_context().add_class("header")
         self.append(header)
-
-        # Create a list box to display generations
-        self.generations_list = Gtk.ListBox()
-        self.append(self.generations_list)
-
-        # Placeholder text for now
-        self.no_generations_label = Gtk.Label(label="No generations available")
-        self.generations_list.append(self.no_generations_label)
-
-        # Initialize the generation manager
-        self.generation_manager = GenerationManager(debug_mode)
-
-        # Fetch actual generation data from the backend
-        self.fetch_generations()
-
-    def fetch_generations(self):
-        """Fetch actual system generations from the backend."""
-        generations = self.generation_manager.get_generations()
         
-        # Clear existing list
-        while self.generations_list.get_first_child():
-            self.generations_list.remove(self.generations_list.get_first_child())
+        # Toolbar mit Aktionen
+        self.create_toolbar()
         
-        if generations:
-            # System Generations Section
-            system_header = Gtk.Label(label="NixOS System Generations")
-            system_header.set_margin_top(10)
-            system_header.set_margin_bottom(5)
-            system_header.add_css_class("heading")
-            self.generations_list.append(system_header)
-
-            for gen in generations:
-                if gen['type'] == "system":
-                    self._add_system_generation(gen)
-
-            # Add Flake Generations section
-            flake_header = Gtk.Label(label="Flake Generations")
-            flake_header.set_margin_top(10)
-            flake_header.set_margin_bottom(5)
-            flake_header.add_css_class("heading")
-            self.generations_list.append(flake_header)
-
-            # Add flake generations
-            for gen in generations:
-                if gen['type'] == "flake":
-                    self._add_flake_generation(gen)
-
-            # Add Legacy Generations section
-            legacy_header = Gtk.Label(label="Legacy Generations")
-            legacy_header.set_margin_top(20)
-            legacy_header.set_margin_bottom(5)
-            legacy_header.add_css_class("heading")
-            self.generations_list.append(legacy_header)
-
-            # Add legacy generations
-            for gen in generations:
-                if gen['type'] == "legacy":
-                    self._add_legacy_generation(gen)
-        else:
-            self.generations_list.append(self.no_generations_label)
-
-    def _add_flake_generation(self, generation):
-        """Add a flake generation entry with proper formatting."""
-        gen_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-        gen_container.set_margin_start(10)
-        gen_container.set_margin_end(10)
-        gen_container.set_margin_top(5)
-
-        # Name and path info
-        info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        name_label = Gtk.Label(label=f"Name: {generation['name']}")
-        name_label.set_xalign(0)
-        path_label = Gtk.Label(label=f"Path: {generation['store_path']}")
-        path_label.set_xalign(0)
-        
-        info_box.append(name_label)
-        info_box.append(path_label)
-        
-        # Action buttons
-        button_box = self._create_action_buttons(generation)
-        
-        # Add everything to container
-        gen_container.append(info_box)
-        gen_container.append(button_box)
-        
-        self.generations_list.append(gen_container)
-
-    def _add_legacy_generation(self, generation):
-        """Add a legacy generation entry with proper formatting."""
-        gen_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        gen_box.set_margin_start(10)
-        gen_box.set_margin_end(10)
-        gen_box.set_margin_top(5)
-        
-        # Legacy info
-        info_label = Gtk.Label(
-            label=f"Generation #{generation['number']} - {generation['date']} {generation['status']}"
+        # ScrolledWindow für die Liste
+        scrolled_window = Gtk.ScrolledWindow()
+        scrolled_window.set_vexpand(True)
+        scrolled_window.set_policy(
+            Gtk.PolicyType.NEVER,
+            Gtk.PolicyType.AUTOMATIC
         )
-        info_label.set_xalign(0)
-        gen_box.append(info_label)
         
-        # Action buttons
-        button_box = self._create_action_buttons(generation)
-        gen_box.append(button_box)
+        # Container für die Generationen-Liste
+        self.generations_list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.generations_list.get_style_context().add_class("list-container")
         
-        self.generations_list.append(gen_box)
+        scrolled_window.set_child(self.generations_list)
+        self.append(scrolled_window)
+        
+        # Status-Bar
+        self.status_bar = Gtk.Label()
+        self.status_bar.get_style_context().add_class("status-bar")
+        self.append(self.status_bar)
+        
+        # Generationen laden
+        self.load_generations()
+        
+        # Auto-Refresh alle 30 Sekunden
+        GLib.timeout_add_seconds(30, self.refresh_generations)
+
+    def create_toolbar(self):
+        """Erstellt die Toolbar mit Aktionen"""
+        toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        toolbar.get_style_context().add_class("toolbar")
+        
+        refresh_btn = Gtk.Button(label="Refresh")
+        refresh_btn.connect("clicked", lambda _: self.refresh_generations())
+        
+        cleanup_btn = Gtk.Button(label="Cleanup Old")
+        cleanup_btn.connect("clicked", self.on_cleanup_clicked)
+        
+        toolbar.append(refresh_btn)
+        toolbar.append(cleanup_btn)
+        
+        self.append(toolbar)
+
+    def load_generations(self):
+        """Lädt und zeigt alle System-Generationen"""
+        try:
+            # Bestehende Einträge entfernen
+            while self.generations_list.get_first_child():
+                self.generations_list.remove(self.generations_list.get_first_child())
+            
+            generations = self.generation_manager.get_generations()
+            
+            for generation in generations:
+                self._add_system_generation(generation)
+            
+            self.update_status(f"Loaded {len(generations)} generations")
+            
+        except Exception as e:
+            logger.error(f"Error loading generations: {e}")
+            self.show_error(f"Failed to load generations: {str(e)}")
+
+    def refresh_generations(self):
+        """Aktualisiert die Generationen-Liste"""
+        self.load_generations()
+        return True  # Wichtig für GLib.timeout_add_seconds
+
+    def on_cleanup_clicked(self, button):
+        """Behandelt Klicks auf den Cleanup-Button"""
+        dialog = Gtk.MessageDialog(
+            transient_for=self.root,
+            message_type=Gtk.MessageType.WARNING,
+            buttons=Gtk.ButtonsType.YES_NO,
+            text="Clean up old generations?",
+            secondary_text="This will remove all non-current, non-locked generations."
+        )
+        
+        response = dialog.run()
+        dialog.destroy()
+        
+        if response == Gtk.ResponseType.YES:
+            try:
+                removed = self.generation_manager.cleanup_old_generations()
+                self.update_status(f"Removed {removed} old generations")
+                self.load_generations()
+            except Exception as e:
+                self.show_error(f"Cleanup failed: {str(e)}")
 
     def _add_system_generation(self, generation):
-        """Add a system generation entry with proper formatting."""
-        gen_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        gen_box.set_margin_start(15)
-        gen_box.set_margin_end(15)
-        gen_box.set_margin_top(5)
-        gen_box.add_css_class("generation-container")
-
-        # Generation info
-        info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        """Add a system generation entry with proper formatting"""
+        list_item = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        list_item.get_style_context().add_class("list-item")
         
-        # Vereinfachte Hauptinformationen: #NR TITLE BuildDate
-        main_info = f"#{generation['number']} {generation.get('title', 'NixOS')} - {generation.get('date', '')}"
+        # Info Box mit fixer Breite
+        info_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        info_box.set_size_request(600, -1)  # Fixe Breite für Info-Box
         
-        gen_label = Gtk.Label(label=main_info)
-        gen_label.set_xalign(0)
-        
+        # Generation Label
+        gen_label = Gtk.Label(
+            label=f"#{generation['number']} {generation.get('title', 'GamingSetup')} | {generation.get('date', '')} | Kernel: {generation.get('kernel', '')}"
+        )
         if generation.get('status') == 'current':
-            gen_label.add_css_class("current-generation")
+            gen_label.set_text(gen_label.get_text() + " (current)")
         
-        # Ausführliche Informationen im Tooltip
-        tooltip_parts = [
-            f"NixOS Version: {generation.get('nixos_version', 'Unknown')}",
-            f"Kernel: {generation.get('kernel', 'Unknown')}",
-            f"Build Date: {generation.get('date', 'Unknown')}"
-        ]
-        
-        if 'boot_options' in generation:
-            tooltip_parts.append(f"Boot Options: {generation['boot_options']}")
-        
-        gen_label.set_tooltip_text('\n'.join(tooltip_parts))
+        gen_label.set_xalign(0)
+        gen_label.get_style_context().add_class("generation-label")
         
         info_box.append(gen_label)
-        gen_box.append(info_box)
         
-        # Action buttons
-        button_box = self._create_action_buttons(generation)
-        gen_box.append(button_box)
+        # Button-Gruppe
+        button_group = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        button_group.get_style_context().add_class("button-group")
+        button_group.set_spacing(8)  # Konsistenter Abstand zwischen Buttons
         
-        self.generations_list.append(gen_box)
-
-    def _create_action_buttons(self, generation):
-        """Create a consistent set of action buttons."""
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        buttons = [
+            ("Rename", "edit-button", self.on_rename_clicked),
+            ("Lock", "lock-button", self.on_lock_clicked),
+            ("Analyze", "analyze-button", self.on_analyze_clicked),
+            ("Delete", "delete-button", self.on_delete_clicked)
+        ]
         
-        rename_button = Gtk.Button(label="Rename")
-        rename_button.connect("clicked", self.on_rename_clicked, generation)
+        for label, style_class, callback in buttons:
+            button = Gtk.Button(label=label)
+            button.get_style_context().add_class("button")
+            button.get_style_context().add_class(style_class)
+            button.connect("clicked", callback, generation)
+            button_group.append(button)
         
-        lock_button = Gtk.Button(label="Lock")
-        lock_button.connect("clicked", self.on_lock_clicked, generation)
+        list_item.append(info_box)
+        list_item.append(button_group)
         
-        analyze_button = Gtk.Button(label="Analyze")
-        analyze_button.connect("clicked", self.on_analyze_clicked, generation)
-        
-        delete_button = Gtk.Button(label="Delete")
-        delete_button.connect("clicked", self.on_delete_clicked, generation)
-        
-        for button in [rename_button, lock_button, analyze_button, delete_button]:
-            button_box.append(button)
-        
-        return button_box
+        self.generations_list.append(list_item)
 
     def on_rename_clicked(self, button, generation):
-        """Handle rename action."""
-        logger.info(f"Renaming generation: {generation}")
-        
-        # Create a dialog for name input
+        """Behandelt Klicks auf den Rename-Button"""
         dialog = Gtk.Dialog(
             title="Rename Generation",
-            transient_for=self.get_root(),
-            modal=True,
-            use_header_bar=True
+            transient_for=self.root,
+            modal=True
         )
+        
+        box = dialog.get_content_area()
+        entry = Gtk.Entry()
+        entry.set_text(generation.get('title', ''))
+        box.append(entry)
         
         dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
         dialog.add_button("Rename", Gtk.ResponseType.OK)
         
-        # Add content area
-        content_area = dialog.get_content_area()
-        content_area.set_spacing(6)
-        content_area.set_margin_top(6)
-        content_area.set_margin_bottom(6)
-        content_area.set_margin_start(6)
-        content_area.set_margin_end(6)
+        dialog.show()
+        response = dialog.run()
         
-        # Add description label
-        description = Gtk.Label()
-        description.set_markup(
-            f"Enter new name for Generation #{generation['number']}\n"
-            "<small>Allowed: letters, numbers, spaces, and -_.</small>"
-        )
-        content_area.append(description)
+        if response == Gtk.ResponseType.OK:
+            new_name = entry.get_text()
+            try:
+                self.generation_manager.rename_generation(generation['number'], new_name)
+                self.load_generations()
+            except Exception as e:
+                self.show_error(f"Failed to rename generation: {str(e)}")
         
-        # Add entry for new name
-        entry = Gtk.Entry()
-        entry.set_max_length(50)  # Limit name length
-        if 'name' in generation:
-            entry.set_text(generation['name'])
-        content_area.append(entry)
-        
-        # Add error label (hidden by default)
-        error_label = Gtk.Label()
-        error_label.set_markup("<small><span color='red'></span></small>")
-        error_label.set_visible(False)
-        content_area.append(error_label)
-        
-        def get_generation_data(row):
-            """Extract generation data from ListBoxRow."""
-            if hasattr(row, 'generation_data'):
-                return row.generation_data
-            return None
-        
-        def validate_name(name):
-            """Validate the entered name."""
-            if not name or len(name.strip()) == 0:
-                return "Name cannot be empty"
-            
-            if len(name) > 50:
-                return "Name is too long (max 50 characters)"
-            
-            # Check for valid characters
-            import re
-            if not re.match(r'^[a-zA-Z0-9\s\-_.]+$', name):
-                return "Name contains invalid characters"
-            
-            # Check for existing names
-            existing_names = []
-            for row in self.generations_list:
-                gen_data = get_generation_data(row)
-                if gen_data and gen_data.get('number') != generation['number']:
-                    existing_names.append(gen_data.get('name', ''))
-            
-            if name in existing_names:
-                return "This name is already in use"
-            
-            return None
-
-        def on_text_changed(entry):
-            """Handle text changes in the entry."""
-            name = entry.get_text().strip()
-            error = validate_name(name)
-            
-            # Update error label
-            if error:
-                error_label.set_markup(f"<small><span color='red'>{error}</span></small>")
-                error_label.set_visible(True)
-            else:
-                error_label.set_visible(False)
-            
-            # Update OK button sensitivity
-            rename_button = dialog.get_widget_for_response(Gtk.ResponseType.OK)
-            if rename_button:
-                rename_button.set_sensitive(error is None)
-
-        def on_response(dialog, response):
-            """Handle dialog response."""
-            if response == Gtk.ResponseType.OK:
-                new_name = entry.get_text().strip()
-                error = validate_name(new_name)
-                
-                if error is None:
-                    success = self.generation_manager.rename_generation(generation, new_name)
-                    
-                    if success:
-                        # Show success message
-                        success_dialog = Gtk.MessageDialog(
-                            transient_for=self.get_root(),
-                            message_type=Gtk.MessageType.INFO,
-                            buttons=Gtk.ButtonsType.OK,
-                            text=f"Generation #{generation['number']} renamed successfully"
-                        )
-                        success_dialog.present()
-                        success_dialog.connect("response", lambda d, r: d.destroy())
-                        
-                        # Refresh only the modified generation
-                        self._update_generation_entry(generation['number'])
-                    else:
-                        # Show error message
-                        error_dialog = Gtk.MessageDialog(
-                            transient_for=self.get_root(),
-                            message_type=Gtk.MessageType.ERROR,
-                            buttons=Gtk.ButtonsType.OK,
-                            text="Failed to rename generation",
-                            secondary_text="Please check the logs for more information"
-                        )
-                        error_dialog.present()
-                        error_dialog.connect("response", lambda d, r: d.destroy())
-            
-            dialog.destroy()
-
-        # Connect signals
-        entry.connect('changed', on_text_changed)
-        dialog.connect('response', on_response)
-        
-        # Show dialog
-        dialog.set_default_size(300, -1)
-        dialog.present()
-
-    def _update_generation_entry(self, gen_number):
-        """Update a specific generation entry."""
-        # Get current data for this generation
-        updated_gen = None
-        for gen in self.generation_manager.get_generations():
-            if gen['number'] == gen_number:
-                updated_gen = gen
-                break
-        
-        if updated_gen:
-            # Find and replace the corresponding ListBoxRow
-            for row in self.generations_list:
-                if isinstance(row, Gtk.ListBoxRow):
-                    child = row.get_child()
-                    if hasattr(child, 'generation_number') and child.generation_number == gen_number:
-                        # Create new widget
-                        new_widget = self._create_generation_widget(updated_gen)
-                        # Replace old widget
-                        row.set_child(new_widget)
-                        break
+        dialog.destroy()
 
     def on_lock_clicked(self, button, generation):
-        """Handle lock action."""
-        logger.info(f"Locking generation: {generation}")
-        success = self.generation_manager.operation_handler.lock(generation)
-        if success:
-            self.fetch_generations()  # Aktualisiere die Ansicht
+        """Behandelt Klicks auf den Lock-Button"""
+        try:
+            self.generation_manager.toggle_lock_generation(generation['number'])
+            self.load_generations()
+        except Exception as e:
+            self.show_error(f"Failed to toggle lock: {str(e)}")
 
     def on_analyze_clicked(self, button, generation):
-        """Handle analyze action."""
-        logger.info(f"Analyzing generation: {generation}")
-        result = self.generation_manager.operation_handler.analyze(generation)
-        if result:
-            self._show_analysis_dialog(result)
+        """Behandelt Klicks auf den Analyze-Button"""
+        try:
+            diff = self.generation_manager.analyze_generation(generation['number'])
+            self.show_diff_dialog(diff)
+        except Exception as e:
+            self.show_error(f"Failed to analyze generation: {str(e)}")
 
     def on_delete_clicked(self, button, generation):
-        """Handle delete action."""
-        logger.info(f"Deleting generation: {generation}")
-        success = self.generation_manager.operation_handler.delete(generation)
-        if success:
-            self.fetch_generations()  # Aktualisiere die Ansicht
+        """Behandelt Klicks auf den Delete-Button"""
+        if generation.get('status') == 'current':
+            self.show_error("Cannot delete current generation")
+            return
+            
+        dialog = Gtk.MessageDialog(
+            transient_for=self.root,
+            message_type=Gtk.MessageType.WARNING,
+            buttons=Gtk.ButtonsType.YES_NO,
+            text=f"Delete generation #{generation['number']}?",
+            secondary_text="This action cannot be undone."
+        )
+        
+        response = dialog.run()
+        dialog.destroy()
+        
+        if response == Gtk.ResponseType.YES:
+            try:
+                self.generation_manager.delete_generation(generation['number'])
+                self.load_generations()
+            except Exception as e:
+                self.show_error(f"Failed to delete generation: {str(e)}")
 
-    def create_generations_view(self):
-        """Create the generations view with a scrollable list."""
-        scrolled_window = Gtk.ScrolledWindow()
-        scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        scrolled_window.set_min_content_height(400)  # Mindesthöhe für die Anzeige
+    def show_diff_dialog(self, diff):
+        """Zeigt einen Dialog mit Generations-Unterschieden"""
+        dialog = Gtk.Dialog(
+            title="Generation Differences",
+            transient_for=self.root,
+            modal=True
+        )
+        dialog.set_default_size(600, 400)
+        
+        scroll = Gtk.ScrolledWindow()
+        text_view = Gtk.TextView()
+        text_view.get_buffer().set_text(diff)
+        text_view.set_editable(False)
+        text_view.get_style_context().add_class("monospace")
+        
+        scroll.set_child(text_view)
+        dialog.get_content_area().append(scroll)
+        
+        dialog.add_button("Close", Gtk.ResponseType.CLOSE)
+        dialog.run()
+        dialog.destroy()
 
-        self.generations_list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        scrolled_window.set_child(self.generations_list)
+    def show_error(self, message):
+        """Zeigt einen Fehlerdialog"""
+        dialog = Gtk.MessageDialog(
+            transient_for=self.root,
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text="Error",
+            secondary_text=message
+        )
+        dialog.run()
+        dialog.destroy()
 
-        return scrolled_window
-
+    def update_status(self, message):
+        """Aktualisiert die Status-Bar"""
+        self.status_bar.set_text(message)

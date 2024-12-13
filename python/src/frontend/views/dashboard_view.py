@@ -3,6 +3,7 @@
 import logging
 from gi.repository import Gtk, GLib
 from src.backend.services.system_monitor import SystemMonitor
+from src.frontend.core.theme_manager import ThemeManager
 
 
 class DashboardView(Gtk.Box):
@@ -17,22 +18,36 @@ class DashboardView(Gtk.Box):
 
     def create_section_header(self):
         header = Gtk.Label(label="System Overview")
-        header.set_margin_bottom(10)
-        header.set_margin_top(10)
+        ThemeManager.apply_header_style(header)
+        header.set_margin_bottom(ThemeManager.get_margin())
+        header.set_margin_top(ThemeManager.get_margin())
         header.set_justify(Gtk.Justification.CENTER)
         self.append(header)
 
     def create_metrics_box(self):
-        metrics_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        self.cpu_label = Gtk.Label(label="CPU Usage: Loading...")
-        self.memory_label = Gtk.Label(label="Memory Usage: Loading...")
-        self.disk_label = Gtk.Label(label="Disk Usage: Loading...")
-        self.network_label = Gtk.Label(label="Network Activity: Loading...")
+        metrics_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, 
+                            spacing=ThemeManager.get_margin("sm"))
+        ThemeManager.apply_panel_style(metrics_box)
+        
+        # Erstelle Labels mit konsistentem Styling
+        self.cpu_label = self._create_metric_label("CPU Usage: Loading...")
+        self.memory_label = self._create_metric_label("Memory Usage: Loading...")
+        self.disk_label = self._create_metric_label("Disk Usage: Loading...")
+        self.network_label = self._create_metric_label("Network Activity: Loading...")
+        
         metrics_box.append(self.cpu_label)
         metrics_box.append(self.memory_label)
         metrics_box.append(self.disk_label)
         metrics_box.append(self.network_label)
         self.append(metrics_box)
+
+    def _create_metric_label(self, text):
+        """Hilfsmethode zum Erstellen einheitlich gestylter Metric-Labels"""
+        label = Gtk.Label(label=text)
+        label.get_style_context().add_class("metric-label")
+        label.set_margin_start(ThemeManager.get_margin("sm"))
+        label.set_margin_end(ThemeManager.get_margin("sm"))
+        return label
 
     def update_dashboard(self, system_metrics):
         logging.info(f"Updating dashboard with: {system_metrics}")
