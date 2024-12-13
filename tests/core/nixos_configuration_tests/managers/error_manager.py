@@ -16,8 +16,10 @@ class ErrorManager:
     
     def get_handler(self, test_name: str) -> NixOSErrorHandler:
         """Gibt einen Error Handler für einen spezifischen Test zurück"""
-        if test_name not in self._handlers:
-            self._handlers[test_name] = NixOSErrorHandler()
+        if test_name in self._handlers:
+            del self._handlers[test_name]
+        
+        self._handlers[test_name] = NixOSErrorHandler()
         return self._handlers[test_name]
     
     def save_error_reports(self):

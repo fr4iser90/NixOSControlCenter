@@ -257,108 +257,96 @@ class NixOSErrorHandler:
         print(f"self._python_config: {getattr(self, '_python_config', 'NOT SET')}")
         print(f"self._nix_config: {getattr(self, '_nix_config', 'NOT SET')}")
         
-        # Erstelle die Zusammenfassung nur einmal
+        # Header mit Konfigurationen
         summary = [
             "=== NixOS Configuration Error Log ===",
-            f"Test: {test_name or getattr(self, '_test_name', 'unknown_test')}",
+            f"Test: {test_name or self._test_name}",
             f"Time: {datetime.now().isoformat()}",
-            "",
-            "=== Python Configuration ===",
-            str(getattr(self, '_python_config', 'No configuration provided')),
-            "",
-            "=== Generated NixOS Configuration ===",
-            str(getattr(self, '_nix_config', 'No configuration available')),
-            "",
-            "=== Environment Details ===",
+            "\n=== Python Configuration ===",
+            str(self._python_config) if hasattr(self, '_python_config') else "No Python configuration available",
+            "\n=== Generated NixOS Configuration ===", 
+            self._nix_config if hasattr(self, '_nix_config') else "No Nix configuration available",
+            "\n=== Environment Details ===",
             self._get_environment_details(),
-            "",
-            "=== Error Summary ==="
+            "\n=== Error Summary ==="
         ]
 
-        # Füge Fehler hinzu
-        if self.errors:
+        if not self.errors:
+            summary.append("Keine NixOS Konfigurationsfehler gefunden")
+        else:
             for i, error in enumerate(self.errors, 1):
                 summary.extend([
                     f"\nFehler {i}:",
                     f"• Was: {error.message}"
                 ])
+                
                 if error.file_path:
                     summary.append(f"• Wo: {error.file_path}" + 
                                 (f" (Zeile {error.line_number})" if error.line_number else ""))
+                    
                 if error.suggestion:
                     summary.append(f"• Lösung: {error.suggestion}")
-        
+
         summary_text = "\n".join(summary)
         
-        # Speichere den Log wie gehabt...
+        # Speichere Log-Datei wenn ein Test-Name vorhanden ist
         if test_name:
-            try:
-                # Erstelle Log-Verzeichnis im Projekt-Root
-                project_root = Path(__file__).parent.parent.parent.parent.parent
-                log_dir = project_root / "logs" / "nixos_error_logs"
-                log_dir.mkdir(exist_ok=True, parents=True)
+            self._save_error_log(test_name, summary_text)
+            
+        return summary_text
+
+    def _save_error_log(self, test_name: str, summary_text: str) -> None:
+        """Speichert den Error-Log in eine Datei"""
+        try:
+            # Erstelle Log-Verzeichnis im Projekt-Root
+            project_root = Path(__file__).parent.parent.parent.parent.parent
+            log_dir = project_root / "logs" / "nixos_error_logs"
+            log_dir.mkdir(exist_ok=True, parents=True)
+            
+            # Erstelle und teste die Log-Datei
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_file = log_dir / f"nixos_errors_{test_name}_{timestamp}.log"
+            
+            # Bereite Log-Inhalt vor
+            full_log = [
+                summary_text,
+                "\n=== Raw Errors ==="
+            ]
+            
+            # Schreibe in die Datei
+            with log_file.open('w') as f:
+                f.write('\n'.join(full_log))
+                if self.errors:
+                    for error in self.errors:
+                        error_details = {
+                            'type': error.error_type.value,
+                            'message': error.message,
+                            'location': error.location,
+                            'file_path': str(error.file_path) if error.file_path else None,
+                            'line_number': error.line_number,
+                            'column': error.column,
+                            'context': error.context,
+                            'suggestion': error.suggestion,
+                            'stack_trace': error.stack_trace,
+                            'severity': error.severity
+                        }
+                        f.write('\n' + json.dumps(error_details, indent=2))
                 
-                # Erstelle und teste die Log-Datei
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                log_file = log_dir / f"nixos_errors_{test_name}_{timestamp}.log"
-                log_file.touch()
-                
-                if not log_file.exists():
-                    raise IOError(f"Could not create log file: {log_file}")
-                    
-                # Bereite Log-Inhalt vor
-                full_log = [
-                    "=== NixOS Configuration Error Log ===",
-                    f"Test: {test_name or self._test_name}",
-                    f"Time: {datetime.now().isoformat()}",
-                    "\n=== Python Configuration ===",
-                    self._format_test_config(self._python_config) if hasattr(self, '_python_config') else "No Python configuration available",
-                    "\n=== Generated NixOS Configuration ===",
-                    "# This file is generated for testing",
-                    self._nix_config if hasattr(self, '_nix_config') else "No Nix configuration available",
-                    "\n=== Environment Details ===",
-                    self._get_environment_details(),
-                    "\n=== Error Summary ===",
-                    summary_text,
-                    "\n=== Raw Errors ==="
-                ]
-                
-                # Schreibe in die Datei
-                with log_file.open('w') as f:
-                    f.write('\n'.join(full_log))
-                    if self.errors:
-                        for error in self.errors:
-                            error_details = {
-                                'type': error.error_type.value,
-                                'message': error.message,
-                                'location': error.location,
-                                'file_path': str(error.file_path) if error.file_path else None,
-                                'line_number': error.line_number,
-                                'column': error.column,
-                                'context': error.context,
-                                'suggestion': error.suggestion,
-                                'stack_trace': error.stack_trace,
-                                'severity': error.severity
-                            }
-                            f.write('\n' + json.dumps(error_details, indent=2))
-                    
-                    # Füge den Build-Log hinzu
-                    f.write("\n\n=== NixOS Build Log ===\n")
-                    if hasattr(self, '_last_build_log') and self._last_build_log:
-                        formatted_log = self._format_build_log(self._last_build_log)
-                        f.write(formatted_log)
-                    else:
-                        f.write("No build log available")
-                
-                # Setze Berechtigungen
-                log_file.chmod(0o644)
-                self._current_log_file = log_file
-                logger.info(f"Successfully wrote error log to: {log_file}")
-                
-            except Exception as e:
-                logger.error(f"Failed to save error log: {e}", exc_info=True)
-                
-            return summary_text
+                # Füge den Build-Log hinzu
+                f.write("\n\n=== NixOS Build Log ===\n")
+                if hasattr(self, '_last_build_log') and self._last_build_log:
+                    formatted_log = self._format_build_log(self._last_build_log)
+                    f.write(formatted_log)
+                else:
+                    f.write("No build log available")
+            
+            # Setze Berechtigungen
+            log_file.chmod(0o644)
+            self._current_log_file = log_file
+            logger.info(f"Successfully wrote error log to: {log_file}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save error log: {e}", exc_info=True)
 
     def _get_environment_details(self) -> str:
         """Gibt die Details der verwendeten Umgebung zurück"""
@@ -453,3 +441,43 @@ class NixOSErrorHandler:
         self._test_name = test_name
         self._python_config = python_config
         self._nix_config = nix_config
+
+def export_errors(self, test_name: str, export_dir: Path) -> None:
+    """Exportiert die Fehler in eine JSON-Datei"""
+    try:
+        # Erstelle Export-Verzeichnis falls es nicht existiert
+        export_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Erstelle Dateinamen
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        export_file = export_dir / f"{test_name}_{timestamp}_errors.json"
+        
+        # Bereite Export-Daten vor
+        export_data = {
+            "test_name": test_name,
+            "timestamp": timestamp,
+            "errors": [
+                {
+                    "type": error.error_type.value,
+                    "message": error.message,
+                    "location": error.location,
+                    "file_path": str(error.file_path) if error.file_path else None,
+                    "line_number": error.line_number,
+                    "suggestion": error.suggestion,
+                    "severity": error.severity
+                }
+                for error in self.errors
+            ],
+            "build_log": self._last_build_log if hasattr(self, '_last_build_log') else None,
+            "python_config": self._python_config if hasattr(self, '_python_config') else None,
+            "nix_config": self._nix_config if hasattr(self, '_nix_config') else None
+        }
+        
+        # Schreibe in Datei
+        with export_file.open('w') as f:
+            json.dump(export_data, f, indent=2)
+            
+        logger.info(f"Successfully exported errors to: {export_file}")
+        
+    except Exception as e:
+        logger.error(f"Failed to export errors: {e}", exc_info=True)

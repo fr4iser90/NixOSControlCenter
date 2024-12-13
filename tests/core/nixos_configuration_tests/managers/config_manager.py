@@ -57,6 +57,5 @@ class ConfigManager:
         self.builder.set_env_path(self.test_env_path)
         print(f"\nExecuting build for test: {self.current_test}")
         success, error = self.builder.build_config()
-        if not success:
-            error = NixConfigErrorHandler.format_error(error, self.current_test or "unknown_test")
+
         return success, error
