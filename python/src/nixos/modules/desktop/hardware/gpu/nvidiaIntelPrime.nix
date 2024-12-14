@@ -8,7 +8,7 @@
     modesetting.enable = true;
     nvidiaSettings = true;
     package = config.boot.kernelPackages.nvidiaPackages.production;
-    powerManagement.enable = true;
+    powerManagement.enable = true;   # causes problems with intel
     prime = {
       sync.enable = true;
       # Multiple uses are available, check the NVIDIA NixOS wiki

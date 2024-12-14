@@ -27,43 +27,51 @@
       ./modules/reporting
     ];
 
+    # Desktop-specific modules
+    desktopModules = [
+      ./modules/desktop
+      ./modules/sound
+    ];
+
   in {
     nixosConfigurations = {
       "${env.hostName}" = nixpkgs.lib.nixosSystem {
         inherit system;
 
-        modules = baseModules ++ [      
-          # Unfree Konfiguration
-          {
-            nixpkgs.config = {
-              allowUnfree = env.allowUnfree or false;
-            };
-          }
+        modules = baseModules ++ 
+          (if env.desktop != null then desktopModules else []) ++ 
+          [      
+            # Unfree Konfiguration
+            {
+              nixpkgs.config = {
+                allowUnfree = env.allowUnfree or false;
+              };
+            }
 
-          # Home Manager integration
-          home-manager.nixosModules.home-manager
-          {
-            system.stateVersion = "unstable";
-            
-            home-manager = {
-              useGlobalPkgs = true;
-              useUserPackages = true;
-              users = lib.mapAttrs (username: userConfig: 
-                  { config, ... }: {
-                    imports = [ 
-                      (import ./modules/homemanager/roles/${userConfig.role}.nix {
-                        inherit pkgs lib config;
-                        user = username;
-                      })
-                    ];
-                    home = {
-                      username = username;
-                      homeDirectory = "/home/${username}";
-                    };
-              }) env.users;
-            };
-          }
-        ];
+            # Home Manager integration
+            home-manager.nixosModules.home-manager
+            {
+              system.stateVersion = "unstable";
+              
+              home-manager = {
+                useGlobalPkgs = true;
+                useUserPackages = true;
+                users = lib.mapAttrs (username: userConfig: 
+                    { config, ... }: {
+                      imports = [ 
+                        (import ./modules/homemanager/roles/${userConfig.role}.nix {
+                          inherit pkgs lib config;
+                          user = username;
+                        })
+                      ];
+                      home = {
+                        username = username;
+                        homeDirectory = "/home/${username}";
+                      };
+                }) env.users;
+              };
+            }
+          ];
       };
     };
   };

@@ -39,9 +39,25 @@
 
   # Virtualisierung
   virtualisation = {
-    libvirtd.enable = true;
+    libvirtd = {
+      enable = true;
+      qemu = {
+        package = pkgs.qemu_kvm;
+        runAsRoot = true;
+      };
+    };
     docker.enable = true;
   };
+
+  systemd.user.services.plasma-powerdevil = {   # Causing issues with KDE Plasma
+    enable = false;
+    wantedBy = [];  # Entfernt alle Abhängigkeiten
+  };
+  # KVM Kernel Module
+  boot.kernelModules = [ "kvm-intel" ];  # Wenn du AMD CPU hast, nutze "kvm-amd"
+
+  # Benutzergruppen für Virtualisierung
+  users.users.fr4iser.extraGroups = [ "libvirtd" "kvm" ];
   
     # Shell-Konfiguration mit mkForce um Konflikte zu vermeiden
   programs = {

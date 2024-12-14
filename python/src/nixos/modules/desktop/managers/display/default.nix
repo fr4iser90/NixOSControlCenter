@@ -1,3 +1,4 @@
+#/etc/nixos/modules/desktop/display/default.nix
 { config, lib, pkgs, ... }:
 let
   env = import ../../../../env.nix;
@@ -24,6 +25,8 @@ let
   sessionMap = {
     gnome = "gnome";
     plasma = "plasma";
+    plasmax11 = "plasmax11";  # Neuer Name für X11   Alle noch angleichen für einfache verwendung
+    plasma6 = "plasma";  # Für Wayland in Plasma 6
     plasmawayland = "plasmawayland";
     xfce = "xfce";
     i3 = "i3";
