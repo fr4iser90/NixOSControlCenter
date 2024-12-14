@@ -16,9 +16,9 @@
 
     # Gaming
     lutris
-    wine
-    winetricks
-    wineWowPackages.full
+    #wine
+    #winetricks
+    #wineWowPackages.full
     noisetorch
 
     # Multimedia & Communication

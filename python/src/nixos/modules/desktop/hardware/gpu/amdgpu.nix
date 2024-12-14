@@ -8,6 +8,9 @@
     libva-utils
     vaapiVdpau
     libvdpau-va-gl
+    vulkan-tools    # Für Vulkan-Diagnose
+    glxinfo         # Für OpenGL-Diagnose
+    radeontop       # Für AMD GPU-Monitoring
   ];
 
   hardware.graphics = {

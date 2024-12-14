@@ -27,12 +27,6 @@
       ./modules/reporting
     ];
 
-    # Desktop-specific modules
-    desktopModules = [
-      ./modules/desktop
-      ./modules/sound
-    ];
-
   in {
     nixosConfigurations = {
       "${env.hostName}" = nixpkgs.lib.nixosSystem {
