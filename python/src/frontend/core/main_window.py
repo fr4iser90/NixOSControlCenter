@@ -3,9 +3,9 @@
 from gi.repository import Gtk
 from .sidebar import Sidebar
 from .content_manager import ContentManager
-from src.frontend.views.dashboard_view import DashboardView
-from src.frontend.views.generations_view import GenerationsView
-from src.frontend.views.configuration_view import ConfigurationView  # Neue Zeile
+from src.frontend.modules.dashboard.view import DashboardView
+from src.frontend.modules.generations.view import GenerationsView
+from src.frontend.modules.configuration.view import ConfigurationView
 
 
 class MainWindow(Gtk.ApplicationWindow):

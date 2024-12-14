@@ -22,5 +22,3 @@ class Sidebar(Gtk.ListBox):
             label = row.get_child().get_text().lower().replace(" ", "_")
             logging.info(f"Selected label: {label}")
             self.content_manager.switch_view(label)
-
-
