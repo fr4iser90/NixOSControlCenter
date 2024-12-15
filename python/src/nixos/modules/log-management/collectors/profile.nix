@@ -1,15 +1,14 @@
-{ config, lib, colors, formatting, reportLevels, currentLevel, ... }:
+{ config, lib, colors, formatting, reportLevels, currentLevel, systemConfig, ... }:
 
 with lib;
 
 let
-  env = import ../../../env.nix;
   types = import ../../profile-management/types;
 
   systemInfo = {
-    hasDesktop = env.desktop != null && env.desktop != "";
-    systemType = env.systemType;
-    desktop = env.desktop or "none";
+    hasDesktop = systemConfig.desktop != null && systemConfig.desktop != "";
+    systemType = systemConfig.systemType;
+    desktop = systemConfig.desktop or "none";
   };
 
   # Reports für verschiedene Detail-Level
@@ -30,14 +29,14 @@ let
   '';
 
   profileModule = 
-    if types.systemTypes.hybrid ? ${env.systemType} then
+    if types.systemTypes.hybrid ? ${systemConfig.systemType} then
       "hybrid/gaming-workstation.nix"
-    else if types.systemTypes.desktop ? ${env.systemType} then
-      "desktop/${env.systemType}.nix"
-    else if types.systemTypes.server ? ${env.systemType} then
-      "server/${env.systemType}.nix"
+    else if types.systemTypes.desktop ? ${systemConfig.systemType} then
+      "desktop/${systemConfig.systemType}.nix"
+    else if types.systemTypes.server ? ${systemConfig.systemType} then
+      "server/${systemConfig.systemType}.nix"
     else
-      throw "Unknown system type: ${env.systemType}";
+      throw "Unknown system type: ${systemConfig.systemType}";
 
 in {
   collect = 

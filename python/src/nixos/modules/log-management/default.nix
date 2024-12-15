@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
 with lib;
 
@@ -57,7 +57,7 @@ let
     listToAttrs (map (name: {
       inherit name;
       value = import ./collectors/${name}.nix { 
-        inherit config lib pkgs colors formatting reportLevels; 
+        inherit config lib pkgs colors formatting reportLevels systemConfig; # systemConfig hinzugefügt
         currentLevel = reportLevels.${
           if cfg.collectors.${name}.detailLevel != null
           then cfg.collectors.${name}.detailLevel

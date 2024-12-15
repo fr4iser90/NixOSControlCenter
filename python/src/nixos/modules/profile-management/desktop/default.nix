@@ -1,5 +1,5 @@
 # modules/profiles/desktop/default.nix
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
 {
   imports = [

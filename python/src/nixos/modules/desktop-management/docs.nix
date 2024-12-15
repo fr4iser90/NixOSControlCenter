@@ -2,7 +2,7 @@
 {
   meta = {
     description = "Desktop environment configuration module";
-    maintainers = ["${env.mainUser}"];
+    maintainers = ["${systemConfig.mainUser}"];
     documentation = ./docs/README.md;
   };
 }

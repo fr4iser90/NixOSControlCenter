@@ -1,13 +1,10 @@
 # modules/profiles/types/desktop/gaming.nix
-{ config, lib, pkgs, ... }:
-
-let
-  env = import ../../../env.nix;
-in {
-  config = lib.mkIf (env.systemType == "gaming") {
+{ config, lib, pkgs, systemConfig, ... }:
+{
+  config = lib.mkIf (systemConfig.systemType == "gaming") {
     # Gaming-spezifische Konfiguration
-    programs.steam.enable = env.overrides.enableSteam or false;
-    programs.gamemode.enable = env.overrides.enableGameMode or false;
+    programs.steam.enable = systemConfig.overrides.enableSteam or false;
+    programs.gamemode.enable = systemConfig.overrides.enableGameMode or false;
     # ... weitere Gaming-Einstellungen
   };
 }

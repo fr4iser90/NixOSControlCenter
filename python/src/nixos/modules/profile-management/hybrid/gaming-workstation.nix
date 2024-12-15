@@ -1,5 +1,5 @@
 # modules/profiles/types/hybrid/gaming-workstation.nix
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
 {
 

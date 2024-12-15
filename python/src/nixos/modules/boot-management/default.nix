@@ -1,9 +1,7 @@
 # src/nixos/modules/bootloader/default.nix
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
 let
-  env = import ../../env.nix;
-  
   # Import core libraries
   entryManagement = import ./lib/entry-management {
     inherit config lib pkgs;
@@ -26,9 +24,9 @@ let
   };
 
   # Select bootloader configuration
-  selectedLoader = bootloaders.${env.bootloader} or bootloaders.systemd-boot;
+  selectedLoader = bootloaders.${systemConfig.bootloader} or bootloaders.systemd-boot;
   bootloaderConfig = import selectedLoader.module {
-    inherit config lib pkgs env;
+    inherit config lib pkgs systemConfig;
     entryManager = selectedLoader.provider;
   };
 
@@ -46,7 +44,7 @@ in {
   };
 
   environment.systemPackages = 
-    if env.entryManagement
+    if systemConfig.entryManagement
     then [
       selectedLoader.provider.scripts.listEntries
       selectedLoader.provider.scripts.renameEntry
@@ -54,16 +52,16 @@ in {
     ]
     else [];
 
-  system.activationScripts = lib.optionalAttrs env.entryManagement {
+  system.activationScripts = lib.optionalAttrs systemConfig.entryManagement {
     bootEntryInit = entryManagement.activation.initializeJson;
-    bootEntrySync = lib.mkIf (env.bootloader == "systemd-boot") 
+    bootEntrySync = lib.mkIf (systemConfig.bootloader == "systemd-boot") 
       entryManagement.activation.syncEntries;
   };
 
   assertions = [
     {
-      assertion = builtins.hasAttr env.bootloader bootloaders;
-      message = "Invalid bootloader selection: ${env.bootloader}";
+      assertion = builtins.hasAttr systemConfig.bootloader bootloaders;
+      message = "Invalid bootloader selection: ${systemConfig.bootloader}";
     }
   ];
 }

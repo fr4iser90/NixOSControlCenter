@@ -1,7 +1,6 @@
-{ config, lib, pkgs, user, ... }:
+{ config, lib, pkgs, user, systemConfig, ... }:
 
 let
-  env = import ../../../../env.nix;
   shellInitFile = ../shellInit/bashInit.nix;  # Gäste bekommen bash
   shellInitModule = import (builtins.toString shellInitFile) { inherit pkgs lib; };
 in {

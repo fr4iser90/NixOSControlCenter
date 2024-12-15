@@ -8,45 +8,48 @@
 
   outputs = { self, nixpkgs, home-manager, ... }: let
     system = "x86_64-linux";
-    env = import ./env.nix;
+    systemConfig = import ./system-config.nix;
     
     pkgs = import nixpkgs { 
       inherit system;
-      config.allowUnfree = env.allowUnfree or false;
+      config.allowUnfree = systemConfig.allowUnfree or false;
     };
     lib = pkgs.lib;
 
     # Base modules required for all systems
-    baseModules = [
+    systemModules = [
       ./hardware-configuration.nix
+      
+      # Core system management
       ./modules/boot-management
-      ./modules/network-management
-      ./modules/user-management
-      ./modules/profile-management
       ./modules/nix-management
       ./modules/log-management
+      
+      # Hardware & Network
+      ./modules/hardware-management
+      ./modules/network-management
+      ./modules/audio-management 
+      
+      # User management
+      ./modules/user-management
+      ./modules/profile-management
+      ./modules/desktop-management
     ];
 
-    # Desktop-specific modules
-    desktopModules = [
-      ./modules/desktop-management
-      ./modules/audio-management
-    ];
 
   in {
     nixosConfigurations = {
-      "${env.hostName}" = nixpkgs.lib.nixosSystem {
+      "${systemConfig.hostName}" = nixpkgs.lib.nixosSystem {
         inherit system;
+        specialArgs = { inherit systemConfig; }; 
 
-        modules = baseModules ++ 
-          (if env.desktop != null then desktopModules else []) ++ 
-          [      
-            # Unfree Konfiguration
-            {
-              nixpkgs.config = {
-                allowUnfree = env.allowUnfree or false;
-              };
-            }
+        modules = systemModules ++ [      
+          # Unfree Konfiguration
+          {
+            nixpkgs.config = {
+              allowUnfree = systemConfig.allowUnfree or false;
+            };
+          }
 
             # Home Manager integration
             home-manager.nixosModules.home-manager
@@ -58,11 +61,12 @@
               home-manager = {
                 useGlobalPkgs = true;
                 useUserPackages = true;
+                extraSpecialArgs = { inherit systemConfig; };
                 users = lib.mapAttrs (username: userConfig: 
                     { config, ... }: {
                       imports = [ 
                         (import ./modules/user-management/home-manager/roles/${userConfig.role}.nix {
-                          inherit pkgs lib config;
+                          inherit pkgs lib config systemConfig;
                           user = username;
                         })
                       ];
@@ -70,7 +74,7 @@
                         username = username;
                         homeDirectory = "/home/${username}";
                       };
-                }) env.users;
+                }) systemConfig.users;
               };
             }
           ];

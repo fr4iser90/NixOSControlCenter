@@ -1,9 +1,8 @@
 #/etc/nixos/modules/homemanager/shellInit/index.nix
-{ pkgs, lib, defaultShell, ... }:
+{ pkgs, lib, defaultShell, systemConfig, ... }:
 
 let
-  env = import ../../../env.nix;
-  shellInitFile = ./${env.defaultShell} + "Init.nix";
+  shellInitFile = ./${systemConfig.defaultShell} + "Init.nix";
 in
 {
   programs = import shellInitFile { inherit pkgs lib; };

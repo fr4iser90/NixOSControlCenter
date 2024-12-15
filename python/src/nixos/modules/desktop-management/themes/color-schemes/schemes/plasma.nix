@@ -1,10 +1,7 @@
 # modules/desktop/themes/color-schemes/plasma.nix
-{ config, lib, pkgs, ... }:
-
-let
-  env = import ../../../../../env.nix;
-in {
-  config = lib.mkIf env.darkMode {
+{ config, lib, pkgs, systemConfig, ... }:
+{
+  config = lib.mkIf systemConfig.darkMode {
     services.displayManager.sddm.theme = "breeze";
     environment.variables = {
       KDE_GLOBAL_THEME = "Breeze";

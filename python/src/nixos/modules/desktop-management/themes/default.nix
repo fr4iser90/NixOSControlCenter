@@ -1,9 +1,6 @@
 # modules/desktop/themes/index.nix
-{ config, lib, pkgs, ... }:
-
-let
-  env = import ../../../env.nix;
-in {
+{ config, lib, pkgs, systemConfig, ... }:
+{
   imports = [
 #    ./color-schemes
 #    ./cursors

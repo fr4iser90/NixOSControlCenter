@@ -1,5 +1,5 @@
 # modules/profiles/types/server/headless.nix
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
 let
   env = import ../../../env.nix;

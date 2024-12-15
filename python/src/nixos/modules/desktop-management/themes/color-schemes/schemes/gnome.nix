@@ -1,9 +1,6 @@
-{ config, lib, pkgs, ... }:
-
-let
-  env = import ../../../../env.nix;
-in {
-  config = lib.mkIf (env.desktop == "gnome") {
+{ config, lib, pkgs, systemConfig, ... }:
+{
+  config = lib.mkIf (systemConfig.desktop == "gnome") {
     services.xserver = {
       displayManager.gdm.enable = true;
       desktopManager.gnome.enable = true;
@@ -13,8 +10,8 @@ in {
     programs.dconf.profiles.user.databases = [{
       settings = {
         "org/gnome/desktop/interface" = {
-          color-scheme = if env.darkMode then "prefer-dark" else "default";
-          gtk-theme = if env.darkMode then "Adwaita-dark" else "Adwaita";
+          color-scheme = if systemConfig.darkMode then "prefer-dark" else "default";
+          gtk-theme = if systemConfig.darkMode then "Adwaita-dark" else "Adwaita";
         };
       };
     }];

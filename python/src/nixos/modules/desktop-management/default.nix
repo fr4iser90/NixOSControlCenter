@@ -1,55 +1,30 @@
-#/etc/nixos/modules/desktop/default.nix
-{ config, lib, pkgs, ... }:
-
-let
-  env = import ../../env.nix;
-
-  # GPU configuration selection based on environment settings
-  gpuConfigs = {
-#    nvidia = ./hardware/gpu/nvidia.nix;
-#    nvidiaIntelPrime = ./hardware/gpu/nvidiaIntelPrime.nix;
-#    intel = ./hardware/gpu/intel.nix;
-    amdgpu = ./hardware/gpu/amdgpu.nix;
-  };
-
-  # Select GPU configuration or default to amdgpu
-  gpuConfig = import (gpuConfigs.${env.gpu} or gpuConfigs.amdgpu) { 
-    inherit config pkgs; 
-  };
-
-in {
+{ config, lib, pkgs, systemConfig, ... }:
+{
   imports = [ 
-    gpuConfig 
-#    ./display/x11
-    ./display/wayland
-    ./managers/display
-    ./managers/desktop
-#    ./themes
-  ];
+      ./display-managers
+      ./display-servers
+      ./environments
+      ./themes
+    ];
 
-  # DBus-Fix
+  # DBus-Fix (könnte auch in display-servers/common.nix verschoben werden)
   services.dbus = {
     enable = true;
     implementation = "broker";
   };
 
-  # X Server configuration
-  services.xserver = {
-    enable = true;
-    xkb = {
-      layout = env.keyboardLayout;
-      options = env.keyboardOptions;
-    };
-  };
-
   assertions = [
     {
-      assertion = builtins.hasAttr env.gpu gpuConfigs;
-      message = "Invalid GPU configuration: ${env.gpu}";
+      assertion = builtins.elem systemConfig.displayServer ["x11" "wayland" "hybrid"];
+      message = "Invalid display server selection: ${systemConfig.displayServer}";
+    }
+    {
+      assertion = builtins.elem systemConfig.desktop ["plasma" "gnome" "xfce"];
+      message = "Invalid desktop environment: ${systemConfig.desktop}";
+    }
+    {
+      assertion = builtins.elem systemConfig.displayManager ["sddm" "gdm" "lightdm"];
+      message = "Invalid display manager: ${systemConfig.displayManager}";
     }
   ];
 }
-
-
-
-

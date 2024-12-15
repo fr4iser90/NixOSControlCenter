@@ -1,9 +1,7 @@
 # src/nixos/nixconfig/users/default.nix
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, systemConfig, ... }:
 
 let
-  env = import ../../env.nix;
-
   # Gruppen basierend auf Rolle
   roleGroups = {
     admin = [ "wheel" "networkmanager" "docker" "video" "audio" "render" "input" "seat" ];
@@ -17,7 +15,7 @@ let
       users = [ username ];
       commands = [{
         command = "ALL";
-        options = if env.sudo.requirePassword or true
+        options = if systemConfig.sudo.requirePassword or true
           then [ "PASSWD" ]
           else [ "NOPASSWD" ];
       }];
@@ -37,11 +35,13 @@ in {
   
   # Aktiviere die Shells auf System-Level
   programs = {
-    zsh.enable = lib.any (user: env.users.${user}.defaultShell == "zsh") (builtins.attrNames env.users);
-    fish.enable = lib.any (user: env.users.${user}.defaultShell == "fish") (builtins.attrNames env.users);
+    zsh.enable = lib.any (user: systemConfig.users.${user}.defaultShell == "zsh") 
+      (builtins.attrNames systemConfig.users);
+    fish.enable = lib.any (user: systemConfig.users.${user}.defaultShell == "fish") 
+      (builtins.attrNames systemConfig.users);
   };
   
-  # Benutzer aus env.users erstellen
+  # Benutzer aus systemConfig.users erstellen
   users.users = lib.mapAttrs (username: userConfig: {
     isNormalUser = true;
     home = "/home/${username}";
@@ -50,16 +50,15 @@ in {
       then "/etc/nixos/secrets/passwords/.hashedLoginPassword"
       else null;
     extraGroups = roleGroups.${userConfig.role};
-  }) env.users;
+  }) systemConfig.users;
 
   # Sudo-Konfiguration
   security.sudo = {
     enable = true;
     extraRules = lib.concatLists (lib.mapAttrsToList 
       (username: userConfig: makeSudoRules username userConfig.role)
-      env.users
+      systemConfig.users
     );
-    
   };
 
   # TTY-Konfiguration

@@ -1,4 +1,4 @@
-{ config, lib, pkgs, env, ... }: 
+{ config, lib, pkgs, systemConfig, ... }: 
 
 let
   entryManager = import ../lib/entry-management/providers/systemd-boot.nix {
@@ -28,7 +28,7 @@ in
   };
 
   # Activation hooks for entry management
-  system.activationScripts = lib.optionalAttrs env.entryManagement {
+  system.activationScripts = lib.optionalAttrs systemConfig.entryManagement {
     # Initialize JSON storage
     bootEntryInit = lib.mkForce entryManager.activation.initializeJson;
     
@@ -38,7 +38,7 @@ in
   };
 
   # Make management utilities available if entry management is enabled
-  environment.systemPackages = lib.optionals env.entryManagement [
+  environment.systemPackages = lib.optionals systemConfig.entryManagement [
     entryManager.scripts.listEntries
     entryManager.scripts.renameEntry
     entryManager.scripts.resetEntry
