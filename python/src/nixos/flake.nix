@@ -19,18 +19,18 @@
     # Base modules required for all systems
     baseModules = [
       ./hardware-configuration.nix
-      ./modules/bootloader
-      ./modules/networking
-      ./modules/users
-      ./modules/profiles
-      ./modules/nix
-      ./modules/reporting
+      ./modules/boot-management
+      ./modules/network-management
+      ./modules/user-management
+      ./modules/profile-management
+      ./modules/nix-management
+      ./modules/log-management
     ];
 
     # Desktop-specific modules
     desktopModules = [
-      ./modules/desktop
-      ./modules/sound
+      ./modules/desktop-management
+      ./modules/audio-management
     ];
 
   in {
@@ -51,7 +51,9 @@
             # Home Manager integration
             home-manager.nixosModules.home-manager
             {
-              system.stateVersion = "unstable";
+              #system.stateVersion = "24.05"; # Deprecated
+              #system.stateVersion = "24.05"; # stable Vicuna
+              system.stateVersion = "25.05"; #  unstable Warbler
               
               home-manager = {
                 useGlobalPkgs = true;
@@ -59,7 +61,7 @@
                 users = lib.mapAttrs (username: userConfig: 
                     { config, ... }: {
                       imports = [ 
-                        (import ./modules/homemanager/roles/${userConfig.role}.nix {
+                        (import ./modules/user-management/home-manager/roles/${userConfig.role}.nix {
                           inherit pkgs lib config;
                           user = username;
                         })

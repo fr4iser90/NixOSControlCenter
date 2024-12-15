@@ -2,10 +2,11 @@
   # System-Typ (bestimmt das Profil)
   systemType = "gaming-workstation";
   bootloader = "systemd-boot";
-
+  
   # Nix-Konfiguration
   allowUnfree = true;
-
+  # Experimental Features
+  entryManagement = true;
   
   # Benutzer-Konfiguration
   users = {
@@ -28,12 +29,12 @@
   # Desktop (nur für Desktop-basierte Profile)
   desktop = "plasma";
   displayManager = "sddm";
-  session = "plasmawayland";
+  session = "plasma";
   darkMode = true;
 
   # Hardware
   gpu = "amdgpu";
-  audio = "pulseaudio";
+  audio = "pipewire";
   
   # Sicherheit
   sudo = {
