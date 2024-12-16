@@ -27,6 +27,7 @@ structure
 secret/
 secrets/
 *.secret
+hardware-configuration.nix
 
 # Generated documentation
 # If you generate HTML or other files during documentation generation, exclude them.
