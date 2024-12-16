@@ -56,9 +56,8 @@ NixOsControlCenter/
 │   └── system-config.nix    # Main system configuration
 │
 ├── docs/                    # Project documentation
-│   ├── API.md               # API reference
-│   ├── INSTALL.md           # Installation guide
-│   └── USAGE.md             # User manual
+│   ├── INSTALL.md           # Installation guide comming soon
+│   └── USAGE.md             # User manual comming soon
 │  
 ├── logs/                    # Logging directory
 │   └── nixos_error_logs     # System error logs
