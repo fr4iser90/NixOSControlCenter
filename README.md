@@ -45,21 +45,21 @@ NixOsControlCenter/
 │
 ├── nixos/                   # NixOS configuration
 │   ├── modules/             # Modular system configuration
-│   ├── audio-management/    # Audio subsystem
-│   ├── boot-management/     # Boot and kernel
-│   ├── desktop-management/  # Desktop environments
-│   ├── hardware-management/ # Hardware drivers
-│   ├── network-management/  # Network stack
-│   ├── profile-management/  # System profiles
-│   │   └── user-management/ # User management
-│   ├── flake.nix            # Nix flake definition
+│   │   ├── audio-management/    # Audio subsystem
+│   │   ├── boot-management/     # Boot and kernel
+│   │   ├── desktop-management/  # Desktop environments
+│   │   ├── hardware-management/ # Hardware drivers
+│   │   ├── network-management/  # Network stack
+│   │   ├── profile-management/  # System profiles
+│   │   ├── user-management/     # User management
+│   └── flake.nix            # Nix flake definition
 │   └── system-config.nix    # Main system configuration
 │
 ├── docs/                    # Project documentation
 │   ├── API.md               # API reference
 │   ├── INSTALL.md           # Installation guide
 │   └── USAGE.md             # User manual
-│
+│  
 ├── logs/                    # Logging directory
 │   └── nixos_error_logs     # System error logs
 │
