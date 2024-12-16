@@ -7,7 +7,7 @@ let
     set -e
 
     # Erst Preflight-Checks ausführen
-    if ! run-system-checks; then
+    if ! run-system.preflight.checks; then
       exit 1
     fi
 
@@ -18,7 +18,7 @@ in
 {
   imports = [
     ./checks/hardware/gpu.nix
-    ./runners/cli.nix
+    ./checks/hardware/runners/cli.nix
   ];
 
   config = lib.mkIf config.system.management.enablePreflight {
@@ -32,7 +32,7 @@ in
     ];
 
     # Wrapper für alle nixos-rebuild Varianten
-    programs.bash.shellAliases = {
+    programs.bash.shellAliases = lib.mkForce {
       "nixos-rebuild" = "nixos-rebuild-with-checks";
     };
   };

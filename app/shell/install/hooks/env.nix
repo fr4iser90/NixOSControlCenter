@@ -2,10 +2,12 @@
 { pkgs }:
 
 ''
-  # Installation Paths
+  # Project Structure
   export INSTALL_ROOT=$(pwd)
-  export MOUNT_POINT="/mnt"
-  export EFI_MOUNT="$MOUNT_POINT/boot/efi"
+  export NIXOS_CONFIG_DIR=$INSTALL_ROOT/nixos
+  
+  # System Config Location
+  export SYSTEM_CONFIG_DIR="/etc/nixos"
   
   # Temporary and Backup
   export INSTALL_TMP="/tmp/nixos-install"

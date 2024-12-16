@@ -1,5 +1,5 @@
 # modules/system-management/default.nix
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
 {
   imports = [
@@ -17,10 +17,10 @@
     system.management = {
       enablePreflight = lib.mkOption {
         type = lib.types.bool;
-        default = true;
+        default = systemConfig.preflightChecks or false;
         description = ''
           Whether to enable preflight checks before system rebuilds.
-          Set to false to skip all preflight checks.
+          Can be configured via systemConfig.preflightChecks.
         '';
       };
     };

@@ -1,36 +1,37 @@
 # app/shell/install/hooks/aliases.nix
 { pkgs }:
 
+let
+  inherit (pkgs) lib;
+  preflight = import ../preflight { inherit pkgs lib; };
+in
+
 ''
-  # Installation Commands
-  alias install-basic="bash $INSTALL_ROOT/scripts/install-basic.sh"
-  alias install-minimal="bash $INSTALL_ROOT/scripts/install-minimal.sh"
-  
-  # Profile Installation
-  alias install-desktop="bash $INSTALL_ROOT/scripts/profiles/install-desktop.sh"
-  alias install-server="bash $INSTALL_ROOT/scripts/profiles/install-server.sh"
-  alias install-dev="bash $INSTALL_ROOT/scripts/profiles/install-dev.sh"
-  alias install-gaming="bash $INSTALL_ROOT/scripts/profiles/install-gaming.sh"
-  
   # System Checks
-  alias check-hardware="bash $INSTALL_ROOT/scripts/checks/hardware.sh"
-  alias check-network="bash $INSTALL_ROOT/scripts/checks/network.sh"
-  alias check-disk="bash $INSTALL_ROOT/scripts/checks/disk.sh"
-  alias check-efi="bash $INSTALL_ROOT/scripts/checks/efi.sh"
-  alias check-all="bash $INSTALL_ROOT/scripts/checks/all.sh"
+  alias check-gpu="${preflight.checks.gpu}/bin/check-gpu"
+  alias check-system-information="${preflight.checks.system-information}/bin/check-system-info"
   
-  # Disk Management
-  alias list-disks="lsblk -f"
-  alias show-partitions="fdisk -l"
-  alias mount-all="bash $INSTALL_ROOT/scripts/mount-all.sh"
-  
-  # Configuration
-  alias show-config="cat $INSTALL_ROOT/config/current.nix"
-  alias edit-config="$EDITOR $INSTALL_ROOT/config/current.nix"
-  alias backup-config="cp $INSTALL_ROOT/config/current.nix $INSTALL_BACKUP/config-\$(date +%F-%H%M).nix"
+  # Disk Management (direkt über pkgs)
+  alias list-disks="${pkgs.util-linux}/bin/lsblk -f"
+  alias show-partitions="${pkgs.util-linux}/bin/fdisk -l"
   
   # Utilities
   alias log="tail -f $INSTALL_LOG"
   alias clear-mounts="umount -R /mnt"
   alias restart-install="clear-mounts && rm -rf $INSTALL_TMP/* && clear"
+
+  # Installation Commands (TODO)
+  # alias install-basic="..."
+  # alias install-minimal="..."
+  
+  # Profile Installation (TODO)
+  # alias install-desktop="..."
+  # alias install-server="..."
+  # alias install-dev="..."
+  # alias install-gaming="..."
+  
+  # Configuration (TODO)
+  # alias show-config="..."
+  # alias edit-config="..."
+  # alias backup-config="..."
 ''

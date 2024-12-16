@@ -12,6 +12,7 @@
   services.xserver = lib.mkIf (systemConfig.displayServer != "wayland") {
     enable = true;
   };
+  
   # Optional: Validierung
   assertions = [
     {

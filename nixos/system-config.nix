@@ -7,7 +7,8 @@
   allowUnfree = true;
   # Experimental Features
   entryManagement = true;
-  
+  preflightChecks = true;
+
   # Benutzer-Konfiguration
   users = {
     "test" = {
@@ -22,7 +23,7 @@
   
   # Lokalisierung
   timeZone = "Europe/Berlin";
-  locales = [ "en_US.UTF-8" ];
+  locales = [ "de_DE.UTF-8" ];
   keyboardLayout = "de";
   keyboardOptions = "eurosign:e";
   

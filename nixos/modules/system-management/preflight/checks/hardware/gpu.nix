@@ -47,8 +47,5 @@ let
 in {
   config = {
     environment.systemPackages = [ preflightScript ];
-    programs.bash.shellAliases = {
-      "nixos-rebuild" = "nixos-rebuild-preflight";
-    };
   };
 }
