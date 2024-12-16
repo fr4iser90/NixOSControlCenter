@@ -9,6 +9,6 @@ in
 
 pkgs.mkShell {
   name = "NixOsControlCenter-InstallShell";
-  inherit (packages) buildInputs;
+  inherit (packages) buildInputs;  
   shellHook = hooks.shellHook;
 }
