@@ -10,7 +10,7 @@
   
   # Benutzer-Konfiguration
   users = {
-    "fr4iser" = {
+    "test" = {
       role = "admin";
       defaultShell = "zsh";
       autoLogin = true;

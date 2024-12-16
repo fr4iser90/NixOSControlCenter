@@ -11,12 +11,7 @@
   # Gemeinsame Basis-Konfiguration für alle Display Server
   services.xserver = lib.mkIf (systemConfig.displayServer != "wayland") {
     enable = true;
-    xkb = {
-      layout = systemConfig.keyboardLayout;
-      options = systemConfig.keyboardOptions;
-    };
   };
-
   # Optional: Validierung
   assertions = [
     {
