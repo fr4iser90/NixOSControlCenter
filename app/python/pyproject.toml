@@ -45,7 +45,7 @@ norecursedirs = [
 # Umgebungsvariablen
 env = [
     "PYTHON_ROOT",
-    "PYTHON_NIXOS_CONFIG_DIR",
+    "NIXOS_CONFIG_DIR",
     "PYTHON_TEST_TMP_DIR",
     "PYTHON_TEST_LOG_DIR",
 ]

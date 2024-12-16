@@ -14,7 +14,7 @@ def python_root():
 @pytest.fixture(scope="session")
 def nixos_config_dir():
     """Returns the NixOS config directory from environment"""
-    return Path(os.environ["PYTHON_NIXOS_CONFIG_DIR"])
+    return Path(os.environ["NIXOS_CONFIG_DIR"])
 
 @pytest.fixture(scope="session")
 def test_tmp_dir():

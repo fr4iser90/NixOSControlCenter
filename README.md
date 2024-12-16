@@ -1,20 +1,67 @@
 # NixOS Control Center
 
-Das NixOS Control Center ist ein grafisches Tool zur Verwaltung von Paketen, Konfigurationen und Geräten unter NixOS.
+A graphical tool for managing packages, configurations, and devices on NixOS systems.
 
-## Funktionen
-- **Bootloader**: Konfigurieren und Verwalten von Bootloadern und Entries. EXPERIMENTAL, CAN CAUSE BIG DAMAGE
-- **Paketverwaltung**: Installieren, Entfernen und Aktualisieren von Paketen. EXPERIMENTAL
-- **Konfigurationsmanagement**: Bearbeiten und Anwenden von `flakes.nix` und den Modulen.
-- **Systemüberwachung**: Ressourcenverbrauch und Dienste überwachen.
-- **Netzwerkverwaltung**: Verbindungen und Firewall-Regeln konfigurieren.
+## Features (Work in Progress)
+- **Bootloader Management**: Configure and manage bootloader entries
+  > ⚠️ EXPERIMENTAL: Use with caution - risk of system damage
+- **Package Management**: Install, remove, and update packages
+  > ⚠️ EXPERIMENTAL: Features under development
+- **Configuration Management**: Edit and apply `flakes.nix` and modules
+- **System Monitoring**: Monitor resource usage and services
+- **Network Management**: Configure connections and firewall rules
 
-## Entwicklung
-1. Starte die Entwicklungsumgebung:
+## Current Status
+This project is under active development. The GUI is not yet implemented, and many features are in experimental state.
+
+## Development Setup
+1. Start the development environment:
    ```bash
    nix-shell
+   ```
+2. Run the program:
+   ```bash
+   run     #for gui 
+   rundebug #for gui with debug mode 
+   ```
 
-    Führe das Programm aus:
-
-    run
-
+## Project Structure
+NixOsControlCenter/
+├── app/                     # Main application directory
+│   ├── nix/                 # App-specific Nix configurations
+│   ├── python/              # Python application
+│   │   ├── assets/          # Resources (Icons, Images, Themes)
+│   │   ├── src/             # Source code
+│   │   │   ├── backend/     # Backend logic
+│   │   │   ├── frontend/    # Frontend components
+│   │   │   └── config/      # Configuration management
+│   │   ├── tests/           # Test suites
+│   │   └── ui/              # UI definitions
+│   └── shell/               # Development environment
+│       ├── hooks/           # Shell hooks and aliases
+│       └── packages/        # Package definitions
+│
+├── nixos/                   # NixOS configuration
+│   ├── modules/             # Modular system configuration
+│   ├── audio-management/    # Audio subsystem
+│   ├── boot-management/     # Boot and kernel
+│   ├── desktop-management/  # Desktop environments
+│   ├── hardware-management/ # Hardware drivers
+│   ├── network-management/  # Network stack
+│   ├── profile-management/  # System profiles
+│   │   └── user-management/ # User management
+│   ├── flake.nix            # Nix flake definition
+│   └── system-config.nix    # Main system configuration
+│
+├── docs/                    # Project documentation
+│   ├── API.md               # API reference
+│   ├── INSTALL.md           # Installation guide
+│   └── USAGE.md             # User manual
+│
+├── logs/                    # Logging directory
+│   └── nixos_error_logs     # System error logs
+│
+├── CHANGELOG.md             # Change history
+├── LICENSE                  # Project license
+├── README.md                # Project overview
+└── shell.nix                # Main development environment

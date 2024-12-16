@@ -1,8 +1,8 @@
 { pkgs ? import <nixpkgs> {} }:
 
 let
-  packages = import ./shell/packages { inherit pkgs; };
-  hooks = import ./shell/hooks { inherit pkgs; };
+  packages = import ./app/shell/packages { inherit pkgs; };
+  hooks = import ./app/shell/hooks { inherit pkgs; };
 in
 
 pkgs.mkShell {
