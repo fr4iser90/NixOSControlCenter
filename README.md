@@ -26,6 +26,8 @@ This project is under active development. The GUI is not yet implemented, and ma
    ```
 
 ## Project Structure
+
+```tree
 NixOsControlCenter/
 ├── app/                     # Main application directory
 │   ├── nix/                 # App-specific Nix configurations
@@ -65,3 +67,4 @@ NixOsControlCenter/
 ├── LICENSE                  # Project license
 ├── README.md                # Project overview
 └── shell.nix                # Main development environment
+```
