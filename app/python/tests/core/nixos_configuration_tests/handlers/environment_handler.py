@@ -38,7 +38,7 @@ class NixOSTestEnvironment:
         logger.info(f"Setting up test environment in: {self.current_environment}")
 
         # Copy required files
-        required_files = ['flake.nix', 'hardware-configuration.nix']
+        required_files = ['flake.nix']
         for file in required_files:
             src = self.nixos_root / file
             dst = self.current_environment / file

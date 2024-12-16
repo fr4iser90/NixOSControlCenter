@@ -1,9 +1,11 @@
+# app/shell/dev/hooks/aliases.nix
+{ pkgs }:
+
 ''
   # Navigation
   alias cdp="cd $PROJECT_ROOT"
   alias cdpy="cd $PYTHON_ROOT"
   alias cdnix="cd $NIX_ROOT"
-  alias cdshared="cd $SHARED_ROOT"
   alias cdsrc="cd $PYTHON_ROOT/src"
   alias cdtest="cd $PYTHON_ROOT/tests"
   

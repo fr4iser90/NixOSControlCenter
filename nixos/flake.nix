@@ -18,6 +18,7 @@
 
     # Base modules required for all systems
     systemModules = [
+
       ./hardware-configuration.nix
       
       # Core system management
@@ -34,6 +35,7 @@
       ./modules/user-management
       ./modules/profile-management
       ./modules/desktop-management
+      ./modules/system-management
     ];
 
 
@@ -50,7 +52,12 @@
               allowUnfree = systemConfig.allowUnfree or false;
             };
           }
-
+          # Shell Alias für nixos-rebuild
+          {
+            programs.bash.shellAliases = {
+              "nixos-rebuild" = "nixos-rebuild-with-check";
+            };
+          }
             # Home Manager integration
             home-manager.nixosModules.home-manager
             {

@@ -1,12 +1,13 @@
+# dev-shell.nix
 { pkgs ? import <nixpkgs> {} }:
 
 let
-  packages = import ./app/shell/packages { inherit pkgs; };
-  hooks = import ./app/shell/hooks { inherit pkgs; };
+  packages = import ./app/shell/dev/packages { inherit pkgs; };
+  hooks = import ./app/shell/dev/hooks { inherit pkgs; };
 in
 
 pkgs.mkShell {
-  name = "NixOsControlCenterEnv";
+  name = "NixOsControlCenter-DevShell";
   inherit (packages) buildInputs;
   
   noNewPrivileges = false;

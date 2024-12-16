@@ -31,7 +31,7 @@ def test_environment(test_tmp_dir, request):
         raise RuntimeError(f"NIXOS_CONFIG_DIR path does not exist: {nixos_config_dir}")
     
     # Verify required files exist
-    required_files = ['flake.nix', 'hardware-configuration.nix']
+    required_files = ['flake.nix']
     missing_files = [f for f in required_files if not (nixos_config_path / f).exists()]
     if missing_files:
         raise RuntimeError(f"Missing required files in {nixos_config_dir}: {missing_files}")

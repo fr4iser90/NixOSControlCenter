@@ -17,13 +17,19 @@ This project is under active development. The GUI is not yet implemented, and ma
 ## Development Setup
 1. Start the development environment:
    ```bash
-   nix-shell
+   nix-shell dev-shell.nix
    ```
-2. Run the program:
+2. Commands available:
    ```bash
-   run     #for gui 
-   rundebug #for gui with debug mode 
+   show-help
+   ```  
+   
+## Installation Setup
+1. Start the installation environment:
+   ```bash
+   nix-shell install-shell.nix
    ```
+2. Follow the installation instructions
 
 ## Project Structure
 
