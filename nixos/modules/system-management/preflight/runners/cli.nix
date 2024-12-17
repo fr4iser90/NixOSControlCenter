@@ -24,23 +24,23 @@ let
   '';
 
   # Check-Runner Funktion
-  runCheck = name: check: ''
-    echo "Running ${name}..."
-    if [ -x "${check}/bin/${name}" ]; then
-      RESULT=$(${check}/bin/${name} 2>&1)
+  runCheck = name: checkSet: ''
+    echo "Running ${checkSet.name or name}..."
+    if [ -x "${checkSet.check}/bin/${checkSet.binary or name}" ]; then
+      RESULT=$(${checkSet.check}/bin/${checkSet.binary or name} 2>&1)
       EXIT_CODE=$?
       
       # Validiere das Ergebnis
-      VALIDATION=$(${validateResult} "$EXIT_CODE" "${check.validate or ""}")
+      VALIDATION=$(${validateResult} "$EXIT_CODE" "${checkSet.validate or ""}")
       
       if [ "$(echo "$VALIDATION" | ${pkgs.jq}/bin/jq -r .success)" = "true" ]; then
-        echo "✓ ${name}: $(echo "$VALIDATION" | ${pkgs.jq}/bin/jq -r .message)"
+        echo "✓ ${checkSet.name or name}: $(echo "$VALIDATION" | ${pkgs.jq}/bin/jq -r .message)"
       else
-        echo "✗ ${name}: $(echo "$VALIDATION" | ${pkgs.jq}/bin/jq -r .message)"
+        echo "✗ ${checkSet.name or name}: $(echo "$VALIDATION" | ${pkgs.jq}/bin/jq -r .message)"
         FAILED=1
       fi
     else
-      echo "! ${name}: Check not executable"
+      echo "! ${checkSet.name or name}: Check not executable"
       FAILED=1
     fi
   '';
@@ -77,6 +77,16 @@ in {
           type = types.str;
           default = "";
           description = "Optional validation command";
+        };
+        name = lib.mkOption {
+          type = types.str;
+          default = "";
+          description = "Display name for the check";
+        };
+        binary = lib.mkOption {
+          type = types.str;
+          default = "";
+          description = "Name of the binary to execute (if different from check name)";
         };
       };
     });

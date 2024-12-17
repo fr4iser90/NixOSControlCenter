@@ -2,50 +2,62 @@
 { config, lib, pkgs, ... }:
 
 let
-  preflightScript = pkgs.writeScriptBin "nixos-rebuild-preflight" ''
+  preflightScript = pkgs.writeScriptBin "gpu-check" ''
     #!${pkgs.bash}/bin/bash
-    set -e
+    set -euo pipefail
     
-    echo "Running preflight checks..."
+    echo "Checking GPU configuration..."
     
     # GPU Detection
-    echo "Checking GPU configuration..."
-    GPU_INFO=$(${pkgs.pciutils}/bin/lspci | grep -E 'VGA|3D|2D')
+    if ! GPU_INFO=$(${pkgs.pciutils}/bin/lspci | grep -E 'VGA|3D|2D'); then
+      echo "Error: Could not detect any GPU devices"
+      exit 1
+    fi
     
-    if echo "$GPU_INFO" | grep -q "NVIDIA" && echo "$GPU_INFO" | grep -q "Intel"; then
+    # Präzisere GPU-Erkennung
+    if echo "$GPU_INFO" | grep -qi "nvidia.*intel\|intel.*nvidia"; then
       DETECTED="nvidia-intel"
-    elif echo "$GPU_INFO" | grep -q "AMD\|ATI" && echo "$GPU_INFO" | grep -q "Intel"; then
+    elif echo "$GPU_INFO" | grep -qi "\\(amd\\|ati\\).*intel\|intel.*(amd\\|ati)"; then
       DETECTED="amd-intel"
-    elif echo "$GPU_INFO" | grep -q "NVIDIA"; then
+    elif echo "$GPU_INFO" | grep -qi "nvidia"; then
       DETECTED="nvidia"
-    elif echo "$GPU_INFO" | grep -q "AMD\|ATI"; then
+    elif echo "$GPU_INFO" | grep -qi "\\(amd\\|ati\\)"; then
       DETECTED="amd"
-    elif echo "$GPU_INFO" | grep -q "Intel"; then
+    elif echo "$GPU_INFO" | grep -qi "intel"; then
       DETECTED="intel"
     else
       DETECTED="generic"
     fi
     
-    CONFIGURED=$(grep 'gpu =' /etc/nixos/system-config.nix | cut -d'"' -f2)
+    if [ ! -f /etc/nixos/system-config.nix ]; then
+      echo "Error: system-config.nix not found"
+      exit 1
+    fi
+    
+    if ! CONFIGURED=$(grep 'gpu =' /etc/nixos/system-config.nix | cut -d'"' -f2); then
+      echo "Error: Could not find GPU configuration in system-config.nix"
+      exit 1
+    fi
     
     echo "Detected GPU: $DETECTED"
     echo "Configured GPU: $CONFIGURED"
     
     if [ "$DETECTED" != "$CONFIGURED" ]; then
-      echo "WARNING: GPU configuration mismatch!"
-      read -p "Continue anyway? [y/N] " response
-      if [[ ! "$response" =~ ^[Yy]$ ]]; then
-        echo "Aborting system rebuild."
-        exit 1
-      fi
+      echo "ERROR: GPU configuration mismatch!"
+      echo "Your system is configured for $CONFIGURED but detected $DETECTED"
+      exit 1
     fi
     
-    # Wenn alles OK, führe den eigentlichen nixos-rebuild aus
-    exec nixos-rebuild "$@"
+    echo "GPU configuration check passed."
+    exit 0
   '';
 
 in {
   config = {
-    environment.systemPackages = [ preflightScript ];
+    system.preflight.checks.gpu = {
+      check = preflightScript;
+      name = "GPU Check";
+      binary = "gpu-check";
+    };
   };
 }

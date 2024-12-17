@@ -1,5 +1,5 @@
 # modules/system-management/preflight/default.nix
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
 let
   preflightWrapper = pkgs.writeScriptBin "nixos-rebuild" ''

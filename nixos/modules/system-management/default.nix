@@ -2,12 +2,9 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 {
-  imports = [
-    # Preflight System
-    ./preflight
-    ./update
-
-  ];
+  imports = 
+    lib.optional (systemConfig.preflightChecks or false) ./preflight
+    ++ lib.optional (systemConfig.flakeUpdater or false) ./update;
 
   options = {
     system.management = {
@@ -25,7 +22,6 @@
   config = {
     # Basis-Konfiguration für System-Management
     environment.systemPackages = with pkgs; [
-      # Basis-Tools für System-Management
       pciutils
       usbutils
       lshw
