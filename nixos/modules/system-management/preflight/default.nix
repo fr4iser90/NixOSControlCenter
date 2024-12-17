@@ -18,7 +18,8 @@ in
 {
   imports = [
     ./checks/hardware/gpu.nix
-    ./checks/hardware/runners/cli.nix
+    ./checks/system/users.nix
+    ./runners/cli.nix
   ];
 
   config = lib.mkIf config.system.management.enablePreflight {
