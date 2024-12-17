@@ -2,7 +2,7 @@
 { config, lib, pkgs, ... }:
 
 let
-  preflightWrapper = pkgs.writeScriptBin "nixos-rebuild-with-checks" ''
+  preflightWrapper = pkgs.writeScriptBin "flake-rebuild-with-checks" ''
     #!${pkgs.bash}/bin/bash
     set -e
 
@@ -34,7 +34,7 @@ in
 
     # Wrapper für alle nixos-rebuild Varianten
     programs.bash.shellAliases = lib.mkForce {
-      "nixos-rebuild" = "nixos-rebuild-with-checks";
+      "flake-rebuild" = "flake-rebuild-with-checks";
     };
   };
 }

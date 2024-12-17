@@ -13,13 +13,13 @@ let
     GPU_INFO=$(${pkgs.pciutils}/bin/lspci | grep -E 'VGA|3D|2D')
     
     if echo "$GPU_INFO" | grep -q "NVIDIA" && echo "$GPU_INFO" | grep -q "Intel"; then
-      DETECTED="nvidiaIntelPrime"
+      DETECTED="nvidia-intel"
     elif echo "$GPU_INFO" | grep -q "AMD\|ATI" && echo "$GPU_INFO" | grep -q "Intel"; then
-      DETECTED="amdIntelPrime"
+      DETECTED="amd-intel"
     elif echo "$GPU_INFO" | grep -q "NVIDIA"; then
       DETECTED="nvidia"
     elif echo "$GPU_INFO" | grep -q "AMD\|ATI"; then
-      DETECTED="amdgpu"
+      DETECTED="amd"
     elif echo "$GPU_INFO" | grep -q "Intel"; then
       DETECTED="intel"
     else

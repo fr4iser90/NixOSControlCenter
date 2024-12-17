@@ -37,7 +37,7 @@
   darkMode = true;
 
   # Hardware
-  gpu = "amdgpu";
+  gpu = "amd";
   audio = "pipewire";
   
   # Sicherheit
