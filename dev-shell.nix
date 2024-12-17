@@ -8,8 +8,8 @@ in
 
 pkgs.mkShell {
   name = "NixOsControlCenter-DevShell";
-  inherit (packages) buildInputs;
-  
+  buildInputs = packages.buildInputs;
+
   noNewPrivileges = false;
   PKG_CONFIG_PATH = "${pkgs.pkg-config}/bin";
 
