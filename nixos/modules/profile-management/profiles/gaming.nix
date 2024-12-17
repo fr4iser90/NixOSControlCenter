@@ -2,9 +2,6 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 {
-
-  
-  # Pakete
   environment.systemPackages = with pkgs; [
     # Development
     vscode
@@ -16,9 +13,9 @@
     # Gaming
     lutris
     fzf
-    #wine
-    #winetricks
-    #wineWowPackages.full
+    wine
+    winetricks
+    wineWowPackages.full
     noisetorch
 
     # Multimedia & Communication
@@ -39,14 +36,7 @@
   ];
 
   
-  programs = {
-    steam.enable = true;
-    git = {
-      enable = true;
-      config = {
-        credential.helper = "manager"; 
-      };
-    };
-  };
+  programs.steam.enable = true;
+
 
 }

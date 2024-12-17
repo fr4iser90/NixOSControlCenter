@@ -7,7 +7,7 @@
   allowUnfree = true;
   # Experimental Features
   entryManagement = true;
-  preflightChecks = true;
+  preflightChecks = true;   # Checks for hardware compatibility ( CPU, GPU, )
   sshManager = true;
   flakeUpdater = true; # true or false auto maybe coming?
 

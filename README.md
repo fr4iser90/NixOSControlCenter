@@ -2,6 +2,22 @@
 
 A graphical tool for managing packages, configurations, and devices on NixOS systems.
 
+## TODO
+- [ ] GUI
+- [ ] Documentation
+- [ ] Testing
+- [ ] CI/CD
+- [ ] Docker to nix 
+
+# Modular NixOS Configuration
+
+   ```bash
+   sudo upate-nixos-flake   # upadate flake and modules
+   ```  
+   ```bash
+   sudo check-and-build   # use preflight hardware checks if activated 
+   ```
+
 ## Features (Work in Progress)
 - **Bootloader Management**: Configure and manage bootloader entries
   > ⚠️ EXPERIMENTAL: Use with caution - risk of system damage
@@ -11,7 +27,7 @@ A graphical tool for managing packages, configurations, and devices on NixOS sys
 - **System Monitoring**: Monitor resource usage and services
 - **Network Management**: Configure connections and firewall rules
 
-## Current Status
+## Current Status (Work in Progress, actual more time investing in configuration)
 This project is under active development. The GUI is not yet implemented, and many features are in experimental state.
 
 ## Development Setup
@@ -29,6 +45,8 @@ This project is under active development. The GUI is not yet implemented, and ma
    ```bash
    nix-shell install-shell.nix
    ```
+
+
 2. Follow the installation instructions
 
 ## Project Structure
