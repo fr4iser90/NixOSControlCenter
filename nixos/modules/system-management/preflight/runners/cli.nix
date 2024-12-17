@@ -27,16 +27,15 @@ let
   runCheck = name: checkSet: ''
     echo "Running ${checkSet.name or name}..."
     if [ -x "${checkSet.check}/bin/${checkSet.binary or name}" ]; then
-      RESULT=$(${checkSet.check}/bin/${checkSet.binary or name} 2>&1)
+      # Direkte Ausführung des Checks ohne Capture
+      ${checkSet.check}/bin/${checkSet.binary or name}
       EXIT_CODE=$?
       
-      # Validiere das Ergebnis
-      VALIDATION=$(${validateResult}/bin/validate-result "$EXIT_CODE" "${checkSet.validate or ""}")
-      
-      if [ "$(echo "$VALIDATION" | ${pkgs.jq}/bin/jq -r .success)" = "true" ]; then
-        echo "✓ ${checkSet.name or name}: $(echo "$VALIDATION" | ${pkgs.jq}/bin/jq -r .message)"
+      if [ $EXIT_CODE -eq 0 ]; then
+        # Nur den finalen Status ausgeben wenn der Check erfolgreich war
+        echo "✓ ${checkSet.name or name}: Check passed"
       else
-        echo "✗ ${checkSet.name or name}: $(echo "$VALIDATION" | ${pkgs.jq}/bin/jq -r .message)"
+        echo "✗ ${checkSet.name or name}: Check failed"
         FAILED=1
       fi
     else
@@ -57,11 +56,9 @@ let
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList runCheck config.system.preflight.checks)}
     
     if [ "$FAILED" -eq 1 ]; then
-      echo "Some checks failed. Please review the messages above."
       exit 1
     fi
     
-    echo "All checks passed successfully!"
     exit 0
   '';
 

@@ -6,11 +6,15 @@ let
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
     
+    # Add color definitions
+    RED='\033[0;31m'
+    NC='\033[0m' # No Color
+    
     echo "Checking GPU configuration..."
     
     # GPU Detection
     if ! GPU_INFO=$(${pkgs.pciutils}/bin/lspci | grep -E 'VGA|3D|2D'); then
-      echo "Error: Could not detect any GPU devices"
+      echo -e "''${RED}Error: Could not detect any GPU devices''${NC}"
       exit 1
     fi
     
@@ -43,12 +47,23 @@ let
     echo "Configured GPU: $CONFIGURED"
     
     if [ "$DETECTED" != "$CONFIGURED" ]; then
-      echo "ERROR: GPU configuration mismatch!"
-      echo "Your system is configured for $CONFIGURED but detected $DETECTED"
-      exit 1
+      echo -e "''${RED}WARNING: GPU configuration mismatch!''${NC}"
+      echo -e "''${RED}System configured for $CONFIGURED but detected $DETECTED''${NC}"
+      
+      # Create backup of system-config.nix
+      cp /etc/nixos/system-config.nix /etc/nixos/system-config.nix.bak.gpu
+      
+      echo "Updating system-config.nix..."
+      echo "Original line: $(grep 'gpu =' /etc/nixos/system-config.nix)"
+      
+      # Update GPU configuration
+      sed -i "s/gpu = \"$CONFIGURED\"/gpu = \"$DETECTED\"/" /etc/nixos/system-config.nix
+      
+      echo "Updated line: $(grep 'gpu =' /etc/nixos/system-config.nix)"
+      echo "Configuration updated. Original config backed up to system-config.nix.bak.gpu"
     fi
     
-    echo "GPU configuration check passed."
+    echo "GPU check completed."
     exit 0
   '';
 

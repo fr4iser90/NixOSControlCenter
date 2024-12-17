@@ -38,6 +38,7 @@
 
   # Hardware
   gpu = "amd";
+  cpu = "amd";
   audio = "pipewire";
   
   # Sicherheit

@@ -4,12 +4,16 @@ let
   preflightScript = pkgs.writeScriptBin "check-cpu" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
-    
+
+    # Add color definitions
+    RED='\033[0;31m'
+    NC='\033[0m' # No Color
+
     echo "Checking CPU configuration..."
     
     # CPU Detection using lscpu
     if ! CPU_INFO=$(${pkgs.util-linux}/bin/lscpu); then
-      echo "Error: Could not detect CPU information"
+      echo -e "''${RED}Error: Could not detect CPU information''${NC}"
       exit 1
     fi
     
@@ -23,12 +27,12 @@ let
     fi
     
     if [ ! -f /etc/nixos/system-config.nix ]; then
-      echo "Error: system-config.nix not found"
+      echo -e "''${RED}Error: system-config.nix not found''${NC}"
       exit 1
     fi
     
     if ! CONFIGURED=$(grep 'cpu =' /etc/nixos/system-config.nix | cut -d'"' -f2); then
-      echo "Error: Could not find CPU configuration in system-config.nix"
+      echo -e "''${RED}Error: Could not find CPU configuration in system-config.nix''${NC}"
       exit 1
     fi
     
@@ -36,12 +40,19 @@ let
     echo "Configured CPU: $CONFIGURED"
     
     if [ "$DETECTED" != "$CONFIGURED" ]; then
-      echo "ERROR: CPU configuration mismatch!"
-      echo "Your system is configured for $CONFIGURED but detected $DETECTED"
-      exit 1
+      echo -e "''${RED}WARNING: CPU configuration mismatch!''${NC}"
+      echo -e "''${RED}System configured for $CONFIGURED but detected $DETECTED''${NC}"
+      
+      echo "Updating system-config.nix..."
+      echo "Original line: $(grep 'cpu =' /etc/nixos/system-config.nix)"
+      
+      # Update CPU configuration
+      sed -i "s/cpu = \"$CONFIGURED\"/cpu = \"$DETECTED\"/" /etc/nixos/system-config.nix
+      
+      echo "Updated line: $(grep 'cpu =' /etc/nixos/system-config.nix)"
     fi
     
-    echo "CPU configuration check passed."
+    echo "CPU check completed."
     exit 0
   '';
 

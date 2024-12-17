@@ -3,7 +3,7 @@
 {
   imports = [
     ./gpu
-#    ./cpu
+    ./cpu
   ];
 
   assertions = [
