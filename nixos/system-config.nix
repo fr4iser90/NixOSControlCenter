@@ -8,6 +8,8 @@
   # Experimental Features
   entryManagement = true;
   preflightChecks = true;
+  sshManager = true;
+  flakeUpdater = true; # true or false auto maybe coming?
 
   # Benutzer-Konfiguration
   users = {

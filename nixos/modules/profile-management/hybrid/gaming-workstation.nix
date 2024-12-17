@@ -15,6 +15,7 @@
 
     # Gaming
     lutris
+    fzf
     #wine
     #winetricks
     #wineWowPackages.full

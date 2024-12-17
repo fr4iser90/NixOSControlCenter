@@ -5,12 +5,8 @@
   imports = [
     # Preflight System
     ./preflight
-    
-    # Hier können später weitere System-Management Module kommen
-    # ./monitoring
-    # ./maintenance
-    # ./backup
-    # etc.
+    ./update
+
   ];
 
   options = {

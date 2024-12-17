@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
 let
   ssh-manager = pkgs.writeScriptBin "ssh-manager" ''
@@ -95,23 +95,32 @@ let
     main
   '';
 
+  # Erstelle einen Wrapper für ssh-connect
+  ssh-connect = pkgs.writeScriptBin "ssh-connect" ''
+    #!${pkgs.bash}/bin/bash
+    exec ${ssh-manager}/bin/ssh-manager "$@"
+  '';
+
 in {
   config = {
     environment.systemPackages = [ 
       ssh-manager
+      ssh-connect  # Füge den Wrapper hinzu
       pkgs.fzf
       pkgs.openssh
     ];
     
-    system.activationScripts.sshManagerSetup = ''
-      if [ ! -f /home/$USER/.creds ]; then
-        touch /home/$USER/.creds
-        chmod 600 /home/$USER/.creds
-        chown $USER:$USER /home/$USER/.creds
-      fi
-      
-      # Symlink für ssh-* Befehle
-      ln -sf ${ssh-manager}/bin/connect-server /run/current-system/sw/bin/ssh-connect
+    # Erstelle .creds nur für konfigurierte Benutzer
+    system.activationScripts.sshManagerSetup = let
+      configuredUsers = lib.attrNames systemConfig.users;
+      setupForUser = user: ''
+        if [ ! -f /home/${user}/.creds ]; then
+          install -m 600 -o ${user} -g ${user} /dev/null /home/${user}/.creds
+        fi
+      '';
+    in ''
+      # Erstelle .creds für konfigurierte Benutzer
+      ${lib.concatMapStrings setupForUser configuredUsers}
     '';
   };
 }

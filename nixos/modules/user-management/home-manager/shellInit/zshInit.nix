@@ -12,8 +12,8 @@
     nix-zsh-completions
     oh-my-zsh
     autojump
-    powerline-fonts    # Wichtig für Agnoster/Powerlevel10k
-    meslo-lgs-nf      # Empfohlene Schriftart für Powerlevel10k
+    powerline-fonts   
+    meslo-lgs-nf      
   ];
 
   programs.zsh = {
@@ -30,7 +30,7 @@
         "sudo"
         "autojump"
       ];
-      theme = "agnoster";  # oder "powerlevel10k/powerlevel10k" wenn du das bevorzugst
+      theme = "agnoster";
     };
 
     initExtra = ''
@@ -38,9 +38,7 @@
       alias ll='ls -lah'
       alias la='ls -A'
       alias l='ls -CF'
-      alias buildNix='bash ~/Documents/nixos/build.sh'
-      alias connect='bash ~/.scripts/connect.sh'
-      alias connectDeploy='bash ~/.scripts/connectDeploy.sh'
+      alias buildNix='bash ~/Documents/build.sh'
     '';
   };
 }
