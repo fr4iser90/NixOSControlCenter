@@ -59,5 +59,6 @@ in {
       name = "GPU Check";
       binary = "gpu-check";
     };
+    environment.systemPackages = [ preflightScript ];
   };
 }

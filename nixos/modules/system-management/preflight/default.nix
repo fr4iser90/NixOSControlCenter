@@ -22,7 +22,7 @@ in
     ./runners/cli.nix
   ];
 
-  config = lib.mkIf config.system.management.enablePreflight {
+  config = {
     environment.systemPackages = with pkgs; [
       pciutils
       coreutils

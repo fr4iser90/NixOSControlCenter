@@ -1,5 +1,5 @@
 # modules/system-management/preflight/runners/cli.nix
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
 let
   inherit (lib) types;
@@ -94,7 +94,7 @@ in {
     description = "Set of system.preflight.checks to run";
   };
 
-  config = lib.mkIf config.system.management.enablePreflight {
+  config = {
     environment.systemPackages = [ checkRunner ];
   };
 }
