@@ -5,6 +5,7 @@ let
   # Import sub-modules based on configuration
   networkingModules = [
     ./networkmanager.nix
+    ./tools
 #    ./firewall.nix
     # Conditional imports based on systemConfig settings
     #(lib.mkIf systemConfig.enableWireless ./wireless.nix)
