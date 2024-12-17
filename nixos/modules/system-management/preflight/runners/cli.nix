@@ -5,7 +5,7 @@ let
   inherit (lib) types;
 
   # Validierungs-Script
-  validateResult = pkgs.writeScript "validate-result" ''
+  validateResult = pkgs.writeScriptBin "validate-result" ''
     #!${pkgs.bash}/bin/bash
     RESULT="$1"
     VALIDATION="$2"
@@ -31,7 +31,7 @@ let
       EXIT_CODE=$?
       
       # Validiere das Ergebnis
-      VALIDATION=$(${validateResult} "$EXIT_CODE" "${checkSet.validate or ""}")
+      VALIDATION=$(${validateResult}/bin/validate-result "$EXIT_CODE" "${checkSet.validate or ""}")
       
       if [ "$(echo "$VALIDATION" | ${pkgs.jq}/bin/jq -r .success)" = "true" ]; then
         echo "✓ ${checkSet.name or name}: $(echo "$VALIDATION" | ${pkgs.jq}/bin/jq -r .message)"
@@ -63,6 +63,26 @@ let
     
     echo "All checks passed successfully!"
     exit 0
+  '';
+
+  # Neuer check-and-build Befehl
+  checkAndBuild = pkgs.writeShellScriptBin "check-and-build" ''
+    #!${pkgs.bash}/bin/bash
+    
+    if [ $# -eq 0 ]; then
+      echo "Usage: check-and-build [nixos-rebuild options]"
+      echo "Example: check-and-build switch"
+      exit 1
+    fi
+
+    echo "Running preflight checks..."
+    if ! run-system.preflight.checks; then
+      echo "Preflight checks failed!"
+      exit 1
+    fi
+
+    echo "Checks passed! Running nixos-rebuild..."
+    exec ${pkgs.nixos-rebuild}/bin/nixos-rebuild "$@" 
   '';
 
 in {
