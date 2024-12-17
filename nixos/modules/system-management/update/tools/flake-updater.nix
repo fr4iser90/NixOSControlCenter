@@ -4,8 +4,15 @@ let
   update-flake = pkgs.writeScriptBin "update-nixos-flake" ''
     #!${pkgs.bash}/bin/bash
     
+    # Sudo-Check
+    if [ "$EUID" -ne 0 ]; then
+      echo -e "''${RED}This script must be run as root (use sudo)''${NC}"
+      echo "Usage: sudo update-nixos-flake"
+      exit 1
+    fi
+
     # Konfiguration
-    REPO_URL="https://github.com/fr4iser90/NixOsControlCenter"
+    REPO_URL="https://github.com/fr4iser90/NixOsControlCenter.git"
     NIXOS_DIR="/etc/nixos"
     TEMP_DIR="/tmp/nixos-update"
     BACKUP_ROOT="/var/backup/nixos"
@@ -17,46 +24,34 @@ let
     NC='\033[0m'
     
     # Branch-Auswahl
-    select_branch() {
-      echo -e "''${YELLOW}Select branch to use:''${NC}"
-      select branch in "main (stable)" "develop" "experimental" "Custom"; do
-        case $branch in
-          "main (stable)")
-            echo "main"
-            break
-            ;;
-          "develop"|"experimental")
-            echo "$branch"
-            break
-            ;;
-          "Custom")
-            read -p "Enter branch name: " custom
-            echo "$custom"
-            break
-            ;;
-        esac
-      done
-    }
+    PS3="Select a branch: "
+    branches=("main" "develop" "experimental" "custom")
     
-    # Cleanup-Funktion
-    cleanup() {
-      echo -e "''${YELLOW}Cleaning up temporary files...''${NC}"
-      rm -rf "$TEMP_DIR"
-    }
+    echo -e "''${YELLOW}Available branches:''${NC}"
+    select branch in "''${branches[@]}"; do
+      case $branch in
+        "main"|"develop"|"experimental")
+          SELECTED_BRANCH=$branch
+          break
+          ;;
+        "custom")
+          read -p "Enter custom branch name: " SELECTED_BRANCH
+          break
+          ;;
+        *) 
+          echo "Invalid selection"
+          ;;
+      esac
+    done
     
-    # Trap für cleanup
-    trap cleanup EXIT
-    
-    # Branch wählen
-    BRANCH=$(select_branch)
-    echo -e "''${YELLOW}Selected branch: $BRANCH''${NC}"
+    echo -e "''${YELLOW}Selected branch:''${NC} $SELECTED_BRANCH"
     
     # Temporäres Verzeichnis erstellen und Repository klonen
     echo -e "''${YELLOW}Cloning repository...''${NC}"
     rm -rf "$TEMP_DIR"
     mkdir -p "$TEMP_DIR"
     
-    if ! git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$TEMP_DIR"; then
+    if ! git clone --depth 1 --branch "$SELECTED_BRANCH" "$REPO_URL" "$TEMP_DIR"; then
       echo -e "''${RED}Failed to clone repository!''${NC}"
       exit 1
     fi
@@ -108,7 +103,6 @@ in {
       pkgs.git
     ];
     
-    # Backup-Verzeichnis erstellen und Berechtigungen setzen
     system.activationScripts.nixosBackupDir = ''
       mkdir -p /var/backup/nixos
       chmod 700 /var/backup/nixos
