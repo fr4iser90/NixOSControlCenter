@@ -1,10 +1,6 @@
-# modules/profiles/types/hybrid/gaming-workstation.nix
+# modules/profiles/types/hybrid/workstation.nix
 { config, lib, pkgs, systemConfig, ... }:
-
 {
-
-  
-  # Pakete
   environment.systemPackages = with pkgs; [
     vscode
     godot_4
@@ -19,8 +15,8 @@
     vlc
     ffmpeg
     audacity
+    jellyfin-media-player
     owncloud-client
-    # System Tools
     kitty
     kate
     pavucontrol

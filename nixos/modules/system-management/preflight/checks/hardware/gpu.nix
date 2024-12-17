@@ -49,16 +49,16 @@ let
     if [ "$DETECTED" != "$CONFIGURED" ]; then
       echo -e "''${RED}WARNING: GPU configuration mismatch!''${NC}"
       echo -e "''${RED}System configured for $CONFIGURED but detected $DETECTED''${NC}"
-      
+
       # Create backup of system-config.nix
       cp /etc/nixos/system-config.nix /etc/nixos/system-config.nix.bak.gpu
-      
+
       echo "Updating system-config.nix..."
       echo "Original line: $(grep 'gpu =' /etc/nixos/system-config.nix)"
-      
+
       # Update GPU configuration
       sed -i "s/gpu = \"$CONFIGURED\"/gpu = \"$DETECTED\"/" /etc/nixos/system-config.nix
-      
+
       echo "Updated line: $(grep 'gpu =' /etc/nixos/system-config.nix)"
       echo "Configuration updated. Original config backed up to system-config.nix.bak.gpu"
     fi
@@ -77,3 +77,4 @@ in {
     environment.systemPackages = [ preflightScript ];
   };
 }
+

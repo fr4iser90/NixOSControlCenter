@@ -9,7 +9,7 @@
   entryManagement = true;
   preflightChecks = true;   # Checks for hardware compatibility ( CPU, GPU, )
   sshManager = true;
-  flakeUpdater = true; # true or false auto maybe coming?
+  flakeUpdater = true; # true or false 
 
   # Benutzer-Konfiguration
   users = {

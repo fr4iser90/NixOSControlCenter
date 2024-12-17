@@ -93,7 +93,7 @@ let
     
     echo -e "''${GREEN}Update completed successfully!''${NC}"
     echo -e "''${YELLOW}Backup created in: $BACKUP_DIR''${NC}"
-    echo -e "''${YELLOW}You can now run 'sudo nixos-rebuild switch' to apply changes.''${NC}"
+    echo -e "''${YELLOW}You can now run 'sudo check-and-build switch --flake /etc/nixos#HostName' to apply changes.''${NC}"
   '';
 
 in {
