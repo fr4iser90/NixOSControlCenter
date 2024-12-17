@@ -73,7 +73,7 @@ in {
     
     defaultDetailLevel = mkOption {
       type = lib.types.enum (attrNames reportLevels);
-      default = "full";
+      default = systemConfig.buildLogLevel or "standard";
       description = "Default detail level for all reports";
     };
 
@@ -100,6 +100,11 @@ in {
     {
       system.reporting = {
         enable = mkDefault true;
+        defaultDetailLevel = mkDefault (
+          if systemConfig ? buildLogLevel 
+          then systemConfig.buildLogLevel
+          else "standard"
+        );
       };
     }
 

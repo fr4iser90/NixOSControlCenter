@@ -48,6 +48,9 @@
   };
   enableFirewall = false;
   
+  # Build-LogLevel
+  buildLogLevel = "minimal"; # detailed, standard, minimal, full
+
   # Optionale Überschreibungen der Profil-Defaults
   overrides = {
     enableSSH = null;
