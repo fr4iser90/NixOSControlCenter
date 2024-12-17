@@ -33,6 +33,7 @@ in
 {
   imports = [
     ./checks/hardware/gpu.nix
+    ./checks/hardware/cpu.nix
     ./checks/system/users.nix
     ./runners/cli.nix
   ];
