@@ -2,7 +2,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  preflightWrapper = pkgs.writeScriptBin "nixos-rebuild" ''
+  preflightWrapper = pkgs.writeScriptBin "nixos-rebuild-with-checks" ''
     #!${pkgs.bash}/bin/bash
     set -e
 
@@ -30,6 +30,12 @@ in
       gawk
       jq
       preflightWrapper
+      nixos-rebuild
     ];
+
+    # Shell-Alias für nixos-rebuild
+    programs.bash.shellAliases = {
+      "nixos-rebuild" = "nixos-rebuild-with-checks";
+    };
   };
 }

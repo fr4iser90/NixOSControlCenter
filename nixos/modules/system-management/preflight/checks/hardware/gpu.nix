@@ -2,7 +2,7 @@
 { config, lib, pkgs, ... }:
 
 let
-  preflightScript = pkgs.writeScriptBin "gpu-check" ''
+  preflightScript = pkgs.writeScriptBin "check-gpu" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
     
@@ -57,7 +57,7 @@ in {
     system.preflight.checks.gpu = {
       check = preflightScript;
       name = "GPU Check";
-      binary = "gpu-check";
+      binary = "check-gpu";
     };
     environment.systemPackages = [ preflightScript ];
   };
