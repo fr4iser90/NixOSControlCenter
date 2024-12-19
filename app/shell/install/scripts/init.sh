@@ -62,6 +62,9 @@ main() {
             exit 1
         }
         
+        # Bereinige mögliche %-Zeichen in der Konfigurationsdatei
+        sed -i 's/%$//' "$SYSTEM_CONFIG_FILE"
+        
         # 2. System-Deploy und Build
         deploy_config || {
             log_error "Config deployment failed"
