@@ -6,6 +6,7 @@ get_gpu_info() {
     local gpu_config="unknown"
     local found_gpus=()
     local primary_bus_id=""
+    local secondary_bus_id=""
     local has_dgpu=false
     local has_igpu=false
 
@@ -36,12 +37,11 @@ get_gpu_info() {
                     ;;
             esac
 
-            # Erste dedizierte GPU als primär setzen
-            if [ -z "$primary_bus_id" ] && [ "$has_dgpu" = true ]; then
+            # Bus IDs setzen
+            if [ "$has_dgpu" = true ] && [ -z "$primary_bus_id" ]; then
                 primary_bus_id="$bus_id"
-            # Sonst erste GPU überhaupt
-            elif [ -z "$primary_bus_id" ]; then
-                primary_bus_id="$bus_id"
+            elif [ "$has_igpu" = true ] && [ -z "$secondary_bus_id" ]; then
+                secondary_bus_id="$bus_id"
             fi
         done < <(lspci | grep -E "VGA|3D|Display")
 
@@ -73,7 +73,8 @@ get_gpu_info() {
 
         log_info "GPU Configuration:"
         log_info "  Type: ${CYAN}${gpu_config}${NC}"
-        log_info "  Primary Bus ID: ${CYAN}${primary_bus_id}${NC}"
+        log_info "  Primary GPU Bus ID: ${CYAN}${primary_bus_id}${NC}"
+        [ -n "$secondary_bus_id" ] && log_info "  Secondary GPU Bus ID: ${CYAN}${secondary_bus_id}${NC}"
         
         if [ "${DEBUG:-false}" = true ]; then
             log_debug "Found GPUs: ${found_gpus[*]}"
@@ -87,7 +88,8 @@ get_gpu_info() {
 
     # Variablen für weitere Verarbeitung
     export GPU_CONFIG="$gpu_config"
-    export GPU_BUS_ID="$primary_bus_id"
+    export GPU_PRIMARY_BUS="$primary_bus_id"
+    export GPU_SECONDARY_BUS="$secondary_bus_id"
 }
 
 # Ausführen
