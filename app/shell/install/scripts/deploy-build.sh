@@ -55,17 +55,25 @@ if [[ -n "$docker_config" ]]; then
     done
 
     if ! systemctl is-active docker >/dev/null 2>&1; then
-        echo "Docker service not ready. Please reboot and run:"
-        echo "sudo cp -r $docker_config /home/docker/docker"
+        echo "Docker service not ready. Please reboot first."
         exit 1
     fi
 
     echo "Setting up Docker configuration..."
-    # Frage nach Docker-User wenn nicht gesetzt
-    if [ -z "\${VIRT_USER}" ]; then
-        read -p "Enter Docker user name [docker]: " VIRT_USER
-        VIRT_USER=\${VIRT_USER:-docker}
-    fi
+    # Frage nach benötigten Variablen
+    read -p "Enter Docker user name [docker]: " VIRT_USER
+    VIRT_USER=\${VIRT_USER:-docker}
+    read -p "Enter email address: " USER_EMAIL
+    read -p "Enter domain: " USER_DOMAIN
+    read -p "Enter certificate email: " CERT_EMAIL
+
+    # Prüfe Variablen
+    for var in VIRT_USER USER_EMAIL USER_DOMAIN CERT_EMAIL; do
+        if [[ -z "\${!var}" ]]; then
+            echo "Error: \$var is required"
+            exit 1
+        fi
+    done
     
     local docker_home="/home/\${VIRT_USER}"
     local docker_dest="\${docker_home}/docker"
@@ -79,14 +87,33 @@ if [[ -n "$docker_config" ]]; then
     fi
     
     # Erstelle Docker-Verzeichnisstruktur
+    echo "Creating Docker directory structure"
     sudo mkdir -p "\${docker_dest}"/{compose,data,config}
     
     # Kopiere Docker-Konfiguration
+    echo "Deploying Docker configuration"
     sudo cp -r "$docker_config"/* "\${docker_dest}/"
     
     # Setze Berechtigungen
+    echo "Setting permissions"
     sudo chown -R "\${VIRT_USER}:\${VIRT_USER}" "\${docker_dest}"
     sudo chmod -R 755 "\${docker_dest}"
+    
+    # Ersetze Platzhalter
+    echo "Updating configuration files"
+    find "\${docker_dest}" -type f -name "*.yml" -o -name "*.env" | while read -r file; do
+        sudo sed -i \
+            -e "s|{{EMAIL}}|\${USER_EMAIL}|g" \
+            -e "s|{{DOMAIN}}|\${USER_DOMAIN}|g" \
+            -e "s|{{CERTEMAIL}}|\${CERT_EMAIL}|g" \
+            -e "s|{{USER}}|\${VIRT_USER}|g" \
+            "\$file"
+    done
+    
+    # Setze spezielle Berechtigungen für sensitive Dateien
+    find "\${docker_dest}" -type f -name "*.key" -o -name "*.pem" -o -name "*.crt" | while read -r file; do
+        sudo chmod 600 "\$file"
+    done
     
     echo "Docker configuration deployed!"
 fi
