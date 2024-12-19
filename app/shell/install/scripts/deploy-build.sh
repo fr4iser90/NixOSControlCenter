@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-
 deploy_config() {
     log_section "Deploying Configuration"
     
@@ -25,15 +23,35 @@ deploy_config() {
         cp -r "/etc/nixos/secrets" "$nixos_dir/"
     fi
     
+    # Erstelle Build-Skript
+    local hostname=$(hostname)
+    local build_script="${NIXOS_CONFIG_DIR}/build-${hostname}.sh"
+    
+    cat > "$build_script" << EOF
+#!/usr/bin/env bash
+set -e  # Exit bei Fehlern
+
+echo "Copying configuration..."
+sudo cp -r $nixos_dir/* /etc/nixos/
+
+echo "Building system..."
+sudo nixos-rebuild switch --flake /etc/nixos#${hostname}
+
+echo "Cleaning up..."
+rm -rf $nixos_dir
+
+echo "Build complete!"
+EOF
+    
+    chmod +x "$build_script"
+    
     log_success "Configuration prepared"
-    log_info "Please run the following commands manually after exiting the shell:"
+    log_info "Please run the following script after exiting the shell:"
     echo
-    echo "sudo cp -r $nixos_dir/* /etc/nixos/"
-    echo "sudo nixos-rebuild switch --flake /etc/nixos#Hostname"
-    echo "rm -rf $nixos_dir"
+    echo "$build_script"
     echo
-    log_info "Press any key to exit the shell..."
-    read -n 1
+    log_info "Press Ctrl+D to exit the shell, then run the script"
+    
     exit 0
 }
 

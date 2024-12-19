@@ -1,21 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-
-
-# Prüfe auf Build-Skript von vorherigem Durchlauf
-if [ -f "/tmp/nixos-build-path" ]; then
-    build_script=$(cat "/tmp/nixos-build-path")
-    rm "/tmp/nixos-build-path"
-    
-    # Kleine Pause um sicherzustellen, dass die Shell richtig beendet wurde
-    sleep 1
-    
-    # Führe das Build-Skript aus und warte
-    exec "$build_script"
-    exit 0  # Sollte nie erreicht werden wegen exec
-fi
-
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/prompts/setup-mode.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/prompts/setup-rules.sh"
