@@ -19,17 +19,29 @@ fi
 main() {
     log_header "NixOS System Setup"
     
-    # 1. System Checks
-    source "${INSTALL_SCRIPTS_SETUP}/config/collect-system-data.sh"
-    
-    # 2. Installation Mode
+    # 1. Installation Mode ZUERST
     log_section "Setup Mode"
     
-    # Hole die Auswahl und konvertiere sie in ein Array
-    IFS=' ' read -ra selected_modules <<< "$(select_setup_mode)"
+    # Interaktive Auswahl des Setup-Modus
+    if ! selected_modules=$(select_setup_mode); then
+        log_error "Setup mode selection failed"
+        exit 1
+    fi
+    
+    # Konvertiere in Array
+    IFS=' ' read -ra selected_modules <<< "$selected_modules"
     
     # Debug-Ausgabe
     echo "Debug: Ausgewählte Module: ${selected_modules[@]}"
+    
+    # Prüfe ob überhaupt etwas ausgewählt wurde
+    if [[ ${#selected_modules[@]} -eq 0 ]]; then
+        log_error "No setup mode selected"
+        exit 1
+    }
+    
+    # 2. System Checks DANACH
+    source "${INSTALL_SCRIPTS_SETUP}/config/collect-system-data.sh"
     
     # Bestimme den Basis-Typ
     local setup_type
@@ -44,7 +56,10 @@ main() {
     fi
 
     # Führe das entsprechende Setup-Script aus (VOR Deploy!)
-    "${INSTALL_SCRIPTS_SETUP}/modes/model-setup/${setup_type}-setup.sh" "${selected_modules[@]}"
+    if ! "${INSTALL_SCRIPTS_SETUP}/modes/model-setup/${setup_type}-setup.sh" "${selected_modules[@]}"; then
+        log_error "Setup script failed"
+        exit 1
+    fi
     
     # Spezielle Behandlung für Homelab
     if [[ "$setup_type" == "homelab" ]]; then
