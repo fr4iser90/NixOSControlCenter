@@ -4,6 +4,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/prompts/setup-mode.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/prompts/setup-rules.sh"
+
 main() {
     log_header "NixOS System Setup"
     
@@ -13,26 +14,26 @@ main() {
     # 2. Installation Mode
     log_section "Setup Mode"
     
-    local selection
-    selection=$(select_setup_mode)
+    # Hole die Auswahl und konvertiere sie in ein Array
+    IFS=' ' read -ra selected_modules <<< "$(select_setup_mode)"
     
-    # Extrahiere die tatsächliche Auswahl (entferne den "Final selection" Text)
-    local cleaned_selection=$(echo "$selection" | grep -v "Final selection" | tr -d '\n')
+    # Debug-Ausgabe
+    echo "Debug: Ausgewählte Module: ${selected_modules[@]}"
     
     # Bestimme den Basis-Typ
     local setup_type
-    if [[ "$cleaned_selection" == *"Desktop"* ]]; then
+    if [[ "${selected_modules[0]}" == "Desktop" ]]; then
         setup_type="desktop"
-    elif [[ "$cleaned_selection" == *"Server"* ]]; then
+    elif [[ "${selected_modules[0]}" == "Server" ]]; then
         setup_type="server"
-    elif [[ "$cleaned_selection" == *"Homelab"* ]]; then
+    elif [[ "${selected_modules[0]}" == "Homelab" ]]; then
         setup_type="homelab"
     else
         setup_type="custom"
     fi
     
     # Führe das entsprechende Setup-Script aus
-    source "${INSTALL_SCRIPTS_SETUP}/modes/model-setup/${setup_type}-setup.sh"
+    "${INSTALL_SCRIPTS_SETUP}/modes/model-setup/${setup_type}-setup.sh" "${selected_modules[@]}"
     
     log_success "Setup complete! 🎉"
 }

@@ -24,7 +24,7 @@ generate_preview() {
 
     cat << EOF
 ┌────────────────────────────────┐
-│ SYSTEM TYPE: $desc_type
+│ SYSTEM TYPE: $desc_type        │
 └────────────────────────────────┘
 
 Description:

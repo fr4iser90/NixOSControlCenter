@@ -5,6 +5,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/setup-options.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/setup-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/setup-preview.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/validate-mode.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/setup-formatting.sh"
 
 declare -a selected=()
 
@@ -23,7 +24,9 @@ select_setup_mode() {
         --header="Wähle die Hauptkategorie" \
         --bind 'space:accept' \
         --preview 'bash -c "generate_preview {}"' \
-        --preview-window="right:50%:wrap")
+        --preview-window="right:50%:wrap" \
+        --pointer="▶" \
+        --marker="✓")
 
     [ -z "$main_choice" ] && return 1
 
@@ -33,8 +36,12 @@ select_setup_mode() {
             --multi \
             --header="Wähle Module für $main_choice (Leertaste zum Auswählen, Enter zum Bestätigen)" \
             --bind 'tab:toggle,space:toggle' \
+            --bind 'ctrl-a:toggle-all' \
+            --bind 'ctrl-n:change-preview(echo "None ausgewählt - andere Module deaktiviert")+toggle-all+toggle' \
             --preview 'generate_preview {}' \
-            --preview-window="right:50%:wrap")
+            --preview-window="right:50%:wrap" \
+            --pointer="▶" \
+            --marker="✓")
         
         [ -z "$module_choices" ] && return 1
     fi
@@ -42,15 +49,20 @@ select_setup_mode() {
     # Baue finale Auswahl
     selected=("$main_choice")
     if [[ -n "$module_choices" ]]; then
+        local has_none=false
         while IFS= read -r choice; do
             clean_choice=$(echo "$choice" | sed 's/^[ │├└─]*//g')
-            if [[ "$clean_choice" = "No Modules" ]]; then
-                selected=("$main_choice" "No Modules")
+            if [[ "$clean_choice" = "None" ]]; then
+                has_none=true
                 break
-            else
-                selected+=("$clean_choice")
             fi
+            selected+=("$clean_choice")
         done <<< "$module_choices"
+
+        # Wenn None ausgewählt wurde, überschreibe alle anderen Auswahlen
+        if [[ "$has_none" = true ]]; then
+            selected=("$main_choice" "None")
+        fi
     fi
 
     # Gib nur die ausgewählten Module zurück
