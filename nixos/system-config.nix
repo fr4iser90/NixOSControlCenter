@@ -28,12 +28,12 @@
   # User Management
   # Wird durch das Script mit allen User-Einträgen ersetzt
   users = {
-    "fr4iser" = {
+    "test" = {
       role = "admin";
       defaultShell = "zsh";
       autoLogin = false;
     };
-    "botchi" = {
+    "test1" = {
       role = "admin";
       defaultShell = "zsh";
       autoLogin = false;
