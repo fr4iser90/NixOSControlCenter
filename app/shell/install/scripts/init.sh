@@ -2,39 +2,33 @@
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prompts/setup-mode.sh"
 
 main() {
     log_header "NixOS System Setup"
     
     # 1. System Checks
-    log_section "System Detection"
-    source "${SETUP_DIR}/config/collect-system-data.sh"
+    source "${INSTALL_SCRIPTS_SETUP}/config/collect-system-data.sh"
     
     # 2. Installation Mode
     log_section "Setup Mode"
-    if ask_user "Use predefined setup?"; then
-        # Model Setup
-        source "${SETUP_DIR}/modes/model-setup/$(select_model)-setup.sh"
-    else
-        # Custom Setup
-        source "${SETUP_DIR}/modes/custom-setup/custom-setup.sh"
-    fi
     
-    # 3. Generate Config
-    log_section "Configuration"
-    source "${SETUP_DIR}/config/generate-config.sh"
+    local setup_mode
+    setup_mode=$(select_setup_mode)
     
-    # 4. Validate
-    source "${SETUP_DIR}/config/validate-config.sh"
+    case "$setup_mode" in
+        "Custom Setup")
+            source "${INSTALL_SCRIPTS_SETUP}/modes/custom-setup/custom-setup.sh"
+            ;;
+        *)
+            # Konvertiere den Namen in einen Script-Pfad
+            local script_name="${setup_mode,,}" # lowercase
+            script_name="${script_name// /-}"   # spaces to dashes
+            source "${INSTALL_SCRIPTS_SETUP}/modes/model-setup/${script_name}-setup.sh"
+            ;;
+    esac
     
-    # 5. Install
-    log_section "Installation"
-    if confirm_installation; then
-        source "${SETUP_DIR}/install/prepare-system.sh"
-        source "${SETUP_DIR}/install/copy-config.sh"
-        source "${SETUP_DIR}/install/build-system.sh"
-    fi
-    
+    # Rest des Scripts...
     log_success "Setup complete! 🎉"
 }
 

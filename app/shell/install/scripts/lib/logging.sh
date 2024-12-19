@@ -15,6 +15,10 @@ LOG_LEVEL_ERROR=3
 CURRENT_LOG_LEVEL=${INSTALL_DEBUG:-1}
 
 # Logging functions
+log_header() {
+    echo -e "\n=== ${BLUE}$1${NC} ===\n"
+}
+
 log_debug() {
     [[ $CURRENT_LOG_LEVEL -le $LOG_LEVEL_DEBUG ]] && echo -e "${GRAY}[DEBUG] $*${NC}"
 }

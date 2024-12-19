@@ -1,80 +1,107 @@
 {
-  # System-Typ (bestimmt das Profil)
-  systemType = "desktop";
+  #
+  # System Type & Profile
+  #
+  systemType = "desktop";    # Determines the system profile
+  hostName = "Gaming";       # System hostname
   bootloader = "systemd-boot";
 
-  # Extra Module
+  #
+  # Profile Modules
+  #
   profileModules = {
     gaming = {
-      streaming = true;
-      emulation = false;
+      streaming = false;     # true/false
+      emulation = false;     # true/false
     };
     development = {
-      game = true;
-      web = false;
+      game = false;                 # true/false
+      web = false;                   # true/false
     };
-  };  
-  # Nix-Konfiguration
-  allowUnfree = true;
-  # Experimental Features
-  entryManagement = true;
-  preflightChecks = true;   # Checks for hardware compatibility ( CPU, GPU, )
-  sshManager = true;
-  flakeUpdater = true; # true or false 
+    server = {
+      docker = false;          # true/false
+      web = false;               # true/false
+    };
+  };
 
-  # Benutzer-Konfiguration
+  #
+  # User Management
+  #
   users = {
     "test" = {
-      role = "admin";
+      role = "admin";          # Full system access
       defaultShell = "zsh";
       autoLogin = true;
     };
     "test2" = {
-      role = "restricted-admin";
+      role = "restricted-admin"; # Limited admin privileges
+      defaultShell = "zsh";
+      autoLogin = false;
+    };
+    "test3" = {
+      role = "guest";          # Basic user access
       defaultShell = "zsh";
       autoLogin = false;
     };
     "docker" = {
-      role = "virtualization";
+      role = "virtualization"; # Container management access
       defaultShell = "zsh";
       autoLogin = false;
     };
   };
 
-  # System-Einstellungen
-  hostName = "Gaming";
-  
-  # Lokalisierung
+  #
+  # Desktop Environment
+  #
+  desktop = "plasma";          # KDE Plasma desktop
+  displayManager = "sddm";     # Simple Desktop Display Manager
+  displayServer = "wayland";   # Options: "x11", "wayland", "hybrid"
+  session = "plasma";
+  darkMode = true;            # Enable dark theme
+
+  #
+  # Hardware Configuration
+  #
+  cpu = "amd";               # Processor vendor
+  gpu = "amd";               # Graphics card vendor
+  audio = "pipewire";        # Modern audio system
+
+  #
+  # Nix Configuration
+  #
+  allowUnfree = true;        # Allow proprietary software
+  buildLogLevel = "minimal"; # Options: "detailed", "standard", "minimal", "full"
+
+  #
+  # System Features
+  #
+  entryManagement = true;    # Enable boot entry management
+  preflightChecks = true;    # Hardware compatibility checks
+  sshManager = true;         # Enable SSH key management
+  flakeUpdater = true;       # Enable automatic flake updates
+
+  #
+  # Security Settings
+  #
+  sudo = {
+    requirePassword = false;  # Disable sudo password requirement
+    timeout = 15;            # Sudo timeout in minutes
+  };
+  enableFirewall = false;    # Disable system firewall
+
+  #
+  # Localization
+  #
   timeZone = "Europe/Berlin";
-  locales = [ "en_US.UTF-8" ];
+  locales = [ "de_US.UTF-8" ];
   keyboardLayout = "de";
   keyboardOptions = "eurosign:e";
-  
-  # Desktop (nur für Desktop-basierte Profile)
-  desktop = "plasma";
-  displayManager = "sddm";
-  displayServer = "wayland"; # oder "x11" oder "hybrid"
-  session = "plasma";
-  darkMode = true;
 
-  # Hardware
-  gpu = "amd";
-  cpu = "amd";
-  audio = "pipewire";
-  
-  # Sicherheit
-  sudo = {
-    requirePassword = false;
-    timeout = 15;
-  };
-  enableFirewall = false;
-  
-  # Build-LogLevel
-  buildLogLevel = "minimal"; # detailed, standard, minimal, full
-
-  # Optionale Überschreibungen der Profil-Defaults
+  #
+  # Profile Overrides
+  #
   overrides = {
-    enableSSH = null;
-    enableSteam = true;
+    enableSSH = null;        # Use profile default
+    enableSteam = true;      # Force enable Steam
   };
 }

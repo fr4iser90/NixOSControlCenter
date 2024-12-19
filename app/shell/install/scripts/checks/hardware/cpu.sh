@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 
+# Ensure colors are loaded
+if [[ -z "$COLORS_IMPORTED" ]]; then
+    source "$(dirname "${BASH_SOURCE[0]}")/../../../lib/colors.sh"
+fi
 
+# Ensure logging is loaded
+if ! command -v log_info &> /dev/null; then
+    source "$(dirname "${BASH_SOURCE[0]}")/../../../lib/logging.sh"
+fi
 
 log_section "CPU Detection"
 
@@ -21,7 +29,8 @@ get_cpu_info() {
         fi
 
         # Virtualisierung prüfen
-        features=$(grep "flags" /proc/cpuinfo | head -n1 | cut -d: -f2-)
+        features=$(grep "flags" /proc/cpuinfo | head -n1 | cut -d: -f2- || true)
+        
         if echo "$features" | grep -q "vmx"; then
             virtualization="intel"
         elif echo "$features" | grep -q "svm"; then
@@ -30,8 +39,8 @@ get_cpu_info() {
 
         # Ausgabe für Benutzer
         log_info "CPU Information:"
-        log_info "  Vendor: ${CYAN}${vendor}${NC}"
-        log_info "  Virtualization: ${CYAN}${virtualization}${NC}"
+        log_info "  Vendor: $vendor"
+        log_info "  Virtualization: $virtualization"
     else
         log_error "Could not read CPU information"
         return 1

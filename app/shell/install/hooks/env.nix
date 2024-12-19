@@ -19,9 +19,9 @@ in
   export SYSTEM_CONFIG_DIR="/etc/nixos"
   
   # Temporary and Backup
-  export INSTALL_TMP="/tmp/nixos-install"
-  export INSTALL_BACKUP="/tmp/nixos-backup"
-  export INSTALL_LOG="/tmp/nixos-install.log"
+  export INSTALL_TMP="$INSTALL_SCRIPTS/tmp/nixos-install"
+  export INSTALL_BACKUP="$INSTALL_SCRIPTS/tmp/nixos-backup"
+  export INSTALL_LOG="$INSTALL_SCRIPTS/tmp/nixos-install.log"
   
   # Create necessary directories
   mkdir -p $INSTALL_TMP
@@ -36,10 +36,8 @@ in
   
   # Set permissions and load libraries
   echo "Setting execute permissions for scripts..."
-  chmod +x $INSTALL_SCRIPTS/checks/hardware/*.sh
-  chmod +x $INSTALL_SCRIPTS/checks/system/*.sh
-  chmod +x $INSTALL_SCRIPTS/setup/modes/*.sh
-  chmod +x $INSTALL_SCRIPTS/lib/*.sh
+  source "$INSTALL_SCRIPTS/lib/setup-permissions.sh"
+
   
   # Load common libraries
   source "$INSTALL_SCRIPTS_LIB/colors.sh"
