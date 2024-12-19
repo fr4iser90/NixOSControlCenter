@@ -61,30 +61,31 @@ setup_users() {
     
     # Füge Homelab Profile-Module hinzu
     if ! grep -q "profileModules = {" "$temp_file"; then
-        cat >> "$temp_file" << 'EOF'
-
-  profileModules = {
-    homelab = {
-      monitoring = true;
-      media = true;
-      storage = true;
-      network = true;
-    };
-    server = {
-      docker = true;
-      web = true;
-    };
-    development = {
-      web = false;
-      game = false;
-    };
-    gaming = {
-      streaming = false;
-      emulation = false;
-    };
-  };
-}
-EOF
+        # Finde die letzte schließende Klammer
+        last_line=$(grep -n "^}" "$temp_file" | tail -n1 | cut -d: -f1)
+        
+        # Füge Profile-Module VOR der letzten Klammer ein
+        sed -i "${last_line}i\\
+  profileModules = {\\
+    homelab = {\\
+      monitoring = true;\\
+      media = true;\\
+      storage = true;\\
+      network = true;\\
+    };\\
+    server = {\\
+      docker = true;\\
+      web = true;\\
+    };\\
+    development = {\\
+      web = false;\\
+      game = false;\\
+    };\\
+    gaming = {\\
+      streaming = false;\\
+      emulation = false;\\
+    };\\
+  };" "$temp_file"
     fi
 
     # Überprüfe die Änderungen
