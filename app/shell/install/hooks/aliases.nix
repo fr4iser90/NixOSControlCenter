@@ -6,7 +6,8 @@
   alias check-cpu="$INSTALL_SCRIPTS/checks/hardware/cpu.sh"
   alias check-memory="$INSTALL_SCRIPTS/checks/hardware/memory.sh"
   alias check-storage="$INSTALL_SCRIPTS/checks/hardware/storage.sh"
-  
+  alias check-users="$INSTALL_SCRIPTS/checks/system/users.sh"
+
   # System Configuration
   alias check-bootloader="$INSTALL_SCRIPTS/checks/system/bootloader.sh"
   alias check-locale="$INSTALL_SCRIPTS/checks/system/locale.sh"

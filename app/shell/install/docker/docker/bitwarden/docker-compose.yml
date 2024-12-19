@@ -1,0 +1,40 @@
+services:
+
+  bitwarden:
+    image: vaultwarden/server:latest
+    container_name: bitwarden
+    restart: always
+    env_file: bw.env
+    volumes:
+      - ./data:/data
+    dns:
+      - 1.1.1.1
+    networks:
+      - proxy
+    networks:
+      proxy:
+        ipv4_address: 172.40.0.15
+    labels:
+      - "traefik.docker.network=proxy"
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.bw-secure.entrypoints=websecure"
+      - "traefik.http.routers.bw-secure.middlewares=default@file,bitwarden-whitelist@docker"
+      - "traefik.http.routers.bw-secure.rule=Host(`bw.${DOMAIN}`)"
+      - "traefik.http.routers.bw-secure.service=bitwarden"
+      - "traefik.http.routers.bw-secure.tls=true"
+      - "traefik.http.routers.bw-secure.tls.certresolver=http_resolver"
+      - "traefik.http.routers.bw.entrypoints=web"
+      - "traefik.http.routers.bw.rule=Host(`bw.${DOMAIN}`)"
+      - "traefik.http.services.bitwarden.loadbalancer.server.port=80"
+      - "traefik.http.routers.bitwarden-sock.rule=Host(`bw.${DOMAIN}`) && Path(`/notifications/hub`)"
+      - "traefik.http.routers.bitwarden-sock.entrypoints=websecure"
+      - "traefik.http.routers.bitwarden-sock.tls=true"
+      - "traefik.http.routers.bitwarden-sock.tls.certresolver=http_resolver"
+      - "traefik.http.routers.bitwarden-sock.service=bitwarden-sock"
+      - "traefik.http.services.bitwarden-sock.loadbalancer.server.port=3012"
+      - "traefik.http.middlewares.bitwarden-whitelist.ipwhitelist.sourcerange=192.168.0.0/16,10.0.0.0/8,172.16.0.0/12"
+
+networks:
+  proxy:
+    external: true

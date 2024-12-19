@@ -1,0 +1,21 @@
+services:
+
+  watchtower:
+    container_name: watchtower
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/localtime:/etc/localtime:ro
+      - ./watchtower-logs:/watchtower/logs
+    environment:
+      - WATCHTOWER_SCHEDULE=15 03 * * *  # Täglich um 03:15 Uhr
+      - WATCHTOWER_NOTIFICATIONS_LEVEL=info
+      - WATCHTOWER_LOGFILE=/watchtower/logs/watchtower.log
+      # - WATCHTOWER_NOTIFICATIONS=slack
+      # - WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL="https://chat.DOMAIN.com/hook/"  # Optional
+      # - WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER=watchtower-server-01
+      # - WATCHTOWER_NOTIFICATION_SLACK_CHANNEL=#watchtower
+    command:
+      - --cleanup  # Alte Images werden entfernt
+      - --run-once # Updates nur auf Befehl
+    restart: unless-stopped

@@ -1,0 +1,35 @@
+services:
+
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    env_file:
+      - pihole.env
+    networks:
+      proxy:
+        ipv4_address: 172.40.0.3
+    volumes:
+      - './etc-pihole/:/etc/pihole/'
+      - './etc-dnsmasq.d/:/etc/dnsmasq.d/'
+    dns:
+      - 1.1.1.1
+    ports:
+      - "53:53/tcp"        # DNS nur lokal erreichbar
+      - "53:53/udp"
+      - "853:853"          # DNS-over-TLS nur lokal erreichbar
+    restart: unless-stopped
+    labels:
+      - "traefik.docker.network=proxy"
+      - "traefik.enable=true"
+      - "traefik.http.routers.pihole-secure.entrypoints=websecure"
+      - "traefik.http.routers.pihole-secure.middlewares=default@file,pihole-whitelist@docker"
+      - "traefik.http.routers.pihole-secure.rule=Host(`pihole.${DOMAIN}`)"
+      - "traefik.http.routers.pihole-secure.service=pihole"
+      - "traefik.http.routers.pihole-secure.tls=true"
+      - "traefik.http.routers.pihole-secure.tls.certresolver=http_resolver"
+      - "traefik.http.services.pihole.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.pihole-whitelist.ipwhitelist.sourcerange=192.168.0.0/16,10.0.0.0/8,172.16.0.0/12"
+
+networks:
+  proxy:
+    external: true

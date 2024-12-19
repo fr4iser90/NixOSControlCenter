@@ -1,0 +1,28 @@
+services:
+
+  organizr:
+    image: organizr/organizr
+    container_name: organizr
+    volumes:
+      - ./data:/config
+    dns:
+       - 1.1.1.1
+    restart: unless-stopped
+    networks:
+      proxy:
+        ipv4_address: 172.40.0.51
+    labels:
+      - "traefik.docker.network=proxy"
+      - "traefik.enable=true"
+      - "traefik.http.routers.organizr-secure.entrypoints=websecure"
+      - "traefik.http.routers.organizr-secure.middlewares=default@file,organizr-whitelist@docker"
+      - "traefik.http.routers.organizr-secure.rule=Host(`dash.${DOMAIN}`)"
+      - "traefik.http.routers.organizr-secure.service=organizr"
+      - "traefik.http.routers.organizr-secure.tls=true"
+      - "traefik.http.routers.organizr-secure.tls.certresolver=http_resolver"
+      - "traefik.http.services.organizr.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.organizr-whitelist.ipwhitelist.sourcerange=192.168.0.0/16,10.0.0.0/8,172.16.0.0/12"
+
+networks:
+  proxy:
+    external: true

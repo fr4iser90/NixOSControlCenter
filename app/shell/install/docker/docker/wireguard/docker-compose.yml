@@ -1,0 +1,55 @@
+services:
+
+  wireguard:
+    image: lscr.io/linuxserver/wireguard:latest
+    container_name: wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    env_file: wireguard.env
+    volumes:
+      - /home/docker/wireguard/config:/config
+      - /lib/modules:/lib/modules
+    ports:
+      - 51820:51820/udp
+    dns:
+      - 1.1.1.1
+    sysctls:
+       - net.ipv4.conf.all.src_valid_mark=1
+    restart: unless-stopped
+    networks:
+      proxy:
+        ipv4_address: 172.40.0.9
+    labels:
+      traefik.enable: "false" 
+
+  wireguard-ui:
+    image: ngoduykhanh/wireguard-ui:latest
+    container_name: wireguard-ui
+    depends_on:
+      - wireguard
+    cap_add:
+      - NET_ADMIN
+    network_mode: service:wireguard
+    env_file: wireguard.env
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+    volumes:
+      - ./db:/app/db
+      - ./config:/etc/wireguard
+    labels:
+      traefik.docker.network: proxy
+      traefik.enable: "true"
+      traefik.http.routers.wireguard-ui-secure.entrypoints: websecure
+      traefik.http.routers.wireguard-ui-secure.middlewares: default@file
+      traefik.http.routers.wireguard-ui-secure.rule: Host(`wireguard-ui.${DOMAIN}`)
+      traefik.http.routers.wireguard-ui-secure.service: wireguard-ui
+      traefik.http.routers.wireguard-ui-secure.tls: "true"
+      traefik.http.routers.wireguard-ui-secure.tls.certresolver: http_resolver
+      traefik.http.services.wireguard-ui.loadbalancer.server.port: 5000
+
+networks:
+  proxy:
+    external: true
