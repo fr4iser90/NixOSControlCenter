@@ -39,7 +39,15 @@ main() {
         setup_type="server"
     elif [[ "${selected_modules[0]}" == "Homelab" ]]; then
         setup_type="homelab"
-        
+    else
+        setup_type="custom"
+    fi
+
+    # Führe das entsprechende Setup-Script aus (VOR Deploy!)
+    "${INSTALL_SCRIPTS_SETUP}/modes/model-setup/${setup_type}-setup.sh" "${selected_modules[@]}"
+    
+    # Spezielle Behandlung für Homelab
+    if [[ "$setup_type" == "homelab" ]]; then
         # 1. User-Setup
         setup_users || {
             log_error "User setup failed"
@@ -68,11 +76,17 @@ main() {
             log_info "Please reboot manually and run this script with --docker-deploy to complete setup"
         fi
     else
-        setup_type="custom"
+        # Für andere Setup-Typen
+        deploy_config || {
+            log_error "Config deployment failed"
+            exit 1
+        }
+        
+        build_system || {
+            log_error "System build failed"
+            exit 1
+        }
     fi
-    
-    # Führe das entsprechende Setup-Script aus
-    "${INSTALL_SCRIPTS_SETUP}/modes/model-setup/${setup_type}-setup.sh" "${selected_modules[@]}"
     
     log_success "Setup complete! 🎉"
 }
