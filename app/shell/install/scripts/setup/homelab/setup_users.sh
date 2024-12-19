@@ -61,7 +61,7 @@ setup_users() {
     
     # Füge Homelab Profile-Module hinzu
     if ! grep -q "profileModules = {" "$temp_file"; then
-        cat >> "$temp_file" << EOF
+        cat >> "$temp_file" << 'EOF'
 
   profileModules = {
     homelab = {
@@ -83,6 +83,7 @@ setup_users() {
       emulation = false;
     };
   };
+}
 EOF
     fi
 
