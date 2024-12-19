@@ -27,9 +27,7 @@
     audacity
     jellyfin-media-player
     owncloud-client
-    tartube
-    freetube
-    youtube-music
+
     kdePackages.kdeconnect-kde
     
     # System Tools
