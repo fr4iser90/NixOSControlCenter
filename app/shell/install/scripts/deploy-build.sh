@@ -3,58 +3,42 @@
 deploy_config() {
     log_section "Deploying Configuration"
     
-    # Backup von /etc/nixos
-    local timestamp=$(date +%Y%m%d_%H%M%S)
-    local backup_dir="/etc/nixos.backup_${timestamp}"
+    # Bereite Konfiguration vor
+    local nixos_dir="$HOME/.local/nixos"
+    rm -rf "$nixos_dir"
+    mkdir -p "$nixos_dir"
     
-    log_info "Creating backup at ${backup_dir}"
-    sudo cp -r /etc/nixos "${backup_dir}"
+    # Kopiere Konfigurationsdateien
+    cp -r "${NIXOS_CONFIG_DIR}"/* "$nixos_dir/"
     
-    # Hardware-Config sichern
-    local hardware_config="/etc/nixos/hardware-configuration.nix"
-    if [ -f "$hardware_config" ]; then
-        log_info "Preserving hardware configuration"
-        sudo cp "$hardware_config" "/tmp/hardware-configuration.nix"
-    fi
-    
-    # Kopiere neue Konfiguration
-    log_info "Deploying new configuration"
-    sudo rm -rf /etc/nixos/*.nix
-    sudo cp -r "${NIXOS_CONFIG_DIR}"/*.nix /etc/nixos/
-    
-    # Hardware-Config wiederherstellen
-    if [ -f "/tmp/hardware-configuration.nix" ]; then
-        sudo mv "/tmp/hardware-configuration.nix" "$hardware_config"
-    fi
-    
-    # Secrets und Custom-Ordner nicht überschreiben
-    log_info "Preserving secrets and custom configurations"
-    for dir in "secrets" "custom"; do
-        if [ -d "/etc/nixos/$dir" ]; then
-            log_info "Keeping existing $dir directory"
-        elif [ -d "${NIXOS_CONFIG_DIR}/$dir" ]; then
-            sudo cp -r "${NIXOS_CONFIG_DIR}/$dir" /etc/nixos/
+    # Kopiere wichtige Dateien aus /etc/nixos
+    for file in "hardware-configuration.nix" "flake.lock" "flake.nix" ".system-config.previous.json"; do
+        if [ -f "/etc/nixos/$file" ]; then
+            log_info "Copying $file from system configuration"
+            cp "/etc/nixos/$file" "$nixos_dir/"
         fi
     done
     
-    log_success "Configuration deployed to /etc/nixos"
+    # Kopiere secrets
+    if [ -d "/etc/nixos/secrets" ]; then
+        log_info "Copying secrets directory"
+        cp -r "/etc/nixos/secrets" "$nixos_dir/"
+    fi
+    
+    log_success "Configuration prepared"
+    log_info "Please run the following commands manually after exiting the shell:"
+    echo
+    echo "sudo cp -r $nixos_dir/* /etc/nixos/"
+    echo "sudo nixos-rebuild switch --flake /etc/nixos#Hostname"
+    echo "rm -rf $nixos_dir"
+    echo
+    log_info "Press any key to exit the shell..."
+    read -n 1
+    exit 0
 }
 
 build_system() {
-    log_section "Building System"
-    
-    # Führe User-Check durch
-    check_user_passwords || return 1
-    
-    local hostname=$(hostname)
-    log_info "Building configuration for $hostname"
-    
-    if sudo nixos-rebuild switch --flake "/etc/nixos#${hostname}"; then
-        log_success "System successfully rebuilt with flake for $hostname"
-    else
-        log_error "System rebuild failed"
-        return 1
-    fi
+    deploy_config
 }
 
 # Export functions

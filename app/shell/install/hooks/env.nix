@@ -40,6 +40,15 @@ in
   export INSTALL_DEBUG=0
   export INSTALL_VERBOSE=1
   
+  # Set root capabilities for nixos-rebuild
+  if ! command -v nixos-rebuild >/dev/null 2>&1; then
+    export PATH="${pkgs.nixos-rebuild}/bin:$PATH"
+  fi
+  
+  # Allow nixos-rebuild without sudo
+  export NIX_REMOTE=daemon
+  export NIX_SUDO_INCLUDED=1
+  
   # Set permissions and load libraries
   echo "Setting execute permissions for scripts..."
   source "$INSTALL_SCRIPTS/lib/setup-permissions.sh"

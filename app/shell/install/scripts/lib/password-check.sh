@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
-
 check_user_passwords() {
     log_section "Checking User Configuration"
     
@@ -9,10 +7,10 @@ check_user_passwords() {
     local CURRENT_USERS=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 && $1 !~ /^nixbld/ && $1 !~ /^systemd-/ {print $1}')
     
     # Konfigurierte Benutzer aus system-config.nix extrahieren
-    local CONFIGURED_USERS=$(grep -A 20 "users = {" "$SYSTEM_CONFIG_FILE" | grep -B 20 "};" | grep "=" | cut -d'"' -f2)
+    local CONFIGURED_USERS=$(awk '/users = {/,/};/ {if ($1 ~ /".*"/) print $1}' "$SYSTEM_CONFIG_FILE" | tr -d '"')
     
-    # Das eine, korrekte Password-Verzeichnis
-    local PASSWORD_DIR="/etc/nixos/secrets/passwords"
+    # Das korrekte Password-Verzeichnis im Build-Dir
+    local PASSWORD_DIR="build/secrets/passwords"
     
     log_info "Current system users: $CURRENT_USERS"
     log_info "Configured users: $CONFIGURED_USERS"
@@ -22,47 +20,17 @@ check_user_passwords() {
     local added_users=""
     local users_without_password=""
     
-    # Prüfe auf Änderungen und fehlende Passwörter
+    # Prüfe NUR auf neue Benutzer
     for user in $CONFIGURED_USERS; do
-        # Prüfe ob Benutzer neu ist
-        if ! echo "$CURRENT_USERS" | grep -q "$user"; then
-            added_users="$added_users $user"
-            changes_detected=1
-        fi
-        
-        # Prüfe ob Passwort existiert
-        if [ ! -f "$PASSWORD_DIR/$user/.hashedPassword" ] || [ ! -s "$PASSWORD_DIR/$user/.hashedPassword" ]; then
+        # Prüfe ob der Benutzer überhaupt im System existiert
+        if ! id "$user" >/dev/null 2>&1; then
             users_without_password="$users_without_password $user"
         fi
     done
     
-    # Prüfe auf zu entfernende Benutzer
-    for user in $CURRENT_USERS; do
-        if ! echo "$CONFIGURED_USERS" | grep -q "$user"; then
-            removed_users="$removed_users $user"
-            changes_detected=1
-        fi
-    done
-    
-    # Zeige Änderungen an
-    if [ $changes_detected -eq 1 ]; then
-        log_warning "User configuration changes detected!"
-        
-        if [ ! -z "$removed_users" ]; then
-            log_warning "Users to be removed:$removed_users"
-        fi
-        
-        if [ ! -z "$added_users" ]; then
-            log_warning "Users to be added:$added_users"
-        fi
-        
-        log_warning "You will need to log out and log back in after applying these changes!"
-        log_warning "Make sure to save all your work before proceeding!"
-    fi
-    
     # Passwort-Management nur wenn wirklich nötig
     if [ ! -z "$users_without_password" ]; then
-        log_warning "The following users have no password set:$users_without_password"
+        log_warn "The following users have no password set:$users_without_password"
         
         for user in $users_without_password; do
             while true; do
@@ -80,17 +48,14 @@ check_user_passwords() {
                         break
                         ;;
                     * )
-                        # Erstelle Passwort-Verzeichnis
-                        sudo mkdir -p "/etc/nixos/secrets/passwords/$user"
-                        sudo chown $user:users "/etc/nixos/secrets/passwords/$user"
-                        sudo chmod 700 "/etc/nixos/secrets/passwords/$user"
+                        # Erstelle Passwort-Verzeichnis im Build-Dir
+                        mkdir -p "$PASSWORD_DIR/$user"
                         
                         # Setze Passwort
-                        if sudo passwd $user; then
-                            # Speichere gehashtes Passwort
-                            sudo sh -c "getent shadow $user | cut -d: -f2 > /etc/nixos/secrets/passwords/$user/.hashedPassword"
-                            sudo chown $user:users "/etc/nixos/secrets/passwords/$user/.hashedPassword"
-                            sudo chmod 600 "/etc/nixos/secrets/passwords/$user/.hashedPassword"
+                        if passwd $user; then
+                            # Speichere gehashtes Passwort im Build-Dir
+                            getent shadow $user | cut -d: -f2 > "$PASSWORD_DIR/$user/.hashedPassword"
+                            chmod 600 "$PASSWORD_DIR/$user/.hashedPassword"
                             log_success "Password set successfully for $user"
                             break
                         else
@@ -100,14 +65,6 @@ check_user_passwords() {
                 esac
             done
         done
-    fi
-    
-    if [ $changes_detected -eq 1 ]; then
-        read -p "Continue with system rebuild? [y/N] " response
-        if [[ ! "$response" =~ ^[Yy]$ ]]; then
-            log_error "Aborting system rebuild."
-            exit 1
-        fi
     fi
     
     log_success "User configuration check passed"

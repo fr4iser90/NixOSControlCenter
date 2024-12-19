@@ -10,11 +10,25 @@ if ! command -v log_info &> /dev/null; then
     source "$(dirname "${BASH_SOURCE[0]}")/logging.sh"
 fi
 
-# Prüfe ob wir root sind
+# Prüfe ob wir root sind oder sudo nutzen können
 check_root() {
     if [ "$EUID" -ne 0 ]; then 
-        log_error "Please run as root"
-        exit 1
+        if command -v sudo >/dev/null 2>&1; then
+            # Versuche sudo zu verwenden
+            if ! sudo -n true 2>/dev/null; then
+                log_error "Neither root privileges nor passwordless sudo available"
+                log_info "Please add NOPASSWD entry to sudoers for this script"
+                exit 1
+            fi
+            # Exportiere SUDO für andere Funktionen
+            export SUDO="sudo"
+        else
+            log_error "Neither root privileges nor sudo available"
+            exit 1
+        fi
+    else
+        # Wenn wir bereits root sind, kein sudo notwendig
+        export SUDO=""
     fi
 }
 

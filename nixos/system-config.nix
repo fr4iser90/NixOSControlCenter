@@ -11,12 +11,12 @@
   #
   profileModules = {
     gaming = {
-      streaming = false;     # true/false
-      emulation = false;     # true/false
+      streaming = true;     # true/false
+      emulation = true;     # true/false
     };
     development = {
-      game = false;                 # true/false
-      web = false;                   # true/false
+      game = true;                 # true/false
+      web = true;                   # true/false
     };
     server = {
       docker = false;          # true/false
@@ -28,12 +28,12 @@
   # User Management
   # Wird durch das Script mit allen User-Einträgen ersetzt
   users = {
-    "test" = {
+    "fr4iser" = {
       role = "admin";
       defaultShell = "zsh";
       autoLogin = false;
     };
-    "test1" = {
+    "botchi" = {
       role = "admin";
       defaultShell = "zsh";
       autoLogin = false;
