@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+source "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
+
 check_user_passwords() {
     log_section "Checking User Configuration"
     
@@ -9,13 +11,8 @@ check_user_passwords() {
     # Konfigurierte Benutzer aus system-config.nix extrahieren
     local CONFIGURED_USERS=$(grep -A 20 "users = {" "$SYSTEM_CONFIG_FILE" | grep -B 20 "};" | grep "=" | cut -d'"' -f2)
     
-    # Mögliche Password-Verzeichnisse
-    local PASSWORD_DIRS=(
-        "/etc/nixos/secrets/passwords"
-        "/etc/nixos/secrets"
-        "/etc/nixos/password"
-        "/etc/nixos"
-    )
+    # Das eine, korrekte Password-Verzeichnis
+    local PASSWORD_DIR="/etc/nixos/secrets/passwords"
     
     log_info "Current system users: $CURRENT_USERS"
     log_info "Configured users: $CONFIGURED_USERS"
@@ -33,22 +30,8 @@ check_user_passwords() {
             changes_detected=1
         fi
         
-        # Suche nach Passwort-Datei in allen möglichen Verzeichnissen
-        local password_found=0
-        for dir in "${PASSWORD_DIRS[@]}"; do
-            if [ -f "$dir/$user/.hashedPassword" ] && [ -s "$dir/$user/.hashedPassword" ]; then
-                password_found=1
-                break
-            elif [ -f "$dir/$user/password" ] && [ -s "$dir/$user/password" ]; then
-                password_found=1
-                break
-            elif [ -f "$dir/passwords/$user" ] && [ -s "$dir/passwords/$user" ]; then
-                password_found=1
-                break
-            fi
-        done
-        
-        if [ $password_found -eq 0 ]; then
+        # Prüfe ob Passwort existiert
+        if [ ! -f "$PASSWORD_DIR/$user/.hashedPassword" ] || [ ! -s "$PASSWORD_DIR/$user/.hashedPassword" ]; then
             users_without_password="$users_without_password $user"
         fi
     done
