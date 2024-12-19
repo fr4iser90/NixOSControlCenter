@@ -9,13 +9,6 @@ source "$(dirname "${BASH_SOURCE[0]}")/setup/homelab/setup_users.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/setup/homelab/deploy-dockers.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/password-check.sh"
 
-# Parameter-Behandlung
-if [[ "${1:-}" == "--docker-deploy" ]]; then
-    log_header "Docker Configuration Deployment"
-    deploy_docker_config
-    exit $?
-fi
-
 main() {
     log_header "NixOS System Setup"
     
@@ -75,21 +68,28 @@ main() {
             exit 1
         }
         
-        build_system || {
-            log_error "System build failed"
+        # 3. Docker-Deploy vorbereiten
+        deploy_docker_config || {
+            log_error "Docker config preparation failed"
             exit 1
         }
         
-        # 3. Docker-Deploy (nach System-Build)
-        log_info "System needs to be rebooted before deploying Docker configuration"
-        read -p "Do you want to reboot now? [Y/n] " -n 1 -r
+        # Hole Script-Namen
+        local hostname=$(hostname)
+        local build_script="${NIXOS_CONFIG_DIR}/build-${hostname}.sh"
+        local docker_script="${NIXOS_CONFIG_DIR}/deploy-docker-${hostname}.sh"
+        
+        log_success "Setup scripts prepared!"
+        log_info "Please follow these steps:"
         echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            log_info "System will reboot. Run this script again with --docker-deploy to complete setup"
-            sudo reboot
-        else
-            log_info "Please reboot manually and run this script with --docker-deploy to complete setup"
-        fi
+        echo "1. Exit this shell (Ctrl+D)"
+        echo "2. Run: $build_script"
+        echo "3. After reboot, run: $docker_script"
+        echo
+        
+        read -p "Press Enter to continue..."
+        exit 0
+        
     else
         # Für andere Setup-Typen
         deploy_config || {
