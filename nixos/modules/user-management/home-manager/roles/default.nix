@@ -1,3 +1,4 @@
+# src/nixos/modules/homemanager/roles/default.nix
 { config, lib, pkgs, systemConfig, ... }:
 
 {

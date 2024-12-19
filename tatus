@@ -1,0 +1,52 @@
+[33m0038683[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/develop[m[33m, [m[1;32mdevelop[m[33m)[m added minor bugs
+[33m1a9f529[m added placeholder
+[33mbb1cba0[m[33m ([m[1;31morigin/main[m[33m)[m adjusted logging
+[33mf95b21d[m refactored botch checks, to progress even if failed, force available
+[33meb023b9[m added simple cpu check
+[33m604b76b[m refactored check-and-build
+[33m2735e76[m added alias again
+[33m8852c9d[m correct imports
+[33m047956d[m added activation checks
+[33m5573921[m cleaner way
+[33mdd66a5c[m renamed preflight
+[33m863a34d[m added cpu placeholder
+[33me55dbd7[m added sudo check, corrected colors
+[33md3c7803[m added simple flake update-system
+[33mb0f4887[m added simple ssh-manager
+[33m6778ade[m correct preflight import
+[33m9db5d63[m added username change check
+[33mb5803ec[m added some shell stuff
+[33macfcce8[m added darktheme, correct system.checks to system.preflight.checks to avoid dealing with core funcs of NixOs
+[33m534add0[m added install shell stuff
+[33m0c5f038[m added new shell, improved dev shell
+[33mcc886a4[m displaced xkb options, corrected it
+[33m73e3859[m removed hardware-configuration.nix
+[33mc93a2a7[m corrected doc part
+[33mc6cb300[m corrected tree
+[33m52f2419[m corrected tree
+[33m21ff37d[m structured project
+[33m56b52e5[m refactored env imports
+[33m68eaf8f[m corrected plasma6, sddm errors/ correctred experimental bootentrymanager/ refactored layer
+[33m22bfd92[m updated to plasma6
+[33m996f064[m corrected double sound/desktop import
+[33mc18723f[m Add control center module and GUI with testing framework
+[33mcda26bd[m added plaaceholder configuration_view, added themes, corrected button alignment dashboard
+[33mf764235[m added structure layer, for nix implementation
+[33mda8dd49[m improved ErrorHandler , log
+[33me8fd1f3[m added better log, improving errormanagement
+[33mb59ef90[m added tmp/
+[33m29de147[m fixxed sleep timer
+[33m447e2bc[m added random_build tests , pt -m random --test-strategy=full
+[33m59c3c94[m refactored configuration test, going to improve it
+[33m0f7291a[m test-profile working, gaming passed
+[33md35baf6[m implemented new test, needs to improve
+[33mb440c19[m cleaned tree
+[33m58a0108[m adjusted reports
+[33m5ed3ab5[m removed bash from profiles, implemented reporting module
+[33m114b351[m refactored flakes , modules
+[33mdec97ac[m refactored prfiles /systemtypes
+[33m8373812[m refactored bootloader, added placeholder for grub/ refind/// Considering adding Kernel Detection for Specialsation creation/// refactored desktop module
+[33mc3ea4e3[m cleared redudancy
+[33mcfe2cd1[m updated bootLoaderManager & scripts // update stateVersion, changed to flakes
+[33m7431003[m Updated Bootloader.nix & added bootentries scripts
+[33m047f1bc[m Initial commit: NixOS Control Center

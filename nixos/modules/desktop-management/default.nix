@@ -4,7 +4,7 @@
       ./display-managers
       ./display-servers
       ./environments
-      ./themes
+#      ./themes
     ];
 
   # Globale Tastaturkonfiguration für alle Display-Server

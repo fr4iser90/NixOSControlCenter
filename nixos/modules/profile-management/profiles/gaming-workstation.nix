@@ -9,9 +9,9 @@
     code-cursor
     git
     git-credential-manager
+    delta
 
     # Gaming
-    lutris
     fzf
     #wine
     #winetricks
@@ -27,6 +27,9 @@
     audacity
     jellyfin-media-player
     owncloud-client
+    #tartube
+    #freetube
+    #youtube-music
 
     # System Tools
     kitty

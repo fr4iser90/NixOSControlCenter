@@ -1,10 +1,10 @@
 { config, lib, pkgs, user, systemConfig, ... }:
 
 let
-  shellInitFile = ../shellInit/bashInit.nix;
-  shellInitModule = import (builtins.toString shellInitFile) { inherit pkgs lib; };
+  userConfig = systemConfig.users.${user};
+  shellInit = import ../shellInit/${userConfig.defaultShell}Init.nix { inherit pkgs lib; };
 in {
-  imports = [ shellInitModule ];
+  imports = [ shellInit ];
 
   home = {
     stateVersion = "24.05";
@@ -14,13 +14,6 @@ in {
   
   # Eingeschränkte Admin-Berechtigungen
   home.sessionVariables = {
-    SUDO_ASKPASS = "${pkgs.x11}/bin/ssh-askpass";  # Immer Passwort-Prompt
+    SUDO_ASKPASS = "${pkgs.ksshaskpass}/bin/ksshaskpass";
   };
-  # Eingeschränkte Admin-Gruppen
-  users.users.${user}.extraGroups = [
-    "wheel"
-    "networkmanager"
-    "video"
-    "audio"
-  ];
 }

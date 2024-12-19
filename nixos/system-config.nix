@@ -18,6 +18,16 @@
       defaultShell = "zsh";
       autoLogin = true;
     };
+    "test2" = {
+      role = "restricted-admin";
+      defaultShell = "zsh";
+      autoLogin = false;
+    };
+    "test3" = {
+      role = "guest";
+      defaultShell = "zsh";
+      autoLogin = false;
+    };
   };
 
   # System-Einstellungen
@@ -25,7 +35,7 @@
   
   # Lokalisierung
   timeZone = "Europe/Berlin";
-  locales = [ "de_DE.UTF-8" ];
+  locales = [ "en_US.UTF-8" ];
   keyboardLayout = "de";
   keyboardOptions = "eurosign:e";
   

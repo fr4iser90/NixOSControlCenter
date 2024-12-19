@@ -34,14 +34,20 @@ let
 
     echo "Running preflight checks..."
     
-    # Direkt ausführen statt zu capturen
+    # Führe Checks aus
+    if ! check-users; then
+      echo -e "''${RED}User checks failed!''${NC}"
+      exit 1
+    fi
+
     if ! run-system.preflight.checks; then
-      echo -e "''${RED}Preflight checks failed!''${NC}"
+      echo -e "''${RED}System checks failed!''${NC}"
       echo -e "''${RED}To bypass checks, use: check-and-build force <command> [options]''${NC}"
       exit 1
     fi
 
-    echo "Checks passed! Running nixos-rebuild..."
+    echo -e "''${GREEN}All checks passed!''${NC}"
+    echo "Running nixos-rebuild..."
     exec ${pkgs.nixos-rebuild}/bin/nixos-rebuild "$@"
   '';
 

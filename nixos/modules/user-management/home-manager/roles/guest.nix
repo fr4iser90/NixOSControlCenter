@@ -16,5 +16,4 @@ in {
   home.sessionVariables = {
     PATH = lib.mkForce "$HOME/.local/bin:/usr/bin:/bin";  # Eingeschränkter PATH
   };
-
 }

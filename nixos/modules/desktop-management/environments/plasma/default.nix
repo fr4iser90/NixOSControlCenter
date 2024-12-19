@@ -2,11 +2,7 @@
 { config, pkgs, systemConfig, ... }: {
   # Plasma 6 Basis
   services.desktopManager.plasma6.enable = true;
-  services.displayManager.sddm = {
-    enable = true;
-    wayland.enable = true;
-  };
-  services.displayManager.defaultSession = "plasma";  # Plasma 6 verwendet "plasma" statt "plasmawayland"
+  services.displayManager.defaultSession = "plasma";
   programs.kdeconnect.enable = true;
 
   # Wayland Support

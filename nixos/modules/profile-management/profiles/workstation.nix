@@ -21,6 +21,7 @@
     kate
     pavucontrol
     tree
+    delta
   ];
 
   

@@ -27,12 +27,8 @@ in {
      else throw "Unknown system type: ${systemConfig.systemType}. Valid types: ${toString (attrNames profiles)}")
   ];
 
-  # Gemeinsame Basis-Konfiguration
   i18n = {
-    defaultLocale = "en_US.UTF-8";
-    supportedLocales = [
-      "de_DE.UTF-8/UTF-8"
-      "en_US.UTF-8/UTF-8"
-    ];
+    defaultLocale = head systemConfig.locales; # Take the first locale as default
+    supportedLocales = map (l: "${l}/UTF-8") systemConfig.locales;
   };
 }

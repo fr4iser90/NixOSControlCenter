@@ -56,7 +56,7 @@
             home-manager.nixosModules.home-manager
             {
               #system.stateVersion = "24.05"; # Deprecated
-              #system.stateVersion = "24.05"; # stable Vicuna
+              #system.stateVersion = "24.11"; # stable Vicuna
               system.stateVersion = "25.05"; #  unstable Warbler
               
               home-manager = {
