@@ -70,7 +70,7 @@ setup_users() {
     local temp_file=$(mktemp)
     cp "$SYSTEM_CONFIG_FILE" "$temp_file"
 
-    # Ersetze den users-Block und füge Email/Domain Konfiguration hinzu
+    # Ersetze den users-Block
     sed -i "/users = {/,/};/c\  users = {\n    \"${main_user}\" = {\n      role = \"admin\";\n      defaultShell = \"zsh\";\n      autoLogin = false;\n    };\n    \"${virt_user}\" = {\n      role = \"virtualization\";\n      defaultShell = \"zsh\";\n      autoLogin = false;\n    };\n  };" "$temp_file"
 
     # Füge Email/Domain Konfiguration hinzu
@@ -80,6 +80,39 @@ setup_users() {
         sed -i "s/email = \".*\";/email = \"${email}\";/" "$temp_file"
         sed -i "s/domain = \".*\";/domain = \"${domain}\";/" "$temp_file"
         sed -i "s/certEmail = \".*\";/certEmail = \"${cert_email}\";/" "$temp_file"
+    fi
+
+    # Setze System-Typ und Profile-Module für Homelab
+    sed -i "s/systemType = \".*\";/systemType = \"homelab\";/" "$temp_file"
+    
+    # Füge Homelab Profile-Module hinzu
+    if ! grep -q "profileModules = {" "$temp_file"; then
+        cat >> "$temp_file" << EOF
+
+  profileModules = {
+    homelab = {
+      monitoring = true;
+      media = true;
+      storage = true;
+      network = true;
+    };
+    server = {
+      docker = true;
+      web = true;
+    };
+    development = {
+      web = false;
+      game = false;
+    };
+    gaming = {
+      streaming = false;
+      emulation = false;
+    };
+  };
+EOF
+    else
+        # Aktualisiere existierende Profile-Module
+        sed -i '/profileModules = {/,/};/c\  profileModules = {\n    homelab = {\n      monitoring = true;\n      media = true;\n      storage = true;\n      network = true;\n    };\n    server = {\n      docker = true;\n      web = true;\n    };\n    development = {\n      web = false;\n      game = false;\n    };\n    gaming = {\n      streaming = false;\n      emulation = false;\n    };\n  };' "$temp_file"
     fi
 
     # Überprüfe die Änderungen

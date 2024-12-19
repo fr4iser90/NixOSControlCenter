@@ -15,7 +15,7 @@ deploy_docker_config() {
     if ! systemctl is-active docker >/dev/null 2>&1; then
         log_warning "Docker service not running yet. Please reboot first."
         return 1
-    }
+    fi
 
     local virt_user="${VIRT_USER:-docker}"
     local docker_home="/home/${virt_user}"
