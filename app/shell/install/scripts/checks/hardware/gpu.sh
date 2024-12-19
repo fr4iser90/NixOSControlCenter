@@ -1,31 +1,94 @@
 #!/usr/bin/env bash
 
-
 log_section "Detecting GPU Configuration"
 
-# Check for GPUs using lspci
-log_info "GPU Hardware Detection:"
-if command -v lspci &> /dev/null; then
-    while IFS= read -r line; do
-        # Wichtige Build-Informationen
-        bus_id=$(echo "$line" | cut -d' ' -f1)
-        vendor_id=$(lspci -n -s "$bus_id" | awk '{print $3}' | cut -d':' -f1)
-        device_id=$(lspci -n -s "$bus_id" | awk '{print $3}' | cut -d':' -f2)
-        gpu_name=$(echo "$line" | sed 's/.*: //')
-        
-        echo -e "  Device   : ${CYAN}${gpu_name}${NC}"
-        echo -e "  Bus ID   : ${GRAY}${bus_id}${NC}"
-        echo -e "  Vendor ID: ${GRAY}${vendor_id}${NC}"
-        echo -e "  Device ID: ${GRAY}${device_id}${NC}"
-        
-        # Kernel Driver
-        if [ -d "/sys/bus/pci/devices/0000:${bus_id}" ]; then
-            driver=$(readlink "/sys/bus/pci/devices/0000:${bus_id}/driver" 2>/dev/null | xargs basename 2>/dev/null)
-            [ -n "$driver" ] && echo -e "  Driver   : ${GRAY}${driver}${NC}"
+get_gpu_info() {
+    local gpu_config="unknown"
+    local found_gpus=()
+    local primary_bus_id=""
+    local has_dgpu=false
+    local has_igpu=false
+
+    if command -v lspci &> /dev/null; then
+        while IFS= read -r line; do
+            local bus_id=$(echo "$line" | cut -d' ' -f1)
+            local vendor_id=$(lspci -n -s "$bus_id" | awk '{print $3}' | cut -d':' -f1)
+            local gpu_name=$(echo "$line" | sed 's/.*: //')
+            
+            # GPU-Typ und Rolle bestimmen
+            case "$vendor_id" in
+                "1002")  # AMD
+                    if echo "$gpu_name" | grep -qi "radeon\|graphics"; then
+                        found_gpus+=("amd-dgpu")
+                        has_dgpu=true
+                    else
+                        found_gpus+=("amd-igpu")
+                        has_igpu=true
+                    fi
+                    ;;
+                "10de")  # NVIDIA
+                    found_gpus+=("nvidia")
+                    has_dgpu=true
+                    ;;
+                "8086")  # Intel
+                    found_gpus+=("intel-igpu")
+                    has_igpu=true
+                    ;;
+            esac
+
+            # Erste dedizierte GPU als primär setzen
+            if [ -z "$primary_bus_id" ] && [ "$has_dgpu" = true ]; then
+                primary_bus_id="$bus_id"
+            # Sonst erste GPU überhaupt
+            elif [ -z "$primary_bus_id" ]; then
+                primary_bus_id="$bus_id"
+            fi
+        done < <(lspci | grep -E "VGA|3D|Display")
+
+        # GPU-Konfiguration bestimmen
+        if [ ${#found_gpus[@]} -eq 1 ]; then
+            # Einzelne GPU
+            case "${found_gpus[0]}" in
+                "amd-dgpu") gpu_config="amd" ;;
+                "amd-igpu") gpu_config="amd-integrated" ;;
+                "nvidia") gpu_config="nvidia" ;;
+                "intel-igpu") gpu_config="intel" ;;
+            esac
+        elif [ ${#found_gpus[@]} -ge 2 ]; then
+            # Multiple GPUs - Sortiere dGPU vor iGPU
+            if echo "${found_gpus[*]}" | grep -q "nvidia"; then
+                if echo "${found_gpus[*]}" | grep -q "intel-igpu"; then
+                    gpu_config="nvidia-intel"
+                elif echo "${found_gpus[*]}" | grep -q "amd-igpu"; then
+                    gpu_config="nvidia-amd"
+                fi
+            elif echo "${found_gpus[*]}" | grep -q "amd-dgpu"; then
+                if echo "${found_gpus[*]}" | grep -q "intel-igpu"; then
+                    gpu_config="amd-intel"
+                elif echo "${found_gpus[*]}" | grep -q "amd-igpu"; then
+                    gpu_config="amd-integrated"
+                fi
+            fi
         fi
+
+        log_info "GPU Configuration:"
+        log_info "  Type: ${CYAN}${gpu_config}${NC}"
+        log_info "  Primary Bus ID: ${CYAN}${primary_bus_id}${NC}"
         
-        echo ""
-    done < <(lspci | grep -E "VGA|3D|Display")
-else
-    echo -e "  ${RED}Could not detect PCI devices${NC}"
-fi
+        if [ "${DEBUG:-false}" = true ]; then
+            log_debug "Found GPUs: ${found_gpus[*]}"
+            log_debug "Has dGPU: $has_dgpu"
+            log_debug "Has iGPU: $has_igpu"
+        fi
+    else
+        log_error "Could not detect PCI devices"
+        return 1
+    fi
+
+    # Variablen für weitere Verarbeitung
+    export GPU_CONFIG="$gpu_config"
+    export GPU_BUS_ID="$primary_bus_id"
+}
+
+# Ausführen
+get_gpu_info
