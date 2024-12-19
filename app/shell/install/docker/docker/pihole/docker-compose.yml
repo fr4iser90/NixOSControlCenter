@@ -7,7 +7,6 @@ services:
       - pihole.env
     networks:
       proxy:
-        ipv4_address: 172.40.0.3
     volumes:
       - './etc-pihole/:/etc/pihole/'
       - './etc-dnsmasq.d/:/etc/dnsmasq.d/'

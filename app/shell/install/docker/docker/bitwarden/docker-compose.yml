@@ -10,10 +10,7 @@ services:
     dns:
       - 1.1.1.1
     networks:
-      - proxy
-    networks:
       proxy:
-        ipv4_address: 172.40.0.15
     labels:
       - "traefik.docker.network=proxy"
       - "traefik.enable=true"

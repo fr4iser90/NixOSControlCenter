@@ -13,7 +13,6 @@ services:
       - 8.8.8.8
     networks:
       proxy:
-        ipv4_address: 172.40.0.14
     labels:
       - "traefik.docker.network=proxy"
       - "traefik.enable=true"

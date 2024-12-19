@@ -1,4 +1,3 @@
-# modules/profiles/types/hybrid/gaming-workstation.nix
 { config, lib, pkgs, systemConfig, ... }:
 {
   # Pakete
@@ -18,7 +17,7 @@
     #wineWowPackages.full
     noisetorch
 
-    # Multimedia & Communication
+    # Multimedia
     firefox
     thunderbird
     vesktop

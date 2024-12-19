@@ -1,8 +1,19 @@
 {
   # System-Typ (bestimmt das Profil)
-  systemType = "gaming-workstation";
+  systemType = "desktop";
   bootloader = "systemd-boot";
-  
+
+  # Extra Module
+  profileModules = {
+    gaming = {
+      streaming = true;
+      emulation = false;
+    };
+    development = {
+      game = true;
+      web = false;
+    };
+  };  
   # Nix-Konfiguration
   allowUnfree = true;
   # Experimental Features
@@ -23,8 +34,8 @@
       defaultShell = "zsh";
       autoLogin = false;
     };
-    "test3" = {
-      role = "guest";
+    "docker" = {
+      role = "virtualization";
       defaultShell = "zsh";
       autoLogin = false;
     };

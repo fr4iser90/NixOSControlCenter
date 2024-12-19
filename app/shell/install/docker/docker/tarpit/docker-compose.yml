@@ -12,7 +12,6 @@ services:
       - -geoip_supplier=ip-api
     networks:
       proxy:
-        ipv4_address: 172.40.0.20
     ports:
       - 2222:2222 # SSH port
       - 127.0.0.1:2112:2112 # Prometheus metrics port
@@ -30,7 +29,6 @@ services:
       - --web.enable-admin-api
     networks:
       proxy:
-        ipv4_address: 172.40.0.21
     ports:
       - 127.0.0.1:9090:9090
     dns:
@@ -46,7 +44,6 @@ services:
     restart: always
     networks:
       proxy:
-        ipv4_address: 172.40.0.22
     dns:
       - 1.1.1.1
       - 8.8.8.8
