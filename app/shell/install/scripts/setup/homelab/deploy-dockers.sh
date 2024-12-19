@@ -3,77 +3,105 @@
 deploy_docker_config() {
     log_section "Deploying Docker Configuration"
     
-    # Prüfe benötigte Umgebungsvariablen
-    for var in VIRT_USER USER_EMAIL USER_DOMAIN CERT_EMAIL; do
-        if [[ -z "${!var:-}" ]]; then
-            log_error "Required environment variable $var is not set"
-            return 1
-        fi
-    done
-    
-    # Warte auf System-Neustart wenn nötig
-    if ! systemctl is-active docker >/dev/null 2>&1; then
-        log_warning "Docker service not running yet. Please reboot first."
+    # Prüfe ob Docker-Konfiguration existiert
+    if [[ ! -d "${NIXOS_CONFIG_DIR}/docker" ]]; then
+        log_error "No Docker configuration found in ${NIXOS_CONFIG_DIR}/docker"
         return 1
     fi
 
-    local virt_user="${VIRT_USER:-docker}"
-    local docker_home="/home/${virt_user}"
-    local docker_config="${docker_home}/docker"
-    
-    # Prüfe/Sammle Passwort für Docker-User
-    local PASSWORD_DIR="build/secrets/passwords"
-    if [ ! -f "$PASSWORD_DIR/$virt_user/.hashedPassword" ]; then
-        log_warn "No stored password found for Docker user: $virt_user"
-        mkdir -p "$PASSWORD_DIR/$virt_user"
-        if id "$virt_user" >/dev/null 2>&1; then
-            if getent shadow "$virt_user" | cut -d: -f2 | grep -q '[^!*]'; then
-                getent shadow "$virt_user" | cut -d: -f2 > "$PASSWORD_DIR/$virt_user/.hashedPassword"
-                chmod 600 "$PASSWORD_DIR/$virt_user/.hashedPassword"
-                log_success "Stored existing password for $virt_user"
-            fi
-        fi
-    fi
-    
-    # Backup existierender Docker-Konfiguration
-    if [ -d "$docker_config" ]; then
-        local timestamp=$(date +%Y%m%d_%H%M%S)
-        local backup_dir="${docker_config}.backup_${timestamp}"
-        log_info "Creating backup at ${backup_dir}"
-        sudo mv "$docker_config" "$backup_dir"
-    fi
-    
-    # Erstelle Docker-Verzeichnisstruktur
-    log_info "Creating Docker directory structure"
-    sudo mkdir -p "${docker_config}"/{compose,data,config}
-    
+    # Erstelle temporäres Verzeichnis
+    local docker_temp="$HOME/.local/docker-temp"
+    rm -rf "$docker_temp"
+    mkdir -p "$docker_temp"
+
     # Kopiere Docker-Konfiguration
-    log_info "Deploying Docker configuration"
-    sudo cp -r "${NIXOS_CONFIG_DIR}/docker/"* "${docker_config}/"
+    cp -r "${NIXOS_CONFIG_DIR}/docker/"* "$docker_temp/"
+
+    # Erstelle Docker-Deploy-Skript
+    local hostname=$(hostname)
+    local deploy_script="${NIXOS_CONFIG_DIR}/deploy-docker-${hostname}.sh"
     
-    # Setze Berechtigungen
-    log_info "Setting permissions"
-    sudo chown -R "${virt_user}:${virt_user}" "${docker_config}"
-    sudo chmod -R 755 "${docker_config}"
+    cat > "$deploy_script" << EOF
+#!/usr/bin/env bash
+set -e  # Exit bei Fehlern
+
+# Prüfe Docker-Service
+if ! systemctl is-active docker >/dev/null 2>&1; then
+    echo "Docker service not running. Please reboot first."
+    exit 1
+fi
+
+# Frage nach Variablen
+read -p "Enter Docker user name [docker]: " VIRT_USER
+VIRT_USER=\${VIRT_USER:-docker}
+read -p "Enter email address: " USER_EMAIL
+read -p "Enter domain: " USER_DOMAIN
+read -p "Enter certificate email: " CERT_EMAIL
+
+# Prüfe Variablen
+for var in VIRT_USER USER_EMAIL USER_DOMAIN CERT_EMAIL; do
+    if [[ -z "\${!var}" ]]; then
+        echo "Error: \$var is required"
+        exit 1
+    fi
+done
+
+# Setup Docker-Verzeichnisse
+docker_home="/home/\${VIRT_USER}"
+docker_dest="\${docker_home}/docker"
+
+# Backup wenn nötig
+if [ -d "\$docker_dest" ]; then
+    timestamp=\$(date +%Y%m%d_%H%M%S)
+    backup_dir="\${docker_dest}.backup_\${timestamp}"
+    echo "Creating backup at \${backup_dir}"
+    sudo mv "\$docker_dest" "\$backup_dir"
+fi
+
+# Erstelle Struktur
+echo "Creating Docker directory structure"
+sudo mkdir -p "\${docker_dest}"/{compose,data,config}
+
+# Kopiere Konfiguration
+echo "Deploying Docker configuration"
+sudo cp -r "$docker_temp"/* "\${docker_dest}/"
+
+# Setze Berechtigungen
+echo "Setting permissions"
+sudo chown -R "\${VIRT_USER}:\${VIRT_USER}" "\${docker_dest}"
+sudo chmod -R 755 "\${docker_dest}"
+
+# Ersetze Platzhalter
+echo "Updating configuration files"
+find "\${docker_dest}" -type f -name "*.yml" -o -name "*.env" | while read -r file; do
+    sudo sed -i \
+        -e "s|{{EMAIL}}|\${USER_EMAIL}|g" \
+        -e "s|{{DOMAIN}}|\${USER_DOMAIN}|g" \
+        -e "s|{{CERTEMAIL}}|\${CERT_EMAIL}|g" \
+        -e "s|{{USER}}|\${VIRT_USER}|g" \
+        "\$file"
+done
+
+# Setze Berechtigungen für sensitive Dateien
+find "\${docker_dest}" -type f -name "*.key" -o -name "*.pem" -o -name "*.crt" | while read -r file; do
+    sudo chmod 600 "\$file"
+done
+
+# Cleanup
+rm -rf "$docker_temp"
+
+echo "Docker configuration deployed successfully!"
+EOF
+
+    chmod +x "$deploy_script"
     
-    # Ersetze Platzhalter in Docker-Compose-Dateien
-    log_info "Updating configuration files"
-    find "${docker_config}" -type f -name "*.yml" -o -name "*.env" | while read -r file; do
-        sudo sed -i \
-            -e "s|{{EMAIL}}|${USER_EMAIL}|g" \
-            -e "s|{{DOMAIN}}|${USER_DOMAIN}|g" \
-            -e "s|{{CERTEMAIL}}|${CERT_EMAIL}|g" \
-            -e "s|{{USER}}|${virt_user}|g" \
-            "$file"
-    done
+    log_success "Docker deployment script prepared"
+    log_info "Please run the following script after system rebuild and reboot:"
+    echo
+    echo "$deploy_script"
+    echo
     
-    # Setze spezielle Berechtigungen für sensitive Dateien
-    find "${docker_config}" -type f -name "*.key" -o -name "*.pem" -o -name "*.crt" | while read -r file; do
-        sudo chmod 600 "$file"
-    done
-    
-    log_success "Docker configuration deployed"
-    log_info "You can now start your Docker services"
+    return 0
 }
 
 # Export function
