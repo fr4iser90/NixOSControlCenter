@@ -21,6 +21,7 @@ let
     "nvidia-optimus" = ./nvidia-optimus.nix;  # Laptop-spezifisch
     "vm-gpu" = ./vm-gpu.nix;                 # Für virtuelle Maschinen
     "none" = ./nvidia.nix;                     # Minimale Konfiguration
+    "amd-intel" = ./intel.nix;
   };
 
 in {
