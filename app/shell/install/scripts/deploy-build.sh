@@ -30,7 +30,7 @@ deploy_config() {
     # Prüfe ob Docker-Deployment nötig ist
     local docker_config=""
     if [[ -d "${NIXOS_CONFIG_DIR}/docker" ]]; then
-        log_info "Docker configuration found, preparing deployment..."
+        log_info "Docker configuration found, will deploy after system build..."
         docker_config="${NIXOS_CONFIG_DIR}/docker"
     fi
     
@@ -45,9 +45,29 @@ echo "Building system..."
 sudo nixos-rebuild switch --flake /etc/nixos#${hostname}
 
 if [[ -n "$docker_config" ]]; then
+    echo "Waiting for Docker service..."
+    for i in {1..30}; do
+        if systemctl is-active docker >/dev/null 2>&1; then
+            break
+        fi
+        echo "Waiting for Docker to start... (\$i/30)"
+        sleep 1
+    done
+
+    if ! systemctl is-active docker >/dev/null 2>&1; then
+        echo "Docker service not ready. Please reboot and run:"
+        echo "sudo cp -r $docker_config /home/docker/docker"
+        exit 1
+    fi
+
     echo "Setting up Docker configuration..."
-    local virt_user="\${VIRT_USER:-docker}"
-    local docker_home="/home/\${virt_user}"
+    # Frage nach Docker-User wenn nicht gesetzt
+    if [ -z "\${VIRT_USER}" ]; then
+        read -p "Enter Docker user name [docker]: " VIRT_USER
+        VIRT_USER=\${VIRT_USER:-docker}
+    fi
+    
+    local docker_home="/home/\${VIRT_USER}"
     local docker_dest="\${docker_home}/docker"
     
     # Backup existierender Docker-Konfiguration
@@ -65,7 +85,7 @@ if [[ -n "$docker_config" ]]; then
     sudo cp -r "$docker_config"/* "\${docker_dest}/"
     
     # Setze Berechtigungen
-    sudo chown -R "\${virt_user}:\${virt_user}" "\${docker_dest}"
+    sudo chown -R "\${VIRT_USER}:\${VIRT_USER}" "\${docker_dest}"
     sudo chmod -R 755 "\${docker_dest}"
     
     echo "Docker configuration deployed!"
