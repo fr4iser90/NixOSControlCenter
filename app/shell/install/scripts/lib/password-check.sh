@@ -15,59 +15,25 @@ check_user_passwords() {
     log_info "Current system users: $CURRENT_USERS"
     log_info "Configured users: $CONFIGURED_USERS"
     
-    local changes_detected=0
-    local removed_users=""
-    local added_users=""
-    local users_without_password=""
+    # Erstelle Password-Dir wenn nicht existiert
+    mkdir -p "$PASSWORD_DIR"
     
-    # Prüfe NUR auf neue Benutzer
-    for user in $CONFIGURED_USERS; do
-        # Prüfe ob der Benutzer überhaupt im System existiert
-        if ! id "$user" >/dev/null 2>&1; then
-            users_without_password="$users_without_password $user"
+    # Sammle existierende Passwörter
+    for user in $CURRENT_USERS; do
+        if [ -f "$PASSWORD_DIR/$user/.hashedPassword" ]; then
+            log_info "Found existing password for $user"
+        else
+            log_warn "No stored password found for $user"
+            mkdir -p "$PASSWORD_DIR/$user"
+            if getent shadow "$user" | cut -d: -f2 | grep -q '[^!*]'; then
+                getent shadow "$user" | cut -d: -f2 > "$PASSWORD_DIR/$user/.hashedPassword"
+                chmod 600 "$PASSWORD_DIR/$user/.hashedPassword"
+                log_success "Stored existing password for $user"
+            fi
         fi
     done
     
-    # Passwort-Management nur wenn wirklich nötig
-    if [ ! -z "$users_without_password" ]; then
-        log_warn "The following users have no password set:$users_without_password"
-        
-        for user in $users_without_password; do
-            while true; do
-                echo ""
-                log_info "Setting password for user: $user"
-                read -p "Do you want to set a password for $user now? [Y/n/s(skip)] " response
-                
-                case $response in
-                    [Nn]* )
-                        log_error "Aborting system rebuild."
-                        exit 1
-                        ;;
-                    [Ss]* )
-                        log_info "Skipping password for $user"
-                        break
-                        ;;
-                    * )
-                        # Erstelle Passwort-Verzeichnis im Build-Dir
-                        mkdir -p "$PASSWORD_DIR/$user"
-                        
-                        # Setze Passwort
-                        if passwd $user; then
-                            # Speichere gehashtes Passwort im Build-Dir
-                            getent shadow $user | cut -d: -f2 > "$PASSWORD_DIR/$user/.hashedPassword"
-                            chmod 600 "$PASSWORD_DIR/$user/.hashedPassword"
-                            log_success "Password set successfully for $user"
-                            break
-                        else
-                            log_error "Failed to set password, please try again"
-                        fi
-                        ;;
-                esac
-            done
-        done
-    fi
-    
-    log_success "User configuration check passed"
+    log_success "Password collection complete"
     return 0
 }
 

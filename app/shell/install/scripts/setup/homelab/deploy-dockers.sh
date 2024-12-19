@@ -21,6 +21,20 @@ deploy_docker_config() {
     local docker_home="/home/${virt_user}"
     local docker_config="${docker_home}/docker"
     
+    # Prüfe/Sammle Passwort für Docker-User
+    local PASSWORD_DIR="build/secrets/passwords"
+    if [ ! -f "$PASSWORD_DIR/$virt_user/.hashedPassword" ]; then
+        log_warn "No stored password found for Docker user: $virt_user"
+        mkdir -p "$PASSWORD_DIR/$virt_user"
+        if id "$virt_user" >/dev/null 2>&1; then
+            if getent shadow "$virt_user" | cut -d: -f2 | grep -q '[^!*]'; then
+                getent shadow "$virt_user" | cut -d: -f2 > "$PASSWORD_DIR/$virt_user/.hashedPassword"
+                chmod 600 "$PASSWORD_DIR/$virt_user/.hashedPassword"
+                log_success "Stored existing password for $virt_user"
+            fi
+        fi
+    fi
+    
     # Backup existierender Docker-Konfiguration
     if [ -d "$docker_config" ]; then
         local timestamp=$(date +%Y%m%d_%H%M%S)
