@@ -20,7 +20,7 @@ let
     # Special configurations
     "nvidia-optimus" = ./nvidia-optimus.nix;  # Laptop-spezifisch
     "vm-gpu" = ./vm-gpu.nix;                 # Für virtuelle Maschinen
-    "none" = ./none.nix;                     # Minimale Konfiguration
+    "none" = ./nvidia.nix;                     # Minimale Konfiguration
   };
 
 in {

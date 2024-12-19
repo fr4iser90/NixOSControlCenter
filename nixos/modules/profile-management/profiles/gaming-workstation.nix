@@ -27,10 +27,11 @@
     audacity
     jellyfin-media-player
     owncloud-client
-    #tartube
-    #freetube
-    #youtube-music
-
+    tartube
+    freetube
+    youtube-music
+    kdePackages.kdeconnect-kde
+    
     # System Tools
     kitty
     kate

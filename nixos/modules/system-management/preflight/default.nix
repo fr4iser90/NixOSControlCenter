@@ -7,6 +7,7 @@ let
     
     # Add color definitions
     RED='\033[0;31m'
+    GREEN='\033[0;32m'
     NC='\033[0m'
     
     # Prüfe ob ein Argument übergeben wurde
@@ -18,18 +19,22 @@ let
       echo "  boot        - Build configuration and make it the boot default"
       echo "  test        - Build and activate, but don't add to boot menu"
       echo "  build       - Build configuration only"
-      echo "  force       - Ignore preflight checks and build configuration"
+      echo ""
+      echo "Options:"
+      echo "  --force     - Skip all preflight checks"
       echo ""
       echo "Example: check-and-build switch --flake /etc/nixos#Gaming"
+      echo "         check-and-build switch --force"
       exit 1
     fi
 
-    # Prüfe ob force verwendet wird
-    if [ "$1" = "force" ]; then
-      shift  # Entferne "force" aus den Argumenten
+    # Prüfe ob --force verwendet wird
+    if [[ " $* " =~ " --force " ]]; then
       echo -e "''${RED}WARNING: Bypassing preflight checks!''${NC}"
       echo "Running nixos-rebuild..."
-      exec ${pkgs.nixos-rebuild}/bin/nixos-rebuild "$@"
+      # Entferne --force Option
+      args=$(echo "$@" | sed 's/--force//')
+      exec ${pkgs.nixos-rebuild}/bin/nixos-rebuild $args
     fi
 
     echo "Running preflight checks..."
@@ -37,12 +42,13 @@ let
     # Führe Checks aus
     if ! check-users; then
       echo -e "''${RED}User checks failed!''${NC}"
+      echo -e "Use --force to bypass checks"
       exit 1
     fi
 
     if ! run-system.preflight.checks; then
       echo -e "''${RED}System checks failed!''${NC}"
-      echo -e "''${RED}To bypass checks, use: check-and-build force <command> [options]''${NC}"
+      echo -e "''${RED}To bypass checks, use: check-and-build <command> --force''${NC}"
       exit 1
     fi
 
