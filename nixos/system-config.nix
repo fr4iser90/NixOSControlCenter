@@ -11,8 +11,8 @@
   #
   profileModules = {
     gaming = {
-      streaming = true;     # true/false
-      emulation = true;     # true/false
+      streaming = false;     # true/false
+      emulation = false;     # true/false
     };
     development = {
       game = false;                 # true/false
@@ -28,12 +28,12 @@
   # User Management
   # Wird durch das Script mit allen User-Einträgen ersetzt
   users = {
-    "test" = {
+    "fr4iser" = {
       role = "admin";
       defaultShell = "zsh";
       autoLogin = false;
     };
-    "test2" = {
+    "botchi" = {
       role = "admin";
       defaultShell = "zsh";
       autoLogin = false;

@@ -28,6 +28,9 @@ in {
 
   # Environment-Variablen für Docker
   home.sessionVariables = {
+    EMAIL = "${systemConfig.email}";
+    DOMAIN = "${systemConfig.domain}";
+    CERTEMAIL = "${systemConfig.certEmail}";
     DOCKER_CONFIG = "$HOME/.docker";
     DOCKER_BUILDKIT = "1";
   };

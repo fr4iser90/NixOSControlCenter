@@ -45,9 +45,20 @@ This project is under active development. The GUI is not yet implemented, and ma
    ```bash
    nix-shell install-shell.nix
    ```
+   ```bash
+   install
+   ```
+2. Follow the installation instructions // Choose mods
 
+Caution: not well tested( unit test in py test, but need real environment testing)
+Tested : amd gpu                  working fine
+Tested : intel gpu                working fine
+Tested : nvidia-intel gpu         working fine
+Tested : bootloader systemd-boot  working fine
 
-2. Follow the installation instructions
+Many scripts are not present yet, but will be added maybe.
+My Goal is to achieve a fully automated installation or change of a NixOS system, with a GUI Control Center.
+
 
 ## Project Structure
 

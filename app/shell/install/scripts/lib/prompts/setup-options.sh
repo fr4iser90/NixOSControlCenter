@@ -34,3 +34,8 @@ SETUP_OPTIONS=(
     "Docker"
     "Database"
 )
+
+export MAIN_OPTIONS
+export SUB_OPTIONS
+export MODULE_OPTIONS
+export SETUP_OPTIONS

@@ -19,7 +19,7 @@ select_setup_mode() {
     # Clear previous selections
     selected=()
     
-    # 1. Hauptauswahl (Desktop/Server/etc)
+    # 1. Hauptauswahl
     local main_choice=$(printf "%s\n" "${MAIN_OPTIONS[@]}" | fzf \
         --header="Wähle die Hauptkategorie" \
         --bind 'space:accept' \
@@ -30,7 +30,13 @@ select_setup_mode() {
 
     [ -z "$main_choice" ] && return 1
 
-    # 2. Modulauswahl mit Untermodulen
+    # Bei HomelabServer direkt zurückgeben
+    if [[ "$main_choice" == "HomelabServer" ]]; then
+        echo "Homelab"
+        return 0
+    fi
+    
+    # 2. Modulauswahl
     if [[ ${SUB_OPTIONS[$main_choice]} ]]; then
         local module_choices=$(echo ${SUB_OPTIONS[$main_choice]} | tr '|' '\n' | fzf \
             --multi \
@@ -59,13 +65,11 @@ select_setup_mode() {
             selected+=("$clean_choice")
         done <<< "$module_choices"
 
-        # Wenn None ausgewählt wurde, überschreibe alle anderen Auswahlen
         if [[ "$has_none" = true ]]; then
             selected=("$main_choice" "None")
         fi
     fi
 
-    # Gib nur die ausgewählten Module zurück
     echo "${selected[*]}"
     return 0
 }

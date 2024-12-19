@@ -25,6 +25,10 @@ in
   export INSTALL_BACKUP="$INSTALL_SCRIPTS/tmp/nixos-backup"
   export INSTALL_LOG="$INSTALL_SCRIPTS/tmp/nixos-install.log"
   
+  # Homelab Setup
+  export HOMELAB_SETUP_DIR="$INSTALL_ROOT/app/shell/install/docker"
+  export HOMELAB_SETUP_SCRIPT="$INSTALL_ROOT/app/shell/install/scripts/setup/modes/model-setup/homelab-setup.sh"
+  
   # Create necessary directories
   mkdir -p $INSTALL_TMP
   mkdir -p $INSTALL_BACKUP
