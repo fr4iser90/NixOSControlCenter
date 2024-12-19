@@ -9,8 +9,13 @@ check_user_passwords() {
     # Konfigurierte Benutzer aus system-config.nix extrahieren
     local CONFIGURED_USERS=$(grep -A 20 "users = {" "$SYSTEM_CONFIG_FILE" | grep -B 20 "};" | grep "=" | cut -d'"' -f2)
     
-    # Password Directory
-    local PASSWORD_DIR="/etc/nixos/secrets/passwords"
+    # Mögliche Password-Verzeichnisse
+    local PASSWORD_DIRS=(
+        "/etc/nixos/secrets/passwords"
+        "/etc/nixos/secrets"
+        "/etc/nixos/password"
+        "/etc/nixos"
+    )
     
     log_info "Current system users: $CURRENT_USERS"
     log_info "Configured users: $CONFIGURED_USERS"
@@ -28,8 +33,22 @@ check_user_passwords() {
             changes_detected=1
         fi
         
-        # Prüfe ob Passwort existiert
-        if [ ! -f "$PASSWORD_DIR/$user/.hashedPassword" ] || [ ! -s "$PASSWORD_DIR/$user/.hashedPassword" ]; then
+        # Suche nach Passwort-Datei in allen möglichen Verzeichnissen
+        local password_found=0
+        for dir in "${PASSWORD_DIRS[@]}"; do
+            if [ -f "$dir/$user/.hashedPassword" ] && [ -s "$dir/$user/.hashedPassword" ]; then
+                password_found=1
+                break
+            elif [ -f "$dir/$user/password" ] && [ -s "$dir/$user/password" ]; then
+                password_found=1
+                break
+            elif [ -f "$dir/passwords/$user" ] && [ -s "$dir/passwords/$user" ]; then
+                password_found=1
+                break
+            fi
+        done
+        
+        if [ $password_found -eq 0 ]; then
             users_without_password="$users_without_password $user"
         fi
     done
@@ -58,7 +77,7 @@ check_user_passwords() {
         log_warning "Make sure to save all your work before proceeding!"
     fi
     
-    # Passwort-Management
+    # Passwort-Management nur wenn wirklich nötig
     if [ ! -z "$users_without_password" ]; then
         log_warning "The following users have no password set:$users_without_password"
         
@@ -79,16 +98,16 @@ check_user_passwords() {
                         ;;
                     * )
                         # Erstelle Passwort-Verzeichnis
-                        sudo mkdir -p "$PASSWORD_DIR/$user"
-                        sudo chown $user:users "$PASSWORD_DIR/$user"
-                        sudo chmod 700 "$PASSWORD_DIR/$user"
+                        sudo mkdir -p "/etc/nixos/secrets/passwords/$user"
+                        sudo chown $user:users "/etc/nixos/secrets/passwords/$user"
+                        sudo chmod 700 "/etc/nixos/secrets/passwords/$user"
                         
                         # Setze Passwort
                         if sudo passwd $user; then
                             # Speichere gehashtes Passwort
-                            sudo sh -c "getent shadow $user | cut -d: -f2 > $PASSWORD_DIR/$user/.hashedPassword"
-                            sudo chown $user:users "$PASSWORD_DIR/$user/.hashedPassword"
-                            sudo chmod 600 "$PASSWORD_DIR/$user/.hashedPassword"
+                            sudo sh -c "getent shadow $user | cut -d: -f2 > /etc/nixos/secrets/passwords/$user/.hashedPassword"
+                            sudo chown $user:users "/etc/nixos/secrets/passwords/$user/.hashedPassword"
+                            sudo chmod 600 "/etc/nixos/secrets/passwords/$user/.hashedPassword"
                             log_success "Password set successfully for $user"
                             break
                         else

@@ -38,7 +38,7 @@ main() {
     if [[ ${#selected_modules[@]} -eq 0 ]]; then
         log_error "No setup mode selected"
         exit 1
-    }
+    fi
     
     # 2. System Checks DANACH
     source "${INSTALL_SCRIPTS_SETUP}/config/collect-system-data.sh"
