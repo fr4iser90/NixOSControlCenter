@@ -40,7 +40,7 @@ let
     echo "Running preflight checks..."
     
     # Führe Checks aus
-    if ! check-users; then
+    if ! preflight-check-users; then
       echo -e "''${RED}User checks failed!''${NC}"
       echo -e "Use --force to bypass checks"
       exit 1

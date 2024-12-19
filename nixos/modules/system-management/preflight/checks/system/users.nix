@@ -2,7 +2,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  preflightScript = pkgs.writeScriptBin "check-users" ''
+  preflightScript = pkgs.writeScriptBin "preflight-check-users" ''
     #!${pkgs.bash}/bin/bash
     set -e
     

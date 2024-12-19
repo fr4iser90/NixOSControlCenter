@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
 
 let
-  preflightScript = pkgs.writeScriptBin "check-cpu" ''
+  preflightScript = pkgs.writeScriptBin "preflight-check-cpu" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
 
@@ -61,7 +61,7 @@ in {
     system.preflight.checks.cpu = {
       check = preflightScript;
       name = "CPU Check";
-      binary = "check-cpu";
+      binary = "preflight-check-cpu";
     };
     environment.systemPackages = [ preflightScript ];
   };
