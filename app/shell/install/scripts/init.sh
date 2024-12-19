@@ -4,7 +4,8 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/prompts/setup-mode.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/prompts/setup-rules.sh"
-
+source "$(dirname "${BASH_SOURCE[0]}")/deploy-build.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/checks/password-check.sh"
 main() {
     log_header "NixOS System Setup"
     

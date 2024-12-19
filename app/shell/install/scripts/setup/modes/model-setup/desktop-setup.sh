@@ -1,51 +1,46 @@
 #!/usr/bin/env bash
 
 process_selected_modules() {
-    # Prüfe ob Parameter übergeben wurden
     if [ $# -eq 0 ]; then
         echo "Fehler: Keine Module übergeben"
         exit 1
     fi
 
-    
-    local -a modules=("$@")
-    
-    
-    # Hauptkategorie ist immer das erste Element
-    local main_category="${modules[0]}"
-    
-    
-    # Alle weiteren Elemente sind die ausgewählten Module
-    for module in "${modules[@]:1}"; do
-        echo "Verarbeite Modul: $module"
+    # Backup erstellen
+    if [ -f "$SYSTEM_CONFIG_FILE" ]; then
+        backup_file "$SYSTEM_CONFIG_FILE"
+    fi
+
+    # Setze System Type
+    sed -i 's/systemType = ".*";/systemType = "desktop";/' "$SYSTEM_CONFIG_FILE"
+
+    # Setze erstmal alle Desktop-Module auf false
+    sed -i \
+        -e '/gaming = {/,/};/s/streaming = .*;/streaming = false;/' \
+        -e '/gaming = {/,/};/s/emulation = .*;/emulation = false;/' \
+        -e '/development = {/,/};/s/game = .*;/game = false;/' \
+        -e '/development = {/,/};/s/web = .*;/web = false;/' \
+        "$SYSTEM_CONFIG_FILE"
+
+    # Verarbeite die Module
+    for module in "${@:1}"; do
         case "$module" in
-            "Gaming")
-                echo "Konfiguriere Gaming-Setup..."
-                ;;
             "Gaming-Streaming")
-                echo "Konfiguriere Streaming-Setup..."
+                sed -i '/gaming = {/,/};/s/streaming = .*;/streaming = true;/' "$SYSTEM_CONFIG_FILE"
                 ;;
             "Gaming-Emulation")
-                echo "Konfiguriere Emulations-Setup..."
-                ;;
-            "Development")
-                echo "Konfiguriere Development-Setup..."
-                ;;
-            "Development-Web")
-                echo "Konfiguriere Web-Development..."
+                sed -i '/gaming = {/,/};/s/emulation = .*;/emulation = true;/' "$SYSTEM_CONFIG_FILE"
                 ;;
             "Development-Game")
-                echo "Konfiguriere Game-Development..."
+                sed -i '/development = {/,/};/s/game = .*;/game = true;/' "$SYSTEM_CONFIG_FILE"
                 ;;
-            "None")
-                echo "Basis-Desktop-Konfiguration..."
-                ;;
-            *)
-                echo "Unbekanntes Modul: $module"
+            "Development-Web")
+                sed -i '/development = {/,/};/s/web = .*;/web = true;/' "$SYSTEM_CONFIG_FILE"
                 ;;
         esac
     done
+
+    log_success "Desktop profile modules updated"
 }
 
-# Verarbeite die übergebenen Module
 process_selected_modules "$@"
