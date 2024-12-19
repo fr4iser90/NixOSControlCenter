@@ -28,12 +28,24 @@ let
       exit 1
     fi
 
+    # Funktion zum Speichern der Konfiguration
+    save_config() {
+      echo "Saving current configuration state..."
+      echo '${builtins.toJSON {
+        systemType = systemConfig.systemType or null;
+        gpu = systemConfig.gpu or null;
+        cpu = systemConfig.cpu or null;
+        users = systemConfig.users or {};
+      }}' > /etc/nixos/.system-config.previous.json
+    }
+
     # Prüfe ob --force verwendet wird
     if [[ " $* " =~ " --force " ]]; then
       echo -e "''${RED}WARNING: Bypassing preflight checks!''${NC}"
       echo "Running nixos-rebuild..."
       # Entferne --force Option
       args=$(echo "$@" | sed 's/--force//')
+      # Kein Config-Speichern bei Force
       exec ${pkgs.nixos-rebuild}/bin/nixos-rebuild $args
     fi
 
@@ -54,7 +66,18 @@ let
 
     echo -e "''${GREEN}All checks passed!''${NC}"
     echo "Running nixos-rebuild..."
-    exec ${pkgs.nixos-rebuild}/bin/nixos-rebuild "$@"
+
+    # Speichere aktuelle Konfiguration vor dem Build
+    save_config
+
+    # Führe Build aus
+    if ${pkgs.nixos-rebuild}/bin/nixos-rebuild "$@"; then
+      echo -e "''${GREEN}Build successful!''${NC}"
+      exit 0
+    else
+      echo -e "''${RED}Build failed!''${NC}"
+      exit 1
+    fi
   '';
 
 in

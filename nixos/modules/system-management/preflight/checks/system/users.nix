@@ -8,6 +8,36 @@ let
     
     echo "Checking user configuration..."
     
+        check_passwords() {
+        local users=("$@")
+        local no_password=()
+
+        if [ "$(id -u)" -eq 0 ]; then
+            # Direkt shadow lesen als root
+            shadow_content=$(cat /etc/shadow)
+        else
+            # Via sudo wenn nicht root
+            shadow_content=$(sudo cat /etc/shadow 2>/dev/null || echo "")
+        fi
+
+        if [ -z "$shadow_content" ]; then
+            echo -e "  ''${YELLOW}⚠️  Cannot check passwords (no root access)''${NC}"
+            return 0
+        fi
+
+        for user in "''${users[@]}"; do
+            if echo "$shadow_content" | grep "^$user:" | grep -q ':\*\|:!'; then
+                no_password+=("$user")
+            fi
+        done
+
+        if [ ''${#no_password[@]} -gt 0 ]; then
+            echo -e "  ''${YELLOW}⚠️  The following users have no password set: ''${no_password[*]}''${NC}"
+            return 1
+        fi
+
+        return 0
+    }
     # Aktuelle System-Benutzer ermitteln, aber nixbld* und andere System-Benutzer ausschließen
     CURRENT_USERS=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 && $1 !~ /^nixbld/ && $1 !~ /^systemd-/ {print $1}')
     

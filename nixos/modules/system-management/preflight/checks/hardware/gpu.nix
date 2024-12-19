@@ -73,9 +73,6 @@ let
       echo -e "\n''${RED}WARNING: GPU configuration mismatch!''${NC}"
       echo -e "''${RED}System configured for $CONFIGURED but detected $DETECTED''${NC}"
 
-      # Create backup
-      cp /etc/nixos/system-config.nix /etc/nixos/system-config.nix.bak.gpu
-      echo -e "''${GRAY}Backup created: system-config.nix.bak.gpu''${NC}"
 
       # Update configuration
       sed -i "s/gpu = \"$CONFIGURED\"/gpu = \"$DETECTED\"/" /etc/nixos/system-config.nix
