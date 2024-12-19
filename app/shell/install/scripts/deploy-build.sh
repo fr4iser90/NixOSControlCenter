@@ -27,6 +27,13 @@ deploy_config() {
     local hostname=$(hostname)
     local build_script="${NIXOS_CONFIG_DIR}/build-${hostname}.sh"
     
+    # Prüfe ob Docker-Deployment nötig ist
+    local docker_config=""
+    if [[ -d "${NIXOS_CONFIG_DIR}/docker" ]]; then
+        log_info "Docker configuration found, preparing deployment..."
+        docker_config="${NIXOS_CONFIG_DIR}/docker"
+    fi
+    
     cat > "$build_script" << EOF
 #!/usr/bin/env bash
 set -e  # Exit bei Fehlern
@@ -36,6 +43,33 @@ sudo cp -r $nixos_dir/* /etc/nixos/
 
 echo "Building system..."
 sudo nixos-rebuild switch --flake /etc/nixos#${hostname}
+
+if [[ -n "$docker_config" ]]; then
+    echo "Setting up Docker configuration..."
+    local virt_user="\${VIRT_USER:-docker}"
+    local docker_home="/home/\${virt_user}"
+    local docker_dest="\${docker_home}/docker"
+    
+    # Backup existierender Docker-Konfiguration
+    if [ -d "\$docker_dest" ]; then
+        local timestamp=\$(date +%Y%m%d_%H%M%S)
+        local backup_dir="\${docker_dest}.backup_\${timestamp}"
+        echo "Creating backup at \${backup_dir}"
+        sudo mv "\$docker_dest" "\$backup_dir"
+    fi
+    
+    # Erstelle Docker-Verzeichnisstruktur
+    sudo mkdir -p "\${docker_dest}"/{compose,data,config}
+    
+    # Kopiere Docker-Konfiguration
+    sudo cp -r "$docker_config"/* "\${docker_dest}/"
+    
+    # Setze Berechtigungen
+    sudo chown -R "\${virt_user}:\${virt_user}" "\${docker_dest}"
+    sudo chmod -R 755 "\${docker_dest}"
+    
+    echo "Docker configuration deployed!"
+fi
 
 echo "Cleaning up..."
 rm -rf $nixos_dir
