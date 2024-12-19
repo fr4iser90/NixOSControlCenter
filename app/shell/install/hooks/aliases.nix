@@ -1,37 +1,31 @@
-# app/shell/install/hooks/aliases.nix
 { pkgs }:
-
-let
-  inherit (pkgs) lib;
-  preflight = import ../preflight { inherit pkgs lib; };
-in
 
 ''
   # System Checks
-  alias check-gpu="${preflight.checks.gpu}/bin/check-gpu"
-  alias check-system-information="${preflight.checks.system-information}/bin/check-system-info"
+  alias check-gpu="$INSTALL_SCRIPTS/checks/hardware/gpu.sh"
+  alias check-cpu="$INSTALL_SCRIPTS/checks/hardware/cpu.sh"
+  alias check-memory="$INSTALL_SCRIPTS/checks/hardware/memory.sh"
+  alias check-storage="$INSTALL_SCRIPTS/checks/hardware/storage.sh"
   
-  # Disk Management (direkt über pkgs)
-  alias list-disks="${pkgs.util-linux}/bin/lsblk -f"
-  alias show-partitions="${pkgs.util-linux}/bin/fdisk -l"
+  # System Configuration
+  alias check-bootloader="$INSTALL_SCRIPTS/checks/system/bootloader.sh"
+  alias check-locale="$INSTALL_SCRIPTS/checks/system/locale.sh"
+  alias check-network="$INSTALL_SCRIPTS/checks/system/network.sh"
+  
+  # Setup Commands
+  alias setup-predefined="$INSTALL_SCRIPTS/setup/modes/predefinedSetup.sh"
+  alias setup-personalized="$INSTALL_SCRIPTS/setup/modes/personalizedSetup.sh"
   
   # Utilities
   alias log="tail -f $INSTALL_LOG"
   alias clear-mounts="umount -R /mnt"
   alias restart-install="clear-mounts && rm -rf $INSTALL_TMP/* && clear"
-
-  # Installation Commands (TODO)
-  # alias install-basic="..."
-  # alias install-minimal="..."
   
-  # Profile Installation (TODO)
-  # alias install-desktop="..."
-  # alias install-server="..."
-  # alias install-dev="..."
-  # alias install-gaming="..."
+  # Helper für die Entwicklung
+  alias edit-script="$EDITOR $INSTALL_SCRIPTS/"
+  alias run-script="bash $INSTALL_SCRIPTS/"
   
-  # Configuration (TODO)
-  # alias show-config="..."
-  # alias edit-config="..."
-  # alias backup-config="..."
+  # Disk Management (direkt über pkgs)
+  alias list-disks="${pkgs.util-linux}/bin/lsblk -f"
+  alias show-partitions="${pkgs.util-linux}/bin/fdisk -l"
 ''
