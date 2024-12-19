@@ -2,7 +2,7 @@
 # Exclude all log files to avoid tracking transient output from the application.
 *.log
 nixos_control_center.log
-system-config.nix.backup
+system-config.nix.backup.*
 
 # Virtual environments and environment variables
 # Exclude virtual environment directories and local .env files for environment-specific configurations.

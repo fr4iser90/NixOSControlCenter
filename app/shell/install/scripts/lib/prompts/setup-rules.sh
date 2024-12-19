@@ -1,13 +1,14 @@
+# setup-rules.sh
 #!/usr/bin/env bash
 
 # Einfache Definition der Abhängigkeiten
 declare -A REQUIRES=(
     ["Gaming"]="Desktop"
-    ["Streaming"]="Gaming"
-    ["Emulation"]="Gaming"
+    ["Gaming-Streaming"]="Gaming"
+    ["Gaming-Emulation"]="Gaming"
     ["Development"]="Desktop"
-    ["Web"]="Development"
-    ["Game"]="Development"
+    ["Development-Web"]="Development"
+    ["Development-Game"]="Development"
     ["Docker"]="Server"
     ["Database"]="Server"
 )
@@ -30,6 +31,10 @@ activate_dependencies() {
     # Entferne Duplikate und gib das Ergebnis zurück
     echo "${deps[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '
 }
+
+# Exportiere die Funktion und das Array
+export -f activate_dependencies
+export REQUIRES
 
 # Funktion zum Prüfen von Konflikten
 check_conflicts() {

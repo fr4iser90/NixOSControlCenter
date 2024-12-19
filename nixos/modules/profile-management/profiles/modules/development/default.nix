@@ -8,6 +8,7 @@
     git
     git-credential-manager
     delta
+    godot_4
   ];
 
   programs.git = {
