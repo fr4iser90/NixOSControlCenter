@@ -3,8 +3,6 @@
 log_section "Collecting System Information"
 
 collect_system_data() {
-    local config_file="$NIXOS_CONFIG_DIR/system-config.nix"
-    local template_file="$INSTALL_SCRIPTS_SETUP/config/system-config.template.nix"
     local temp_config="${INSTALL_TMP}/system-config.nix.tmp"
 
     # Hardware Checks
@@ -19,12 +17,12 @@ collect_system_data() {
     source "${CHECKS_DIR}/system/bootloader.sh"
 
     # Backup erstellen wenn Datei existiert
-    if [ -f "$config_file" ]; then
-        backup_file "$config_file"
+    if [ -f "$SYSTEM_CONFIG_FILE" ]; then
+        backup_file "$SYSTEM_CONFIG_FILE"
     fi
 
     # Template kopieren und anpassen
-    cp "$template_file" "$temp_config"
+    cp "$SYSTEM_CONFIG_TEMPLATE" "$temp_config"
 
     # System Type & Profile
     sed -i \
@@ -116,13 +114,13 @@ collect_system_data() {
 
     # Aktiviere neue Konfiguration
     if [ -s "$temp_config" ]; then
-        ensure_dir "$(dirname "$config_file")"
-        mv "$temp_config" "$config_file"
-        log_success "System configuration updated at $config_file"
+        ensure_dir "$(dirname "$SYSTEM_CONFIG_FILE")"
+        mv "$temp_config" "$SYSTEM_CONFIG_FILE"
+        log_success "System configuration updated at $SYSTEM_CONFIG_FILE"
     else
         log_error "Generated config is empty!"
-        if [ -f "${config_file}.backup" ]; then
-            mv "${config_file}.backup" "$config_file"
+        if [ -f "${SYSTEM_CONFIG_FILE}.backup" ]; then
+            mv "${SYSTEM_CONFIG_FILE}.backup" "$SYSTEM_CONFIG_FILE"
             log_info "Restored backup configuration"
         fi
         return 1

@@ -17,7 +17,9 @@ in
   
   # System Config Location
   export SYSTEM_CONFIG_DIR="/etc/nixos"
-  
+  export SYSTEM_CONFIG_FILE="$NIXOS_CONFIG_DIR/system-config.nix"
+  export SYSTEM_CONFIG_TEMPLATE="$INSTALL_SCRIPTS_SETUP/config/system-config.template.nix"
+
   # Temporary and Backup
   export INSTALL_TMP="$INSTALL_SCRIPTS/tmp/nixos-install"
   export INSTALL_BACKUP="$INSTALL_SCRIPTS/tmp/nixos-backup"

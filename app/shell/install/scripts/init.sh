@@ -3,7 +3,7 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/prompts/setup-mode.sh"
-
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prompts/setup-rules.sh"
 main() {
     log_header "NixOS System Setup"
     
@@ -13,22 +13,27 @@ main() {
     # 2. Installation Mode
     log_section "Setup Mode"
     
-    local setup_mode
-    setup_mode=$(select_setup_mode)
+    local selection
+    selection=$(select_setup_mode)
     
-    case "$setup_mode" in
-        "Custom Setup")
-            source "${INSTALL_SCRIPTS_SETUP}/modes/custom-setup/custom-setup.sh"
-            ;;
-        *)
-            # Konvertiere den Namen in einen Script-Pfad
-            local script_name="${setup_mode,,}" # lowercase
-            script_name="${script_name// /-}"   # spaces to dashes
-            source "${INSTALL_SCRIPTS_SETUP}/modes/model-setup/${script_name}-setup.sh"
-            ;;
-    esac
+    # Extrahiere die tatsächliche Auswahl (entferne den "Final selection" Text)
+    local cleaned_selection=$(echo "$selection" | grep -v "Final selection" | tr -d '\n')
     
-    # Rest des Scripts...
+    # Bestimme den Basis-Typ
+    local setup_type
+    if [[ "$cleaned_selection" == *"Desktop"* ]]; then
+        setup_type="desktop"
+    elif [[ "$cleaned_selection" == *"Server"* ]]; then
+        setup_type="server"
+    elif [[ "$cleaned_selection" == *"Homelab"* ]]; then
+        setup_type="homelab"
+    else
+        setup_type="custom"
+    fi
+    
+    # Führe das entsprechende Setup-Script aus
+    source "${INSTALL_SCRIPTS_SETUP}/modes/model-setup/${setup_type}-setup.sh"
+    
     log_success "Setup complete! 🎉"
 }
 
