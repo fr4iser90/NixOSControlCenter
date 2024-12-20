@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+
+setup_server() {
+    log_section "Server Modules Setup"
+    
+    # Skip the setup type ("Server")
+    shift
+    
+    # Validate remaining modules
+    if [[ $# -eq 0 ]]; then
+        log_error "No modules provided"
+        return 1
+    fi
+    
+    # Backup configuration
+    backup_config || return 1
+    
+    # Update configuration
+    update_server_system_type || return 1
+    reset_module_states || return 1
+    process_server_modules "$@" || return 1
+    
+    log_success "Server profile modules updated"
+}
+
+backup_config() {
+    if [[ -f "$SYSTEM_CONFIG_FILE" ]]; then
+        backup_file "$SYSTEM_CONFIG_FILE" || {
+            log_error "Failed to create backup"
+            return 1
+        }
+    fi
+    return 0
+}
+
+update_server_system_type() {
+    log_debug "Setting system type to server"
+    sed -i 's/systemType = ".*";/systemType = "server";/' "$SYSTEM_CONFIG_FILE" || {
+        log_error "Failed to update system type"
+        return 1
+    }
+    return 0
+}
+
+reset_module_states() {
+    log_debug "Resetting module states"
+    
+    local module_updates=(
+        '/server = {/,/};/s/docker = .*;/docker = false;/'
+        '/server = {/,/};/s/database = .*;/database = false;/'
+    )
+    
+    for update in "${module_updates[@]}"; do
+        sed -i "$update" "$SYSTEM_CONFIG_FILE" || {
+            log_error "Failed to reset module states"
+            return 1
+        }
+    done
+    
+    return 0
+}
+
+process_server_modules() {
+    log_debug "Processing selected modules"
+    
+    local module
+    for module in "$@"; do
+        enable_server_module "$module" || return 1
+    done
+    
+    return 0
+}
+
+enable_server_module() {
+    local module="$1"
+    local update_command
+    
+    case "$module" in
+        "Docker")  
+            update_command='/server = {/,/};/s/docker = .*;/docker = true;/'
+            ;;
+        "Database")  
+            update_command='/server = {/,/};/s/database = .*;/database = true;/'
+            ;;
+        *)
+            log_error "Unknown module: $module"
+            return 1
+            ;;
+    esac
+    
+    sed -i "$update_command" "$SYSTEM_CONFIG_FILE" || {
+        log_error "Failed to enable module: $module"
+        return 1
+    }
+    
+    log_success "Enabled module: $module"
+    return 0
+}
+
+# Export functions
+export -f setup_server
+export -f enable_server_module
+
+# Check script execution
+check_script_execution "SYSTEM_CONFIG_FILE" "setup_server $*"
