@@ -10,8 +10,8 @@ deploy_docker_config() {
     fi
 
     # Prüfe ob Docker-Konfiguration existiert
-    if [[ ! -d "${NIXOS_CONFIG_DIR}/docker" ]]; then
-        log_error "No Docker configuration found in ${NIXOS_CONFIG_DIR}/docker"
+    if [[ ! -d "${HOMELAB_SETUP_DIR}" ]]; then
+        log_error "No Docker configuration found in ${HOMELAB_SETUP_DIR}"
         return 1
     fi
 
@@ -42,7 +42,7 @@ fi
 # Erstelle und kopiere Docker-Konfiguration
 echo "Deploying Docker configuration"
 sudo mkdir -p "\$docker_dest"/{compose,data,config}
-sudo cp -r "${NIXOS_CONFIG_DIR}/docker/"* "\$docker_dest/"
+sudo cp -r "${HOMELAB_SETUP_DIR}/"* "\$docker_dest/"
 
 # Setze Berechtigungen
 echo "Setting permissions"
