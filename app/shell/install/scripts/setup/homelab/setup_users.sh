@@ -45,7 +45,7 @@ setup_users() {
     cp "$SYSTEM_CONFIG_FILE" "$temp_file"
 
     # Ersetze den users-Block
-    sed -i "/users = {/,/};/c\  users = {\n    \"${main_user}\" = {\n      role = \"admin\";\n      defaultShell = \"zsh\";\n      autoLogin = false\n    };\n    \"${virt_user}\" = {\n      role = \"virtualization\";\n      defaultShell = \"zsh\";\n      autoLogin = false\n    };\n " "$temp_file"
+    sed -i "/users = {/,/};/c\  users = {\n    \"${main_user}\" = {\n      role = \"admin\";\n      defaultShell = \"zsh\";\n      autoLogin = false;\n    };\n    \"${virt_user}\" = {\n      role = \"virtualization\";\n      defaultShell = \"zsh\";\n      autoLogin = false;\n    };\n  };" "$temp_file"
 
     # Füge Email/Domain Konfiguration hinzu
     if ! grep -q "email =" "$temp_file"; then
