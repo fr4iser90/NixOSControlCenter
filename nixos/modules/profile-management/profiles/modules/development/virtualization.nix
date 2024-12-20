@@ -1,7 +1,7 @@
 # development/virtualization.nix
 { config, lib, pkgs, ... }:
 {
-    imports = [../../../virtualization-management/testing/nixos-vm.nix];
+    imports = [../../../../virtualization-management/testing/nixos-vm.nix];
 
     # Aktiviere VM mit Remote-Zugriff
     virtualisation.nixos-vm = {
