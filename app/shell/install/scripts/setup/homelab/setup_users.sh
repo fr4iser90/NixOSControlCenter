@@ -42,68 +42,51 @@ setup_users() {
     
     # Erstelle temporäre Datei für sed
     local temp_file=$(mktemp)
+    cp "$SYSTEM_CONFIG_FILE" "$temp_file"
+
+    # Ersetze den users-Block
+    sed -i "/users = {/,/};/c\  users = {\n    \"${main_user}\" = {\n      role = \"admin\";\n      defaultShell = \"zsh\";\n      autoLogin = false\n    };\n    \"${virt_user}\" = {\n      role = \"virtualization\";\n      defaultShell = \"zsh\";\n      autoLogin = false\n    };\n " "$temp_file"
+
+    # Füge Email/Domain Konfiguration hinzu
+    if ! grep -q "email =" "$temp_file"; then
+        sed -i "/^{/a\  email = \"${email}\";\n  domain = \"${domain}\";\n  certEmail = \"${cert_email}\";" "$temp_file"
+    else
+        sed -i "s/email = \".*\";/email = \"${email}\";/" "$temp_file"
+        sed -i "s/domain = \".*\";/domain = \"${domain}\";/" "$temp_file"
+        sed -i "s/certEmail = \".*\";/certEmail = \"${cert_email}\";/" "$temp_file"
+    fi
+
+    # Setze System-Typ und Profile-Module für Homelab
+    sed -i "s/systemType = \".*\";/systemType = \"homelab\";/" "$temp_file"
     
-    # Erstelle eine saubere Basis-Konfiguration
-    cat > "$temp_file" << 'EOF'
-{
-  #
-  # User Management
-  #
-  users = {
-    "{{MAIN_USER}}" = {
-      role = "admin";
-      defaultShell = "zsh";
-      autoLogin = false
-    };
-    "{{VIRT_USER}}" = {
-      role = "virtualization";
-      defaultShell = "zsh";
-      autoLogin = false
-    };
-  };
-
-  #
-  # System Type & Profile
-  #
-  systemType = "homelab";
-  email = "{{EMAIL}}";
-  domain = "{{DOMAIN}}";
-  certEmail = "{{CERT_EMAIL}}";
-
-  #
-  # Profile Modules
-  #
-  profileModules = {
-    homelab = {
-      monitoring = true;
-      media = true;
-      storage = true;
-      network = true
-    };
-    server = {
-      docker = true;
-      web = true
-    };
-    development = {
-      web = false;
-      game = false
-    };
-    gaming = {
-      streaming = false;
-      emulation = false
-    };
-  };
-}
-EOF
-
-    # Ersetze die Platzhalter
-    sed -i \
-        -e "s/{{MAIN_USER}}/${main_user}/g" \
-        -e "s/{{VIRT_USER}}/${virt_user}/g" \
-        -e "s/{{EMAIL}}/${email}/g" \
-        -e "s/{{DOMAIN}}/${domain}/g" \
-        -e "s/{{CERT_EMAIL}}/${cert_email}/g" \
-        "$temp_file"
+    # Füge Homelab Profile-Module hinzu
+    if ! grep -q "profileModules = {" "$temp_file"; then
+        # Finde die letzte schließende Klammer
+        last_line=$(grep -n "^}" "$temp_file" | tail -n1 | cut -d: -f1)
+        
+        # Füge Profile-Module VOR der letzten Klammer ein
+        sed -i "${last_line}i\\
+  profileModules = {\\
+    homelab = {\\
+      monitoring = true;\\
+      media = true;\\
+      storage = true;\\
+      network = true;\\
+    };\\
+    server = {\\
+      docker = true;\\
+      web = true;\\
+    };\\
+    development = {\\
+      web = false;\\
+      game = false;\\
+    };\\
+    gaming = {\\
+      streaming = false;\\
+      emulation = false;\\
+    };\\
+  };" "$temp_file"
+    fi
 
     # Überprüfe die Änderungen
     if diff "$SYSTEM_CONFIG_FILE" "$temp_file" >/dev/null; then
