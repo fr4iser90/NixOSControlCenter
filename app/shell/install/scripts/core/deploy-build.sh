@@ -66,7 +66,7 @@ echo "Copying configuration..."
 sudo cp -r /home/fr4iser/.local/nixos/* /etc/nixos/
 
 echo "Building system..."
-sudo nixos-rebuild switch --flake /etc/nixos#{hostname}
+sudo nixos-rebuild switch --flake /etc/nixos#${hostname}
 
 echo "Cleaning up..."
 rm -rf /home/fr4iser/.local/nixos
