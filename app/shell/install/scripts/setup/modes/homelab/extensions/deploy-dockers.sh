@@ -33,95 +33,64 @@ validate_environment() {
 create_deploy_script() {
     local deploy_script="$1"
     
-    cat > "$deploy_script" << 'EOF'
+    cat > "$deploy_script" << EOF
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Source common functions
-source "$(dirname "$0")/lib/logging.sh"
-
 main() {
-    log_section "Docker Deployment"
+    echo "=== Docker Deployment ==="
     
     # Check docker service
-    check_docker_service || exit 1
-    
-    # Setup directories
-    setup_directories || exit 1
-    
-    # Deploy configuration
-    deploy_configuration || exit 1
-    
-    # Set permissions
-    set_permissions || exit 1
-    
-    # Update configurations
-    update_configurations || exit 1
-    
-    log_success "Docker configuration deployed successfully!"
-}
-
-check_docker_service() {
     if ! systemctl is-active docker >/dev/null 2>&1; then
-        log_error "Docker service not running"
-        log_info "Please reboot first"
-        return 1
+        echo "ERROR: Docker service not running"
+        echo "Please reboot first"
+        exit 1
     fi
-}
 
-setup_directories() {
-    local docker_dest="/home/${VIRT_USER}/docker"
+    # Setup directories
+    echo "Setting up docker directories..."
+    DOCKER_HOME="/home/${VIRT_USER}/docker"
     
     # Backup if needed
-    if [[ -d "$docker_dest" ]]; then
-        local timestamp=$(date +%Y%m%d_%H%M%S)
-        local backup="${docker_dest}.backup_${timestamp}"
-        log_info "Creating backup at $backup"
-        sudo mv "$docker_dest" "$backup"
+    if [[ -d "\$DOCKER_HOME" ]]; then
+        BACKUP="\${DOCKER_HOME}.backup_\$(date +%Y%m%d_%H%M%S)"
+        echo "Creating backup at \$BACKUP"
+        sudo mv "\$DOCKER_HOME" "\$BACKUP"
     fi
     
-    # Create directories
-    log_info "Creating docker directories"
-    sudo mkdir -p "$docker_dest"/{compose,data,config}
+    # Create directory structure
+    sudo mkdir -p "\$DOCKER_HOME"/{compose,data,config}
     
-    return 0
+    # Copy configurations
+    echo "Copying docker configuration..."
+    sudo cp -r "${HOMELAB_DOCKER_DIR}/"* "\$DOCKER_HOME/"
+    
+    # Set permissions
+    echo "Setting permissions..."
+    sudo chown -R "${VIRT_USER}:${VIRT_USER}" "\$DOCKER_HOME"
+    sudo chmod -R 755 "\$DOCKER_HOME"
+    
+    # Set sensitive file permissions
+    echo "Setting sensitive file permissions..."
+    sudo find "\$DOCKER_HOME" \\
+        -type f \\( -name "*.key" -o -name "*.pem" -o -name "*.crt" \\) \\
+        -exec chmod 600 {} \\;
+    
+    # Update configuration files
+    echo "Updating configuration files..."
+    sudo find "\$DOCKER_HOME" \\
+        -type f \\( -name "*.yml" -o -name "*.env" \\) \\
+        -exec sed -i \\
+            -e "s|{{EMAIL}}|${HOMELAB_EMAIL}|g" \\
+            -e "s|{{DOMAIN}}|${HOMELAB_DOMAIN}|g" \\
+            -e "s|{{CERTEMAIL}}|${HOMELAB_CERT_EMAIL}|g" \\
+            -e "s|{{USER}}|${VIRT_USER}|g" \\
+            {} \\;
+    
+    echo "Docker configuration deployed successfully!"
 }
 
-deploy_configuration() {
-    local docker_dest="/home/${VIRT_USER}/docker"
-    
-    log_info "Copying docker configuration"
-    sudo cp -r "${HOMELAB_DOCKER_DIR}/"* "$docker_dest/"
-}
-
-set_permissions() {
-    local docker_dest="/home/${VIRT_USER}/docker"
-    
-    log_info "Setting directory permissions"
-    sudo chown -R "${VIRT_USER}:${VIRT_USER}" "$docker_dest"
-    sudo chmod -R 755 "$docker_dest"
-    
-    log_info "Setting sensitive file permissions"
-    sudo find "$docker_dest" \
-        -type f \( -name "*.key" -o -name "*.pem" -o -name "*.crt" \) \
-        -exec chmod 600 {} \;
-}
-
-update_configurations() {
-    local docker_dest="/home/${VIRT_USER}/docker"
-    
-    log_info "Updating configuration files"
-    sudo find "$docker_dest" \
-        -type f \( -name "*.yml" -o -name "*.env" \) \
-        -exec sed -i \
-            -e "s|{{EMAIL}}|${USER_EMAIL}|g" \
-            -e "s|{{DOMAIN}}|${USER_DOMAIN}|g" \
-            -e "s|{{CERTEMAIL}}|${CERT_EMAIL}|g" \
-            -e "s|{{USER}}|${VIRT_USER}|g" \
-            {} \;
-}
-
-main "$@"
+main "\$@"
 EOF
 
     chmod +x "$deploy_script" || return 1
