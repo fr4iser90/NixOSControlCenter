@@ -33,19 +33,22 @@ in {
     virtualisation.libvirtd.enable = true;
     programs.virt-manager.enable = true;
 
-    # SPICE für Remote-Display
+    # Packages and tools
     environment.systemPackages = with pkgs; [
+      # GUI tools
       virt-manager
       virt-viewer
+      
+      # SPICE remote display
       spice
       spice-gtk
       spice-protocol
+      
+      # Virtualization tools
       win-virtio
       OVMF
-    ];
-
-    # VM Start-Script
-    environment.systemPackages = with pkgs; [
+      
+      # VM start script
       (writeShellScriptBin "start-nixos-vm" ''
         ${pkgs.qemu}/bin/qemu-system-x86_64 \
           -enable-kvm \
