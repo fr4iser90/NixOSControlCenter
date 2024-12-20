@@ -21,10 +21,13 @@ in {
       description = "Number of CPU cores";
     };
 
-    spicePort = mkOption {
-      type = types.port;
-      default = 5900;
-      description = "SPICE display port";
+    remote = {
+      enable = mkEnableOption "Remote access";
+      displayPort = mkOption {
+        type = types.port;
+        default = 5900;
+        description = "SPICE display port";
+      };
     };
   };
 
@@ -56,7 +59,7 @@ in {
           -smp ${toString cfg.cores} \
           -cpu host \
           -vga qxl \
-          -spice port=${toString cfg.spicePort},disable-ticketing=on \
+          -spice port=${toString cfg.remote.port},disable-ticketing=on \
           -device virtio-tablet-pci \
           -device virtio-keyboard-pci \
           -drive file=/var/lib/libvirt/images/nixos-test.qcow2,if=virtio \
@@ -65,6 +68,8 @@ in {
     ];
 
     # Firewall
-    networking.firewall.allowedTCPPorts = [ cfg.spicePort ];
+    networking.firewall = mkIf cfg.remote.enable {
+      allowedTCPPorts = [ cfg.remote.port ];
+    };
   };
 }
