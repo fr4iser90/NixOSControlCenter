@@ -13,6 +13,7 @@ let
   baseProfiles = {
     desktop = import ./profiles/base/desktop.nix;
     server = import ./profiles/base/server.nix;
+    homelab = import ./profiles/custom/homelab.nix;
   };
 
   # Aktive Module aus systemConfig extrahieren
