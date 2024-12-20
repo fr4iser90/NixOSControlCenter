@@ -43,13 +43,19 @@ collect_homelab_info() {
     fi
     
     # Email configuration (use found if available)
-    [[ -z "$email" ]] && email=$(get_email) || return 1
+    if [[ -z "$email" ]]; then
+        email=$(get_email) || return 1
+    fi
     
     # Domain configuration (use found if available)
-    [[ -z "$domain" ]] && domain=$(get_domain) || return 1
+    if [[ -z "$domain" ]]; then
+        domain=$(get_domain) || return 1
+    fi
     
     # SSL cert email (use found if available)
-    [[ -z "$cert_email" ]] && cert_email=$(get_cert_email "$email") || return 1
+    if [[ -z "$cert_email" ]]; then
+        cert_email=$(get_cert_email "$email") || return 1
+    fi
     
     return 0
 }
