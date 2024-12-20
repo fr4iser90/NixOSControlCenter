@@ -9,6 +9,8 @@
     vim
     htop
     tmux
+    tree
+    fzf
     iotop
     iftop
     ufw

@@ -9,5 +9,7 @@
     vim
     htop
     tmux
+    tree
+    fzf
   ];
 }

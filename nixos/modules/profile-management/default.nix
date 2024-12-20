@@ -1,7 +1,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  # Hilfsfunktionen
+  # Helper functions
   findModules = dir:
     let
       files = builtins.readDir dir;
@@ -9,37 +9,36 @@ let
       modules = lib.mapAttrs (n: _: import (dir + "/${n}")) nixFiles;
     in modules;
 
-  # Basis-Profile laden
+  # Load base profiles
   baseProfiles = {
     desktop = import ./profiles/base/desktop.nix;
     server = import ./profiles/base/server.nix;
     homelab = import ./profiles/custom/homelab.nix;
   };
 
-  # Aktive Module aus systemConfig extrahieren
+  # Extract active modules from systemConfig
   activeModules = lib.flatten (lib.mapAttrsToList (moduleName: moduleConfig:
-    # Für jedes Modul
     let
-      # Basis-Modul laden wenn es existiert
-      baseModule = if builtins.pathExists ./profiles/modules/${moduleName}/default.nix
+      # ALWAYS load the base module if any sub-module is active
+      baseModule = if (lib.any (x: x == true) (lib.attrValues moduleConfig))
                   then [ ./profiles/modules/${moduleName}/default.nix ]
                   else [];
       
-      # Sub-Module laden die auf true gesetzt sind
+      # Load sub-modules that are set to true
       subModules = lib.mapAttrsToList (subName: enabled:
         if enabled 
         then ./profiles/modules/${moduleName}/${subName}.nix
         else null
       ) moduleConfig;
     in
-    # Null-Werte filtern und Listen zusammenführen
+    # Filter null values and merge lists
     baseModule ++ (builtins.filter (x: x != null) subModules)
   ) systemConfig.profileModules);
 
 in {
   imports = 
-    # Basis-Profil laden
+    # Load base system profile
     [ (baseProfiles.${systemConfig.systemType} or (throw "Unknown system type: ${systemConfig.systemType}")) ] 
-    # Aktive Module laden
+    # Load active modules + their base modules
     ++ activeModules;
 }
