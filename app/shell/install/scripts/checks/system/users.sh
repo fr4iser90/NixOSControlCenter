@@ -5,19 +5,11 @@ check_users() {
 
     local current_user
     local current_shell
-    local is_admin
     local user_block=""
 
     # Aktueller User
     current_user=$(whoami)
     current_shell=$(getent passwd "$current_user" | cut -d: -f7)
-    
-    # Admin-Status (wheel Gruppe)
-    if groups "$current_user" | grep -q "wheel"; then
-        is_admin="true"
-    else
-        is_admin="false"
-    fi
 
     # Alle regulären User finden (UID >= 1000)
     while IFS=: read -r username _ uid _ _ home shell; do
@@ -27,11 +19,17 @@ check_users() {
            [[ ! "$username" =~ ^nobody$ ]] && \
            [[ ! "$username" =~ ^nix$ ]]; then
             
-            # Admin-Status für jeden User prüfen
+            # Spezifische Rollen-Prüfung
             if groups "$username" 2>/dev/null | grep -q "wheel"; then
-                user_role="admin"
+                if [[ "$username" == "admin" ]]; then
+                    user_role="admin"
+                else
+                    user_role="restricted-admin"
+                fi
+            elif groups "$username" 2>/dev/null | grep -q "docker"; then
+                user_role="virtualization"
             else
-                user_role="user"
+                user_role="guest"
             fi
 
             # Shell-Pfad in Shell-Name umwandeln
@@ -63,7 +61,6 @@ check_users() {
     # Export für weitere Verarbeitung
     export CURRENT_USER="$current_user"
     export CURRENT_SHELL="$current_shell"
-    export IS_ADMIN="$is_admin"
     export ALL_USERS="$user_block"
     
     return 0
