@@ -20,12 +20,6 @@ deploy_config() {
 }
 
 deploy_base_config() {
-
-    # Ensure required variables are set
-    if [[ -z "${SUDO:-}" ]]; then
-        SUDO="sudo"
-        log_debug "Setting default SUDO command"
-    fi
     # Setup temp directory
     local nixos_dir="$HOME/.local/nixos"
     ensure_dir "$nixos_dir"
@@ -54,57 +48,42 @@ deploy_base_config() {
         cp -r "/etc/nixos/secrets" "$nixos_dir/"
     }
     
-    # Create build script
-    local hostname=$(hostname)
-    local build_script="${NIXOS_CONFIG_DIR}/build-${hostname}.sh"
+    # Deploy directly
+    log_info "Copying configuration..."
+    cp -r "$nixos_dir"/* /etc/nixos/
+
+    # Fix permissions
+    log_info "Setting permissions..."
+    chown -R root:root /etc/nixos/
+    chmod -R 644 /etc/nixos/
+    find /etc/nixos/ -type d -exec chmod 755 {} \;
+
+    # Build and switch
+    log_info "Building system..."
+    nixos-rebuild switch --flake /etc/nixos#$(hostname)
+
+    # Cleanup
+    log_info "Cleaning up..."
+    rm -rf "$nixos_dir"
     
-    cat > "$build_script" << EOF
-#!/usr/bin/env bash
-set -e
-
-echo "Copying configuration..."
-sudo cp -r /home/fr4iser/.local/nixos/* /etc/nixos/
-
-# Fix permissions
-echo "Setting permissions..."
-sudo chown -R root:root /etc/nixos/
-sudo chmod -R 644 /etc/nixos/
-sudo find /etc/nixos/ -type d -exec chmod 755 {} \;
-
-echo "Building system..."
-sudo nixos-rebuild switch --flake /etc/nixos#${hostname}
-
-echo "Cleaning up..."
-rm -rf /home/fr4iser/.local/nixos
-
-echo "Build complete!"
-EOF
-    
-    chmod +x "$build_script"
+    log_success "Build complete!"
     return 0
 }
 
 show_standard_completion_message() {
-    local hostname=$(hostname)
-    local build_script="${NIXOS_CONFIG_DIR}/build-${hostname}.sh"
-    
-    log_success "Configuration prepared"
-    log_info "Please run the following script after exiting the shell:"
-    echo "$build_script"
-    log_info "Press Ctrl+D to exit the shell, then run the script"
-    
+    log_success "Configuration deployed"
+    log_info "System will rebuild on next boot"
+    log_info "Press Ctrl+D to exit the shell"
     return 0
 }
 
 show_homelab_completion_message() {
-    local hostname=$(hostname)
-    local build_script="${NIXOS_CONFIG_DIR}/build-${hostname}.sh"
     local docker_script="${NIXOS_CONFIG_DIR}/deploy-docker-${hostname}.sh"
     
-    log_success "Setup scripts prepared!"
+    log_success "Setup complete!"
     log_info "Please follow these steps:"
     echo "1. Exit this shell (Ctrl+D)"
-    echo "2. Run: $build_script"
+    echo "2. Reboot the system"
     echo "3. After reboot, run: $docker_script"
     
     read -p "Press Enter to continue..."

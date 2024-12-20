@@ -7,6 +7,7 @@ with pkgs; [
   usbutils
   lshw
   dmidecode
+
   
   # Disk-Tools
   parted
@@ -43,7 +44,8 @@ with pkgs; [
   # Hardware Detection
   hwinfo
   lm_sensors
-  
+
+
   # Boot Tools
   efibootmgr
   os-prober

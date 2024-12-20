@@ -11,6 +11,14 @@ in
 
 pkgs.mkShell {
   name = "NixOsControlCenter-InstallShell";
-  inherit (packages) buildInputs;  
-  shellHook = hooks.shellHook;
+  inherit (packages) buildInputs;
+  shellHook = ''
+    ${hooks.shellHook}
+    
+    # Check if we have root rights
+    if [[ $EUID -ne 0 ]]; then
+      echo "Restarting shell with root privileges..."
+      exec sudo "$(which nix-shell)" "$@"
+    fi
+  '';
 }
