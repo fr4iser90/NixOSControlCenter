@@ -19,27 +19,8 @@
         };
       };
 
-      homelab = {
-        # Home laboratory for self-hosting and experimentation
-        type = "homelab";
-        category = "server";
-        defaults = {
-          desktop = true;      # Optional GUI für Management
-          ssh = true;         # Remote-Zugriff
-          virtualization = true;  # Für VMs/Container
-          docker = true;      # Container-Support
-          monitoring = true;   # System-Monitoring
-          sound = false;      # Kein Audio nötig
-          bluetooth = false;  # Kein Bluetooth nötig
-          printing = false;   # Kein Drucker nötig
-          # Homelab-spezifische Defaults
-          reverse-proxy = true;  # Für Service-Routing
-          dns = true;           # Lokaler DNS
-          backup = true;        # Backup-System
-          automation = true;    # Home Automation
-        };
-      };     
-      
+    
+
       desktop = {
         # Server with GUI for easier administration
         type = "server-desktop";
@@ -143,6 +124,7 @@
       };
     };
 
+      
     # Hybrid Profiles - Combinations of server/desktop features
     hybrid = {
       gaming-workstation = {
@@ -184,6 +166,29 @@
           docker = true;
           virtualization = true;
           monitoring = true;
+        };
+      };
+    };
+    # Homelab Profile - New top-level category
+    homelab = {
+      default = {
+        # Home laboratory for self-hosting and experimentation
+        type = "homelab";
+        category = "homelab";
+        defaults = {
+          desktop = true;      # Optional GUI für Management
+          ssh = true;         # Remote-Zugriff
+          virtualization = true;  # Für VMs/Container
+          docker = true;      # Container-Support
+          monitoring = true;   # System-Monitoring
+          sound = false;      # Kein Audio nötig
+          bluetooth = false;  # Kein Bluetooth nötig
+          printing = false;   # Kein Drucker nötig
+          # Homelab-spezifische Defaults
+          reverse-proxy = true;  # Für Service-Routing
+          dns = true;           # Lokaler DNS
+          backup = true;        # Backup-System
+          automation = true;    # Home Automation
         };
       };
     };
