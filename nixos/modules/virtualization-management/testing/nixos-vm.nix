@@ -59,7 +59,7 @@ in {
           -smp ${toString cfg.cores} \
           -cpu host \
           -vga qxl \
-          -spice port=${toString cfg.remote.port},disable-ticketing=on \
+          -spice port=${toString cfg.remote.displayPort},disable-ticketing=on \
           -device virtio-tablet-pci \
           -device virtio-keyboard-pci \
           -drive file=/var/lib/libvirt/images/nixos-test.qcow2,if=virtio \
@@ -69,7 +69,7 @@ in {
 
     # Firewall
     networking.firewall = mkIf cfg.remote.enable {
-      allowedTCPPorts = [ cfg.remote.port ];
+      allowedTCPPorts = [ cfg.remote.displayPort ];
     };
   };
 }
