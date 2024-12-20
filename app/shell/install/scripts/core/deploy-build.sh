@@ -62,16 +62,16 @@ deploy_base_config() {
 #!/usr/bin/env bash
 set -e
 
-log_info "Copying configuration..."
-$SUDO cp -r $nixos_dir/* /etc/nixos/
+echo "Copying configuration..."
+sudo cp -r /home/fr4iser/.local/nixos/* /etc/nixos/
 
-log_info "Building system..."
-$SUDO nixos-rebuild switch --flake /etc/nixos#${hostname}
+echo "Building system..."
+sudo nixos-rebuild switch --flake /etc/nixos#Gaming
 
-log_info "Cleaning up..."
-rm -rf $nixos_dir
+echo "Cleaning up..."
+rm -rf /home/fr4iser/.local/nixos
 
-log_success "Build complete!"
+echo "Build complete!"
 EOF
     
     chmod +x "$build_script"
