@@ -2,7 +2,7 @@
 
 setup_homelab_config() {
     log_section "Homelab Configuration"
-    log_debug "Starting homelab configuration..."
+
 
     
     # Initialize variables with existing data
@@ -108,8 +108,6 @@ get_cert_email() {
 }
 
 update_homelab_config() {
-    log_info "Updating homelab configuration"
-    
     # Create temp file
     local temp_file=$(mktemp)
     cp "$SYSTEM_CONFIG_FILE" "$temp_file" || return 1
@@ -119,7 +117,6 @@ update_homelab_config() {
     update_email_domain "$temp_file" || return 1
     update_system_type "$temp_file" || return 1
 
-    
     # Verify changes
     if diff "$SYSTEM_CONFIG_FILE" "$temp_file" >/dev/null; then
         log_error "Failed to update system configuration"
@@ -128,7 +125,21 @@ update_homelab_config() {
     fi
     
     # Apply changes
-    sudo mv "$temp_file" "$SYSTEM_CONFIG_FILE" || return 1
+    if [[ -w "$SYSTEM_CONFIG_FILE" ]]; then
+        mv "$temp_file" "$SYSTEM_CONFIG_FILE"
+    else
+        if command -v sudo >/dev/null 2>&1; then
+            sudo mv "$temp_file" "$SYSTEM_CONFIG_FILE"
+        else
+            if command -v doas >/dev/null 2>&1; then
+                doas mv "$temp_file" "$SYSTEM_CONFIG_FILE"
+            else
+                log_error "Cannot write to $SYSTEM_CONFIG_FILE (no sudo/doas available)"
+                rm "$temp_file"
+                return 1
+            fi
+        fi
+    fi
     
     return 0
 }
@@ -136,28 +147,44 @@ update_homelab_config() {
 update_users_homelab_block() {
     local config_file="$1"
     
+    # Create a temporary file
+    local temp_file="${config_file}.tmp"
+    
+    # First, remove any existing users blocks (including malformed ones)
+    awk '
+    BEGIN { skip = 0; }
+    /^  users = {/ { skip = 1; next; }
+    /^  };/ { if (skip) { skip = 0; next; } }
+    /^  #[ ]*$/ { next; }
+    { if (!skip) print; }
+    ' "$config_file" > "$temp_file"
+    
+    # Now insert our new users block at the right position
     awk -v admin_user="$admin_user" -v virt_user="$virt_user" '
-    /^  users = {/,/^  };/ {
-        if ($0 ~ /^  users = {/) {
-            print "  users = {"
-            print "    \"" admin_user "\" = {"
-            print "      role = \"admin\";"
-            print "      defaultShell = \"zsh\";"
-            print "      autoLogin = false;"
-            print "    };"
-            if (virt_user != "") {
-                print "    \"" virt_user "\" = {"
-                print "      role = \"virtualization\";"
-                print "      defaultShell = \"zsh\";"
-                print "      autoLogin = false;"
-                print "    };"
-            }
-            print "  };"
-            next
+    /^  # User Management$/ {
+        print;
+        print "  users = {";
+        print "    \"" admin_user "\" = {";
+        print "      role = \"admin\";";
+        print "      defaultShell = \"zsh\";";
+        print "      autoLogin = false;";
+        print "    };";
+        if (virt_user != "") {
+            print "    \"" virt_user "\" = {";
+            print "      role = \"virtualization\";";
+            print "      defaultShell = \"zsh\";";
+            print "      autoLogin = false;";
+            print "    };";
         }
+        print "  };";
+        next;
     }
     { print }
-    ' "$config_file" > "${config_file}.new" && mv "${config_file}.new" "$config_file"
+    ' "$temp_file" > "${config_file}.new"
+    
+    # Apply changes
+    mv "${config_file}.new" "$config_file"
+    rm -f "$temp_file"
 }
 
 update_email_domain() {
@@ -182,6 +209,7 @@ update_system_type() {
 
 
 export_homelab_vars() {
+    export SYSTEM_TYPE="homelab"
     export ADMIN_USER="$admin_user"
     export VIRT_USER="$virt_user"
     export HOMELAB_EMAIL="$email"

@@ -16,14 +16,12 @@ deploy_docker_config() {
 }
 
 validate_environment() {
-    # Check docker user
+    # Check docker user - only warn if not exists
     if ! id -u "${VIRT_USER}" >/dev/null 2>&1; then
-        log_error "Docker user ${VIRT_USER} does not exist"
-        log_info "Did setup_users run correctly?"
-        return 1
+        log_warn "Docker user ${VIRT_USER} does not exist yet - will be created after rebuild"
     fi
 
-    # Check docker config
+    # Check docker config - this should still be an error
     if [[ ! -d "${HOMELAB_DOCKER_DIR}" ]]; then
         log_error "No Docker configuration found in ${HOMELAB_DOCKER_DIR}"
         return 1

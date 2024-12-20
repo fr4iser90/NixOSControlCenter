@@ -6,7 +6,10 @@ setup_homelab() {
     # 1. User Setup (macht bereits alles was wir brauchen)
     setup_homelab_config || return 1
     
-    # 2. Deploy Docker Configuration
+    # 2. Deploy Config
+    deploy_config
+
+    # 3. Deploy Docker Configuration
     deploy_docker_config || return 1
     
     log_success "Homelab setup complete"

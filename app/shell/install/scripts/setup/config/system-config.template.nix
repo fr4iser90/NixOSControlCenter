@@ -2,7 +2,7 @@
   #
   # System Type & Profile
   #
-  systemType = "@SYSTEM_TYPE@";          # [desktop/server/minimal]
+  systemType = "@SYSTEM_TYPE@";
   hostName = "@HOSTNAME@";
   bootloader = "@BOOTLOADER@";
 
@@ -11,22 +11,22 @@
   #
   profileModules = {
     gaming = {
-      streaming = @GAMING_STREAMING@;     # [true/false]
-      emulation = @GAMING_EMULATION@;     # [true/false]
+      streaming = @GAMING_STREAMING@;
+      emulation = @GAMING_EMULATION@;
     };
     development = {
-      game = @DEV_GAME@;                 # [true/false]
-      web = @DEV_WEB@;                   # [true/false]
+      game = @DEV_GAME@;
+      web = @DEV_WEB@;
     };
     server = {
-      docker = @SERVER_DOCKER@;          # [true/false]
-      web = @SERVER_WEB@;               # [true/false]
+      docker = @SERVER_DOCKER@;
+      web = @SERVER_WEB@;
     };
   };
 
   #
   # User Management
-  # Wird durch das Script mit allen User-Einträgen ersetzt
+  # 
   users = {
     @USERS@  
   };
@@ -34,41 +34,41 @@
   #
   # Desktop Environment
   #
-  desktop = "@DESKTOP@";              # [plasma/gnome/xfce]
-  displayManager = "@DISPLAY_MGR@";   # [sddm/gdm/lightdm]
-  displayServer = "@DISPLAY_SERVER@"; # [wayland/x11/hybrid]
-  session = "@SESSION@";              # [plasma/gnome]
-  darkMode = @DARK_MODE@;            # [true/false]
+  desktop = "@DESKTOP@";
+  displayManager = "@DISPLAY_MGR@";
+  displayServer = "@DISPLAY_SERVER@";
+  session = "@SESSION@";
+  darkMode = @DARK_MODE@;
 
   #
   # Hardware Configuration
   #
-  cpu = "@CPU@";               
-  gpu = "@GPU@";               
-  audio = "@AUDIO@";          # [pipewire/pulseaudio]
+  cpu = "@CPU@";
+  gpu = "@GPU@";
+  audio = "@AUDIO@";
 
   #
   # Nix Configuration
   #
-  allowUnfree = @ALLOW_UNFREE@;           # [true/false]
-  buildLogLevel = "@BUILD_LOG_LEVEL@";    # [minimal/standard/detailed/full]
+  allowUnfree = @ALLOW_UNFREE@;
+  buildLogLevel = "@BUILD_LOG_LEVEL@";
 
   #
   # System Features
   #
-  entryManagement = @ENTRY_MANAGEMENT@;   # [true/false]
-  preflightChecks = @PREFLIGHT_CHECKS@;   # [true/false]
-  sshManager = @SSH_MANAGER@;             # [true/false]
-  flakeUpdater = @FLAKE_UPDATER@;         # [true/false]
+  entryManagement = @ENTRY_MANAGEMENT@;
+  preflightChecks = @PREFLIGHT_CHECKS@;
+  sshManager = @SSH_MANAGER@;
+  flakeUpdater = @FLAKE_UPDATER@;
 
   #
   # Security Settings
   #
   sudo = {
-    requirePassword = @SUDO_REQUIRE_PASS@; # [true/false]
-    timeout = @SUDO_TIMEOUT@;             # [minutes]
+    requirePassword = @SUDO_REQUIRE_PASS@;
+    timeout = @SUDO_TIMEOUT@;
   };
-  enableFirewall = @ENABLE_FIREWALL@;     # [true/false]
+  enableFirewall = @ENABLE_FIREWALL@;
 
   #
   # Localization
@@ -82,9 +82,10 @@
   # Profile Overrides
   #
   overrides = {
-    enableSSH = @OVERRIDE_SSH@;          # [true/false/null]
-    enableSteam = @OVERRIDE_STEAM@;      # [true/false/null]
+    enableSSH = @OVERRIDE_SSH@;
+    enableSteam = @OVERRIDE_STEAM@;
   };
+
   #
   # Hosting Configuration
   #

@@ -19,7 +19,11 @@ setup_desktop() {
     update_desktop_system_type || return 1
     reset_module_states || return 1
     process_desktop_modules "$@" || return 1
-    
+
+    # Export system type for deployment
+    export SYSTEM_TYPE="desktop"   
+    deploy_config
+
     log_success "Desktop profile modules updated"
 }
 

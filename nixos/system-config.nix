@@ -2,7 +2,7 @@
   #
   # System Type & Profile
   #
-  systemType = "desktop";          # [desktop/server/minimal]
+  systemType = "desktop";
   hostName = "Gaming";
   bootloader = "systemd-boot";
 
@@ -11,22 +11,22 @@
   #
   profileModules = {
     gaming = {
-      streaming = false;     # [true/false]
-      emulation = false;     # [true/false]
+      streaming = true;
+      emulation = true;
     };
     development = {
-      game = false;                 # [true/false]
-      web = false;                   # [true/false]
+      game = true;
+      web = true;
     };
     server = {
-      docker = false;          # [true/false]
-      web = false;               # [true/false]
+      docker = false;
+      web = false;
     };
   };
 
   #
   # User Management
-  # Wird durch das Script mit allen User-Einträgen ersetzt
+  # 
   users = {
     "fr4iser" = {
       role = "admin";
@@ -44,41 +44,41 @@
   #
   # Desktop Environment
   #
-  desktop = "plasma";              # [plasma/gnome/xfce]
-  displayManager = "sddm";   # [sddm/gdm/lightdm]
-  displayServer = "wayland"; # [wayland/x11/hybrid]
-  session = "plasma";              # [plasma/gnome]
-  darkMode = true;            # [true/false]
+  desktop = "plasma";
+  displayManager = "sddm";
+  displayServer = "wayland";
+  session = "plasma";
+  darkMode = true;
 
   #
   # Hardware Configuration
   #
-  cpu = "intel";               
-  gpu = "amd";               
-  audio = "pipewire";          # [pipewire/pulseaudio]
+  cpu = "intel";
+  gpu = "amd";
+  audio = "pipewire";
 
   #
   # Nix Configuration
   #
-  allowUnfree = true;           # [true/false]
-  buildLogLevel = "minimal";    # [minimal/standard/detailed/full]
+  allowUnfree = true;
+  buildLogLevel = "minimal";
 
   #
   # System Features
   #
-  entryManagement = true;   # [true/false]
-  preflightChecks = true;   # [true/false]
-  sshManager = true;             # [true/false]
-  flakeUpdater = true;         # [true/false]
+  entryManagement = true;
+  preflightChecks = true;
+  sshManager = true;
+  flakeUpdater = true;
 
   #
   # Security Settings
   #
   sudo = {
-    requirePassword = false; # [true/false]
-    timeout = 15;             # [minutes]
+    requirePassword = false;
+    timeout = 15;
   };
-  enableFirewall = false;     # [true/false]
+  enableFirewall = false;
 
   #
   # Localization
@@ -92,13 +92,14 @@
   # Profile Overrides
   #
   overrides = {
-    enableSSH = null;          # [true/false/null]
-    enableSteam = true;      # [true/false/null]
+    enableSSH = null;
+    enableSteam = true;
   };
+
   #
   # Hosting Configuration
   #
   email = "pa.boe90@gmail.com";
-  domain = "example.com";
+  domain = "fr4iserhome.com";
   certEmail = "pa.boe90@gmail.com";
 }

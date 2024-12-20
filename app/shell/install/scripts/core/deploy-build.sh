@@ -7,7 +7,10 @@ deploy_config() {
     deploy_base_config || return 1
     
     # Special handling for homelab
-    if [[ "${SYSTEM_TYPE}" == "homelab" ]]; then
+    if [[ -z "${SYSTEM_TYPE:-}" ]]; then
+        log_error "SYSTEM_TYPE is not set"
+        return 1
+    elif [[ "${SYSTEM_TYPE}" == "homelab" ]]; then
         show_homelab_completion_message || return 1
     else
         show_standard_completion_message || return 1
@@ -17,6 +20,12 @@ deploy_config() {
 }
 
 deploy_base_config() {
+
+    # Ensure required variables are set
+    if [[ -z "${SUDO:-}" ]]; then
+        SUDO="sudo"
+        log_debug "Setting default SUDO command"
+    fi
     # Setup temp directory
     local nixos_dir="$HOME/.local/nixos"
     ensure_dir "$nixos_dir"

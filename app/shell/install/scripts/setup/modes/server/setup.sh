@@ -20,6 +20,11 @@ setup_server() {
     reset_module_states || return 1
     process_server_modules "$@" || return 1
     
+
+    # Export system type for deployment
+    export SYSTEM_TYPE="server"
+    deploy_config
+
     log_success "Server profile modules updated"
 }
 
