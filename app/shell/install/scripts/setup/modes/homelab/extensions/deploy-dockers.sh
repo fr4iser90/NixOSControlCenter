@@ -24,8 +24,8 @@ validate_environment() {
     fi
 
     # Check docker config
-    if [[ ! -d "${HOMELAB_SETUP_DIR}" ]]; then
-        log_error "No Docker configuration found in ${HOMELAB_SETUP_DIR}"
+    if [[ ! -d "${HOMELAB_DOCKER_DIR}" ]]; then
+        log_error "No Docker configuration found in ${HOMELAB_DOCKER_DIR}"
         return 1
     fi
     
@@ -93,7 +93,7 @@ deploy_configuration() {
     local docker_dest="/home/${VIRT_USER}/docker"
     
     log_info "Copying docker configuration"
-    sudo cp -r "${HOMELAB_SETUP_DIR}/"* "$docker_dest/"
+    sudo cp -r "${HOMELAB_DOCKER_DIR}/"* "$docker_dest/"
 }
 
 set_permissions() {
@@ -136,4 +136,4 @@ export -f validate_environment
 export -f create_deploy_script
 
 # Check script execution
-check_script_execution "HOMELAB_SETUP_DIR" "deploy_docker_config"
+check_script_execution "HOMELAB_DOCKER_DIR" "deploy_docker_config"

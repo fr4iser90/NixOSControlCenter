@@ -26,15 +26,11 @@ setup_homelab_config() {
 }
 
 collect_homelab_info() {
-    # Admin user (use current if available)
-    if [[ -z "$admin_user" ]]; then
-        admin_user=$(get_admin_username) || return 1
-    fi
+    # Admin user
+    admin_user=$(get_admin_username "$admin_user") || return 1
     
-    # Virtualization user (use found if available)
-    if [[ -z "$virt_user" ]]; then
-        virt_user=$(get_virt_username) || return 1
-    fi
+    # Virtualization user
+    virt_user=$(get_virt_username "$virt_user") || return 1
     
     # Validate usernames
     if [[ "$admin_user" == "$virt_user" ]]; then
@@ -42,28 +38,24 @@ collect_homelab_info() {
         return 1
     fi
     
-    # Email configuration (use found if available)
-    if [[ -z "$email" ]]; then
-        email=$(get_email) || return 1
-    fi
+    # Email configuration
+    email=$(get_email "$email") || return 1
     
-    # Domain configuration (use found if available)
-    if [[ -z "$domain" ]]; then
-        domain=$(get_domain) || return 1
-    fi
+    # Domain configuration
+    domain=$(get_domain "$domain") || return 1
     
-    # SSL cert email (use found if available)
-    if [[ -z "$cert_email" ]]; then
-        cert_email=$(get_cert_email "$email") || return 1
-    fi
+    # SSL cert email
+    cert_email=$(get_cert_email "$email" "$cert_email") || return 1
     
     return 0
 }
 
 get_admin_username() {
+    local default_user="$1"
     local username
     while true; do
-        read -ep $'\033[0;34m[?]\033[0m Enter admin username: ' username
+        read -ep $'\033[0;34m[?]\033[0m Enter admin username'"${default_user:+ [$default_user]}"': ' username
+        username="${username:-$default_user}"
         if [[ -n "$username" ]]; then
             echo "$username"
             return 0
@@ -73,15 +65,18 @@ get_admin_username() {
 }
 
 get_virt_username() {
+    local default_user="$1"
     local username
-    read -ep $'\033[0;34m[?]\033[0m Enter virtualization username [docker]: ' username
-    echo "${username:-docker}"
+    read -ep $'\033[0;34m[?]\033[0m Enter virtualization username'"${default_user:+ [$default_user]}"': ' username
+    echo "${username:-${default_user:-docker}}"
 }
 
 get_email() {
+    local default_email="$1"
     local email
     while true; do
-        read -ep $'\033[0;34m[?]\033[0m Enter main email address: ' email
+        read -ep $'\033[0;34m[?]\033[0m Enter main email address'"${default_email:+ [$default_email]}"': ' email
+        email="${email:-$default_email}"
         if [[ "$email" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
             echo "$email"
             return 0
@@ -91,9 +86,11 @@ get_email() {
 }
 
 get_domain() {
+    local default_domain="$1"
     local domain
     while true; do
-        read -p "${BLUE}[?]${NC} Enter domain (e.g., example.com): " domain
+        read -ep $'\033[0;34m[?]\033[0m Enter domain (e.g., example.com)'"${default_domain:+ [$default_domain]}"': ' domain
+        domain="${domain:-$default_domain}"
         if [[ "$domain" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]]; then
             echo "$domain"
             return 0
@@ -104,9 +101,10 @@ get_domain() {
 
 get_cert_email() {
     local default_email="$1"
+    local current_cert_email="$2"
     local cert_email
-    read -p "${BLUE}[?]${NC} Enter SSL certificate email [${default_email}]: " cert_email
-    echo "${cert_email:-$default_email}"
+    read -ep $'\033[0;34m[?]\033[0m Enter SSL certificate email'"${current_cert_email:+ [$current_cert_email]}"': ' cert_email
+    echo "${cert_email:-${current_cert_email:-$default_email}}"
 }
 
 update_homelab_config() {
