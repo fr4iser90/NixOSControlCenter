@@ -4,8 +4,8 @@ deploy_docker_config() {
     log_section "Deploying Docker Configuration"
     
     # Prüfe ob Docker-Konfiguration existiert
-    if [[ ! -d "${NIXOS_CONFIG_DIR}/docker" ]]; then
-        log_error "No Docker configuration found in ${NIXOS_CONFIG_DIR}/docker"
+    if [[ ! -d "${HOMELAB_SETUP_DIR}" ]]; then
+        log_error "No Docker configuration found in ${HOMELAB_SETUP_DIR}"
         return 1
     fi
 
@@ -15,7 +15,7 @@ deploy_docker_config() {
     mkdir -p "$docker_temp"
 
     # Kopiere Docker-Konfiguration
-    cp -r "${NIXOS_CONFIG_DIR}/docker/"* "$docker_temp/"
+    cp -r "${HOMELAB_SETUP_DIR}/"* "$docker_temp/"
 
     # Erstelle Docker-Deploy-Skript
     local hostname=$(hostname)

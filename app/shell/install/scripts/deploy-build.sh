@@ -52,7 +52,7 @@ EOF
     echo
     log_info "Press Ctrl+D to exit the shell, then run the script"
     
-    exit 0
+    return 0
 }
 
 build_system() {
