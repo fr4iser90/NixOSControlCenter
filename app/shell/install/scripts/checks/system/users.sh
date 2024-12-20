@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-log_section "Checking User Configuration"
+check_users() {
+    log_section "Checking User Configuration"
 
-get_user_info() {
     local current_user
     local current_shell
     local is_admin
@@ -51,9 +51,9 @@ get_user_info() {
 "
 
             # Logging
-            log_info "  User: ${CYAN}${username}${NC}"
-            log_info "    Role: ${CYAN}${user_role}${NC}"
-            log_info "    Shell: ${CYAN}${shell_name}${NC}"
+            log_info "  User: ${username}"
+            log_info "    Role: ${user_role}"
+            log_info "    Shell: ${shell_name}"
         fi
     done < /etc/passwd
 
@@ -65,7 +65,9 @@ get_user_info() {
     export CURRENT_SHELL="$current_shell"
     export IS_ADMIN="$is_admin"
     export ALL_USERS="$user_block"
+    
+    return 0
 }
 
-# Ausführen
-get_user_info
+# Export functions
+export -f check_users

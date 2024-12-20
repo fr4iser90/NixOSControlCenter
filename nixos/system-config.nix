@@ -2,7 +2,7 @@
   #
   # System Type & Profile
   #
-  systemType = "desktop";    # desktop, server, minimal
+  systemType = "desktop";          # [desktop/server/minimal]
   hostName = "Gaming";
   bootloader = "systemd-boot";
 
@@ -11,16 +11,16 @@
   #
   profileModules = {
     gaming = {
-      streaming = true;     # true/false
-      emulation = true;     # true/false
+      streaming = false;     # [true/false]
+      emulation = false;     # [true/false]
     };
     development = {
-      game = false;                 # true/false
-      web = false;                   # true/false
+      game = false;                 # [true/false]
+      web = false;                   # [true/false]
     };
     server = {
-      docker = false;          # true/false
-      web = false;               # true/false
+      docker = false;          # [true/false]
+      web = false;               # [true/false]
     };
   };
 
@@ -28,56 +28,57 @@
   # User Management
   # Wird durch das Script mit allen User-Einträgen ersetzt
   users = {
-    "test" = {
+    "fr4iser" = {
       role = "admin";
       defaultShell = "zsh";
       autoLogin = false;
     };
-    "test" = {
+    "botchi" = {
       role = "admin";
       defaultShell = "zsh";
       autoLogin = false;
     };
+
   };
 
   #
   # Desktop Environment
   #
-  desktop = "plasma";              # plasma, gnome, xfce, etc.
-  displayManager = "sddm";   # sddm, gdm, lightdm
-  displayServer = "wayland"; # wayland, x11, hybrid
-  session = "plasma";              # plasma, gnome, etc.
-  darkMode = true;            # true/false
+  desktop = "plasma";              # [plasma/gnome/xfce]
+  displayManager = "sddm";   # [sddm/gdm/lightdm]
+  displayServer = "wayland"; # [wayland/x11/hybrid]
+  session = "plasma";              # [plasma/gnome]
+  darkMode = true;            # [true/false]
 
   #
   # Hardware Configuration
   #
   cpu = "intel";               
   gpu = "amd";               
-  audio = "pipewire";          # pipewire, pulseaudio
+  audio = "pipewire";          # [pipewire/pulseaudio]
 
   #
   # Nix Configuration
   #
-  allowUnfree = true;           # true/false
-  buildLogLevel = "minimal";    # minimal, standard, detailed, full
+  allowUnfree = true;           # [true/false]
+  buildLogLevel = "minimal";    # [minimal/standard/detailed/full]
 
   #
   # System Features
   #
-  entryManagement = true;   # true/false
-  preflightChecks = true;   # true/false
-  sshManager = true;             # true/false
-  flakeUpdater = true;         # true/false
+  entryManagement = true;   # [true/false]
+  preflightChecks = true;   # [true/false]
+  sshManager = true;             # [true/false]
+  flakeUpdater = true;         # [true/false]
 
   #
   # Security Settings
   #
   sudo = {
-    requirePassword = false; # true/false
-    timeout = 15;             # minutes
+    requirePassword = false; # [true/false]
+    timeout = 15;             # [minutes]
   };
-  enableFirewall = false;     # true/false
+  enableFirewall = false;     # [true/false]
 
   #
   # Localization
@@ -91,7 +92,13 @@
   # Profile Overrides
   #
   overrides = {
-    enableSSH = null;          # true/false/null
-    enableSteam = true;      # true/false/null
+    enableSSH = null;          # [true/false/null]
+    enableSteam = true;      # [true/false/null]
   };
+  #
+  # Hosting Configuration
+  #
+  email = "pa.boe90@gmail.com";
+  domain = "example.com";
+  certEmail = "pa.boe90@gmail.com";
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-log_section "Detecting Boot Configuration"
+check_bootloader() {
+    log_section "Detecting Boot Configuration"
 
-get_boot_info() {
     local boot_type="unknown"
 
     # Boot Mode prüfen
@@ -14,11 +14,13 @@ get_boot_info() {
 
     # Ausgabe
     log_info "Boot Configuration:"
-    log_info "  Type: ${CYAN}${boot_type}${NC}"
+    log_info "  Type: ${boot_type}"
 
     # Export für weitere Verarbeitung
     export BOOT_TYPE="$boot_type"
+    
+    return 0
 }
 
-# Ausführen
-get_boot_info
+# Export functions
+export -f check_bootloader

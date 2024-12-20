@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-log_section "Detecting GPU Configuration"
-
-get_gpu_info() {
+check_gpu_info() {
+    log_section "Detecting GPU Configuration"
+    
     local gpu_config="unknown"
     local found_gpus=()
     local primary_bus_id=""
@@ -72,9 +72,9 @@ get_gpu_info() {
         fi
 
         log_info "GPU Configuration:"
-        log_info "  Type: ${CYAN}${gpu_config}${NC}"
-        log_info "  Primary GPU Bus ID: ${CYAN}${primary_bus_id}${NC}"
-        [ -n "$secondary_bus_id" ] && log_info "  Secondary GPU Bus ID: ${CYAN}${secondary_bus_id}${NC}"
+        log_info "  Type: ${gpu_config}"
+        log_info "  Primary GPU Bus ID: ${primary_bus_id}"
+        [ -n "$secondary_bus_id" ] && log_info "  Secondary GPU Bus ID: ${secondary_bus_id}"
         
         if [ "${DEBUG:-false}" = true ]; then
             log_debug "Found GPUs: ${found_gpus[*]}"
@@ -90,7 +90,9 @@ get_gpu_info() {
     export GPU_CONFIG="$gpu_config"
     export GPU_PRIMARY_BUS="$primary_bus_id"
     export GPU_SECONDARY_BUS="$secondary_bus_id"
+    
+    return 0
 }
 
-# Ausführen
-get_gpu_info
+# Export functions
+export -f check_gpu_info

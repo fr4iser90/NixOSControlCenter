@@ -1,63 +1,25 @@
-# app/shell/install/hooks/env.nix
 { pkgs }:
 
 let
-  aliases = import ./aliases.nix { inherit pkgs; };
+  paths = import ./env-paths.nix { inherit pkgs; };
+  system = import ./env-system.nix { inherit pkgs; };
+  temp = import ./env-temp.nix { inherit pkgs; };
+  aliases = import ./ui-aliases.nix { inherit pkgs; };
 in
 ''
-  # Project Structure
-  export INSTALL_ROOT="$(pwd)"
-  export NIXOS_CONFIG_DIR="$INSTALL_ROOT/nixos"
-  
-  # Scripts Structure
-  export INSTALL_SCRIPTS="$INSTALL_ROOT/app/shell/install/scripts"
-  export INSTALL_SCRIPTS_LIB="$INSTALL_SCRIPTS/lib"
-  export INSTALL_SCRIPTS_CHECKS="$INSTALL_SCRIPTS/checks"
-  export INSTALL_SCRIPTS_SETUP="$INSTALL_SCRIPTS/setup"
-  
-  # System Config Location
-  export SYSTEM_CONFIG_DIR="/etc/nixos"
-  export SYSTEM_CONFIG_FILE="$NIXOS_CONFIG_DIR/system-config.nix"
-  export SYSTEM_CONFIG_TEMPLATE="$INSTALL_SCRIPTS_SETUP/config/system-config.template.nix"
-
-  # Temporary and Backup
-  export INSTALL_TMP="$INSTALL_SCRIPTS/tmp/nixos-install"
-  export INSTALL_BACKUP="$INSTALL_SCRIPTS/tmp/nixos-backup"
-  export INSTALL_LOG="$INSTALL_SCRIPTS/tmp/nixos-install.log"
-  
-  # Homelab Setup
-  export HOMELAB_SETUP_DIR="$INSTALL_ROOT/app/shell/install/docker"
-  export HOMELAB_SETUP_SCRIPT="$INSTALL_ROOT/app/shell/install/scripts/setup/modes/model-setup/homelab-setup.sh"
-  
-  # Create necessary directories
-  mkdir -p $INSTALL_TMP
-  mkdir -p $INSTALL_BACKUP
-  
-  # System
-  export NIXPKGS_ALLOW_UNFREE=1
-  
-  # Debug/Logging
-  export INSTALL_DEBUG=0
-  export INSTALL_VERBOSE=1
-  
-  # Set root capabilities for nixos-rebuild
-  if ! command -v nixos-rebuild >/dev/null 2>&1; then
-    export PATH="${pkgs.nixos-rebuild}/bin:$PATH"
-  fi
-  
-  # Allow nixos-rebuild without sudo
-  export NIX_REMOTE=daemon
-  export NIX_SUDO_INCLUDED=1
+  # Load all environment configurations
+  ${paths}
+  ${system}
+  ${temp}
   
   # Set permissions and load libraries
   echo "Setting execute permissions for scripts..."
-  source "$INSTALL_SCRIPTS/lib/setup-permissions.sh"
-
+  source "$SECURITY_DIR/setup-permissions.sh"
   
   # Load common libraries
-  source "$INSTALL_SCRIPTS_LIB/colors.sh"
-  source "$INSTALL_SCRIPTS_LIB/logging.sh"
-  source "$INSTALL_SCRIPTS_LIB/utils.sh"
+  source "$LIB_DIR/colors.sh"
+  source "$LIB_DIR/logging.sh"
+  source "$LIB_DIR/utils.sh"
   
   ${aliases}
   

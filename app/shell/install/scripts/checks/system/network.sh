@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-log_section "Detecting Network Configuration"
+check_network() {
+    log_section "Detecting Network Configuration"
 
-get_network_info() {
     local primary_interface=""
     local hostname=""
 
@@ -16,13 +16,15 @@ get_network_info() {
 
     # Ausgabe
     log_info "Network Configuration:"
-    log_info "  Hostname: ${CYAN}${hostname}${NC}"
-    log_info "  Primary Interface: ${CYAN}${primary_interface}${NC}"
+    log_info "  Hostname: ${hostname}"
+    log_info "  Primary Interface: ${primary_interface}"
 
     # Export für weitere Verarbeitung
     export SYSTEM_HOSTNAME="$hostname"
     export SYSTEM_PRIMARY_INTERFACE="$primary_interface"
+    
+    return 0
 }
 
-# Ausführen
-get_network_info
+# Export functions
+export -f check_network

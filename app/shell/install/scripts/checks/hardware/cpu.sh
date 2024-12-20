@@ -1,18 +1,8 @@
 #!/usr/bin/env bash
 
-# Ensure colors are loaded
-if [[ -z "$COLORS_IMPORTED" ]]; then
-    source "$(dirname "${BASH_SOURCE[0]}")/../../../lib/colors.sh"
-fi
-
-# Ensure logging is loaded
-if ! command -v log_info &> /dev/null; then
-    source "$(dirname "${BASH_SOURCE[0]}")/../../../lib/logging.sh"
-fi
-
-log_section "CPU Detection"
-
-get_cpu_info() {
+check_cpu_info() {
+    log_section "CPU Detection"
+    
     local vendor="unknown"
     local model_name
     local virtualization="none"
@@ -49,7 +39,12 @@ get_cpu_info() {
     # Variablen für weitere Verarbeitung
     export CPU_VENDOR="$vendor"
     export CPU_VIRTUALIZATION="$virtualization"
+    
+    return 0
 }
 
-# Ausführen
-get_cpu_info
+# Export functions
+export -f check_cpu_info
+
+# Check script execution
+check_script_execution "COLORS_IMPORTED" "LOGGING_IMPORTED"

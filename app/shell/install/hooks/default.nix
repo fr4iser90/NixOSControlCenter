@@ -1,11 +1,16 @@
-# app/shell/dev/hooks/default.nix
 { pkgs }:
 
 let
-  envHook = import ./env.nix { inherit pkgs; };
-  aliasesHook = import ./aliases.nix { inherit pkgs; };
-  infoHook = import ./info.nix { inherit pkgs; };
-  welcomeHook = import ./welcome.nix { inherit pkgs; };
-in {
-  shellHook = envHook + welcomeHook + aliasesHook + infoHook;
+  # Environment Hooks
+  paths = import ./env-paths.nix { inherit pkgs; };
+  system = import ./env-system.nix { inherit pkgs; };
+  temp = import ./env-temp.nix { inherit pkgs; };
+
+  # UI Hooks
+  welcome = import ./ui-welcome.nix { inherit pkgs; };
+  info = import ./ui-info.nix { inherit pkgs; };
+  aliases = import ./ui-aliases.nix { inherit pkgs; };
+in 
+{
+  shellHook = paths + system + temp + welcome + info + aliases;
 }

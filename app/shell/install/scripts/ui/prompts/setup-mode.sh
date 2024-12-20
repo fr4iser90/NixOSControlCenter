@@ -1,32 +1,22 @@
 #!/usr/bin/env bash
-source "$(dirname "${BASH_SOURCE[0]}")/setup-descriptions.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/setup-rules.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/setup-options.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/setup-tree.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/setup-preview.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/validate-mode.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/setup-formatting.sh"
 
-declare -a selected=()
-
-# Definiere die Unterkategorien pro Hauptkategorie
-declare -A SUB_OPTIONS=(
-    ["Desktop"]="None|Gaming|Gaming-Streaming|Gaming-Emulation|Development|Development-Web|Development-Game"
-    ["Server"]="None|Docker|Database"
-)
+# Declare arrays for options
+echo "DEBUG in setup-mode.sh:"
+declare -p SUB_OPTIONS
 
 select_setup_mode() {
     # Clear previous selections
     selected=()
     
     # 1. Hauptauswahl
-    local main_choice=$(printf "%s\n" "${MAIN_OPTIONS[@]}" | fzf \
+    local main_choice
+    main_choice=$(printf "%s\n" "${MAIN_OPTIONS[@]}" | fzf \
         --header="Wähle die Hauptkategorie" \
         --bind 'space:accept' \
         --preview 'bash -c "generate_preview {}"' \
         --preview-window="right:50%:wrap" \
         --pointer="▶" \
-        --marker="✓")
+        --marker="✓") || return 1
 
     [ -z "$main_choice" ] && return 1
 
@@ -37,13 +27,14 @@ select_setup_mode() {
     fi
     
     # 2. Modulauswahl
-    if [[ ${SUB_OPTIONS[$main_choice]} ]]; then
-        local module_choices=$(echo ${SUB_OPTIONS[$main_choice]} | tr '|' '\n' | fzf \
+    local module_choices=""
+    if [[ -n "${SUB_OPTIONS["$main_choice"]:-}" ]]; then
+        # Direkt die Optionen anzeigen
+        module_choices=$(echo -n "${SUB_OPTIONS["$main_choice"]}" | tr '|' '\n' | fzf \
             --multi \
             --header="Wähle Module für $main_choice (Leertaste zum Auswählen, Enter zum Bestätigen)" \
             --bind 'tab:toggle,space:toggle' \
             --bind 'ctrl-a:toggle-all' \
-            --bind 'ctrl-n:change-preview(echo "None ausgewählt - andere Module deaktiviert")+toggle-all+toggle' \
             --preview 'generate_preview {}' \
             --preview-window="right:50%:wrap" \
             --pointer="▶" \
@@ -55,21 +46,12 @@ select_setup_mode() {
     # Baue finale Auswahl
     selected=("$main_choice")
     if [[ -n "$module_choices" ]]; then
-        local has_none=false
         while IFS= read -r choice; do
-            clean_choice=$(echo "$choice" | sed 's/^[ │├└─]*//g')
-            if [[ "$clean_choice" = "None" ]]; then
-                has_none=true
-                break
-            fi
-            selected+=("$clean_choice")
+            selected+=("$choice")
         done <<< "$module_choices"
-
-        if [[ "$has_none" = true ]]; then
-            selected=("$main_choice" "None")
-        fi
     fi
 
+    # Gib die Auswahl zurück
     echo "${selected[*]}"
     return 0
 }
@@ -95,4 +77,17 @@ is_disabled() {
     return 1
 }
 
+# Export functions and variables
+export -f select_setup_mode
 export -f is_disabled
+
+# Nur ausführen wenn direkt aufgerufen
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Ensure environment is initialized
+    if [[ -z "${PROMPTS_DIR:-}" ]]; then
+        echo "Error: Environment not properly initialized"
+        exit 1
+    fi
+    
+    select_setup_mode
+fi

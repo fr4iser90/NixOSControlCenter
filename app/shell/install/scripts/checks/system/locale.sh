@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-log_section "Detecting System Locale Configuration"
+check_locale() {
+    log_section "Detecting System Locale Configuration"
 
-get_locale_info() {
     local system_locale
     local timezone
     local keyboard_layout
@@ -27,17 +27,19 @@ get_locale_info() {
 
     # Ausgabe
     log_info "System Configuration:"
-    log_info "  Locale: ${CYAN}${system_locale:-not set}${NC}"
-    log_info "  Timezone: ${CYAN}${timezone:-not set}${NC}"
-    log_info "  Keyboard Layout: ${CYAN}${keyboard_layout:-not set}${NC}"
-    [ -n "$keyboard_options" ] && log_info "  Keyboard Options: ${CYAN}${keyboard_options}${NC}"
+    log_info "  Locale: ${system_locale:-not set}"
+    log_info "  Timezone: ${timezone:-not set}"
+    log_info "  Keyboard Layout: ${keyboard_layout:-not set}"
+    [ -n "$keyboard_options" ] && log_info "  Keyboard Options: ${keyboard_options}"
 
     # Export für weitere Verarbeitung
     export SYSTEM_LOCALE="$system_locale"
     export SYSTEM_TIMEZONE="$timezone"
     export SYSTEM_KEYBOARD_LAYOUT="$keyboard_layout"
     export SYSTEM_KEYBOARD_OPTIONS="$keyboard_options"
+    
+    return 0
 }
 
-# Ausführen
-get_locale_info
+# Export functions
+export -f check_locale
