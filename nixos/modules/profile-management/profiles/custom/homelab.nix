@@ -9,10 +9,5 @@
   
   # Optional GUI
   services.xserver.enable = lib.mkDefault true;
-  
-  # Netzwerk-Konfiguration
-  networking = {
-    firewall.enable = true;
-    networkmanager.enable = true;
-  };
+
 }
