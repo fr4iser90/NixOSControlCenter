@@ -65,6 +65,12 @@ set -e
 echo "Copying configuration..."
 sudo cp -r /home/fr4iser/.local/nixos/* /etc/nixos/
 
+# Fix permissions
+echo "Setting permissions..."
+sudo chown -R root:root /etc/nixos/
+sudo chmod -R 644 /etc/nixos/
+sudo find /etc/nixos/ -type d -exec chmod 755 {} \;
+
 echo "Building system..."
 sudo nixos-rebuild switch --flake /etc/nixos#${hostname}
 
