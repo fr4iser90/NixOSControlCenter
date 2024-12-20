@@ -59,7 +59,7 @@ setup_users() {
       role = "virtualization";
       defaultShell = "zsh";
       autoLogin = false
-    }
+    };
   };
 
   #
@@ -91,8 +91,8 @@ setup_users() {
     gaming = {
       streaming = false;
       emulation = false
-    }
-  }
+    };
+  };
 }
 EOF
 

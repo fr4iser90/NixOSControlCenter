@@ -15,8 +15,8 @@
       emulation = true;     # true/false
     };
     development = {
-      game = true;                 # true/false
-      web = true;                   # true/false
+      game = false;                 # true/false
+      web = false;                   # true/false
     };
     server = {
       docker = false;          # true/false
@@ -28,17 +28,16 @@
   # User Management
   # Wird durch das Script mit allen User-Einträgen ersetzt
   users = {
-    "fr4iser" = {
+    "test" = {
       role = "admin";
       defaultShell = "zsh";
       autoLogin = false;
     };
-    "botchi" = {
+    "test" = {
       role = "admin";
       defaultShell = "zsh";
       autoLogin = false;
     };
-
   };
 
   #
