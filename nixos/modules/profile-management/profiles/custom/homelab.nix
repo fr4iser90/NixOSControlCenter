@@ -2,6 +2,7 @@
 
 {
 
+
   # Basis-Konfiguration für Homelab
   services.openssh.enable = true;
   virtualisation.docker.enable = true;

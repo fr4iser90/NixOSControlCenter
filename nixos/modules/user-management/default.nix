@@ -7,6 +7,29 @@ let
     admin = [ "wheel" "networkmanager" "docker" "video" "audio" "render" "input" "seat" ];
     guest = [ "networkmanager" ];
     restricted-admin = [ "wheel" "networkmanager" "video" "audio" ];
+    virtualization = [ "docker" "libvirtd" "kvm" ];  # Neue Rolle für Docker/VM-User
+  };
+
+  # User-spezifische Pakete basierend auf Rolle
+  rolePkgs = {
+    virtualization = with pkgs; [
+      docker-compose
+      virt-manager
+      qemu
+    ];
+    admin = [];  # Basis-Admin-Pakete
+    guest = [];  # Basis-Guest-Pakete
+  };
+
+  # Environment-Variablen basierend auf Rolle
+  roleEnv = {
+    virtualization = {
+      EMAIL = "${systemConfig.email}";
+      DOMAIN = "${systemConfig.domain}";
+      CERTEMAIL = "${systemConfig.certEmail}";
+      DOCKER_CONFIG = "$HOME/.docker";
+      DOCKER_BUILDKIT = "1";
+    };
   };
 
   # Sudo-Regeln basierend auf Rolle
@@ -82,6 +105,7 @@ in {
       shell = pkgs.${userConfig.defaultShell};
       group = username;
       extraGroups = [ "users" ] ++ roleGroups.${userConfig.role};
+      packages = rolePkgs.${userConfig.role} or [];
       
       # WICHTIG: Erst die Passwort-Konfiguration vom Manager holen
       } // (config.security.passwordManagement.getUserPasswordConfig username userConfig) // {
@@ -110,4 +134,13 @@ in {
     fish.enable = lib.any (user: systemConfig.users.${user}.defaultShell == "fish") 
       (builtins.attrNames systemConfig.users);
   };
+
+  # Environment-Variablen für spezifische Rollen
+  environment.sessionVariables = lib.mkMerge (
+    lib.mapAttrsToList (username: userConfig: 
+      if roleEnv ? ${userConfig.role} 
+      then roleEnv.${userConfig.role} 
+      else {}
+    ) systemConfig.users
+  );
 }
