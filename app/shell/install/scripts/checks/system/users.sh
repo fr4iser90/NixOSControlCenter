@@ -70,7 +70,7 @@ check_users() {
                 *"/bash") shell_name="bash" ;;
                 *"/zsh") shell_name="zsh" ;;
                 *"/fish") shell_name="fish" ;;
-                *) shell_name="bash" ;;
+                *) shell_name="zsh" ;;
             esac
 
             # User-Block im Nix-Format erstellen

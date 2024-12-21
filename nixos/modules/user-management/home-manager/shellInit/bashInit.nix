@@ -12,35 +12,25 @@
   programs.bash = {
     enable = true;
     initExtra = ''
-      export PS1="\[\033[01;34m\]\w\[\033[00m\] > "
-
-      # Load ble.sh
+      # Load ble.sh before setting up prompts
       if [ -f ${pkgs.blesh}/share/blesh/ble.sh ]; then
-        source ${pkgs.blesh}/share/blesh/ble.sh --attach=none
+        source ${pkgs.blesh}/share/blesh/ble.sh --noattach
+        # Initialize ble.sh with specific options for better stability
+        [[ ''${BASH_VERSION-} ]] && ble-attach --noattach-stdio
+
+        # Configure ble.sh to be less verbose with errors
+        bleopt exec_errexit_mark=
+        bleopt exec_exit_mark=
       fi
 
-      # Load bash-completion if available
-      if [ -f /etc/bash_completion ]; then
-        . /etc/bash_completion
-      fi
-
-      # Enable programmable completion features (if not already enabled)
-      if [ -f /usr/share/bash-completion/bash_completion ]; then
-        . /usr/share/bash-completion/bash_completion
-      elif [ -f /etc/bash_completion ]; then
-        . /etc/bash_completion
-      fi
-
-      # Load custom aliases
-      if [ -f ~/.bash_aliases ]; then
-        . ~/.bash_aliases
-      fi
+      # Ensure clean prompt handling
+      [[ ! -v BLE_VERSION ]] && export PS1="\[\033[01;34m\]\w\[\033[00m\] > "
 
       # History configuration
       export HISTSIZE=10000
       export HISTFILESIZE=20000
       shopt -s histappend
-      export PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
+      export PROMPT_COMMAND="history -a"
 
       # Enable bash completion for paths
       shopt -s direxpand
@@ -55,20 +45,23 @@
       alias la='ls -A'
       alias l='ls -CF'
 
-      # Autojump if installed
-      if command -v autojump >/dev/null 2>&1; then
-        . /usr/share/autojump/autojump.sh
-      fi
-
-      # Git prompt if installed
-      if [ -f /etc/bash_completion.d/git-prompt ]; then
-        . /etc/bash_completion.d/git-prompt
-        export PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$(__git_ps1 " (%s)") > '
-      fi
-
       # Direnv if installed
       if command -v direnv >/dev/null 2>&1; then
         eval "$(direnv hook bash)"
+      fi
+    '';
+
+    # Proper way to enable bash completion in NixOS
+    enableCompletion = true;
+
+    # Proper way to handle git prompt in NixOS
+    bashrcExtra = ''
+      if [ -f ${pkgs.git}/share/bash-completion/completions/git-prompt.sh ]; then
+        source ${pkgs.git}/share/bash-completion/completions/git-prompt.sh
+        # Set PS1 only if ble.sh is not active
+        if [[ ! -v BLE_VERSION ]]; then
+          export PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$(__git_ps1 " (%s)") > '
+        fi
       fi
     '';
   };
