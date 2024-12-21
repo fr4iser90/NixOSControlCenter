@@ -38,7 +38,6 @@
       defaultShell = "zsh";
       autoLogin = false;
     };
-
   };
 
   #
