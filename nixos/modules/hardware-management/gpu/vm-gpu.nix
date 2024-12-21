@@ -25,8 +25,6 @@
       };
     };
 
-    # Enable SPICE agent if available
-    virtualisation.spiceAgent.enable = lib.mkDefault true;
 
     # Enable QXL and Virtio GPU support
     hardware.opengl = {
