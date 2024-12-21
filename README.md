@@ -43,7 +43,7 @@ This project is under active development. The GUI is not yet implemented, and ma
 ## Installation Setup
 1. Start the installation environment:
    ```bash
-   nix-shell install-shell.nix
+   sudo nix-shell install-shell.nix
    ```
    ```bash
    install
