@@ -27,8 +27,19 @@ check_users() {
                     user_role="restricted-admin"
                 fi
                 
-                # Prüfe Passwort für Admin-User
-                if ! getent shadow "$username" | grep -q "^$username:[^\*\!:]"; then
+                # Prüfe und handle Passwörter für Admin-User
+                if getent shadow "$username" | grep -q "^$username:[^\*\!:]"; then
+                    # Existierendes Passwort gefunden -> kopiere es
+                    if [ ! -f "/etc/nixos/secrets/passwords/$username/.hashedPassword" ]; then
+                        log_info "Copying existing password hash for $username..."
+                        sudo mkdir -p "/etc/nixos/secrets/passwords/$username"
+                        sudo sh -c "getent shadow $username | cut -d: -f2 > /etc/nixos/secrets/passwords/$username/.hashedPassword"
+                        sudo chown "$username:users" "/etc/nixos/secrets/passwords/$username" "/etc/nixos/secrets/passwords/$username/.hashedPassword"
+                        sudo chmod 700 "/etc/nixos/secrets/passwords/$username"
+                        sudo chmod 600 "/etc/nixos/secrets/passwords/$username/.hashedPassword"
+                    fi
+                else
+                    # Kein Passwort gefunden
                     if [ ! -f "/etc/nixos/secrets/passwords/$username/.hashedPassword" ]; then
                         log_warning "Admin user '$username' has no password configured!"
                         needs_password_setup=true
@@ -40,6 +51,20 @@ check_users() {
                 user_role="guest"
             fi
 
+    # Nach dem Shell-Check und vor dem User-Block
+    if groups "$username" 2>/dev/null | grep -q "wheel"; then
+        # Wenn Passwort im Shadow existiert aber keine .hashedPassword Datei
+        if getent shadow "$username" | grep -q "^$username:[^\*\!:]" && \
+        [ ! -f "/etc/nixos/secrets/passwords/$username/.hashedPassword" ]; then
+            echo "Copying existing password hash for $username..."
+            sudo mkdir -p "/etc/nixos/secrets/passwords/$username"
+            sudo sh -c "getent shadow $username | cut -d: -f2 > /etc/nixos/secrets/passwords/$username/.hashedPassword"
+            sudo chown "$username:users" "/etc/nixos/secrets/passwords/$username" "/etc/nixos/secrets/passwords/$username/.hashedPassword"
+            sudo chmod 700 "/etc/nixos/secrets/passwords/$username"
+            sudo chmod 600 "/etc/nixos/secrets/passwords/$username/.hashedPassword"
+        fi
+    fi
+    
             # Shell-Pfad in Shell-Name umwandeln
             case "$shell" in
                 *"/bash") shell_name="bash" ;;
@@ -59,7 +84,7 @@ check_users() {
                 user_block+="      hashedPasswordFile = \"/etc/nixos/secrets/passwords/$username/.hashedPassword\";\n"
             fi
 
-            user_block+="    };"
+            user_block+="    };  "
 
             # Logging
             log_info "  User: ${username}"
