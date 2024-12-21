@@ -5,7 +5,7 @@ with lib;
 let
   entriesDir = "/boot/loader/entries";
   
-  # Hilfsfunktionen
+  # Helper function to get boot entries
   getBootEntries = ''
     if [ -d "${entriesDir}" ]; then
       entries=$(ls ${entriesDir}/nixos-generation-*.conf 2>/dev/null || true)
@@ -27,37 +27,23 @@ let
     fi
   '';
 
-  minimalReport = ''
-    printf '%b' "${colors.cyan}=== Boot Entries ===${colors.reset}\n"
-    echo "Boot Directory: ${entriesDir}"
-  '';
-
+  # Standard report shows current boot entries
   standardReport = ''
-    ${minimalReport}
+    ${formatting.section "Boot Entries"}
     echo -e "\nCurrent Entries:"
     ${getBootEntries}
   '';
 
+  # Detailed shows same as standard
   detailedReport = standardReport;
 
-  fullReport = ''
-    ${standardReport}
-    echo -e "\nBoot Entry Details:"
-    if [ -d "${entriesDir}" ]; then
-      for entry in ${entriesDir}/nixos-generation-*.conf; do
-        if [ -f "$entry" ]; then
-          echo -e "\nEntry: $(basename "$entry")"
-          echo "Contents:"
-          echo "$(cat "$entry" | ${pkgs.gnused}/bin/sed 's/^/  /')"
-        fi
-      done
-    fi
-  '';
+  # Full report shows just standard info
+  fullReport = standardReport;
 
 in {
   collect = 
     if currentLevel >= reportLevels.full then fullReport
     else if currentLevel >= reportLevels.detailed then detailedReport
     else if currentLevel >= reportLevels.standard then standardReport
-    else minimalReport;
+    else "";  # Minimal level: show nothing
 }

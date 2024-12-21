@@ -1,19 +1,14 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, reportingConfig, ... }:
 
 let
   preflightScript = pkgs.writeScriptBin "preflight-check-cpu" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
 
-    # Add color definitions
-    RED='\033[0;31m'
-    NC='\033[0m' # No Color
-
-    echo "Checking CPU configuration..."
     
     # CPU Detection using lscpu
     if ! CPU_INFO=$(${pkgs.util-linux}/bin/lscpu); then
-      echo -e "''${RED}Error: Could not detect CPU information''${NC}"
+      ${reportingConfig.formatting.error "Could not detect CPU information"}
       exit 1
     fi
     
@@ -27,32 +22,36 @@ let
     fi
     
     if [ ! -f /etc/nixos/system-config.nix ]; then
-      echo -e "''${RED}Error: system-config.nix not found''${NC}"
+      ${reportingConfig.formatting.error "system-config.nix not found"}
       exit 1
     fi
     
     if ! CONFIGURED=$(grep 'cpu =' /etc/nixos/system-config.nix | cut -d'"' -f2); then
-      echo -e "''${RED}Error: Could not find CPU configuration in system-config.nix''${NC}"
+      ${reportingConfig.formatting.error "Could not find CPU configuration in system-config.nix"}
       exit 1
     fi
     
-    echo "Detected CPU: $DETECTED"
-    echo "Configured CPU: $CONFIGURED"
+    ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then ''
+      ${reportingConfig.formatting.info "Detected CPU: $DETECTED"}
+      ${reportingConfig.formatting.info "Configured CPU: $CONFIGURED"}
+    '' else ""}
     
     if [ "$DETECTED" != "$CONFIGURED" ]; then
-      echo -e "''${RED}WARNING: CPU configuration mismatch!''${NC}"
-      echo -e "''${RED}System configured for $CONFIGURED but detected $DETECTED''${NC}"
-      
-      echo "Updating system-config.nix..."
-      echo "Original line: $(grep 'cpu =' /etc/nixos/system-config.nix)"
+      ${reportingConfig.formatting.warning "CPU configuration mismatch!"}
+      ${reportingConfig.formatting.warning "System configured for $CONFIGURED but detected $DETECTED"}
       
       # Update CPU configuration
       sed -i "s/cpu = \"$CONFIGURED\"/cpu = \"$DETECTED\"/" /etc/nixos/system-config.nix
       
-      echo "Updated line: $(grep 'cpu =' /etc/nixos/system-config.nix)"
+      ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then ''
+        ${reportingConfig.formatting.success "Configuration updated."}
+      '' else ""}
+    ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then ''
+    else
+      ${reportingConfig.formatting.success "CPU configuration matches hardware."}
+    '' else ""}
     fi
     
-    echo "CPU check completed."
     exit 0
   '';
 

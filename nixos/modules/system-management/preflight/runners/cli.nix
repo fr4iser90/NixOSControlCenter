@@ -1,5 +1,5 @@
 # modules/system-management/preflight/runners/cli.nix
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, reportingConfig, ... }:
 
 let
   inherit (lib) types;
@@ -10,11 +10,9 @@ let
     RESULT="$1"
     VALIDATION="$2"
     
-    # Führe die Validierung durch
     if [ -n "$VALIDATION" ]; then
       eval "$VALIDATION '$RESULT'"
     else
-      # Standard-Validierung: Prüfe auf Exit-Code 0
       if [ "$RESULT" = "0" ]; then
         echo '{"success":true,"message":"Check passed"}'
       else
@@ -25,21 +23,24 @@ let
 
   # Check-Runner Funktion
   runCheck = name: checkSet: ''
-    echo "Running ${checkSet.name or name}..."
+    ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.detailed then ''
+      ${reportingConfig.formatting.info "Running ${checkSet.name or name}..."}
+    '' else ""}
+
     if [ -x "${checkSet.check}/bin/${checkSet.binary or name}" ]; then
-      # Direkte Ausführung des Checks ohne Capture
       ${checkSet.check}/bin/${checkSet.binary or name}
       EXIT_CODE=$?
       
       if [ $EXIT_CODE -eq 0 ]; then
-        # Nur den finalen Status ausgeben wenn der Check erfolgreich war
-        echo "✓ ${checkSet.name or name}: Check passed"
+        ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.minimal then ''
+          ${reportingConfig.formatting.success "${checkSet.name or name}: Check passed"}
+        '' else ""}
       else
-        echo "✗ ${checkSet.name or name}: Check failed"
+        ${reportingConfig.formatting.error "${checkSet.name or name}: Check failed"}
         FAILED=1
       fi
     else
-      echo "! ${checkSet.name or name}: Check not executable"
+      ${reportingConfig.formatting.error "${checkSet.name or name}: Check not executable"}
       FAILED=1
     fi
   '';
@@ -51,7 +52,6 @@ let
 
     FAILED=0
 
-    echo "Running system preflight checks..."
     
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList runCheck config.system.preflight.checks)}
     
@@ -59,6 +59,9 @@ let
       exit 1
     fi
     
+    ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.minimal then ''
+      ${reportingConfig.formatting.success "All checks passed!"}
+    '' else ""}
     exit 0
   '';
 
@@ -67,18 +70,27 @@ let
     #!${pkgs.bash}/bin/bash
     
     if [ $# -eq 0 ]; then
-      echo "Usage: check-and-build [nixos-rebuild options]"
-      echo "Example: check-and-build switch"
+      ${reportingConfig.formatting.error "No build command specified"}
+      ${reportingConfig.formatting.info "Usage: check-and-build [nixos-rebuild options]"}
+      ${reportingConfig.formatting.info "Example: check-and-build switch"}
       exit 1
     fi
 
-    echo "Running preflight checks..."
+    ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then ''
+      ${reportingConfig.formatting.section "NixOS System Build"}
+      ${reportingConfig.formatting.info "Running preflight checks..."}
+    '' else ""}
+
     if ! run-system.preflight.checks; then
-      echo "Preflight checks failed!"
+      ${reportingConfig.formatting.error "Preflight checks failed!"}
       exit 1
     fi
 
-    echo "Checks passed! Running nixos-rebuild..."
+    ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then ''
+      ${reportingConfig.formatting.success "Checks passed!"}
+      ${reportingConfig.formatting.info "Running nixos-rebuild..."}
+    '' else ""}
+
     exec ${pkgs.nixos-rebuild}/bin/nixos-rebuild "$@" 
   '';
 
@@ -112,6 +124,6 @@ in {
   };
 
   config = {
-    environment.systemPackages = [ checkRunner ];
+    environment.systemPackages = [ checkRunner checkAndBuild ];
   };
 }

@@ -1,31 +1,20 @@
 # modules/system-management/preflight/checks/hardware/gpu.nix
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, reportingConfig, ... }:
 
 let
   preflightScript = pkgs.writeScriptBin "preflight-check-gpu" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
-    
-    # Add color definitions
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    CYAN='\033[0;36m'
-    GRAY='\033[0;37m'
-    NC='\033[0m'
-    
-    echo "Checking GPU configuration..."
-    
+        
     # Initialize DETECTED with a default value
     DETECTED="generic"
-    
-    # Debug output
-    echo "Starting GPU detection..."
     
     # Physical hardware detection first
     declare -A gpu_types
     while IFS= read -r line; do
         bus_id=$(echo "$line" | cut -d' ' -f1)
         vendor_id=$(${pkgs.pciutils}/bin/lspci -n -s "$bus_id" | awk '{print $3}' | cut -d':' -f1)
+        device=$(echo "$line" | sed 's/.*: //')
         
         case "$vendor_id" in
             "10de") gpu_types["nvidia"]=1 ;; # NVIDIA
@@ -33,10 +22,12 @@ let
             "8086") gpu_types["intel"]=1 ;;   # Intel
         esac
         
-        echo -e "Found GPU:"
-        echo -e "  Device   : ''${CYAN}$(echo "$line" | sed 's/.*: //')''${NC}"
-        echo -e "  Bus ID   : ''${GRAY}$bus_id''${NC}"
-        echo -e "  Vendor ID: ''${GRAY}$vendor_id''${NC}"
+        ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.detailed then ''
+          ${reportingConfig.formatting.info "Found GPU:"}
+          ${reportingConfig.formatting.keyValue "  Device" "$device"}
+          ${reportingConfig.formatting.keyValue "  Bus ID" "$bus_id"}
+          ${reportingConfig.formatting.keyValue "  Vendor ID" "$vendor_id"}
+        '' else ""}
     done < <(${pkgs.pciutils}/bin/lspci | grep -E "VGA|3D|Display")
 
     # Determine GPU configuration
@@ -56,11 +47,8 @@ let
     if [ "$DETECTED" = "generic" ]; then
         if command -v ${pkgs.systemd}/bin/systemd-detect-virt &> /dev/null; then
             virt_type=$(${pkgs.systemd}/bin/systemd-detect-virt || echo "none")
-            echo "Virtualization check: $virt_type"
             
             if [ "$virt_type" != "none" ]; then
-                echo -e "Detected Virtual Machine: ''${CYAN}$virt_type''${NC}"
-                
                 # Check for virtual GPU types
                 if ${pkgs.pciutils}/bin/lspci | grep -qi "qxl"; then
                     DETECTED="qxl-virtual"
@@ -70,34 +58,44 @@ let
                     DETECTED="basic-virtual"
                 fi
                 
-                echo -e "Virtual Display: ''${CYAN}$DETECTED''${NC}"
+                ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.detailed then ''
+                  ${reportingConfig.formatting.info "Virtual Machine: $virt_type"}
+                  ${reportingConfig.formatting.info "Virtual Display: $DETECTED"}
+                '' else ""}
             fi
         fi
     fi
     
     if [ ! -f /etc/nixos/system-config.nix ]; then
-      echo -e "''${RED}Error: system-config.nix not found''${NC}"
+      ${reportingConfig.formatting.error "system-config.nix not found"}
       exit 1
     fi
     
     if ! CONFIGURED=$(grep 'gpu =' /etc/nixos/system-config.nix | cut -d'"' -f2); then
-      echo -e "''${RED}Error: Could not find GPU configuration in system-config.nix''${NC}"
+      ${reportingConfig.formatting.error "Could not find GPU configuration in system-config.nix"}
       exit 1
     fi
     
-    echo -e "\nGPU Configuration:"
-    echo -e "  Detected  : ''${CYAN}$DETECTED''${NC}"
-    echo -e "  Configured: ''${CYAN}$CONFIGURED''${NC}"
+    ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then ''
+      ${reportingConfig.formatting.info "GPU Configuration:"}
+      ${reportingConfig.formatting.keyValue "  Detected" "$DETECTED"}
+      ${reportingConfig.formatting.keyValue "  Configured" "$CONFIGURED"}
+    '' else ""}
     
     if [ "$DETECTED" != "$CONFIGURED" ]; then
-      echo -e "\n''${RED}WARNING: GPU configuration mismatch!''${NC}"
-      echo -e "''${RED}System configured for $CONFIGURED but detected $DETECTED''${NC}"
+      ${reportingConfig.formatting.warning "GPU configuration mismatch!"}
+      ${reportingConfig.formatting.warning "System configured for $CONFIGURED but detected $DETECTED"}
 
       # Update configuration
       sed -i "s/gpu = \"$CONFIGURED\"/gpu = \"$DETECTED\"/" /etc/nixos/system-config.nix
-      echo -e "''${GREEN}Configuration updated to: $DETECTED''${NC}"
+      
+      ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then ''
+        ${reportingConfig.formatting.success "Configuration updated."}
+      '' else ""}
+    ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then ''
     else
-      echo -e "\n''${GREEN}GPU configuration matches detected hardware.''${NC}"
+      ${reportingConfig.formatting.success "GPU configuration matches hardware."}
+    '' else ""}
     fi
     
     exit 0

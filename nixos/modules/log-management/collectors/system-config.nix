@@ -1,35 +1,37 @@
 { config, lib, pkgs, colors, formatting, reportLevels, currentLevel, systemConfig, ... }:
 
+with lib;
+
 let
-  formatSection = formatting.formatSection;
-  formatList = formatting.formatList;
-  
-  # Hole die vorherige Konfiguration aus dem systemConfig
+  # Get previous configuration from systemConfig
   prevConfig = systemConfig.previousConfig or {};
   
-  # Funktion zum Vergleichen von Werten
+  # Helper to check if a value has changed
   hasChanged = attr: 
     systemConfig ? ${attr} && 
     prevConfig ? ${attr} && 
     systemConfig.${attr} != prevConfig.${attr};
   
-  # Sammle alle Änderungen
-  changes = lib.concatStringsSep "\n" (lib.filter (x: x != null) [
-    (lib.optionalString (hasChanged "gpu") 
-      "  GPU: ${prevConfig.gpu} → ${systemConfig.gpu}")
+  # Collect all changes
+  changes = concatStringsSep "\n" (filter (x: x != null) [
+    (optionalString (hasChanged "gpu") 
+      (formatting.keyValue "GPU" "${prevConfig.gpu} → ${systemConfig.gpu}"))
     
-    (lib.optionalString (hasChanged "cpu")
-      "  CPU: ${prevConfig.cpu} → ${systemConfig.cpu}")
+    (optionalString (hasChanged "cpu")
+      (formatting.keyValue "CPU" "${prevConfig.cpu} → ${systemConfig.cpu}"))
     
-    (lib.optionalString (hasChanged "users")
-      "  Users: ${toString (builtins.attrNames prevConfig.users)} → ${toString (builtins.attrNames systemConfig.users)}")
+    (optionalString (hasChanged "users")
+      (formatting.keyValue "Users" "${toString (attrNames prevConfig.users)} → ${toString (attrNames systemConfig.users)}"))
   ]);
 
-  collectChanges = if changes != "" then ''
-    echo -e "\n''${colors.blue}=== Configuration Changes ===${colors.reset}"
-    echo -e "${changes}"
-  '' else "";
+  # Standard report shows changes if any exist
+  standardReport = 
+    if changes != "" then ''
+      ${formatting.section "Configuration Changes"}
+      ${changes}
+    '' else "";
 
 in {
-  collect = collectChanges;
+  # Show changes for standard level and above, nothing for minimal
+  collect = if currentLevel >= reportLevels.standard then standardReport else "";
 }

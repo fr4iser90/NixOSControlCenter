@@ -5,29 +5,14 @@ with lib;
 let
   types = import ../../profile-management/types;
 
+  # Get system information
   systemInfo = {
     hasDesktop = systemConfig.desktop != null && systemConfig.desktop != "";
     systemType = systemConfig.systemType;
     desktop = systemConfig.desktop or "none";
   };
 
-  # Reports für verschiedene Detail-Level
-  minimalReport = ''
-    echo -e "${colors.magenta}=== Profile Configuration ===${colors.reset}"
-    echo -e "System Type: ${systemInfo.systemType}"
-  '';
-
-  standardReport = ''
-    ${minimalReport}
-    echo -e "Desktop: ${systemInfo.desktop}"
-  '';
-
-  detailedReport = ''
-    ${standardReport}
-    echo -e "Has Desktop: ${toString systemInfo.hasDesktop}"
-    echo -e "Profile Module: ${baseNameOf profileModule}"
-  '';
-
+  # Determine profile module path
   profileModule = 
     if types.systemTypes.hybrid ? ${systemConfig.systemType} then
       "hybrid/gaming-workstation.nix"
@@ -38,9 +23,24 @@ let
     else
       throw "Unknown system type: ${systemConfig.systemType}";
 
+  # Standard report shows basic system info
+  standardReport = ''
+    ${formatting.section "Profile Configuration"}
+    ${formatting.keyValue "System Type" systemInfo.systemType}
+    ${formatting.keyValue "Desktop" systemInfo.desktop}
+  '';
+
+  # Detailed report adds desktop status and module path
+  detailedReport = ''
+    ${standardReport}
+    ${formatting.keyValue "Has Desktop" (toString systemInfo.hasDesktop)}
+    ${formatting.keyValue "Profile Module" (baseNameOf profileModule)}
+  '';
+
 in {
+  # Minimal level shows nothing
   collect = 
     if currentLevel >= reportLevels.detailed then detailedReport
     else if currentLevel >= reportLevels.standard then standardReport
-    else minimalReport;
+    else "";
 }

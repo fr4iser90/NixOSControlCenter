@@ -1,36 +1,38 @@
-# modules/system-management/preflight/default.nix
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, reportingConfig, ... }:
+
+with lib;
 
 let
   checkAndBuild = pkgs.writeShellScriptBin "check-and-build" ''
     #!${pkgs.bash}/bin/bash
     
-    # Add color definitions
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    NC='\033[0m'
-    
-    # Prüfe ob ein Argument übergeben wurde
+    # Show usage if no arguments
     if [ $# -eq 0 ]; then
-      echo "Usage: check-and-build <command> [options]"
-      echo ""
-      echo "Commands:"
-      echo "  switch      - Build and activate configuration"
-      echo "  boot        - Build configuration and make it the boot default"
-      echo "  test        - Build and activate, but don't add to boot menu"
-      echo "  build       - Build configuration only"
-      echo ""
-      echo "Options:"
-      echo "  --force     - Skip all preflight checks"
-      echo ""
-      echo "Example: check-and-build switch --flake /etc/nixos#Gaming"
-      echo "         check-and-build switch --force"
+      ${reportingConfig.formatting.section "Usage"}
+      ${reportingConfig.formatting.keyValue "Command" "check-and-build <command> [options]"}
+      
+      ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then ''
+        echo -e "\nCommands:"
+        echo "  switch    - Build and activate configuration"
+        echo "  boot      - Build configuration and make it the boot default"
+        echo "  test      - Build and activate, but don't add to boot menu"
+        echo "  build     - Build configuration only"
+        
+        echo -e "\nOptions:"
+        echo "  --force   - Skip all preflight checks"
+        
+        echo -e "\nExample:"
+        echo "  check-and-build switch --flake /etc/nixos#Gaming"
+        echo "  check-and-build switch --force"
+      '' else ""}
       exit 1
     fi
 
-    # Funktion zum Speichern der Konfiguration
+    # Save current configuration state
     save_config() {
-      echo "Saving current configuration state..."
+      ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then 
+        reportingConfig.formatting.info "Saving current configuration state..." 
+      else ""}
       echo '${builtins.toJSON {
         systemType = systemConfig.systemType or null;
         gpu = systemConfig.gpu or null;
@@ -39,49 +41,61 @@ let
       }}' > /etc/nixos/.system-config.previous.json
     }
 
-    # Prüfe ob --force verwendet wird
+    # Check for --force flag
     if [[ " $* " =~ " --force " ]]; then
-      echo -e "''${RED}WARNING: Bypassing preflight checks!''${NC}"
-      echo "Running nixos-rebuild..."
-      # Entferne --force Option
+      ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.minimal then 
+        reportingConfig.formatting.warning "Bypassing preflight checks!"
+      else ""}
+      ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then 
+        reportingConfig.formatting.info "Running nixos-rebuild..." 
+      else ""}
       args=$(echo "$@" | sed 's/--force//')
-      # Kein Config-Speichern bei Force
       exec ${pkgs.nixos-rebuild}/bin/nixos-rebuild $args
     fi
 
-    echo "Running preflight checks..."
+    ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then 
+      reportingConfig.formatting.section "Preflight Checks"
+    else ""}
     
-    # Führe Checks aus
+    # Run checks
     if ! preflight-check-users; then
-      echo -e "''${RED}User checks failed!''${NC}"
-      echo -e "Use --force to bypass checks"
+      ${reportingConfig.formatting.error "User checks failed!"}
+      ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then 
+        reportingConfig.formatting.info "Use --force to bypass checks"
+      else ""}
       exit 1
     fi
 
     if ! run-system.preflight.checks; then
-      echo -e "''${RED}System checks failed!''${NC}"
-      echo -e "''${RED}To bypass checks, use: check-and-build <command> --force''${NC}"
+      ${reportingConfig.formatting.error "System checks failed!"}
+      ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then 
+        reportingConfig.formatting.info "To bypass checks, use: check-and-build <command> --force"
+      else ""}
       exit 1
     fi
 
-    echo -e "''${GREEN}All checks passed!''${NC}"
-    echo "Running nixos-rebuild..."
+    ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.minimal then 
+      reportingConfig.formatting.success "All checks passed!"
+    else ""}
+    ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then 
+      reportingConfig.formatting.info "Running nixos-rebuild..."
+    else ""}
 
-    # Speichere aktuelle Konfiguration vor dem Build
+    # Save config and build
     save_config
 
-    # Führe Build aus
     if ${pkgs.nixos-rebuild}/bin/nixos-rebuild "$@"; then
-      echo -e "''${GREEN}Build successful!''${NC}"
+      ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.minimal then 
+        reportingConfig.formatting.success "Build successful!"
+      else ""}
       exit 0
     else
-      echo -e "''${RED}Build failed!''${NC}"
+      ${reportingConfig.formatting.error "Build failed!"}
       exit 1
     fi
   '';
 
-in
-{
+in {
   imports = [
     ./checks/hardware/gpu.nix
     ./checks/hardware/cpu.nix
@@ -90,8 +104,6 @@ in
   ];
 
   config = {
-    environment.systemPackages = [
-      checkAndBuild
-    ];
+    environment.systemPackages = [ checkAndBuild ];
   };
 }

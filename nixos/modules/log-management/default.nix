@@ -73,7 +73,7 @@ in {
     
     defaultDetailLevel = mkOption {
       type = lib.types.enum (attrNames reportLevels);
-      default = systemConfig.buildLogLevel or "standard";
+      default = "standard";
       description = "Default detail level for all reports";
     };
 
@@ -126,14 +126,24 @@ in {
           ) sortedCollectors;
 
         in ''
-          echo -e "\n${colors.blue}=== NixOS System Report ===${colors.reset}"
-          echo -e "Hostname: ${config.networking.hostName}"
-          echo -e "Generation: <current-generation>"  # Placeholder
-          echo -e "Default Detail Level: ${cfg.defaultDetailLevel}\n"
+          ${formatting.header colors.blue "NixOS System Report"}
+          ${formatting.keyValue "Hostname" config.networking.hostName}
+          ${formatting.keyValue "Generation" "$(readlink /nix/var/nix/profiles/system | cut -d'-' -f2)"}
+          ${formatting.keyValue "Detail Level" cfg.defaultDetailLevel}
+          ${formatting.separator "-" 50}
           
           ${concatStringsSep "\n" reports}
         '';
       };
     })
+
+    # Exportiere reportingConfig für andere Module
+    {
+      _module.args.reportingConfig = {
+        inherit formatting colors;
+        reportLevels = reportLevels;
+        currentLevel = reportLevels.${cfg.defaultDetailLevel};
+      };
+    }
   ];
 }

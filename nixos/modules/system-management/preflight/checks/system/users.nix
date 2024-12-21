@@ -1,18 +1,14 @@
 # modules/system-management/preflight/checks/system/users.nix
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, reportingConfig, ... }:
 
 let
   preflightScript = pkgs.writeScriptBin "preflight-check-users" ''
     #!${pkgs.bash}/bin/bash
     set -e
     
-    # Color definitions
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[1;33m'
-    NC='\033[0m'
-    
-    echo "Checking user configuration..."
+    ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then ''
+      ${reportingConfig.formatting.section "User Configuration Check"}
+    '' else ""}
     
     # Password checking function
     check_passwords() {
@@ -27,12 +23,11 @@ let
         fi
 
         if [ -z "$shadow_content" ]; then
-            echo -e "''${YELLOW}⚠️  Cannot check passwords (no root access)''${NC}"
+            ${reportingConfig.formatting.warning "Cannot check passwords (no root access)"}
             return 0
         fi
 
         for user in "''${users[@]}"; do
-            # Prüfe erst shadow, dann das Passwort-Verzeichnis
             if ! echo "$shadow_content" | grep -q "^$user:[^\*\!:]"; then
                 if [ ! -f "/etc/nixos/secrets/passwords/$user/.hashedPassword" ] || [ ! -s "/etc/nixos/secrets/passwords/$user/.hashedPassword" ]; then
                     no_password+=("$user")
@@ -41,7 +36,9 @@ let
         done
 
         if [ ''${#no_password[@]} -gt 0 ]; then
-            echo -e "''${YELLOW}⚠️  The following users have no password set: ''${no_password[*]}''${NC}"
+            missing_users=$(printf '%s ' "''${no_password[@]}")
+            ${reportingConfig.formatting.warning "The following users have no password set:"} 
+            ${reportingConfig.formatting.warning "$missing_users"}
             return 1
         fi
 
@@ -54,9 +51,11 @@ let
     CONFIGURED_USERS="${builtins.concatStringsSep " " (builtins.attrNames systemConfig.users)}"
     PASSWORD_DIR="/etc/nixos/secrets/passwords"
     
-    echo "Current system users: $CURRENT_USERS"
-    echo "Current systemd users: $SYSTEMD_USERS"
-    echo "Configured users: $CONFIGURED_USERS"
+    ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.detailed then ''
+      ${reportingConfig.formatting.keyValue "Current system users" "$CURRENT_USERS"}
+      ${reportingConfig.formatting.keyValue "Current systemd users" "$SYSTEMD_USERS"}
+      ${reportingConfig.formatting.keyValue "Configured users" "$CONFIGURED_USERS"}
+    '' else ""}
     
     # Track changes
     changes_detected=0
@@ -64,34 +63,29 @@ let
     added_users=""
     users_without_password=""
     
-    # Check for users to be removed (both from passwd and systemd)
+    # Check for users to be removed
     for user in $CURRENT_USERS $SYSTEMD_USERS; do
       if ! echo "$CONFIGURED_USERS" | grep -q "$user"; then
-        echo -e "''${YELLOW}Notice: User '$user' will be removed by NixOS''${NC}"
+        ${reportingConfig.formatting.warning "User '$user' will be removed by NixOS"}
         
-        # Aggressivere Cleanup von systemd
-        echo "Cleaning up systemd for $user..."
+        ${if reportingConfig.currentLevel >= reportingConfig.reportLevels.standard then ''
+          ${reportingConfig.formatting.info "Cleaning up systemd for $user..."}
+        '' else ""}
         
-        # Get user ID (falls der User noch existiert)
+        # Get user ID
         USER_ID=$(id -u "$user" 2>/dev/null || getent passwd "$user" | cut -d: -f3 || echo "")
         
         if [ ! -z "$USER_ID" ]; then
-          # Disable lingering
+          # Cleanup actions
           sudo loginctl disable-linger "$user" 2>/dev/null || true
-          
-          # Kill all user processes
           sudo pkill -u "$USER_ID" 2>/dev/null || true
-          
-          # Force terminate all sessions
           for session in $(loginctl list-sessions --no-legend | awk "\$2 == $USER_ID {print \$1}"); do
             sudo loginctl terminate-session "$session" 2>/dev/null || true
           done
-          
-          # Remove user runtime directory
           sudo rm -rf "/run/user/$USER_ID" 2>/dev/null || true
         fi
         
-        # Force systemd to reload its configuration
+        # Force systemd reload
         if command -v dbus-launch >/dev/null 2>&1; then
           dbus-launch --exit-with-session sudo systemctl daemon-reload || true
         else
@@ -103,14 +97,12 @@ let
       fi
     done
     
-    # Check for new users and password status
+    # Check for new users
     for user in $CONFIGURED_USERS; do
-      # Check if user is new
       if ! echo "$CURRENT_USERS" | grep -q "$user"; then
         added_users="$added_users $user"
         changes_detected=1
         
-        # Only check password for new users or existing configured users
         if [ ! -f "$PASSWORD_DIR/$user/.hashedPassword" ] || [ ! -s "$PASSWORD_DIR/$user/.hashedPassword" ]; then
           users_without_password="$users_without_password $user"
         fi
@@ -119,33 +111,33 @@ let
     
     # Show changes
     if [ $changes_detected -eq 1 ]; then
-      echo -e "''${YELLOW}⚠️  User configuration changes detected!''${NC}"
+      ${reportingConfig.formatting.warning "User configuration changes detected!"}
       
       if [ ! -z "$removed_users" ]; then
-        echo "Users removed:$removed_users"
+        ${reportingConfig.formatting.keyValue "Users removed" "$removed_users"}
       fi
       
       if [ ! -z "$added_users" ]; then
-        echo "Users to be added:$added_users"
+        ${reportingConfig.formatting.keyValue "Users to be added" "$added_users"}
       fi
       
-      # Password Management - nur für neue oder konfigurierte User
+      # Password Management
       if [ ! -z "$users_without_password" ]; then
-        echo -e "''${YELLOW}⚠️  Users without password:$users_without_password''${NC}"
+        ${reportingConfig.formatting.warning "Users without password:$users_without_password"}
         
         for user in $users_without_password; do
           while true; do
             echo ""
-            echo "Setting password for user: $user"
+            ${reportingConfig.formatting.info "Setting password for user: $user"}
             read -p "Do you want to set a password for $user now? [Y/n/s(skip)] " response
             
             case $response in
               [Nn]* )
-                echo "Aborting system rebuild."
+                ${reportingConfig.formatting.error "Aborting system rebuild."}
                 exit 1
                 ;;
               [Ss]* )
-                echo "Skipping password for $user"
+                ${reportingConfig.formatting.info "Skipping password for $user"}
                 break
                 ;;
               * )
@@ -159,10 +151,10 @@ let
                   sudo sh -c "getent shadow $user | cut -d: -f2 > $PASSWORD_DIR/$user/.hashedPassword"
                   sudo chown $user:users "$PASSWORD_DIR/$user/.hashedPassword"
                   sudo chmod 600 "$PASSWORD_DIR/$user/.hashedPassword"
-                  echo -e "''${GREEN}✅ Password set successfully for $user''${NC}"
+                  ${reportingConfig.formatting.success "Password set successfully for $user"}
                   break
                 else
-                  echo -e "''${RED}❌ Failed to set password, please try again''${NC}"
+                  ${reportingConfig.formatting.error "Failed to set password, please try again"}
                 fi
                 ;;
             esac
@@ -175,12 +167,12 @@ let
     if [ $changes_detected -eq 1 ]; then
       read -p "Continue with system rebuild? [y/N] " response
       if [[ ! "$response" =~ ^[Yy]$ ]]; then
-        echo "Aborting system rebuild."
+        ${reportingConfig.formatting.error "Aborting system rebuild."}
         exit 1
       fi
     fi
     
-    echo -e "''${GREEN}✅ User configuration check passed''${NC}"
+    ${reportingConfig.formatting.success "User configuration check passed"}
     exit 0
   '';
 

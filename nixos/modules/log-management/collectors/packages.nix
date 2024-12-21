@@ -3,6 +3,7 @@
 with lib;
 
 let
+  # Check if a package is free or non-free
   checkPackage = pkg: 
     let
       meta = if pkg ? meta then pkg.meta else {};
@@ -15,7 +16,7 @@ let
       isFree = true;
     };
 
-  # Paketanalyse
+  # Analyze installed packages
   packageAnalysis = let
     allPackages = lib.unique (flatten (with config; [
       (environment.systemPackages or [])
@@ -29,14 +30,15 @@ let
     unfree = filter (p: !p.isFree) checkedPackages;
   };
 
-  # Einheitlicher Report für alle Level
-  report = ''
-    printf '%b' "${colors.cyan}=== Package Analysis ===${colors.reset}\n"
-    printf 'Total Packages: %d\n' ${toString packageAnalysis.total}
-    echo -e "Free Packages: ${toString (length packageAnalysis.free)}"
-    echo -e "Unfree Packages: ${toString (length packageAnalysis.unfree)}"
+  # Standard report shows package statistics
+  standardReport = ''
+    ${formatting.section "Package Analysis"}
+    ${formatting.keyValue "Total Packages" (toString packageAnalysis.total)}
+    ${formatting.keyValue "Free Packages" (toString (length packageAnalysis.free))}
+    ${formatting.keyValue "Unfree Packages" (toString (length packageAnalysis.unfree))}
   '';
 
 in {
-  collect = report;
+  # Minimal level shows nothing
+  collect = if currentLevel >= reportLevels.standard then standardReport else "";
 }
