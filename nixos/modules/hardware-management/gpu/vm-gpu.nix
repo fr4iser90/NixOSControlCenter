@@ -13,16 +13,7 @@
         "modesetting"  # Fallback
       ];
 
-      # Basic display settings
-      displayManager = {
-        # Use simple display manager for VMs
-        lightdm.enable = true;
-        # Default resolution
-        sessionCommands = ''
-          xrandr --output Virtual-1 --mode 1920x1080
-        '';
-      };
-    };
+
 
     # Enable SPICE agent service
     services.spice-vdagentd.enable = true;
