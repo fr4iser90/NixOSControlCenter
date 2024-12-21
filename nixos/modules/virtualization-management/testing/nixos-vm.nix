@@ -55,7 +55,7 @@ in {
     image = {
       path = mkOption {
         type = types.path;
-        default = "/var/lib/virt/testing/nixos-test.qcow2";
+        default = "/var/lib/virt/testing/images/nixos-test.qcow2";
         description = "Path to VM image";
       };
       size = mkOption {
@@ -112,12 +112,13 @@ in {
       '')
     ];
 
-    # Base directory structure with correct permissions
+    # Verzeichnisstruktur mit korrekten Berechtigungen
     systemd.tmpfiles.rules = [
       "d /var/lib/virt 0755 root root -"
       "d /var/lib/virt/testing 0775 root libvirt -"
-      "d /var/lib/virt/testing/iso 0775 root libvirt -"
-      "d /var/lib/virt/testing/vars 0775 root libvirt -"  # Für OVMF_VARS
+      "d /var/lib/virt/testing/iso 0775 root libvirt -"  # ISO-Verzeichnis
+      "d /var/lib/virt/testing/vars 0775 root libvirt -" # OVMF_VARS
+      "d /var/lib/virt/testing/images 0775 root libvirt -" # VM-Images
     ];
 
     # Network access
