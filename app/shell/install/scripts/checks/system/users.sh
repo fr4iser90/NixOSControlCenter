@@ -81,7 +81,7 @@ check_users() {
 "
             # Füge hashedPasswordFile hinzu, wenn es existiert
             if [ -f "/etc/nixos/secrets/passwords/$username/.hashedPassword" ]; then
-                user_block+="      hashedPasswordFile = \"/etc/nixos/secrets/passwords/$username/.hashedPassword\";\n"
+                user_block+="      hashedPasswordFile = \"/etc/nixos/secrets/passwords/$username/.hashedPassword\";"
             fi
 
             user_block+="    };  "
