@@ -5,7 +5,7 @@
   systemType = "desktop";
   hostName = "Gaming";
   bootloader = "systemd-boot";
-
+ 
   #
   # Profile Modules
   #
@@ -68,6 +68,7 @@
   #
   entryManagement = true;
   preflightChecks = true;
+  postflightChecks = true;
   sshManager = true;
   flakeUpdater = true;
 
