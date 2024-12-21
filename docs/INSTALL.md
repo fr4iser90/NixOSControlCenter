@@ -13,8 +13,8 @@ A brief description of what this project does and who it's for
 ## Quick Install
 1. Clone the repository
 ```
-git clone https://github.com/yourusername/nixos-control-center
-cd nixos-control-center
+git clone https://github.com/fr4iser90/NixOSControlCenter
+cd NixOSControlCenter
 ```
 
 2. Start installation environment
