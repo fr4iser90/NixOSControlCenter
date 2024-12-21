@@ -1,4 +1,4 @@
-{ config, lib, pkgs, cliTools, ... }:
+{ config, lib, pkgs, ... }:
 
 with lib;
 
@@ -68,13 +68,23 @@ in {
 
   config = mkIf cfg.enable (mkMerge [
     {
-      # Basis-Konfiguration ohne CLI-Tools
+      cli-management.categories.vm = "Virtual Machine Management";
+    }
+
+    {
+      # QEMU/KVM und SPICE Konfiguration
       virtualisation = {
-        libvirtd.enable = true;
+        libvirtd = {
+          enable = true;
+          qemu = {
+            swtpm.enable = true;
+            ovmf.enable = true;
+          };
+        };
         spiceUSBRedirection.enable = true;
       };
-      programs.virt-manager.enable = true;
 
+      # Benötigte Pakete
       environment.systemPackages = with pkgs; [
         virt-manager
         virt-viewer
@@ -86,21 +96,12 @@ in {
         OVMF
       ];
 
-      # Verzeichnisstruktur mit korrekten Berechtigungen
-      systemd.tmpfiles.rules = [
-        "d /var/lib/virt 0755 root root -"
-        "d /var/lib/virt/testing 0775 root libvirt -"
-        "d /var/lib/virt/testing/iso 0775 root libvirt -"  # ISO-Verzeichnis
-        "d /var/lib/virt/testing/vars 0775 root libvirt -" # OVMF_VARS
-        "d /var/lib/virt/testing/images 0775 root libvirt -" # VM-Images
-      ];
-
-      # Network access
+      # Firewall-Regeln für SPICE
       networking.firewall = mkIf cfg.remote.enable {
         allowedTCPPorts = [ cfg.remote.displayPort ];
       };
 
-      # User permissions
+      # Benutzerrechte
       users.groups.libvirt = {};
       security.wrappers.qemu-bridge-helper = mkForce {
         source = "${pkgs.qemu}/libexec/qemu-bridge-helper";
@@ -112,7 +113,9 @@ in {
     }
 
     {
-      environment.systemPackages = [
+      environment.systemPackages = let
+        cliTools = config.cli-management.tools;
+      in [
         (cliTools.mkCommand {
           category = "vm";
           name = "test-nixos";
@@ -143,6 +146,31 @@ in {
             create_disk
             iso_path=$(download_iso)
             start_vm "$iso_path"
+          '';
+        })
+
+        (cliTools.mkCommand {
+          category = "vm";
+          name = "test-nixos-reset";
+          description = "Reset NixOS test VM";
+          longDescription = ''
+            Removes all files associated with the NixOS test VM and prepares for fresh setup.
+          '';
+          script = ''
+            set -e
+            
+            echo "Stopping VM if running..."
+            sudo virsh destroy nixos-test 2>/dev/null || true
+            
+            echo "Removing VM from libvirt..."
+            sudo virsh undefine nixos-test --remove-all-storage 2>/dev/null || true
+            
+            echo "Cleaning up files..."
+            sudo rm -f ${cfg.image.path}
+            sudo rm -rf /var/lib/virt/testing/iso/*
+            sudo rm -rf /var/lib/virt/testing/vars/*
+            
+            echo "Reset complete. You can now run ncc-vm-test-nixos to create a fresh VM."
           '';
         })
       ];
