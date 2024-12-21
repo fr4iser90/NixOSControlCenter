@@ -18,7 +18,7 @@
     services.spice-vdagentd.enable = true;
 
     # Enable QXL and Virtio GPU support
-    hardware.opengl = {
+    hardware.graphics = {
       enable = true;
       # Basic 3D acceleration
       package = pkgs.mesa.drivers;

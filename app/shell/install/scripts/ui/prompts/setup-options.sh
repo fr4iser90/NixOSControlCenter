@@ -13,14 +13,14 @@ MAIN_OPTIONS=(
 
 # Unterkategorien direkt mit Display-Namen
 declare -A -g SUB_OPTIONS=(
-    ["Desktop"]="None|Gaming-Streaming|Gaming-Emulation|Development-Web|Development-Game"
+    ["Desktop"]="None|Gaming-Streaming|Gaming-Emulation|Development-Web|Development-Game|Development-Virtualization"
     ["Server"]="None|Docker|Database"
 )
 
 
 declare -A -g MODULE_OPTIONS=(
     ["Gaming Module"]="None|Streaming|Emulation"
-    ["Development Module"]="None|Web|Game"
+    ["Development Module"]="None|Web|Game|Virtualization"
 )
 
 # Verfügbare Optionen (Display-Namen)
@@ -33,6 +33,7 @@ SETUP_OPTIONS=(
     "Gaming-Emulation"
     "Development-Web"
     "Development-Game"
+    "Development-Virtualization"
     "Docker"
     "Database"
 )

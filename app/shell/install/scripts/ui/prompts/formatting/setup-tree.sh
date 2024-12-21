@@ -47,6 +47,7 @@ add_desktop_branch() {
     tree_ref+=("$TREE_INDENT$TREE_LAST Development")
     tree_ref+=("$TREE_INDENT   $TREE_BRANCH Development-Web")
     tree_ref+=("$TREE_INDENT   $TREE_LAST Development-Game")
+    tree_ref+=("$TREE_INDENT   $TREE_LAST Development-Virtualization")
 }
 
 add_server_branch() {

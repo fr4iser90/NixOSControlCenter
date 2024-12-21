@@ -9,6 +9,7 @@ declare -A REQUIRES=(
     ["Development"]="Desktop"
     ["Development-Web"]="Development"
     ["Development-Game"]="Development"
+    ["Development-Virtualization"]="Development"
     ["Docker"]="Server"
     ["Database"]="Server"
 )
