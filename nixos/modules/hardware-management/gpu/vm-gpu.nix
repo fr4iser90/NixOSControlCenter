@@ -30,7 +30,6 @@
     # Enable QXL and Virtio GPU support
     hardware.opengl = {
       enable = true;
-      driSupport = true;
       # Basic 3D acceleration
       package = pkgs.mesa.drivers;
     };
