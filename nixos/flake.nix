@@ -25,6 +25,7 @@
       ./modules/boot-management
       ./modules/nix-management
       ./modules/log-management
+      ./modules/cli-management
       
       # Hardware & Network
       ./modules/hardware-management

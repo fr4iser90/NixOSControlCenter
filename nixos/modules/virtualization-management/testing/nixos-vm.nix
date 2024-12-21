@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, cliTools, ... }:
 
 with lib;
 
@@ -66,74 +66,86 @@ in {
     };
   };
 
-  config = mkIf cfg.enable {
-    # Aktiviere automatisch alle Abhängigkeiten
-    virtualisation = {
-      libvirtd.enable = true;
-      spiceUSBRedirection.enable = true;
-    };
-    programs.virt-manager.enable = true;
+  config = mkIf cfg.enable (mkMerge [
+    {
+      # Basis-Konfiguration ohne CLI-Tools
+      virtualisation = {
+        libvirtd.enable = true;
+        spiceUSBRedirection.enable = true;
+      };
+      programs.virt-manager.enable = true;
 
-    # Required packages
-    environment.systemPackages = with pkgs; [
-      # GUI tools
-      virt-manager
-      virt-viewer
-      
-      # SPICE remote display
-      spice
-      spice-gtk
-      spice-protocol
-      
-      # Virtualization tools
-      qemu
-      win-virtio
-      OVMF
-      
-      # VM management script
-      (writeShellScriptBin "nixos-test-vm" ''
-        set -e
-        
-        ${libVM.mkVmScript {
-          name = "nixos-test";
-          memory = cfg.memory;
-          cores = cfg.cores;
-          image = cfg.image;
-          distro = cfg.distro;
-          variant = cfg.variant;
-          version = cfg.version;
-        }}
+      environment.systemPackages = with pkgs; [
+        virt-manager
+        virt-viewer
+        spice
+        spice-gtk
+        spice-protocol
+        qemu
+        win-virtio
+        OVMF
+      ];
 
-        # Main
-        prepare_ovmf
-        create_disk
-        iso_path=$(download_iso)
-        start_vm "$iso_path"
-      '')
-    ];
+      # Verzeichnisstruktur mit korrekten Berechtigungen
+      systemd.tmpfiles.rules = [
+        "d /var/lib/virt 0755 root root -"
+        "d /var/lib/virt/testing 0775 root libvirt -"
+        "d /var/lib/virt/testing/iso 0775 root libvirt -"  # ISO-Verzeichnis
+        "d /var/lib/virt/testing/vars 0775 root libvirt -" # OVMF_VARS
+        "d /var/lib/virt/testing/images 0775 root libvirt -" # VM-Images
+      ];
 
-    # Verzeichnisstruktur mit korrekten Berechtigungen
-    systemd.tmpfiles.rules = [
-      "d /var/lib/virt 0755 root root -"
-      "d /var/lib/virt/testing 0775 root libvirt -"
-      "d /var/lib/virt/testing/iso 0775 root libvirt -"  # ISO-Verzeichnis
-      "d /var/lib/virt/testing/vars 0775 root libvirt -" # OVMF_VARS
-      "d /var/lib/virt/testing/images 0775 root libvirt -" # VM-Images
-    ];
+      # Network access
+      networking.firewall = mkIf cfg.remote.enable {
+        allowedTCPPorts = [ cfg.remote.displayPort ];
+      };
 
-    # Network access
-    networking.firewall = mkIf cfg.remote.enable {
-      allowedTCPPorts = [ cfg.remote.displayPort ];
-    };
+      # User permissions
+      users.groups.libvirt = {};
+      security.wrappers.qemu-bridge-helper = mkForce {
+        source = "${pkgs.qemu}/libexec/qemu-bridge-helper";
+        owner = "root";
+        group = "libvirt";
+        setuid = true;
+        permissions = "u+rx,g+x";
+      };
+    }
 
-    # User permissions
-    users.groups.libvirt = {};
-    security.wrappers.qemu-bridge-helper = mkForce {
-      source = "${pkgs.qemu}/libexec/qemu-bridge-helper";
-      owner = "root";
-      group = "libvirt";
-      setuid = true;
-      permissions = "u+rx,g+x";
-    };
-  };
+    {
+      environment.systemPackages = [
+        (cliTools.mkCommand {
+          category = "vm";
+          name = "test-nixos";
+          description = "Create and manage NixOS test VMs";
+          longDescription = ''
+            Creates and manages NixOS test virtual machines with 
+            configurable settings.
+          '';
+          examples = [
+            "ncc-vm-test-nixos --memory 4096"
+            "ncc-vm-test-nixos --variant gnome"
+          ];
+          script = ''
+            set -e
+            
+            ${libVM.mkVmScript {
+              name = "nixos-test";
+              memory = cfg.memory;
+              cores = cfg.cores;
+              image = cfg.image;
+              distro = cfg.distro;
+              variant = cfg.variant;
+              version = cfg.version;
+            }}
+
+            # Main
+            prepare_ovmf
+            create_disk
+            iso_path=$(download_iso)
+            start_vm "$iso_path"
+          '';
+        })
+      ];
+    }
+  ]);
 }
