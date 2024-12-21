@@ -53,6 +53,7 @@ check_users() {
       role = \"$user_role\";
       defaultShell = \"$shell_name\";
       autoLogin = false;
+      };
 "
             # Füge hashedPasswordFile hinzu, wenn es existiert
             if [ -f "/etc/nixos/secrets/passwords/$username/.hashedPassword" ]; then
