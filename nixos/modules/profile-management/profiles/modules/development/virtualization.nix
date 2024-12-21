@@ -1,10 +1,10 @@
 # development/virtualization.nix
 { config, lib, pkgs, ... }:
 {
-    imports = [../../../../virtualization-management/testing/nixos-vm.nix];
+    imports = [../../../../virtualization-management];
 
     # Aktiviere VM mit Remote-Zugriff
-    virtualisation.nixos-vm = {
+    virtualisation.management.testing.nixos-vm = {
       enable = true;
       memory = 8192;  # 8GB RAM
       cores = 4;      # 4 Kerne
