@@ -30,6 +30,39 @@
   - [ ] Dark Mode
   - [ ] Custom Themes
 
+## System Management 🔄
+- [x] Flake Updates
+  - [x] Auto-Backup before Update
+  - [x] Error Detection
+  - [ ] Rollback Support
+- [x] System Checks
+  - [x] Pre-flight Validation
+  - [x] Post-flight Validation
+  - [x] Hardware Compatibility
+
+## Virtualization 🖥️
+- [x] Basic Container Support
+  - [x] Docker Integration
+  - [ ] Podman Support
+- [x] Virtual Machines
+  - [x] QEMU/KVM
+  - [ ] VirtualBox
+- [ ] Container Management
+  - [ ] Image Management
+  - [ ] Network Configuration
+
+## Remote Management 🌐
+- [x] SSH Configuration
+  - [x] Key Management
+  - [ ] Port Configuration
+  - [ ] Access Control
+- [ ] Remote Access
+  - [ ] Web Interface
+  - [ ] API Access
+- [ ] Security
+  - [x] Firewall Rules
+  - [ ] Fail2Ban Integration
+
 ## Package Management 
 - [ ] Package Operations
   - [ ] Search
