@@ -8,28 +8,46 @@ check_locale() {
     local keyboard_layout
     local keyboard_options
 
-    # System Locale
+    # System Locale mit Default
     system_locale=$(locale | grep LANG= | cut -d= -f2 | tr -d '"')
+    system_locale=${system_locale:-"en_US.UTF-8"}
     
-    # Timezone
+    # Timezone mit Default
     if [ -L "/etc/localtime" ]; then
         real_tz=$(readlink -f /etc/localtime)
         if echo "$real_tz" | grep -q "zoneinfo"; then
             timezone=$(echo "$real_tz" | grep -o 'zoneinfo/.*' | cut -d'/' -f2-)
         fi
     fi
+    : ${timezone:="Europe/Berlin"}  # Default Timezone wenn nicht gesetzt!
 
-    # Keyboard Layout
+    # Keyboard Layout mit Default
     if command -v localectl &> /dev/null; then
         keyboard_layout=$(localectl status | grep "X11 Layout" | cut -d: -f2 | tr -d ' ')
         keyboard_options=$(localectl status | grep "X11 Options" | cut -d: -f2 | tr -d ' ')
     fi
+    keyboard_layout=${keyboard_layout:-"us"}
 
-    # Ausgabe
+    # Ausgabe mit Hinweis auf Defaults
     log_info "System Configuration:"
-    log_info "  Locale: ${system_locale:-not set}"
-    log_info "  Timezone: ${timezone:-not set}"
-    log_info "  Keyboard Layout: ${keyboard_layout:-not set}"
+    if [ "$system_locale" = "en_US.UTF-8" ] && [ -z "$(locale | grep LANG= | cut -d= -f2 | tr -d '"')" ]; then
+        log_info "  Locale: ${system_locale} (default)"
+    else
+        log_info "  Locale: ${system_locale}"
+    fi
+
+    if [ "$timezone" = "Europe/Berlin" ] && [ ! -L "/etc/localtime" ]; then
+        log_info "  Timezone: ${timezone} (default)"
+    else
+        log_info "  Timezone: ${timezone}"
+    fi
+
+    if [ "$keyboard_layout" = "us" ] && [ -z "$(localectl status | grep "X11 Layout" | cut -d: -f2 | tr -d ' ')" ]; then
+        log_info "  Keyboard Layout: ${keyboard_layout} (default)"
+    else
+        log_info "  Keyboard Layout: ${keyboard_layout}"
+    fi
+
     [ -n "$keyboard_options" ] && log_info "  Keyboard Options: ${keyboard_options}"
 
     # Export für weitere Verarbeitung
