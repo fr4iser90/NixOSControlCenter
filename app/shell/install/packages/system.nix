@@ -14,7 +14,7 @@ with pkgs; [
   gptfdisk
   dosfstools
   ntfs3g
-  
+  fzf
   # Network-Tools
   iw
   wirelesstools
