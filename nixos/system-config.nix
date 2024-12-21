@@ -99,7 +99,7 @@
   #
   # Hosting Configuration
   #
-  email = "pa.boe90@gmail.com";
-  domain = "fr4iserhome.com";
-  certEmail = "pa.boe90@gmail.com";
+  email = "example@example.com";
+  domain = "example.com";
+  certEmail = "example@example.com";
 }
