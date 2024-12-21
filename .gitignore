@@ -3,7 +3,7 @@
 *.log
 nixos_control_center.log
 system-config.nix.backup.*
-
+build-gaming.sh
 # Virtual environments and environment variables
 # Exclude virtual environment directories and local .env files for environment-specific configurations.
 venv/

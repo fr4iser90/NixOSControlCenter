@@ -9,6 +9,35 @@ check_gpu_info() {
     local secondary_bus_id=""
     local has_dgpu=false
     local has_igpu=false
+    
+    # First check if we're running in a VM
+    if command -v systemd-detect-virt &>/dev/null; then
+        local virt_type=$(systemd-detect-virt)
+        if [ -n "$virt_type" ]; then
+            log_info "Virtual Machine detected: ${virt_type}"
+            
+            # Check for virtual GPU types
+            if lspci | grep -qi "qxl"; then
+                gpu_config="qxl-virtual"
+                primary_bus_id=$(lspci | grep -i "qxl" | cut -d' ' -f1)
+            elif lspci | grep -qi "virtio"; then
+                gpu_config="virtio-virtual"
+                primary_bus_id=$(lspci | grep -i "virtio" | cut -d' ' -f1)
+            else
+                gpu_config="basic-virtual"
+                primary_bus_id=$(lspci | grep -E "VGA|3D|Display" | cut -d' ' -f1)
+            fi
+
+            log_info "GPU Configuration:"
+            log_info "  Type: ${gpu_config}"
+            log_info "  Primary GPU Bus ID: ${primary_bus_id}"
+            
+            # Export variables and return early for VMs
+            export GPU_CONFIG="$gpu_config"
+            export GPU_PRIMARY_BUS="$primary_bus_id"
+            return 0
+        fi
+    fi
 
     if command -v lspci &> /dev/null; then
         while IFS= read -r line; do
