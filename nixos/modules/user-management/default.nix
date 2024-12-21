@@ -71,6 +71,14 @@ let
     };
   } else {};
 
+  # Lingering-Konfiguration basierend auf Rolle
+  roleLingering = {
+    virtualization = true;    # Docker/VM-User brauchen Lingering
+    admin = false;           # Admins normalerweise nicht
+    guest = false;           # Gäste definitiv nicht
+    restricted-admin = false; # Restricted Admins auch nicht
+  };
+
 in {
   imports = [ ./password-manager.nix ];
   
@@ -106,6 +114,9 @@ in {
       group = username;
       extraGroups = [ "users" ] ++ roleGroups.${userConfig.role};
       packages = rolePkgs.${userConfig.role} or [];
+      
+      # Lingering-Konfiguration
+      linger = roleLingering.${userConfig.role} or false;
       
       # WICHTIG: Erst die Passwort-Konfiguration vom Manager holen
       } // (config.security.passwordManagement.getUserPasswordConfig username userConfig) // {

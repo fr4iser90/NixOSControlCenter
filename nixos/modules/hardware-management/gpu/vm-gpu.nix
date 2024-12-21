@@ -12,8 +12,7 @@
         "virtio"
         "modesetting"  # Fallback
       ];
-
-
+    };
 
     # Enable SPICE agent service
     services.spice-vdagentd.enable = true;

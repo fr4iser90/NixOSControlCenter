@@ -28,12 +28,12 @@
   # User Management
   # 
   users = {
-    "fr4iser" = {
+    "test" = {
       role = "admin";
       defaultShell = "zsh";
       autoLogin = false;
     };
-    "botchi" = {
+    "test2" = {
       role = "admin";
       defaultShell = "zsh";
       autoLogin = false;

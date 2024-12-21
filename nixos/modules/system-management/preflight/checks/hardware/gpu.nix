@@ -1,3 +1,4 @@
+# modules/system-management/preflight/checks/hardware/gpu.nix
 { config, lib, pkgs, ... }:
 
 let
@@ -14,63 +15,64 @@ let
     
     echo "Checking GPU configuration..."
     
-    # First check if we're running in a VM
-    if command -v ${pkgs.systemd}/bin/systemd-detect-virt &> /dev/null; then
-      virt_type=$(${pkgs.systemd}/bin/systemd-detect-virt)
-      if [ -n "$virt_type" ]; then
-        echo -e "Detected Virtual Machine: ''${CYAN}$virt_type''${NC}"
+    # Initialize DETECTED with a default value
+    DETECTED="generic"
+    
+    # Debug output
+    echo "Starting GPU detection..."
+    
+    # Physical hardware detection first
+    declare -A gpu_types
+    while IFS= read -r line; do
+        bus_id=$(echo "$line" | cut -d' ' -f1)
+        vendor_id=$(${pkgs.pciutils}/bin/lspci -n -s "$bus_id" | awk '{print $3}' | cut -d':' -f1)
         
-        # Check for virtual GPU types
-        if ${pkgs.pciutils}/bin/lspci | grep -qi "qxl"; then
-          DETECTED="qxl-virtual"
-        elif ${pkgs.pciutils}/bin/lspci | grep -qi "virtio"; then
-          DETECTED="virtio-virtual"
-        else
-          DETECTED="basic-virtual"
+        case "$vendor_id" in
+            "10de") gpu_types["nvidia"]=1 ;; # NVIDIA
+            "1002") gpu_types["amd"]=1 ;;    # AMD
+            "8086") gpu_types["intel"]=1 ;;   # Intel
+        esac
+        
+        echo -e "Found GPU:"
+        echo -e "  Device   : ''${CYAN}$(echo "$line" | sed 's/.*: //')''${NC}"
+        echo -e "  Bus ID   : ''${GRAY}$bus_id''${NC}"
+        echo -e "  Vendor ID: ''${GRAY}$vendor_id''${NC}"
+    done < <(${pkgs.pciutils}/bin/lspci | grep -E "VGA|3D|Display")
+
+    # Determine GPU configuration
+    if [[ ''${gpu_types["nvidia"]-0} -eq 1 && ''${gpu_types["intel"]-0} -eq 1 ]]; then
+        DETECTED="nvidia-intel"
+    elif [[ ''${gpu_types["amd"]-0} -eq 1 && ''${gpu_types["intel"]-0} -eq 1 ]]; then
+        DETECTED="amd-intel"
+    elif [[ ''${gpu_types["nvidia"]-0} -eq 1 ]]; then
+        DETECTED="nvidia"
+    elif [[ ''${gpu_types["amd"]-0} -eq 1 ]]; then
+        DETECTED="amd"
+    elif [[ ''${gpu_types["intel"]-0} -eq 1 ]]; then
+        DETECTED="intel"
+    fi
+
+    # Only check for VM if no physical GPU was detected
+    if [ "$DETECTED" = "generic" ]; then
+        if command -v ${pkgs.systemd}/bin/systemd-detect-virt &> /dev/null; then
+            virt_type=$(${pkgs.systemd}/bin/systemd-detect-virt || echo "none")
+            echo "Virtualization check: $virt_type"
+            
+            if [ "$virt_type" != "none" ]; then
+                echo -e "Detected Virtual Machine: ''${CYAN}$virt_type''${NC}"
+                
+                # Check for virtual GPU types
+                if ${pkgs.pciutils}/bin/lspci | grep -qi "qxl"; then
+                    DETECTED="qxl-virtual"
+                elif ${pkgs.pciutils}/bin/lspci | grep -qi "virtio"; then
+                    DETECTED="virtio-virtual"
+                else
+                    DETECTED="basic-virtual"
+                fi
+                
+                echo -e "Virtual Display: ''${CYAN}$DETECTED''${NC}"
+            fi
         fi
-        
-        echo -e "Virtual Display: ''${CYAN}$DETECTED''${NC}"
-      fi
-    else
-      # Physical hardware GPU detection
-      if ! command -v ${pkgs.pciutils}/bin/lspci &> /dev/null; then
-        echo -e "''${RED}Error: lspci not found''${NC}"
-        exit 1
-      fi
-
-      # Array for found GPUs
-      declare -A gpu_types
-
-      while IFS= read -r line; do
-          bus_id=$(echo "$line" | cut -d' ' -f1)
-          vendor_id=$(${pkgs.pciutils}/bin/lspci -n -s "$bus_id" | awk '{print $3}' | cut -d':' -f1)
-          
-          case "$vendor_id" in
-              "10de") gpu_types["nvidia"]=1 ;; # NVIDIA
-              "1002") gpu_types["amd"]=1 ;;    # AMD
-              "8086") gpu_types["intel"]=1 ;;   # Intel
-          esac
-          
-          echo -e "Found GPU:"
-          echo -e "  Device   : ''${CYAN}$(echo "$line" | sed 's/.*: //')''${NC}"
-          echo -e "  Bus ID   : ''${GRAY}$bus_id''${NC}"
-          echo -e "  Vendor ID: ''${GRAY}$vendor_id''${NC}"
-      done < <(${pkgs.pciutils}/bin/lspci | grep -E "VGA|3D|Display")
-
-      # Determine GPU configuration
-      if [[ ''${gpu_types["nvidia"]-0} -eq 1 && ''${gpu_types["intel"]-0} -eq 1 ]]; then
-          DETECTED="nvidia-intel"
-      elif [[ ''${gpu_types["amd"]-0} -eq 1 && ''${gpu_types["intel"]-0} -eq 1 ]]; then
-          DETECTED="amd-intel"
-      elif [[ ''${gpu_types["nvidia"]-0} -eq 1 ]]; then
-          DETECTED="nvidia"
-      elif [[ ''${gpu_types["amd"]-0} -eq 1 ]]; then
-          DETECTED="amd"
-      elif [[ ''${gpu_types["intel"]-0} -eq 1 ]]; then
-          DETECTED="intel"
-      else
-          DETECTED="generic"
-      fi
     fi
     
     if [ ! -f /etc/nixos/system-config.nix ]; then
@@ -110,4 +112,5 @@ in {
     };
     environment.systemPackages = [ preflightScript ];
   };
-} 
+}
+
