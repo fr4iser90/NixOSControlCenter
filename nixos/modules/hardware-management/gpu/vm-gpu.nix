@@ -6,13 +6,12 @@
     services.xserver = {
       enable = true;
       
-      # Auto-detect virtual display driver
-      videoDrivers = lib.mkDefault (
-        if config.virtualisation.qemu.enable then
-          (if config.virtualisation.spiceAgent.enable then [ "qxl" ] else [ "virtio" ])
-        else
-          [ "modesetting" ]
-      );
+      # Set appropriate video driver based on detection
+      videoDrivers = [
+        "qxl"
+        "virtio"
+        "modesetting"  # Fallback
+      ];
 
       # Basic display settings
       displayManager = {
@@ -25,6 +24,8 @@
       };
     };
 
+    # Enable SPICE agent service
+    services.spice-vdagentd.enable = true;
 
     # Enable QXL and Virtio GPU support
     hardware.opengl = {
