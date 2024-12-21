@@ -22,11 +22,16 @@ let
     "vm-gpu" = ./vm-gpu.nix;                 # Für virtuelle Maschinen
     "none" = ./nvidia.nix;                     # Minimale Konfiguration
     "amd-intel" = ./intel.nix;
+    
+    # Virtual Machine configs
+    "qxl-virtual" = ./vm-gpu.nix;
+    "virtio-virtual" = ./vm-gpu.nix;
+    "basic-virtual" = ./vm-gpu.nix;
   };
 
 in {
   imports = [
-    (gpuConfigs.${systemConfig.gpu} or gpuConfigs.none)  # Default auf 'none' statt amdgpu
+    (gpuConfigs.${systemConfig.gpu} or gpuConfigs.none)
   ];
 
   assertions = [
