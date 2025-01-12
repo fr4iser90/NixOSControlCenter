@@ -1,0 +1,42 @@
+endpoints/
+├── llm/                    # LLM-bezogene Endpoints
+│   ├── chat.py            # Chat & Completion
+│   │   ├── /chat         # Basis-Chat
+│   │   ├── /chat/stream  # Streaming-Chat
+│   │   └── /complete     # Code-Completion
+│   │
+│   ├── models.py          # Modell-Management
+│   │   ├── /models       # Liste verfügbarer Modelle
+│   │   ├── /models/pull  # Neue Modelle laden
+│   │   └── /models/info  # Modell-Details
+│   │
+│   └── fine_tuning.py     # Modell-Training
+│       ├── /train        # Training starten
+│       └── /evaluate     # Modell evaluieren
+│
+├── vector/                # Vector-DB Operationen
+│   ├── store.py          # Speicher-Operationen
+│   │   ├── /store       # Daten speichern
+│   │   └── /delete      # Daten löschen
+│   │
+│   └── search.py         # Such-Operationen
+│       ├── /search      # Vektorsuche
+│       └── /similar     # Ähnlichkeitssuche
+│
+├── code/                  # Code-spezifische Endpoints
+│   ├── analysis.py       # Code-Analyse
+│   │   ├── /analyze     # Code analysieren
+│   │   └── /suggest     # Verbesserungen vorschlagen
+│   │
+│   └── git.py            # Git-Integration
+│       ├── /review      # PR Review
+│       └── /commit      # Commit-Analyse
+│
+└── system/               # System-Management
+    ├── auth.py          # Authentifizierung
+    │   ├── /login      # Login
+    │   └── /verify     # Token verifizieren
+    │
+    └── monitoring.py    # System-Monitoring
+        ├── /status     # System-Status
+        └── /metrics    # Performance-Metriken

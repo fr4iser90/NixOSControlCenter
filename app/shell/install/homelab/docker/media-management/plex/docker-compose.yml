@@ -1,0 +1,53 @@
+services:
+
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    env_file:
+      - plex.env
+    dns:
+      - 1.1.1.1
+    volumes:
+      - ./plex/library:/config
+      - ./plex/tv:/tv
+      - ./plex/movies:/movies
+    networks:
+      proxy:
+    ports:
+      # Direct access ports for local network discovery
+      - "32400:32400/tcp"
+      - "1900:1900/udp"  # DLNA
+      - "3005:3005/tcp"  # Plex Home Theater via Plex Companion
+      - "5353:5353/udp"  # Bonjour/Avahi
+      - "8324:8324/tcp"  # Roku via Plex Companion
+      - "32410:32410/udp"  # GDM network discovery
+      - "32412:32412/udp"  # GDM network discovery
+      - "32413:32413/udp"  # GDM network discovery
+      - "32414:32414/udp"  # GDM network discovery
+      - "32469:32469/tcp"  # DLNA
+    labels:
+      # Basis-Konfiguration
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      
+      # Router Konfiguration
+      - "traefik.http.routers.plex.entrypoints=websecure"
+      - "traefik.http.routers.plex.rule=Host(`plex.${DOMAIN}`)"
+      - "traefik.http.routers.plex.tls=true"
+      - "traefik.http.routers.plex.tls.certresolver=http_resolver"
+      
+      # Service Konfiguration
+      - "traefik.http.services.plex.loadbalancer.server.port=32400"
+      
+      # Middleware Chain - ANGEPASST für Plex
+      - "traefik.http.routers.plex.middlewares=default@file,admin-whitelist@file"
+      
+      # Sticky Sessions für Plex
+      - "traefik.http.services.plex.loadbalancer.sticky.cookie.httpOnly=true"
+      - "traefik.http.services.plex.loadbalancer.sticky.cookie.secure=true"
+    restart: unless-stopped
+
+networks:
+  proxy:
+    external: true
+

@@ -1,0 +1,19 @@
+# src/nixos/modules/homemanager/roles/admin.nix
+{ config, lib, pkgs, user, systemConfig, ... }:
+
+let
+  userConfig = systemConfig.users.${user};
+  shellInit = import ../shellInit/${userConfig.defaultShell}Init.nix { inherit pkgs lib; };
+in {
+  imports = [ shellInit ];
+
+  home = {
+    stateVersion = systemConfig.system.version;
+    username = user;
+    homeDirectory = "/home/${user}";
+  };
+
+  home.sessionVariables = {
+    SUDO_EDITOR = "vim";
+  };
+}

@@ -1,0 +1,81 @@
+Phase 1: ✓ (Bereits implementiert)
+✓ Docker-Setup mit Ollama
+✓ Basis GPU-Integration
+✓ Erste Web-UI
+✓ Vector Database Integration
+✓ REST-API Layer
+
+Phase 2: ✓ Training Infrastructure (Teilweise implementiert)
+✓ Hugging Face Integration
+  ✓ 🤗 Transformers Setup
+  ✓ Basis Training Pipeline
+  - Hardware Limitierungen erkannt -> Strategiewechsel
+
+Phase 2.1: Spezialisierte Modelle & RAG
+1. RAG-System Setup
+   - Verbesserte Vector DB Integration
+   - Chunking-Strategien für NixOS Docs
+   - Kontext-Management
+   - Prompt Engineering
+
+2. Spezialisierte Mini-Modelle
+   - Flake-Syntax Validator
+   - Hardware Config Assistant
+   - Package Builder Helper
+   - Service Definition Expert
+   - Modell-Kommunikations-Layer
+
+3. Agent-System
+   - Agent Orchestrierung
+   - Task Routing
+   - Ergebnis-Aggregation
+   - Fehlerbehandlung
+
+Phase 3: NixOS Spezialisierung (Angepasst)
+1. Datensammlung & Aufbereitung (Für RAG & Mini-Modelle)
+   - NixOS Konfigurationen
+   - GitHub Issues/PRs
+   - Dokumentation
+   - User Feedback
+   - Kategorisierung nach Spezialgebieten
+
+2. Knowledge Engineering
+   - Domänen-spezifische Embeddings
+   - Kontext-Templates
+   - Validierungsregeln
+   - Beispiel-Datenbank
+
+3. Integration
+   - Ollama für Inference
+   - RAG-Backend
+   - Agent-Kommunikation
+   - Monitoring
+
+Phase 4: Features & Deployment
+1. Control Center Features
+   - Config Management
+   - System Analysis
+   - Security Checks
+   - Update Management
+
+2. Deployment Pipeline
+   - Model Versioning
+   - A/B Testing
+   - Rollback Mechanismen
+   - Performance Monitoring
+
+Phase 5: Enterprise & Scale
+1. Multi-Model Support
+   - Spezialisierte Modelle
+   - Model Routing
+   - Ensemble Learning
+
+2. Security & Compliance
+   - Access Control
+   - Audit Logging
+   - Compliance Checks
+
+3. Advanced Features
+   - Team Collaboration
+   - Custom Workflows
+   - Analytics Dashboard

@@ -1,0 +1,45 @@
+services:
+
+  yourls:
+    image: yourls
+    restart: always
+    container_name: yoURLs
+    networks:
+      proxy:
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    labels:
+      # Basis-Konfiguration
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      
+      # Router Konfiguration
+      - "traefik.http.routers.yourls.entrypoints=websecure"
+      - "traefik.http.routers.yourls.rule=Host(`link.${DOMAIN}`)"
+      - "traefik.http.routers.yourls.tls=true"
+      - "traefik.http.routers.yourls.tls.certresolver=http_resolver"
+      
+      # Service Konfiguration
+      - "traefik.http.services.yourls.loadbalancer.server.port=80"
+      
+      # Maximale Sicherheit mit allen Middlewares
+      - "traefik.http.routers.yourls.middlewares=default@file,traefikAuth@file,admin-whitelist@file,rate-limit@docker"
+      
+      # Sticky Sessions
+      - "traefik.http.services.yourls.loadbalancer.sticky.cookie.httpOnly=true"
+      - "traefik.http.services.yourls.loadbalancer.sticky.cookie.secure=true"
+
+  yourls-db:
+    image: mysql
+    restart: always
+    networks:
+      proxy:
+        ipv4_address: 172.40.0.11
+    env_file: env.mysql
+    volumes:
+      - ./data:/var/lib/mysql
+
+networks:
+  proxy:
+    external: true
