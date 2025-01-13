@@ -50,9 +50,9 @@ let
   '';
 
 in {
-  imports = [
+  imports = if (systemConfig.desktop.enable or false) then [ 
     ./ssh-monitor.nix
-  ];
+  ] else [];
 
   # SSH CONFIG MIT PAM
   services.openssh = {
