@@ -1,13 +1,12 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
 {
-
-
   # Basis-Konfiguration für Homelab
   services.openssh.enable = true;
   virtualisation.docker.enable = true;
-  programs.firefox.enable = true;
-  # Optional GUI
-  services.xserver.enable = lib.mkDefault true;
+
+  # Firefox nur aktivieren, wenn Desktop aktiviert ist
+  programs.firefox.enable = systemConfig.desktop.enable or false;
+
 
 }

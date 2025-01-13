@@ -119,7 +119,6 @@ init_hardware_config() {
     sed -i \
         -e "s|@CPU@|$CPU_VENDOR|" \
         -e "s|@GPU@|$GPU_CONFIG|" \
-        -e "s|@AUDIO@|pipewire|" \
         "$temp_config"
 }
 
@@ -128,10 +127,11 @@ init_nix_config() {
     sed -i \
         -e "s|@ALLOW_UNFREE@|true|" \
         -e "s|@BUILD_LOG_LEVEL@|minimal|" \
-        -e "s|@ENTRY_MANAGEMENT@|true|" \
-        -e "s|@PREBUILD_CHECKS@|true|" \
-        -e "s|@SSH_MANAGER@|true|" \
-        -e "s|@FLAKE_UPDATER@|true|" \
+        -e "s|@ENTRY_MANAGEMENT@|false|" \
+        -e "s|@PREBUILD_CHECKS@|false|" \
+        -e "s|@SSH_CLIENT_MANAGER@|false|" \
+        -e "s|@SSH_SERVER_MANAGER@|false|" \
+        -e "s|@FLAKE_UPDATER@|false|" \
         "$temp_config"
 }
 

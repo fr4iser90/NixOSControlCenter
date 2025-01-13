@@ -3,13 +3,13 @@
 with lib;
 
 let
-  cfg = config.homelab.networking;
+  cfg = config.networking;
 in {
-  options.homelab.networking = {
-    enable = mkEnableOption "Enable homelab networking";
+  options.networking = {
+    enable = mkEnableOption "Enable container networking";
 
     networks = mkOption {
-      type = types.attrsOf config.homelab.types.networkTypes.networkConfig;
+      type = types.attrsOf types.networkConfig;
       default = {};
       description = "Container networks configuration";
     };
@@ -18,23 +18,6 @@ in {
       type = types.listOf types.str;
       default = [ "proxy" "crowdsec" ];
       description = "Default networks to create";
-    };
-
-    # Hilfsfunktionen
-    createNetwork = mkOption {
-      type = types.functionTo types.attrs;
-      default = name: settings: {
-        inherit name;
-        inherit (settings) subnet gateway;
-        attachable = settings.attachable or true;
-      };
-      description = "Helper function to create network configurations";
-    };
-
-    getNetworkConfig = mkOption {
-      type = types.functionTo types.attrs;
-      default = name: cfg.networks.${name} or null;
-      description = "Get network configuration by name";
     };
   };
 
@@ -64,7 +47,7 @@ in {
     ];
 
     # Standard-Netzwerke
-    homelab.networking.networks = mkMerge [
+    networking.networks = mkMerge [
       (mkIf (elem "proxy" cfg.defaultNetworks) {
         proxy = {
           subnet = "172.40.0.0/16";

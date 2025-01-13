@@ -3,7 +3,7 @@
 with lib;
 
 {
-  options.homelab.types = {
+  options.types = {
     containerOptions = mkOption {
       type = types.submodule {
         options = {

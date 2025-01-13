@@ -28,13 +28,16 @@ in {
       ./homelab-manager
     ] ++ lib.optionals (cfg.bootentry-manager or false) [
       ./bootentry-manager
-    ] ++ lib.optionals (cfg.ssh-manager or false) [
-      ./ssh-manager
+    ] ++ lib.optionals (cfg.ssh-client-manager or false) [
+      ./ssh-client-manager
+#      ./homelab-manager/containers
+      ./homelab-manager/container-manager
+    ] ++ lib.optionals (cfg.ssh-server-manager or false) [
+      ./ssh-server-manager
     ] ++ lib.optionals (cfg.vm-manager or false) [
       ./vm-manager
     ] ++ lib.optionals (cfg.ai-workspace or false) [
       ./ai-workspace
-#      ./homelab-manager/container-manager
     ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];

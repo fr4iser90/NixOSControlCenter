@@ -3,10 +3,10 @@
 with lib;
 
 let
-  cfg = config.homelab.monitoring;
+  cfg = config.monitoring;
 in {
-  options.homelab.monitoring = {
-    enable = mkEnableOption "Enable homelab monitoring";
+  options.monitoring = {
+    enable = mkEnableOption "Enable container monitoring";
 
     # Basis-Monitoring
     healthchecks = {

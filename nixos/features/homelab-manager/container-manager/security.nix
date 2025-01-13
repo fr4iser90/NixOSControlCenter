@@ -3,10 +3,10 @@
 with lib;
 
 let
-  cfg = config.homelab.security;
+  cfg = config.security;
 in {
-  options.homelab.security = {
-    enable = mkEnableOption "Enable homelab security management";
+  options.security = {
+    enable = mkEnableOption "Enable security management";
 
     users = mkOption {
       type = types.attrsOf (types.submodule {
@@ -67,27 +67,8 @@ in {
 
     secretsDir = mkOption {
       type = lib.types.path;
-      default = "/var/lib/homelab/secrets";
+      default = "/var/lib/secrets";
       description = "Base directory for secrets";
-    };
-
-    # Hilfsfunktionen
-    createUser = mkOption {
-      type = lib.types.functionTo lib.types.attrs;
-      default = name: settings: {
-        inherit name;
-        uid = settings.uid;
-        group = settings.group;
-        groups = settings.groups or [];
-        createSystemUser = settings.createSystemUser or true;
-      };
-      description = "Helper function to create user configurations";
-    };
-
-    getUser = mkOption {
-      type = lib.types.functionTo lib.types.attrs;
-      default = name: cfg.users.${name} or null;
-      description = "Get user configuration by name";
     };
   };
 
@@ -109,22 +90,22 @@ in {
     ) cfg.users);
 
     # Secrets Management
-    systemd.services.homelab-secrets = {
-      description = "Setup homelab secrets";
+    systemd.services.secrets-setup = {
+      description = "Setup secrets";
       wantedBy = [ "multi-user.target" ];
-      after = [ "network.target" ];  # Hinzugefügt
+      after = [ "network.target" ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
         ExecStart = let
           setupSecrets = concatStringsSep "\n" (mapAttrsToList (name: secret: ''
             mkdir -p $(dirname ${cfg.secretsDir}/${name})
-            install -m ${secret.mode} ${secret.source} ${cfg.secretsDir}/${name}  # Sicherer mit install
+            install -m ${secret.mode} ${secret.source} ${cfg.secretsDir}/${name}
             chown ${secret.owner}:${secret.group} ${cfg.secretsDir}/${name}
           '') cfg.secrets);
-        in pkgs.writeScript "setup-homelab-secrets" ''
+        in pkgs.writeScript "setup-secrets" ''
           #!${pkgs.bash}/bin/bash
-          install -d -m 700 ${cfg.secretsDir}  # Sicherer mit install
+          install -d -m 700 ${cfg.secretsDir}
           ${setupSecrets}
         '';
       };

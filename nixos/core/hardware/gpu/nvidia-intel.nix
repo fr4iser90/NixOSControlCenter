@@ -12,7 +12,7 @@ in
     modesetting.enable = true;
     nvidiaSettings = true;
     package = nvidiaPackage;
-    powerManagement.enable = true;
+#    powerManagement.enable = true;     # efi error 
     prime = {
       sync.enable = true;
       intelBusId = "PCI:0:2:0";

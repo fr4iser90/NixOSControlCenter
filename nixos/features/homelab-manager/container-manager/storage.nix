@@ -3,49 +3,28 @@
 with lib;
 
 let
-  cfg = config.homelab.storage;
+  cfg = config.storage;
 in {
-  options.homelab.storage = {
-    enable = mkEnableOption "Enable homelab storage management";
+  options.storage = {
+    enable = mkEnableOption "Enable storage management";
 
     baseDir = mkOption {
       type = types.path;
-      default = "/var/lib/homelab";
-      description = "Base directory for all homelab data";
+      default = "/var/lib/containers";
+      description = "Base directory for all container data";
     };
 
     volumes = mkOption {
-      type = types.attrsOf config.homelab.types.volumeOptions;
+      type = types.attrsOf types.volumeOptions;
       default = {};
       description = "Volume configurations";
-    };
-
-    # Hilfsfunktionen
-    createVolume = mkOption {
-      type = types.functionTo types.attrs;
-      default = name: settings: {
-        inherit name;
-        path = "${cfg.baseDir}/${name}";
-        mode = settings.mode or "0755";
-        user = settings.user or "root";
-        group = settings.group or "root";
-        backup = settings.backup or false;
-        labels = settings.labels or {};
-      };
-      description = "Helper function to create volume configurations";
-    };
-
-    getVolumePath = mkOption {
-      type = types.functionTo types.str;
-      default = name: "${cfg.baseDir}/${name}";
-      description = "Get full path for a volume";
     };
   };
 
   config = mkIf cfg.enable {
     # Basis-Verzeichnisse erstellen
-    systemd.services.homelab-storage-init = {
-      description = "Initialize homelab storage directories";
+    systemd.services.container-storage-init = {
+      description = "Initialize container storage directories";
       wantedBy = [ "multi-user.target" ];
       serviceConfig = {
         Type = "oneshot";
@@ -56,7 +35,7 @@ in {
             chown ${volume.user}:${volume.group} ${volume.path}
             chmod ${volume.mode} ${volume.path}
           '') cfg.volumes);
-        in pkgs.writeScript "init-homelab-storage" ''
+        in pkgs.writeScript "init-container-storage" ''
           #!${pkgs.bash}/bin/bash
           mkdir -p ${cfg.baseDir}
           ${createDirs}
@@ -65,8 +44,8 @@ in {
     };
 
     # Backup-Service für Volumes mit backup = true
-    systemd.services.homelab-volume-backup = mkIf (any (v: v.backup) (attrValues cfg.volumes)) {
-      description = "Backup homelab volumes";
+    systemd.services.volume-backup = mkIf (any (v: v.backup) (attrValues cfg.volumes)) {
+      description = "Backup container volumes";
       startAt = "daily";
       serviceConfig = {
         Type = "oneshot";
@@ -79,17 +58,12 @@ in {
               ls -t ${cfg.baseDir}/backups/${name}/backup-*.tar.gz | tail -n +8 | xargs rm -f
             ''
           ) cfg.volumes);
-        in pkgs.writeScript "backup-homelab-volumes" ''
+        in pkgs.writeScript "backup-container-volumes" ''
           #!${pkgs.bash}/bin/bash
           mkdir -p ${cfg.baseDir}/backups
           ${backupDirs}
         '';
       };
-    };
-
-    # Standard-Volumes
-    homelab.storage.volumes = {
-      # Hier könnten Standard-Volumes definiert werden
     };
   };
 }

@@ -49,6 +49,7 @@
     theme = {
       dark = @DARK_MODE@;             # [true/false]
     };
+    audio = "pipewire";
   };
 
   #
@@ -57,8 +58,6 @@
   hardware = {
     cpu = "@CPU@";
     gpu = "@GPU@";
-    audio = "@AUDIO@";
-    # Weitere Hardware-Konfigurationen
   };
 
   #
@@ -74,7 +73,8 @@
     system-logger = false;     
     system-checks = @SYSTEM_CHECKS@;      
     system-updater = false;    
-    ssh-manager = @SSH_MANAGER@;        
+    ssh-client-manager = @SSH_CLIENT_MANAGER@;
+    ssh-server-manager = @SSH_SERVER_MANAGER@;        
     bootentry-manager = false; 
     homelab-manager = @HOMELAB_MANAGER@;    
     vm-manager = false;         

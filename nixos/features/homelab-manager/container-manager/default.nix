@@ -9,28 +9,28 @@
     ./types.nix
   ];
 
-  options.homelab = {
-    enable = lib.mkEnableOption "Homelab container management";
+  options.containerManager = {
+    enable = lib.mkEnableOption "Container management";
     
     dataDir = lib.mkOption {
       type = lib.types.path;
-      default = "/var/lib/homelab";
-      description = "Base directory for homelab data";
+      default = "/var/lib/containers";
+      description = "Base directory for container data";
     };
   };
 
-  config = lib.mkIf config.homelab.enable {
+  config = lib.mkIf config.containerManager.enable {
     # Basis-Setup
-    systemd.services.homelab-init = {
-      description = "Initialize homelab directory structure";
+    systemd.services.container-init = {
+      description = "Initialize container directory structure";
       wantedBy = [ "multi-user.target" ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        ExecStart = pkgs.writeScript "init-homelab" ''
+        ExecStart = pkgs.writeScript "init-containers" ''
           #!${pkgs.bash}/bin/bash
-          mkdir -p ${config.homelab.dataDir}
-          chmod 755 ${config.homelab.dataDir}
+          mkdir -p ${config.containerManager.dataDir}
+          chmod 755 ${config.containerManager.dataDir}
         '';
       };
     };
@@ -38,7 +38,10 @@
     # Aktiviere Podman
     virtualisation.podman = {
       enable = true;
-      dockerCompat = true;  # Optional: Docker-Kompatibilitäts-Layer
+      dockerCompat = true;
     };
+
+    # Stelle sicher, dass Podman vor den Container-Services startet
+    systemd.services.container-init.after = [ "podman.service" ];
   };
 }

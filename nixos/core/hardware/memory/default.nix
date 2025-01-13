@@ -1,58 +1,67 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
-{
+let
+  memoryInGB = systemConfig.hardware.memory.sizeGB or 32;  # Default to 32GB if not set
+
+
+  # Automatic configuration based on available RAM
+  memoryConfig = 
+    if memoryInGB >= 64 then {
+      swappiness = 5;      # Minimal swap usage for high-memory systems
+      zramPercent = 15;    # Small zram since plenty of RAM available
+      tmpfsPercent = 75;   # Large tmpfs allocation possible
+      minFreeKb = 524288;  # Reserve 512MB for system operations
+    } else if memoryInGB >= 32 then {
+      swappiness = 10;     # Low swap usage for good-memory systems
+      zramPercent = 25;    # Moderate zram compression
+      tmpfsPercent = 75;   # Large tmpfs allocation possible
+      minFreeKb = 262144;  # Reserve 256MB for system operations
+    } else if memoryInGB >= 16 then {
+      swappiness = 30;     # Balanced swap usage
+      zramPercent = 35;    # Higher zram to compensate for less RAM
+      tmpfsPercent = 50;   # Moderate tmpfs allocation
+      minFreeKb = 131072;  # Reserve 128MB for system operations
+    } else {
+      swappiness = 60;     # Aggressive swap usage for low-memory systems
+      zramPercent = 50;    # Maximum zram compression
+      tmpfsPercent = 25;   # Conservative tmpfs allocation
+      minFreeKb = 65536;   # Reserve 64MB for system operations
+    };
+in {
   boot = {
+    # Kernel parameters for memory management
     kernelParams = [
-      "memory_corruption_check=1"
-      "page_alloc.shuffle=1"
+      "memory_corruption_check=1"  # Enable memory corruption detection
+      "page_alloc.shuffle=1"       # Improve memory allocation distribution
     ];
 
+    # Kernel sysctl settings for memory management
     kernel.sysctl = {
-      # Anpassen je nach RAM:
-      # 8GB:  vm.swappiness = 60
-      # 16GB: vm.swappiness = 30
-      # 32GB: vm.swappiness = 10
-      # 64GB: vm.swappiness = 5
-      "vm.swappiness" = 10;
-      
-      "vm.vfs_cache_pressure" = 50;
-      "vm.dirty_background_ratio" = 5;
-      "vm.dirty_ratio" = 10;
-
-      # Anpassen je nach RAM:
-      # 8GB:  65536    (64MB)
-      # 16GB: 131072   (128MB)
-      # 32GB: 262144   (256MB)
-      # 64GB: 524288   (512MB)
-      "vm.min_free_kbytes" = 262144;
+      "vm.swappiness" = memoryConfig.swappiness;          # Control swap aggressiveness
+      "vm.vfs_cache_pressure" = 50;                       # Balance inode/dentry cache
+      "vm.dirty_background_ratio" = 5;                    # Start background writeback at 5%
+      "vm.dirty_ratio" = 10;                              # Force synchronous writeback at 10%
+      "vm.min_free_kbytes" = memoryConfig.minFreeKb;      # Minimum free memory reserve
     };
   };
 
-  # zram Konfiguration
+  # zram configuration for compressed swap in RAM
   zramSwap = {
     enable = true;
-    algorithm = "zstd";
-    # Anpassen je nach RAM:
-    # 8GB:  50%
-    # 16GB: 35%
-    # 32GB: 25%
-    # 64GB: 15%
-    memoryPercent = 25;
+    algorithm = "zstd";                        # Use zstd compression algorithm
+    memoryPercent = memoryConfig.zramPercent;  # Dynamic zram size based on RAM
   };
 
-  # Temporäre Dateien im RAM
-  boot.tmp.useTmpfs = true;
-  # Anpassen je nach RAM:
-  # 8GB:  25%
-  # 16GB: 50%
-  # 32GB: 75%
-  # 64GB: 75%
-  boot.tmp.tmpfsSize = "75%";
+  # Temporary files storage in RAM
+  boot.tmp = {
+    useTmpfs = true;                                          # Enable tmpfs for /tmp
+    tmpfsSize = "${toString memoryConfig.tmpfsPercent}%";     # Dynamic tmpfs size
+  };
 
+  # Early OOM (Out Of Memory) killer configuration
   services.earlyoom = {
-    enable = true;
-    enableNotifications = true;
-    # Für alle Systeme okay
-    freeMemThreshold = 5;
+    enable = true;                     # Enable early OOM detection
+    enableNotifications = true;        # Show notifications when OOM occurs
+    freeMemThreshold = 5;              # Trigger at 5% free memory
   };
 }

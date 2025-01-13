@@ -58,6 +58,7 @@
     theme = {
       dark = true;
     };
+    audio = "pipewire";
   };
 
   #
@@ -66,8 +67,9 @@
   hardware = {
     cpu = "intel";
     gpu = "amd";
-    audio = "pipewire";
-    # Weitere Hardware-Konfigurationen
+    memory = {
+      sizeGB = 32;
+    };
   };
 
   #
@@ -83,7 +85,8 @@
     system-logger = false;      # Optional
     system-checks = false;      # Optional
     system-updater = false;     # Optional
-    ssh-manager = false;        # Optional
+    ssh-client-manager = false; # Optional
+    ssh-server-manager = false; # Optional
     bootentry-manager = false;  # Optional
     homelab-manager = false;    # Optional
     vm-manager = false;         # Optional
