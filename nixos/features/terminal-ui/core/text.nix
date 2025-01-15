@@ -47,6 +47,19 @@ with lib;
     printf '%*s\n' "$width" " " | tr ' ' '-'
   '';
 
+  # Basic text components
+  normal = text: ''
+    printf '%b\n' "${colors.reset}${text}${colors.reset}"
+  '';
+
+  newline = ''
+    printf '\n'
+  '';
+
+  error = text: ''
+    printf '%b\n' "${colors.red}${text}${colors.reset}"
+  '';
+
   tables = {
     keyValue = key: value: ''
       printf '%b\n' "  ${colors.cyan}${key}${colors.reset}: ${value}"
