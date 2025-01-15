@@ -4,6 +4,9 @@
   environment.systemPackages = with pkgs; [
     # Development
     vscode
+    nodejs
+    gcc
+    libgcc
     code-cursor
     git
     git-credential-manager
