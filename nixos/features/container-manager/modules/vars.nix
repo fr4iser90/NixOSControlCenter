@@ -3,6 +3,7 @@
 with lib;
 
 let
+  types = lib.types;
   # Variable type definitions
   varTypes = {
     string = types.str;
@@ -70,7 +71,10 @@ in {
     description = "Centralized container environment variable definitions";
   };
 
-  config = {
-    containerManager.vars = containerVars;
-  };
+  options.containerManager.varTypes = mkOption {
+  type    = types.attrsOf types.anything;  # or similar
+  default = varTypes;                      # from your let binding
+  description = "All our custom variable types";
+};
+
 }

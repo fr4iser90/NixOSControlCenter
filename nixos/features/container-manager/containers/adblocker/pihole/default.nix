@@ -9,14 +9,13 @@ let
 in {
   imports = [
     ./config.nix
-    ./pihole.nix
+    ./container.nix
     ./vars.nix
   ];
-  
+
   services.pihole = {
     enable = true;
     subdomain = "pihole";
     domain = "example.com";
-    security.secrets.webpassword.source = "/path/to/your/webpassword/file";
   };
 }

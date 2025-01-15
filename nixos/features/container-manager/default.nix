@@ -4,7 +4,7 @@ with lib;
 
 let
   # Import container variables
-  containerVars = import ./container-vars.nix { inherit lib pkgs; };
+  containerVars = import ./modules/vars.nix { inherit lib config types pkgs; };
 
   # Finde alle Benutzer mit virtualization Rolle
   virtUsers = lib.filterAttrs 
@@ -38,13 +38,14 @@ let
       );
 in {
   imports = [
-    ./networking.nix
-    ./storage.nix
-    ./security.nix
-    ./monitoring.nix
-    ./types.nix
-    ./scripts
-    ./container-vars.nix
+    ./modules/networking.nix
+    ./modules/storage.nix
+    ./modules/security.nix
+    ./modules/monitoring.nix
+    ./modules/types.nix
+    ./modules/vars.nix
+    ./modules/crud
+    ./containers
   ];
 
   options.containerManager = {

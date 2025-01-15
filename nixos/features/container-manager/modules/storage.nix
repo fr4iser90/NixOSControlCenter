@@ -59,7 +59,7 @@ in {
   };
 
   config = mkIf cfg.enable {
-    # Define Pi-hole volumes
+
     storage.volumes = {
       "pihole/etc-pihole" = {
         path = "${cfg.baseDir}/pihole/etc-pihole";
