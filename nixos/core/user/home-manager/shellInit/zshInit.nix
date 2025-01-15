@@ -37,6 +37,9 @@
     };
 
     initExtra = ''
+      # Disable NOMATCH behavior
+      setopt NO_NOMATCH
+      
       # Aliases
       export MANPAGER='nvim +Man!'
       
