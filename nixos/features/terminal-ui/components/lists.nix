@@ -23,4 +23,9 @@ with lib;
   in ''
     printf '%b\n' "  ${mark} ${item}"
   '') items;
+
+  # Unordered list with color support
+  unordered = color: items: concatMapStrings (item: ''
+    printf '%b\n' "${color}  • ${item}${colors.reset}"
+  '') items;
 }
