@@ -67,25 +67,28 @@ let
 in {
   config = {
     environment.systemPackages = [ prebuildScript ];
-    features.command-center.commands.userCheck = {
-      name = "check-users";
-      category = "system-checks";
-      description = "Check user configuration before system rebuild";
-      script = prebuildScript;
-      shortHelp = "check-users - Verify user configuration";
-      longHelp = ''
-        Check user configuration before system rebuild
-        
-        Checks:
-        - Current vs configured users
-        - User passwords
-        - Password directories
-        - System cleanup for removed users
-        
-        Interactive: Yes (for password management)
-      '';
-      interactive = true;
-      dependencies = [ "system-checks" ];
-    };
+    features.command-center.commands = [
+      {
+        name = "check-users";
+        category = "system-checks";
+        description = "Check user configuration before system rebuild";
+        script = "${prebuildScript}/bin/prebuild-check-users";
+        shortHelp = "check-users - Verify user configuration";
+        longHelp = ''
+          Check user configuration before system rebuild
+          
+          Checks:
+          - Current vs configured users
+          - User passwords
+          - Password directories
+          - System cleanup for removed users
+          
+          Interactive: Yes (for password management)
+        '';
+        interactive = true;
+        dependencies = [ "system-checks" ];
+      }
+      # Weitere Befehle können hier hinzugefügt werden
+    ];
   };
 }
