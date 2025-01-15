@@ -1,74 +1,113 @@
 { config, lib, pkgs, ... }:
 
 let
+  # Zugriff auf die Terminal-UI-API
   ui = config.features.terminal-ui.api;
+
+  # Befehle aus der Konfiguration
   cfg = config.features.command-center;
 
-  # Hauptscript
+  # Generiert Case-Blöcke für Befehlsausführung
+  generateExecCase = cmd: ''
+    ${cmd.name})
+      exec "${cmd.script}" "$@"
+      ;;
+  '';
+
+  # Generiert Case-Blöcke für detaillierte Hilfe
+  generateLongHelpCase = cmd: ''
+    ${cmd.name})
+      echo "${cmd.longHelp}"
+      ;;
+  '';
+
+  # Dynamische Inhalte vorbereiten
+  caseBlock = lib.concatMapStringsSep "\n  " generateExecCase cfg.commands;
+  commandLongHelp = lib.concatMapStringsSep "\n  " generateLongHelpCase cfg.commands;
+  commandList = lib.concatMapStringsSep "\n" (cmd: '' "  ${cmd.name} - ${cmd.description}"'') cfg.commands;
+  validCommands = lib.concatStringsSep " " (map (cmd: cmd.name) cfg.commands);
+
+  # Hauptskript für ncc
   mainScript = pkgs.writeScriptBin "ncc" ''
-    #!${pkgs.bash}/bin/bash
-    
-    # Hilfe anzeigen
+    #!/usr/bin/env bash
+
+    # Hilfefunktion anzeigen
     function show_help() {
       ${ui.text.header "NixOS Control Center"}
-      echo "Usage: ncc <command> [arguments]"
-      echo ""
-      echo "Commands:"
-      ${builtins.concatStringsSep "\n" (map (cmd: 
-        "  ${cmd.name} - ${cmd.description}"
-      ) (builtins.attrValues cfg.commands))}
+      ${ui.text.normal "Usage: ncc <command> [arguments]"}
+      ${ui.text.normal "       ncc help <command>"}
+      ${ui.text.newline}
+      ${ui.text.subHeader "Available commands:"}
+      echo "${commandList}"
+      ${ui.text.newline}
+      ${ui.text.normal "Use 'ncc help <command>' for more details on a specific command."}
     }
 
-    # Befehl ausführen
-    function run_command() {
+    # Detaillierte Hilfe für Befehle anzeigen
+    function show_command_help() {
       local cmd="$1"
-      shift
-      
-      if [ -z "$cmd" ]; then
+      if [[ -z "$cmd" ]]; then
         show_help
-        exit 1
+        exit 0
       fi
-
       case "$cmd" in
-        ${builtins.concatStringsSep "\n        " (map (name: 
-          "${name})
-            exec ${toString (lib.getAttr name cfg.commands).script} \"$@\"
-            ;;"
-        ) (builtins.attrNames cfg.commands))}
+        ${commandLongHelp}
         *)
-          ${ui.messages.error "Unknown command: $cmd"}
+          ${ui.badges.error "Unknown command '$cmd'"}
+          ${ui.text.newline}
+          show_help
           exit 1
           ;;
       esac
     }
 
+    # Hauptfunktion für Befehle
+    function run_command() {
+      local cmd="$1"
+      shift
+      if [[ -z "$cmd" ]]; then
+        show_help
+        exit 0
+      fi
+      case "$cmd" in
+        help)
+          show_command_help "$1"
+          ;;
+        ${caseBlock}
+        *)
+          ${ui.badges.error "Unknown command '$cmd'"}
+          ${ui.text.newline}
+          show_help
+          exit 1
+          ;;
+      esac
+    }
+
+    # Einstiegspunkt
     run_command "$@"
   '';
 
-  # Symlinks für alternative Namen
+  # Alternativen für den Hauptbefehl erstellen
   nixcc = pkgs.writeScriptBin "nixcc" ''
-    #!${pkgs.bash}/bin/bash
+    #!/usr/bin/env bash
     exec ${mainScript}/bin/ncc "$@"
   '';
-
   nixctl = pkgs.writeScriptBin "nixctl" ''
-    #!${pkgs.bash}/bin/bash
+    #!/usr/bin/env bash
     exec ${mainScript}/bin/ncc "$@"
   '';
-
   nix-center = pkgs.writeScriptBin "nix-center" ''
-    #!${pkgs.bash}/bin/bash
+    #!/usr/bin/env bash
     exec ${mainScript}/bin/ncc "$@"
   '';
-
   nix-control = pkgs.writeScriptBin "nix-control" ''
-    #!${pkgs.bash}/bin/bash
+    #!/usr/bin/env bash
     exec ${mainScript}/bin/ncc "$@"
   '';
 
 in {
   config = {
-    environment.systemPackages = [ 
+    environment.systemPackages = [
       mainScript   # Hauptbefehl
       nixcc        # Alternative Namen
       nixctl
