@@ -123,7 +123,7 @@ let
     
     ${ui.messages.success "Update completed successfully!"}
     ${ui.tables.keyValue "Backup created in" "$BACKUP_DIR"}
-    ${ui.messages.info "You can now run 'sudo check-and-build switch --flake /etc/nixos#HostName' to apply changes."}
+    ${ui.messages.info "You can now run 'sudo ncc-build switch --flake /etc/nixos#HostName' to apply changes."}
   '';
 
 in {
