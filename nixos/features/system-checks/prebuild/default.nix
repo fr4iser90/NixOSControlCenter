@@ -2,7 +2,8 @@
 
 let
   ui = config.features.terminal-ui.api;
-  checkScript = pkgs.writeScriptBin "check-and-build" ''
+
+  checkScript = pkgs.writeScriptBin "build" ''
     #!${pkgs.bash}/bin/bash
     
     # Trap für CTRL+C
@@ -10,7 +11,7 @@ let
 
     # Show usage if no arguments
     if [ $# -eq 0 ]; then
-      ${ui.messages.info "Usage: check-and-build <command> [options]"}
+      ${ui.messages.info "Usage: build <command> [options]"}
       ${ui.messages.info "Commands: switch, boot, test, build"}
       ${ui.messages.info "Options: --force (Skip checks)"}
       exit 1
@@ -81,11 +82,13 @@ in {
 
   config = {
     # Command Center Registration
-    features.command-center.commands.build = {
+    features.command-center.commands = [
+    {
       name = "build";
       category = "system";
       description = "Build and activate NixOS configuration with safety checks";
-      script = checkScript;
+#      script = checkScript;
+      script = "${checkScript}/bin/build";
       arguments = [
         "switch"
         "boot"
@@ -108,8 +111,9 @@ in {
       '';
       interactive = true;
       dependencies = [ "system-checks" ];
-    };
-
+    }
+    ];
     environment.systemPackages = [ checkScript ];
   };
+  
 }
