@@ -20,17 +20,6 @@ let
     guest = [];  # Basis-Guest-Pakete
   };
 
-  # Environment-Variablen basierend auf Rolle
-#  roleEnv = {
-#    virtualization = {
-#      EMAIL = "${systemConfig.email}";
-#      DOMAIN = "${systemConfig.domain}";
-#      CERTEMAIL = "${systemConfig.certEmail}";
-#      DOCKER_CONFIG = "$HOME/.docker";
-#      DOCKER_BUILDKIT = "1";
-#    };
-#  };
-
   # Sudo-Regeln basierend auf Rolle
   makeSudoRules = username: role: 
     if role == "admin" then [{
@@ -146,13 +135,4 @@ in {
     fish.enable = lib.any (user: systemConfig.users.${user}.defaultShell == "fish") 
       (builtins.attrNames systemConfig.users);
   };
-
-  # Environment-Variablen für spezifische Rollen
-#  environment.sessionVariables = lib.mkMerge (
-#    lib.mapAttrsToList (username: userConfig: 
-#      if roleEnv ? ${userConfig.role} 
-#      then roleEnv.${userConfig.role} 
-#      else {}
-#    ) systemConfig.users
-#  );
-}
+} 
