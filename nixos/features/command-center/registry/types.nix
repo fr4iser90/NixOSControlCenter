@@ -17,7 +17,7 @@
       };
 
       script = lib.mkOption {
-        type = lib.types.package;
+        type = lib.types.path;
         description = "Executable script for this command";
       };
 
