@@ -76,6 +76,7 @@
     ssh-client-manager = @SSH_CLIENT_MANAGER@;
     ssh-server-manager = @SSH_SERVER_MANAGER@;        
     bootentry-manager = false; 
+    container-manager = false;  
     homelab-manager = @HOMELAB_MANAGER@;    
     vm-manager = false;         
     ai-workspace = false;       
