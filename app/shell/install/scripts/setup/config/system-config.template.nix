@@ -71,10 +71,10 @@
   #
   features = {
     system-logger = false;     
-    system-checks = @SYSTEM_CHECKS@;      
+    system-checks = false;      
     system-updater = false;    
-    ssh-client-manager = @SSH_CLIENT_MANAGER@;
-    ssh-server-manager = @SSH_SERVER_MANAGER@;        
+    ssh-client-manager = false;
+    ssh-server-manager = false;        
     bootentry-manager = false; 
     container-manager = false;  
     homelab-manager = @HOMELAB_MANAGER@;    
