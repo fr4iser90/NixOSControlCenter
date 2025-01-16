@@ -77,7 +77,7 @@
     ssh-server-manager = false;        
     bootentry-manager = false; 
     container-manager = false;  
-    homelab-manager = @HOMELAB_MANAGER@;    
+    homelab-manager = false;    
     vm-manager = false;         
     ai-workspace = false;       
   };
