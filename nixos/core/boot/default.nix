@@ -22,6 +22,7 @@ in {
       systemd.enable = true;
       includeDefaultModules = true;
     };
+    kernelPackages = pkgs.linuxPackages_latest;
   };
 
   assertions = [
