@@ -3,10 +3,10 @@
 let
   # Gruppen basierend auf Rolle
   roleGroups = {
-    admin = [ "wheel" "networkmanager" "docker" "video" "audio" "render" "input" "seat" ];
+    admin = [ "wheel" "networkmanager" "docker" "podman" "video" "audio" "render" "input" "seat" ];
     guest = [ "networkmanager" ];
     restricted-admin = [ "wheel" "networkmanager" "video" "audio" ];
-    virtualization = [ "docker" "libvirtd" "kvm" ];  # Neue Rolle für Docker/VM-User
+    virtualization = [ "docker" "podman" "libvirtd" "kvm" ];  # Neue Rolle für Docker/VM-User
   };
 
   # User-spezifische Pakete basierend auf Rolle
@@ -84,6 +84,7 @@ in {
         wheel = {};
         networkmanager = {};
         docker = {};
+        podman = {};
         video = {};
         audio = {};
         render = {};
