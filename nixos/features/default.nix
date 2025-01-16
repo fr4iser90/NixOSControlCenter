@@ -29,10 +29,10 @@ in {
     ] ++ lib.optionals (cfg.system-logger or false) [
       ./system-logger
     ] ++ lib.optionals (cfg.container-manager or false && !(cfg.homelab-manager or false)) [
-      ./container-manager
+      ./container-manager/podman
     ] ++ lib.optionals (cfg.homelab-manager or false) [
       ./homelab-manager
-      ./container-manager
+      ./container-manager/podman
     ] ++ lib.optionals (cfg.bootentry-manager or false) [
       ./bootentry-manager
     ] ++ lib.optionals (cfg.ssh-client-manager or false) [
