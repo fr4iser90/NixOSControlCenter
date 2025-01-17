@@ -1,17 +1,6 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  # Finde alle Benutzer mit virtualization Rolle
-  virtUsers = lib.filterAttrs 
-    (name: user: user.role == "virtualization") 
-    systemConfig.users;
-
-  # Prüfe ob wir Virtualisierungsbenutzer haben
-  hasVirtUsers = (lib.length (lib.attrNames virtUsers)) > 0;
-
-  # Hole den ersten Virtualisierungsbenutzer, falls vorhanden
-  virtUser = lib.head (lib.attrNames virtUsers);
-
   homelab-fetch = pkgs.writeScriptBin "homelab-fetch" ''
     #!${pkgs.bash}/bin/bash
     
@@ -74,9 +63,8 @@ let
 
 
 in {
-  # Nur Pakete installieren wenn es einen Virtualisierungsbenutzer gibt
-  environment.systemPackages = if hasVirtUsers then [
+  environment.systemPackages = [
     homelab-fetch
     pkgs.git
-  ] else [];
+  ];
 }
