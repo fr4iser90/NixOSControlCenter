@@ -6,6 +6,12 @@ system-config.nix.backup.*
 build-gaming.sh
 ./continue
 ./continue/config.json
+
+nixos/custom/
+!nixos/custom/default.nix
+!nixos/custom/template.nix
+!nixos/custom/README.md
+
 # Virtual environments and environment variables
 # Exclude virtual environment directories and local .env files for environment-specific configurations.
 venv/
@@ -43,6 +49,7 @@ tmp/
 *.tmp
 *.bak
 *.old
+*.log
 
 # Build artifacts
 # If you build distributions (e.g., wheels, eggs), exclude these directories/files.
