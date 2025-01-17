@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Roadmap Tracker
+Comment=Multi-Roadmap Tracking Application
+Exec=/home/fr4iser/Documents/Projects/NixOsControlCenter-main/nixos/features/tracker/tracker_ui.py
+Icon=tracker
+Type=Application
+Categories=Utility;ProjectManagement;
+Keywords=roadmap;tracker;project;management;
