@@ -14,8 +14,12 @@ let
     (cfg.ssh-manager or false)
     (cfg.vm-manager or false)
     (cfg.ai-workspace or false)
+    (cfg.tracker or false)
   ];
 
+  # Prüfe ob der systemType auf homelab gesetzt ist
+  isHomelabSystem = (systemConfig.systemType or "") == "homelab";
+  
 in {
   # Terminal-UI wird automatisch geladen, wenn Features aktiv sind
   imports = lib.optionals hasActiveFeatures [ 
@@ -43,6 +47,8 @@ in {
       ./vm-manager
     ] ++ lib.optionals (cfg.ai-workspace or false) [
       ./ai-workspace
+    ] ++ lib.optionals (cfg.tracker or false) [
+      ./tracker
     ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
