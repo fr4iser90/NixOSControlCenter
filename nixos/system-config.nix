@@ -92,6 +92,7 @@
     homelab-manager = false;    # Optional
     vm-manager = false;         # Optional
     ai-workspace = false;       # Optional
+    tracker = true;
   };
 
   #
