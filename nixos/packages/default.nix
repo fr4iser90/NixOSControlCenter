@@ -13,7 +13,7 @@ let
   basePackages = {
     desktop = import ./base/desktop.nix;
     server = import ./base/server.nix;
-    homelab = import ./custom/homelab.nix;
+    homelab = import ./base/homelab.nix;
   };
 
   # Extract active modules from systemConfig
