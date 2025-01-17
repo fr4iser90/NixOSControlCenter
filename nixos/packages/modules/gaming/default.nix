@@ -7,6 +7,7 @@
     gamemode
     lutris
     wine
+    bottles-unwrapped
     # Communication
     vesktop
     noisetorch
@@ -18,8 +19,6 @@
     audacity
     jellyfin-media-player
     owncloud-client
-    # KDE
-    kdePackages.kdeconnect-kde
   ];
 
   programs.steam.enable = true;
