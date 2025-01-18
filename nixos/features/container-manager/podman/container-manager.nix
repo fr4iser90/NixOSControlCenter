@@ -8,7 +8,6 @@ in {
   imports = [ 
     ./modules/container-options.nix
     ./modules/container-implementation.nix
-    ./containers
   ];
 
   options.containerManager = {
@@ -108,16 +107,6 @@ in {
       };
     };
 
-    users.users.podman = {
-      isSystemUser = true;
-      subUidRanges = [ { startUid = 100000; count = 65536; } ];
-      subGidRanges = [ { startGid = 100000; count = 65536; } ];
-      home = "/var/lib/podman";
-      group = "podman";
-      createHome = true;
-      shell = pkgs.bashInteractive;
-    };
-
     system.activationScripts.podman-setup = let
       podmanDataDir = "/var/lib/podman/.local/share/containers";
     in ''
@@ -157,7 +146,5 @@ in {
         StandardError = "journal";
       };
     };
-
-    users.groups.podman = {};
   };
 }
