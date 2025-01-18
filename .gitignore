@@ -7,7 +7,10 @@ build-gaming.sh
 ./continue
 ./continue/config.json
 
-nixos/custom/
+# Exclude everything in the nixos/custom/ directory...
+nixos/custom/**
+
+# ...but explicitly allow specific files to be tracked
 !nixos/custom/default.nix
 !nixos/custom/template.nix
 !nixos/custom/README.md
