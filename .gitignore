@@ -12,7 +12,6 @@ nixos/custom/**
 
 # ...but explicitly allow specific files to be tracked
 !nixos/custom/default.nix
-!nixos/custom/template.nix
 !nixos/custom/README.md
 
 # Virtual environments and environment variables
