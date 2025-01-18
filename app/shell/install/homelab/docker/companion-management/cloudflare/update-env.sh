@@ -75,7 +75,7 @@ store_service_credentials "$SERVICE_NAME" "$CF_API_EMAIL" "$CF_TOKEN"
 
 # Update environment file
 new_values=(
-    "CF_EMAIL:$CF_API_EMAIL"
+    "#CF_EMAIL:$CF_API_EMAIL"
     "#CF_API_KEY:$CF_API_KEY"
     "CF_TOKEN:$CF_TOKEN"
     "DOMAIN1_ZONE_ID:$CF_ZONE_ID"
