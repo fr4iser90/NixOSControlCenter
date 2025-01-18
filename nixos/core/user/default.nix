@@ -93,6 +93,7 @@ in {
         libvirtd = {};
         kvm = {};
       }
+      
       # Erstelle Gruppen für jeden Benutzer
       (lib.mapAttrs (name: _: {}) systemConfig.users)
     ];
@@ -136,4 +137,4 @@ in {
     fish.enable = lib.any (user: systemConfig.users.${user}.defaultShell == "fish") 
       (builtins.attrNames systemConfig.users);
   };
-} 
+}
