@@ -12,6 +12,7 @@
     tmux
     tree
     fzf
-    bottles-unwrapped
+    
+
   ];
 }
