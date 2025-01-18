@@ -1,51 +1,43 @@
-### Custom Import
+# NixOS Custom Configuration
 
-Just add .nix files in here, default is importing all files.
+This directory contains custom NixOS configurations that are automatically imported via `default.nix`. 
 
-# kde-connect.nix
+## Usage
+
+1. Add `.nix` files to this directory
+2. The configurations will be automatically imported and applied
+3. Files are imported in alphabetical order
+
+## Examples
+
+The following examples demonstrate how to create custom configurations:
+
+### KDE Connect Configuration (kde-connect.nix)
+```nix
 { config, lib, pkgs, ... }:
 
 {
   environment.systemPackages = with pkgs; [
-    # KDE Connect Basis
     kdePackages.kdeconnect-kde
-    
-    # Screen Sharing und Remote-Zugriff
-    kdePackages.krfb   # KDE Remote Desktop
-    kdePackages.krdc   # KDE Remote Desktop Client
+    kdePackages.krfb
+    kdePackages.krdc
     kdePackages.plasma-browser-integration
     kdePackages.qtwebengine
-    
-    # Multimedia-Integration
-#    kdePackages.plasma-pa  # Pulseaudio-Integration
-    
-    # Netzwerk-Tools
     kdePackages.plasma-firewall
     kdePackages.plasma-nm
     kdePackages.kdenetwork-filesharing
-    
-    # Benachrichtigungen und System-Integration
     kdePackages.plasma-systemmonitor
     kdePackages.plasma-workspace
     kdePackages.knotifications
-    
-    # Bluetooth-Unterstützung
     kdePackages.bluedevil
     bluez
   ];
 
-  # XDG Portal Konfiguration
   xdg.portal = {
     enable = true;
-    extraPortals = with pkgs; [
-      xdg-desktop-portal-kde
-    ];
+    extraPortals = [ pkgs.xdg-desktop-portal-kde ];
     config = {
-      common = {
-        default = ["kde"];
-        preferred = ["kde"];
-      };
-      # Spezifische Portal-Konfigurationen
+      common.default = ["kde"];
       kde = {
         default = ["kde"];
         "org.freedesktop.impl.portal.Secret" = ["kde"];
@@ -54,65 +46,45 @@ Just add .nix files in here, default is importing all files.
     };
   };
 
-  # Bluetooth Hardware Support
-  hardware.bluetooth = {
-    enable = true;
-    powerOnBoot = true;
-  };
+  hardware.bluetooth.enable = true;
+  services.dbus.packages = [ pkgs.kdePackages.kdeconnect-kde ];
+  networking.firewall.allowedTCPPortRanges = [ { from = 1714; to = 1764; } ];
+  networking.firewall.allowedUDPPortRanges = [ { from = 1714; to = 1764; } ];
+}
+```
 
-  # DBus und System-Services
-  services = {
-    # DBus Konfiguration
-    dbus = {
-      enable = true;
-      packages = [ pkgs.kdePackages.kdeconnect-kde ];
-    };
-    # Avahi für Netzwerk-Discovery
-    avahi = {
-      enable = true;
-      nssmdns4 = true;
-      publish = {
-        enable = true;
-        addresses = true;
-        userServices = true;
-      };
-    };
-  };
+### NoiseTorch Configuration (noisetorch.nix)
+```nix
+{ config, lib, pkgs, ... }:
 
-  # Firewall-Regeln für KDE Connect
-  networking.firewall = {
-    allowedTCPPortRanges = [
-      { from = 1714; to = 1764; }  # KDE Connect
-    ];
-    allowedUDPPortRanges = [
-      { from = 1714; to = 1764; }  # KDE Connect
-    ];
-  };
-
-  # Environment-Variablen
-  environment.sessionVariables = {
-    # Desktop-Integration
-    XDG_CURRENT_DESKTOP = "KDE";
-    XDG_SESSION_DESKTOP = "KDE";
-    
-    # KDE Connect spezifische Variablen
-    KDECONNECT_ENABLE_NOTIFICATIONS = "true";
-    KDECONNECT_ENABLE_CLIPBOARD = "true";
-  };
-
-  # Systemd User Service
-  systemd.user.services.kdeconnect = {
-    description = "KDE Connect";
-    wantedBy = [ "default.target" ];
-    after = [ "network.target" "graphical-session.target" ];
-    serviceConfig = {
-      ExecStart = "${pkgs.kdePackages.kdeconnect-kde}/bin/kdeconnect-indicator";
-      Restart = "on-failure";
-      RestartSec = "5s";
-      Environment = [
-        "QT_QPA_PLATFORM=wayland;xcb"
-        "XDG_CURRENT_DESKTOP=KDE"
-      ];
-    };
+{
+  environment.systemPackages = [ pkgs.noisetorch ];
+  
+  security.wrappers.noisetorch = {
+    owner = "root";
+    group = "root";
+    capabilities = "cap_sys_resource+ep";
+    source = "${pkgs.noisetorch}/bin/noisetorch";
   };
 }
+```
+
+## Import System
+
+The `default.nix` file automatically imports all `.nix` files in this directory:
+
+```nix
+let
+  currentDir = toString ./.;
+  nixFiles = builtins.attrNames (lib.filterAttrs 
+    (_: v: lib.hasSuffix ".nix" v) 
+    (builtins.readDir currentDir));
+  
+  imports = map (file: currentDir + "/${file}") nixFiles;
+in
+{
+  imports = if nixFiles == [] then [] else imports;
+}
+```
+
+> Note: Files are imported in alphabetical order. Use proper naming if configuration order matters.
