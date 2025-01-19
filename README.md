@@ -106,6 +106,14 @@ For complete project structure, see [PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTUR
 - **CI/CD**: Planned
 - **Docker to Nix**: Planned
 
+## Support the Project
+
+If you find this project useful, please consider supporting its development:
+
+[![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.me/SupportMySnacks)
+
+Your support helps cover development costs and keeps the project actively maintained.
+
 ## License
 
 This project is licensed under the terms of the [LICENSE](LICENSE) file.
