@@ -1,60 +1,37 @@
 # Project Structure
 
 ```tree
-
+# Main Project Structure
 NixOsControlCenter/
-├── app/
-│ ├── modules/ # App-specific modules
-│ ├── nix/ # App-specific Nix configurations
-│ ├── python/ # Python application
-│ │ ├── assets/ # Resources (icons, images, themes)
-│ │ ├── src/ # Source code
-│ │ ├── tests/ # Test suites
-│ │ └── ui/ # UI definitions
-│ └── shell/ # Shell environments
-│ ├── dev/ # Development environment
-│ └── install/ # Installation environment
+├── app/                     # Application components
+│   ├── modules/             # Application-specific modules
+│   ├── python/              # Python GUI application
+│   │   ├── src/             # Source code
+│   │   │   ├── backend/     # Backend services and logic
+│   │   │   ├── frontend/    # Frontend components and UI
+│   │   │   └── config/      # Configuration management
+│   │   ├── tests/           # Test suites
+│   │   └── ui/              # UI definitions and assets
+│   └── shell/               # Shell environments
+│       ├── dev/             # Development environment setup
+│       └── install/         # Installation environment setup
 │
-├── docs/ # Documentation
-│ ├── DEVELOPMENT.md
-│ ├── INSTALL.md
-│ ├── PROJECT_STRUCTURE.md
-│ └── USAGE.md
+├── docs/                    # Project documentation
+│   ├── DEVELOPMENT.md       # Development setup guide
+│   ├── INSTALL.md           # Installation instructions
+│   ├── USAGE.md             # User manual
+│   └── PROJECT_STRUCTURE.md # This document
 │
-├── nixos/ # NixOS configuration
-│ ├── modules/ # System modules
-│ │ ├── core/ # Core system functionality
-│ │ │ ├── boot/ # Boot and bootloader management
-│ │ │ ├── hardware/ # Hardware configuration
-│ │ │ ├── network/ # Network configuration
-│ │ │ ├── system/ # System management
-│ │ │ └── user/ # User management
-│ │ │
-│ │ ├── desktop/ # Desktop environment
-│ │ │ ├── audio/ # Audio configuration
-│ │ │ ├── display-managers/
-│ │ │ ├── display-servers/
-│ │ │ ├── environments/
-│ │ │ └── themes/ # Visual customization
-│ │ │
-│ │ └── services/ # System services
-│ │ ├── cli/ # Command-line tools
-│ │ ├── homelab/ # Homelab configuration
-│ │ ├── log/ # Logging system
-│ │ ├── ssh/ # SSH configuration
-│ │ └── virtualization/ # VM and container management
-│ │
-│ ├── packages/ # System packages and profiles
-│ │ ├── base/ # Base system configurations
-│ │ ├── custom/ # Custom configurations
-│ │ └── modules/ # Package modules
-│ │
-│ ├── local/ # Local overrides
-│ ├── flake.nix # Main Nix flake
-│ └── system-config.nix # System configuration
+├── nixos/                   # NixOS configuration management
+│   ├── core/                # Core system configuration
+│   ├── desktop/             # Desktop environment setup
+│   ├── features/            # Feature modules
+│   ├── packages/            # Package collections
+│   ├── flake.nix            # Main Nix flake configuration
+│   └── system-config.nix    # System-wide configuration
 │
-├── CHANGELOG.md
-├── dev-shell.nix # Development shell configuration
-├── install-shell.nix # Installation shell configuration
-├── LICENSE
-└── README.md
+├── CHANGELOG.md             # Project changelog
+├── dev-shell.nix            # Development shell setup
+├── install-shell.nix        # Installation shell setup
+├── LICENSE                  # Project license
+└── README.md                # Main project documentation

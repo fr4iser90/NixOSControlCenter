@@ -1,34 +1,111 @@
 # NixOS Control Center
 
-A tool for managing packages, configurations, and devices on NixOS systems.
+A comprehensive tool for managing packages, configurations, and devices on NixOS systems with a focus on reproducibility and declarative configurations. Quick install desktop, server or whole homelab setup in less then 5 Minutes.
 
 > ⚠️ EXPERIMENTAL: This project is under active development
 
-## Quick Start
+## Key Features
 
-- [Installation Guide](docs/INSTALL.md)
-- [Development Setup](docs/DEVELOPMENT.md)
-- [User Manual](docs/USAGE.md)
+- **System Configuration Management**: Declarative system configuration through Nix expressions
+- **Package Management**: Unified package management interface
+- **Device Management**: Hardware configuration and monitoring
+- **Modular Architecture**: Extensible through Nix modules
+- **Development Environment**: Integrated development shell with all dependencies
 
-## Project Status
+## Installation
 
-- GUI: In Development
-- Documentation: In Progress
-- Testing: In Progress
-- CI/CD: Planned
-- Docker to Nix: Planned
+### System Requirements
+- NixOS (tested on 24.11)
+- systemd-boot
+- Supported GPUs: AMD, Intel, NVIDIA-Intel
 
-## Hardware Compatibility
+### Quick Install
+```bash
+git clone https://github.com/fr4iser90/NixOSControlCenter
+cd NixOSControlCenter
+sudo nix-shell install-shell.nix
+install
+```
 
-✅ AMD GPU
-✅ Intel GPU
-✅ NVIDIA-Intel GPU
-✅ systemd-boot
+For detailed installation instructions, see [INSTALL.md](docs/INSTALL.md)
+
+## Development Setup
+
+1. Start development shell:
+```bash
+nix-shell dev-shell.nix
+```
+
+2. Available commands:
+```bash
+show-help
+```
+
+For more details, see [DEVELOPMENT.md](docs/DEVELOPMENT.md)
 
 ## Project Structure
 
-[See Project Structure](docs/PROJECT_STRUCTURE.md)
+The project is organized into these main components:
+
+- **app/**: Main application code
+  - `modules/`: App-specific modules
+  - `python/`: Python application
+    - `src/`: Source code
+      - `backend/`: Backend services and models
+      - `config/`: Configuration files
+      - `frontend/`: Frontend components
+    - `tests/`: Test suites
+    - `ui/`: UI definitions and components
+  - `shell/`: Shell environments
+    - `dev/`: Development environment
+    - `install/`: Installation environment
+
+- **docs/**: Project documentation
+  - `DEVELOPMENT.md`: Development setup
+  - `INSTALL.md`: Installation guide
+  - `PROJECT_STRUCTURE.md`: Detailed structure
+  - `USAGE.md`: Usage instructions
+
+- **nixos/**: NixOS configurations
+  - `core/`: Core system functionality
+    - `boot/`: Bootloader configuration
+    - `hardware/`: Hardware-specific settings
+    - `network/`: Network configuration
+    - `system/`: System management
+    - `user/`: User management
+  - `desktop/`: Desktop environment
+    - `audio/`: Audio configuration
+    - `display-managers/`: Display managers
+    - `display-servers/`: Display servers
+    - `environments/`: Desktop environments
+    - `themes/`: Visual customization
+  - `features/`: System features
+    - `ai-workspace/`: AI development tools
+    - `container-manager/`: Container management
+    - `homelab-manager/`: Homelab configuration
+    - `ssh-client-manager/`: SSH client management
+    - `system-checks/`: System validation
+  - `packages/`: System packages
+    - `base/`: Base system packages
+    - `modules/`: Package modules
+
+For complete project structure, see [PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)
+
+## Hardware Compatibility
+
+✅ AMD GPU  
+✅ Intel GPU  
+✅ NVIDIA-Intel GPU  
+✅ systemd-boot  
+
+## Project Status
+
+- **GUI**: In Development
+- **Documentation**: In Progress
+- **Testing**: In Progress
+- **CI/CD**: Planned
+- **Docker to Nix**: Planned
 
 ## License
 
-[License Information](LICENSE)
+This project is licensed under the terms of the [LICENSE](LICENSE) file.
