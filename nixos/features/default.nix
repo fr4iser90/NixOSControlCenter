@@ -47,8 +47,6 @@ in {
       ./vm-manager
     ] ++ lib.optionals (cfg.ai-workspace or false) [
       ./ai-workspace
-    ] ++ lib.optionals (cfg.tracker or false) [
-      ./tracker
     ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];

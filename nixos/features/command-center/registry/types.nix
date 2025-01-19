@@ -69,6 +69,59 @@
         default = false;
         description = "Whether the command needs user interaction";
       };
+
+      # System updater specific options
+      autoBuild = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Whether to automatically build after updates";
+      };
+
+      updateSources = lib.mkOption {
+        type = lib.types.listOf (lib.types.submodule {
+          options = {
+            name = lib.mkOption {
+              type = lib.types.str;
+              description = "Source name";
+            };
+            url = lib.mkOption {
+              type = lib.types.str;
+              description = "Source URL";
+            };
+            branches = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = ["main"];
+              description = "Available branches";
+            };
+          };
+        });
+        default = [];
+        description = "Available update sources";
+      };
+
+      backupSettings = lib.mkOption {
+        type = lib.types.submodule {
+          options = {
+            enabled = lib.mkOption {
+              type = lib.types.bool;
+              default = true;
+              description = "Whether to create backups";
+            };
+            retention = lib.mkOption {
+              type = lib.types.int;
+              default = 5;
+              description = "Number of backups to keep";
+            };
+            directory = lib.mkOption {
+              type = lib.types.str;
+              default = "/var/backup/nixos";
+              description = "Backup directory path";
+            };
+          };
+        };
+        default = {};
+        description = "Backup configuration settings";
+      };
     };
   };
 }

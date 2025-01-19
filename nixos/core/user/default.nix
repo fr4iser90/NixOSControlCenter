@@ -40,9 +40,9 @@ let
     }]
     else [];  # Keine sudo-Rechte für andere Rollen
 
-  # Automatisches Autologin für den ersten Admin-User
+  # Automatisches Autologin für den ersten restricted-Admin-User
   autoLoginUser = lib.findFirst 
-    (user: systemConfig.users.${user}.role == "admin" && systemConfig.users.${user}.autoLogin)
+    (user: systemConfig.users.${user}.role == "restricted-admin" && systemConfig.users.${user}.autoLogin)
     null
     (builtins.attrNames systemConfig.users);
 
