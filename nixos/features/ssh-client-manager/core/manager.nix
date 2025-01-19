@@ -42,6 +42,27 @@ let
             --prompt="Select a server: " \
             --header="Available servers"
     }
+
+    delete_server() {
+        local servers_list="$(load_saved_servers)"
+        local selected="$(select_server "$servers_list")"
+        
+        # Skip if Add new server was selected
+        if [[ "$selected" == "Add new server" ]]; then
+            ${ui.messages.warning "No server selected for deletion."}
+            return
+        fi
+        
+        # Extract IP from selection
+        local ip_to_delete="$(echo "$selected" | awk '{print $1}')"
+        
+        # Remove server from .creds
+        local temp_file="$(mktemp)"
+        grep -v "^$ip_to_delete=" "$CREDS_FILE" > "$temp_file"
+        mv "$temp_file" "$CREDS_FILE"
+        
+        ${ui.messages.success "Server $ip_to_delete successfully deleted."}
+    }
   '';
 in {
   options = {

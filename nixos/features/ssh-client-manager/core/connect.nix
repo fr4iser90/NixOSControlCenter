@@ -34,11 +34,25 @@ let
 
     connect_server() {
         local servers_list; servers_list=$(load_saved_servers)
-
+        local options=("Connect to server" "Add new server" "Delete server")
+        
         ${ui.messages.loading "Loading saved servers..."}
+        
+        local action; action=$(printf '%s\n' "''${options[@]}" | ${pkgs.fzf}/bin/fzf \
+            --prompt="Select action: " \
+            --header="SSH Manager")
+
+        if [[ -z "$action" ]]; then
+            ${ui.messages.error "No action selected"}
+            exit 0
+        fi
+
+        if [[ "$action" == "Delete server" ]]; then
+            delete_server
+            exit 0
+        fi
 
         local choice; choice=$(select_server "$servers_list")
-
         local server
         local username
 
