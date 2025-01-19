@@ -5,8 +5,8 @@ let
   connectScript = pkgs.writeScriptBin "ssh-manager" ''
     #!${pkgs.bash}/bin/bash
     
-    # Trap für CTRL+C
-    trap '${ui.messages.error "Operation abgebrochen"}; exit 0' INT
+    # Trap for CTRL+C
+    trap '${ui.messages.error "Operation cancelled"}; exit 0' INT
     
     ${config.services.ssh-manager.utils}
 
@@ -43,14 +43,23 @@ let
         local username
 
         if [[ -z "$choice" ]]; then
-            ${ui.messages.error "Keine Server-Auswahl getroffen"}
+            ${ui.messages.error "No server selected"}
             exit 0
         fi
 
         if [[ "$choice" == "Add new server" ]]; then
-            server=$(get_user_input "$(${ui.prompts.prompt "Enter server IP/hostname"})")
-            username=$(get_user_input "$(${ui.prompts.prompt "Enter username"})")
+            ${ui.messages.info "Adding new server"}
+            read -p "Enter server IP/hostname: " server
+            read -p "Enter username: " username
+            
+            if [[ -z "$server" || -z "$username" ]]; then
+                ${ui.messages.error "Server and username are required"}
+                exit 1
+            fi
+            
+            ${ui.messages.loading "Saving new server..."}
             save_new_server "$server" "$username"
+            ${ui.messages.success "Server saved successfully"}
         else
             server=$(echo "$choice" | cut -d' ' -f1)
             username=$(echo "$choice" | cut -d'(' -f2 | cut -d')' -f1)
@@ -72,7 +81,7 @@ let
         fi
     }
 
-    # Hauptprogramm
+    # Main program
     if ! command -v ${pkgs.fzf}/bin/fzf &> /dev/null; then
         ${ui.messages.error "fzf not found. Please install fzf to use this script."}
         exit 1
