@@ -32,6 +32,57 @@ show_status() {
     echo -e "${BLUE}=====================${NC}\n"
 }
 
+# Confirm action
+confirm_action() {
+    local message=$1
+    echo -e "${YELLOW}$message [y/N]${NC}"
+    read -p "" confirm
+    [[ "$confirm" =~ ^[Yy]$ ]]
+}
+
+# Mount menu
+mount_menu() {
+    while true; do
+        clear
+        echo -e "${BLUE}=== Mount Management ===${NC}"
+        echo -e "1) Mount Partitions"
+        echo -e "2) Unmount Partitions"
+        echo -e "3) Check Mount Status"
+        echo -e "4) Back to Main Menu"
+        echo -e "${BLUE}=======================${NC}"
+        
+        read -p "Select option: " mount_choice
+        
+        case $mount_choice in
+            1)
+                if confirm_action "Are you sure you want to mount partitions?"; then
+                    mount_partitions && bind_mounts
+                fi
+                ;;
+            2)
+                if confirm_action "Are you sure you want to unmount partitions?"; then
+                    unmount_partitions
+                fi
+                ;;
+            3)
+                if is_mounted; then
+                    echo -e "${GREEN}Partitions are mounted${NC}"
+                else
+                    echo -e "${RED}Partitions are not mounted${NC}"
+                fi
+                ;;
+            4)
+                break
+                ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                ;;
+        esac
+        
+        read -p "Press Enter to continue..."
+    done
+}
+
 # Main menu
 main_menu() {
     while true; do
@@ -41,7 +92,7 @@ main_menu() {
         echo -e "${BLUE}========================================${NC}"
         show_status
         echo -e "1) Run System Checks"
-        echo -e "2) Mount/Unmount Partitions"
+        echo -e "2) Manage Partitions"
         echo -e "3) Backup System"
         echo -e "4) Rebuild System"
         echo -e "5) Manage SSH Daemon"
@@ -54,11 +105,12 @@ main_menu() {
         
         case $choice in
             1)
-                run_checks
+                if confirm_action "Run system checks?"; then
+                    run_checks
+                fi
                 ;;
             2)
-                mount_partitions
-                bind_mounts
+                mount_menu
                 ;;
             3)
                 read -p "Enter backup directory: " backup_dir
@@ -68,14 +120,24 @@ main_menu() {
                 read -p "Choice: " backup_mode
                 
                 case $backup_mode in
-                    1) backup_menu "$backup_dir" "essential" ;;
-                    2) backup_menu "$backup_dir" "full" ;;
+                    1) 
+                        if confirm_action "Create essential backup?"; then
+                            backup_menu "$backup_dir" "essential"
+                        fi
+                        ;;
+                    2)
+                        if confirm_action "Create full system backup?"; then
+                            backup_menu "$backup_dir" "full"
+                        fi
+                        ;;
                     *) echo "Invalid choice" ;;
                 esac
                 ;;
             4)
-                if run_checks && mount_partitions && bind_mounts; then
-                    full_rebuild
+                if confirm_action "Rebuild system configuration?"; then
+                    if run_checks; then
+                        full_rebuild
+                    fi
                 fi
                 ;;
             5)
@@ -94,9 +156,21 @@ main_menu() {
                     read -p "Select option: " ssh_choice
                     
                     case $ssh_choice in
-                        1) start_sshd ;;
-                        2) stop_sshd ;;
-                        3) restart_sshd ;;
+                        1) 
+                            if confirm_action "Start SSH daemon?"; then
+                                start_sshd
+                            fi
+                            ;;
+                        2)
+                            if confirm_action "Stop SSH daemon?"; then
+                                stop_sshd
+                            fi
+                            ;;
+                        3)
+                            if confirm_action "Restart SSH daemon?"; then
+                                restart_sshd
+                            fi
+                            ;;
                         4) check_sshd_status ;;
                         5) configure_sshd ;;
                         6) enable_sshd ;;
@@ -145,9 +219,7 @@ main_menu() {
                 read -p ""
                 ;;
             8)
-                echo -e "${YELLOW}Are you sure you want to exit? [y/N]${NC}"
-                read -p "" confirm_exit
-                if [[ "$confirm_exit" =~ ^[Yy]$ ]]; then
+                if confirm_action "Are you sure you want to exit?"; then
                     echo -e "${GREEN}Exiting...${NC}"
                     exit 0
                 fi
@@ -161,39 +233,5 @@ main_menu() {
     done
 }
 
-# Initialize rescue system
-initialize_rescue() {
-    # Check if running in chroot
-    if [ "$(stat -c %d:%i /)" != "$(stat -c %d:%i /proc/1/root/.)" ]; then
-        echo "Running in chroot environment"
-        return 0
-    fi
-    
-    # Run initial checks
-    if ! run_checks; then
-        echo "System checks failed"
-        return 1
-    fi
-    
-    # Mount partitions
-    if ! mount_partitions; then
-        echo "Failed to mount partitions"
-        return 1
-    fi
-    
-    # Set bind mounts
-    if ! bind_mounts; then
-        echo "Failed to set bind mounts"
-        return 1
-    fi
-    
-    return 0
-}
-
 # Start rescue system
-if initialize_rescue; then
-    main_menu
-else
-    echo "Rescue system initialization failed"
-    exit 1
-fi
+main_menu

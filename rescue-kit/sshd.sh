@@ -26,7 +26,19 @@ start_sshd() {
     # Set root password if not set
     if ! grep -q '^root:' /etc/shadow; then
         echo -e "${YELLOW}Setting temporary root password${NC}"
-        echo "root:temppass" | chpasswd
+        TEMP_PASS="temp$(openssl rand -base64 6 | tr -dc 'a-zA-Z0-9')"
+        if echo "root:$TEMP_PASS" | chpasswd; then
+            echo -e "${GREEN}Password set successfully${NC}"
+            echo -e "${YELLOW}Temporary root password: $TEMP_PASS${NC}"
+        else
+            echo -e "${RED}Failed to set password, trying fallback${NC}"
+            if echo "root:temppass123" | chpasswd; then
+                echo -e "${YELLOW}Using fallback password: temppass123${NC}"
+            else
+                echo -e "${RED}Critical: Failed to set any root password${NC}"
+                return 1
+            fi
+        fi
     fi
     
     # Configure authorized_keys if provided
