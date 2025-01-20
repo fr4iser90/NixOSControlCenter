@@ -1,131 +1,64 @@
 #!/bin/bash
 
-# Configure SSH daemon
-configure_sshd() {
-    log "Configuring SSH daemon..."
-    
-    # Create backup of current config
-    cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
-    
-    # Apply secure defaults
-    sed -i 's/#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
-    sed -i 's/#PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
-    sed -i 's/#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-    
-    log "SSH configuration updated"
-}
+# Simplified SSH setup for live USB environment
+# Designed for temporary remote access during system reinstallation
 
-# Start SSH daemon
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Basic configuration
+SSH_PORT=22
+AUTHORIZED_KEYS=""
+
+# Start SSH service
 start_sshd() {
-    log "Starting SSH daemon..."
+    echo -e "${YELLOW}=== Starting SSH Service ===${NC}"
     
-    if ! systemctl start sshd; then
-        log "Error: Failed to start SSH daemon"
-        return 1
+    # Check if SSH is already running
+    if pgrep sshd >/dev/null; then
+        echo -e "${YELLOW}SSH is already running${NC}"
+        return 0
     fi
     
-    log "SSH daemon started successfully"
-    return 0
-}
-
-# Stop SSH daemon
-stop_sshd() {
-    log "Stopping SSH daemon..."
-    
-    if ! systemctl stop sshd; then
-        log "Error: Failed to stop SSH daemon"
-        return 1
+    # Set root password if not set
+    if ! grep -q '^root:' /etc/shadow; then
+        echo -e "${YELLOW}Setting temporary root password${NC}"
+        echo "root:temppass" | chpasswd
     fi
     
-    log "SSH daemon stopped successfully"
-    return 0
-}
-
-# Check SSH status
-check_sshd_status() {
-    log "Checking SSH daemon status..."
-    
-    if ! systemctl status sshd; then
-        log "Error: SSH daemon is not running"
-        return 1
+    # Configure authorized_keys if provided
+    if [ -n "$AUTHORIZED_KEYS" ]; then
+        echo -e "${YELLOW}Configuring SSH authorized_keys${NC}"
+        mkdir -p /root/.ssh
+        echo "$AUTHORIZED_KEYS" > /root/.ssh/authorized_keys
+        chmod 700 /root/.ssh
+        chmod 600 /root/.ssh/authorized_keys
     fi
     
-    log "SSH daemon is running"
-    return 0
-}
-
-# Restart SSH daemon
-# Completely stops and then starts the SSH service
-# Use this when you need to ensure a clean state
-restart_sshd() {
-    log "Restarting SSH daemon..."
-    
-    if ! systemctl restart sshd; then
-        log "Error: Failed to restart SSH daemon"
+    # Start SSH service
+    echo -e "${YELLOW}Starting SSH service...${NC}"
+    if /usr/sbin/sshd -p $SSH_PORT; then
+        echo -e "${GREEN}SSH service started successfully on port $SSH_PORT${NC}"
+        echo -e "${YELLOW}You can now connect via:${NC}"
+        echo -e "  ssh root@$(hostname -I | awk '{print $1}')"
+        return 0
+    else
+        echo -e "${RED}Failed to start SSH service${NC}"
         return 1
     fi
-    
-    log "SSH daemon restarted successfully"
-    return 0
 }
 
-# Reload SSH configuration
-# Applies configuration changes without interrupting existing connections
-# Use this after modifying sshd_config to apply changes
-reload_sshd() {
-    log "Reloading SSH configuration..."
-    
-    if ! systemctl reload sshd; then
-        log "Error: Failed to reload SSH configuration"
-        return 1
+# Main function
+main() {
+    if [ "$(id -u)" != "0" ]; then
+        echo -e "${RED}This script must be run as root${NC}"
+        exit 1
     fi
     
-    log "SSH configuration reloaded successfully"
-    return 0
+    start_sshd
 }
 
-# Enable SSH on boot
-enable_sshd() {
-    log "Enabling SSH daemon on boot..."
-    
-    if ! systemctl enable sshd; then
-        log "Error: Failed to enable SSH daemon"
-        return 1
-    fi
-    
-    log "SSH daemon enabled on boot"
-    return 0
-}
-
-# Main SSH management function
-manage_sshd() {
-    local action=$1
-    
-    case $action in
-        start)
-            start_sshd
-            ;;
-        stop)
-            stop_sshd
-            ;;
-        restart)
-            restart_sshd
-            ;;
-        status)
-            check_sshd_status
-            ;;
-        reload)
-            reload_sshd
-            ;;
-        enable)
-            enable_sshd
-            ;;
-        configure)
-            configure_sshd
-            ;;
-        *)
-            log "Invalid SSH action: $action"
-            return 1
-            ;;
-    esac
-}
+main "$@"

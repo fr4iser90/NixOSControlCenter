@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# This script should be sourced from rescue.sh, not run directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    echo "ERROR: This script is designed to be sourced from rescue.sh"
+    echo "Please run the main rescue script instead:"
+    echo "  sudo ./rescue.sh"
+    exit 1
+fi
+
 # Detect and suggest partitions
 detect_partitions() {
     log "Detecting partitions..."
