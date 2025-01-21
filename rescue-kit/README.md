@@ -9,20 +9,67 @@ A modular rescue system for NixOS providing essential recovery, backup, and syst
 - **Backup System**: Create essential or full system backups
 - **System Rebuild**: Rebuild NixOS configuration
 - **Remote Access**: Start SSH daemon for remote management
+- **Interactive UI**: User-friendly terminal interface with menus and prompts
 
 ## Script Structure
 
 ```
 rescue-kit/
-├── config.sh        # Shared configuration and utilities
 ├── rescue.sh        # Main entry point and menu
-├── mount.sh         # Partition mounting functions
-├── checks.sh        # System verification functions
-├── backup.sh        # Backup operations
-├── rebuild.sh       # System rebuild functions
-├── sshd.sh          # SSH daemon management
+├── modules/         # Core system modules
+│   ├── config.sh    # Shared configuration and utilities
+│   ├── mount.sh     # Partition mounting functions
+│   ├── checks.sh    # System verification functions
+│   ├── backup.sh    # Backup operations
+│   ├── rebuild.sh   # System rebuild functions
+│   ├── sshd.sh      # SSH daemon management
+│   ├── repair.sh    # System repair functions
+│   └── handlers/    # Module-specific handlers
+│       ├── backup/
+│       ├── checks/
+│       ├── config/
+│       ├── mount/
+│       ├── rebuild/
+│       ├── repair/
+│       └── sshd/
+├── utils/           # Utility functions
+│   ├── imports.sh   # Module imports
+│   ├── logging.sh   # Logging utilities
+│   └── ui/          # User interface components
+│       ├── base.sh  # Core UI functions and constants
+│       ├── display.sh # Text formatting and display utilities
+│       ├── menus.sh # Menu navigation and selection
+│       └── prompts.sh # User input handling and prompts
 └── README.md        # Documentation
 ```
+
+## UI Components
+
+The rescue kit includes a robust terminal UI framework with these components:
+
+### base.sh
+- Defines core UI constants and functions
+- Handles terminal initialization and cleanup
+- Provides color definitions and formatting helpers
+
+### display.sh
+- Text formatting and alignment utilities
+- Progress bars and status indicators
+- Section headers and dividers
+- Error and success message displays
+
+### menus.sh
+- Interactive menu navigation
+- Single and multi-select menus
+- Keyboard controls (arrows, enter, space)
+- Menu theming and customization
+
+### prompts.sh
+- Text input with validation
+- Password input with confirmation
+- Yes/No confirmation dialogs
+- File selection prompts
+- Numeric input with range validation
 
 ## Usage
 
@@ -40,12 +87,14 @@ Edit `config.sh` to set:
 - Mount directory
 - Backup directory
 - Log file location
+- UI color scheme
 
 ## Requirements
 
 - Bash shell
 - Root privileges
 - NixOS system
+- Terminal supporting ANSI escape codes
 
 ## License
 

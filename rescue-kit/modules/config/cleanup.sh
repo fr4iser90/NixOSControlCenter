@@ -1,33 +1,5 @@
 #!/bin/bash
 
-# Configuration variables
-ROOT_PART="/dev/nvme0n1p2"
-BOOT_PART="/dev/nvme0n1p1"
-MOUNT_DIR="/mnt"
-BACKUP_DIR="/backup"
-LOG_FILE="/var/log/rescue-kit.log"
-
-# Logging function
-log() {
-    local message=$1
-    local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-    echo "[$timestamp] $message" | tee -a $LOG_FILE
-}
-
-# Error handling
-handle_error() {
-    local message=$1
-    log "ERROR: $message"
-    exit 1
-}
-
-# Verify root privileges
-verify_root() {
-    if [ "$EUID" -ne 0 ]; then
-        handle_error "Script must be run as root"
-    fi
-}
-
 # Cleanup function
 cleanup() {
     log "Cleaning up..."
