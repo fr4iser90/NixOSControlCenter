@@ -25,31 +25,30 @@ run_all_checks_handler() {
 # Detect partitions and categorize
 detect_partitions_handler() {
     echo "Detecting partitions..."
-    
-    # Detect all valid partitions
-    local all_partitions=$(lsblk -o NAME,SIZE,FSTYPE,TRAN,MOUNTPOINT -p -n | grep -Ev 'iso9660|loop|zram|swap')
+
+    # Detect all valid partitions, excluding ISO, ZRAM, SWAP, and USB devices
+    local all_partitions=$(lsblk -o NAME,SIZE,FSTYPE,TRAN -p -n | grep -Ev 'iso9660|loop|zram|swap|usb')
     if [ -z "$all_partitions" ]; then
         echo "Error: No valid partitions found."
         return 1
     fi
-    
+
     echo "All detected partitions:"
     echo "$all_partitions"
     echo ""
-    
-    # Categorize partitions
-    local root_candidates=$(echo "$all_partitions" | grep -E 'ext4|xfs|btrfs' | grep -v 'usb')
-    local boot_candidates=$(echo "$all_partitions" | grep -E 'vfat|fat32' | grep -v 'usb')
-    local backup_candidates=$(echo "$all_partitions" | grep 'usb' | grep -v 'iso9660')
+
+    # Categorize partitions based on size and type
+    local root_candidates=$(echo "$all_partitions" | grep -E 'ext4|xfs|btrfs' | sort -nr -k2)
+    local boot_candidates=$(echo "$all_partitions" | grep -E 'vfat|fat32' | grep -E '250M' | sort -nr -k2)
+    local backup_candidates=$(echo "$all_partitions" | grep 'usb' | grep -E '500M' | sort -nr -k2)
 
     # Save categorized partitions to files
     echo "$root_candidates" > /tmp/root_candidates
     echo "$boot_candidates" > /tmp/boot_candidates
     echo "$backup_candidates" > /tmp/backup_candidates
-    
+
     return 0
 }
-
 
 # Enhanced Select a partition from a given list
 select_partition_handler() {
