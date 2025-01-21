@@ -95,7 +95,7 @@ sudo ./rescue.sh
    cd NixOsControlCenter/rescue-kit
    ```
 
-2. **Direct Download:**
+2. **Wget Download:**
    ```bash
    wget -r --no-parent -nH --cut-dirs=3 -P ./rescue-kit \
      https://github.com/fr4iser90/NixOsControlCenter/tree/main/rescue-kit
@@ -112,7 +112,7 @@ sudo ./rescue.sh
 1. Boot into rescue environment
 2. Run the main script:
    ```bash
-   sudo ./rescue.sh
+   sudo bash rescue.sh
    ```
 3. Follow the menu prompts
 
