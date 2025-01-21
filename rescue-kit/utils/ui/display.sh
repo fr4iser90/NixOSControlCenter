@@ -54,6 +54,24 @@ key_value() {
   printf "${UI_SPACER}${UI_COLOR_PRIMARY}%-${key_width}s${UI_COLOR_FG}%s\n" "$key" "$(echo "$value" | fold -s -w $value_width)"
 }
 
+# Wait for a specified time or press any key to continue
+display_wait_or_enter_key() {
+  local timeout=$1
+  local message="Press any key to continue or wait ${timeout} seconds..."
+  
+  # Display the message
+  echo -e "${UI_SPACER}${UI_COLOR_PRIMARY}${message}${UI_COLOR_FG}"
+  
+  # Wait for key press or timeout
+  read -t "$timeout" -n 1 -s || {
+    if [ $? -eq 142 ]; then
+      echo -e "${UI_SPACER}${UI_COLOR_ERROR}Timeout reached! Please choose an option to proceed.${UI_COLOR_FG}"
+    fi
+  }
+  echo "" # Print a new line for better formatting after the function completes
+}
+
+
 # Print progress bar
 progress_bar() {
   local current=$1

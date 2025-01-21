@@ -10,12 +10,6 @@ run_rescue_handler() {
         return 1
     fi
 
-    # Step 2: Detect and mount backup device
-    if ! detect_backup_device; then
-        display_error "Backup device detection failed!"
-        return 1
-    fi
-
     # Step 3: Mount partitions for recovery
     if ! mount_partitions; then
         display_error "Failed to mount partitions!"
@@ -47,14 +41,10 @@ run_rescue_handler() {
 # Step 1: Detect and select partitions
 detect_and_select_partitions() {
     echo "Detecting partitions..."
-    # Logik für Partitionserkennung hier
-    return 0
-}
-
-# Step 2: Detect backup device
-detect_backup_device() {
-    echo "Detecting backup device..."
-    # Logik für Backup-Erkennung hier
+    detect_partitions_handler
+    suggest_partitions_handler
+    select_partition_handler
+    sleep 1.0
     return 0
 }
 
@@ -87,79 +77,6 @@ rebuild_system() {
 }
 
 
-# Main extended_menu configuration
-extended_menus_handler() {
-    create_standard_menu "main" "NixOS Rescue Kit - Main Menu" \
-        "System Checks" \
-        "Partition Management" \
-        "Backup Management" \
-        "System Repair" \
-        "Rebuild System" \
-        "SSH Management" \
-        "Help" \
-        "Exit"
-}
-# Main menu handlers
-system_checks_handler() {
-    if [ -f "$rescue_kit_root_dir/modules/checks/menu.sh" ]; then
-        source "$rescue_kit_root_dir/modules/checks/menu.sh"
-        checks_menu
-    else
-        display_error "System Checks module not found!"
-        sleep 1.5
-    fi
-}
-
-partition_management_handler() {
-    if [ -f "$rescue_kit_root_dir/modules/mount/menu.sh" ]; then
-        source "$rescue_kit_root_dir/modules/mount/menu.sh"
-        mount_menu
-    else
-        display_error "Partition Management module not found!"
-        sleep 1.5
-    fi
-}
-
-backup_management_handler() {
-    if [ -f "$rescue_kit_root_dir/modules/backup/menu.sh" ]; then
-        source "$rescue_kit_root_dir/modules/backup/menu.sh"
-        backup_menu
-    else
-        display_error "Backup Management module not found!"
-        sleep 1.5
-    fi
-}
-
-system_repair_handler() {
-    if [ -f "$rescue_kit_root_dir/modules/repair/menu.sh" ]; then
-        source "$rescue_kit_root_dir/modules/repair/menu.sh"
-        repair_menu
-    else
-        display_error "System Repair module not found!"
-        sleep 1.5
-    fi
-}
-
-rebuild_system_handler() {
-    if [ -f "$rescue_kit_root_dir/modules/rebuild/menu.sh" ]; then
-        source "$rescue_kit_root_dir/modules/rebuild/menu.sh"
-        rebuild_menu
-    else
-        display_error "Rebuild System module not found!"
-        sleep 1.5
-    fi
-}
-
-ssh_management_handler() {
-    if [ -f "$rescue_kit_root_dir/modules/sshd/menu.sh" ]; then
-        source "$rescue_kit_root_dir/modules/sshd/menu.sh"
-        sshd_menu
-    else
-        display_error "SSH Management module not found!"
-        sleep 1.5
-    fi
-}
-
 help_handler() {
     display_help
     prompt_continue
@@ -170,4 +87,17 @@ exit_handler() {
         display_success "Exiting..."
         exit 0
     fi
+}
+
+
+# Show system status overview
+show_status_handler() {
+    display_header "Current Status"
+    
+    key_value "Mounted Partitions" "$(if is_mounted; then echo -e "${UI_COLOR_SUCCESS}Yes${UI_COLOR_FG}"; else echo -e "${UI_COLOR_ERROR}No${UI_COLOR_FG}"; fi)"
+    key_value "SSH Daemon" "$(if check_sshd_status &>/dev/null; then echo -e "${UI_COLOR_SUCCESS}Running${UI_COLOR_FG}"; else echo -e "${UI_COLOR_ERROR}Stopped${UI_COLOR_FG}"; fi)"
+    key_value "Last Backup" "$(if [ -f "$BACKUP_DIR/last_backup" ]; then cat "$BACKUP_DIR/last_backup"; else echo -e "${UI_COLOR_ERROR}Never${UI_COLOR_FG}"; fi)"
+    key_value "Last Rebuild" "$(if [ -f "$REBUILD_LOG" ]; then tail -1 "$REBUILD_LOG"; else echo -e "${UI_COLOR_ERROR}Never${UI_COLOR_FG}"; fi)"
+    
+    echo ""
 }
