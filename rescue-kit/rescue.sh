@@ -26,7 +26,7 @@ source "$rescue_kit_root_dir/utils/menu.sh"
 
 # Import main menu components
 source "$rescue_kit_root_dir/modules/main/menu.sh"
-source "$rescue_kit_root_dir/modules/main/handler.sh"
+source "$rescue_kit_root_dir/modules/main/operations.sh"
 
 # Initialize system
 echo "Initializing NixOS Rescue Kit..."

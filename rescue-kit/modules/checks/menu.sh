@@ -15,13 +15,3 @@ checks_menu() {
     # Register back handler
     add_menu_item "checks" 6 "Back to main menu" "back_to_main_handler"
 }
-
-    create_standard_menu "checks" "System Checks" \
-        "Check System Integrity" \
-        "Verify Partitions (Mount Status)" \
-        "Validate Partitions" \
-        "Backup Verification" \
-        "List USB Devices" \
-        "Check Network Configuration" \
-        "Monitor Disk Health (SMART)" \
-        "Back to Main Menu"
