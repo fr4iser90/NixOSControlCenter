@@ -271,11 +271,6 @@ mount_partitions_handler() {
     mkdir -p /mnt/boot || { echo "Failed to create /mnt/boot directory"; return 1; }
     mkdir -p /mnt/backup || { echo "Failed to create /mnt/backup directory"; return 1; }
 
-    # Export required variables
-    export ROOT_PART="$ROOT_PARTITION"
-    export BOOT_PART="$BOOT_PARTITION"
-    export BACKUP_PART="$BACKUP_PARTITION"
-
     # Überprüfen ob Partitionen gesetzt sind
     if [ -z "$ROOT_PART" ] || [ -z "$BOOT_PART" ] || [ -z "$BACKUP_PART" ]; then
         echo "Error: Required partitions are missing."
