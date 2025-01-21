@@ -6,7 +6,7 @@ BOOT_PART="/dev/nvme0n1p1"
 USER="UserName"
 MOUNT_DIR="/mnt"
 BACKUP_DIR="/backup"
-LOG_FILE="/var/log/rescue-kit.log"
+LOG_FILE="${rescue_kit_root_dir}/log/rescue-kit.log"
 
 # Export variables for use in other scripts
 export ROOT_PART

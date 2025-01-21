@@ -33,9 +33,14 @@ add_menu_item() {
 display_menu() {
   local menu_name=$1
   local title=$2
+  local title_type=${3:-primary}
   
   clear
-  center_text "$title"
+  if [[ "$title_type" == "primary" ]]; then
+    center_text "$title"
+  else
+    echo -e "\n${UI_SPACER}${UI_COLOR_SECONDARY}${title}${UI_COLOR_FG}"
+  fi
   echo -e "\n${UI_LINE}"
   
   # Get and display menu items in order
@@ -44,7 +49,7 @@ display_menu() {
     local label_key="${menu_name}_${i}_label"
     if [[ -n "${MENU_ITEMS[$label_key]:-}" ]]; then
       item_count=$((item_count + 1))
-      echo -e "${UI_SPACER}${i}. ${MENU_ITEMS[$label_key]}"
+      echo -e "${UI_SPACER}${UI_COLOR_SECONDARY}${i}. ${MENU_ITEMS[$label_key]}${UI_COLOR_FG}"
     fi
   done
   
@@ -52,7 +57,7 @@ display_menu() {
   echo -e "${UI_LINE}"
   
   # Display prompt with proper spacing
-  echo -e "\n${UI_COLOR_THIRD}Please enter your choice (1-${item_count}):${UI_COLOR_FG}"
+  echo -e "\n${UI_COLOR_SECONDARY}Please enter your choice (1-${item_count}):${UI_COLOR_FG}"
 }
 
 # Handle menu selection
@@ -103,6 +108,9 @@ create_standard_menu() {
   local items=("$@")
   
   init_menu
+  # Store the menu title
+  MENU_ITEMS["${menu_name}_title"]=$title
+  
   for i in "${!items[@]}"; do
     # Convert menu item to handler name (lowercase with underscores)
     local handler_name=$(echo "${items[$i]}" | tr '[:upper:]' '[:lower:]' | tr ' ' '_')"_handler"
@@ -112,84 +120,42 @@ create_standard_menu() {
   CURRENT_MENU="$menu_name"
 }
 
-# Menu handler functions
-system_checks_handler() {
-    if [ -f "$rescue_kit_root_dir/modules/checks/menu.sh" ]; then
-        source "$rescue_kit_root_dir/modules/checks/menu.sh"
-        checks_menu
-    else
-        display_error "System Checks module not found!"
-        sleep 1.5
-    fi
-}
-
-partition_management_handler() {
-    if [ -f "$rescue_kit_root_dir/modules/mount/menu.sh" ]; then
-        source "$rescue_kit_root_dir/modules/mount/menu.sh"
-        mount_menu
-    else
-        display_error "Partition Management module not found!"
-        sleep 1.5
-    fi
-}
-
-backup_management_handler() {
-    if [ -f "$rescue_kit_root_dir/modules/backup/menu.sh" ]; then
-        source "$rescue_kit_root_dir/modules/backup/menu.sh"
-        backup_menu
-    else
-        display_error "Backup Management module not found!"
-        sleep 1.5
-    fi
-}
-
-system_repair_handler() {
-    if [ -f "$rescue_kit_root_dir/modules/repair/menu.sh" ]; then
-        source "$rescue_kit_root_dir/modules/repair/menu.sh"
-        repair_menu
-    else
-        display_error "System Repair module not found!"
-        sleep 1.5
-    fi
-}
-
-rebuild_system_handler() {
-    if [ -f "$rescue_kit_root_dir/modules/rebuild/menu.sh" ]; then
-        source "$rescue_kit_root_dir/modules/rebuild/menu.sh"
-        rebuild_menu
-    else
-        display_error "Rebuild System module not found!"
-        sleep 1.5
-    fi
-}
-
-ssh_management_handler() {
-    if [ -f "$rescue_kit_root_dir/modules/sshd/menu.sh" ]; then
-        source "$rescue_kit_root_dir/modules/sshd/menu.sh"
-        sshd_menu
-    else
-        display_error "SSH Management module not found!"
-        sleep 1.5
-    fi
-}
-
-help_handler() {
-    display_help
-    prompt_continue
-}
-
-exit_handler() {
-    if confirm_action "Are you sure you want to exit?"; then
-        display_success "Exiting..."
-        exit 0
-    fi
-}
-
 # Main menu loop
 menu_loop() {
+  local title_type=${1:-primary}
   while true; do
-    display_menu "$CURRENT_MENU" "Main Menu"
+    local title="${MENU_ITEMS["${CURRENT_MENU}_title"]}"
+    display_menu "$CURRENT_MENU" "${title:-$CURRENT_MENU}" "$title_type"
     read -p "Enter your choice: " choice
     handle_menu_selection "$CURRENT_MENU" "$choice"
   done
+}
+
+# Push current menu to stack and switch to new menu
+push_menu() {
+  MENU_STACK+=("$CURRENT_MENU")
+  CURRENT_MENU=$1
+}
+
+# Pop menu from stack and return to previous menu
+pop_menu() {
+  if [ ${#MENU_STACK[@]} -gt 0 ]; then
+    CURRENT_MENU=${MENU_STACK[-1]}
+    unset 'MENU_STACK[${#MENU_STACK[@]}-1]'
+    # Reinitialize menu items for the previous menu
+    init_menu
+    case $CURRENT_MENU in
+      "main") create_main_menu ;;
+      "sshd") sshd_menu ;;
+      *) create_main_menu ;;
+    esac
+  else
+    CURRENT_MENU="main"
+    create_main_menu
+  fi
+}
+
+# Handler for back to main menu
+back_to_main_handler() {
+  pop_menu
 }

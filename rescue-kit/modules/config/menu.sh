@@ -1,5 +1,21 @@
 #!/bin/bash
 
+source "${rescue_kit_root_dir}/modules/config/operations.sh"
+
+config_menu() {
+    display_backup_dir_status_handler
+    
+    create_standard_menu "config" "Configurate Variables Management" \
+        "Update Partition " \
+        "Update Backup Method" \
+        "Backup essential service" \
+        "View Backup config" \
+        "Back to main menu"
+        
+    # Register back handler
+    add_menu_item "backup" 5 "Back to main menu" "back_to_main_handler"
+}
+
 # Configuration menu
 config_menu() {
     while true; do

@@ -4,7 +4,6 @@
 rescue_kit_root_dir="$(dirname "$(realpath "$0")")"
 
 # Source configuration after paths are defined
-source "$rescue_kit_root_dir/utils/variables.sh"
 modules_dir="$rescue_kit_root_dir/modules"
 utils_dir="$rescue_kit_root_dir/utils"
 

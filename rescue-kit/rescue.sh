@@ -5,7 +5,7 @@ set -euo pipefail
 rescue_kit_root_dir="$(dirname "$(realpath "$0")")"
 
 # Import variables and functions
-source "$rescue_kit_root_dir/utils/variables.sh"
+
 source "$rescue_kit_root_dir/utils/imports.sh"
 
 # Import modules and utils
@@ -24,19 +24,14 @@ trap cleanup EXIT
 # Import menu utilities
 source "$rescue_kit_root_dir/utils/menu.sh"
 
+# Import main menu components
+source "$rescue_kit_root_dir/modules/main/menu.sh"
+source "$rescue_kit_root_dir/modules/main/handler.sh"
+
 # Initialize system
 echo "Initializing NixOS Rescue Kit..."
 echo "System ready. Loading main menu..."
 
 # Create and start main menu
-create_standard_menu "main" "NixOS Rescue Kit - Main Menu" \
-    "System Checks" \
-    "Partition Management" \
-    "Backup Management" \
-    "System Repair" \
-    "Rebuild System" \
-    "SSH Management" \
-    "Help" \
-    "Exit"
-
+create_main_menu
 menu_loop
