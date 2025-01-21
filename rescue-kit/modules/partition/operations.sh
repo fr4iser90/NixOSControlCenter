@@ -269,7 +269,6 @@ mount_partitions_handler() {
     # Create mount directories if they don't exist
     mkdir -p /mnt || { echo "Failed to create /mnt directory"; return 1; }
     mkdir -p /mnt/boot || { echo "Failed to create /mnt/boot directory"; return 1; }
-    mkdir -p /mnt/root || { echo "Failed to create /mnt/root directory"; return 1; }
     mkdir -p /mnt/backup || { echo "Failed to create /mnt/backup directory"; return 1; }
 
 
@@ -280,21 +279,21 @@ mount_partitions_handler() {
     fi
 
     # Partitionen mounten
-    if mount "$ROOT_PART" /mnt; then
+    if sudo mount "$ROOT_PART" /mnt; then
         echo "Root partition mounted successfully."
     else
         echo "Failed to mount root partition."
         return 1
     fi
 
-    if mount "$BOOT_PART" /mnt/boot; then
+    if sudo mount "$BOOT_PART" /mnt/boot; then
         echo "Boot partition mounted successfully."
     else
         echo "Failed to mount boot partition."
         return 1
     fi
 
-    if mount "$BACKUP_PART" /mnt/backup; then
+    if sudo mount "$BACKUP_PART" /mnt/backup; then
         echo "Backup partition mounted successfully."
     else
         echo "Failed to mount backup partition."
