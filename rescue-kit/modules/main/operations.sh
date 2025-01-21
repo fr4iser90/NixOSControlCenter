@@ -50,14 +50,18 @@ detect_and_select_partitions() {
 # Step 3: Mount partitions
 mount_partitions() {
     echo "Mounting partitions..."
+    sleep 1.0
     mount_partitions_handler
+    sleep 1.0
     return 0
 }
 
 # Step 4: Validate and copy backups
 validate_and_copy_backups() {
     echo "Validating and copying backups..."
+    sleep 1.0
     backup_essential_handler
+    sleep 1.0
     return 0
 }
 

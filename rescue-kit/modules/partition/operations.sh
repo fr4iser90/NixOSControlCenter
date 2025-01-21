@@ -136,7 +136,7 @@ suggest_partitions_handler() {
     echo "Root Partition: $ROOT_PART"
     echo "Boot Partition: $BOOT_PART"
     echo "Backup Partition: ${BACKUP_PART:-No backup selected}"
-    sleep 5.0
+    sleep 1.0
 
     export ROOT_PART BOOT_PART BACKUP_PART
     return 0
