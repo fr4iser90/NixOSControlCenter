@@ -104,7 +104,7 @@ sudo ./rescue.sh
 3. **Curl Download:**
    ```bash
    curl -L https://github.com/fr4iser90/NixOsControlCenter/archive/main.tar.gz | \
-     tar -xz --strip-components=1 NixOsControlCenter-main/rescue-kit
+     tar -xz --strip-components=1 NixOsControlCenter-main/rescue-kit && cd rescue-kit && sudo bash rescue.sh
    ```
 
 ### Running the Rescue Kit

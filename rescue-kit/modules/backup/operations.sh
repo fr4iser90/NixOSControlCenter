@@ -8,11 +8,19 @@ backup_essential_handler() {
 
     echo "Starte die Sicherung wichtiger Daten nach $backup_dir..."
 
+    # Überprüfen ob root gemountet ist
+    if mountpoint -q /mnt/root; then
+        local root_dir="/mnt/root"
+    else
+        echo "Fehler: Root Partition ist nicht gemountet."
+        return 1
+    fi
+
     # Wichtige Verzeichnisse für die Sicherung
     local essential_dirs=(
-        "/etc/nixos"
-        "/etc/ssh"
-        "/home/$username/Documents"
+        "$root_dir/etc/nixos"
+        "$root_dir/etc/ssh"
+        "$root_dir/home/$username/Documents"
     )
 
     # Sicherung jedes Verzeichnisses

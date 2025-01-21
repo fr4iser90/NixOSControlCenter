@@ -269,7 +269,9 @@ mount_partitions_handler() {
     # Create mount directories if they don't exist
     mkdir -p /mnt || { echo "Failed to create /mnt directory"; return 1; }
     mkdir -p /mnt/boot || { echo "Failed to create /mnt/boot directory"; return 1; }
+    mkdir -p /mnt/root || { echo "Failed to create /mnt/root directory"; return 1; }
     mkdir -p /mnt/backup || { echo "Failed to create /mnt/backup directory"; return 1; }
+
 
     # Überprüfen ob Partitionen gesetzt sind
     if [ -z "$ROOT_PART" ] || [ -z "$BOOT_PART" ] || [ -z "$BACKUP_PART" ]; then
