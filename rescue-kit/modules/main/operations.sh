@@ -50,14 +50,14 @@ detect_and_select_partitions() {
 # Step 3: Mount partitions
 mount_partitions() {
     echo "Mounting partitions..."
-    # Logik zum Mounten von Partitionen hier
+    mount_partitions_handler
     return 0
 }
 
 # Step 4: Validate and copy backups
 validate_and_copy_backups() {
     echo "Validating and copying backups..."
-    # Backup-Größe validieren und Dateien kopieren
+    backup_essential_handler
     return 0
 }
 

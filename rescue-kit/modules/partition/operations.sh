@@ -263,23 +263,51 @@ bind_mounts() {
 
 
 # Mount partitions and set up chroot environment
-mount_partitions() {
-    log "Mounting partitions..."
-    
-    # Create mount directory if it doesn't exist
-    mkdir -p $MOUNT_DIR || { log "Failed to create mount directory"; return 1; }
-    
-    # Mount root partition
-    mount $ROOT_PART $MOUNT_DIR || { log "Failed to mount root partition"; return 1; }
-    
-    # Mount boot partition if specified
-    if [ -n "$BOOT_PART" ]; then
-        mkdir -p $MOUNT_DIR/boot
-        mount $BOOT_PART $MOUNT_DIR/boot || { log "Failed to mount boot partition"; return 1; }
+mount_partitions_handler() {
+    echo "Mounting partitions..."
+
+    # Create mount directories if they don't exist
+    mkdir -p /mnt || { echo "Failed to create /mnt directory"; return 1; }
+    mkdir -p /mnt/boot || { echo "Failed to create /mnt/boot directory"; return 1; }
+    mkdir -p /mnt/backup || { echo "Failed to create /mnt/backup directory"; return 1; }
+
+    # Example logic to mount root, boot, and backup partitions
+    # Überprüfen, ob die Partitionen korrekt vorgeschlagen wurden
+    local root_partition=$(< /tmp/root_partition)
+    local boot_partition=$(< /tmp/boot_partition)
+    local backup_partition=$(< /tmp/backup_partition)
+
+    # Überprüfen ob Partitionen gesetzt sind
+    if [ -z "$root_partition" ] || [ -z "$boot_partition" ] || [ -z "$backup_partition" ]; then
+        echo "Error: Required partitions are missing."
+        return 1
     fi
-    
-    log "Partitions mounted successfully"
+
+    # Partitionen mounten
+    if mount "$root_partition" /mnt; then
+        echo "Root partition mounted successfully."
+    else
+        echo "Failed to mount root partition."
+        return 1
+    fi
+
+    if mount "$boot_partition" /mnt/boot; then
+        echo "Boot partition mounted successfully."
+    else
+        echo "Failed to mount boot partition."
+        return 1
+    fi
+
+    if mount "$backup_partition" /mnt/backup; then
+        echo "Backup partition mounted successfully."
+    else
+        echo "Failed to mount backup partition."
+        return 1
+    fi
+
+    return 0
 }
+
 
 # Check if partitions are mounted
 is_mounted() {
