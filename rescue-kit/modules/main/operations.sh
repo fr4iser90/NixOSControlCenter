@@ -43,7 +43,6 @@ detect_and_select_partitions() {
     echo "Detecting partitions..."
     detect_partitions_handler
     suggest_partitions_handler
-    select_partition_handler
     sleep 1.0
     return 0
 }

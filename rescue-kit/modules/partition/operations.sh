@@ -26,8 +26,8 @@ run_all_checks_handler() {
 detect_partitions_handler() {
     echo "Detecting partitions..."
 
-    # Detect all valid partitions, excluding ISO, ZRAM, SWAP, and USB devices
-    local all_partitions=$(lsblk -o NAME,SIZE,FSTYPE,TRAN -p -n | grep -Ev 'iso9660|loop|zram|swap|usb')
+    # Alle Partitionen abrufen
+    local all_partitions=$(lsblk -o NAME,SIZE,FSTYPE,TRAN,MOUNTPOINT -p -n | grep -Ev 'iso9660|loop|zram|swap')
     if [ -z "$all_partitions" ]; then
         echo "Error: No valid partitions found."
         return 1
@@ -37,51 +37,68 @@ detect_partitions_handler() {
     echo "$all_partitions"
     echo ""
 
-    # Categorize partitions based on size and type
-    local root_candidates=$(echo "$all_partitions" | grep -E 'ext4|xfs|btrfs' | sort -nr -k2)
-    local boot_candidates=$(echo "$all_partitions" | grep -E 'vfat|fat32' | grep -E '250M' | sort -nr -k2)
-    local backup_candidates=$(echo "$all_partitions" | grep 'usb' | grep -E '500M' | sort -nr -k2)
+    # Root-Kandidaten: NVMe/SATA mit gängigen Dateisystemen
+    local root_candidates=$(echo "$all_partitions" | grep -E 'ext4|xfs|btrfs' | grep -E 'nvme|sata' | sort -k2 -nr)
 
-    # Save categorized partitions to files
+    # Boot-Kandidaten: FAT-basierte Partitionen mit Mindestgröße 250 MB
+    local boot_candidates=$(echo "$all_partitions" | grep -E 'vfat|fat32' | awk '{if ($2 >= 250 * 1024 * 1024) print}' | sort -k2 -nr)
+
+    # Backup-Kandidaten: USB-Partitionen
+    local backup_candidates=$(echo "$all_partitions" | grep 'usb' | sort -k2 -nr)
+
+    # Ergebnisse speichern
     echo "$root_candidates" > /tmp/root_candidates
     echo "$boot_candidates" > /tmp/boot_candidates
     echo "$backup_candidates" > /tmp/backup_candidates
 
+    echo "Root Partition Candidates:"
+    echo "$root_candidates"
+    echo ""
+    echo "Boot Partition Candidates:"
+    echo "$boot_candidates"
+    echo ""
+    echo "Backup Partition Candidates:"
+    echo "$backup_candidates"
+    echo ""
+
+    echo "Partition detection completed."
     return 0
 }
+
+
+
 
 # Enhanced Select a partition from a given list
 select_partition_handler() {
     local prompt="$1"
     local candidates_file="$2"
-    
+
     if [ ! -s "$candidates_file" ]; then
         echo "No valid $prompt candidates found."
         return 1
     fi
-    
-    # Show candidates
+
+    # Zeige verfügbare Partitionen an
     echo "Available $prompt partitions:"
     cat "$candidates_file"
     echo ""
-    
-    # Display suggestions
-    selected=""
-    echo -e "\nPartition Suggestions:"
-    grep -E 'ext4|vfat' "$candidates_file" # Display relevant suggestions
-    
-    # Prompt user with suggested default
+
+    # Automatische Vorschläge anzeigen
+    local default=$(head -n1 "$candidates_file" | awk '{print $1}')
+    echo "Suggested $prompt partition: $default"
+
+    # Benutzer zur Eingabe auffordern
     echo ""
-    read -p "Enter your choice for $prompt partition (or press Enter to use the first suggestion): " selected
-    
+    read -p "Enter your choice for $prompt partition (or press Enter to use the suggestion): " selected
+
+    # Verwende Vorschlag, wenn keine Eingabe erfolgt
     if [ -z "$selected" ]; then
-        # Use the first candidate if no input
-        selected=$(head -n1 "$candidates_file" | awk '{print $1}')
+        selected="$default"
         echo "Defaulting to: $selected"
     fi
-    
-    # Validate the selection
-    if grep -q "$selected" "$candidates_file"; then
+
+    # Validierung der Auswahl
+    if grep -q "^$selected" "$candidates_file"; then
         echo "Selected $prompt partition: $selected"
         echo "$selected"
         return 0
@@ -91,46 +108,36 @@ select_partition_handler() {
     fi
 }
 
-
 # High-level function to suggest and select partitions
 suggest_partitions_handler() {
-    detect_partitions_handler || return 1
-    
     echo ""
     echo "Partition Suggestions:"
-    
-    # Show suggestions
+
     echo "Root Partition Candidates:"
     cat /tmp/root_candidates
     echo ""
-    
+
     echo "Boot Partition Candidates:"
     cat /tmp/boot_candidates
     echo ""
-    
+
     echo "Backup Partition Candidates:"
     cat /tmp/backup_candidates
     echo ""
-    
-    # Let the user select or fall back to default
+
+    # Auswahl treffen
     ROOT_PART=$(select_partition_handler "root" "/tmp/root_candidates") || return 1
-    BOOT_PART=$(select_partition_handler "boot" "/tmp/boot_candidates")
+    BOOT_PART=$(select_partition_handler "boot" "/tmp/boot_candidates") || return 1
     BACKUP_PART=$(select_partition_handler "backup" "/tmp/backup_candidates")
-    
-    # Handle case when no backup is selected
-    if [ -z "$BACKUP_PART" ]; then
-        echo "No backup partition selected. A backup partition is recommended!!!"
-        BACKUP_PART="No backup selected"
-    fi
 
-
-    # Display final choices
+    # Endgültige Auswahl anzeigen
     echo ""
     echo "Using the following partitions:"
     echo "Root Partition: $ROOT_PART"
     echo "Boot Partition: $BOOT_PART"
-    echo "Backup Partition: $BACKUP_PART"
-    display_wait_or_enter_key 2
+    echo "Backup Partition: ${BACKUP_PART:-No backup selected}"
+    sleep 5.0
+
     export ROOT_PART BOOT_PART BACKUP_PART
     return 0
 }
