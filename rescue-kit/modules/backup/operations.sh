@@ -1,40 +1,28 @@
 #!/bin/bash
 
-
 # Backup wichtige System- und Benutzerdaten
 backup_essential_handler() {
-    local backup_dir=$1
+    local username="fr4iser"  # Benutzername als dynamischer Placeholder
+    local backup_dir="/mnt/backup"  # Fester Pfad für das Backup-Verzeichnis
     local max_size=32000000  # Maximale Größe in Kilobyte (32GB)
 
     echo "Starte die Sicherung wichtiger Daten nach $backup_dir..."
-
-    # Sicherungsverzeichnis erstellen
-    mkdir -p "$backup_dir" || {
-        echo "Fehler: Sicherungsverzeichnis konnte nicht erstellt werden"
-        return 1
-    }
 
     # Wichtige Verzeichnisse für die Sicherung
     local essential_dirs=(
         "/etc/nixos"
         "/etc/ssh"
-        "/home/$USER/Documents"
+        "/home/$username/Documents"
     )
-
-    # Überprüfen, ob benutzerdefinierte Verzeichnisse hinzugefügt wurden
-    if [ -n "$2" ]; then
-        IFS=' ' read -r -a custom_dirs <<< "$2"
-        essential_dirs+=("${custom_dirs[@]}")
-    fi
 
     # Sicherung jedes Verzeichnisses
     local total_size=0
     for dir in "${essential_dirs[@]}"; do
-        if [ -d "/mnt$dir" ]; then  # MOUNT_DIR wird ersetzt durch /mnt
+        if [ -d "$dir" ]; then
             echo "Backup von $dir..."
-            local dir_size=$(du -sk "/mnt$dir" | cut -f1)
+            local dir_size=$(du -sk "$dir" | cut -f1)
             if [ $((total_size + dir_size)) -le $max_size ]; then
-                rsync -a --relative "/mnt$dir" "$backup_dir" || {
+                rsync -a --relative "$dir" "$backup_dir" || {
                     echo "Fehler: Backup von $dir fehlgeschlagen"
                     return 1
                 }
@@ -49,6 +37,8 @@ backup_essential_handler() {
     sleep 5
     return 0
 }
+
+
 
 
 
