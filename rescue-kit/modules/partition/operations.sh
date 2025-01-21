@@ -232,7 +232,7 @@ verify_system_requirements_handler() {
 
 # Set up bind mounts for chroot
 setup_bind_mounts_handler() {
-    log "Setting up bind mounts..."
+    echo "Setting up bind mounts..."
     
     local required_mounts=("/proc" "/sys" "/dev" "/run")
     
@@ -240,22 +240,22 @@ setup_bind_mounts_handler() {
         if [ -d "$mount_point" ]; then
             mkdir -p $MOUNT_DIR$mount_point
             mount --bind $mount_point $MOUNT_DIR$mount_point || { 
-                log "Failed to bind mount $mount_point"; 
+                echo "Failed to bind mount $mount_point"; 
                 return 1
             }
         else
-            log "Warning: $mount_point does not exist"
+            echo "Warning: $mount_point does not exist"
         fi
     done
     
-    log "Bind mounts set up successfully"
+    echo "Bind mounts set up successfully"
     return 0
 }
 
 # Main bind mounts function
 bind_mounts() {
     if ! setup_bind_mounts; then
-        log "Error: Failed to set up bind mounts"
+        echo "Error: Failed to set up bind mounts"
         return 1
     fi
     return 0
@@ -271,34 +271,33 @@ mount_partitions_handler() {
     mkdir -p /mnt/boot || { echo "Failed to create /mnt/boot directory"; return 1; }
     mkdir -p /mnt/backup || { echo "Failed to create /mnt/backup directory"; return 1; }
 
-    # Example logic to mount root, boot, and backup partitions
-    # Überprüfen, ob die Partitionen korrekt vorgeschlagen wurden
-    local root_partition=$(< /tmp/root_partition)
-    local boot_partition=$(< /tmp/boot_partition)
-    local backup_partition=$(< /tmp/backup_partition)
+    # Export required variables
+    export ROOT_PART="$ROOT_PARTITION"
+    export BOOT_PART="$BOOT_PARTITION"
+    export BACKUP_PART="$BACKUP_PARTITION"
 
     # Überprüfen ob Partitionen gesetzt sind
-    if [ -z "$root_partition" ] || [ -z "$boot_partition" ] || [ -z "$backup_partition" ]; then
+    if [ -z "$ROOT_PART" ] || [ -z "$BOOT_PART" ] || [ -z "$BACKUP_PART" ]; then
         echo "Error: Required partitions are missing."
         return 1
     fi
 
     # Partitionen mounten
-    if mount "$root_partition" /mnt; then
+    if mount "$ROOT_PART" /mnt; then
         echo "Root partition mounted successfully."
     else
         echo "Failed to mount root partition."
         return 1
     fi
 
-    if mount "$boot_partition" /mnt/boot; then
+    if mount "$BOOT_PART" /mnt/boot; then
         echo "Boot partition mounted successfully."
     else
         echo "Failed to mount boot partition."
         return 1
     fi
 
-    if mount "$backup_partition" /mnt/backup; then
+    if mount "$BACKUP_PART" /mnt/backup; then
         echo "Backup partition mounted successfully."
     else
         echo "Failed to mount backup partition."
@@ -307,7 +306,6 @@ mount_partitions_handler() {
 
     return 0
 }
-
 
 # Check if partitions are mounted
 is_mounted() {
@@ -327,17 +325,17 @@ is_mounted() {
 
 # Unmount all partitions and bind mounts
 unmount_all() {
-    log "Unmounting all partitions..."
+    echo "Unmounting all partitions..."
     
     # Unmount bind mounts first
     local mounted_points=($(grep $MOUNT_DIR /proc/mounts | awk '{print $2}' | sort -r))
     
     for point in "${mounted_points[@]}"; do
-        umount $point || log "Warning: Failed to unmount $point"
+        umount $point || echo "Warning: Failed to unmount $point"
     done
     
     # Finally unmount root
-    umount $MOUNT_DIR || log "Warning: Failed to unmount root partition"
+    umount $MOUNT_DIR || echo "Warning: Failed to unmount root partition"
     
-    log "Unmounting complete"
+    echo "Unmounting complete"
 }
