@@ -71,7 +71,43 @@ The rescue kit includes a robust terminal UI framework with these components:
 - File selection prompts
 - Numeric input with range validation
 
-## Usage
+## Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/fr4iser90/NixOsControlCenter.git
+cd NixOsControlCenter/rescue-kit
+
+# Make the script executable
+chmod +x rescue.sh
+
+# Run the rescue kit
+sudo ./rescue.sh
+```
+
+## Detailed Usage
+
+### Installation Options
+
+1. **Git Clone (Recommended):**
+   ```bash
+   git clone https://github.com/fr4iser90/NixOsControlCenter.git
+   cd NixOsControlCenter/rescue-kit
+   ```
+
+2. **Direct Download:**
+   ```bash
+   wget -r --no-parent -nH --cut-dirs=3 -P ./rescue-kit \
+     https://github.com/fr4iser90/NixOsControlCenter/tree/main/rescue-kit
+   ```
+
+3. **Curl Download:**
+   ```bash
+   curl -L https://github.com/fr4iser90/NixOsControlCenter/archive/main.tar.gz | \
+     tar -xz --strip-components=1 NixOsControlCenter-main/rescue-kit
+   ```
+
+### Running the Rescue Kit
 
 1. Boot into rescue environment
 2. Run the main script:
