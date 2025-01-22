@@ -10,7 +10,7 @@ run_rescue_handler() {
         return 1
     fi
 
-    # Step 3: Mount partitions for recovery
+    # Step 2: Mount partitions for recovery
     if ! mount_partitions; then
         display_error "Failed to mount partitions!"
         return 1
