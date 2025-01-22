@@ -80,7 +80,7 @@ select_partition_handler() {
 
     # Zeige verfügbare Partitionen an
     echo "Available $prompt partitions:"
-    cat "$candidates_file"
+    cat "$candidates_file" | awk '{print $1, $2, $3, $4, $5}'  # Entfernt "├─", "- " und "_|_"
     echo ""
 
     # Automatische Vorschläge anzeigen
@@ -89,7 +89,7 @@ select_partition_handler() {
 
     # Benutzer zur Eingabe auffordern
     echo ""
-    read -p "Enter your choice for $prompt partition (or press Enter to use the suggestion): " selected
+    read -p "Enter your choice for $prompt partition (or press Enter to use the $default): " selected
 
     # Verwende Vorschlag, wenn keine Eingabe erfolgt
     if [ -z "$selected" ]; then
