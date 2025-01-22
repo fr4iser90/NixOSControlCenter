@@ -121,35 +121,20 @@ select_partition_handler() {
 
 # High-level function to suggest and select partitions
 suggest_partitions_handler() {
-    echo ""
-    echo "Partition Suggestions:"
-
-    echo "Root Partition Candidates:"
-    cat /tmp/root_candidates
-    echo ""
-
-    echo "Boot Partition Candidates:"
-    cat /tmp/boot_candidates
-    echo ""
-
-    echo "Backup Partition Candidates:"
-    cat /tmp/backup_candidates
-    echo ""
-
-    # Auswahl treffen
+    # Make selections
     ROOT_PART=$(select_partition_handler "root" "/tmp/root_candidates") || return 1
     BOOT_PART=$(select_partition_handler "boot" "/tmp/boot_candidates") || return 1
     BACKUP_PART=$(select_partition_handler "backup" "/tmp/backup_candidates")
 
-    # Endgültige Auswahl anzeigen
-    echo ""
-    echo "Using the following partitions:"
-    echo "Root Partition: $ROOT_PART"
-    echo "Boot Partition: $BOOT_PART"
-    echo "Backup Partition: ${BACKUP_PART:-No backup selected}"
-    sleep 1.0
-
+    # Export selected values
     export ROOT_PART BOOT_PART BACKUP_PART
+    
+    # Show final selection
+    echo -e "\nSelected Partitions:"
+    echo "ROOT_PART=$ROOT_PART"
+    echo "BOOT_PART=$BOOT_PART"
+    [ -n "$BACKUP_PART" ] && echo "BACKUP_PART=$BACKUP_PART"
+    
     return 0
 }
 
