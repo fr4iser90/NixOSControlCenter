@@ -282,7 +282,10 @@ mount_partitions_handler() {
     mkdir -p /mnt/boot || { echo "Failed to create /mnt/boot directory"; return 1; }
     mkdir -p /mnt/backup || { echo "Failed to create /mnt/backup directory"; return 1; }
 
-
+    echo "ROOT_PART: $ROOT_PART"
+    echo "BOOT_PART: $BOOT_PART"
+    echo "BACKUP_PART: $BACKUP_PART"
+    sleep 5
     # Überprüfen ob Partitionen gesetzt sind
     if [ -z "$ROOT_PART" ] || [ -z "$BOOT_PART" ] || [ -z "$BACKUP_PART" ]; then
         echo "Error: Required partitions are missing."
