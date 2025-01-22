@@ -57,15 +57,23 @@ suggest_and_select_partitions() {
     detect_partitions_handler || return 1
 
     echo "Selecting partitions..."
-    ROOT_PART=$(select_partition_handler "root" "/tmp/root_candidates") || return 1
-    BOOT_PART=$(select_partition_handler "boot" "/tmp/boot_candidates") || return 1
-    BACKUP_PART=$(select_partition_handler "backup" "/tmp/backup_candidates") || return 1
+    ROOT_PART=$(select_partition_handler "root" "/tmp/root_candidates" | awk '{print $1}') || return 1
+    BOOT_PART=$(select_partition_handler "boot" "/tmp/boot_candidates" | awk '{print $1}') || return 1
+    BACKUP_PART=$(select_partition_handler "backup" "/tmp/backup_candidates" | awk '{print $1}') || return 1
+
+    # Validate partition paths
+    for part in "$ROOT_PART" "$BOOT_PART" "$BACKUP_PART"; do
+        if [[ ! -e "$part" ]]; then
+            echo "Error: Invalid partition path: $part"
+            return 1
+        fi
+    done
 
     export ROOT_PART BOOT_PART BACKUP_PART
 
     echo -e "\nFinal Selections:"
     echo "ROOT_PART=$ROOT_PART"
-    echo "BOOT_PART=$BOOT_PART"
+    echo "BOOT_PART=$BOOT_PART" 
     echo "BACKUP_PART=$BACKUP_PART"
 
     return 0
