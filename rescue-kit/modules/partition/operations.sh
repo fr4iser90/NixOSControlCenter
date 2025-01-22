@@ -1,22 +1,20 @@
 #!/bin/bash
 
-
-
 detect_suggest_and_select_partitions() {
     # Step 1: Detect partitions
-    if ! detect_partitions; then
+    if ! detect_partitions_handler; then
         echo "Error: Failed to detect partitions"
         return 1
     fi
 
     # Step 2: Suggest partitions
-    if ! suggest_partitions; then
+    if ! suggest_partitions_handler; then
         echo "Error: Failed to suggest partitions"
         return 1
     fi
 
     # Step 3: Select partitions
-    if ! select_partitions; then
+    if ! select_partitions_handler; then
         echo "Error: Failed to select partitions"
         return 1
     fi
@@ -56,50 +54,29 @@ detect_partitions_handler() {
     return 0
 }
 
-# Clean detected partitions
-clean_partitions() {
-    echo "$1" | sed 's/├─//g; s/└─//g; s/│//g'
-}
+# Suggest a partition to the user
+suggest_partition_handler() {
+    local prompt="$1"
+    local candidates_file="$2"
 
-# Detect partitions and save candidates
-detect_partitions() {
-    echo "Detecting partitions..."
-    detect_partitions_handler || return 1
-    
-    # Read detected partitions into local variables
-    local detected_root=$(cat /tmp/root_candidates)
-    local detected_boot=$(cat /tmp/boot_candidates)
-    local detected_backup=$(cat /tmp/backup_candidates)
-    
-    echo -e "\nDetected Partitions:"
-    echo "Root:"
-    echo "$detected_root"
-    echo -e "\nBoot:"
-    echo "$detected_boot"
-    echo -e "\nBackup:"
-    echo "$detected_backup"
-    
+    if [ ! -s "$candidates_file" ]; then
+        echo "No valid $prompt candidates found."
+        return 1
+    fi
+
+    echo "Available $prompt partitions:"
+    cat "$candidates_file"
+    echo ""
+
+    local default=$(head -n1 "$candidates_file")
+    echo "Suggested $prompt partition: $default"
     return 0
 }
 
-# Suggest best partition candidates
-suggest_partitions() {
-    echo -e "\nSuggested Partitions:"
-    
-    # Get suggested partitions
-    local suggested_root=$(head -n1 /tmp/root_candidates)
-    local suggested_boot=$(head -n1 /tmp/boot_candidates)
-    local suggested_backup=$(head -n1 /tmp/backup_candidates)
-    
-    echo "Root: $suggested_root"
-    echo "Boot: $suggested_boot"
-    echo "Backup: $suggested_backup"
-    
-    return 0
-}
+
 
 # Select partitions with user input
-select_partitions() {
+select_partitions_handler() {
     echo -e "\nSelecting partitions..."
     
     # Get user selections
@@ -121,10 +98,10 @@ select_partitions() {
         fi
     done
     
-    echo -e "\nSelected Partitions:"
-    echo "Root: $selected_root"
-    echo "Boot: $selected_boot"
-    echo "Backup: $selected_backup"
+    echo -e "\nFinal Partition Selection:"
+    echo "$selected_root"
+    echo "$selected_boot"
+    echo "$selected_backup"
     
     # Export selected partitions
     export SELECTED_ROOT_PART="$selected_root"
@@ -139,57 +116,13 @@ select_partitions() {
     return 0
 }
 
-# Select a partition with validation
-select_partition_handler() {
-    local prompt="$1"
-    local candidates_file="$2"
-    
-    # Verify candidates file exists and is readable
-    if [ ! -r "$candidates_file" ]; then
-        echo "Error: Cannot read candidates file $candidates_file"
-        return 1
-    fi
-
-    # Get default selection
-    local default=$(head -n1 "$candidates_file")
-    
-    # Show available partitions
-    suggest_partition_handler "$prompt" "$candidates_file" || return 1
-
-    # Get user selection with validation
-    while true; do
-        read -p "Enter your choice for $prompt partition (or press Enter to use '$default'): " selected
-        
-        # Use default if empty input
-        if [ -z "$selected" ]; then
-            selected="$default"
-            echo "Using default selection: $selected"
-        fi
-
-        # Extract just the device path from selection
-        selected=$(echo "$selected" | awk '{print $1}')
-
-        # Validate selection exists in candidates
-        if grep -q "^$selected" "$candidates_file"; then
-            # Additional validation that partition exists
-            if [ -e "$selected" ]; then
-                echo "Selected $prompt partition: $selected"
-                echo "$selected"
-                return 0
-            else
-                echo "Error: Partition $selected does not exist"
-            fi
-        else
-            echo "Error: Invalid selection - must be one of:"
-            cat "$candidates_file"
-        fi
-        
-        echo "Please try again"
-    done
+# Clean detected partitions
+clean_partitions() {
+    echo "$1" | sed 's/├─//g; s/└─//g; s/│//g' | awk '{print $1}'
 }
 
 # Clean up tree structure characters and format output
-prepare_and_save_partition_candidates() {
+prepare_and_save_partition_candidates_handler() {
     local candidates="$1"
     local output_file="$2"
 
@@ -200,27 +133,14 @@ prepare_and_save_partition_candidates() {
     fi
 }
 
-
-
-# Suggest a partition to the user
-suggest_partition_handler() {
-    local prompt="$1"
-    local candidates_file="$2"
-
-    if [ ! -s "$candidates_file" ]; then
-        echo "No valid $prompt candidates found."
-        return 1
+# Load partition configuration
+load_partition_config() {
+    if [ -f /tmp/partition_config ]; then
+        source /tmp/partition_config
+        return 0
     fi
-
-    echo "Available $prompt partitions:"
-    cat "$candidates_file"
-    echo ""
-
-    local default=$(head -n1 "$candidates_file")
-    echo "Suggested $prompt partition: $default"
-    return 0
+    return 1
 }
-
 
 # List available USB devices with improved error handling
 list_usb_devices_handler() {
@@ -267,49 +187,6 @@ list_live_usb_devices_handler() {
     return 0
 }
 
-# Verify system partitions
-verify_partitions_handler() {
-    echo "Verifying partitions..."
-    
-    # Check if root partition exists
-    if [ ! -e "$SELECTED_ROOT_PART" ]; then
-        echo "Error: Root partition $SELECTED_ROOT_PART not found"
-        return 1
-    fi
-    
-    # Check if boot partition exists (if specified)
-    if [ -n "$SELECTED_BOOT_PART" ] && [ ! -e "$SELECTED_BOOT_PART" ]; then
-        echo "Error: Boot partition $SELECTED_BOOT_PART not found"
-        return 1
-    fi
-    
-    echo "Partitions verified successfully"
-    return 0
-}
-
-# Verify system requirements
-verify_system_requirements_handler() {
-    echo "Verifying system requirements..."
-    
-    # Check if running as root
-    if [ "$EUID" -ne 0 ]; then
-        echo "Error: Script must be run as root"
-        return 1
-    fi
-    
-    # Check for required commands
-    local required_commands=("lsblk" "mount" "umount" "chroot" "nixos-install")
-    for cmd in "${required_commands[@]}"; do
-        if ! command -v $cmd &> /dev/null; then
-            echo "Error: Required command '$cmd' not found"
-            return 1
-        fi
-    done
-    
-    echo "System requirements verified"
-    return 0
-}
-
 # Set up bind mounts for chroot
 setup_bind_mounts_handler() {
     echo "Setting up bind mounts..."
@@ -339,23 +216,6 @@ bind_mounts() {
         return 1
     fi
     return 0
-}
-
-
-# Save partition configuration
-save_partition_config() {
-    echo "SELECTED_ROOT_PART=$SELECTED_ROOT_PART" > /tmp/partition_config
-    echo "SELECTED_BOOT_PART=$SELECTED_BOOT_PART" >> /tmp/partition_config
-    echo "SELECTED_BACKUP_PART=$SELECTED_BACKUP_PART" >> /tmp/partition_config
-}
-
-# Load partition configuration
-load_partition_config() {
-    if [ -f /tmp/partition_config ]; then
-        source /tmp/partition_config
-        return 0
-    fi
-    return 1
 }
 
 # Simplified mount partitions handler

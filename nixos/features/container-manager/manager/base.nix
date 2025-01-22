@@ -102,7 +102,6 @@ in {
       chmod 755 ${selectedConfig.userConfig.home}
     '';
 
-    virtualisation.docker.enable = true;
     virtualisation.docker.rootless = {
       enable = true;
       setSocketVariable = true;

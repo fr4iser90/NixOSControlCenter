@@ -5,7 +5,6 @@ source "${rescue_kit_root_dir}/modules/partition/operations.sh"
 partition_menu() {
 
     create_standard_menu "partition" "Partition Management" \
-        "Run All Checks" \
         "Detect Partitions" \
         "Suggest Partitions" \
         "Select Partitions" \
