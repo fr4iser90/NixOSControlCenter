@@ -260,7 +260,7 @@ bind_mounts() {
 
 # Mount partitions and set up chroot environment
 mount_partitions_handler() {
-    echo "Mounting partitions..."
+    echo "Setup partitions mounting..."
 
     # Create mount directories if they don't exist
     mkdir -p /mnt || { echo "Failed to create /mnt directory"; return 1; }

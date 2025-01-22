@@ -40,16 +40,16 @@ run_rescue_handler() {
 
 # Step 1: Detect and select partitions
 detect_and_select_partitions() {
-    echo "Detecting partitions..."
+    echo "Step 1: Detect and select partitions..."
     detect_partitions_handler
     suggest_partitions_handler
     sleep 1.0
     return 0
 }
 
-# Step 3: Mount partitions
+# Step 2: Mount partitions
 mount_partitions() {
-    echo "Mounting partitions..."
+    echo "Step 2: Mount partitions..."
     sleep 1.0
     mount_partitions_handler
     sleep 1.0
