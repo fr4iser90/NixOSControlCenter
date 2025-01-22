@@ -287,112 +287,83 @@ load_partition_config() {
     return 1
 }
 
-# Mount partitions with improved error handling and validation
+# Simplified mount partitions handler
 mount_partitions_handler() {
     echo "Setting up partition mounts..."
-
-    # Verify required partitions are set
-    if [ -z "$ROOT_PART" ] || [ -z "$BOOT_PART" ] || [ -z "$BACKUP_PART" ]; then
-        echo "Error: Required partitions are missing."
-        if ! load_partition_config; then
-            echo "Error: Could not load saved partition configuration"
-            return 1
-        fi
-        echo "Loaded saved partition configuration:"
-        echo "ROOT_PART: $ROOT_PART"
-        echo "BOOT_PART: $BOOT_PART"
-        echo "BACKUP_PART: $BACKUP_PART"
-        sleep 5
-    fi
-
-    # Verify partitions exist and are block devices
-    for part in "$ROOT_PART" "$BOOT_PART" "$BACKUP_PART"; do
-        if [ ! -e "$part" ]; then
-            echo "Error: Partition $part does not exist"
-            return 1
-        fi
-        if [ ! -b "$part" ]; then
-            echo "Error: $part is not a block device"
-            return 1
-        fi
-    done
-
-    # Get filesystem types
-    local root_fs=$(lsblk -no FSTYPE "$ROOT_PART")
-    local boot_fs=$(lsblk -no FSTYPE "$BOOT_PART")
-    local backup_fs=$(lsblk -no FSTYPE "$BACKUP_PART")
-
-    # Create mount points
-    local mount_points=("/mnt" "/mnt/boot" "/mnt/backup")
-    for dir in "${mount_points[@]}"; do
-        if ! mkdir -p "$dir"; then
-            echo "Error: Failed to create mount directory $dir"
-            return 1
-        fi
-    done
-
-    # Save current configuration
-    save_partition_config
-
-    # Unmount any existing mounts first
-    for part in "$ROOT_PART" "$BOOT_PART" "$BACKUP_PART"; do
-        if mount | grep -q "$part"; then
-            echo "Unmounting existing mount for $part"
-            sudo umount "$part" || echo "Warning: Failed to unmount $part"
-        fi
-    done
-
-    # Mount partitions with error handling
-    local mounted=()
-    local success=false
     
-    echo "Mounting root partition ($ROOT_PART) with filesystem $root_fs"
-    sleep 3
-    if sudo mount -t "$root_fs" -o defaults,noatime "$ROOT_PART" /mnt; then
-        mounted+=("/mnt")
-        echo "Root partition mounted successfully."
-        
-        echo "Mounting boot partition ($BOOT_PART) with filesystem $boot_fs"
-        if sudo mount -t "$boot_fs" -o defaults "$BOOT_PART" /mnt/boot; then
-            mounted+=("/mnt/boot")
-            echo "Boot partition mounted successfully."
-            
-            echo "Mounting backup partition ($BACKUP_PART) with filesystem $backup_fs"
-            if sudo mount -t "$backup_fs" -o defaults "$BACKUP_PART" /mnt/backup; then
-                mounted+=("/mnt/backup")
-                echo "Backup partition mounted successfully."
-                success=true
-            else
-                echo "Error: Failed to mount backup partition $BACKUP_PART"
-            fi
-        else
-            echo "Error: Failed to mount boot partition $BOOT_PART"
-        fi
-    else
-        echo "Error: Failed to mount root partition $ROOT_PART"
-        echo "Debug info:"
-        echo "Device: $ROOT_PART"
-        echo "Filesystem: $root_fs"
-        echo "Mount options: defaults,noatime"
-        echo "Mount point: /mnt"
-        sudo blkid "$ROOT_PART"
-        sudo lsblk -o NAME,FSTYPE,MOUNTPOINT,UUID "$ROOT_PART"
-        sleep 10
-    fi
+    # Create mount points
+    mkdir -p /mnt /mnt/boot /mnt/backup || {
+        echo "Error: Failed to create mount directories"
+        return 1
+    }
 
-    # Cleanup if any mount failed
-    if [ "$success" = false ]; then
-        echo "Unmounting any successful mounts..."
-        for ((i=${#mounted[@]}-1; i>=0; i--)); do
-            sudo umount "${mounted[i]}" || echo "Warning: Failed to unmount ${mounted[i]}"
-        done
+    # Mount root partition
+    echo "Mounting root partition ($ROOT_PART) to /mnt"
+    if ! sudo mount "$ROOT_PART" /mnt; then
+        echo "Error: Failed to mount root partition"
         return 1
     fi
 
+    # Mount boot partition
+    echo "Mounting boot partition ($BOOT_PART) to /mnt/boot"
+    if ! sudo mount "$BOOT_PART" /mnt/boot; then
+        echo "Error: Failed to mount boot partition"
+        sudo umount /mnt
+        return 1
+    fi
+
+    # Mount backup partition
+    echo "Mounting backup partition ($BACKUP_PART) to /mnt/backup"
+    if ! sudo mount "$BACKUP_PART" /mnt/backup; then
+        echo "Error: Failed to mount backup partition"
+        sudo umount /mnt/boot
+        sudo umount /mnt
+        return 1
+    fi
+
+    echo "All partitions mounted successfully"
     return 0
 }
 
 # Enhanced mount checking and unmounting functions
+
+# Unmount backup partition specifically
+unmount_backup() {
+    echo "Starting backup unmount process..."
+    
+    # Check if backup is mounted
+    if ! findmnt -n -o TARGET "/mnt/backup" &>/dev/null; then
+        echo "Backup partition is not mounted"
+        return 0
+    fi
+    
+    echo "Unmounting backup partition..."
+    local errors=0
+    
+    if umount "/mnt/backup" 2>/dev/null; then
+        echo "Successfully unmounted backup partition"
+    else
+        echo "Warning: Failed to unmount backup partition (retrying with lazy unmount)"
+        umount -l "/mnt/backup" || {
+            echo "Error: Could not unmount backup partition"
+            ((errors++))
+        }
+    fi
+    
+    # Clean up backup mount directory
+    if [[ -d "/mnt/backup" ]]; then
+        echo "Cleaning up backup mount directory..."
+        rmdir "/mnt/backup" || echo "Warning: Could not remove backup mount directory"
+    fi
+    
+    if [[ $errors -gt 0 ]]; then
+        echo "Backup unmount completed with $errors error(s)"
+        return 1
+    else
+        echo "Backup unmount completed successfully"
+        return 0
+    fi
+}
 
 # Check if target directory is mounted with detailed status
 is_mounted() {

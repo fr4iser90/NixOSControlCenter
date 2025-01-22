@@ -61,6 +61,7 @@ validate_and_copy_backups() {
     sleep 1.0
     backup_essential_handler
     sleep 1.0
+    unmount_backup
     return 0
 }
 
