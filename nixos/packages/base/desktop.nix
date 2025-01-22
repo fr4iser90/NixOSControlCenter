@@ -12,7 +12,7 @@
     tmux
     tree
     fzf
-    
-
+    # office
+    libreoffice
   ];
 }

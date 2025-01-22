@@ -1,25 +1,6 @@
 #!/bin/bash
 
-# Run all checks
-run_all_checks_handler() {
-    echo "Running system checks..."
-    
-    
-    if ! detect_partitions; then
-        return 1
-    fi
-    
-    if ! verify_partitions; then
-        return 1
-    fi
-    
-    if ! list_usb_devices; then
-        return 1
-    fi
-    
-    echo "All checks completed successfully"
-    return 0
-}
+
 
 detect_suggest_and_select_partitions() {
     # Step 1: Detect partitions
@@ -144,6 +125,11 @@ select_partitions() {
     echo "Root: $selected_root"
     echo "Boot: $selected_boot"
     echo "Backup: $selected_backup"
+    
+    # Export selected partitions
+    export SELECTED_ROOT_PART="$selected_root"
+    export SELECTED_BOOT_PART="$selected_boot"
+    export SELECTED_BACKUP_PART="$selected_backup"
     
     # Save final selections
     echo "SELECTED_ROOT_PART=$selected_root" > /tmp/partition_config
