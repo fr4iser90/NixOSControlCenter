@@ -72,7 +72,7 @@ prepare_and_save_partition_candidates() {
     if [ -n "$candidates" ]; then
         # Clean up tree structure characters and format output
         echo "$candidates" | sed 's/├─//g; s/└─//g; s/│//g' | \
-        awk '{print $1, $2, $3, $4, $5}' > "$output_file"
+        awk '{print $1}' > "$output_file"
     else
         echo "No valid candidates found."
     fi
@@ -91,7 +91,7 @@ select_partition_handler() {
 
     # Zeige verfügbare Partitionen an
     echo "Available $prompt partitions:"
-    cat "$candidates_file" | awk '{print $1, $2, $3, $4, $5}'  # Entfernt "├─", "- " und "_|_"
+    cat "$candidates_file" | awk '{print $1}'  # Entfernt "├─", "- " und "_|_"
     echo ""
 
     # Automatische Vorschläge anzeigen
