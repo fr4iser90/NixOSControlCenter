@@ -34,11 +34,11 @@ detect_partitions_handler() {
     fi
 
     echo "All detected partitions:"
-    echo "$all_partitions"
+    echo "$all_partitions" | awk '{print $1, $2, $3, $4, $5}'
     echo ""
 
     # Root-Kandidaten: NVMe/SATA mit gängigen Dateisystemen
-    local root_candidates=$(echo "$all_partitions" | grep -E 'ext4|xfs|btrfs' | grep -E 'nvme|sata' | sort -k2 -nr)
+    local root_candidates=$(echo "$all_partitions" | grep -E 'ext4|xfs|btrfs' | grep -E 'nvme|sata' | sort -k2 -nr | awk '{print $1, $2, $3, $4, $5}')
 
     # Boot-Kandidaten: FAT-basierte Partitionen mit Mindestgröße 250 MB
     local boot_candidates=$(echo "$all_partitions" | grep -E 'vfat|fat32' | awk '{if ($2 >= 250 * 1024 * 1024) print}' | sort -k2 -nr)
@@ -52,13 +52,13 @@ detect_partitions_handler() {
     prepare_and_save_partition_candidates "$backup_candidates" "/tmp/backup_candidates"
     
     echo "Root Partition Candidates:"
-    echo "$root_candidates"
+    echo "$root_candidates" | awk '{print $1, $2, $3, $4, $5}'
     echo ""
     echo "Boot Partition Candidates:"
-    echo "$boot_candidates"
+    echo "$boot_candidates" | awk '{print $1, $2, $3, $4, $5}'
     echo ""
     echo "Backup Partition Candidates:"
-    echo "$backup_candidates"
+    echo "$backup_candidates" | awk '{print $1, $2, $3, $4, $5}'
     echo ""
 
     echo "Partition detection completed."

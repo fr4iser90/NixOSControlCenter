@@ -46,10 +46,6 @@ backup_essential_handler() {
     return 0
 }
 
-
-
-
-
 # Full system backup
 backup_full_handler() {
     local backup_dir=$1
