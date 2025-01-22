@@ -26,7 +26,7 @@ run_all_checks_handler() {
 detect_partitions_handler() {
     echo "Detecting partitions..."
 
-    # Alle Partitionen abrufen
+    # Fetch all valid partitions
     local all_partitions=$(lsblk -o NAME,SIZE,FSTYPE,TRAN,MOUNTPOINT -p -n | grep -Ev 'iso9660|loop|zram|swap')
     if [ -z "$all_partitions" ]; then
         echo "Error: No valid partitions found."
@@ -34,32 +34,18 @@ detect_partitions_handler() {
     fi
 
     echo "All detected partitions:"
-    echo "$all_partitions" | awk '{print $1, $2, $3, $4, $5}'
+    echo "$all_partitions"
     echo ""
 
-    # Root-Kandidaten: NVMe/SATA mit gängigen Dateisystemen
-    local root_candidates=$(echo "$all_partitions" | grep -E 'ext4|xfs|btrfs' | grep -E 'nvme|sata' | sort -k2 -nr | awk '{print $1, $2, $3, $4, $5}')
+    # Categorize partitions
+    local root_candidates=$(echo "$all_partitions" | grep -E 'ext4|xfs|btrfs' | grep -E 'nvme|sata')
+    local boot_candidates=$(echo "$all_partitions" | grep -E 'vfat|fat32' | awk '{if ($2 >= 250 * 1024 * 1024) print}')
+    local backup_candidates=$(echo "$all_partitions" | grep 'usb')
 
-    # Boot-Kandidaten: FAT-basierte Partitionen mit Mindestgröße 250 MB
-    local boot_candidates=$(echo "$all_partitions" | grep -E 'vfat|fat32' | awk '{if ($2 >= 250 * 1024 * 1024) print}' | sort -k2 -nr)
-
-    # Backup-Kandidaten: USB-Partitionen
-    local backup_candidates=$(echo "$all_partitions" | grep 'usb' | sort -k2 -nr)
-
-    # Ergebnisse vorbereiten und speichern
+    # Save candidates if they exist
     prepare_and_save_partition_candidates "$root_candidates" "/tmp/root_candidates"
     prepare_and_save_partition_candidates "$boot_candidates" "/tmp/boot_candidates"
     prepare_and_save_partition_candidates "$backup_candidates" "/tmp/backup_candidates"
-    
-    echo "Root Partition Candidates:"
-    echo "$root_candidates" | awk '{print $1, $2, $3, $4, $5}'
-    echo ""
-    echo "Boot Partition Candidates:"
-    echo "$boot_candidates" | awk '{print $1, $2, $3, $4, $5}'
-    echo ""
-    echo "Backup Partition Candidates:"
-    echo "$backup_candidates" | awk '{print $1, $2, $3, $4, $5}'
-    echo ""
 
     echo "Partition detection completed."
     return 0
@@ -79,8 +65,8 @@ prepare_and_save_partition_candidates() {
 }
 
 
-# Enhanced Select a partition from a given list
-select_partition_handler() {
+# Suggest a partition to the user
+suggest_partition_handler() {
     local prompt="$1"
     local candidates_file="$2"
 
@@ -89,27 +75,31 @@ select_partition_handler() {
         return 1
     fi
 
-    # Zeige verfügbare Partitionen an
     echo "Available $prompt partitions:"
-    cat "$candidates_file" | awk '{print $1}'  # Entfernt "├─", "- " und "_|_"
+    cat "$candidates_file"
     echo ""
 
-    # Automatische Vorschläge anzeigen
-    local default=$(head -n1 "$candidates_file" | awk '{print $1}')
+    local default=$(head -n1 "$candidates_file")
     echo "Suggested $prompt partition: $default"
+    return 0
+}
 
-    # Benutzer zur Eingabe auffordern
-    echo ""
-    read -p "Enter your choice for $prompt partition (or press Enter to use the $default): " selected
+# Select a partition from the suggestions
+select_partition_handler() {
+    local prompt="$1"
+    local candidates_file="$2"
 
-    # Verwende Vorschlag, wenn keine Eingabe erfolgt
+    suggest_partition_handler "$prompt" "$candidates_file" || return 1
+
+    read -p "Enter your choice for $prompt partition (or press Enter to use the default): " selected
+    local default=$(head -n1 "$candidates_file")
+
     if [ -z "$selected" ]; then
         selected="$default"
         echo "Defaulting to: $selected"
     fi
 
-    # Validierung der Auswahl
-    if grep -q "^$selected" "$candidates_file"; then
+    if grep -q "^$selected$" "$candidates_file"; then
         echo "Selected $prompt partition: $selected"
         echo "$selected"
         return 0
@@ -119,22 +109,23 @@ select_partition_handler() {
     fi
 }
 
-# High-level function to suggest and select partitions
-suggest_partitions_handler() {
-    # Capture selected partitions
-    SELECTED_ROOT_PART=$(select_partition_handler "root" "/tmp/root_candidates") || exit 1
-    SELECTED_BOOT_PART=$(select_partition_handler "boot" "/tmp/boot_candidates") || exit 1
-    SELECTED_BACKUP_PART=$(select_partition_handler "backup" "/tmp/backup_candidates") || echo "No backup partition selected."
+# High-level handler to detect, suggest, select, and export partitions
+suggest_and_select_partitions() {
+    detect_partitions_handler || return 1
 
-    # Print the results
-    echo "Root Partition: $SELECTED_ROOT_PART"
-    echo "Boot Partition: $SELECTED_BOOT_PART"
-    echo "Backup Partition: ${SELECTED_BACKUP_PART:-None}"
-    sleep 10
-    # Export selected values
+    echo "Selecting partitions..."
+
+    ROOT_PART=$(select_partition_handler "root" "/tmp/root_candidates") || return 1
+    BOOT_PART=$(select_partition_handler "boot" "/tmp/boot_candidates") || return 1
+    BACKUP_PART=$(select_partition_handler "backup" "/tmp/backup_candidates") || return 1
+
     export ROOT_PART BOOT_PART BACKUP_PART
-    export SELECTED_ROOT_PART SELECTED_BOOT_PART SELECTED_BACKUP_PART
-    
+
+    echo -e "\nFinal Selections:"
+    echo "ROOT_PART=$ROOT_PART"
+    echo "BOOT_PART=$BOOT_PART"
+    echo "BACKUP_PART=$BACKUP_PART"
+
     return 0
 }
 
@@ -286,48 +277,65 @@ mount_partitions_handler() {
     mkdir -p /mnt/boot || { echo "Failed to create /mnt/boot directory"; return 1; }
     mkdir -p /mnt/backup || { echo "Failed to create /mnt/backup directory"; return 1; }
 
+    echo "ROOT_PART: $ROOT_PART"
+    echo "BOOT_PART: $BOOT_PART"
+    echo "BACKUP_PART: $BACKUP_PART"
+    sleep 2
+
     # Verify partitions are set
-    if [ -z "$SELECTED_ROOT_PART" ] || [ -z "$SELECTED_BOOT_PART" ] || [ -z "$SELECTED_BACKUP_PART" ]; then
+    if [ -z "$ROOT_PART" ] || [ -z "$BOOT_PART" ] || [ -z "$BACKUP_PART" ]; then
         echo "Error: Required partitions are missing."
         # Try to load saved config
         if load_partition_config; then
             echo "Loaded saved partition configuration:"
-            echo "ROOT_PART: $SELECTED_ROOT_PART"
-            echo "BOOT_PART: $SELECTED_BOOT_PART"
-            echo "BACKUP_PART: $SELECTED_BACKUP_PART"
+            echo "ROOT_PART: $ROOT_PART"
+            echo "BOOT_PART: $BOOT_PART"
+            echo "BACKUP_PART: $BACKUP_PART"
         else
             return 1
         fi
     fi
 
-    # Mount root partition
-    if ! mount "$SELECTED_ROOT_PART" /mnt; then
-        echo "Failed to mount root partition: $SELECTED_ROOT_PART"
-        return 1
-    fi
-    echo "Root partition mounted successfully."
+    # Try mounting with retry logic
+    for attempt in {1..3}; do
+        echo "Mount attempt $attempt of 3"
+        
+        # Mount root partition
+        if sudo mount "$ROOT_PART" /mnt; then
+            echo "Root partition mounted successfully."
+            
+            # Mount boot partition
+            if sudo mount "$BOOT_PART" /mnt/boot; then
+                echo "Boot partition mounted successfully."
+                
+                # Mount backup partition
+                if sudo mount "$BACKUP_PART" /mnt/backup; then
+                    echo "Backup partition mounted successfully."
+                    return 0
+                else
+                    echo "Failed to mount backup partition."
+                    sudo umount /mnt/boot
+                fi
+            else
+                echo "Failed to mount boot partition."
+            fi
+            sudo umount /mnt
+        else
+            echo "Failed to mount root partition."
+        fi
+        
+        # Wait before retry
+        sleep 2
+        
+        # Reload saved config for next attempt
+        if load_partition_config; then
+            echo "Retrying with saved partition configuration"
+        fi
+    done
 
-    # Mount boot partition
-    if ! mount "$SELECTED_BOOT_PART" /mnt/boot; then
-        echo "Failed to mount boot partition: $SELECTED_BOOT_PART"
-        umount /mnt
-        return 1
-    fi
-    echo "Boot partition mounted successfully."
-
-    # Mount backup partition
-    if ! mount "$SELECTED_BACKUP_PART" /mnt/backup; then
-        echo "Failed to mount backup partition: $SELECTED_BACKUP_PART"
-        umount /mnt/boot
-        umount /mnt
-        return 1
-    fi
-    echo "Backup partition mounted successfully."
-
-    echo "All partitions mounted successfully."
-    return 0
+    echo "Failed to mount partitions after 3 attempts"
+    return 1
 }
-
 
 # Check if partitions are mounted
 is_mounted() {

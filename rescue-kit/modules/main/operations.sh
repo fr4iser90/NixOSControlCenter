@@ -41,8 +41,7 @@ run_rescue_handler() {
 # Step 1: Detect and select partitions
 detect_and_select_partitions() {
     echo "Step 1: Detect and select partitions..."
-    detect_partitions_handler
-    suggest_partitions_handler
+    suggest_and_select_partitions
     sleep 1.0
     return 0
 }
