@@ -70,8 +70,9 @@ prepare_and_save_partition_candidates() {
     local output_file="$2"
 
     if [ -n "$candidates" ]; then
-        # Entferne Zeichen wie "├─" und strukturiere die Partitionen sauber ab
-        echo "$candidates" | awk '{print $1, $2, $3, $4, $5}' > "$output_file"
+        # Clean up tree structure characters and format output
+        echo "$candidates" | sed 's/├─//g; s/└─//g; s/│//g' | \
+        awk '{print $1, $2, $3, $4, $5}' > "$output_file"
     else
         echo "No valid candidates found."
     fi
