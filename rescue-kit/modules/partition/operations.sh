@@ -134,11 +134,6 @@ suggest_partitions_handler() {
     # Export selected values
     export ROOT_PART BOOT_PART BACKUP_PART
     export SELECTED_ROOT_PART SELECTED_BOOT_PART SELECTED_BACKUP_PART
-    # Show final selection
-    echo -e "\nSelected Partitions:"
-    echo "ROOT_PART=$ROOT_PART"
-    echo "BOOT_PART=$BOOT_PART"
-    [ -n "$BACKUP_PART" ] && echo "BACKUP_PART=$BACKUP_PART"
     
     return 0
 }
