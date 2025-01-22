@@ -46,11 +46,11 @@ detect_partitions_handler() {
     # Backup-Kandidaten: USB-Partitionen
     local backup_candidates=$(echo "$all_partitions" | grep 'usb' | sort -k2 -nr)
 
-    # Ergebnisse speichern
-    echo "$root_candidates" > /tmp/root_candidates
-    echo "$boot_candidates" > /tmp/boot_candidates
-    echo "$backup_candidates" > /tmp/backup_candidates
-
+    # Ergebnisse vorbereiten und speichern
+    prepare_and_save_partition_candidates "$root_candidates" "/tmp/root_candidates"
+    prepare_and_save_partition_candidates "$boot_candidates" "/tmp/boot_candidates"
+    prepare_and_save_partition_candidates "$backup_candidates" "/tmp/backup_candidates"
+    
     echo "Root Partition Candidates:"
     echo "$root_candidates"
     echo ""
@@ -65,7 +65,17 @@ detect_partitions_handler() {
     return 0
 }
 
+prepare_and_save_partition_candidates() {
+    local candidates="$1"
+    local output_file="$2"
 
+    if [ -n "$candidates" ]; then
+        # Entferne Zeichen wie "├─" und strukturiere die Partitionen sauber ab
+        echo "$candidates" | awk '{print $1, $2, $3, $4, $5}' > "$output_file"
+    else
+        echo "No valid candidates found."
+    fi
+}
 
 
 # Enhanced Select a partition from a given list
