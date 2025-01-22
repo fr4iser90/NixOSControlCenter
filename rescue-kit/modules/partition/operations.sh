@@ -78,7 +78,7 @@ select_partition_handler() {
 
     suggest_partition_handler "$prompt" "$candidates_file" || return 1
 
-    read -p "Enter your choice for $prompt partition (or press Enter to use the default): " selected
+    read -p "Enter your choice for $prompt partition (or press Enter to use the $default): " selected
     local default=$(head -n1 "$candidates_file")
 
     if [ -z "$selected" ]; then
