@@ -21,6 +21,34 @@ run_all_checks_handler() {
     return 0
 }
 
+detect_suggest_and_select_partitions() {
+    # Step 1: Detect partitions
+    if ! detect_partitions; then
+        echo "Error: Failed to detect partitions"
+        return 1
+    fi
+
+    # Step 2: Suggest partitions
+    if ! suggest_partitions; then
+        echo "Error: Failed to suggest partitions"
+        return 1
+    fi
+
+    # Step 3: Select partitions
+    if ! select_partitions; then
+        echo "Error: Failed to select partitions"
+        return 1
+    fi
+
+    # Load selected partitions
+    load_partition_config || {
+        echo "Error: Failed to load partition configuration"
+        return 1
+    }
+
+    # Return success
+    return 0
+}
 
 # Detect partitions and categorize
 detect_partitions_handler() {
@@ -52,30 +80,76 @@ clean_partitions() {
     echo "$1" | sed 's/├─//g; s/└─//g; s/│//g'
 }
 
-# Save and select partitions
-suggest_and_select_partitions() {
+# Detect partitions and save candidates
+detect_partitions() {
+    echo "Detecting partitions..."
     detect_partitions_handler || return 1
+    
+    # Read detected partitions into local variables
+    local detected_root=$(cat /tmp/root_candidates)
+    local detected_boot=$(cat /tmp/boot_candidates)
+    local detected_backup=$(cat /tmp/backup_candidates)
+    
+    echo -e "\nDetected Partitions:"
+    echo "Root:"
+    echo "$detected_root"
+    echo -e "\nBoot:"
+    echo "$detected_boot"
+    echo -e "\nBackup:"
+    echo "$detected_backup"
+    
+    return 0
+}
 
-    echo "Selecting partitions..."
-    ROOT_PART=$(select_partition_handler "root" "/tmp/root_candidates" | awk '{print $1}') || return 1
-    BOOT_PART=$(select_partition_handler "boot" "/tmp/boot_candidates" | awk '{print $1}') || return 1
-    BACKUP_PART=$(select_partition_handler "backup" "/tmp/backup_candidates" | awk '{print $1}') || return 1
+# Suggest best partition candidates
+suggest_partitions() {
+    echo -e "\nSuggested Partitions:"
+    
+    # Get suggested partitions
+    local suggested_root=$(head -n1 /tmp/root_candidates)
+    local suggested_boot=$(head -n1 /tmp/boot_candidates)
+    local suggested_backup=$(head -n1 /tmp/backup_candidates)
+    
+    echo "Root: $suggested_root"
+    echo "Boot: $suggested_boot"
+    echo "Backup: $suggested_backup"
+    
+    return 0
+}
 
-    # Validate partition paths
-    for part in "$ROOT_PART" "$BOOT_PART" "$BACKUP_PART"; do
+# Select partitions with user input
+select_partitions() {
+    echo -e "\nSelecting partitions..."
+    
+    # Get user selections
+    local selected_root=$(select_partition_handler "root" "/tmp/root_candidates") || return 1
+    local selected_boot=$(select_partition_handler "boot" "/tmp/boot_candidates") || return 1
+    local selected_backup=$(select_partition_handler "backup" "/tmp/backup_candidates") || return 1
+    
+    # Extract just device paths
+    selected_root=$(echo "$selected_root" | awk '{print $1}')
+    selected_boot=$(echo "$selected_boot" | awk '{print $1}')
+    selected_backup=$(echo "$selected_backup" | awk '{print $1}')
+    
+    # Validate selected paths
+    echo -e "\nValidating selected partitions..."
+    for part in "$selected_root" "$selected_boot" "$selected_backup"; do
         if [[ ! -e "$part" ]]; then
             echo "Error: Invalid partition path: $part"
             return 1
         fi
     done
-
-    export ROOT_PART BOOT_PART BACKUP_PART
-
-    echo -e "\nFinal Selections:"
-    echo "ROOT_PART=$ROOT_PART"
-    echo "BOOT_PART=$BOOT_PART" 
-    echo "BACKUP_PART=$BACKUP_PART"
-
+    
+    echo -e "\nSelected Partitions:"
+    echo "Root: $selected_root"
+    echo "Boot: $selected_boot"
+    echo "Backup: $selected_backup"
+    
+    # Save final selections
+    echo "SELECTED_ROOT_PART=$selected_root" > /tmp/partition_config
+    echo "SELECTED_BOOT_PART=$selected_boot" >> /tmp/partition_config
+    echo "SELECTED_BACKUP_PART=$selected_backup" >> /tmp/partition_config
+    
     return 0
 }
 
@@ -106,8 +180,11 @@ select_partition_handler() {
             echo "Using default selection: $selected"
         fi
 
+        # Extract just the device path from selection
+        selected=$(echo "$selected" | awk '{print $1}')
+
         # Validate selection exists in candidates
-        if grep -q "^$selected$" "$candidates_file"; then
+        if grep -q "^$selected" "$candidates_file"; then
             # Additional validation that partition exists
             if [ -e "$selected" ]; then
                 echo "Selected $prompt partition: $selected"
@@ -209,14 +286,14 @@ verify_partitions_handler() {
     echo "Verifying partitions..."
     
     # Check if root partition exists
-    if [ ! -e "$ROOT_PART" ]; then
-        echo "Error: Root partition $ROOT_PART not found"
+    if [ ! -e "$SELECTED_ROOT_PART" ]; then
+        echo "Error: Root partition $SELECTED_ROOT_PART not found"
         return 1
     fi
     
     # Check if boot partition exists (if specified)
-    if [ -n "$BOOT_PART" ] && [ ! -e "$BOOT_PART" ]; then
-        echo "Error: Boot partition $BOOT_PART not found"
+    if [ -n "$SELECTED_BOOT_PART" ] && [ ! -e "$SELECTED_BOOT_PART" ]; then
+        echo "Error: Boot partition $SELECTED_BOOT_PART not found"
         return 1
     fi
     
@@ -281,9 +358,9 @@ bind_mounts() {
 
 # Save partition configuration
 save_partition_config() {
-    echo "ROOT_PART=$ROOT_PART" > /tmp/partition_config
-    echo "BOOT_PART=$BOOT_PART" >> /tmp/partition_config
-    echo "BACKUP_PART=$BACKUP_PART" >> /tmp/partition_config
+    echo "SELECTED_ROOT_PART=$SELECTED_ROOT_PART" > /tmp/partition_config
+    echo "SELECTED_BOOT_PART=$SELECTED_BOOT_PART" >> /tmp/partition_config
+    echo "SELECTED_BACKUP_PART=$SELECTED_BACKUP_PART" >> /tmp/partition_config
 }
 
 # Load partition configuration
@@ -306,23 +383,23 @@ mount_partitions_handler() {
     }
 
     # Mount root partition
-    echo "Mounting root partition ($ROOT_PART) to /mnt"
-    if ! sudo mount "$ROOT_PART" /mnt; then
+    echo "Mounting root partition ($SELECTED_ROOT_PART) to /mnt"
+    if ! sudo mount "$SELECTED_ROOT_PART" /mnt; then
         echo "Error: Failed to mount root partition"
         return 1
     fi
 
     # Mount boot partition
-    echo "Mounting boot partition ($BOOT_PART) to /mnt/boot"
-    if ! sudo mount "$BOOT_PART" /mnt/boot; then
+    echo "Mounting boot partition ($SELECTED_BOOT_PART) to /mnt/boot"
+    if ! sudo mount "$SELECTED_BOOT_PART" /mnt/boot; then
         echo "Error: Failed to mount boot partition"
         sudo umount /mnt
         return 1
     fi
 
     # Mount backup partition
-    echo "Mounting backup partition ($BACKUP_PART) to /mnt/backup"
-    if ! sudo mount "$BACKUP_PART" /mnt/backup; then
+    echo "Mounting backup partition ($SELECTED_BACKUP_PART) to /mnt/backup"
+    if ! sudo mount "$SELECTED_BACKUP_PART" /mnt/backup; then
         echo "Error: Failed to mount backup partition"
         sudo umount /mnt/boot
         sudo umount /mnt
