@@ -26,7 +26,6 @@ run_all_checks_handler() {
 detect_partitions_handler() {
     echo "Detecting partitions..."
 
-    # Fetch all valid partitions
     local all_partitions=$(lsblk -o NAME,SIZE,FSTYPE,TRAN,MOUNTPOINT -p -n | grep -Ev 'iso9660|loop|zram|swap')
     if [ -z "$all_partitions" ]; then
         echo "Error: No valid partitions found."
@@ -34,15 +33,12 @@ detect_partitions_handler() {
     fi
 
     echo "All detected partitions:"
-    echo "$all_partitions"
-    echo ""
+    clean_partitions "$all_partitions"
 
-    # Categorize partitions
     local root_candidates=$(echo "$all_partitions" | grep -E 'ext4|xfs|btrfs' | grep -E 'nvme|sata')
     local boot_candidates=$(echo "$all_partitions" | grep -E 'vfat|fat32' | awk '{if ($2 >= 250 * 1024 * 1024) print}')
     local backup_candidates=$(echo "$all_partitions" | grep 'usb')
 
-    # Save candidates if they exist
     prepare_and_save_partition_candidates "$root_candidates" "/tmp/root_candidates"
     prepare_and_save_partition_candidates "$boot_candidates" "/tmp/boot_candidates"
     prepare_and_save_partition_candidates "$backup_candidates" "/tmp/backup_candidates"
@@ -51,40 +47,31 @@ detect_partitions_handler() {
     return 0
 }
 
-prepare_and_save_partition_candidates() {
-    local candidates="$1"
-    local output_file="$2"
-
-    if [ -n "$candidates" ]; then
-        # Clean up tree structure characters and format output
-        echo "$candidates" | sed 's/├─//g; s/└─//g; s/│//g' | \
-        awk '{print $1}' > "$output_file"
-    else
-        echo "No valid candidates found."
-    fi
+# Clean detected partitions
+clean_partitions() {
+    echo "$1" | sed 's/├─//g; s/└─//g; s/│//g'
 }
 
+# Save and select partitions
+suggest_and_select_partitions() {
+    detect_partitions_handler || return 1
 
-# Suggest a partition to the user
-suggest_partition_handler() {
-    local prompt="$1"
-    local candidates_file="$2"
+    echo "Selecting partitions..."
+    ROOT_PART=$(select_partition_handler "root" "/tmp/root_candidates") || return 1
+    BOOT_PART=$(select_partition_handler "boot" "/tmp/boot_candidates") || return 1
+    BACKUP_PART=$(select_partition_handler "backup" "/tmp/backup_candidates") || return 1
 
-    if [ ! -s "$candidates_file" ]; then
-        echo "No valid $prompt candidates found."
-        return 1
-    fi
+    export ROOT_PART BOOT_PART BACKUP_PART
 
-    echo "Available $prompt partitions:"
-    cat "$candidates_file"
-    echo ""
+    echo -e "\nFinal Selections:"
+    echo "ROOT_PART=$ROOT_PART"
+    echo "BOOT_PART=$BOOT_PART"
+    echo "BACKUP_PART=$BACKUP_PART"
 
-    local default=$(head -n1 "$candidates_file")
-    echo "Suggested $prompt partition: $default"
     return 0
 }
 
-# Select a partition from the suggestions
+# Select a partition
 select_partition_handler() {
     local prompt="$1"
     local candidates_file="$2"
@@ -109,25 +96,39 @@ select_partition_handler() {
     fi
 }
 
-# High-level handler to detect, suggest, select, and export partitions
-suggest_and_select_partitions() {
-    detect_partitions_handler || return 1
+# Clean up tree structure characters and format output
+prepare_and_save_partition_candidates() {
+    local candidates="$1"
+    local output_file="$2"
 
-    echo "Selecting partitions..."
+    if [ -n "$candidates" ]; then
+        clean_partitions "$candidates" | awk '{print $1}' > "$output_file"
+    else
+        echo "No valid candidates found."
+    fi
+}
 
-    ROOT_PART=$(select_partition_handler "root" "/tmp/root_candidates") || return 1
-    BOOT_PART=$(select_partition_handler "boot" "/tmp/boot_candidates") || return 1
-    BACKUP_PART=$(select_partition_handler "backup" "/tmp/backup_candidates") || return 1
 
-    export ROOT_PART BOOT_PART BACKUP_PART
 
-    echo -e "\nFinal Selections:"
-    echo "ROOT_PART=$ROOT_PART"
-    echo "BOOT_PART=$BOOT_PART"
-    echo "BACKUP_PART=$BACKUP_PART"
+# Suggest a partition to the user
+suggest_partition_handler() {
+    local prompt="$1"
+    local candidates_file="$2"
 
+    if [ ! -s "$candidates_file" ]; then
+        echo "No valid $prompt candidates found."
+        return 1
+    fi
+
+    echo "Available $prompt partitions:"
+    cat "$candidates_file"
+    echo ""
+
+    local default=$(head -n1 "$candidates_file")
+    echo "Suggested $prompt partition: $default"
     return 0
 }
+
 
 # List available USB devices with improved error handling
 list_usb_devices_handler() {
