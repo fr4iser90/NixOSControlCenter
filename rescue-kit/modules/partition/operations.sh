@@ -130,7 +130,7 @@ suggest_partitions_handler() {
     echo "Root Partition: $SELECTED_ROOT_PART"
     echo "Boot Partition: $SELECTED_BOOT_PART"
     echo "Backup Partition: ${SELECTED_BACKUP_PART:-None}"
-
+    sleep 10
     # Export selected values
     export ROOT_PART BOOT_PART BACKUP_PART
     export SELECTED_ROOT_PART SELECTED_BOOT_PART SELECTED_BACKUP_PART
@@ -291,65 +291,48 @@ mount_partitions_handler() {
     mkdir -p /mnt/boot || { echo "Failed to create /mnt/boot directory"; return 1; }
     mkdir -p /mnt/backup || { echo "Failed to create /mnt/backup directory"; return 1; }
 
-    echo "ROOT_PART: $ROOT_PART"
-    echo "BOOT_PART: $BOOT_PART"
-    echo "BACKUP_PART: $BACKUP_PART"
-    sleep 2
-
     # Verify partitions are set
-    if [ -z "$ROOT_PART" ] || [ -z "$BOOT_PART" ] || [ -z "$BACKUP_PART" ]; then
+    if [ -z "$SELECTED_ROOT_PART" ] || [ -z "$SELECTED_BOOT_PART" ] || [ -z "$SELECTED_BACKUP_PART" ]; then
         echo "Error: Required partitions are missing."
         # Try to load saved config
         if load_partition_config; then
             echo "Loaded saved partition configuration:"
-            echo "ROOT_PART: $ROOT_PART"
-            echo "BOOT_PART: $BOOT_PART"
-            echo "BACKUP_PART: $BACKUP_PART"
+            echo "ROOT_PART: $SELECTED_ROOT_PART"
+            echo "BOOT_PART: $SELECTED_BOOT_PART"
+            echo "BACKUP_PART: $SELECTED_BACKUP_PART"
         else
             return 1
         fi
     fi
 
-    # Try mounting with retry logic
-    for attempt in {1..3}; do
-        echo "Mount attempt $attempt of 3"
-        
-        # Mount root partition
-        if sudo mount "$ROOT_PART" /mnt; then
-            echo "Root partition mounted successfully."
-            
-            # Mount boot partition
-            if sudo mount "$BOOT_PART" /mnt/boot; then
-                echo "Boot partition mounted successfully."
-                
-                # Mount backup partition
-                if sudo mount "$BACKUP_PART" /mnt/backup; then
-                    echo "Backup partition mounted successfully."
-                    return 0
-                else
-                    echo "Failed to mount backup partition."
-                    sudo umount /mnt/boot
-                fi
-            else
-                echo "Failed to mount boot partition."
-            fi
-            sudo umount /mnt
-        else
-            echo "Failed to mount root partition."
-        fi
-        
-        # Wait before retry
-        sleep 2
-        
-        # Reload saved config for next attempt
-        if load_partition_config; then
-            echo "Retrying with saved partition configuration"
-        fi
-    done
+    # Mount root partition
+    if ! mount "$SELECTED_ROOT_PART" /mnt; then
+        echo "Failed to mount root partition: $SELECTED_ROOT_PART"
+        return 1
+    fi
+    echo "Root partition mounted successfully."
 
-    echo "Failed to mount partitions after 3 attempts"
-    return 1
+    # Mount boot partition
+    if ! mount "$SELECTED_BOOT_PART" /mnt/boot; then
+        echo "Failed to mount boot partition: $SELECTED_BOOT_PART"
+        umount /mnt
+        return 1
+    fi
+    echo "Boot partition mounted successfully."
+
+    # Mount backup partition
+    if ! mount "$SELECTED_BACKUP_PART" /mnt/backup; then
+        echo "Failed to mount backup partition: $SELECTED_BACKUP_PART"
+        umount /mnt/boot
+        umount /mnt
+        return 1
+    fi
+    echo "Backup partition mounted successfully."
+
+    echo "All partitions mounted successfully."
+    return 0
 }
+
 
 # Check if partitions are mounted
 is_mounted() {
