@@ -9,6 +9,7 @@ let
     (cfg.system-updater or false)
     (cfg.system-logger or false)
     (cfg.container-manager or false)
+    (cfg.system-config-manager or false)
     (cfg.homelab-manager or false)
     (cfg.bootentry-manager or false)
     (cfg.ssh-manager or false)
@@ -32,6 +33,8 @@ in {
       ./system-updater
     ] ++ lib.optionals (cfg.system-logger or false) [
       ./system-logger
+    ] ++ lib.optionals (cfg.system-config-manager or false) [
+      ./system-config-manager
     ] ++ lib.optionals (cfg.container-manager or false && !(cfg.homelab-manager or false)) [
       ./container-manager
     ] ++ lib.optionals (cfg.homelab-manager or false) [

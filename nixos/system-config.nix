@@ -85,6 +85,7 @@
     system-logger = false;      # Optional
     system-checks = false;      # Optional
     system-updater = false;     # Optional
+    system-config-manager = false; # Optional
     ssh-client-manager = false; # Optional
     ssh-server-manager = false; # Optional
     bootentry-manager = false;  # Optional
