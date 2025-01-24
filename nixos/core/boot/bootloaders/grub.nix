@@ -6,7 +6,6 @@
     # Enable GRUB as the bootloader
     grub = {
       enable = true;
-      version = 2;
       efiSupport = true;
       copyKernels = true;
 
@@ -27,7 +26,4 @@
       efiSysMountPoint = "/boot/efi";
     };
   };
-
-  # Optional: Splash-Screen aktivieren
-  services.plymouth.enable = false;
 }

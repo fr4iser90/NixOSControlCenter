@@ -6,9 +6,6 @@ let
   networkingModules = [
     ./networkmanager.nix
 #    ./firewall.nix
-    # Conditional imports based on systemConfig settings
-    #(lib.mkIf systemConfig.enableWireless ./wireless.nix)
-    #(lib.mkIf systemConfig.enableCustomDNS ./dns.nix)
   ];
 in {
   imports = networkingModules;

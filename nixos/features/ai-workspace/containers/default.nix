@@ -21,8 +21,8 @@
   };
     
   environment.systemPackages = with pkgs; [
-    docker
-    docker-compose
-    docker-client
+#    docker
+#    docker-compose
+#    docker-client
   ];
 }
