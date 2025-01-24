@@ -2,16 +2,10 @@
 { config, lib, pkgs, ... }:
 {
   environment.systemPackages = with pkgs; [
-    # Development
     vscode
-    nodejs
-    gcc
-    libgcc
-    code-cursor
     git
     git-credential-manager
     delta
-    godot_4
   ];
 
   programs.git = {

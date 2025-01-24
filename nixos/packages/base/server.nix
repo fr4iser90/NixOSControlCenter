@@ -1,22 +1,24 @@
-# server profile
+# server-profile.nix
 { config, lib, pkgs, ... }:
 {
+  # Installing essential CLI tools for server management
   environment.systemPackages = with pkgs; [
-    # CLI Essentials
-    coreutils
-    curl
-    wget
-    git
-    neovim
-    htop
-    tmux
-    tree
-    fzf
-    iotop
-    iftop
-    ufw
-    nmap
+    coreutils   # Basic file, shell, and text manipulation utilities
+    curl        # Command-line tool for transferring data with URLs
+    wget        # Command-line utility for downloading files from the web
+    git         # Distributed version control system
+    neovim      # Modern text editor for configuration and scripting
+    htop        # Interactive process viewer
+    tmux        # Terminal multiplexer for managing multiple terminal sessions
+    tree        # Display directory structures in a tree-like format
+    fzf         # Fuzzy finder for quick file and command searching
+    iotop       # Monitor disk I/O usage by processes
+    iftop       # Display real-time bandwidth usage by network connections
+    ufw         # Uncomplicated Firewall for managing firewall rules
+    nmap        # Network scanner for auditing and monitoring networks
+    gnupg       # Encryption and signing tool for secure communications
   ];
-  services.openssh.enable = true;
 
+  # Enable OpenSSH for remote access to the server
+  services.openssh.enable = true;
 }

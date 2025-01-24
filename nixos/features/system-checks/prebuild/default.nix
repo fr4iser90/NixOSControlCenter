@@ -3,7 +3,7 @@
 let
   ui = config.features.terminal-ui.api;
 
-  checkScript = pkgs.writeScriptBin "build" ''
+  prebuildCheckScript = pkgs.writeScriptBin "build" ''
     #!${pkgs.bash}/bin/bash
     
     # Trap für CTRL+C
@@ -87,8 +87,7 @@ in {
       name = "build";
       category = "system";
       description = "Build and activate NixOS configuration with safety checks";
-#      script = checkScript;
-      script = "${checkScript}/bin/build";
+      script = "${prebuildCheckScript}/bin/build";
       arguments = [
         "switch"
         "boot"
@@ -113,7 +112,7 @@ in {
       dependencies = [ "system-checks" ];
     }
     ];
-    environment.systemPackages = [ checkScript ];
+    environment.systemPackages = [ prebuildCheckScript ];
   };
   
 }

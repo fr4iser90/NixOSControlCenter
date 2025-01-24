@@ -3,10 +3,10 @@
 with lib;
 
 let
-  cfg = config.system.postflight;
+  cfg = config.system.postbuild;
 
-  # Basis-Skript für Postflight-Checks
-  postflightScript = pkgs.writeScriptBin "nixos-postflight" ''
+  # Basis-Skript für postbuild-Checks
+  postbuildScript = pkgs.writeScriptBin "nixos-postbuild" ''
     #!${pkgs.bash}/bin/bash
     set -e
     
@@ -17,7 +17,7 @@ let
     BLUE='\033[0;34m'
     NC='\033[0m'
     
-    echo -e "''${BLUE}=== NixOS Postflight Checks ===''${NC}"
+    echo -e "''${BLUE}=== NixOS postbuild Checks ===''${NC}"
     
     # Führe alle aktivierten Checks aus
     ${concatStringsSep "\n" (map (check: 
@@ -27,7 +27,7 @@ let
       else ""
     ) (attrNames cfg.checks))}
     
-    echo -e "\\n''${GREEN}✅ All postflight checks passed''${NC}"
+    echo -e "\\n''${GREEN}✅ All postbuild checks passed''${NC}"
   '';
 
   # Verfügbare Checks
@@ -140,8 +140,8 @@ let
 
 in {
   options = {
-    system.postflight = {
-      enable = mkEnableOption "system postflight checks";
+    system.postbuild = {
+      enable = mkEnableOption "system postbuild checks";
       
       checks = mkOption {
         type = types.submodule {
@@ -154,25 +154,25 @@ in {
           }) defaultChecks;
         };
         default = {};
-        description = "Enabled postflight checks";
+        description = "Enabled postbuild checks";
       };
       
       availableChecks = mkOption {
         type = types.attrs;
         default = mapAttrs (_: check: check.script) defaultChecks;
-        description = "Available postflight check scripts";
+        description = "Available postbuild check scripts";
       };
     };
   };
 
   config = mkIf cfg.enable {
-    environment.systemPackages = [ postflightScript ];
+    environment.systemPackages = [ postbuildScript ];
     
-    system.activationScripts.postflight = {
+    system.activationScripts.postbuild = {
       deps = [ "users" "groups" ];
       text = ''
-        echo "Running postflight checks..."
-        ${postflightScript}/bin/nixos-postflight
+        echo "Running postbuild checks..."
+        ${postbuildScript}/bin/nixos-postbuild
       '';
     };
   };
