@@ -43,7 +43,7 @@
       ./desktop
       ./packages
       ./features
-      (if builtins.pathExists ./custom then ./custom else null)
+      ./custom
     ];
 
   in {

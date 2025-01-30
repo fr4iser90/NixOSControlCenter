@@ -35,11 +35,10 @@ in {
       ./system-logger
     ] ++ lib.optionals (cfg.system-config-manager or false) [
       ./system-config-manager
-    ] ++ lib.optionals (cfg.container-manager or false && !(cfg.homelab-manager or false)) [
+    ] ++ lib.optionals (cfg.container-manager or false) [
       ./container-manager
     ] ++ lib.optionals (cfg.homelab-manager or false) [
       ./homelab-manager
-      ./container-manager
     ] ++ lib.optionals (cfg.bootentry-manager or false) [
       ./bootentry-manager
     ] ++ lib.optionals (cfg.ssh-client-manager or false) [

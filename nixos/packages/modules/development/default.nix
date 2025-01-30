@@ -7,7 +7,6 @@
     git-credential-manager
     delta
   ];
-
   programs.git = {
     enable = true;
     config = {

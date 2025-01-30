@@ -43,6 +43,13 @@ let
       checks_failed=1
     fi
 
+    # Run Memory check
+    ${ui.badges.info "Running Memory check..."}
+    if ! prebuild-check-memory; then
+      ${ui.badges.error "Memory check failed!"}
+      checks_failed=1
+    fi
+
     # Run User check
     ${ui.badges.info "Running User check..."}
     if ! prebuild-check-users; then
@@ -77,6 +84,7 @@ in {
   imports = [
     ./checks/hardware/gpu.nix
     ./checks/hardware/cpu.nix
+    ./checks/hardware/memory.nix
     ./checks/system/users.nix
   ];
 
@@ -114,5 +122,4 @@ in {
     ];
     environment.systemPackages = [ prebuildCheckScript ];
   };
-  
 }

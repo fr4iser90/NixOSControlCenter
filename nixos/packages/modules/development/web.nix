@@ -9,6 +9,10 @@
     #npm                    # Default Node.js package manager
     deno                   # Alternative runtime for modern JavaScript/TypeScript
     pnpm                   # Faster alternative to npm
+    maven
+    xorg.libX11
+    xorg.libXtst
+    gtk3  
 
     # Web Servers
     nginx                  # Web server for testing and deployment

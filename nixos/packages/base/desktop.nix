@@ -8,7 +8,6 @@
     git
     neovim
     htop
-    docker
     tmux
     tree
     fzf
