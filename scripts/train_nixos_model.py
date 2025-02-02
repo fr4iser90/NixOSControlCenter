@@ -13,9 +13,10 @@ from transformers import (
 )
 from datasets import Dataset
 from typing import List, Dict, Any, Tuple
+from peft import LoraConfig, get_peft_model
 
 class NixOSModelTrainer:
-    def __init__(self, dataset_dir: str, output_dir: str, model_name: str = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
+    def __init__(self, dataset_dir: str, output_dir: str, model_name: str = "facebook/opt-125m"):
         self.dataset_dir = Path(dataset_dir)
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True, parents=True)
@@ -31,14 +32,31 @@ class NixOSModelTrainer:
             model_name,
             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
             device_map="auto",
-            trust_remote_code=True
+            low_cpu_mem_usage=True
         )
+
+        # LoRA Configuration
+        lora_config = LoraConfig(
+            r=8,
+            lora_alpha=32,
+            target_modules=["q_proj", "v_proj"],
+            lora_dropout=0.05,
+            bias="none",
+            task_type="CAUSAL_LM"
+        )
+        self.model = get_peft_model(self.model, lora_config)
         
-        # Configure special tokens
+        # Jetson Optimierungen
+        if torch.cuda.is_available():
+            self.model = self.model.to("cuda")
+            torch.backends.cuda.enable_flash_sdp(True)
+            torch.backends.cuda.enable_mem_efficient_sdp(True)
+        
+        self.model.print_trainable_parameters()
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.model.config.pad_token_id = self.tokenizer.eos_token_id
         
-    def load_datasets(self) -> List[Dict[str, str]]:
+    def load_datasets(self) -> Dataset:
         training_data = []
         dataset_files = [
             'nixos_concepts.jsonl',
@@ -57,11 +75,11 @@ class NixOSModelTrainer:
                         pairs = self._format_data_for_training(data)
                         for prompt, response in pairs:
                             training_data.append({
-                                "prompt": f"<|user|>\n{prompt}\n<|assistant|>\n",
-                                "response": f"{response}\n</s>"
+                                "text": f"<|user|>\n{prompt}\n<|assistant|>\n{response}\n</s>"
                             })
         
-        return training_data
+        dataset = Dataset.from_pandas(pd.DataFrame(training_data))
+        return dataset.train_test_split(test_size=0.1)
     
     def _format_data_for_training(self, data: dict) -> List[Tuple[str, str]]:
         pairs = []
@@ -95,70 +113,74 @@ class NixOSModelTrainer:
         return pairs
 
     def train(self):
-        training_data = self.load_datasets()
-        print(f"Loaded {len(training_data)} training examples")
-        
-        dataset = Dataset.from_pandas(pd.DataFrame(training_data))
-        
+        dataset = self.load_datasets()
+        print(f"Loaded {len(dataset['train'])} training examples")
+        print(f"Using {len(dataset['test'])} validation examples")
+
         def preprocess(examples):
             return self.tokenizer(
-                text=examples["prompt"],
-                text_target=examples["response"],
+                examples["text"],
                 truncation=True,
-                max_length=1024,
+                max_length=256,  # Reduziert für Jetson RAM
                 padding="max_length",
-                return_tensors="pt"
-            )
-        
-        dataset = dataset.map(preprocess, batched=True, remove_columns=["prompt", "response"])
-        
-        training_args = TrainingArguments(
-            output_dir=self.output_dir,
-            num_train_epochs=5,
-            per_device_train_batch_size=2,
-            gradient_accumulation_steps=4,
-            learning_rate=2e-5,
-            weight_decay=0.01,
-            fp16=True,
-            optim="adafactor",
-            gradient_checkpointing=True,
-            logging_steps=50,
-            save_strategy="steps",
-            save_steps=500,
-            eval_steps=500,
-            evaluation_strategy="steps",
-            max_steps=3000,
-            report_to="none",
-            ddp_find_unused_parameters=False
+                return_tensors="pt",
+                add_special_tokens=True  # Spezielle Tokens explizit hinzufügen
         )
         
+        tokenized_dataset = dataset.map(
+            preprocess,
+            batched=True,
+            remove_columns=["text"],
+            num_proc=1  # Reduziert für Jetson ARM Architektur
+        )
+
+        training_args = TrainingArguments(
+            output_dir=self.output_dir,
+            num_train_epochs=3,
+            learning_rate=1e-5,
+            fp16=torch.cuda.is_bf16_supported(),
+            optim="adafactor",
+            logging_steps=100,
+            save_strategy="steps",
+            save_steps=500,
+            evaluation_strategy="steps",
+            eval_steps=200,
+            max_steps=2000,
+            per_device_train_batch_size=1,  # Angepasst für 8GB RAM
+            gradient_accumulation_steps=16,
+            report_to="none",
+            dataloader_num_workers=1,
+            remove_unused_columns=True,
+            gradient_checkpointing=False  # Aktiviert für Speicheroptimierung
+        )
+
         trainer = Trainer(
             model=self.model,
             args=training_args,
-            train_dataset=dataset,
-            eval_dataset=dataset,
+            train_dataset=tokenized_dataset["train"],
+            eval_dataset=tokenized_dataset["test"],
             data_collator=DataCollatorForLanguageModeling(
                 tokenizer=self.tokenizer,
-                mlm=False
+                mlm=False,
+                pad_to_multiple_of=8
             ),
         )
-        
+
         print("Starting training...")
         trainer.train()
         self.save_optimized_model()
 
     def save_optimized_model(self):
-        self.model.save_pretrained(self.output_dir / "final_model")
-        self.tokenizer.save_pretrained(self.output_dir / "final_model")
-        
-        # Quantization
-        quantized_model = torch.quantization.quantize_dynamic(
+        # Quantisierung vor dem Speichern
+        self.model = torch.quantization.quantize_dynamic(
             self.model,
             {torch.nn.Linear},
             dtype=torch.qint8
         )
-        quantized_model.save_pretrained(self.output_dir / "quantized")
-        print(f"Saved optimized models to {self.output_dir}")
+        
+        self.model.save_pretrained(self.output_dir / "quantized_model")
+        self.tokenizer.save_pretrained(self.output_dir / "quantized_model")
+        print(f"Saved optimized model to {self.output_dir}")
 
     def test_model(self, test_prompts: List[str]):
         generation_config = {
