@@ -3,7 +3,6 @@ import json
 import torch
 import pandas as pd
 from pathlib import Path
-from datetime import datetime
 from transformers import (
     AutoTokenizer, 
     AutoModelForCausalLM,
@@ -28,14 +27,19 @@ class NixOSModelTrainer:
             padding_side="left",
             trust_remote_code=True
         )
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+        
+        # Load base model first
+        print(f"Loading base model from {model_name}...")
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
             device_map="auto",
             low_cpu_mem_usage=True
         )
-
-        # LoRA Configuration
+        self.model.config.pad_token_id = self.tokenizer.eos_token_id
+        
+        # Apply LoRA config
         lora_config = LoraConfig(
             r=8,
             lora_alpha=32,
@@ -44,17 +48,34 @@ class NixOSModelTrainer:
             bias="none",
             task_type="CAUSAL_LM"
         )
-        self.model = get_peft_model(self.model, lora_config)
         
-        # Jetson Optimierungen
+        # Try to load from checkpoints or saved model
+        checkpoint_dir = self.output_dir / "checkpoint-2000"  # Use the latest checkpoint
+        saved_model_dir = self.output_dir / "quantized_model"
+        
+        if checkpoint_dir.exists():
+            print(f"Loading from checkpoint: {checkpoint_dir}")
+            self.model = get_peft_model(self.model, lora_config)
+            self.model.load_adapter(checkpoint_dir, "default")
+        elif saved_model_dir.exists():
+            print(f"Loading from saved model: {saved_model_dir}")
+            self.model = AutoModelForCausalLM.from_pretrained(
+                saved_model_dir,
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+                device_map="auto",
+                low_cpu_mem_usage=True
+            )
+        else:
+            print("No saved model found. Creating new LoRA model...")
+            self.model = get_peft_model(self.model, lora_config)
+        
+        # Move to GPU if available
         if torch.cuda.is_available():
             self.model = self.model.to("cuda")
             torch.backends.cuda.enable_flash_sdp(True)
             torch.backends.cuda.enable_mem_efficient_sdp(True)
         
         self.model.print_trainable_parameters()
-        self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.model.config.pad_token_id = self.tokenizer.eos_token_id
         
     def load_datasets(self) -> Dataset:
         training_data = []
@@ -75,7 +96,7 @@ class NixOSModelTrainer:
                         pairs = self._format_data_for_training(data)
                         for prompt, response in pairs:
                             training_data.append({
-                                "text": f"<|user|>\n{prompt}\n<|assistant|>\n{response}\n</s>"
+                                "text": f"### Question: {prompt}\n\n### Answer: {response}\n"
                             })
         
         dataset = Dataset.from_pandas(pd.DataFrame(training_data))
@@ -121,37 +142,32 @@ class NixOSModelTrainer:
             return self.tokenizer(
                 examples["text"],
                 truncation=True,
-                max_length=256,  # Reduziert für Jetson RAM
+                max_length=512,
                 padding="max_length",
-                return_tensors="pt",
-                add_special_tokens=True  # Spezielle Tokens explizit hinzufügen
-        )
+                return_tensors=None
+            )
         
         tokenized_dataset = dataset.map(
             preprocess,
             batched=True,
-            remove_columns=["text"],
-            num_proc=1  # Reduziert für Jetson ARM Architektur
+            remove_columns=dataset["train"].column_names,
+            num_proc=1
         )
 
         training_args = TrainingArguments(
             output_dir=self.output_dir,
             num_train_epochs=3,
-            learning_rate=1e-5,
-            fp16=torch.cuda.is_bf16_supported(),
-            optim="adafactor",
+            learning_rate=1e-4,
+            fp16=torch.cuda.is_available(),
+            optim="adamw_torch",
             logging_steps=100,
-            save_strategy="steps",
-            save_steps=500,
-            evaluation_strategy="steps",
-            eval_steps=200,
-            max_steps=2000,
-            per_device_train_batch_size=4,  # Angepasst für 8GB RAM
-            gradient_accumulation_steps=16,
-            report_to="none",
-            dataloader_num_workers=1,
-            remove_unused_columns=True,
-            gradient_checkpointing=False  # Aktiviert für Speicheroptimierung
+            save_strategy="epoch",
+            evaluation_strategy="epoch",
+            per_device_train_batch_size=4,
+            gradient_accumulation_steps=4,
+            warmup_steps=100,
+            weight_decay=0.01,
+            report_to="none"
         )
 
         trainer = Trainer(
@@ -161,56 +177,71 @@ class NixOSModelTrainer:
             eval_dataset=tokenized_dataset["test"],
             data_collator=DataCollatorForLanguageModeling(
                 tokenizer=self.tokenizer,
-                mlm=False,
-                pad_to_multiple_of=8
-            ),
+                mlm=False
+            )
         )
 
         print("Starting training...")
         trainer.train()
-        self.save_optimized_model()
+        self.save_model()
 
-    def save_optimized_model(self):
-        # Quantisierung vor dem Speichern
-        self.model = torch.quantization.quantize_dynamic(
-            self.model,
-            {torch.nn.Linear},
-            dtype=torch.qint8
-        )
+    def save_model(self):
+        model_path = self.output_dir / "nixos_model"
+        model_path.mkdir(parents=True, exist_ok=True)
         
-        self.model.save_pretrained(self.output_dir / "quantized_model")
-        self.tokenizer.save_pretrained(self.output_dir / "quantized_model")
-        print(f"Saved optimized model to {self.output_dir}")
+        # Save the model state
+        self.model.save_pretrained(model_path)
+        self.tokenizer.save_pretrained(model_path)
+        print(f"Saved model to {model_path}")
 
     def test_model(self, test_prompts: List[str]):
+        self.model.eval()
+        device = next(self.model.parameters()).device
+        
+        # Faster generation config
         generation_config = {
-            "max_new_tokens": 1024,
+            "max_new_tokens": 256,  # Reduced from 1024
             "temperature": 0.7,
             "top_p": 0.9,
-            "repetition_penalty": 1.2,
             "do_sample": True,
-            "pad_token_id": self.tokenizer.eos_token_id
+            "pad_token_id": self.tokenizer.eos_token_id,
+            "eos_token_id": self.tokenizer.eos_token_id,
+            "num_return_sequences": 1,
+            "max_time": 30.0  # Add timeout of 30 seconds
         }
         
         print("\nTesting model with NixOS prompts:")
-        for prompt in test_prompts:
-            formatted_prompt = f"<|user|>\n{prompt}\n<|assistant|>\n"
-            inputs = self.tokenizer(
-                formatted_prompt,
-                return_tensors="pt"
-            ).to(self.model.device)
-            
-            outputs = self.model.generate(
-                **inputs,
-                **generation_config
-            )
-            
-            response = self.tokenizer.decode(
-                outputs[0][inputs.input_ids.shape[1]:],
-                skip_special_tokens=True
-            )
-            
-            print(f"\nPROMPT: {prompt}\nRESPONSE:\n{response}\n{'='*50}")
+        with torch.no_grad():
+            for i, prompt in enumerate(test_prompts, 1):
+                print(f"\nGenerating response {i}/{len(test_prompts)}...")
+                formatted_prompt = f"### Question: {prompt}\n\n### Answer:"
+                
+                try:
+                    inputs = self.tokenizer(
+                        formatted_prompt,
+                        return_tensors="pt",
+                        padding=True,
+                        truncation=True,
+                        max_length=512
+                    ).to(device)
+                    
+                    outputs = self.model.generate(
+                        input_ids=inputs.input_ids,
+                        attention_mask=inputs.attention_mask,
+                        **generation_config
+                    )
+                    
+                    response = self.tokenizer.decode(
+                        outputs[0][inputs.input_ids.shape[1]:],
+                        skip_special_tokens=True
+                    )
+                    
+                    print(f"\nPrompt: {prompt}")
+                    print(f"Response: {response}")
+                    print("="*80)
+                except Exception as e:
+                    print(f"Error generating response: {str(e)}")
+                    continue
 
 def main():
     trainer = NixOSModelTrainer(
@@ -218,8 +249,8 @@ def main():
         output_dir="/home/fr4iser/Documents/Git/NixOsControlCenter/models"
     )
     
-    # Train and save optimized model
-    trainer.train()
+    # Uncomment to train the model
+    #trainer.train()  # This will automatically save after training
     
     # Test with various prompts
     test_prompts = [
