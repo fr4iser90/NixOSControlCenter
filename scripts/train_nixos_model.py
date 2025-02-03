@@ -15,67 +15,72 @@ from typing import List, Dict, Any, Tuple
 from peft import LoraConfig, get_peft_model
 
 class NixOSModelTrainer:
-    def __init__(self, dataset_dir: str, output_dir: str, model_name: str = "facebook/opt-125m"):
+    def __init__(self, dataset_dir: str, output_dir: str, model_name: str = "NixOS"):
         self.dataset_dir = Path(dataset_dir)
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True, parents=True)
         self.model_name = model_name
+        self.base_model = "NixOS"
         
-        print(f"Loading tokenizer and model from {model_name}...")
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            padding_side="left",
-            trust_remote_code=True
-        )
-        self.tokenizer.pad_token = self.tokenizer.eos_token
-        
-        # Load base model first
-        print(f"Loading base model from {model_name}...")
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            device_map="auto",
-            low_cpu_mem_usage=True
-        )
-        self.model.config.pad_token_id = self.tokenizer.eos_token_id
-        
-        # Apply LoRA config
-        lora_config = LoraConfig(
-            r=8,
-            lora_alpha=32,
-            target_modules=["q_proj", "v_proj"],
-            lora_dropout=0.05,
-            bias="none",
-            task_type="CAUSAL_LM"
-        )
-        
-        # Try to load from checkpoints or saved model
-        checkpoint_dir = self.output_dir / "checkpoint-2000"  # Use the latest checkpoint
-        saved_model_dir = self.output_dir / "quantized_model"
-        
-        if checkpoint_dir.exists():
-            print(f"Loading from checkpoint: {checkpoint_dir}")
-            self.model = get_peft_model(self.model, lora_config)
-            self.model.load_adapter(checkpoint_dir, "default")
-        elif saved_model_dir.exists():
-            print(f"Loading from saved model: {saved_model_dir}")
+        # First check if we're loading an existing model
+        if Path(model_name).exists() and (Path(model_name) / "adapter_model.safetensors").exists():
+            print(f"Loading existing NixOS model from {model_name}...")
+            # Load tokenizer from existing model
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                model_name,
+                padding_side="left",
+                trust_remote_code=True
+            )
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+            
+            # Load our trained model directly
+            print(f"Loading NixOS model...")
             self.model = AutoModelForCausalLM.from_pretrained(
-                saved_model_dir,
+                model_name,
                 torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
                 device_map="auto",
                 low_cpu_mem_usage=True
             )
+            self.model.config.pad_token_id = self.tokenizer.eos_token_id
+            
         else:
-            print("No saved model found. Creating new LoRA model...")
+            # For new models, we still need to start from opt-125m
+            print(f"Creating new NixOS model based on facebook/opt-125m...")
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                "facebook/opt-125m",
+                padding_side="left",
+                trust_remote_code=True
+            )
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+            
+            # Load base model first
+            self.model = AutoModelForCausalLM.from_pretrained(
+                "facebook/opt-125m",
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+                device_map="auto",
+                low_cpu_mem_usage=True
+            )
+            self.model.config.pad_token_id = self.tokenizer.eos_token_id
+            
+            # Apply LoRA config
+            lora_config = LoraConfig(
+                r=8,
+                lora_alpha=32,
+                target_modules=["q_proj", "v_proj"],
+                lora_dropout=0.05,
+                bias="none",
+                task_type="CAUSAL_LM"
+            )
+            
+            print("Applying LoRA configuration...")
             self.model = get_peft_model(self.model, lora_config)
+            self.model.print_trainable_parameters()
         
         # Move to GPU if available
         if torch.cuda.is_available():
             self.model = self.model.to("cuda")
             torch.backends.cuda.enable_flash_sdp(True)
             torch.backends.cuda.enable_mem_efficient_sdp(True)
-        
-        self.model.print_trainable_parameters()
         
     def load_datasets(self) -> Dataset:
         training_data = []

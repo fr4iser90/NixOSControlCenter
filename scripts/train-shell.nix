@@ -42,15 +42,16 @@ let
                   PyYAML==6.0.1 \
                   tqdm==4.66.1 \
                   psutil==5.9.8 \
-                  requests==2.31.0
+                  requests==2.31.0 \
+                  inquirer==3.1.3
       
       # Überprüfe Installation
       echo "Überprüfe Installation..."
-      if python -c "import torch; import transformers; import peft; print('Alle Pakete erfolgreich installiert!')" ; then
+      if python -c "import torch; import transformers; import peft; import inquirer; print('Alle Pakete erfolgreich installiert!')" ; then
           echo "✓ Installation erfolgreich!"
       else
           echo "✗ Installation fehlgeschlagen!"
-          return 1
+          exit 1
       fi
       
       # CUDA support wenn verfügbar
