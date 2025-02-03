@@ -60,7 +60,7 @@ let
 
     get_user_input() {
         local prompt="$1"
-        ${ui.prompts.prompt "$prompt"}
+        echo -n "$prompt"
         read -r input
         echo "$input"
     }

@@ -46,8 +46,10 @@ let
         case "$action" in
             "connect")
                 if [[ "$selection" == "Add new server" ]]; then
-                    local server_ip="$(get_user_input "Enter server IP/hostname: ")"
-                    local username="$(get_user_input "Enter username: ")"
+                    echo -n "Enter server IP/hostname: "
+                    read -r server_ip
+                    echo -n "Enter username: "
+                    read -r username
                     if [[ -n "$server_ip" && -n "$username" ]]; then
                         save_new_server "$server_ip" "$username"
                         ${ui.messages.info "Testing connection..."}
@@ -115,7 +117,8 @@ let
         # Read both lines from select_server
         { read -r selection; read -r action; } < <(select_server "$servers_list")
         
-        if [[ -z "$selection" ]]; then
+        # Don't show error if user just pressed enter on Add new server
+        if [[ -z "$selection" && "$action" != "new" ]]; then
             ${ui.messages.error "No server selected"}
             exit 0
         fi
