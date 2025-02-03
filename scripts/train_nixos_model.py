@@ -87,6 +87,7 @@ class NixOSModelTrainer:
             'nixos_troubleshooting.jsonl'
         ]
         
+        # Load regular datasets
         for file in dataset_files:
             file_path = self.dataset_dir / file
             if file_path.exists():
@@ -98,6 +99,41 @@ class NixOSModelTrainer:
                             training_data.append({
                                 "text": f"### Question: {prompt}\n\n### Answer: {response}\n"
                             })
+        
+        # Load optimization datasets
+        optimization_files = list(self.dataset_dir.glob('nixos_optimization_dataset_*.json'))
+        for file_path in optimization_files:
+            print(f"Loading optimization dataset: {file_path.name}")
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+                for item in data:
+                    # Format hardware profile
+                    hw_profile = item['input']['hardware_profile']
+                    hw_str = f"System: CPU={hw_profile['cpu_model']}, GPU={hw_profile['gpu_model']}, " \
+                            f"Memory={hw_profile['memory_gb']}GB, Storage={hw_profile['storage_type']}"
+                    
+                    # Format performance metrics
+                    metrics = item['input']['performance_metrics']
+                    metrics_str = f"Current Metrics: CPU Usage={metrics['cpu_usage']}%, " \
+                                f"Memory Usage={metrics['memory_usage']['percent']}%, " \
+                                f"Disk IO: Read={metrics['disk_io']['read_bytes']}, Write={metrics['disk_io']['write_bytes']}"
+                    
+                    # Format requirements
+                    reqs = item['input']['requirements']
+                    reqs_str = f"Purpose: {reqs['purpose']}, Priorities: {', '.join(reqs['priorities'])}"
+                    
+                    # Create prompt
+                    prompt = f"Optimize this NixOS configuration for the following system:\n\n" \
+                            f"{hw_str}\n{metrics_str}\n{reqs_str}\n\n" \
+                            f"Current configuration:\n```nix\n{item['input']['current_config']['content']}\n```"
+                    
+                    # Create response with optimizations and rationale
+                    response = f"Here's the optimized configuration:\n\n```nix\n{item['output']['optimized_config']['content']}\n```\n\n" \
+                              f"Improvements:\n{item['output']['rationale']}"
+                    
+                    training_data.append({
+                        "text": f"### Question: {prompt}\n\n### Answer: {response}\n"
+                    })
         
         dataset = Dataset.from_pandas(pd.DataFrame(training_data))
         return dataset.train_test_split(test_size=0.1)
