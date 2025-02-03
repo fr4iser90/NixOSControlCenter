@@ -194,74 +194,14 @@ class NixOSModelTrainer:
         self.tokenizer.save_pretrained(model_path)
         print(f"Saved model to {model_path}")
 
-    def test_model(self, test_prompts: List[str]):
-        self.model.eval()
-        device = next(self.model.parameters()).device
-        
-        # Faster generation config
-        generation_config = {
-            "max_new_tokens": 256,  # Reduced from 1024
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "do_sample": True,
-            "pad_token_id": self.tokenizer.eos_token_id,
-            "eos_token_id": self.tokenizer.eos_token_id,
-            "num_return_sequences": 1,
-            "max_time": 30.0  # Add timeout of 30 seconds
-        }
-        
-        print("\nTesting model with NixOS prompts:")
-        with torch.no_grad():
-            for i, prompt in enumerate(test_prompts, 1):
-                print(f"\nGenerating response {i}/{len(test_prompts)}...")
-                formatted_prompt = f"### Question: {prompt}\n\n### Answer:"
-                
-                try:
-                    inputs = self.tokenizer(
-                        formatted_prompt,
-                        return_tensors="pt",
-                        padding=True,
-                        truncation=True,
-                        max_length=512
-                    ).to(device)
-                    
-                    outputs = self.model.generate(
-                        input_ids=inputs.input_ids,
-                        attention_mask=inputs.attention_mask,
-                        **generation_config
-                    )
-                    
-                    response = self.tokenizer.decode(
-                        outputs[0][inputs.input_ids.shape[1]:],
-                        skip_special_tokens=True
-                    )
-                    
-                    print(f"\nPrompt: {prompt}")
-                    print(f"Response: {response}")
-                    print("="*80)
-                except Exception as e:
-                    print(f"Error generating response: {str(e)}")
-                    continue
-
 def main():
     trainer = NixOSModelTrainer(
         dataset_dir="/home/fr4iser/Documents/Git/NixOsControlCenter/datasets",
         output_dir="/home/fr4iser/Documents/Git/NixOsControlCenter/models"
     )
     
-    # Uncomment to train the model
-    #trainer.train()  # This will automatically save after training
-    
-    # Test with various prompts
-    test_prompts = [
-        "What is NixOS and how is it different from other Linux distributions?",
-        "How do I create a Python development environment with Poetry in NixOS?",
-        "Explain how to update a NixOS system using flakes.",
-        "How do I debug a broken NixOS configuration?",
-        "Create a basic flake.nix for a Python web server with FastAPI"
-    ]
-    
-    trainer.test_model(test_prompts)
+    # Train the model
+    trainer.train()  # This will automatically save after training
 
 if __name__ == "__main__":
     main()

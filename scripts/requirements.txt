@@ -4,3 +4,7 @@ datasets>=2.18.0
 accelerate>=0.27.0
 huggingface-hub>=0.20.0
 llama-cpp-python>=0.2.56
+psutil>=5.9.0
+PyGithub>=2.1.1
+PyYAML>=6.0.1
+requests>=2.31.0
