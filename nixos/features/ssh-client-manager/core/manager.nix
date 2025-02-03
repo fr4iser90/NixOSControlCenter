@@ -67,16 +67,14 @@ let
 
     select_server() {
         local servers_list="$1"
-        local options=("Add new server")
-        while IFS='=' read -r ip user; do
-            if [[ -n "$ip" && -n "$user" ]]; then
-                options+=("$ip ($user)")
-            fi
-        done <<< "$servers_list"
-        
-        # Use process substitution for action output
         local selection action
-        selection=$(printf '%s\n' "''${options[@]}" | ${pkgs.fzf}/bin/fzf \
+        
+        # Create the list of options directly in the pipe
+        selection=$( (echo "Add new server"; while IFS='=' read -r ip user; do 
+            if [[ -n "$ip" && -n "$user" ]]; then
+                echo "$ip ($user)"
+            fi
+        done <<< "$servers_list") | ${pkgs.fzf}/bin/fzf \
             --prompt="${cfg.fzf.theme.prompt}" \
             --pointer="${cfg.fzf.theme.pointer}" \
             --marker="${cfg.fzf.theme.marker}" \
@@ -86,7 +84,7 @@ let
               --preview "${previewScript}/bin/ssh-preview {}" \
               --preview-window="${cfg.fzf.preview.position}"
             ''} \
-            --expect=ctrl-x,ctrl-e,ctrl-n,enter)
+            --expect=ctrl-x,ctrl-e,ctrl-n,enter 2>/dev/null)
         
         # Parse the selection and action
         local key=$(echo "$selection" | head -1)
@@ -96,7 +94,13 @@ let
         case "$key" in
             "ctrl-x") action="delete" ;;
             "ctrl-e") action="edit" ;;
-            "ctrl-n") action="new" ;;
+            "ctrl-n"|"") 
+                if [[ "$choice" == "Add new server" ]]; then
+                    action="new"
+                else
+                    action="connect"
+                fi
+                ;;
             *) action="connect" ;;
         esac
         
