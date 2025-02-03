@@ -18,6 +18,7 @@ nixos/custom/**
 # Exclude virtual environment directories and local .env files for environment-specific configurations.
 venv/
 .env/
+.venv/
 
 # System-specific files
 # Files created by macOS or Windows that have no relevance to the project.
