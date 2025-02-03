@@ -53,7 +53,7 @@
     display = {
       manager = "sddm";
       server = "wayland";
-      session = "plasma";
+      session = "plasma"; 
     };
     theme = {
       dark = true;
@@ -83,12 +83,12 @@
   #
   features = {
     system-logger = false;      # Optional
-    system-checks = false;      # Optional
+    system-checks = false;      # Optional 
     system-updater = false;     # Optional
     system-config-manager = false; # Optional
     ssh-client-manager = false; # Optional
     ssh-server-manager = false; # Optional
-    bootentry-manager = false;  # Optional
+    bootentry-manager = false;  # Optional 
     container-manager = false;   # Optional
     homelab-manager = false;    # Optional
     vm-manager = false;         # Optional

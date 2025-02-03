@@ -6,17 +6,17 @@ let
 
   # Automatic configuration based on available RAM
   memoryConfig = 
-    if memoryInGB >= 64 then {
+    if memoryInGB >= 60 then {
       swappiness = 5;      # Minimal swap usage for high-memory systems
       zramPercent = 15;    # Small zram since plenty of RAM available
       tmpfsPercent = 75;   # Large tmpfs allocation possible
       minFreeKb = 524288;  # Reserve 512MB for system operations
-    } else if memoryInGB >= 32 then {
+    } else if memoryInGB >= 30 then {
       swappiness = 10;     # Low swap usage for good-memory systems
       zramPercent = 25;    # Moderate zram compression
       tmpfsPercent = 75;   # Large tmpfs allocation possible
       minFreeKb = 262144;  # Reserve 256MB for system operations
-    } else if memoryInGB >= 16 then {
+    } else if memoryInGB >= 14 then {
       swappiness = 30;     # Balanced swap usage
       zramPercent = 35;    # Higher zram to compensate for less RAM
       tmpfsPercent = 50;   # Moderate tmpfs allocation

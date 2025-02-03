@@ -146,7 +146,7 @@ class NixOSModelTrainer:
             evaluation_strategy="steps",
             eval_steps=200,
             max_steps=2000,
-            per_device_train_batch_size=1,  # Angepasst für 8GB RAM
+            per_device_train_batch_size=4,  # Angepasst für 8GB RAM
             gradient_accumulation_steps=16,
             report_to="none",
             dataloader_num_workers=1,

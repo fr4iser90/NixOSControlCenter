@@ -21,7 +21,7 @@ A comprehensive tool for managing packages, configurations, and devices on NixOS
 
 ### Quick Install
 ```bash
-git clone https://github.com/fr4iser90/NixOSControlCenter
+git clone https://github.com/fr4iser90/NixOSControlCenter.git
 cd NixOSControlCenter
 sudo nix-shell install-shell.nix
 install

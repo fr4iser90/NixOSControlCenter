@@ -2,15 +2,52 @@
 
 let
   ui = config.features.terminal-ui.api;
+  cfg = config.services.ssh-manager;
+  
+  # Helper function to generate FZF preview text
+  previewScript = pkgs.writeScriptBin "ssh-preview" ''
+    #!${pkgs.bash}/bin/bash
+    line="$1"
+    
+    if [[ "$line" == "Add new server" ]]; then
+      echo "Add a new SSH server connection"
+      echo ""
+      echo "Shortcuts:"
+      echo "  enter - Start new server wizard"
+      echo "  esc   - Cancel"
+    else
+      server=''${line%% *}
+      user=''${line#* (}
+      user=''${user%)*}
+      
+      echo "Server: $server"
+      echo "User: $user"
+      echo ""
+      echo "Connection Status: "
+      if ${pkgs.openssh}/bin/ssh -o BatchMode=yes -o ConnectTimeout=5 "$user@$server" exit 2>/dev/null; then
+        echo "✓ Connected"
+      else
+        echo "✗ Unreachable"
+      fi
+      echo ""
+      echo "Shortcuts:"
+      echo "  enter  - Connect to server"
+      echo "  ctrl-x - Delete server"
+      echo "  ctrl-e - Edit server"
+    fi
+  '';
+
   serverUtils = ''
-    CREDS_FILE="$HOME/.creds"
+    CREDS_FILE="/home/$USER/${cfg.credentialsFile}"
 
     load_saved_servers() {
         if [[ -f "$CREDS_FILE" ]]; then
             cat "$CREDS_FILE"
         else
             ${ui.messages.info "Credentials file not found. Creating a new one."}
+            mkdir -p "$(dirname "$CREDS_FILE")"
             touch "$CREDS_FILE"
+            chmod 600 "$CREDS_FILE"
         fi
     }
 
@@ -32,46 +69,60 @@ let
         local servers_list="$1"
         local options=("Add new server")
         while IFS='=' read -r ip user; do
-            if [[ -n "$ip" && -n "$user" ]]; then  # Prüfe auf nicht-leere Werte
+            if [[ -n "$ip" && -n "$user" ]]; then
                 options+=("$ip ($user)")
             fi
         done <<< "$servers_list"
         
-        # Verwende printf um die Optionen an fzf zu übergeben
-        printf '%s\n' "''${options[@]}" | ${pkgs.fzf}/bin/fzf \
-            --prompt="Select a server: " \
-            --header="Available servers"
+        # Use process substitution for action output
+        local selection action
+        selection=$(printf '%s\n' "''${options[@]}" | ${pkgs.fzf}/bin/fzf \
+            --prompt="${cfg.fzf.theme.prompt}" \
+            --pointer="${cfg.fzf.theme.pointer}" \
+            --marker="${cfg.fzf.theme.marker}" \
+            --header="Available SSH Servers" \
+            --header-first \
+            ${lib.optionalString cfg.fzf.preview.enable ''
+              --preview "${previewScript}/bin/ssh-preview {}" \
+              --preview-window="${cfg.fzf.preview.position}"
+            ''} \
+            --expect=ctrl-x,ctrl-e,ctrl-n,enter)
+        
+        # Parse the selection and action
+        local key=$(echo "$selection" | head -1)
+        local choice=$(echo "$selection" | tail -1)
+        
+        # Map key to action
+        case "$key" in
+            "ctrl-x") action="delete" ;;
+            "ctrl-e") action="edit" ;;
+            "ctrl-n") action="new" ;;
+            *) action="connect" ;;
+        esac
+        
+        # Output both the selection and action
+        echo "$choice"
+        echo "$action"
     }
 
     delete_server() {
         local servers_list="$(load_saved_servers)"
         local selected="$(select_server "$servers_list")"
         
-        # Skip if Add new server was selected
         if [[ "$selected" == "Add new server" ]]; then
-            ${ui.messages.warning "No server selected for deletion."}
             return
         fi
         
-        # Extract IP from selection
-        local ip_to_delete="$(echo "$selected" | awk '{print $1}')"
-        
-        # Remove server from .creds
-        local temp_file="$(mktemp)"
-        grep -v "^$ip_to_delete=" "$CREDS_FILE" > "$temp_file"
-        mv "$temp_file" "$CREDS_FILE"
-        
-        ${ui.messages.success "Server $ip_to_delete successfully deleted."}
+        local server_ip=''${selected%% *}
+        if [[ -n "$server_ip" ]]; then
+            ${ui.messages.loading "Deleting server..."}
+            sed -i "/^$server_ip=/d" "$CREDS_FILE"
+            ${ui.messages.success "Server deleted successfully."}
+        fi
     }
   '';
 in {
-  options = {
-    services.ssh-manager.utils = lib.mkOption {
-      type = lib.types.str;
-      default = serverUtils;
-      description = "SSH Manager utility functions";
-    };
+  config = {
+    services.ssh-manager.utils = serverUtils;
   };
-
-  config = {};
 }

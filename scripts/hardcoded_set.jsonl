@@ -1,2 +1,12 @@
-{"task": "update_nixos_flakes", "input": "Explain how to update a NixOS system using flakes", "output": "\n                To update a NixOS system using flakes:\n                1. Run: nix flake update\n                2. Apply updates: sudo nixos-rebuild switch --flake .#your-hostname\n                3. Check generation: sudo nix-env --list-generations -p /nix/var/nix/profiles/system\n                "}
-{"task": "fix_broken_boot", "input": "How do I fix a broken NixOS boot after an update?", "output": "\n                Steps to recover from broken boot:\n                1. Select previous generation in GRUB\n                2. Rollback: sudo nixos-rebuild switch --rollback\n                3. Investigate logs: journalctl -b -1 -xe\n                4. Check configuration: sudo nixos-rebuild build --show-trace\n                "}
+{
+  "task": "explain nixOS",
+  "input": "What exactly is NixOS?",
+  "output": "\n                NixOS, or New Haven Linux OS, is a unique and innovative POSIX-compliant operating system based on the principles of reproducibility, portability, immutability, declarativeness, predictability, isolation (through namespaces), compositionality, and self-healing. Developed by NixOS Foundation, it uses these concepts to create a minimal yet powerful OS that is easy for administrators to manage.",
+  "task": "understand the .nix file format",
+  "input": "What does a '.nix' configuration file contain?",
+  "output": "\n                A '.nix' or 'NixOS' configuration file, typically named '.config', contains all settings and packages necessary to build NixOS. It includes system configurations like the operating system package selection (e.g., linux-nix for GNU/Linux), enabled services such as firewalld, network interfaces setup with net.interface-drivers, user accounts details, software preferences including shells or desktop environment settings.",
+  "task": "update a NixOS using flakes",
+  "input": "How do you update your NixOS system?",
+  "output": "\n                To keep the latest versions of packages in a stable and predictable way, use Flakes. Follow these steps:\n                1. Run: nix flake update\n                2. Apply updates to selected environments with sudo nixos-rebuild switch --flake .#your-hostname \n                Note that not all packages will be updated automatically as NixOS uses a 'flax' approach where only compatible changes are applied.\n"
+}
+
