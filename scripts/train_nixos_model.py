@@ -35,13 +35,28 @@ class NixOSModelTrainer:
             
             # Load our trained model directly
             print(f"Loading NixOS model...")
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_name,
+            base_model = AutoModelForCausalLM.from_pretrained(
+                "facebook/opt-125m",  # Load base model first
                 torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
                 device_map="auto",
                 low_cpu_mem_usage=True
             )
-            self.model.config.pad_token_id = self.tokenizer.eos_token_id
+            base_model.config.pad_token_id = self.tokenizer.eos_token_id
+            
+            # Apply LoRA config
+            lora_config = LoraConfig(
+                r=8,
+                lora_alpha=32,
+                target_modules=["q_proj", "v_proj"],
+                lora_dropout=0.05,
+                bias="none",
+                task_type="CAUSAL_LM"
+            )
+            
+            # Create PEFT model and load trained weights
+            self.model = get_peft_model(base_model, lora_config)
+            self.model.load_adapter(model_name, adapter_name="default")
+            print("Loaded existing LoRA weights")
             
         else:
             # For new models, we still need to start from opt-125m
