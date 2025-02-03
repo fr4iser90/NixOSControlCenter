@@ -323,11 +323,15 @@ class OptimizationDatasetGenerator:
 
         # Storage optimizations for SSD
         if self.hardware_profile.storage_type == "ssd":
-            optimized["fileSystems."/".options"] = [
-                "noatime",
-                "nodiratime",
-                "discard=async"
-            ]
+            optimized["fileSystems"] = {
+                "/": {
+                    "options": [
+                        "noatime",
+                        "nodiratime",
+                        "discard=async"
+                    ]
+                }
+            }
             optimized["boot.kernel.sysctl"] = {
                 "vm.swappiness": 10,
                 "vm.vfs_cache_pressure": 50
