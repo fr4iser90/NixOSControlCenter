@@ -18,6 +18,11 @@ class ProjectPaths:
     RAW_DIR = DATA_DIR / 'raw'
     SCRIPTS_DIR = LLM_DIR / 'scripts'
     
+    # Visualization directories
+    VISUALIZATION_DIR = SCRIPTS_DIR / 'visualization'
+    METRICS_DIR = MODELS_DIR / 'metrics'
+    VISUALIZER_SCRIPT = VISUALIZATION_DIR / 'training_visualizer.py'
+    
     # Dataset directories
     DATASET_DIR = PROCESSED_DIR / 'datasets'
     CONCEPTS_DIR = DATASET_DIR / 'concepts'
@@ -100,6 +105,8 @@ class ProjectPaths:
             cls.EXAMPLES_DIR,
             cls.TROUBLESHOOTING_DIR,
             cls.OPTIMIZATION_DIR,
+            cls.VISUALIZATION_DIR,
+            cls.METRICS_DIR,
         ]
         
         for directory in directories:

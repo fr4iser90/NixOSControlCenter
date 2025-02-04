@@ -12,16 +12,16 @@ import numpy as np
 import sys
 import os
 
-# Add the project root to Python path
-project_root = str(Path(__file__).parent.parent.parent)
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+# Add project root to Python path
+ROOT_DIR = Path(__file__).parent.parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from scripts.utils.path_config import ProjectPaths
 
 class TrainingVisualizer:
     def __init__(self):
-        self.metrics_dir = ProjectPaths.MODELS_DIR / "metrics"
+        self.metrics_dir = ProjectPaths.METRICS_DIR
         self.metrics_dir.mkdir(exist_ok=True)
         
     def save_training_metrics(self, step: int, metrics: Dict):

@@ -145,18 +145,18 @@ class NixOSModelTrainer:
         import subprocess
         import threading
         import sys
+        import os
         
         def run_server():
-            # Add project root to Python path
-            project_root = str(Path(__file__).parent.parent.parent)
-            if project_root not in sys.path:
-                sys.path.insert(0, project_root)
-                
-            visualizer_path = Path(__file__).parent.parent / "visualization" / "training_visualizer.py"
+            # Set up the environment
+            env = os.environ.copy()
+            env["PYTHONPATH"] = str(ProjectPaths.PROJECT_ROOT)
+            
+            # Prepare command
             cmd = [
-                sys.executable,  # Use the same Python interpreter
+                sys.executable,
                 "-m", "streamlit", "run",
-                str(visualizer_path),
+                str(ProjectPaths.VISUALIZER_SCRIPT),
                 "--server.headless=true"
             ]
             
@@ -166,15 +166,31 @@ class NixOSModelTrainer:
                     "--browser.serverAddress=0.0.0.0"
                 ])
             
-            # Set PYTHONPATH to include project root
-            env = os.environ.copy()
-            env["PYTHONPATH"] = f"{project_root}:{env.get('PYTHONPATH', '')}"
+            # Start the server process
+            process = subprocess.Popen(
+                cmd,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
             
-            subprocess.Popen(cmd, env=env)
+            # Monitor for errors
+            def check_process():
+                while True:
+                    line = process.stderr.readline()
+                    if not line:
+                        break
+                    error_line = line.decode().strip()
+                    if "Error" in error_line or "Exception" in error_line:
+                        self.logger.error(f"Visualization server error: {error_line}")
+            
+            # Start error monitoring in a separate thread
+            error_thread = threading.Thread(target=check_process, daemon=True)
+            error_thread.start()
             
         # Start server in background thread
-        thread = threading.Thread(target=run_server, daemon=True)
-        thread.start()
+        server_thread = threading.Thread(target=run_server, daemon=True)
+        server_thread.start()
         
         # Give server time to start
         time.sleep(2)
