@@ -8,6 +8,8 @@ let
     pkgs.git
     pkgs.python312Packages.pip
     pkgs.python312Packages.virtualenv
+    pkgs.python312Packages.streamlit
+    pkgs.python312Packages.plotly
   ];
 
   hooks = {
@@ -43,11 +45,13 @@ let
                   tqdm==4.66.1 \
                   psutil==5.9.8 \
                   requests==2.31.0 \
-                  inquirer==3.1.3
+                  inquirer==3.1.3 \
+                  streamlit \
+                  plotly
       
       # Überprüfe Installation
       echo "Überprüfe Installation..."
-      if python -c "import torch; import transformers; import peft; import inquirer; print('Alle Pakete erfolgreich installiert!')" ; then
+      if python -c "import torch; import transformers; import peft; import inquirer; import streamlit; import plotly; print('Alle Pakete erfolgreich installiert!')" ; then
           echo "✓ Installation erfolgreich!"
       else
           echo "✗ Installation fehlgeschlagen!"
