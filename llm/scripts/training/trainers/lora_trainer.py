@@ -7,14 +7,14 @@ class LoRATrainer(FeedbackTrainer):
     """Trainer specifically for LoRA-based model fine-tuning."""
     
     def __init__(self, model_name="NixOS", *args, **kwargs):
+        # Setup model and tokenizer
         self.model_name = model_name
         self.setup_model()
-        super().__init__(
-            model=self.model,
-            tokenizer=self.tokenizer,
-            *args,
-            **kwargs
-        )
+        
+        # Initialize parent class with our model and tokenizer
+        kwargs['model'] = self.model
+        kwargs['tokenizer'] = self.tokenizer
+        super().__init__(*args, **kwargs)
         
     def setup_model(self):
         """Initialize the model with LoRA configuration."""
@@ -61,4 +61,7 @@ class LoRATrainer(FeedbackTrainer):
     def save_pretrained(self, output_dir):
         """Save LoRA weights and tokenizer."""
         self.model.save_pretrained(output_dir)
-        self.tokenizer.save_pretrained(output_dir)
+        if hasattr(self, 'processing_class'):
+            self.processing_class.save_pretrained(output_dir)
+        elif hasattr(self, 'tokenizer'):
+            self.tokenizer.save_pretrained(output_dir)

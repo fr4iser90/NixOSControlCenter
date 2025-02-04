@@ -26,8 +26,8 @@ class FeedbackTrainer(NixOSBaseTrainer):
             self.state.is_local_process_zero):
             batch_size = inputs["input_ids"].shape[0]
             for i in range(batch_size):
-                prediction = self.tokenizer.decode(outputs.logits[i].argmax(dim=-1))
-                expected = self.tokenizer.decode(inputs["labels"][i])
+                prediction = self.processing_class.decode(outputs.logits[i].argmax(dim=-1))
+                expected = self.processing_class.decode(inputs["labels"][i])
                 example_id = f"example_{self.state.global_step}_{i}"
                 self._collect_prediction_feedback(prediction, expected, example_id)
         

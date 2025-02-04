@@ -1,10 +1,20 @@
-from transformers import Trainer
+from transformers import Trainer, DataCollatorForLanguageModeling
+import torch
 from ...utils.path_config import ProjectPaths
 
 class NixOSBaseTrainer(Trainer):
     """Base trainer class with common NixOS-specific functionality."""
     
     def __init__(self, *args, **kwargs):
+        if 'tokenizer' in kwargs:
+            # Create data collator with tokenizer
+            kwargs['data_collator'] = DataCollatorForLanguageModeling(
+                tokenizer=kwargs['tokenizer'],
+                mlm=False
+            )
+            # Store tokenizer as processing class
+            self.processing_class = kwargs.pop('tokenizer')
+            
         super().__init__(*args, **kwargs)
         self.best_loss = float('inf')
         self.patience = 3

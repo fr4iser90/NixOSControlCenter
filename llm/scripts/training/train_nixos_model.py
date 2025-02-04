@@ -362,7 +362,7 @@ class NixOSModelTrainer:
         )
 
         trainer = LoRATrainer(
-            model=self.model,
+            model_name=self.model_name,
             args=training_args,
             train_dataset=dataset["train"],
             eval_dataset=dataset["test"],
