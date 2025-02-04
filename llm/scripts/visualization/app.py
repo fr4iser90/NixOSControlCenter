@@ -10,7 +10,7 @@ from frontend.dataset_view import DatasetView
 from frontend.system_view import SystemView
 from frontend.history_view import HistoryView
 from utils.config import VisualizerConfig
-from utils.path_utils import ProjectPaths
+from ..utils.path_config import ProjectPaths
 
 class NixOSVisualizer:
     """Main application class for the NixOS Model Training Visualizer."""

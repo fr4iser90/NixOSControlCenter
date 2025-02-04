@@ -20,8 +20,7 @@ class ProjectPaths:
     
     # Visualization directories
     VISUALIZATION_DIR = SCRIPTS_DIR / 'visualization'
-    METRICS_DIR = MODELS_DIR / 'metrics'
-    VISUALIZER_SCRIPT = VISUALIZATION_DIR / 'training_visualizer.py'
+    METRICS_DIR = MODELS_DIR / 'metrics'  # For storing training metrics and visualization data
     
     # Dataset directories
     DATASET_DIR = PROCESSED_DIR / 'datasets'

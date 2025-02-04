@@ -17,13 +17,13 @@ from peft import LoraConfig, get_peft_model
 from ..utils.path_config import ProjectPaths
 from ..data.dataset_manager import DatasetManager, DatasetFeedback
 from ..data.dataset_improver import DatasetImprover
-from ..visualization.training_visualizer import TrainingVisualizer
+from ..visualization.app import NixOSVisualizer
 import logging
 from datetime import datetime
 import torch.cuda
 from .trainers import LoRATrainer
 import time
-import threading
+import multiprocessing
 import subprocess
 
 logging.basicConfig(level=logging.INFO)
@@ -51,10 +51,10 @@ class NixOSModelTrainer:
         # Initialize components
         self.dataset_manager = DatasetManager()
         if self.start_visualizer:
-            self.visualizer = TrainingVisualizer()
-            # Start visualization server
-            self._start_visualization_server()
+            self.visualizer_process = self._start_visualization_server()
+            self.visualizer = None
         else:
+            self.visualizer_process = None
             self.visualizer = None
             
         # First check if we're loading an existing model
@@ -142,64 +142,28 @@ class NixOSModelTrainer:
         
     def _start_visualization_server(self):
         """Start the Streamlit visualization server."""
-        import subprocess
-        import threading
-        import sys
-        import os
+        if not self.start_visualizer:
+            return None
+            
+        try:
+            # Start visualization in a separate process
+            def run_visualizer():
+                visualizer = NixOSVisualizer()
+                visualizer.config.update({
+                    'network_access': self.visualizer_network_access,
+                    'auto_refresh': True,
+                    'refresh_interval': 5
+                })
+                visualizer.run()
+            
+            viz_process = multiprocessing.Process(target=run_visualizer)
+            viz_process.start()
+            return viz_process
+            
+        except Exception as e:
+            self.logger.error(f"Failed to start visualization server: {e}")
+            return None
         
-        def run_server():
-            # Set up the environment
-            env = os.environ.copy()
-            env["PYTHONPATH"] = str(ProjectPaths.PROJECT_ROOT)
-            
-            # Prepare command
-            cmd = [
-                sys.executable,
-                "-m", "streamlit", "run",
-                str(ProjectPaths.VISUALIZER_SCRIPT),
-                "--server.headless=true"
-            ]
-            
-            if self.visualizer_network_access:
-                cmd.extend([
-                    "--server.address=0.0.0.0",
-                    "--browser.serverAddress=0.0.0.0"
-                ])
-            
-            # Start the server process
-            process = subprocess.Popen(
-                cmd,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            
-            # Monitor for errors
-            def check_process():
-                while True:
-                    line = process.stderr.readline()
-                    if not line:
-                        break
-                    error_line = line.decode().strip()
-                    if "Error" in error_line or "Exception" in error_line:
-                        self.logger.error(f"Visualization server error: {error_line}")
-            
-            # Start error monitoring in a separate thread
-            error_thread = threading.Thread(target=check_process, daemon=True)
-            error_thread.start()
-            
-        # Start server in background thread
-        server_thread = threading.Thread(target=run_server, daemon=True)
-        server_thread.start()
-        
-        # Give server time to start
-        time.sleep(2)
-        
-        if self.visualizer_network_access:
-            self.logger.info("Visualization server started and accessible from network at http://0.0.0.0:8501")
-        else:
-            self.logger.info("Visualization server started at http://localhost:8501")
-            
     def load_datasets(self):
         """Load and prepare datasets for training"""
         training_data = []
