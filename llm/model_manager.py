@@ -116,37 +116,61 @@ class ModelManager:
         return answers['action'], checkpoint_path, model_name
     
     def start_training(self, mode: str, checkpoint_path: Optional[Path] = None, model_name: Optional[str] = None):
-        """Initialize and start the training process"""
-        if model_name:
-            output_dir = self.models_dir / model_name
+        """Start model training with specified mode and checkpoint"""
+        if mode == "continue":
+            if not checkpoint_path:
+                print("Error: No checkpoint specified for continued training")
+                return
+            print(f"Continuing training from checkpoint: {checkpoint_path}")
+            trainer = NixOSModelTrainer(checkpoint_path)
         else:
-            output_dir = self.current_model_dir
-        
-        if mode == 'fresh':
-            # Backup existing model if it exists
-            if output_dir.exists():
-                backup_dir = output_dir.parent / f"{output_dir.name}_backup"
-                if backup_dir.exists():
-                    import shutil
-                    shutil.rmtree(backup_dir)
-                output_dir.rename(backup_dir)
-                print(f"Backed up existing model to {backup_dir}")
-            model_path = 'facebook/opt-125m'
-        else:
-            # Use existing model or checkpoint
-            if checkpoint_path:
-                model_path = str(checkpoint_path)
-            elif mode == 'quantized' and self.quantized_model_dir.exists():
-                model_path = str(self.quantized_model_dir)
-            else:
-                model_path = str(self.current_model_dir)
+            if not model_name:
+                questions = [
+                    inquirer.Text('model_name',
+                                message="Enter model name",
+                                default="NixOS"),
+                    inquirer.Text('version',
+                                message="Enter version (e.g. v1, v2.1)",
+                                default="v1")
+                ]
+                answers = inquirer.prompt(questions)
+                if not answers:
+                    return
+                model_name = f"{answers['model_name']}-{answers['version']}"
+                
+            # Ask about visualization server
+            vis_questions = [
+                inquirer.List('visualizer',
+                            message="Would you like to start the visualization server?",
+                            choices=['Yes', 'No'],
+                            default='Yes')
+            ]
+            vis_answers = inquirer.prompt(vis_questions)
+            if not vis_answers:
+                return
+                
+            start_visualizer = vis_answers['visualizer'] == 'Yes'
             
-        trainer = NixOSModelTrainer(
-            model_name=model_path
-        )
-        
-        if checkpoint_path:
-            print(f"Loading from checkpoint: {checkpoint_path}")
+            if start_visualizer:
+                vis_network_questions = [
+                    inquirer.List('network_access',
+                                message="Allow network access to visualization server?",
+                                choices=['Yes (accessible from other devices)', 'No (localhost only)'],
+                                default='No (localhost only)')
+                ]
+                network_answers = inquirer.prompt(vis_network_questions)
+                if not network_answers:
+                    return
+                    
+                network_access = network_answers['network_access'].startswith('Yes')
+            else:
+                network_access = False
+                
+            trainer = NixOSModelTrainer(
+                model_name=model_name,
+                start_visualizer=start_visualizer,
+                visualizer_network_access=network_access
+            )
             
         trainer.train()
 

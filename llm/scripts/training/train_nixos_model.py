@@ -22,26 +22,41 @@ import logging
 from datetime import datetime
 import torch.cuda
 from .trainers import LoRATrainer
+import time
+import threading
+import subprocess
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class NixOSModelTrainer:
-    def __init__(self, model_name: str = "NixOS"):
+    """Trainer for the NixOS model."""
+    
+    def __init__(self, model_name: str = "NixOS", start_visualizer: bool = False, visualizer_network_access: bool = False):
+        """Initialize the trainer with model name and visualization options."""
+        self.model_name = model_name
+        self.start_visualizer = start_visualizer
+        self.visualizer_network_access = visualizer_network_access
+        
+        # Initialize paths
         ProjectPaths.ensure_directories()
         self.dataset_dir = ProjectPaths.DATASET_DIR
-        self.output_dir = ProjectPaths.MODELS_DIR
+        self.output_dir = ProjectPaths.MODELS_DIR / model_name
         self.current_model_dir = ProjectPaths.CURRENT_MODEL_DIR
-        self.model_name = model_name
-        self.base_model = "NixOS"
-        self.best_loss = float('inf')
-        self.patience = 3
-        self.patience_counter = 0
-        self.dataset_manager = DatasetManager()
-        self.dataset_improver = DatasetImprover()
-        self.visualizer = TrainingVisualizer()
-        self.collected_feedback = []
         
+        # Setup logging
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
+        
+        # Initialize components
+        self.dataset_manager = DatasetManager()
+        if self.start_visualizer:
+            self.visualizer = TrainingVisualizer()
+            # Start visualization server
+            self._start_visualization_server()
+        else:
+            self.visualizer = None
+            
         # First check if we're loading an existing model
         if Path(model_name).exists() and (Path(model_name) / "adapter_model.safetensors").exists():
             print(f"Loading existing NixOS model from {model_name}...")
@@ -125,6 +140,38 @@ class NixOSModelTrainer:
             torch.backends.cuda.enable_flash_sdp(True)
             torch.backends.cuda.enable_mem_efficient_sdp(True)
         
+    def _start_visualization_server(self):
+        """Start the Streamlit visualization server."""
+        import subprocess
+        import threading
+        
+        def run_server():
+            cmd = [
+                "streamlit", "run",
+                str(Path(__file__).parent.parent / "visualization" / "training_visualizer.py"),
+                "--server.headless=true"
+            ]
+            
+            if self.visualizer_network_access:
+                cmd.extend([
+                    "--server.address=0.0.0.0",
+                    "--browser.serverAddress=0.0.0.0"
+                ])
+                
+            subprocess.Popen(cmd)
+            
+        # Start server in background thread
+        thread = threading.Thread(target=run_server, daemon=True)
+        thread.start()
+        
+        # Give server time to start
+        time.sleep(2)
+        
+        if self.visualizer_network_access:
+            self.logger.info("Visualization server started and accessible from network at http://0.0.0.0:8501")
+        else:
+            self.logger.info("Visualization server started at http://localhost:8501")
+            
     def load_datasets(self):
         """Load and prepare datasets for training"""
         training_data = []
@@ -418,20 +465,7 @@ def get_user_home():
 
 def main():
     # Initialize trainer with paths from config
-    trainer = NixOSModelTrainer()
-    
-    # Start visualization server
-    print("\nStarting visualization server...")
-    import subprocess
-    import sys
-    
-    viz_process = subprocess.Popen([
-        sys.executable, "-m", "streamlit", "run",
-        str(Path(__file__).parent.parent / "visualization" / "training_visualizer.py"),
-        "--server.port=8501", "--server.address=localhost"
-    ])
-    
-    print("Visualization dashboard available at: http://localhost:8501")
+    trainer = NixOSModelTrainer(start_visualizer=True, visualizer_network_access=True)
     
     trainer.train()  # This will automatically save after training
 
