@@ -6,7 +6,7 @@ import warnings
 from pathlib import Path
 from typing import Optional
 import inquirer
-from train_nixos_model import NixOSModelTrainer
+from data.scripts.training.train_nixos_model import NixOSModelTrainer
 from data.scripts.utils.path_config import ProjectPaths
 
 # Filter out FutureWarning from transformers
