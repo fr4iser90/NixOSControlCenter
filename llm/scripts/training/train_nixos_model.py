@@ -456,7 +456,8 @@ class NixOSModelTrainer:
             train_dataset=dataset["train"],
             eval_dataset=dataset["test"],
             dataset_manager=self.dataset_manager,
-            visualizer=self.visualizer if self.start_visualizer else None  # Only pass visualizer if enabled
+            processing_class=self.tokenizer,  # Use processing_class instead of tokenizer
+            visualizer=self.visualizer if self.start_visualizer else None
         )
 
         print("Starting training...")

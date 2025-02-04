@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from ....scripts.utils.path_config import ProjectPaths
+from llm.scripts.utils.path_config import ProjectPaths
 
 class MetricsManager:
     """Manages the collection, storage, and retrieval of training metrics."""

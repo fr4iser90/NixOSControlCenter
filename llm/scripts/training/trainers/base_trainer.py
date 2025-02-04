@@ -17,7 +17,7 @@ class NixOSBaseTrainer(Trainer):
                 mlm=False
             )
             # Store tokenizer as processing class
-            self.processing_class = kwargs.pop('tokenizer')
+            kwargs['processing_class'] = kwargs.pop('tokenizer')
             
         super().__init__(*args, **kwargs)
         
