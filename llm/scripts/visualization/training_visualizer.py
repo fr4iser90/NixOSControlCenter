@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 import numpy as np
 import sys
 import os
+import time
 
 # Add project root to Python path
 ROOT_DIR = Path(__file__).parent.parent.parent
@@ -47,152 +48,138 @@ class TrainingVisualizer:
 
 def run_visualization_server():
     """Run the visualization dashboard."""
-    st.set_page_config(page_title="NixOS Model Training Visualizer", layout="wide")
-    
-    st.title("NixOS Model Training Visualizer")
-    st.markdown("""
-    This dashboard provides real-time insights into the NixOS model training process.
-    Monitor training progress, dataset quality, and model performance all in one place.
-    """)
-    
-    # Add auto-refresh
-    st.empty()
-    with st.sidebar:
-        auto_refresh = st.checkbox("Auto refresh", value=True)
-        if auto_refresh:
-            st.empty()
-            st.experimental_rerun()
-    
-    visualizer = TrainingVisualizer()
-    metrics_df = visualizer.load_training_metrics()
-    
-    if metrics_df.empty:
-        st.warning("No training metrics available yet. Start training to see visualizations.")
-        return
+    try:
+        st.set_page_config(page_title="NixOS Model Training Visualizer", layout="wide")
         
-    # Create main metrics display
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if 'train_loss' in metrics_df:
-            latest_loss = metrics_df['train_loss'].iloc[-1]
-            st.metric("Current Training Loss", f"{latest_loss:.4f}")
-            
-    with col2:
-        if 'learning_rate' in metrics_df:
-            latest_lr = metrics_df['learning_rate'].iloc[-1]
-            st.metric("Learning Rate", f"{latest_lr:.6f}")
-            
-    with col3:
-        if 'batch_size' in metrics_df:
-            latest_bs = metrics_df['batch_size'].iloc[-1]
-            st.metric("Batch Size", str(latest_bs))
-            
-    # Create training progress plots
-    st.subheader("Training Progress")
-    fig = make_subplots(
-        rows=2, cols=2,
-        subplot_titles=("Training Loss", "Learning Rate", "Batch Size", "GPU Memory (if available)")
-    )
-    
-    if 'train_loss' in metrics_df:
-        fig.add_trace(
-            go.Scatter(x=metrics_df['step'], y=metrics_df['train_loss'], name="Training Loss"),
-            row=1, col=1
-        )
+        st.title("NixOS Model Training Visualizer")
+        st.markdown("""
+        This dashboard provides real-time insights into the NixOS model training process.
+        Monitor training progress, dataset quality, and model performance all in one place.
+        """)
         
-    if 'learning_rate' in metrics_df:
-        fig.add_trace(
-            go.Scatter(x=metrics_df['step'], y=metrics_df['learning_rate'], name="Learning Rate"),
-            row=1, col=2
-        )
-        
-    if 'batch_size' in metrics_df:
-        fig.add_trace(
-            go.Scatter(x=metrics_df['step'], y=metrics_df['batch_size'], name="Batch Size"),
-            row=2, col=1
-        )
-        
-    if 'gpu_memory_used' in metrics_df:
-        fig.add_trace(
-            go.Scatter(x=metrics_df['step'], y=metrics_df['gpu_memory_used'], name="GPU Memory (GB)"),
-            row=2, col=2
-        )
-        
-    fig.update_layout(height=800, showlegend=True)
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Dataset Quality Metrics
-    st.subheader("Dataset Insights")
-    col3, col4, col5 = st.columns(3)
-    
-    with col3:
-        if "dataset_coverage" in metrics_df.columns:
-            coverage_data = metrics_df["dataset_coverage"].iloc[-1]
-            fig_coverage = px.pie(
-                values=list(coverage_data.values()),
-                names=list(coverage_data.keys()),
-                title="Concept Coverage Distribution"
-            )
-            st.plotly_chart(fig_coverage, use_container_width=True)
-    
-    with col4:
-        if "quality_scores" in metrics_df.columns:
-            quality_data = metrics_df["quality_scores"].iloc[-1]
-            fig_quality = go.Figure(data=[
-                go.Bar(
-                    x=list(quality_data.keys()),
-                    y=list(quality_data.values()),
-                    marker_color="lightblue"
+        # Add auto-refresh controls to sidebar
+        with st.sidebar:
+            st.header("Dashboard Controls")
+            auto_refresh = st.checkbox("Enable auto-refresh", value=True)
+            if auto_refresh:
+                refresh_interval = st.slider(
+                    "Refresh interval (seconds)",
+                    min_value=1,
+                    max_value=60,
+                    value=5
                 )
-            ])
-            fig_quality.update_layout(
-                title="Dataset Quality Scores",
-                xaxis_title="Metric",
-                yaxis_title="Score"
-            )
-            st.plotly_chart(fig_quality, use_container_width=True)
-    
-    with col5:
-        if "improvement_stats" in metrics_df.columns:
-            improvement_data = metrics_df["improvement_stats"].iloc[-1]
-            fig_improvements = go.Figure(data=[
-                go.Bar(
-                    x=list(improvement_data.keys()),
-                    y=list(improvement_data.values()),
-                    marker_color="lightgreen"
-                )
-            ])
-            fig_improvements.update_layout(
-                title="Dataset Improvements",
-                xaxis_title="Category",
-                yaxis_title="Count"
-            )
-            st.plotly_chart(fig_improvements, use_container_width=True)
-    
-    # Recent Updates Section
-    st.subheader("Recent Updates")
-    updates_container = st.container()
-    
-    with updates_container:
-        recent_metrics = metrics_df.iloc[-5:].sort_values("step", ascending=False)
-        for _, row in recent_metrics.iterrows():
-            st.text(f"""
-            Step {row['step']} | Loss: {row['train_loss']:.4f} | Val Loss: {row['eval_loss']:.4f}
-            Batch Size: {row['batch_size']} | Learning Rate: {row['learning_rate']:.6f}
-            Timestamp: {row['timestamp']}
-            """)
+                st.write(f"Auto-refreshing every {refresh_interval} seconds")
+                time.sleep(refresh_interval)
+                st.rerun()
+        
+        # Load and display metrics
+        visualizer = TrainingVisualizer()
+        try:
+            metrics_df = visualizer.load_training_metrics()
             
-    # Add auto-refresh functionality
-    st.markdown("""
-        <script>
-        function reload() {
-            setTimeout(function () {
-                window.location.reload();
-            }, 30000);
-        }
-        reload();
-        </script>
-        """, unsafe_allow_html=True)
+            if metrics_df.empty:
+                st.info("Waiting for training metrics... The dashboard will update automatically when training starts.")
+                return
+                
+            # Create main metrics display
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if 'train_loss' in metrics_df:
+                    latest_loss = metrics_df['train_loss'].iloc[-1]
+                    st.metric(
+                        "Current Training Loss",
+                        f"{latest_loss:.4f}",
+                        delta=f"{latest_loss - metrics_df['train_loss'].iloc[-2]:.4f}" if len(metrics_df) > 1 else None
+                    )
+                    
+            with col2:
+                if 'learning_rate' in metrics_df:
+                    latest_lr = metrics_df['learning_rate'].iloc[-1]
+                    st.metric("Learning Rate", f"{latest_lr:.6f}")
+                    
+            with col3:
+                if 'batch_size' in metrics_df:
+                    latest_bs = metrics_df['batch_size'].iloc[-1]
+                    st.metric("Batch Size", str(latest_bs))
+            
+            # Create training progress plots
+            st.subheader("Training Progress")
+            
+            # Use tabs for different metric views
+            tab1, tab2 = st.tabs(["Training Metrics", "System Metrics"])
+            
+            with tab1:
+                training_fig = make_subplots(
+                    rows=1, cols=2,
+                    subplot_titles=("Training Loss", "Learning Rate")
+                )
+                
+                if 'train_loss' in metrics_df:
+                    training_fig.add_trace(
+                        go.Scatter(
+                            x=metrics_df['step'],
+                            y=metrics_df['train_loss'],
+                            name="Training Loss",
+                            line=dict(color="blue")
+                        ),
+                        row=1, col=1
+                    )
+                    
+                if 'learning_rate' in metrics_df:
+                    training_fig.add_trace(
+                        go.Scatter(
+                            x=metrics_df['step'],
+                            y=metrics_df['learning_rate'],
+                            name="Learning Rate",
+                            line=dict(color="green")
+                        ),
+                        row=1, col=2
+                    )
+                    
+                training_fig.update_layout(height=400, showlegend=True)
+                st.plotly_chart(training_fig, use_container_width=True)
+            
+            with tab2:
+                system_fig = make_subplots(
+                    rows=1, cols=2,
+                    subplot_titles=("Batch Size", "GPU Memory (if available)")
+                )
+                
+                if 'batch_size' in metrics_df:
+                    system_fig.add_trace(
+                        go.Scatter(
+                            x=metrics_df['step'],
+                            y=metrics_df['batch_size'],
+                            name="Batch Size",
+                            line=dict(color="purple")
+                        ),
+                        row=1, col=1
+                    )
+                    
+                if 'gpu_memory_used' in metrics_df:
+                    system_fig.add_trace(
+                        go.Scatter(
+                            x=metrics_df['step'],
+                            y=metrics_df['gpu_memory_used'],
+                            name="GPU Memory (GB)",
+                            line=dict(color="orange")
+                        ),
+                        row=1, col=2
+                    )
+                    
+                system_fig.update_layout(height=400, showlegend=True)
+                st.plotly_chart(system_fig, use_container_width=True)
+                
+        except Exception as e:
+            st.error(f"Error loading metrics: {str(e)}")
+            if auto_refresh:
+                st.info("Will attempt to reload in a few seconds...")
+                
+    except Exception as e:
+        st.error(f"Dashboard error: {str(e)}")
+        if st.button("Retry"):
+            st.rerun()
 
 if __name__ == "__main__":
     run_visualization_server()
