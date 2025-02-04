@@ -130,7 +130,7 @@ class NixOSVisualizer:
 def main():
     """Main entry point for the visualization dashboard."""
     visualizer = NixOSVisualizer()
-    visualizer.run()
+    visualizer.run()  # Only run if called directly as script
 
 if __name__ == "__main__":
     main()

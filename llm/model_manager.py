@@ -169,7 +169,7 @@ class ModelManager:
             trainer = NixOSModelTrainer(
                 model_name=model_name,
                 start_visualizer=start_visualizer,
-                visualizer_network_access=network_access
+                visualizer_network_access=network_access,
             )
             
             try:
