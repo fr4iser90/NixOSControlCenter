@@ -1,6 +1,7 @@
 """Main application for the NixOS Model Training Visualizer."""
 import streamlit as st
 from typing import Dict, Any
+import time
 
 # Add project root to Python path
 from pathlib import Path
@@ -73,7 +74,7 @@ class NixOSVisualizer:
             st.header("Dashboard Controls")
             auto_refresh = st.checkbox(
                 "Enable auto-refresh",
-                value=self.config.get('auto_refresh')
+                value=self.config.get('auto_refresh', True)
             )
             
             if auto_refresh:
@@ -81,7 +82,7 @@ class NixOSVisualizer:
                     "Refresh interval (seconds)",
                     min_value=1,
                     max_value=60,
-                    value=self.config.get('refresh_interval')
+                    value=self.config.get('refresh_interval', 5)
                 )
                 self.config.update({
                     'auto_refresh': auto_refresh,
@@ -92,12 +93,18 @@ class NixOSVisualizer:
             # Display selected page
             if page == "Training Progress":
                 metrics_df = self.metrics_manager.load_training_metrics()
-                self.training_view.display_training_progress(metrics_df)
-                
+                if metrics_df is not None and not metrics_df.empty:
+                    self.training_view.display_training_progress(metrics_df)
+                else:
+                    st.info("Waiting for training metrics... Training data will appear here once available.")
+                    
             elif page == "Dataset Analysis":
                 stats = self.dataset_analyzer.get_dataset_stats()
                 quality_metrics = self.dataset_analyzer.get_quality_metrics()
-                self.dataset_view.display_dataset_analysis(stats, quality_metrics)
+                if stats:
+                    self.dataset_view.display_dataset_analysis(stats, quality_metrics)
+                else:
+                    st.info("Analyzing dataset... Statistics will appear here once available.")
                 
             elif page == "System Monitor":
                 metrics = self.system_monitor.get_system_metrics()
@@ -105,11 +112,14 @@ class NixOSVisualizer:
                 
             else:  # Training History
                 runs = self.metrics_manager.get_training_runs()
-                self.history_view.display_training_history(runs)
+                if runs:
+                    self.history_view.display_training_history(runs)
+                else:
+                    st.info("No training history available yet. Previous training runs will appear here.")
                 
             # Handle auto-refresh
             if auto_refresh:
-                st.empty()
+                time.sleep(0.1)  # Small delay to prevent excessive CPU usage
                 st.rerun()
                 
         except Exception as e:

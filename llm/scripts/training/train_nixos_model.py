@@ -25,6 +25,7 @@ from .trainers import LoRATrainer
 import time
 import multiprocessing
 import subprocess
+import sys
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -147,14 +148,35 @@ class NixOSModelTrainer:
             
         try:
             # Start visualization in a separate process
+            import multiprocessing
+            import os
+            
             def run_visualizer():
-                visualizer = NixOSVisualizer()
-                visualizer.config.update({
-                    'network_access': self.visualizer_network_access,
-                    'auto_refresh': True,
-                    'refresh_interval': 5
-                })
-                visualizer.run()
+                # Set up environment
+                env = os.environ.copy()
+                env["PYTHONPATH"] = str(ProjectPaths.PROJECT_ROOT)
+                
+                # Build command
+                cmd = [
+                    sys.executable,
+                    "-m", "streamlit", "run",
+                    str(ProjectPaths.VISUALIZATION_DIR / "app.py"),
+                    "--server.headless=true",
+                ]
+                
+                if self.visualizer_network_access:
+                    cmd.extend([
+                        "--server.address=0.0.0.0",
+                        "--server.port=8501"
+                    ])
+                    print("\nVisualization dashboard will be available at:")
+                    print("http://localhost:8501 (local)")
+                    print("http://<your-ip>:8501 (network)\n")
+                else:
+                    print("\nVisualization dashboard will be available at:")
+                    print("http://localhost:8501\n")
+                
+                subprocess.run(cmd, env=env)
             
             viz_process = multiprocessing.Process(target=run_visualizer)
             viz_process.start()
