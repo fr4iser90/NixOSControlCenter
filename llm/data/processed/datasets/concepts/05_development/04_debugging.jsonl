@@ -1,0 +1,19 @@
+{"concept": "How does debugging work in NixOS?", "explanation": "[Development] Debugging in NixOS involves: 1) Debug symbol management, 2) Tool integration, 3) Environment setup, 4) Trace capabilities. This enables effective problem diagnosis.", "examples": ["Debug setup", "Tool usage"], "references": ["Debugging Guide", "Development Documentation"]}
+
+{"concept": "What about debug symbols?", "explanation": "[Development] Debug symbol management includes: 1) Symbol package installation, 2) Build configuration, 3) Symbol server setup, 4) Version matching. This enables detailed debugging.", "examples": ["Symbol setup", "Package configuration"], "references": ["Symbol Guide", "Debug Documentation"]}
+
+{"concept": "How do you use GDB?", "explanation": "[Development] GDB usage involves: 1) Installation and setup, 2) Program loading, 3) Breakpoint management, 4) Variable inspection. This enables low-level debugging.", "examples": ["GDB setup", "Debug session"], "references": ["GDB Guide", "Debugging Documentation"]}
+
+{"concept": "What about runtime debugging?", "explanation": "[Development] Runtime debugging includes: 1) Process attachment, 2) State inspection, 3) Memory analysis, 4) Thread management. This enables live system debugging.", "examples": ["Runtime debug", "Process analysis"], "references": ["Runtime Guide", "Debug Documentation"]}
+
+{"concept": "How do you handle core dumps?", "explanation": "[Development] Core dump management involves: 1) Dump configuration, 2) Collection setup, 3) Analysis tools, 4) Storage management. This enables post-mortem debugging.", "examples": ["Dump setup", "Analysis process"], "references": ["Core Dump Guide", "Analysis Documentation"]}
+
+{"concept": "What about system tracing?", "explanation": "[Development] System tracing includes: 1) Tracer setup, 2) Event capture, 3) Analysis tools, 4) Performance monitoring. This enables system-level debugging.", "examples": ["Trace setup", "Analysis configuration"], "references": ["Tracing Guide", "System Documentation"]}
+
+{"concept": "How do you debug services?", "explanation": "[Development] Service debugging involves: 1) Log analysis, 2) State inspection, 3) Dependency tracking, 4) Resource monitoring. This enables service-level debugging.", "examples": ["Service debug", "Log analysis"], "references": ["Service Debug Guide", "Monitoring Documentation"]}
+
+{"concept": "What about remote debugging?", "explanation": "[Development] Remote debugging includes: 1) Connection setup, 2) Protocol configuration, 3) Security measures, 4) Tool integration. This enables debugging distant systems.", "examples": ["Remote setup", "Connection configuration"], "references": ["Remote Debug Guide", "Network Documentation"]}
+
+{"concept": "How do you handle crash analysis?", "explanation": "[Development] Crash analysis involves: 1) Error collection, 2) Stack trace analysis, 3) Memory inspection, 4) Root cause identification. This enables problem resolution.", "examples": ["Crash analysis", "Error investigation"], "references": ["Analysis Guide", "Debug Documentation"]}
+
+{"concept": "What are debugging best practices?", "explanation": "[Development] Best practices include: 1) Systematic approach, 2) Tool proficiency, 3) Documentation maintenance, 4) Environment isolation, 5) Team collaboration. These ensure effective debugging.", "examples": ["Debug practices", "Analysis methods"], "references": ["Best Practices Guide", "Debug Management Documentation"]}

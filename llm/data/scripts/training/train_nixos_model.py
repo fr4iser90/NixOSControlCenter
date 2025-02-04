@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import torch
+import os
 import pandas as pd
 from pathlib import Path
 from transformers import (
@@ -13,12 +14,14 @@ from transformers import (
 from datasets import Dataset
 from typing import List, Dict, Any, Tuple
 from peft import LoraConfig, get_peft_model
+from ..utils.path_config import ProjectPaths
 
 class NixOSModelTrainer:
-    def __init__(self, dataset_dir: str, output_dir: str, model_name: str = "NixOS"):
-        self.dataset_dir = Path(dataset_dir)
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(exist_ok=True, parents=True)
+    def __init__(self, model_name: str = "NixOS"):
+        ProjectPaths.ensure_directories()
+        self.dataset_dir = ProjectPaths.DATASET_DIR
+        self.output_dir = ProjectPaths.MODELS_DIR
+        self.current_model_dir = ProjectPaths.CURRENT_MODEL_DIR
         self.model_name = model_name
         self.base_model = "NixOS"
         
@@ -99,61 +102,48 @@ class NixOSModelTrainer:
         
     def load_datasets(self) -> Dataset:
         training_data = []
-        dataset_files = [
-            'nixos_concepts.jsonl',
-            'nixos_advanced_concepts.jsonl',
-            'nixos_training_tasks.jsonl',
-            'nixos_practical_examples.jsonl',
-            'nixos_troubleshooting.jsonl'
+        
+        # Load all concept datasets from the hierarchical structure
+        concept_dirs = [
+            '00_fundamentals',
+            '01_configuration',
+            '02_package_management',
+            '03_system_administration',
+            '04_user_management',
+            '05_development',
+            '06_deployment'
         ]
         
-        # Load regular datasets
-        for file in dataset_files:
-            file_path = self.dataset_dir / file
-            if file_path.exists():
-                with open(file_path, 'r') as f:
-                    for line in f:
-                        data = json.loads(line)
-                        pairs = self._format_data_for_training(data)
-                        for prompt, response in pairs:
-                            training_data.append({
-                                "text": f"### Question: {prompt}\n\n### Answer: {response}\n"
-                            })
+        # Process all concept files
+        for concept_dir in concept_dirs:
+            dir_path = Path(self.dataset_dir) / 'concepts' / concept_dir
+            if dir_path.exists():
+                for jsonl_file in dir_path.glob('*.jsonl'):
+                    print(f"Loading concept dataset: {jsonl_file.relative_to(self.dataset_dir)}")
+                    with open(jsonl_file, 'r') as f:
+                        for line in f:
+                            data = json.loads(line)
+                            pairs = self._format_data_for_training(data)
+                            for prompt, response in pairs:
+                                training_data.append({
+                                    "text": f"### Question: {prompt}\n\n### Answer: {response}\n"
+                                })
         
-        # Load optimization datasets
-        optimization_files = list(self.dataset_dir.glob('nixos_optimization_dataset_*.json'))
-        for file_path in optimization_files:
-            print(f"Loading optimization dataset: {file_path.name}")
-            with open(file_path, 'r') as f:
-                data = json.load(f)
-                for item in data:
-                    # Format hardware profile
-                    hw_profile = item['input']['hardware_profile']
-                    hw_str = f"System: CPU={hw_profile['cpu_model']}, GPU={hw_profile['gpu_model']}, " \
-                            f"Memory={hw_profile['memory_gb']}GB, Storage={hw_profile['storage_type']}"
-                    
-                    # Format performance metrics
-                    metrics = item['input']['performance_metrics']
-                    metrics_str = f"Current Metrics: CPU Usage={metrics['cpu_usage']}%, " \
-                                f"Memory Usage={metrics['memory_usage']['percent']}%, " \
-                                f"Disk IO: Read={metrics['disk_io']['read_bytes']}, Write={metrics['disk_io']['write_bytes']}"
-                    
-                    # Format requirements
-                    reqs = item['input']['requirements']
-                    reqs_str = f"Purpose: {reqs['purpose']}, Priorities: {', '.join(reqs['priorities'])}"
-                    
-                    # Create prompt
-                    prompt = f"Optimize this NixOS configuration for the following system:\n\n" \
-                            f"{hw_str}\n{metrics_str}\n{reqs_str}\n\n" \
-                            f"Current configuration:\n```nix\n{item['input']['current_config']['content']}\n```"
-                    
-                    # Create response with optimizations and rationale
-                    response = f"Here's the optimized configuration:\n\n```nix\n{item['output']['optimized_config']['content']}\n```\n\n" \
-                              f"Improvements:\n{item['output']['rationale']}"
-                    
-                    training_data.append({
-                        "text": f"### Question: {prompt}\n\n### Answer: {response}\n"
-                    })
+        # Load other dataset categories when they become available
+        other_categories = ['tasks', 'examples', 'troubleshooting', 'optimization']
+        for category in other_categories:
+            category_path = Path(self.dataset_dir) / category
+            if category_path.exists():
+                for jsonl_file in category_path.glob('**/*.jsonl'):
+                    print(f"Loading {category} dataset: {jsonl_file.relative_to(self.dataset_dir)}")
+                    with open(jsonl_file, 'r') as f:
+                        for line in f:
+                            data = json.loads(line)
+                            pairs = self._format_data_for_training(data)
+                            for prompt, response in pairs:
+                                training_data.append({
+                                    "text": f"### Question: {prompt}\n\n### Answer: {response}\n"
+                                })
         
         dataset = Dataset.from_pandas(pd.DataFrame(training_data))
         return dataset.train_test_split(test_size=0.1)
@@ -161,31 +151,67 @@ class NixOSModelTrainer:
     def _format_data_for_training(self, data: dict) -> List[Tuple[str, str]]:
         pairs = []
         
+        # Handle concept format
         if "concept" in data:
-            prompt = f"Explain the NixOS concept: {data['concept']}"
-            pairs.append((prompt, data['explanation']))
+            # Main concept Q&A
+            prompt = data['concept']
+            response = [data['explanation']]
+            
+            # Add examples if available
+            if 'examples' in data and data['examples']:
+                response.append("\nExamples:")
+                for example in data['examples']:
+                    response.append(f"- {example}")
+            
+            # Add references if available
+            if 'references' in data and data['references']:
+                response.append("\nReferences:")
+                for ref in data['references']:
+                    response.append(f"- {ref}")
+            
+            pairs.append((prompt, "\n".join(response)))
         
-        if "task" in data:
+        # Handle task format (when implemented)
+        elif "task" in data:
             pairs.append((data['input'], data['output']))
         
-        if "category" in data and "examples" in data:
-            for example in data["examples"]:
-                prompt = f"Show me how to {example['description']}"
-                response = []
-                if "title" in example:
-                    response.append(f"Title: {example['title']}")
-                if "commands" in example:
-                    response.append("Commands:\n" + "\n".join(example["commands"]))
-                if "explanation" in example:
-                    response.append("Explanation:\n" + example['explanation'])
-                pairs.append((prompt, "\n\n".join(response)))
+        # Handle example format (when implemented)
+        elif "example" in data:
+            prompt = f"Show me an example of: {data['title']}"
+            response = []
+            if "description" in data:
+                response.append(f"Description: {data['description']}")
+            if "code" in data:
+                response.append("Code:\n```nix\n" + data['code'] + "\n```")
+            if "explanation" in data:
+                response.append(f"Explanation: {data['explanation']}")
+            pairs.append((prompt, "\n\n".join(response)))
         
-        if "issue" in data:
+        # Handle troubleshooting format (when implemented)
+        elif "issue" in data:
             prompt = f"How do I fix this NixOS issue: {data['issue']}"
-            response = ["Follow these steps:"]
-            response += [f"{i+1}. {step}" for i, step in enumerate(data['steps'])]
-            response.append("\nCommon causes:\n" + "\n".join(data['common_causes']))
+            response = []
+            if "solution" in data:
+                response.append(f"Solution: {data['solution']}")
+            if "steps" in data:
+                response.append("\nSteps:")
+                for i, step in enumerate(data['steps'], 1):
+                    response.append(f"{i}. {step}")
+            if "notes" in data:
+                response.append(f"\nNotes: {data['notes']}")
             pairs.append((prompt, "\n".join(response)))
+        
+        # Handle optimization format (when implemented)
+        elif "optimization" in data:
+            prompt = f"How can I optimize: {data['target']}"
+            response = []
+            if "suggestion" in data:
+                response.append(f"Suggestion: {data['suggestion']}")
+            if "implementation" in data:
+                response.append("Implementation:\n```nix\n" + data['implementation'] + "\n```")
+            if "benefits" in data:
+                response.append(f"Benefits: {data['benefits']}")
+            pairs.append((prompt, "\n\n".join(response)))
         
         return pairs
 
@@ -250,13 +276,12 @@ class NixOSModelTrainer:
         self.tokenizer.save_pretrained(model_path)
         print(f"Saved model to {model_path}")
 
+def get_user_home():
+    return Path(os.getenv("HOME", "/default/path"))
+
 def main():
-    trainer = NixOSModelTrainer(
-        dataset_dir="/home/fr4iser/Documents/Git/NixOsControlCenter/datasets",
-        output_dir="/home/fr4iser/Documents/Git/NixOsControlCenter/models"
-    )
-    
-    # Train the model
+    # Initialize trainer with paths from config
+    trainer = NixOSModelTrainer()
     trainer.train()  # This will automatically save after training
 
 if __name__ == "__main__":

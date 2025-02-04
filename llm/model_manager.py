@@ -7,17 +7,20 @@ from pathlib import Path
 from typing import Optional
 import inquirer
 from train_nixos_model import NixOSModelTrainer
+from data.scripts.utils.path_config import ProjectPaths
 
 # Filter out FutureWarning from transformers
 warnings.filterwarnings('ignore', category=FutureWarning)
 
 class ModelManager:
     def __init__(self):
-        self.base_dir = Path('/home/fr4iser/Documents/Git/NixOsControlCenter')
-        self.models_dir = self.base_dir / 'models'
-        self.dataset_dir = self.base_dir / 'datasets'
-        self.current_model_dir = self.models_dir / 'nixos_model'
-        self.quantized_model_dir = self.models_dir / 'quantized_model'
+        # Use centralized paths
+        ProjectPaths.ensure_directories()
+        self.base_dir = ProjectPaths.LLM_DIR
+        self.models_dir = ProjectPaths.MODELS_DIR
+        self.dataset_dir = ProjectPaths.DATASET_DIR
+        self.current_model_dir = ProjectPaths.CURRENT_MODEL_DIR
+        self.quantized_model_dir = ProjectPaths.QUANTIZED_MODEL_DIR
         
     def list_checkpoints(self) -> list[Path]:
         """List all available checkpoints in models directory"""

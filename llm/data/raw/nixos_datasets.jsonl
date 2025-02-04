@@ -1,0 +1,15 @@
+{"concept": "What is NixOS?", "explanation": "NixOS is a Linux distribution built on top of the Nix package manager that provides declarative system configuration and reliable system updates"}
+{"concept": "Where is the main NixOS configuration file?", "explanation": "The main system configuration is typically located at '/etc/nixos/configuration.nix'"}
+{"concept": "How do you apply NixOS configuration changes?", "explanation": "Use 'sudo nixos-rebuild switch' to apply changes and make them permanent, or 'sudo nixos-rebuild test' to test temporarily"}
+{"concept": "What is the basic structure of configuration.nix?", "explanation": "It starts with '{ config, pkgs, ... }: { imports = [ ]; boot.loader = { }; networking = { }; services = { }; system.stateVersion = \"XX.XX\"; }'"}
+{"concept": "How do you install system packages in NixOS?", "explanation": "Add packages to environment.systemPackages in configuration.nix: 'environment.systemPackages = with pkgs; [ package1 package2 ];'"}
+{"concept": "What are NixOS modules?", "explanation": "Modules are reusable configuration units that can be imported into configuration.nix to add functionality"}
+{"concept": "How do you enable services in NixOS?", "explanation": "Enable services using services.servicename.enable = true in configuration.nix"}
+{"concept": "What is system.stateVersion?", "explanation": "system.stateVersion specifies which NixOS version your config is compatible with, helping prevent breaking changes"}
+{"concept": "How do you update NixOS?", "explanation": "Update channels with 'sudo nix-channel --update' then rebuild with 'sudo nixos-rebuild switch --upgrade'"}
+{"concept": "What is a NixOS generation?", "explanation": "A generation is a complete snapshot of your system configuration, allowing you to roll back changes if needed"}
+{"concept": "How do you roll back NixOS changes?", "explanation": "Use 'sudo nixos-rebuild switch --rollback' or select a previous generation from the boot menu"}
+{"concept": "What is the difference between switch and test?", "explanation": "switch makes changes permanent and adds a boot entry, while test applies changes temporarily until reboot"}
+{"concept": "How do you configure networking in NixOS?", "explanation": "Use networking.* options in configuration.nix, like networking.hostName and networking.interfaces"}
+{"concept": "What are NixOS options?", "explanation": "Options are configuration settings provided by NixOS and its modules, like services.nginx.enable or networking.hostName"}
+{"concept": "How do you add users in NixOS?", "explanation": "Define users in configuration.nix using users.users.username = { ... }"}

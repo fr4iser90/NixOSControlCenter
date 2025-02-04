@@ -1,0 +1,15 @@
+{"concept": "What is Nixpkgs?", "explanation": "Nixpkgs is the official package collection for the Nix package manager, containing over 80,000 packages and the modules used by NixOS"}
+{"concept": "How do you search for packages in Nixpkgs?", "explanation": "Use 'nix search nixpkgs packagename' or search on https://search.nixos.org"}
+{"concept": "What is a Nixpkgs overlay?", "explanation": "An overlay is a way to customize or extend Nixpkgs by adding or modifying packages without changing the original Nixpkgs repository"}
+{"concept": "How do you create a Nixpkgs overlay?", "explanation": "Create a .nix file with a function that takes self and super as arguments: 'self: super: { package = super.package.override { }; }'"}
+{"concept": "What is the structure of a Nixpkgs package?", "explanation": "A package typically contains: name, version, src (source), buildInputs (dependencies), and build instructions"}
+{"concept": "How do you override a package in Nixpkgs?", "explanation": "Use the override attribute: 'pkgs.package.override { parameter = value; }'"}
+{"concept": "What is callPackage in Nixpkgs?", "explanation": "callPackage is a helper function that automatically fills in dependencies from nixpkgs for a package definition"}
+{"concept": "How do you contribute to Nixpkgs?", "explanation": "Fork the Nixpkgs repository, add or modify packages following the contribution guidelines, and submit a pull request"}
+{"concept": "What is mkDerivation?", "explanation": "mkDerivation is a helper function in Nixpkgs that simplifies creating package definitions with common build steps"}
+{"concept": "How do you use a specific version of Nixpkgs?", "explanation": "Pin the version using a specific commit, release tag, or use Nix flakes to declare exact dependencies"}
+{"concept": "What are Nixpkgs channels?", "explanation": "Channels are rolling releases of Nixpkgs, like nixos-unstable for latest updates or nixos-23.11 for stability"}
+{"concept": "How do you debug Nixpkgs builds?", "explanation": "Use 'nix-build -K' to keep the build directory, or add 'NIX_DEBUG=1' for verbose output"}
+{"concept": "What is fetchFromGitHub in Nixpkgs?", "explanation": "A helper function to fetch source code from GitHub, automatically handling versioning and SHA256 hashes"}
+{"concept": "How do you maintain package versions?", "explanation": "Update the version attribute and src hash in the package definition, test the build, and submit an update PR"}
+{"concept": "What is the Nixpkgs module system?", "explanation": "A framework for declaring NixOS configuration options in a composable and reusable way"}

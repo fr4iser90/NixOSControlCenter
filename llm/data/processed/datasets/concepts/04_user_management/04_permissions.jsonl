@@ -1,0 +1,19 @@
+{"concept": "How does NixOS handle permissions?", "explanation": "[User Management] NixOS manages permissions through: 1) User and group settings, 2) File system permissions, 3) Service access controls, 4) Security policies. This ensures proper access control and security.", "examples": ["Permission setup", "Access control"], "references": ["Permission Guide", "Security Documentation"]}
+
+{"concept": "What about user permissions?", "explanation": "[User Management] User permission management includes: 1) User group assignment, 2) Sudo access configuration, 3) Service permissions, 4) Resource access control. This defines what users can do.", "examples": ["User setup", "Access configuration"], "references": ["User Permission Guide", "Access Documentation"]}
+
+{"concept": "How do you handle group permissions?", "explanation": "[User Management] Group permission management involves: 1) Group creation, 2) Member management, 3) Resource access, 4) Permission inheritance. This organizes user access rights.", "examples": ["Group setup", "Member management"], "references": ["Group Guide", "Permission Documentation"]}
+
+{"concept": "What about file permissions?", "explanation": "[User Management] File permission management includes: 1) Basic permissions (read/write/execute), 2) Special permissions, 3) ACL configuration, 4) Default permissions. This controls file access.", "examples": ["Permission setup", "ACL configuration"], "references": ["File Permission Guide", "Access Control Documentation"]}
+
+{"concept": "How do you manage service permissions?", "explanation": "[User Management] Service permission management involves: 1) Service user setup, 2) Resource access control, 3) Capability management, 4) Security contexts. This ensures proper service isolation.", "examples": ["Service setup", "Access control"], "references": ["Service Permission Guide", "Security Documentation"]}
+
+{"concept": "What about sudo configuration?", "explanation": "[User Management] Sudo configuration includes: 1) User privilege setup, 2) Command restrictions, 3) Authentication rules, 4) Security policies. This manages elevated privileges.", "examples": ["Sudo setup", "Policy configuration"], "references": ["Sudo Guide", "Privilege Documentation"]}
+
+{"concept": "How do you handle special permissions?", "explanation": "[User Management] Special permission management involves: 1) SetUID/SetGID configuration, 2) Sticky bit usage, 3) Capability assignment, 4) Extended attributes. This enables advanced access control.", "examples": ["Special setup", "Capability management"], "references": ["Special Permission Guide", "Advanced Documentation"]}
+
+{"concept": "What about permission inheritance?", "explanation": "[User Management] Permission inheritance includes: 1) Directory permissions, 2) Default ACLs, 3) Group inheritance, 4) Permission propagation. This ensures consistent access control.", "examples": ["Inheritance setup", "Default permissions"], "references": ["Inheritance Guide", "Permission Documentation"]}
+
+{"concept": "How do you audit permissions?", "explanation": "[User Management] Permission auditing involves: 1) Access monitoring, 2) Permission verification, 3) Security checking, 4) Compliance testing. This ensures proper permission setup.", "examples": ["Audit process", "Verification steps"], "references": ["Audit Guide", "Security Documentation"]}
+
+{"concept": "What are permission best practices?", "explanation": "[User Management] Permission best practices include: 1) Principle of least privilege, 2) Regular audits, 3) Documentation maintenance, 4) Security awareness, 5) Regular updates. These ensure secure access control.", "examples": ["Security practices", "Management methods"], "references": ["Best Practices Guide", "Security Documentation"]}

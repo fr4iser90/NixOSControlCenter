@@ -1,0 +1,19 @@
+{"concept": "How does NixOS handle containers?", "explanation": "[Deployment] NixOS container management includes: 1) Container creation with nixos-container, 2) Docker integration, 3) OCI support, 4) Container configuration. This enables reliable containerized deployments.", "examples": ["Container setup", "Docker usage"], "references": ["Container Guide", "Deployment Documentation"]}
+
+{"concept": "What about Docker integration?", "explanation": "[Deployment] Docker integration involves: 1) Docker daemon setup, 2) Image building with Nix, 3) Container management, 4) Network configuration. This enables Docker-based deployments.", "examples": ["Docker setup", "Image building"], "references": ["Docker Guide", "Integration Documentation"]}
+
+{"concept": "How do you create NixOS containers?", "explanation": "[Deployment] NixOS container creation includes: 1) Configuration definition, 2) Resource allocation, 3) Network setup, 4) Service configuration. This creates isolated system containers.", "examples": ["Container creation", "Configuration setup"], "references": ["Container Guide", "Creation Documentation"]}
+
+{"concept": "What about container networking?", "explanation": "[Deployment] Container networking involves: 1) Network configuration, 2) Port mapping, 3) DNS setup, 4) Network isolation. This enables container communication.", "examples": ["Network setup", "Port configuration"], "references": ["Networking Guide", "Container Documentation"]}
+
+{"concept": "How do you manage container storage?", "explanation": "[Deployment] Container storage management includes: 1) Volume configuration, 2) Data persistence, 3) Storage drivers, 4) Backup procedures. This ensures reliable data handling.", "examples": ["Storage setup", "Volume management"], "references": ["Storage Guide", "Container Documentation"]}
+
+{"concept": "What about container orchestration?", "explanation": "[Deployment] Container orchestration involves: 1) Kubernetes integration, 2) Service discovery, 3) Load balancing, 4) Scaling configuration. This enables managed container deployments.", "examples": ["Orchestration setup", "Kubernetes config"], "references": ["Orchestration Guide", "Management Documentation"]}
+
+{"concept": "How do you handle container security?", "explanation": "[Deployment] Container security includes: 1) Image scanning, 2) Runtime protection, 3) Network policies, 4) Access control. This ensures secure container deployments.", "examples": ["Security setup", "Policy configuration"], "references": ["Security Guide", "Container Documentation"]}
+
+{"concept": "What about container monitoring?", "explanation": "[Deployment] Container monitoring involves: 1) Resource tracking, 2) Log collection, 3) Performance metrics, 4) Alert configuration. This enables container oversight.", "examples": ["Monitoring setup", "Metric collection"], "references": ["Monitoring Guide", "Container Documentation"]}
+
+{"concept": "How do you handle container updates?", "explanation": "[Deployment] Container update management includes: 1) Image updates, 2) Configuration changes, 3) Rolling deployments, 4) Rollback procedures. This ensures reliable updates.", "examples": ["Update process", "Rollback handling"], "references": ["Update Guide", "Maintenance Documentation"]}
+
+{"concept": "What are container best practices?", "explanation": "[Deployment] Container best practices include: 1) Image optimization, 2) Security hardening, 3) Resource management, 4) Monitoring setup, 5) Update procedures. These ensure reliable container operations.", "examples": ["Best practices", "Management methods"], "references": ["Best Practices Guide", "Container Management Documentation"]}

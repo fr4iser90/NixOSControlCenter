@@ -6,13 +6,15 @@ from pathlib import Path
 import yaml
 from typing import Dict, List, Any, Union
 import itertools
+from ..utils.path_config import ProjectPaths
 
 class NixOSDatasetGenerator:
-    def __init__(self, config_dir: str):
-        self.config_dir = Path(config_dir)
-        self.system_config = self.config_dir / "system-config.nix"
-        self.output_dir = self.config_dir / "datasets"
-        self.output_dir.mkdir(exist_ok=True)
+    def __init__(self):
+        ProjectPaths.ensure_directories()
+        self.output_dir = ProjectPaths.DATASET_DIR
+        self.concepts_dir = ProjectPaths.CONCEPTS_DIR
+        self.examples_dir = ProjectPaths.EXAMPLES_DIR
+        self.troubleshooting_dir = ProjectPaths.TROUBLESHOOTING_DIR
         
         # Common Nix expressions and patterns
         self.nix_patterns = {
@@ -243,7 +245,7 @@ class NixOSDatasetGenerator:
 
     def generate_dataset(self) -> None:
         """Generate training dataset from NixOS configurations."""
-        with open(self.system_config, 'r') as f:
+        with open(ProjectPaths.SYSTEM_CONFIG, 'r') as f:
             content = f.read()
         
         base_config = self.parse_nix_config(content)
@@ -393,7 +395,7 @@ class NixOSDatasetGenerator:
         return ' and '.join(purposes) if purposes else 'general purpose'
 
 def main():
-    generator = NixOSDatasetGenerator('/home/fr4iser/Documents/Git/NixOsControlCenter/nixos')
+    generator = NixOSDatasetGenerator()
     generator.generate_dataset()
     print("Dataset generation complete! Check the 'datasets' directory for the generated files.")
 

@@ -4,11 +4,14 @@ import requests
 from pathlib import Path
 from typing import Dict, List, Any
 from datetime import datetime
+from ..utils.path_config import ProjectPaths
 
 class NixOSExplanationDataset:
-    def __init__(self, output_dir: str):
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(exist_ok=True)
+    def __init__(self):
+        ProjectPaths.ensure_directories()
+        self.concepts_dir = ProjectPaths.CONCEPTS_DIR
+        self.examples_dir = ProjectPaths.EXAMPLES_DIR
+        self.troubleshooting_dir = ProjectPaths.TROUBLESHOOTING_DIR
         
         # Documentation references
         self.docs = {
@@ -718,24 +721,44 @@ class NixOSExplanationDataset:
             "documentation_sources": self.docs
         }
         
-        self._save_dataset('nixos_concepts.jsonl', concepts)
-        self._save_dataset('nixos_advanced_concepts.jsonl', advanced_concepts)
-        self._save_dataset('nixos_training_tasks.jsonl', training_tasks)
-        self._save_dataset('nixos_dataset_metadata.json', [metadata])
-        self._save_dataset('nixos_practical_examples.jsonl', practical_examples)
-        self._save_dataset('nixos_troubleshooting.jsonl', troubleshooting_guides)
+        self.save_dataset(concepts, "concepts")
+        self.save_dataset(advanced_concepts, "advanced_concepts")
+        self.save_dataset(training_tasks, "training_tasks")
+        self.save_dataset([metadata], "metadata")
+        self.save_dataset(practical_examples, "examples")
+        self.save_dataset(troubleshooting_guides, "troubleshooting")
 
-    def _save_dataset(self, filename: str, data: List[Dict[str, Any]]) -> None:
-        """Save dataset to a JSONL file."""
-        output_file = self.output_dir / filename
+    def save_dataset(self, data: List[Dict[str, Any]], dataset_type: str) -> None:
+        """Save dataset to appropriate directory based on type."""
+        if dataset_type == "concepts":
+            output_file = self.concepts_dir / "nixos_concepts.jsonl"
+        elif dataset_type == "advanced_concepts":
+            output_file = self.concepts_dir / "nixos_advanced_concepts.jsonl"
+        elif dataset_type == "training_tasks":
+            output_file = self.concepts_dir / "nixos_training_tasks.jsonl"
+        elif dataset_type == "metadata":
+            output_file = self.concepts_dir / "nixos_dataset_metadata.json"
+        elif dataset_type == "examples":
+            output_file = self.examples_dir / "nixos_practical_examples.jsonl"
+        elif dataset_type == "troubleshooting":
+            output_file = self.troubleshooting_dir / "nixos_troubleshooting.jsonl"
+        else:
+            raise ValueError(f"Unknown dataset type: {dataset_type}")
+            
         with open(output_file, 'w') as f:
             for item in data:
-                f.write(json.dumps(item) + '\n')
+                json.dump(item, f)
+                f.write('\n')
+        print(f"Saved {len(data)} items to {output_file}")
 
 def main():
-    generator = NixOSExplanationDataset('/home/fr4iser/Documents/Git/NixOsControlCenter/datasets')
+    # Initialize dataset generator with paths from config
+    generator = NixOSExplanationDataset()
+    
+    # Generate all datasets
     generator.generate_concept_dataset()
-    print("NixOS explanation dataset generated successfully!")
+    
+    print("Dataset generation complete!")
 
 if __name__ == "__main__":
     main()

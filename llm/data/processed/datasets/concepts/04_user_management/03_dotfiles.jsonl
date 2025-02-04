@@ -1,0 +1,19 @@
+{"concept": "What are dotfiles in NixOS?", "explanation": "[User Management] Dotfiles are configuration files for user applications and environments. They: 1) Define program settings, 2) Configure shell behavior, 3) Set up development tools, 4) Manage user preferences. NixOS manages these declaratively.", "examples": ["Configuration files", "Environment setup"], "references": ["Dotfiles Guide", "Configuration Documentation"]}
+
+{"concept": "How do you manage dotfiles with Nix?", "explanation": "[User Management] Dotfile management includes: 1) Declarative configuration, 2) Version control integration, 3) Automated deployment, 4) Synchronization across systems. This ensures consistent environments.", "examples": ["Management methods", "Deployment process"], "references": ["Management Guide", "Automation Documentation"]}
+
+{"concept": "What about dotfile organization?", "explanation": "[User Management] Organization involves: 1) Directory structure planning, 2) Module separation, 3) Configuration grouping, 4) Dependency management. This creates maintainable configurations.", "examples": ["Directory structure", "Module organization"], "references": ["Organization Guide", "Structure Documentation"]}
+
+{"concept": "How do you handle dotfile templates?", "explanation": "[User Management] Template management includes: 1) Template creation, 2) Variable substitution, 3) Conditional configuration, 4) Platform adaptation. This enables flexible configuration.", "examples": ["Template usage", "Variable handling"], "references": ["Template Guide", "Configuration Documentation"]}
+
+{"concept": "What about version control?", "explanation": "[User Management] Version control for dotfiles involves: 1) Repository setup, 2) Change tracking, 3) Branch management, 4) Collaboration features. This ensures configuration history and sharing.", "examples": ["Git setup", "Change management"], "references": ["Version Control Guide", "Repository Documentation"]}
+
+{"concept": "How do you handle sensitive data?", "explanation": "[User Management] Sensitive data management includes: 1) Secret separation, 2) Encryption methods, 3) Secure storage, 4) Access control. This protects private information.", "examples": ["Secret handling", "Security measures"], "references": ["Security Guide", "Data Protection Documentation"]}
+
+{"concept": "What about cross-platform compatibility?", "explanation": "[User Management] Cross-platform management involves: 1) Platform detection, 2) Conditional configuration, 3) Compatibility layers, 4) Feature toggles. This ensures dotfiles work across systems.", "examples": ["Platform handling", "Compatibility setup"], "references": ["Compatibility Guide", "Platform Documentation"]}
+
+{"concept": "How do you test dotfile configurations?", "explanation": "[User Management] Testing includes: 1) Configuration validation, 2) Environment testing, 3) Integration checks, 4) Deployment verification. This ensures reliable configurations.", "examples": ["Testing methods", "Validation process"], "references": ["Testing Guide", "Validation Documentation"]}
+
+{"concept": "What about dotfile migration?", "explanation": "[User Management] Migration management involves: 1) Configuration export, 2) Format conversion, 3) Import procedures, 4) Verification steps. This enables smooth transitions.", "examples": ["Migration process", "Conversion steps"], "references": ["Migration Guide", "Transition Documentation"]}
+
+{"concept": "What are dotfile best practices?", "explanation": "[User Management] Best practices include: 1) Modular organization, 2) Version control usage, 3) Documentation maintenance, 4) Regular testing, 5) Backup procedures. These ensure reliable configuration management.", "examples": ["Organization methods", "Management practices"], "references": ["Best Practices Guide", "Management Documentation"]}

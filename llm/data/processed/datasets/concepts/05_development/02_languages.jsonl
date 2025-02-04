@@ -1,0 +1,19 @@
+{"concept": "How does NixOS handle programming languages?", "explanation": "[Development] NixOS manages programming languages through: 1) Language-specific packages, 2) Version management, 3) Runtime environments, 4) Build tools. This enables development in multiple languages.", "examples": ["Language setup", "Version management"], "references": ["Language Guide", "Development Documentation"]}
+
+{"concept": "What about Python development?", "explanation": "[Development] Python development in NixOS includes: 1) Python version management, 2) Virtual environment integration, 3) Package management with pip, 4) Development tool setup. This provides comprehensive Python support.", "examples": ["Python setup", "Environment configuration"], "references": ["Python Guide", "Development Documentation"]}
+
+{"concept": "How do you handle Node.js?", "explanation": "[Development] Node.js development involves: 1) Version management through nix, 2) npm/yarn integration, 3) Global package handling, 4) Development tool setup. This enables JavaScript/Node.js development.", "examples": ["Node.js setup", "Package management"], "references": ["Node.js Guide", "JavaScript Documentation"]}
+
+{"concept": "What about Rust development?", "explanation": "[Development] Rust development includes: 1) Rust toolchain management, 2) Cargo integration, 3) Build dependency handling, 4) Development tool setup. This provides comprehensive Rust support.", "examples": ["Rust setup", "Cargo configuration"], "references": ["Rust Guide", "Development Documentation"]}
+
+{"concept": "How do you manage Go development?", "explanation": "[Development] Go development involves: 1) Go version management, 2) GOPATH configuration, 3) Package management, 4) Build tool setup. This enables effective Go development.", "examples": ["Go setup", "Environment configuration"], "references": ["Go Guide", "Development Documentation"]}
+
+{"concept": "What about Java development?", "explanation": "[Development] Java development includes: 1) JDK version management, 2) Build tool integration (Maven/Gradle), 3) Dependency handling, 4) Development environment setup. This provides Java development support.", "examples": ["Java setup", "Build configuration"], "references": ["Java Guide", "Development Documentation"]}
+
+{"concept": "How do you handle C/C++?", "explanation": "[Development] C/C++ development involves: 1) Compiler setup (GCC/Clang), 2) Build tool integration, 3) Library management, 4) Development tool configuration. This enables native code development.", "examples": ["C/C++ setup", "Build configuration"], "references": ["C/C++ Guide", "Development Documentation"]}
+
+{"concept": "What about multi-language projects?", "explanation": "[Development] Multi-language project management includes: 1) Environment coordination, 2) Dependency resolution, 3) Build system integration, 4) Tool chain management. This enables polyglot development.", "examples": ["Project setup", "Integration configuration"], "references": ["Multi-language Guide", "Project Documentation"]}
+
+{"concept": "How do you manage language versions?", "explanation": "[Development] Language version management involves: 1) Version selection, 2) Environment isolation, 3) Dependency compatibility, 4) Switch mechanisms. This ensures version-specific development.", "examples": ["Version setup", "Environment management"], "references": ["Version Guide", "Management Documentation"]}
+
+{"concept": "What are language-specific best practices?", "explanation": "[Development] Best practices include: 1) Version pinning, 2) Development tool standardization, 3) Environment isolation, 4) Documentation maintenance, 5) Team conventions. These ensure reliable language environments.", "examples": ["Setup practices", "Management methods"], "references": ["Best Practices Guide", "Language Management Documentation"]}

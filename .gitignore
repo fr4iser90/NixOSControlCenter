@@ -7,7 +7,7 @@ build-gaming.sh
 ./continue
 ./continue/config.json
 
-datasets/
+
 
 # Exclude everything in the nixos/custom/ directory...
 nixos/custom/**

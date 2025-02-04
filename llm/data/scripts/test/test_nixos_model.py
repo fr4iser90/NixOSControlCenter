@@ -4,29 +4,21 @@ from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import LoraConfig, get_peft_model
 from typing import List
+from ..utils.path_config import ProjectPaths
 
 class NixOSModelTester:
-    def __init__(self, model_dir: str, model_name: str = "facebook/opt-125m"):
-        self.model_dir = Path(model_dir)
-        self.model_name = model_name
-        
-        print(f"Loading tokenizer and model from {model_name}...")
+    def __init__(self, model_path: str = None):
+        self.model_path = model_path or str(ProjectPaths.CURRENT_MODEL_DIR)
+        # Initialize the tokenizer
+        print(f"Loading tokenizer from facebook/opt-125m...")
         self.tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
+            "facebook/opt-125m",
             padding_side="left",
             trust_remote_code=True
         )
         self.tokenizer.pad_token = self.tokenizer.eos_token
         
-        # Load base model first
-        print(f"Loading base model from {model_name}...")
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            device_map="auto",
-            low_cpu_mem_usage=True
-        )
-        self.model.config.pad_token_id = self.tokenizer.eos_token_id
+        self.model = self.load_model(self.model_path)
         
         # Apply LoRA config
         lora_config = LoraConfig(
@@ -39,7 +31,7 @@ class NixOSModelTester:
         )
         
         # Try to load from checkpoints
-        checkpoint_dir = self.model_dir / "checkpoint-2000"
+        checkpoint_dir = Path(self.model_path) / "checkpoint-2000"
         if checkpoint_dir.exists():
             print(f"Loading from checkpoint: {checkpoint_dir}")
             self.model = get_peft_model(self.model, lora_config)
@@ -51,6 +43,18 @@ class NixOSModelTester:
         if torch.cuda.is_available():
             self.model = self.model.to("cuda")
         
+    def load_model(self, model_path: str):
+        # Load the model from the specified path
+        print(f"Loading model from {model_path}...")
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            device_map="auto",
+            low_cpu_mem_usage=True
+        )
+        model.config.pad_token_id = self.tokenizer.eos_token_id
+        return model
+
     def test_model(self, test_prompts: List[str]):
         self.model.eval()
         device = next(self.model.parameters()).device
@@ -108,9 +112,8 @@ def main():
         "Create a basic flake.nix for a Python web server with FastAPI"
     ]
     
-    tester = NixOSModelTester(
-        model_dir="/home/fr4iser/Documents/Git/NixOsControlCenter/models"
-    )
+    # Use default path from ProjectPaths
+    tester = NixOSModelTester()
     tester.test_model(test_prompts)
 
 if __name__ == "__main__":

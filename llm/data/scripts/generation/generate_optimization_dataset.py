@@ -13,6 +13,7 @@ from datetime import datetime
 from github import Github
 import logging
 from tqdm import tqdm
+from ..utils.path_config import ProjectPaths
 
 # Set up logging
 logging.basicConfig(
@@ -238,9 +239,9 @@ class NixOSConfigCollector:
 class OptimizationDatasetGenerator:
     """Generate datasets for NixOS optimization"""
     
-    def __init__(self, output_dir: str):
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+    def __init__(self):
+        ProjectPaths.ensure_directories()
+        self.output_dir = ProjectPaths.OPTIMIZATION_DIR
         self.hardware_profile = HardwareProfile.from_current_system()
         self.metrics_collector = SystemMetricsCollector()
         self.config_collector = NixOSConfigCollector()
@@ -422,31 +423,14 @@ class OptimizationDatasetGenerator:
         logger.info(f"Generated {len(dataset)} samples")
 
 def main():
-    # Try to get token from environment first
-    github_token = os.getenv('GITHUB_TOKEN')
+    # Initialize the generator with paths from config
+    generator = OptimizationDatasetGenerator()
     
-    # If not in environment, prompt for it
-    if not github_token:
-        print("\nGitHub token not found in environment.")
-        print("Please create a token with 'public_repo' scope at:")
-        print("https://github.com/settings/tokens/new")
-        print("\nOr press Enter to skip GitHub data collection.")
-        github_token = input("Enter GitHub token (will not be stored): ").strip()
+    # Generate dataset with specified number of samples
+    num_samples = 100  # Configurable
+    generator.generate_dataset(num_samples)
     
-    # Initialize dataset generator
-    generator = OptimizationDatasetGenerator(
-        output_dir="/home/fr4iser/Documents/Git/NixOsControlCenter/datasets"
-    )
-    
-    # Update config collector with token if provided
-    if github_token:
-        generator.config_collector = NixOSConfigCollector(github_token)
-        logger.info("GitHub token provided, will collect configurations from GitHub")
-    else:
-        logger.warning("No GitHub token provided, will generate synthetic data only")
-    
-    # Generate dataset with 100 samples
-    generator.generate_dataset(num_samples=100)
+    logger.info(f"Dataset generation complete! Check {generator.output_dir} for the generated files.")
 
 if __name__ == "__main__":
     main()
