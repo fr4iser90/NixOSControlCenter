@@ -45,7 +45,7 @@ class NixOSModelTrainer:
         ProjectPaths.ensure_directories()
         self.output_dir = ProjectPaths.MODELS_DIR / model_name
         self.current_model_dir = ProjectPaths.CURRENT_MODEL_DIR
-        self.dataset_dir = ProjectPaths.DATASET_DIR
+        self.dataset_dir = str(ProjectPaths.DATASET_DIR)
         
         # Initialize components
         self.model = None
@@ -66,7 +66,7 @@ class NixOSModelTrainer:
         # Initialize visualization if requested
         if self.start_visualizer:
             from llm.scripts.visualization.app import NixOSVisualizer
-            self.visualizer = NixOSVisualizer()
+            self.visualizer = NixOSVisualizer(auto_setup=False)  # Don't auto setup
             self._start_visualization_server()
             
     def _initialize_model(self):

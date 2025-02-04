@@ -23,7 +23,7 @@ from llm.scripts.utils.path_config import ProjectPaths
 class NixOSVisualizer:
     """Main application class for the NixOS Model Training Visualizer."""
     
-    def __init__(self):
+    def __init__(self, auto_setup=False):
         """Initialize visualization components."""
         # Ensure directories exist
         ProjectPaths.ensure_directories()
@@ -42,6 +42,9 @@ class NixOSVisualizer:
         self.system_view = SystemView()
         self.history_view = HistoryView()
         
+        if auto_setup:
+            self.setup_page()
+        
     def setup_page(self):
         """Setup the Streamlit page configuration."""
         st.set_page_config(
@@ -58,7 +61,8 @@ class NixOSVisualizer:
         
     def run(self):
         """Run the visualization dashboard."""
-        self.setup_page()
+        if not st._is_running_with_streamlit:
+            self.setup_page()
         
         # Add navigation in sidebar
         with st.sidebar:
@@ -129,7 +133,7 @@ class NixOSVisualizer:
 
 def main():
     """Main entry point for the visualization dashboard."""
-    visualizer = NixOSVisualizer()
+    visualizer = NixOSVisualizer(auto_setup=True)
     visualizer.run()  # Only run if called directly as script
 
 if __name__ == "__main__":
