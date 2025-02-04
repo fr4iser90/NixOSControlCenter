@@ -19,7 +19,6 @@ in {
     initrd = {
       compressor = "zstd";
       compressorArgs = [ "-19" "-T0" ];
-      systemd.enable = true;
       includeDefaultModules = true;
     };
     kernelPackages = pkgs.linuxPackages_latest;

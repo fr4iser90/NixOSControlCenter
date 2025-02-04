@@ -1,6 +1,9 @@
 { config, lib, pkgs, ... }: 
 
 {
+  # Explicitly disable systemd-boot
+  systemd-boot.enable = lib.mkForce false;
+  
   # Boot loader configuration
   boot.loader = {
     # Enable GRUB as the bootloader

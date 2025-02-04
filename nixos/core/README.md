@@ -42,16 +42,4 @@ The core modules provide essential system configuration for NixOS systems. These
   - Password management integration
   - Shell configuration (zsh, fish)
 
-## Usage
-
-Import the core modules in your system configuration:
-
-```nix
-{
-  imports = [
-    ./core
-  ];
-}
-```
-
 Each module can be configured through `systemConfig` parameters.
