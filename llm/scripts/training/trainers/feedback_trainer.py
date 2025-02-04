@@ -1,13 +1,54 @@
 from .base_trainer import NixOSBaseTrainer
+from transformers import TrainerCallback
 import logging
 import warnings
 
 logger = logging.getLogger(__name__)
 
+class MetricsCallback(TrainerCallback):
+    """Callback to handle training metrics visualization."""
+    
+    def __init__(self, trainer):
+        self.trainer = trainer
+        self.metrics_manager = None
+        
+    def on_init_end(self, args, state, control, **kwargs):
+        """Called when trainer initialization ends."""
+        from ...visualization.backend.metrics_manager import MetricsManager
+        self.metrics_manager = MetricsManager()
+        return control
+        
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        """Called when trainer logs metrics."""
+        if not logs:
+            return control
+            
+        # Save training metrics
+        metrics = {
+            'loss': logs.get('loss', 0),
+            'learning_rate': logs.get('learning_rate', 0),
+            'epoch': logs.get('epoch', 0)
+        }
+        
+        if 'eval_loss' in logs:
+            metrics['eval_loss'] = logs['eval_loss']
+            
+        self.metrics_manager.save_training_metrics(
+            step=state.global_step,
+            metrics=metrics
+        )
+        return control
+
 class FeedbackTrainer(NixOSBaseTrainer):
     """Trainer that collects feedback during training for dataset improvement."""
     
     def __init__(self, *args, dataset_manager=None, visualizer=None, **kwargs):
+        # Add metrics callback if visualization is enabled
+        if visualizer:
+            callbacks = kwargs.get('callbacks', [])
+            callbacks.append(MetricsCallback(self))
+            kwargs['callbacks'] = callbacks
+            
         super().__init__(*args, **kwargs)
         self.dataset_manager = dataset_manager
         self.visualizer = visualizer
@@ -23,15 +64,6 @@ class FeedbackTrainer(NixOSBaseTrainer):
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         """Compute loss and collect feedback."""
         loss, outputs = super().compute_loss(model, inputs, return_outputs=True)
-        
-        # Save metrics for visualization
-        if self.visualizer and hasattr(self.state, 'global_step'):
-            metrics = {
-                "train_loss": loss.item(),
-                "learning_rate": self.optimizer.param_groups[0]["lr"],
-                "batch_size": self.args.train_batch_size,
-            }
-            self.visualizer.save_training_metrics(self.state.global_step, metrics)
         
         # Collect feedback during validation
         if (hasattr(self, 'is_in_eval') and self.is_in_eval and 
@@ -50,14 +82,14 @@ class FeedbackTrainer(NixOSBaseTrainer):
                     example_id = f"example_{self.state.global_step}_{i}"
                     self._collect_prediction_feedback(prediction, expected, example_id)
                 except Exception as e:
-                    logger.error(f"Error collecting feedback: {str(e)}")
-        
+                    logger.error(f"Error collecting feedback: {e}")
+                    
         if return_outputs:
             return loss, outputs
         return loss
     
     def _collect_prediction_feedback(self, prediction, expected, example_id):
-        """Collect feedback for a single prediction."""
+        """Collect feedback about model predictions."""
         if self.dataset_manager:
             feedback = {
                 'example_id': example_id,

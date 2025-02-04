@@ -58,7 +58,7 @@ class NixOSBaseTrainer(Trainer):
             return None
             
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
-        """Base loss computation with metrics collection."""
+        """Base loss computation."""
         try:
             if "labels" in inputs:
                 labels = inputs["labels"]
@@ -75,17 +75,6 @@ class NixOSBaseTrainer(Trainer):
             loss_fct = torch.nn.CrossEntropyLoss()
             loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
             
-            # Collect basic metrics
-            metrics = {
-                "train_loss": loss.item(),
-                "learning_rate": self.optimizer.param_groups[0]["lr"],
-                "batch_size": self.args.train_batch_size,
-            }
-            
-            # Add GPU metrics if available
-            if torch.cuda.is_available():
-                metrics["gpu_memory_used"] = torch.cuda.memory_allocated() / 1024**3
-            
             if return_outputs:
                 return loss, outputs
             return loss
@@ -99,6 +88,14 @@ class NixOSBaseTrainer(Trainer):
     def save_model(self, output_dir=None):
         """Save model with NixOS-specific handling."""
         if output_dir is None:
-            output_dir = ProjectPaths.MODELS_DIR / self.model_name
-        super().save_model(output_dir)
-        self.save_metrics(output_dir)
+            output_dir = self.args.output_dir
+            
+        # Save model and configuration
+        self.model.save_pretrained(output_dir)
+        if self.processing_class:
+            self.processing_class.save_pretrained(output_dir)
+        elif self.tokenizer:
+            self.tokenizer.save_pretrained(output_dir)
+            
+        # Save training arguments
+        torch.save(self.args, str(ProjectPaths.MODEL_DIR / "training_args.bin"))

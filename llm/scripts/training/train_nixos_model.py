@@ -8,6 +8,7 @@ from transformers import (
     AutoTokenizer, 
     AutoModelForCausalLM,
     TrainingArguments,
+    TrainerCallback,
     Trainer,
     DataCollatorForLanguageModeling
 )
@@ -33,37 +34,45 @@ logger = logging.getLogger(__name__)
 class NixOSModelTrainer:
     """Trainer for the NixOS model."""
     
-    def __init__(self, model_name: str = "NixOS", start_visualizer: bool = False, visualizer_network_access: bool = False):
+    def __init__(self, model_name="NixOS", start_visualizer=False, visualizer_network_access=False):
         """Initialize the trainer with model name and visualization options."""
         self.model_name = model_name
         self.start_visualizer = start_visualizer
         self.visualizer_network_access = visualizer_network_access
+        self.viz_process = None
         
         # Initialize paths
         ProjectPaths.ensure_directories()
-        self.dataset_dir = ProjectPaths.DATASET_DIR
         self.output_dir = ProjectPaths.MODELS_DIR / model_name
         self.current_model_dir = ProjectPaths.CURRENT_MODEL_DIR
+        
+        # Initialize components
+        self.model = None
+        self.tokenizer = None
+        self.train_dataset = None
+        self.eval_dataset = None
+        self.data_collator = None
+        self.dataset_manager = DatasetManager()
         
         # Setup logging
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
         
-        # Initialize components
-        self.dataset_manager = DatasetManager()
+        # Initialize model and tokenizer
+        self._initialize_model()
+        
+        # Start visualization if requested
         if self.start_visualizer:
-            self.visualizer_process = self._start_visualization_server()
-            self.visualizer = None
-        else:
-            self.visualizer_process = None
-            self.visualizer = None
+            self._start_visualization_server()
             
+    def _initialize_model(self):
+        """Initialize the model and tokenizer."""
         # First check if we're loading an existing model
-        if Path(model_name).exists() and (Path(model_name) / "adapter_model.safetensors").exists():
-            print(f"Loading existing NixOS model from {model_name}...")
+        if Path(self.model_name).exists() and (Path(self.model_name) / "adapter_model.safetensors").exists():
+            print(f"Loading existing NixOS model from {self.model_name}...")
             # Load tokenizer from existing model
             self.tokenizer = AutoTokenizer.from_pretrained(
-                model_name,
+                self.model_name,
                 padding_side="left",
                 trust_remote_code=True
             )
@@ -95,7 +104,7 @@ class NixOSModelTrainer:
             
             # Create PEFT model and load trained weights
             self.model = get_peft_model(base_model, lora_config)
-            self.model.load_adapter(model_name, adapter_name="default")
+            self.model.load_adapter(self.model_name, adapter_name="default")
             print("Loaded existing LoRA weights")
             
         else:
@@ -134,13 +143,28 @@ class NixOSModelTrainer:
             print("Applying LoRA configuration...")
             self.model = get_peft_model(self.model, lora_config)
             self.model.print_trainable_parameters()
-        
+            
         # Move to GPU if available
         if torch.cuda.is_available():
             self.model = self.model.to("cuda")
             torch.backends.cuda.enable_flash_sdp(True)
             torch.backends.cuda.enable_mem_efficient_sdp(True)
+            
+    def __del__(self):
+        """Cleanup visualization server on deletion."""
+        self.cleanup_visualization()
         
+    def cleanup_visualization(self):
+        """Cleanup visualization server."""
+        if self.viz_process:
+            try:
+                self.viz_process.terminate()
+                self.viz_process.join()
+            except Exception as e:
+                self.logger.error(f"Error cleaning up visualization: {e}")
+            finally:
+                self.viz_process = None
+                
     def _start_visualization_server(self):
         """Start the Streamlit visualization server."""
         if not self.start_visualizer:
@@ -178,9 +202,9 @@ class NixOSModelTrainer:
                 
                 subprocess.run(cmd, env=env)
             
-            viz_process = multiprocessing.Process(target=run_visualizer)
-            viz_process.start()
-            return viz_process
+            self.viz_process = multiprocessing.Process(target=run_visualizer)
+            self.viz_process.start()
+            return self.viz_process
             
         except Exception as e:
             self.logger.error(f"Failed to start visualization server: {e}")
@@ -428,37 +452,11 @@ class NixOSModelTrainer:
             train_dataset=dataset["train"],
             eval_dataset=dataset["test"],
             dataset_manager=self.dataset_manager,
-            visualizer=self.visualizer,
-            callbacks=[self.training_callback]  # Add callback for metrics
+            visualizer=self.visualizer  # This will enable metrics visualization
         )
 
         print("Starting training...")
         trainer.train()
-        
-    def training_callback(self, args, state, control, logs=None, **kwargs):
-        """Callback to handle training progress and metrics."""
-        if not logs:
-            return
-            
-        # Initialize metrics manager if needed
-        if not hasattr(self, 'metrics_manager'):
-            from ..visualization.backend.metrics_manager import MetricsManager
-            self.metrics_manager = MetricsManager()
-            
-        # Save training metrics
-        metrics = {
-            'loss': logs.get('loss', 0),
-            'learning_rate': logs.get('learning_rate', 0),
-            'epoch': logs.get('epoch', 0)
-        }
-        
-        if 'eval_loss' in logs:
-            metrics['eval_loss'] = logs['eval_loss']
-            
-        self.metrics_manager.save_training_metrics(
-            step=state.global_step,
-            metrics=metrics
-        )
         
     def _improve_datasets(self):
         """Analyze feedback and improve datasets based on training results."""
