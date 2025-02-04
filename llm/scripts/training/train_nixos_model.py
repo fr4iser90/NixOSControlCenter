@@ -408,34 +408,57 @@ class NixOSModelTrainer:
             gradient_accumulation_steps=4,
             evaluation_strategy="steps",
             eval_steps=50,
+            load_best_model_at_end=True,
             logging_dir=f"{self.output_dir}/logs",
             learning_rate=3e-4,
             weight_decay=0.01,
             warmup_steps=100,
             save_strategy="steps",
             save_steps=50,
-            load_best_model_at_end=True,
             metric_for_best_model="eval_loss",
             greater_is_better=False,
             save_total_limit=3,
             fp16=torch.cuda.is_available(),
-            report_to="none"
+            report_to="none"  # We'll handle metrics ourselves
         )
 
         trainer = LoRATrainer(
-            model_name=self.model_name,
             args=training_args,
+            model_name=self.model_name,
             train_dataset=dataset["train"],
             eval_dataset=dataset["test"],
             dataset_manager=self.dataset_manager,
-            visualizer=self.visualizer
+            visualizer=self.visualizer,
+            callbacks=[self.training_callback]  # Add callback for metrics
         )
 
         print("Starting training...")
         trainer.train()
         
-        # After training, analyze feedback and improve datasets
-        self._improve_datasets()
+    def training_callback(self, args, state, control, logs=None, **kwargs):
+        """Callback to handle training progress and metrics."""
+        if not logs:
+            return
+            
+        # Initialize metrics manager if needed
+        if not hasattr(self, 'metrics_manager'):
+            from ..visualization.backend.metrics_manager import MetricsManager
+            self.metrics_manager = MetricsManager()
+            
+        # Save training metrics
+        metrics = {
+            'loss': logs.get('loss', 0),
+            'learning_rate': logs.get('learning_rate', 0),
+            'epoch': logs.get('epoch', 0)
+        }
+        
+        if 'eval_loss' in logs:
+            metrics['eval_loss'] = logs['eval_loss']
+            
+        self.metrics_manager.save_training_metrics(
+            step=state.global_step,
+            metrics=metrics
+        )
         
     def _improve_datasets(self):
         """Analyze feedback and improve datasets based on training results."""

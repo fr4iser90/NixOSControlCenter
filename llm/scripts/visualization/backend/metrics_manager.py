@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from ..utils.path_utils import ProjectPaths
+from ....scripts.utils.path_config import ProjectPaths
 
 class MetricsManager:
     """Manages the collection, storage, and retrieval of training metrics."""
@@ -17,9 +17,12 @@ class MetricsManager:
     def save_training_metrics(self, step: int, metrics: Dict):
         """Save training metrics to file."""
         metrics_file = self.metrics_dir / "training_metrics.jsonl"
+        
+        # Add metadata
         metrics["step"] = step
         metrics["timestamp"] = datetime.now().isoformat()
         
+        # Save metrics
         with open(metrics_file, "a") as f:
             f.write(json.dumps(metrics) + "\n")
             
@@ -29,16 +32,31 @@ class MetricsManager:
         if not metrics_file.exists():
             return pd.DataFrame()
             
-        metrics = []
-        with open(metrics_file) as f:
-            for line in f:
-                metrics.append(json.loads(line))
-        return pd.DataFrame(metrics)
+        try:
+            metrics = []
+            with open(metrics_file) as f:
+                for line in f:
+                    try:
+                        metrics.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+                        
+            if not metrics:
+                return pd.DataFrame()
+                
+            df = pd.DataFrame(metrics)
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df = df.sort_values('step')
+            return df
+            
+        except Exception as e:
+            print(f"Error loading metrics: {e}")
+            return pd.DataFrame()
         
     def get_training_runs(self) -> List[Dict]:
         """Get all training runs with their metrics."""
         runs = []
-        for run_dir in self.metrics_dir.glob('run_*'):
+        for run_dir in sorted(self.metrics_dir.glob('run_*')):
             if run_dir.is_dir():
                 run_metrics = self._load_run_metrics(run_dir)
                 if run_metrics:
@@ -47,35 +65,20 @@ class MetricsManager:
         
     def _load_run_metrics(self, run_dir: Path) -> Optional[Dict]:
         """Load metrics for a specific training run."""
-        metrics_file = run_dir / 'training_metrics.jsonl'
-        if not metrics_file.exists():
-            return None
-            
-        metrics = {
-            'run_id': run_dir.name,
-            'start_time': None,
-            'end_time': None,
-            'best_loss': float('inf'),
-            'steps': [],
-            'loss': [],
-            'learning_rate': []
-        }
-        
         try:
+            metrics_file = run_dir / 'metrics.json'
+            if not metrics_file.exists():
+                return None
+                
             with open(metrics_file) as f:
-                for line in f:
-                    data = json.loads(line)
-                    if metrics['start_time'] is None:
-                        metrics['start_time'] = data['timestamp']
-                    metrics['end_time'] = data['timestamp']
-                    
-                    if data.get('loss', float('inf')) < metrics['best_loss']:
-                        metrics['best_loss'] = data['loss']
-                        
-                    metrics['steps'].append(data['step'])
-                    metrics['loss'].append(data.get('loss', 0))
-                    metrics['learning_rate'].append(data.get('learning_rate', 0))
+                metrics = json.load(f)
+                
+            # Add run metadata
+            metrics['run_id'] = run_dir.name
+            metrics['timestamp'] = datetime.fromtimestamp(run_dir.stat().st_mtime).isoformat()
             
             return metrics
-        except Exception:
+            
+        except Exception as e:
+            print(f"Error loading run metrics from {run_dir}: {e}")
             return None
