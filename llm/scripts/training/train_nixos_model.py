@@ -21,6 +21,7 @@ from ..visualization.training_visualizer import TrainingVisualizer
 import logging
 from datetime import datetime
 import torch.cuda
+from .trainers import LoRATrainer
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -58,11 +59,13 @@ class NixOSModelTrainer:
                 "facebook/opt-125m",  # Load base model first
                 torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
                 device_map="auto",
-                low_cpu_mem_usage=True,
-                use_gradient_checkpointing=True  # Enable gradient checkpointing
+                low_cpu_mem_usage=True
             )
             base_model.config.pad_token_id = self.tokenizer.eos_token_id
             base_model.config.use_cache = False  # Required for gradient checkpointing
+            
+            # Enable gradient checkpointing after model creation
+            base_model.gradient_checkpointing_enable()
             
             # Apply LoRA config
             lora_config = LoraConfig(
@@ -94,11 +97,13 @@ class NixOSModelTrainer:
                 "facebook/opt-125m",
                 torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
                 device_map="auto",
-                low_cpu_mem_usage=True,
-                use_gradient_checkpointing=True  # Enable gradient checkpointing
+                low_cpu_mem_usage=True
             )
             self.model.config.pad_token_id = self.tokenizer.eos_token_id
             self.model.config.use_cache = False  # Required for gradient checkpointing
+            
+            # Enable gradient checkpointing after model creation
+            self.model.gradient_checkpointing_enable()
             
             # Apply LoRA config
             lora_config = LoraConfig(
@@ -320,97 +325,6 @@ class NixOSModelTrainer:
             timestamp=datetime.now().isoformat()
         )
 
-    class FeedbackTrainer(Trainer):
-        def __init__(self, *args, dataset_manager=None, visualizer=None, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.dataset_manager = dataset_manager
-            self.visualizer = visualizer
-            self.best_loss = float('inf')
-            self.patience = 3
-            self.patience_counter = 0
-
-        def compute_loss(self, model, inputs, return_outputs=False):
-            loss, outputs = super().compute_loss(model, inputs, return_outputs=True)
-            
-            # Collect training metrics
-            metrics = {
-                "train_loss": loss.item(),
-                "learning_rate": self.optimizer.param_groups[0]["lr"],
-                "batch_size": self.args.train_batch_size,
-            }
-            
-            # Add GPU metrics if available
-            if torch.cuda.is_available():
-                metrics["gpu_memory_used"] = torch.cuda.memory_allocated() / 1024**3  # Convert to GB
-                
-            # Add dataset quality metrics
-            if self.dataset_manager:
-                dataset_metrics = self.dataset_manager.compute_dataset_metrics()
-                metrics.update(dataset_metrics)
-            
-            # Save metrics for visualization
-            if self.visualizer:
-                self.visualizer.save_training_metrics(self.state.global_step, metrics)
-            
-            # Collect feedback during evaluation
-            if self.state.is_local_process_zero and not self.state.is_training:
-                batch_size = inputs["input_ids"].shape[0]
-                for i in range(batch_size):
-                    example_id = f"{inputs.get('source_file', 'unknown')}_{inputs.get('line_number', i)}"
-                    prediction = self.tokenizer.decode(outputs.logits[i].argmax(dim=-1))
-                    expected = self.tokenizer.decode(inputs["input_ids"][i])
-                    
-                    feedback = self._collect_prediction_feedback(prediction, expected, example_id)
-                    if self.dataset_manager:
-                        self.dataset_manager.add_feedback(Path(inputs.get('source_file', 'unknown')), feedback)
-            
-            if return_outputs:
-                return loss, outputs
-            return loss
-
-        def evaluate(self, *args, **kwargs):
-            output = super().evaluate(*args, **kwargs)
-            
-            # Add evaluation metrics
-            if self.visualizer:
-                metrics = {
-                    "eval_loss": output["eval_loss"],
-                    "step": self.state.global_step,
-                }
-                self.visualizer.save_training_metrics(self.state.global_step, metrics)
-            
-            return output
-
-        def training_step(self, *args, **kwargs):
-            loss = super().training_step(*args, **kwargs)
-            # Dynamic batch size adjustment based on loss stability
-            if not torch.isnan(loss).any():
-                if loss < self.best_loss * 0.95:  # Significant improvement
-                    self.args.train_batch_size = min(
-                        self.args.train_batch_size + 1, 
-                        32  # Maximum batch size
-                    )
-                elif loss > self.best_loss * 1.5:  # Significant degradation
-                    self.args.train_batch_size = max(
-                        self.args.train_batch_size - 1,
-                        1  # Minimum batch size
-                    )
-                self.best_loss = min(self.best_loss, loss)
-            return loss
-
-        def evaluate(self, *args, **kwargs):
-            output = super().evaluate(*args, **kwargs)
-            
-            # Add evaluation metrics
-            if self.visualizer:
-                metrics = {
-                    "eval_loss": output["eval_loss"],
-                    "step": self.state.global_step,
-                }
-                self.visualizer.save_training_metrics(self.state.global_step, metrics)
-            
-            return output
-
     def train(self):
         dataset = self.load_datasets()
         print(f"Loaded {len(dataset['train'])} training examples")
@@ -447,15 +361,11 @@ class NixOSModelTrainer:
             report_to="none"
         )
 
-        trainer = self.FeedbackTrainer(
+        trainer = LoRATrainer(
             model=self.model,
             args=training_args,
             train_dataset=dataset["train"],
             eval_dataset=dataset["test"],
-            data_collator=DataCollatorForLanguageModeling(
-                tokenizer=self.tokenizer,
-                mlm=False
-            ),
             dataset_manager=self.dataset_manager,
             visualizer=self.visualizer
         )

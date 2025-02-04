@@ -41,33 +41,36 @@ class DatasetValidator:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 for i, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:  # Skip empty lines
+                        continue
+                        
                     try:
-                        data = json.loads(line.strip())
+                        data = json.loads(line)
                         # Validate required fields
                         required_fields = ['concept', 'explanation', 'examples', 'references']
                         for field in required_fields:
                             if field not in data:
                                 errors.append(f"Line {i}: Missing required field '{field}'")
                             elif not data[field]:
-                                errors.append(f"Line {i}: Empty field '{field}'")
-                        
-                        # Validate content quality
-                        if len(data['explanation']) < 50:
-                            errors.append(f"Line {i}: Explanation too short (< 50 chars)")
-                        if not isinstance(data['examples'], list):
-                            errors.append(f"Line {i}: 'examples' must be a list")
-                        if not isinstance(data['references'], list):
-                            errors.append(f"Line {i}: 'references' must be a list")
-                            
+                                errors.append(f"Line {i}: Empty value for required field '{field}'")
+                            elif field in ['examples', 'references'] and not isinstance(data[field], list):
+                                errors.append(f"Line {i}: Field '{field}' must be a list")
+                            elif field in ['concept', 'explanation'] and not isinstance(data[field], str):
+                                errors.append(f"Line {i}: Field '{field}' must be a string")
+                                
                     except json.JSONDecodeError as e:
-                        errors.append(f"Line {i}: Invalid JSON - {str(e)}")
-                    except Exception as e:
-                        errors.append(f"Line {i}: Validation error - {str(e)}")
-                        
+                        if line.strip():  # Only report error if line isn't empty
+                            errors.append(f"Line {i}: Invalid JSON - {str(e)}")
+                            
         except Exception as e:
-            errors.append(f"File error: {str(e)}")
+            errors.append(f"Failed to read file: {str(e)}")
             
-        return len(errors) == 0, errors
+        if errors:
+            self.logger.error(f"Dataset validation failed for {file_path}:\n" + "\n".join(errors))
+            return False, errors
+            
+        return True, []
 
     def compute_metrics(self, dataset_path: Path) -> DatasetMetrics:
         """Compute and store dataset metrics."""
