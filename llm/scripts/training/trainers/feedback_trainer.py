@@ -1,4 +1,8 @@
 from .base_trainer import NixOSBaseTrainer
+import logging
+import warnings
+
+logger = logging.getLogger(__name__)
 
 class FeedbackTrainer(NixOSBaseTrainer):
     """Trainer that collects feedback during training for dataset improvement."""
@@ -7,6 +11,14 @@ class FeedbackTrainer(NixOSBaseTrainer):
         super().__init__(*args, **kwargs)
         self.dataset_manager = dataset_manager
         self.visualizer = visualizer
+        
+        # Handle tokenizer deprecation
+        if hasattr(self, 'tokenizer') and not hasattr(self, 'processing_class'):
+            self.processing_class = self.tokenizer
+            warnings.warn(
+                "Using tokenizer as processing_class. This is deprecated and will be removed in a future version.",
+                DeprecationWarning
+            )
         
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         """Compute loss and collect feedback."""
@@ -23,13 +35,22 @@ class FeedbackTrainer(NixOSBaseTrainer):
         
         # Collect feedback during validation
         if (hasattr(self, 'is_in_eval') and self.is_in_eval and 
-            self.state.is_local_process_zero):
+            self.state.is_local_process_zero and outputs is not None):
             batch_size = inputs["input_ids"].shape[0]
             for i in range(batch_size):
-                prediction = self.processing_class.decode(outputs.logits[i].argmax(dim=-1))
-                expected = self.processing_class.decode(inputs["labels"][i])
-                example_id = f"example_{self.state.global_step}_{i}"
-                self._collect_prediction_feedback(prediction, expected, example_id)
+                # Get decoder for text processing
+                decoder = getattr(self, 'processing_class', None) or self.tokenizer
+                if decoder is None:
+                    logger.warning("No processing_class or tokenizer available for decoding")
+                    continue
+                    
+                try:
+                    prediction = decoder.decode(outputs.logits[i].argmax(dim=-1))
+                    expected = decoder.decode(inputs["labels"][i])
+                    example_id = f"example_{self.state.global_step}_{i}"
+                    self._collect_prediction_feedback(prediction, expected, example_id)
+                except Exception as e:
+                    logger.error(f"Error collecting feedback: {str(e)}")
         
         if return_outputs:
             return loss, outputs
