@@ -13,10 +13,10 @@ class ProjectPaths:
     
     # Data directories
     DATA_DIR = LLM_DIR / 'data'
-    MODELS_DIR = DATA_DIR / 'models'
+    MODELS_DIR = LLM_DIR / 'models'
     PROCESSED_DIR = DATA_DIR / 'processed'
     RAW_DIR = DATA_DIR / 'raw'
-    SCRIPTS_DIR = DATA_DIR / 'scripts'
+    SCRIPTS_DIR = LLM_DIR / 'scripts'
     
     # Dataset directories
     DATASET_DIR = PROCESSED_DIR / 'datasets'

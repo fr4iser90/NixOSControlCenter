@@ -6,8 +6,8 @@ import warnings
 from pathlib import Path
 from typing import Optional
 import inquirer
-from data.scripts.training.train_nixos_model import NixOSModelTrainer
-from data.scripts.utils.path_config import ProjectPaths
+from scripts.training.train_nixos_model import NixOSModelTrainer
+from scripts.utils.path_config import ProjectPaths
 
 # Filter out FutureWarning from transformers
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -142,8 +142,6 @@ class ModelManager:
                 model_path = str(self.current_model_dir)
             
         trainer = NixOSModelTrainer(
-            dataset_dir=str(self.dataset_dir),
-            output_dir=str(output_dir),
             model_name=model_path
         )
         

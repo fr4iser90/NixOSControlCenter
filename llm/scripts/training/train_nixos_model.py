@@ -100,34 +100,36 @@ class NixOSModelTrainer:
             torch.backends.cuda.enable_flash_sdp(True)
             torch.backends.cuda.enable_mem_efficient_sdp(True)
         
-    def load_datasets(self) -> Dataset:
+    def load_datasets(self):
+        """Load and prepare datasets for training"""
         training_data = []
         
-        # Load all concept datasets from the hierarchical structure
-        concept_dirs = [
-            '00_fundamentals',
-            '01_configuration',
-            '02_package_management',
-            '03_system_administration',
-            '04_user_management',
-            '05_development',
-            '06_deployment'
-        ]
-        
-        # Process all concept files
-        for concept_dir in concept_dirs:
-            dir_path = Path(self.dataset_dir) / 'concepts' / concept_dir
-            if dir_path.exists():
-                for jsonl_file in dir_path.glob('*.jsonl'):
-                    print(f"Loading concept dataset: {jsonl_file.relative_to(self.dataset_dir)}")
-                    with open(jsonl_file, 'r') as f:
-                        for line in f:
-                            data = json.loads(line)
-                            pairs = self._format_data_for_training(data)
-                            for prompt, response in pairs:
-                                training_data.append({
-                                    "text": f"### Question: {prompt}\n\n### Answer: {response}\n"
-                                })
+        # Process concept datasets
+        concepts_dir = Path(self.dataset_dir) / 'concepts'
+        if concepts_dir.exists():
+            for dir_path in concepts_dir.glob('*'):
+                if dir_path.is_dir():
+                    for jsonl_file in dir_path.glob('*.jsonl'):
+                        print(f"Loading concept dataset: {jsonl_file.relative_to(self.dataset_dir)}")
+                        with open(jsonl_file, 'r', encoding='utf-8') as f:
+                            for line_num, line in enumerate(f, 1):
+                                line = line.strip()
+                                if not line:  # Skip empty lines
+                                    continue
+                                try:
+                                    data = json.loads(line)
+                                    pairs = self._format_data_for_training(data)
+                                    for prompt, response in pairs:
+                                        training_data.append({
+                                            "text": f"### Question: {prompt}\n\n### Answer: {response}\n"
+                                        })
+                                except json.JSONDecodeError as e:
+                                    print(f"Warning: JSON decode error in {jsonl_file.name} at line {line_num}: {str(e)}")
+                                    print(f"Problematic line: {line[:100]}...")  # Print first 100 chars of the line
+                                    continue
+                                except Exception as e:
+                                    print(f"Warning: Error processing {jsonl_file.name} at line {line_num}: {str(e)}")
+                                    continue
         
         # Load other dataset categories when they become available
         other_categories = ['tasks', 'examples', 'troubleshooting', 'optimization']
@@ -136,17 +138,40 @@ class NixOSModelTrainer:
             if category_path.exists():
                 for jsonl_file in category_path.glob('**/*.jsonl'):
                     print(f"Loading {category} dataset: {jsonl_file.relative_to(self.dataset_dir)}")
-                    with open(jsonl_file, 'r') as f:
-                        for line in f:
-                            data = json.loads(line)
-                            pairs = self._format_data_for_training(data)
-                            for prompt, response in pairs:
-                                training_data.append({
-                                    "text": f"### Question: {prompt}\n\n### Answer: {response}\n"
-                                })
+                    with open(jsonl_file, 'r', encoding='utf-8') as f:
+                        for line_num, line in enumerate(f, 1):
+                            line = line.strip()
+                            if not line:  # Skip empty lines
+                                continue
+                            try:
+                                data = json.loads(line)
+                                pairs = self._format_data_for_training(data)
+                                for prompt, response in pairs:
+                                    training_data.append({
+                                        "text": f"### Question: {prompt}\n\n### Answer: {response}\n"
+                                    })
+                            except json.JSONDecodeError as e:
+                                print(f"Warning: JSON decode error in {jsonl_file.name} at line {line_num}: {str(e)}")
+                                print(f"Problematic line: {line[:100]}...")  # Print first 100 chars of the line
+                                continue
+                            except Exception as e:
+                                print(f"Warning: Error processing {jsonl_file.name} at line {line_num}: {str(e)}")
+                                continue
         
-        dataset = Dataset.from_pandas(pd.DataFrame(training_data))
-        return dataset.train_test_split(test_size=0.1)
+        if not training_data:
+            raise ValueError("No training data was loaded. Check that the dataset files exist and are properly formatted.")
+            
+        # Convert to Dataset format
+        dataset = Dataset.from_list(training_data)
+        
+        # Tokenize the dataset
+        tokenized_dataset = dataset.map(
+            self.preprocess,
+            batched=True,
+            remove_columns=dataset.column_names
+        )
+        
+        return tokenized_dataset.train_test_split(test_size=0.1)
     
     def _format_data_for_training(self, data: dict) -> List[Tuple[str, str]]:
         pairs = []
@@ -215,26 +240,19 @@ class NixOSModelTrainer:
         
         return pairs
 
+    def preprocess(self, examples):
+        return self.tokenizer(
+            examples["text"],
+            truncation=True,
+            max_length=512,
+            padding="max_length",
+            return_tensors=None
+        )
+    
     def train(self):
         dataset = self.load_datasets()
         print(f"Loaded {len(dataset['train'])} training examples")
         print(f"Using {len(dataset['test'])} validation examples")
-
-        def preprocess(examples):
-            return self.tokenizer(
-                examples["text"],
-                truncation=True,
-                max_length=512,
-                padding="max_length",
-                return_tensors=None
-            )
-        
-        tokenized_dataset = dataset.map(
-            preprocess,
-            batched=True,
-            remove_columns=dataset["train"].column_names,
-            num_proc=1
-        )
 
         training_args = TrainingArguments(
             output_dir=self.output_dir,
@@ -255,8 +273,8 @@ class NixOSModelTrainer:
         trainer = Trainer(
             model=self.model,
             args=training_args,
-            train_dataset=tokenized_dataset["train"],
-            eval_dataset=tokenized_dataset["test"],
+            train_dataset=dataset["train"],
+            eval_dataset=dataset["test"],
             data_collator=DataCollatorForLanguageModeling(
                 tokenizer=self.tokenizer,
                 mlm=False
