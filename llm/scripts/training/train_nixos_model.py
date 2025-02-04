@@ -144,11 +144,19 @@ class NixOSModelTrainer:
         """Start the Streamlit visualization server."""
         import subprocess
         import threading
+        import sys
         
         def run_server():
+            # Add project root to Python path
+            project_root = str(Path(__file__).parent.parent.parent)
+            if project_root not in sys.path:
+                sys.path.insert(0, project_root)
+                
+            visualizer_path = Path(__file__).parent.parent / "visualization" / "training_visualizer.py"
             cmd = [
-                "streamlit", "run",
-                str(Path(__file__).parent.parent / "visualization" / "training_visualizer.py"),
+                sys.executable,  # Use the same Python interpreter
+                "-m", "streamlit", "run",
+                str(visualizer_path),
                 "--server.headless=true"
             ]
             
@@ -157,8 +165,12 @@ class NixOSModelTrainer:
                     "--server.address=0.0.0.0",
                     "--browser.serverAddress=0.0.0.0"
                 ])
-                
-            subprocess.Popen(cmd)
+            
+            # Set PYTHONPATH to include project root
+            env = os.environ.copy()
+            env["PYTHONPATH"] = f"{project_root}:{env.get('PYTHONPATH', '')}"
+            
+            subprocess.Popen(cmd, env=env)
             
         # Start server in background thread
         thread = threading.Thread(target=run_server, daemon=True)

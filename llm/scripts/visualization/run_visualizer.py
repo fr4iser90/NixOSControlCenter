@@ -6,6 +6,11 @@ from pathlib import Path
 
 def run_streamlit():
     """Run the Streamlit visualization server with network access."""
+    # Add project root to Python path
+    project_root = str(Path(__file__).parent.parent.parent)
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+        
     visualizer_path = Path(__file__).parent / "training_visualizer.py"
     sys.argv = [
         "streamlit",
@@ -17,3 +22,6 @@ def run_streamlit():
         "--server.headless=true"     # Run without auto-opening browser
     ]
     sys.exit(streamlit.web.bootstrap.run())
+
+if __name__ == "__main__":
+    run_streamlit()

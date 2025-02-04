@@ -9,7 +9,15 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional
 import numpy as np
-from ..utils.path_config import ProjectPaths
+import sys
+import os
+
+# Add the project root to Python path
+project_root = str(Path(__file__).parent.parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from scripts.utils.path_config import ProjectPaths
 
 class TrainingVisualizer:
     def __init__(self):
