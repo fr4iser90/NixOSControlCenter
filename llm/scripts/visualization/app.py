@@ -2,15 +2,22 @@
 import streamlit as st
 from typing import Dict, Any
 
-from backend.metrics_manager import MetricsManager
-from backend.system_monitor import SystemMonitor
-from backend.dataset_analyzer import DatasetAnalyzer
-from frontend.training_view import TrainingView
-from frontend.dataset_view import DatasetView
-from frontend.system_view import SystemView
-from frontend.history_view import HistoryView
-from utils.config import VisualizerConfig
-from ..utils.path_config import ProjectPaths
+# Add project root to Python path
+from pathlib import Path
+import sys
+ROOT_DIR = Path(__file__).parent.parent.parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from llm.scripts.visualization.backend.metrics_manager import MetricsManager
+from llm.scripts.visualization.backend.system_monitor import SystemMonitor
+from llm.scripts.visualization.backend.dataset_analyzer import DatasetAnalyzer
+from llm.scripts.visualization.frontend.training_view import TrainingView
+from llm.scripts.visualization.frontend.dataset_view import DatasetView
+from llm.scripts.visualization.frontend.system_view import SystemView
+from llm.scripts.visualization.frontend.history_view import HistoryView
+from llm.scripts.visualization.utils.config import VisualizerConfig
+from llm.scripts.utils.path_config import ProjectPaths
 
 class NixOSVisualizer:
     """Main application class for the NixOS Model Training Visualizer."""
