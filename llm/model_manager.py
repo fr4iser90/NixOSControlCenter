@@ -163,8 +163,25 @@ class ModelManager:
                     return
                     
                 network_access = network_answers['network_access'].startswith('Yes')
+                
+                # Start visualization in a separate process using new structure
+                import multiprocessing
+                from scripts.visualization.app import NixOSVisualizer
+                
+                def run_visualizer():
+                    visualizer = NixOSVisualizer()
+                    visualizer.config.update({
+                        'network_access': network_access,
+                        'auto_refresh': True,
+                        'refresh_interval': 5
+                    })
+                    visualizer.run()
+                
+                viz_process = multiprocessing.Process(target=run_visualizer)
+                viz_process.start()
             else:
                 network_access = False
+                viz_process = None
                 
             trainer = NixOSModelTrainer(
                 model_name=model_name,
@@ -172,7 +189,12 @@ class ModelManager:
                 visualizer_network_access=network_access
             )
             
-        trainer.train()
+            try:
+                trainer.train()
+            finally:
+                if viz_process:
+                    viz_process.terminate()
+                    viz_process.join()
 
 def main():
     manager = ModelManager()
