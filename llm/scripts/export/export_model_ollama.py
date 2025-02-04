@@ -36,7 +36,7 @@ You are a NixOS expert assistant trained on official documentation and community
 Always provide accurate, up-to-date information about NixOS configuration and administration.
 \"\"\"
 PARAMETER num_ctx 4096
-PARAMETER temperature 0.7
+PARAMETER temperature 0.3
 """
     
     def convert_to_gguf(self, quantization: str = "q4_0") -> Path:
