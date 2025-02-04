@@ -178,6 +178,8 @@ class NixOSModelTrainer:
             # Start visualization in a separate process
             import multiprocessing
             import os
+            import time
+            import subprocess
             
             def run_visualizer():
                 # Set up environment
@@ -190,24 +192,28 @@ class NixOSModelTrainer:
                     "-m", "streamlit", "run",
                     str(ProjectPaths.VISUALIZATION_DIR / "app.py"),
                     "--server.headless=true",
+                    "--server.port=8501"
                 ]
                 
                 if self.visualizer_network_access:
-                    cmd.extend([
-                        "--server.address=0.0.0.0",
-                        "--server.port=8501"
-                    ])
+                    cmd.append("--server.address=0.0.0.0")
                     print("\nVisualization dashboard will be available at:")
                     print("http://localhost:8501 (local)")
                     print("http://<your-ip>:8501 (network)\n")
                 else:
+                    cmd.append("--server.address=127.0.0.1")
                     print("\nVisualization dashboard will be available at:")
                     print("http://localhost:8501\n")
                 
-                subprocess.run(cmd, env=env)
+                # Start the process
+                process = subprocess.Popen(cmd, env=env)
+                time.sleep(2)  # Give the server time to start
+                return process
             
+            # Start in a separate process
             self.viz_process = multiprocessing.Process(target=run_visualizer)
             self.viz_process.start()
+            time.sleep(3)  # Give the server time to fully initialize
             return self.viz_process
             
         except Exception as e:

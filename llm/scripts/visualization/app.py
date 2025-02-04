@@ -61,7 +61,13 @@ class NixOSVisualizer:
         
     def run(self):
         """Run the visualization dashboard."""
-        if not st._is_running_with_streamlit:
+        try:
+            import streamlit.runtime.scriptrunner as streamlit_runtime
+            is_running = streamlit_runtime.get_script_run_ctx() is not None
+        except:
+            is_running = False
+            
+        if not is_running:
             self.setup_page()
         
         # Add navigation in sidebar
