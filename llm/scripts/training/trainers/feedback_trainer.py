@@ -2,6 +2,7 @@ from .base_trainer import NixOSBaseTrainer
 from transformers import TrainerCallback
 import logging
 import warnings
+import torch
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +78,14 @@ class FeedbackTrainer(NixOSBaseTrainer):
                     continue
                     
                 try:
-                    prediction = decoder.decode(outputs.logits[i].argmax(dim=-1))
-                    expected = decoder.decode(inputs["labels"][i])
+                    # Convert logits to token ids safely
+                    logits = outputs.logits[i].detach().cpu()
+                    pred_tokens = logits.argmax(dim=-1).to(torch.int32)
+                    label_tokens = inputs["labels"][i].detach().cpu().to(torch.int32)
+                    
+                    # Decode tokens to text
+                    prediction = decoder.decode(pred_tokens)
+                    expected = decoder.decode(label_tokens)
                     example_id = f"example_{self.state.global_step}_{i}"
                     self._collect_prediction_feedback(prediction, expected, example_id)
                 except Exception as e:

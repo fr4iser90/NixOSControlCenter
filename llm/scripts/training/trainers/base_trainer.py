@@ -85,7 +85,7 @@ class NixOSBaseTrainer(Trainer):
                 return torch.tensor(0.0), None
             return torch.tensor(0.0)
         
-    def save_model(self, output_dir=None):
+    def save_model(self, output_dir=None, _internal_call=False):
         """Save model with NixOS-specific handling."""
         if output_dir is None:
             output_dir = self.args.output_dir
