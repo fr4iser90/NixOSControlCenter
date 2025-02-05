@@ -179,6 +179,7 @@ class ModelManager:
                 model_name=model_name,
                 start_visualizer=start_visualizer,
                 visualizer_network_access=network_access,
+                test_mode=self.test_mode
             )
             
             try:

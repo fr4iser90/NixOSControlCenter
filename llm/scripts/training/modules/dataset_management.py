@@ -14,7 +14,7 @@ class DatasetLoader:
     def __init__(self, dataset_manager, dataset_dir: str):
         """Initialize with dataset manager and directory."""
         self.dataset_manager = dataset_manager
-        self.dataset_dir = dataset_dir
+        self.dataset_dir = Path(dataset_dir)
         self.tokenizer = AutoTokenizer.from_pretrained(
             "facebook/opt-125m",
             padding_side="left",
@@ -35,30 +35,44 @@ class DatasetLoader:
         
     def load_and_validate_processed_datasets(self) -> Tuple[Dataset, Dataset]:
         """Load and validate already processed datasets for training."""
-        # Load all processed JSONL files
         all_data = []
-        concept_dir = Path(self.dataset_dir)
-        
-        # Find all JSONL files in the directory
-        jsonl_files = list(concept_dir.rglob("*.jsonl"))
+        jsonl_files = list(self.dataset_dir.rglob("*.jsonl"))
         
         if not jsonl_files:
-            raise ValueError(f"No JSONL files found in {concept_dir}")
+            raise ValueError(f"No JSONL files found in {self.dataset_dir}")
             
-        # Log dataset loading info
-        if len(jsonl_files) == 1:
-            logger.info("Test mode: Loading single dataset for quick testing")
-        else:
-            logger.info(f"Loading {len(jsonl_files)} datasets for full training")
+        logger.info(f"Loading {len(jsonl_files)} datasets for training")
         
         for jsonl_file in jsonl_files:
-            # The dataset is already processed and validated, just load it
-            logger.info(f"Loading dataset: {jsonl_file.relative_to(concept_dir)}")
+            logger.info(f"Loading dataset: {jsonl_file.relative_to(self.dataset_dir)}")
             with open(jsonl_file, 'r', encoding='utf-8') as f:
                 for line in f:
                     if line.strip():
                         all_data.append(json.loads(line))
         
+        return self._prepare_datasets(all_data)
+        
+    def load_test_dataset(self) -> Tuple[Dataset, Dataset]:
+        """Load a single dataset for testing purposes.
+        
+        Uses only the core concepts dataset for quick testing and validation.
+        """
+        logger.info("Test mode: Loading only core concepts dataset")
+        test_file = Path(self.dataset_dir).parent / "00_fundamentals/01_core_concepts.jsonl"
+        
+        if not test_file.exists():
+            raise ValueError(f"Test file not found: {test_file}")
+            
+        all_data = []
+        with open(test_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    all_data.append(json.loads(line))
+                    
+        return self._prepare_datasets(all_data)
+        
+    def _prepare_datasets(self, all_data: List[Dict]) -> Tuple[Dataset, Dataset]:
+        """Prepare and tokenize datasets from loaded data."""
         logger.info(f"Total examples loaded: {len(all_data)}")
         
         # Split into train/eval

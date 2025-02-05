@@ -24,7 +24,8 @@ class NixOSModelTrainer:
         self,
         model_name: str = "NixOS",
         start_visualizer: bool = False,
-        visualizer_network_access: bool = False
+        visualizer_network_access: bool = False,
+        test_mode: bool = False
     ):
         """Initialize trainer with all necessary components."""
         self.model_name = model_name
@@ -50,6 +51,8 @@ class NixOSModelTrainer:
         self.tokenizer = None
         self.trainer = None
         
+        self.test_mode = test_mode
+        
     def setup(self):
         """Set up all components for training."""
         # Start visualization if requested
@@ -64,7 +67,10 @@ class NixOSModelTrainer:
         
         # Load datasets
         logger.info("Loading and preparing datasets...")
-        train_dataset, eval_dataset = self.dataset_loader.load_and_validate_processed_datasets()
+        if self.test_mode:
+            train_dataset, eval_dataset = self.dataset_loader.load_test_dataset()
+        else:
+            train_dataset, eval_dataset = self.dataset_loader.load_and_validate_processed_datasets()
         
         # Initialize trainer
         logger.info("Setting up trainer...")
