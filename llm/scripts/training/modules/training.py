@@ -36,7 +36,7 @@ class TrainingManager:
             "learning_rate": 3e-4,
             "warmup_steps": 100,
             "logging_steps": 10,
-            "optim": "paged_adamw_32bit",
+            "optim": "adamw_torch",  # Using standard PyTorch AdamW optimizer
             "lr_scheduler_type": "cosine",
             "report_to": "none"
         }
