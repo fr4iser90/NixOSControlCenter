@@ -109,8 +109,8 @@ class NixOSVisualizer:
                     st.info("Waiting for training metrics... Training data will appear here once available.")
                     
             elif page == "Dataset Analysis":
-                stats = self.dataset_analyzer.get_dataset_stats()
-                quality_metrics = self.dataset_analyzer.get_quality_metrics()
+                stats = self.dataset_analyzer.analyze_datasets()
+                quality_metrics = self.dataset_analyzer.compute_quality_metrics()
                 if stats:
                     self.dataset_view.display_dataset_analysis(stats, quality_metrics)
                 else:
