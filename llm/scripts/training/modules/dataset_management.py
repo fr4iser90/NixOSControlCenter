@@ -39,13 +39,27 @@ class DatasetLoader:
         all_data = []
         concept_dir = Path(self.dataset_dir)
         
-        for jsonl_file in concept_dir.rglob("*.jsonl"):
+        # Find all JSONL files in the directory
+        jsonl_files = list(concept_dir.rglob("*.jsonl"))
+        
+        if not jsonl_files:
+            raise ValueError(f"No JSONL files found in {concept_dir}")
+            
+        # Log dataset loading info
+        if len(jsonl_files) == 1:
+            logger.info("Test mode: Loading single dataset for quick testing")
+        else:
+            logger.info(f"Loading {len(jsonl_files)} datasets for full training")
+        
+        for jsonl_file in jsonl_files:
             # The dataset is already processed and validated, just load it
-            logger.info(f"Loading dataset: {jsonl_file.relative_to(self.dataset_dir)}")
+            logger.info(f"Loading dataset: {jsonl_file.relative_to(concept_dir)}")
             with open(jsonl_file, 'r', encoding='utf-8') as f:
                 for line in f:
                     if line.strip():
                         all_data.append(json.loads(line))
+        
+        logger.info(f"Total examples loaded: {len(all_data)}")
         
         # Split into train/eval
         total_examples = len(all_data)
@@ -53,6 +67,8 @@ class DatasetLoader:
         
         train_data = all_data[:split_idx]
         eval_data = all_data[split_idx:]
+        
+        logger.info(f"Train examples: {len(train_data)}, Eval examples: {len(eval_data)}")
         
         # Convert to datasets
         train_texts = [f"{item['concept']}\n{item['explanation']}" for item in train_data]

@@ -3,9 +3,10 @@ import os
 import sys
 import json
 import warnings
-from pathlib import Path
-from typing import Optional
 import inquirer
+from pathlib import Path
+import argparse
+from typing import Optional
 from scripts.training.train_nixos_model import NixOSModelTrainer
 from scripts.utils.path_config import ProjectPaths
 
@@ -13,7 +14,10 @@ from scripts.utils.path_config import ProjectPaths
 warnings.filterwarnings('ignore', category=FutureWarning)
 
 class ModelManager:
-    def __init__(self):
+    """Manages model operations and training."""
+    
+    def __init__(self, test_mode: bool = False):
+        """Initialize with optional test mode."""
         # Use centralized paths
         ProjectPaths.ensure_directories()
         self.base_dir = ProjectPaths.LLM_DIR
@@ -21,6 +25,11 @@ class ModelManager:
         self.dataset_dir = ProjectPaths.DATASET_DIR
         self.current_model_dir = ProjectPaths.CURRENT_MODEL_DIR
         self.quantized_model_dir = ProjectPaths.QUANTIZED_MODEL_DIR
+        self.test_mode = test_mode
+        
+        if test_mode:
+            # Override dataset directory to only use core concepts for testing
+            self.dataset_dir = ProjectPaths.DATASET_DIR / "concepts/00_fundamentals"
         
     def list_checkpoints(self) -> list[Path]:
         """List all available checkpoints in models directory"""
@@ -179,7 +188,15 @@ class ModelManager:
                 trainer.cleanup()  # Ensure cleanup happens
 
 def main():
-    manager = ModelManager()
+    """Main entry point with argument parsing."""
+    parser = argparse.ArgumentParser(description='NixOS Model Manager')
+    parser.add_argument('--test', action='store_true', 
+                       help='Run in test mode using only core concepts dataset')
+    args = parser.parse_args()
+    
+    manager = ModelManager(test_mode=args.test)
+    if args.test:
+        print("Running in test mode with core concepts dataset only")
     mode, checkpoint, model_name = manager.select_training_option()
     manager.start_training(mode, checkpoint, model_name)
 
