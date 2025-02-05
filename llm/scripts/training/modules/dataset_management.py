@@ -4,6 +4,7 @@ from pathlib import Path
 import logging
 from typing import List, Dict, Tuple
 from datasets import Dataset
+from transformers import AutoTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -14,88 +15,78 @@ class DatasetLoader:
         """Initialize with dataset manager and directory."""
         self.dataset_manager = dataset_manager
         self.dataset_dir = dataset_dir
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            "facebook/opt-125m",
+            padding_side="left",
+            trust_remote_code=True
+        )
+        self.tokenizer.pad_token = self.tokenizer.eos_token
         
-    def load_and_validate_datasets(self) -> Tuple[Dataset, Dataset]:
-        """Load, validate and prepare datasets for training."""
-        training_data = self._load_concept_datasets()
+    def load_and_validate_raw_datasets(self) -> Tuple[Dataset, Dataset]:
+        """Process and validate raw datasets before training.
         
-        # Split into train and validation sets
-        dataset = Dataset.from_dict(self._format_training_data(training_data))
-        dataset = dataset.train_test_split(test_size=0.1)
+        This is a placeholder for future raw data processing.
+        Currently not used as we work with pre-processed data.
+        """
+        raise NotImplementedError(
+            "Raw dataset processing not implemented. "
+            "Use load_and_validate_processed_datasets() instead for pre-processed data."
+        )
         
-        return dataset["train"], dataset["test"]
+    def load_and_validate_processed_datasets(self) -> Tuple[Dataset, Dataset]:
+        """Load and validate already processed datasets for training."""
+        # Load all processed JSONL files
+        all_data = []
+        concept_dir = Path(self.dataset_dir)
         
-    def _load_concept_datasets(self) -> List[Dict]:
-        """Load and validate concept datasets."""
-        training_data = []
-        concepts_dir = Path(self.dataset_dir) / 'concepts'
+        for jsonl_file in concept_dir.rglob("*.jsonl"):
+            # The dataset is already processed and validated, just load it
+            logger.info(f"Loading dataset: {jsonl_file.relative_to(self.dataset_dir)}")
+            with open(jsonl_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        all_data.append(json.loads(line))
         
-        if not concepts_dir.exists():
-            logger.warning(f"Concepts directory not found: {concepts_dir}")
-            return training_data
-            
-        for dir_path in concepts_dir.glob('*'):
-            if not dir_path.is_dir():
-                continue
-                
-            for jsonl_file in dir_path.glob('*.jsonl'):
-                training_data.extend(
-                    self._process_jsonl_file(jsonl_file)
-                )
-                
-        return training_data
+        # Split into train/eval
+        total_examples = len(all_data)
+        split_idx = int(total_examples * 0.9)  # 90% train, 10% eval
         
-    def _process_jsonl_file(self, jsonl_file: Path) -> List[Dict]:
-        """Process a single JSONL file."""
-        file_data = []
-        rel_path = jsonl_file.relative_to(self.dataset_dir)
-        logger.info(f"Loading concept dataset: {rel_path}")
+        train_data = all_data[:split_idx]
+        eval_data = all_data[split_idx:]
         
-        # Validate dataset
-        success, error_msg = self.dataset_manager.process_dataset(jsonl_file)
-        if not success:
-            logger.warning(f"Dataset validation failed for {jsonl_file}: {error_msg}")
-            return file_data
-            
-        # Log dataset status
-        status = self.dataset_manager.get_dataset_status(jsonl_file)
-        logger.info(f"Dataset metrics: {status['metrics']}")
+        # Convert to datasets
+        train_texts = [f"{item['concept']}\n{item['explanation']}" for item in train_data]
+        eval_texts = [f"{item['concept']}\n{item['explanation']}" for item in eval_data]
         
-        # Load data
-        with open(jsonl_file, 'r', encoding='utf-8') as f:
-            for line_num, line in enumerate(f, 1):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    data = json.loads(line)
-                    file_data.append(data)
-                except json.JSONDecodeError as e:
-                    logger.error(f"Error parsing line {line_num} in {jsonl_file}: {e}")
-                    
-        return file_data
+        train_dataset = Dataset.from_dict({'text': train_texts})
+        eval_dataset = Dataset.from_dict({'text': eval_texts})
         
-    def _format_training_data(self, data: List[Dict]) -> Dict:
-        """Format raw data into training format."""
-        formatted_data = {
-            "input_ids": [],
-            "labels": [],
-            "attention_mask": []
-        }
+        # Tokenize
+        train_tokenized = train_dataset.map(
+            self._tokenize_function,
+            batched=True,
+            remove_columns=train_dataset.column_names
+        )
         
-        for item in data:
-            processed = self.preprocess_example(item)
-            for key in formatted_data:
-                formatted_data[key].append(processed[key])
-                
-        return formatted_data
+        eval_tokenized = eval_dataset.map(
+            self._tokenize_function,
+            batched=True,
+            remove_columns=eval_dataset.column_names
+        )
         
-    def preprocess_example(self, example: Dict) -> Dict:
-        """Preprocess a single training example."""
-        # This is a placeholder - actual implementation would depend on
-        # your specific preprocessing needs
-        return {
-            "input_ids": example.get("input_ids", []),
-            "labels": example.get("labels", []),
-            "attention_mask": example.get("attention_mask", [])
-        }
+        return train_tokenized, eval_tokenized
+        
+    def _tokenize_function(self, examples):
+        """Tokenize a batch of examples."""
+        model_inputs = self.tokenizer(
+            examples['text'],
+            max_length=512,
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt"
+        )
+        
+        # Create the labels (same as input_ids for causal language modeling)
+        model_inputs["labels"] = model_inputs["input_ids"].clone()
+        
+        return model_inputs

@@ -64,7 +64,7 @@ class NixOSModelTrainer:
         
         # Load datasets
         logger.info("Loading and preparing datasets...")
-        train_dataset, eval_dataset = self.dataset_loader.load_and_validate_datasets()
+        train_dataset, eval_dataset = self.dataset_loader.load_and_validate_processed_datasets()
         
         # Initialize trainer
         logger.info("Setting up trainer...")
