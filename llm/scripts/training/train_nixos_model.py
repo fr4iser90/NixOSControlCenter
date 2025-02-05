@@ -2,7 +2,7 @@
 """Main training script for NixOS model."""
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from ..utils.path_config import ProjectPaths
 from ..data.dataset_manager import DatasetManager
@@ -22,24 +22,37 @@ class NixOSModelTrainer:
     
     def __init__(
         self,
-        model_name: str = "NixOS",
+        model_name_or_path: Union[str, Path] = "NixOS",
         start_visualizer: bool = False,
         visualizer_network_access: bool = False,
         test_mode: bool = False
     ):
         """Initialize trainer with all necessary components."""
-        self.model_name = model_name
+        # Convert Path to string if needed
+        self.model_name = str(model_name_or_path)
         
         # Initialize paths
         ProjectPaths.ensure_directories()
-        self.output_dir = ProjectPaths.MODELS_DIR / model_name
+        
+        # Handle checkpoint paths
+        if isinstance(model_name_or_path, Path) and model_name_or_path.exists():
+            self.output_dir = model_name_or_path
+            # Extract model name from checkpoint path
+            parent_dir = model_name_or_path.parent
+            if parent_dir.name.startswith("checkpoint-"):
+                self.model_name = parent_dir.parent.name
+            else:
+                self.model_name = parent_dir.name
+        else:
+            self.output_dir = ProjectPaths.MODELS_DIR / self.model_name
+            
         self.dataset_dir = str(ProjectPaths.DATASET_DIR)
         
         # Initialize components
         self.model_initializer = ModelInitializer(ProjectPaths)
         self.dataset_manager = DatasetManager()
         self.dataset_loader = DatasetLoader(self.dataset_manager, self.dataset_dir)
-        self.training_manager = TrainingManager(model_name, self.output_dir)
+        self.training_manager = TrainingManager(self.model_name, self.output_dir)
         self.visualization_manager = VisualizationManager(
             ProjectPaths,
             visualizer_network_access
@@ -72,13 +85,14 @@ class NixOSModelTrainer:
         else:
             train_dataset, eval_dataset = self.dataset_loader.load_and_validate_processed_datasets()
         
-        # Initialize trainer
+        # Initialize trainer with processing_class instead of tokenizer
         logger.info("Setting up trainer...")
         self.trainer = self.training_manager.initialize_trainer(
             model=self.model,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            tokenizer=self.tokenizer
+            processing_class=self.tokenizer.__class__,  # Use processing_class instead of tokenizer
+            tokenizer=self.tokenizer  # Keep for backward compatibility
         )
         
     def train(self):
@@ -99,24 +113,40 @@ class NixOSModelTrainer:
                 # Analyze feedback and improve datasets
                 analysis = self.feedback_manager.analyze_feedback()
                 if analysis:
-                    self.feedback_manager.improve_datasets(analysis)
+                    self.dataset_manager.apply_improvements(analysis)
                     
-            return success
-            
+                return True
         except Exception as e:
             logger.error(f"Error during training: {e}")
-            return False
             
+        return False
+        
     def cleanup(self):
         """Clean up resources."""
         if self.visualization_manager:
-            self.visualization_manager.cleanup_server()
-            
+            self.visualization_manager.stop_server()
+
 def main():
     """Main entry point."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Train NixOS model')
+    parser.add_argument('--model-name', type=str, default='NixOS',
+                       help='Name for the model')
+    parser.add_argument('--visualize', action='store_true',
+                       help='Start visualization server')
+    parser.add_argument('--network-access', action='store_true',
+                       help='Allow network access to visualization')
+    parser.add_argument('--test', action='store_true',
+                       help='Run in test mode')
+    
+    args = parser.parse_args()
+    
     trainer = NixOSModelTrainer(
-        start_visualizer=True,
-        visualizer_network_access=False
+        args.model_name,
+        start_visualizer=args.visualize,
+        visualizer_network_access=args.network_access,
+        test_mode=args.test
     )
     
     try:

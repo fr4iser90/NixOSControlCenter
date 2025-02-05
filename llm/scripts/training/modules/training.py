@@ -7,7 +7,7 @@ from transformers import (
 import torch
 import logging
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Type
 from ..trainers import LoRATrainer
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,8 @@ class TrainingManager:
         model,
         train_dataset,
         eval_dataset,
-        tokenizer,
+        processing_class: Optional[Type] = None,
+        tokenizer = None,  # Keep for backward compatibility
         training_args: TrainingArguments = None,
         callbacks: list = None
     ) -> Trainer:
@@ -72,7 +73,8 @@ class TrainingManager:
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             data_collator=data_collator,
-            callbacks=callbacks or []
+            callbacks=callbacks or [],
+            processing_class=processing_class or (tokenizer.__class__ if tokenizer else None)
         )
         
         return trainer

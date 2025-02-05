@@ -98,4 +98,4 @@ class NixOSBaseTrainer(Trainer):
             self.tokenizer.save_pretrained(output_dir)
             
         # Save training arguments
-        torch.save(self.args, str(ProjectPaths.MODEL_DIR / "training_args.bin"))
+        torch.save(self.args, str(ProjectPaths.MODELS_DIR / "training_args.bin"))
