@@ -18,7 +18,7 @@ class ModelInitializer:
         """Initialize model based on whether it's new or existing."""
         if device_config is None:
             device_config = {
-                'dtype': torch.float16 if torch.cuda.is_available() else torch.float32,
+                'torch_dtype': torch.float16 if torch.cuda.is_available() else torch.float32,
                 'device_map': "auto",
                 'low_cpu_mem_usage': True
             }
