@@ -2,7 +2,7 @@
 import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
-from ..data.dataset_improver import DatasetImprover
+from ...data.dataset_improver import DatasetImprover
 
 logger = logging.getLogger(__name__)
 
