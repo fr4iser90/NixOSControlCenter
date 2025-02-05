@@ -1,7 +1,7 @@
 """Module for managing model feedback and dataset improvement."""
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 from ...data.dataset_improver import DatasetImprover
 
 logger = logging.getLogger(__name__)

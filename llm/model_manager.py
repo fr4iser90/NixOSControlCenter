@@ -173,10 +173,10 @@ class ModelManager:
             )
             
             try:
-                trainer.train()
+                trainer.setup()  # Initialize all components
+                trainer.train()  # Start training
             finally:
-                # Cleanup will be handled by the trainer
-                pass
+                trainer.cleanup()  # Ensure cleanup happens
 
 def main():
     manager = ModelManager()
