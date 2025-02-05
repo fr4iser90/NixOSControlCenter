@@ -8,7 +8,7 @@ import torch
 import logging
 from pathlib import Path
 from typing import Dict, Any
-from .trainers import LoRATrainer
+from ..trainers import LoRATrainer
 
 logger = logging.getLogger(__name__)
 
