@@ -10,6 +10,9 @@ let
     pkgs.python312Packages.virtualenv
     pkgs.python312Packages.streamlit
     pkgs.python312Packages.plotly
+    pkgs.python312Packages.matplotlib
+    pkgs.python312Packages.networkx
+    pkgs.python312Packages.wordcloud
   ];
 
   hooks = {
@@ -47,7 +50,10 @@ let
                   requests==2.31.0 \
                   inquirer==3.1.3 \
                   streamlit \
-                  plotly
+                  plotly \
+                  wordcloud==1.9.3 \
+                  networkx==3.2.1 \
+                  matplotlib==3.8.2
       
       # Überprüfe Installation
       echo "Überprüfe Installation..."
