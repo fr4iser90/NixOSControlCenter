@@ -5,6 +5,7 @@ import logging
 from typing import List, Dict, Tuple
 from datasets import Dataset
 from transformers import AutoTokenizer
+from scripts.utils.path_config import ProjectPaths
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ class DatasetLoader:
         Uses only the core concepts dataset for quick testing and validation.
         """
         logger.info("Test mode: Loading only core concepts dataset")
-        test_file = Path(self.dataset_dir).parent / "00_fundamentals/01_core_concepts.jsonl"
+        test_file = ProjectPaths.CONCEPTS_DIR / "00_fundamentals/01_core_concepts.jsonl"
         
         if not test_file.exists():
             raise ValueError(f"Test file not found: {test_file}")
