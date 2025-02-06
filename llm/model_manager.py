@@ -7,6 +7,10 @@ import inquirer
 from pathlib import Path
 import argparse
 from typing import Optional
+
+# Set up project root before importing path_config
+os.environ['PROJECT_ROOT'] = str(Path.cwd())
+
 from scripts.training.train_nixos_model import NixOSModelTrainer
 from scripts.utils.path_config import ProjectPaths
 

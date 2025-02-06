@@ -3,13 +3,12 @@ import os
 from typing import List, Optional
 
 class ProjectPaths:
-    # Get current user and validate home directory
-    USER = os.getenv('USER', os.getenv('USERNAME', 'default'))
-    HOME = Path(os.getenv('HOME', f'/home/{USER}'))
+    # Get the project root directory (parent of the llm directory)
+    CURRENT_DIR = Path(__file__).resolve().parent
+    PROJECT_ROOT = Path(os.getenv('PROJECT_ROOT', CURRENT_DIR.parent.parent.parent))
     
-    # Base directories
-    PROJECT_ROOT = HOME / 'Documents/Git/NixOsControlCenter'
-    LLM_DIR = PROJECT_ROOT / 'llm'
+    # Base directories - no need to append 'llm' since we're already in it
+    LLM_DIR = PROJECT_ROOT
     
     # Data directories
     DATA_DIR = LLM_DIR / 'data'
