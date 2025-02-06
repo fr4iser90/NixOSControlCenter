@@ -14,6 +14,7 @@ class ProjectPaths:
     # Data directories
     DATA_DIR = LLM_DIR / 'data'
     MODELS_DIR = LLM_DIR / 'models'
+    MODEL_DIR = MODELS_DIR  # Alias for backward compatibility
     PROCESSED_DIR = DATA_DIR / 'processed'
     RAW_DIR = DATA_DIR / 'raw'
     SCRIPTS_DIR = LLM_DIR / 'scripts'
