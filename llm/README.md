@@ -67,6 +67,117 @@ llm/
   plotly>=5.14.0
   ```
 
+<details>
+<summary>📦 Package Explanations</summary>
+
+- **Core ML & Training:**
+  <details>
+  <summary>🤖 transformers>=4.40.0</summary>
+  
+  Hugging Face Transformers library providing pre-trained models (GPT, BERT, LLaMA, etc.) for NLP tasks like text generation, classification, and translation. Essential for our model architecture and training pipeline.
+  </details>
+
+  <details>
+  <summary>🔥 torch>=2.2.0</summary>
+  
+  PyTorch deep learning framework. Provides the foundation for neural network training, GPU acceleration, and automatic differentiation.
+  </details>
+
+  <details>
+  <summary>📊 datasets>=2.18.0</summary>
+  
+  Hugging Face Datasets library for efficient data loading, processing, and management of training datasets.
+  </details>
+
+  <details>
+  <summary>🚀 accelerate>=0.27.0</summary>
+  
+  Hugging Face Accelerate for easy distributed training and mixed precision, making training faster and more memory efficient.
+  </details>
+
+- **Model & Data Management:**
+  <details>
+  <summary>🔄 huggingface-hub>=0.20.0</summary>
+  
+  Interface with Hugging Face's model hub for model sharing and version management.
+  </details>
+
+  <details>
+  <summary>🦙 llama-cpp-python>=0.2.56</summary>
+  
+  Python bindings for llama.cpp, enabling efficient inference and quantization of LLaMA-based models.
+  </details>
+
+  <details>
+  <summary>📈 psutil>=5.9.0</summary>
+  
+  System monitoring utilities for tracking CPU, memory, and GPU usage during training.
+  </details>
+
+- **Visualization & Monitoring:**
+  <details>
+  <summary>📊 streamlit>=1.29.0</summary>
+  
+  Creates interactive web dashboards for real-time training monitoring and model evaluation.
+  </details>
+
+  <details>
+  <summary>📈 plotly>=5.18.0</summary>
+  
+  Interactive plotting library for visualizing training metrics and model performance.
+  </details>
+
+  <details>
+  <summary>📉 pandas>=2.2.0</summary>
+  
+  Data manipulation and analysis library for processing training logs and metrics.
+  </details>
+
+- **Additional Utilities:**
+  <details>
+  <summary>☁️ wordcloud>=1.9.3</summary>
+  
+  Generates word clouds for visualizing token distributions and model vocabulary.
+  </details>
+
+  <details>
+  <summary>🕸️ networkx>=3.2.1</summary>
+  
+  Graph theory library for analyzing and visualizing model architecture and attention patterns.
+  </details>
+
+  <details>
+  <summary>📊 matplotlib>=3.8.2</summary>
+  
+  Basic plotting library for static visualizations and exports.
+  </details>
+
+  <details>
+  <summary>🔑 PyGithub>=2.1.1</summary>
+  
+  GitHub API integration for dataset collection and version management.
+  </details>
+
+  <details>
+  <summary>📝 PyYAML>=6.0.1</summary>
+  
+  YAML parser for configuration files and model settings.
+  </details>
+
+  <details>
+  <summary>🌐 requests>=2.31.0</summary>
+  
+  HTTP library for API interactions and data downloads.
+  </details>
+
+  <details>
+  <summary>❓ inquirer>=3.1.3</summary>
+  
+  Interactive command-line interface for training configuration and model management.
+  </details>
+
+</details>
+
 ## 🚦 Quick Start
 
 1. **Setup Environment**
