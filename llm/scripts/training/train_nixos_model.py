@@ -123,8 +123,8 @@ class NixOSModelTrainer:
         
     def cleanup(self):
         """Clean up resources."""
-        if self.visualization_manager:
-            self.visualization_manager.stop_server()
+        if hasattr(self, 'visualization_manager'):
+            self.visualization_manager.cleanup_server()
 
 def main():
     """Main entry point."""
