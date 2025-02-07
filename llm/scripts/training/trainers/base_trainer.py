@@ -119,15 +119,21 @@ class NixOSBaseTrainer(Trainer):
         
     def save_model(self, output_dir=None, _internal_call=False):
         """Save model with NixOS-specific handling."""
-        if output_dir is None:
-            output_dir = self.args.output_dir
+        try:
+            if output_dir is None:
+                output_dir = self.args.output_dir
+                
+            # Save model and configuration
+            self.model.save_pretrained(output_dir)
+            if self.processing_class:
+                self.processing_class.save_pretrained(output_dir)
+            elif self.tokenizer:
+                self.tokenizer.save_pretrained(output_dir)
+                
+            # Save training arguments
+            torch.save(self.args, str(ProjectPaths.MODELS_DIR / "training_args.bin"))
+            logger.info(f"Model saved successfully to {output_dir}")
             
-        # Save model and configuration
-        self.model.save_pretrained(output_dir)
-        if self.processing_class:
-            self.processing_class.save_pretrained(output_dir)
-        elif self.tokenizer:
-            self.tokenizer.save_pretrained(output_dir)
-            
-        # Save training arguments
-        torch.save(self.args, str(ProjectPaths.MODELS_DIR / "training_args.bin"))
+        except Exception as e:
+            logger.error(f"Error saving model: {e}")
+            raise

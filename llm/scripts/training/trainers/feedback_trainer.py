@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""Trainer for feedback-based model training."""
 from .base_trainer import NixOSBaseTrainer
 from transformers import TrainerCallback
 import logging
@@ -99,29 +101,31 @@ class FeedbackTrainer(NixOSBaseTrainer):
                 self.state.is_local_process_zero and outputs is not None):
                 batch_size = inputs["input_ids"].shape[0]
                 for i in range(batch_size):
-                    # Get decoder for text processing
-                    decoder = getattr(self, 'processing_class', None) or self.tokenizer
-                    if decoder is None:
-                        logger.warning("No processing_class or tokenizer available for decoding")
-                        continue
-                        
                     try:
-                        # Convert logits to token ids safely
-                        logits = outputs.logits[i].detach().cpu()
-                        pred_tokens = logits.argmax(dim=-1).to(torch.int32)
-                        label_tokens = inputs["labels"][i].detach().cpu().to(torch.int32)
+                        # Get decoder for text processing
+                        decoder = getattr(self, 'processing_class', None) or self.tokenizer
+                        if decoder is None:
+                            logger.warning("No processing_class or tokenizer available for decoding")
+                            continue
                         
-                        # Decode tokens to text
-                        prediction = decoder.decode(pred_tokens)
-                        expected = decoder.decode(label_tokens)
-                        example_id = f"example_{self.state.global_step}_{i}"
+                        # Process prediction and expected output
+                        prediction = decoder.decode(outputs.logits[i].argmax(dim=-1))
+                        expected = decoder.decode(inputs["labels"][i])
+                        example_id = inputs.get("example_ids", [None])[i]
+                        
+                        # Collect feedback for this prediction
                         self._collect_prediction_feedback(prediction, expected, example_id)
                     except Exception as e:
-                        logger.error(f"Error collecting feedback: {e}")
-                        
+                        logger.error(f"Error processing prediction {i}: {e}")
+                        continue
+            
             if return_outputs:
                 return loss, outputs
             return loss
+            
+        except Exception as e:
+            logger.error(f"Error in compute_loss: {e}")
+            raise
     
     def _collect_prediction_feedback(self, prediction, expected, example_id):
         """Collect feedback about model predictions."""

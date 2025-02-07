@@ -29,18 +29,18 @@ class LoRATrainer(FeedbackTrainer):
         """Initialize the model with LoRA configuration."""
         try:
             logger.info("Setting up tokenizer...")
-            # Setup tokenizer
+            
+            # Load tokenizer first
             self.tokenizer = AutoTokenizer.from_pretrained(
-                "facebook/opt-125m",
+                self.model_name,
                 padding_side="left",
                 trust_remote_code=True
             )
             self.tokenizer.pad_token = self.tokenizer.eos_token
             
-            logger.info("Loading base model...")
-            # Load base model
+            # Load base model and tokenizer
             base_model = AutoModelForCausalLM.from_pretrained(
-                "facebook/opt-125m",
+                self.model_name,
                 torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
                 device_map="auto",
                 low_cpu_mem_usage=True
@@ -51,10 +51,9 @@ class LoRATrainer(FeedbackTrainer):
             # Enable gradient checkpointing
             base_model.gradient_checkpointing_enable()
             
-            logger.info("Applying LoRA configuration...")
-            # Apply LoRA config
+            # Configure LoRA
             lora_config = LoraConfig(
-                r=8,
+                r=16,  # rank
                 lora_alpha=32,
                 target_modules=["q_proj", "v_proj"],
                 lora_dropout=0.05,
@@ -64,12 +63,18 @@ class LoRATrainer(FeedbackTrainer):
             
             # Create PEFT model
             self.model = get_peft_model(base_model, lora_config)
-        
-        # Move to GPU if available
-        if torch.cuda.is_available():
-            self.model = self.model.to("cuda")
-            torch.backends.cuda.enable_flash_sdp(True)
-            torch.backends.cuda.enable_mem_efficient_sdp(True)
+            
+            # Move to GPU if available
+            if torch.cuda.is_available():
+                self.model = self.model.to("cuda")
+                torch.backends.cuda.enable_flash_sdp(True)
+                torch.backends.cuda.enable_mem_efficient_sdp(True)
+                
+            logger.info("Model setup complete")
+            
+        except Exception as e:
+            logger.error(f"Error setting up model: {e}")
+            raise
 
     def save_pretrained(self, output_dir):
         """Save LoRA weights and tokenizer."""
