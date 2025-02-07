@@ -65,42 +65,68 @@ class TrainingController:
             self._test_model()
             
     def start_fresh_training(self):
-        """Start fresh training with default model."""
-        # Get visualization preferences
-        vis_questions = [
-            inquirer.List('visualizer',
-                message="Would you like to start the visualization server?",
-                choices=['Yes', 'No'],
-                default='Yes')
-        ]
-        vis_answers = inquirer.prompt(vis_questions)
-        if not vis_answers:
-            return
-        self.start_visualizer = vis_answers['visualizer'] == 'Yes'
-        
-        if self.start_visualizer:
-            net_questions = [
-                inquirer.List('network_access',
-                    message="Allow network access to visualization server?",
-                    choices=['Yes (accessible from other devices)', 'No (localhost only)'],
-                    default='No (localhost only)')
-            ]
-            net_answers = inquirer.prompt(net_questions)
-            if not net_answers:
-                return
-            self.visualizer_network_access = net_answers['network_access'].startswith('Yes')
-        
-        # Start training with default model
+        """Start fresh training with a new model."""
         try:
+            # Get model name from user
+            questions = [
+                inquirer.Text(
+                    'model_name',
+                    message="Enter a name for the new model",
+                    validate=lambda _, x: bool(x.strip())
+                )
+            ]
+            answers = inquirer.prompt(questions)
+            if not answers:
+                logger.info("Training cancelled by user")
+                return
+                
+            model_name = answers['model_name'].strip()
+            model_dir = self.models_dir / model_name
+            
+            if model_dir.exists():
+                logger.error(f"Model '{model_name}' already exists")
+                return
+                
+            # Create model directory
+            model_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Get visualization preferences
+            vis_questions = [
+                inquirer.List('visualizer',
+                    message="Would you like to start the visualization server?",
+                    choices=['Yes', 'No'],
+                    default='Yes')
+            ]
+            vis_answers = inquirer.prompt(vis_questions)
+            if not vis_answers:
+                return
+            self.start_visualizer = vis_answers['visualizer'] == 'Yes'
+            
+            if self.start_visualizer:
+                net_questions = [
+                    inquirer.List('network_access',
+                        message="Allow network access to visualization server?",
+                        choices=['Yes (accessible from other devices)', 'No (localhost only)'],
+                        default='No (localhost only)')
+                ]
+                net_answers = inquirer.prompt(net_questions)
+                if not net_answers:
+                    return
+                self.visualizer_network_access = net_answers['network_access'].startswith('Yes')
+            
+            # Start training with options
             self.start_training_with_options(
-                "facebook/opt-125m",
+                model_name='facebook/opt-125m',  # Base model
                 mode='fresh',
+                checkpoint_path=model_dir,
                 start_visualizer=self.start_visualizer,
                 visualizer_network_access=self.visualizer_network_access
             )
+            
         except Exception as e:
             logger.error(f"Error during fresh training: {e}")
-        
+            raise
+            
     def start_training_with_options(
         self,
         model_name: str,
@@ -135,7 +161,8 @@ class TrainingController:
                 model_path=model_name if mode == 'fresh' else checkpoint_path,
                 config={
                     'hyperparameters': hyperparameters or {},
-                    'resource_limits': resource_limits or {}
+                    'resource_limits': resource_limits or {},
+                    'output_dir': str(checkpoint_path) if checkpoint_path else None
                 },
                 dataset_manager=self.dataset_manager,
                 visualizer=visualizer,
@@ -145,6 +172,12 @@ class TrainingController:
             
             # Start training
             trainer.train()
+            
+            # Save model after training
+            if checkpoint_path:
+                logger.info(f"Saving model to {checkpoint_path}")
+                trainer.save_model(str(checkpoint_path))
+                logger.info("Model saved successfully")
             
         except Exception as e:
             logger.error(f"Error during training: {e}")
