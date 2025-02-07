@@ -141,11 +141,12 @@ class NixOSBaseTrainer(Trainer):
             logger.error(f"Evaluation error: {e}")
             raise
 
-    def save_model(self, output_dir: str):
+    def save_model(self, output_dir: str, _internal_call=False):
         """Save the model.
         
         Args:
             output_dir: Directory to save the model to
+            _internal_call: Internal parameter used by Trainer
         """
         if not self.model:
             logger.error("Model not initialized")
@@ -154,6 +155,8 @@ class NixOSBaseTrainer(Trainer):
         logger.info(f"Saving model to {output_dir}")
         try:
             self.model.save_pretrained(output_dir)
+            if self.tokenizer:
+                self.tokenizer.save_pretrained(output_dir)
             logger.info("Model saved successfully")
         except Exception as e:
             logger.error(f"Error saving model: {e}")

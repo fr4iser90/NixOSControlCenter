@@ -51,13 +51,14 @@ class MetricsCallback(TrainerCallback):
 class FeedbackTrainer(NixOSBaseTrainer):
     """Trainer that collects feedback during training for dataset improvement."""
     
-    def __init__(self, model_name: str, model=None, tokenizer=None, *args, **kwargs):
+    def __init__(self, model_name: str, model=None, tokenizer=None, dataset_manager=None, *args, **kwargs):
         """Initialize feedback trainer.
         
         Args:
             model_name: Name or path of the model
             model: Optional model instance
             tokenizer: Optional tokenizer instance
+            dataset_manager: Optional dataset manager instance
             *args: Additional positional arguments
             **kwargs: Additional keyword arguments
         """
@@ -66,6 +67,7 @@ class FeedbackTrainer(NixOSBaseTrainer):
         # Initialize feedback collection
         self.feedback_data = []
         self.feedback_scores = []
+        self.dataset_manager = dataset_manager
         
         # Create metrics callback and initialize metrics manager
         self.metrics_callback = MetricsCallback(self)
@@ -74,12 +76,14 @@ class FeedbackTrainer(NixOSBaseTrainer):
         # Remove model/tokenizer from kwargs if present
         kwargs.pop('model', None)
         kwargs.pop('tokenizer', None)
+        kwargs.pop('dataset_manager', None)
         
         # Initialize parent class
         super().__init__(
             model_name=model_name,
             model=model,
             tokenizer=tokenizer,
+            dataset_manager=dataset_manager,
             *args,
             **kwargs
         )
@@ -167,17 +171,21 @@ class FeedbackTrainer(NixOSBaseTrainer):
     
     def _collect_prediction_feedback(self, prediction, expected, example_id):
         """Collect feedback about model predictions."""
+        feedback = {
+            'example_id': example_id,
+            'prediction': prediction,
+            'expected': expected,
+            'score': self._compute_prediction_score(prediction, expected)
+        }
+        self.feedback_data.append(feedback)
+        self.feedback_scores.append(feedback['score'])
+        
         if self.dataset_manager:
-            feedback = {
-                'example_id': example_id,
-                'prediction': prediction,
-                'expected': expected,
-                'score': self._compute_prediction_score(prediction, expected)
-            }
-            self.dataset_manager.add_feedback(feedback)
-            self.feedback_data.append(feedback)
-            self.feedback_scores.append(feedback['score'])
-            
+            try:
+                self.dataset_manager.add_feedback(feedback)
+            except Exception as e:
+                logger.error(f"Error adding feedback to dataset manager: {e}")
+                
     def _compute_prediction_score(self, prediction, expected):
         """Compute a similarity score between prediction and expected output."""
         # Simple exact match score for now
