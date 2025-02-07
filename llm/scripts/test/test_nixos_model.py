@@ -6,6 +6,8 @@ import logging
 from typing import List, Optional, Dict, Any
 import json
 import time
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import argparse
 
 from scripts.utils.path_config import ProjectPaths
 from scripts.training.modules.model_management import ModelInitializer
@@ -33,11 +35,12 @@ class NixOSModelTester:
         
         # Load model and tokenizer
         logger.info(f"Loading model from {self.model_path}...")
-        self.model, self.tokenizer = self.model_init.load_model_and_tokenizer(
-            model_path=str(self.model_path),
-            load_in_8bit=False,
-            device_map="auto"
-        )
+        device_config = {
+            'torch_dtype': torch.float16 if torch.cuda.is_available() else torch.float32,
+            'device_map': "auto",
+            'low_cpu_mem_usage': True
+        }
+        self.model, self.tokenizer = self.model_init.initialize_model(str(self.model_path), device_config)
         
         # Move to GPU if available
         if torch.cuda.is_available():
@@ -142,6 +145,48 @@ class NixOSModelTester:
         except Exception as e:
             logger.error(f"Error saving results: {e}")
     
+    def chat(self):
+        """Start an interactive chat session with the model."""
+        logger.info("Starting interactive chat session. Type 'exit' to end.")
+        logger.info("You can ask questions about NixOS, package management, system configuration, etc.")
+        
+        while True:
+            try:
+                # Get user input
+                user_input = input("\nYou: ").strip()
+                if user_input.lower() in ['exit', 'quit']:
+                    break
+                    
+                # Generate response
+                logger.info("Generating response...")
+                start_time = time.time()
+                
+                inputs = self.tokenizer(user_input, return_tensors="pt", padding=True)
+                inputs = {k: v.to(next(self.model.parameters()).device) for k, v in inputs.items()}
+                
+                outputs = self.model.generate(
+                    **inputs,
+                    max_length=512,
+                    num_return_sequences=1,
+                    temperature=0.7,
+                    do_sample=True,
+                    pad_token_id=self.tokenizer.pad_token_id
+                )
+                
+                response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+                
+                # Print response with timing
+                elapsed = time.time() - start_time
+                print(f"\nNixOS Assistant ({elapsed:.2f}s):\n{response}\n")
+                
+            except KeyboardInterrupt:
+                break
+            except Exception as e:
+                logger.error(f"Error during chat: {e}")
+                continue
+                
+        logger.info("Chat session ended")
+    
     def cleanup(self):
         """Cleanup resources."""
         if hasattr(self, 'viz_manager'):
@@ -150,28 +195,40 @@ class NixOSModelTester:
 
 def main():
     """Main entry point."""
-    # Example test prompts
-    test_prompts = [
-        "What is NixOS and how does it differ from other Linux distributions?",
-        "How do I install a package in NixOS?",
-        "Explain the NixOS configuration system.",
-        "What are flakes in NixOS and how do they work?",
-        "How do I set up a development environment in NixOS?"
-    ]
+    import argparse
+    parser = argparse.ArgumentParser(description="Test NixOS model")
+    parser.add_argument("--model-path", type=str, help="Path to model directory")
+    parser.add_argument("--mode", choices=['test', 'chat'], default='chat',
+                      help="Test mode: 'test' for automated tests, 'chat' for interactive chat")
+    parser.add_argument("--no-viz", action="store_true", help="Disable visualization")
+    args = parser.parse_args()
     
-    try:
-        # Initialize tester
-        tester = NixOSModelTester()
-        
-        # Run tests
+    # Initialize tester
+    tester = NixOSModelTester(
+        model_path=args.model_path,
+        enable_viz=not args.no_viz
+    )
+    
+    if args.mode == 'chat':
+        tester.chat()
+    else:
+        # Run automated tests
+        test_prompts = [
+            "What is NixOS?",
+            "How do I install a package in NixOS?",
+            "Explain the NixOS module system."
+        ]
         results = tester.test_model(test_prompts)
+        
+        # Print results
+        for i, result in enumerate(results):
+            print(f"\nTest {i+1}:")
+            print(f"Prompt: {result['prompt']}")
+            print(f"Response: {result['response']}")
+            print(f"Time: {result['metrics']['generation_time']:.2f}s")
         
         # Cleanup
         tester.cleanup()
-        
-    except Exception as e:
-        logger.error(f"Error during testing: {e}")
-        raise
 
 if __name__ == "__main__":
     main()

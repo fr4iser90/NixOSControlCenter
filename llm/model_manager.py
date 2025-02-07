@@ -10,8 +10,8 @@ from scripts.utils.path_config import ProjectPaths
 ProjectPaths.setup_python_path()
 
 from scripts.model.model_info import ModelInfo
-from scripts.model.training_controller import TrainingController
 from scripts.model.evaluation import ModelEvaluator
+from scripts.model.training_controller import TrainingController
 from scripts.monitoring.resource_monitor import ResourceMonitor
 
 # Filter warnings

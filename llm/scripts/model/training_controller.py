@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """Module for controlling model training operations."""
+import warnings
 import logging
 import inquirer
+import subprocess
 from pathlib import Path
 from typing import Dict, Optional, Any
 
-from ..utils.path_config import ProjectPaths
-from ..training.train_nixos_model import NixOSModelTrainer
-from ..training.modules.trainer_factory import TrainerFactory
-from ..training.modules.visualization import VisualizationManager
-from ..training.modules.dataset_management import DatasetLoader
-from ..data.dataset_manager import DatasetManager
-from .model_info import ModelInfo
-from ..training.modules.training_config import ConfigManager
+from scripts.utils.path_config import ProjectPaths
+from scripts.training.train_nixos_model import NixOSModelTrainer
+from scripts.training.modules.trainer_factory import TrainerFactory
+from scripts.training.modules.visualization import VisualizationManager
+from scripts.training.modules.dataset_management import DatasetLoader
+from scripts.data.dataset_manager import DatasetManager
+from scripts.model.model_info import ModelInfo
+from scripts.training.modules.training_config import ConfigManager
 
 # Set up logging
 logging.basicConfig(
@@ -20,6 +22,8 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+__all__ = ['TrainingController']
 
 class TrainingController:
     """Controls model training operations and user interactions."""
@@ -250,60 +254,59 @@ class TrainingController:
             raise
             
     def _test_model(self):
-        """Test a trained model."""
+        """Test the trained model."""
         try:
-            # Get available models
+            # Get model selection
             available_models = self.model_info.get_available_models()
             if not available_models:
-                logger.info("No existing models found")
+                logger.warning("No trained models found.")
                 return
                 
-            # Let user select model
             questions = [
                 inquirer.List('model',
-                    message="Select model:",
-                    choices=available_models)
+                            message="Select model:",
+                            choices=available_models),
+                inquirer.List('mode',
+                            message="Select test mode:",
+                            choices=['Interactive Chat', 'Automated Tests'])
             ]
             answers = inquirer.prompt(questions)
             if not answers:
                 return
                 
-            selected_model = answers['model']
-            model_dir = self.models_dir / selected_model
+            model_path = str(self.models_dir / answers['model'])
             
-            if not model_dir.exists():
-                logger.error(f"Model directory not found: {model_dir}")
-                return
-                
-            # Load test dataset
-            logger.info("Loading test dataset...")
-            test_dataset = self.dataset_loader.load_test_data()
+            # Import here to avoid circular imports
+            from scripts.test.test_nixos_model import NixOSModelTester
             
-            # Create trainer for testing
-            trainer = TrainerFactory.create_trainer(
-                trainer_type=self.trainer_type,
-                model_path=str(model_dir),  # Use the trained model path
-                config={
-                    'hyperparameters': {},
-                    'resource_limits': {},
-                    'output_dir': str(model_dir / 'test_results'),
-                    'evaluation_strategy': 'epoch',
-                    'do_train': False,
-                    'do_eval': True
-                },
-                dataset_manager=self.dataset_manager,
-                eval_dataset=test_dataset
+            # Initialize tester
+            tester = NixOSModelTester(
+                model_path=model_path,
+                enable_viz=self.start_visualizer
             )
             
-            # Run evaluation
-            logger.info("Starting model evaluation...")
-            eval_results = trainer.evaluate()
+            try:
+                # Run tests based on mode
+                if answers['mode'] == 'Interactive Chat':
+                    tester.chat()
+                else:
+                    test_prompts = [
+                        "What is NixOS?",
+                        "How do I install a package in NixOS?",
+                        "Explain the NixOS module system."
+                    ]
+                    results = tester.test_model(test_prompts)
+                    
+                    # Print results
+                    for i, result in enumerate(results):
+                        print(f"\nTest {i+1}:")
+                        print(f"Prompt: {result['prompt']}")
+                        print(f"Response: {result['response']}")
+                        print(f"Time: {result['metrics']['generation_time']:.2f}s")
+            finally:
+                # Always cleanup
+                tester.cleanup()
             
-            # Log results
-            logger.info("Evaluation Results:")
-            for metric, value in eval_results.items():
-                logger.info(f"{metric}: {value}")
-                
         except Exception as e:
             logger.error(f"Error during model testing: {e}")
             raise
