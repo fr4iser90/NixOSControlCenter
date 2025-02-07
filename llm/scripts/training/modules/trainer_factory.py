@@ -59,7 +59,7 @@ class TrainerFactory:
             
             # Prepare trainer configuration
             trainer_config = {
-                'model_name': str(model_path),
+                'model_name': model_path,  # Pass model_path directly
                 'dataset_manager': dataset_manager,
                 'visualizer': visualizer,
                 'train_dataset': train_dataset,

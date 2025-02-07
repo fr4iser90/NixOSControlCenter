@@ -50,18 +50,21 @@ class MetricsCallback(TrainerCallback):
 class FeedbackTrainer(NixOSBaseTrainer):
     """Trainer that collects feedback during training for dataset improvement."""
     
-    def __init__(self, *args, dataset_manager=None, visualizer=None, **kwargs):
-        """Initialize feedback trainer."""
+    def __init__(self, model_name: str, *args, **kwargs):
+        """Initialize feedback trainer.
+        
+        Args:
+            model_name: Name or path of the model
+            *args: Additional positional arguments
+            **kwargs: Additional keyword arguments
+        """
         logger.info("Initializing feedback trainer")
-        # Add metrics callback if visualization is enabled
-        if visualizer:
-            callbacks = kwargs.get('callbacks', [])
-            callbacks.append(MetricsCallback(self))
-            kwargs['callbacks'] = callbacks
-            
-        super().__init__(*args, **kwargs)
-        self.dataset_manager = dataset_manager
-        self.visualizer = visualizer
+        super().__init__(model_name=model_name, *args, **kwargs)
+        
+        # Initialize feedback collection
+        self.feedback_data = []
+        self.metrics_callback = MetricsCallback(self)
+        self.add_callback(self.metrics_callback)
         
         # Handle tokenizer deprecation
         if hasattr(self, 'tokenizer') and not hasattr(self, 'processing_class'):

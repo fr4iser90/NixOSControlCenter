@@ -16,19 +16,26 @@ logger = logging.getLogger(__name__)
 class LoRATrainer(FeedbackTrainer):
     """LoRA-specific trainer implementation."""
     
-    def __init__(self, model_name="NixOS", lora_config=None, *args, **kwargs):
-        """Initialize LoRA trainer with model and tokenizer setup."""
-        self.model_name = model_name
-        self.lora_config = lora_config or {}
+    def __init__(self, model_name: str, lora_config=None, *args, **kwargs):
+        """Initialize LoRA trainer with model and tokenizer setup.
+        
+        Args:
+            model_name: Name or path of the model to load
+            lora_config: Optional LoRA configuration
+            *args: Additional positional arguments
+            **kwargs: Additional keyword arguments
+        """
         logger.info(f"Initializing LoRA trainer for model: {model_name}")
         
         # Setup model and tokenizer first
+        self.model_name = model_name
+        self.lora_config = lora_config or {}
         self.setup_model()
         
         # Initialize parent class with our model and tokenizer
         kwargs['model'] = self.model
         kwargs['tokenizer'] = self.tokenizer
-        super().__init__(*args, **kwargs)
+        super().__init__(model_name=model_name, *args, **kwargs)
         
     def setup_model(self):
         """Initialize the model with LoRA configuration."""
