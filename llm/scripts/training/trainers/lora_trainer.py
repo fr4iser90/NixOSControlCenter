@@ -30,13 +30,31 @@ class LoRATrainer(FeedbackTrainer):
         # Setup model and tokenizer first
         self.model_name = model_name
         self.lora_config = lora_config or {}
-        self.setup_model()
         
-        # Remove model from kwargs if present to avoid duplicate
+        # Load model and tokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            device_map='auto',
+            torch_dtype=torch.float16
+        )
+        
+        # Apply LoRA config
+        config = LoraConfig(
+            r=self.lora_config.get('r', 8),
+            lora_alpha=self.lora_config.get('lora_alpha', 16),
+            target_modules=self.lora_config.get('target_modules', ['q_proj', 'v_proj']),
+            lora_dropout=self.lora_config.get('lora_dropout', 0.05),
+            bias=self.lora_config.get('bias', 'none'),
+            task_type="CAUSAL_LM"
+        )
+        self.model = get_peft_model(self.model, config)
+        
+        # Remove model and tokenizer from kwargs to avoid duplicates
         kwargs.pop('model', None)
         kwargs.pop('tokenizer', None)
         
-        # Initialize parent class with our model and tokenizer
+        # Initialize parent class
         super().__init__(
             model_name=model_name,
             model=self.model,

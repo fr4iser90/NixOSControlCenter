@@ -12,6 +12,7 @@ from ..training.modules.visualization import VisualizationManager
 from ..training.modules.dataset_management import DatasetLoader
 from ..data.dataset_manager import DatasetManager
 from .model_info import ModelInfo
+from .config_manager import ConfigManager  # Import ConfigManager
 
 # Set up logging
 logging.basicConfig(
@@ -139,30 +140,21 @@ class TrainingController:
             logger.info("Loading training datasets...")
             train_dataset, eval_dataset = self.dataset_loader.load_train_eval_data()
             
-            # Prepare training configuration
-            training_config = {
-                'output_dir': str(self.models_dir / model_name),
-                'evaluation_strategy': 'epoch',
-                'save_strategy': 'epoch',
-                'learning_rate': 2e-5,
-                'per_device_train_batch_size': 4,
-                'per_device_eval_batch_size': 4,
-                'num_train_epochs': 3,
-                'weight_decay': 0.01,
-                'report_to': 'none',
-                'lora': {
-                    'r': 8,
-                    'lora_alpha': 16,
-                    'target_modules': ['q_proj', 'v_proj'],
-                    'lora_dropout': 0.05,
-                    'bias': 'none'
-                }
-            }
+            # Get default config and merge with any overrides
+            training_config = ConfigManager.get_default_config()
+            if kwargs:
+                training_config = ConfigManager.merge_config(training_config, kwargs)
+            
+            # Ensure output directory is set
+            training_config['output_dir'] = str(self.models_dir / model_name)
+            
+            # Validate final config
+            ConfigManager.validate_config(training_config)
             
             # Create trainer
             trainer = TrainerFactory.create_trainer(
-                trainer_type='lora',
-                model_path='facebook/opt-125m',
+                trainer_type='lora',  # TODO: Make configurable
+                model_path='facebook/opt-125m',  # TODO: Make configurable
                 config=training_config,
                 dataset_manager=self.dataset_manager,
                 visualizer=self.visualizer,
@@ -171,7 +163,10 @@ class TrainingController:
             )
             
             # Start training
-            trainer.train()
+            if mode == 'continue':
+                trainer.train(resume_from_checkpoint=True)
+            else:
+                trainer.train()
             
             # Save the model
             trainer.save_model(str(self.models_dir / model_name))
