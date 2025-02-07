@@ -64,7 +64,10 @@ class FeedbackTrainer(NixOSBaseTrainer):
         
         # Initialize feedback collection
         self.feedback_data = []
+        
+        # Create metrics callback and initialize metrics manager
         self.metrics_callback = MetricsCallback(self)
+        self.metrics_callback.on_init_end(None, None, None)  # Initialize metrics manager
         
         # Remove model/tokenizer from kwargs if present
         kwargs.pop('model', None)

@@ -48,9 +48,12 @@ class NixOSBaseTrainer(Trainer):
         # Set up training arguments
         self.setup_training_args(**kwargs)
         
-        # Remove our custom args from kwargs
-        for key in ['model_name', 'dataset_manager', 'visualizer']:
-            kwargs.pop(key, None)
+        # Remove our custom args from kwargs before passing to parent
+        custom_args = [
+            'model_name', 'dataset_manager', 'visualizer', 
+            'training', 'hyperparameters', 'resource_limits'
+        ]
+        trainer_kwargs = {k: v for k, v in kwargs.items() if k not in custom_args}
         
         # Initialize parent class
         super().__init__(
@@ -59,7 +62,7 @@ class NixOSBaseTrainer(Trainer):
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             tokenizer=tokenizer,
-            **kwargs
+            **trainer_kwargs
         )
         
     def setup_training_args(self, **kwargs) -> None:
