@@ -4,11 +4,14 @@ import logging
 from typing import Dict, Any, Optional, Type, Union, List
 from pathlib import Path
 
+from ...utils.path_config import ProjectPaths
 from ..trainers.base_trainer import NixOSBaseTrainer
 from ..trainers.lora_trainer import LoRATrainer
 from ..trainers.feedback_trainer import FeedbackTrainer
 from .training_config import ConfigManager
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TrainerFactory:
@@ -42,34 +45,44 @@ class TrainerFactory:
             
         Returns:
             Configured trainer instance
+            
+        Raises:
+            ValueError: If trainer_type is unknown or configuration is invalid
+            Exception: If trainer initialization fails
         """
-        # Get trainer class
-        trainer_class = cls.TRAINER_TYPES.get(trainer_type)
-        if not trainer_class:
-            raise ValueError(f"Unknown trainer type: {trainer_type}")
+        try:
+            # Get trainer class
+            trainer_class = cls.TRAINER_TYPES.get(trainer_type)
+            if not trainer_class:
+                raise ValueError(f"Unknown trainer type: {trainer_type}")
+                
+            # Get and merge configuration
+            base_config = ConfigManager.get_default_config()
+            if config:
+                base_config = ConfigManager.merge_config(base_config, config)
+                
+            # Validate configuration
+            if not ConfigManager.validate_config(base_config):
+                raise ValueError("Invalid configuration")
+                
+            # Create trainer
+            trainer_kwargs = {
+                'model_name': str(model_path),
+                'dataset_manager': dataset_manager,
+                'visualizer': visualizer,
+                **kwargs
+            }
             
-        # Get and merge configuration
-        base_config = ConfigManager.get_default_config()
-        if config:
-            base_config = ConfigManager.merge_config(base_config, config)
+            # Add configuration-specific arguments
+            if trainer_type == 'lora':
+                trainer_kwargs['lora_config'] = base_config['lora']
+                
+            logger.info(f"Creating {trainer_type} trainer for model: {model_path}")
+            return trainer_class(**trainer_kwargs)
             
-        # Validate configuration
-        if not ConfigManager.validate_config(base_config):
-            raise ValueError("Invalid configuration")
-            
-        # Create trainer
-        trainer_kwargs = {
-            'model_name': str(model_path),
-            'dataset_manager': dataset_manager,
-            'visualizer': visualizer,
-            **kwargs
-        }
-        
-        # Add configuration-specific arguments
-        if trainer_type == 'lora':
-            trainer_kwargs['lora_config'] = base_config['lora']
-            
-        return trainer_class(**trainer_kwargs)
+        except Exception as e:
+            logger.error(f"Failed to create trainer: {e}")
+            raise
         
     @classmethod
     def get_available_trainer_types(cls) -> List[str]:
