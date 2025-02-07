@@ -7,17 +7,22 @@ from peft import LoraConfig, get_peft_model
 from .feedback_trainer import FeedbackTrainer
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 class LoRATrainer(FeedbackTrainer):
-    """Trainer specifically for LoRA-based model fine-tuning."""
+    """LoRA-specific trainer implementation."""
     
-    def __init__(self, model_name="NixOS", *args, **kwargs):
+    def __init__(self, model_name="NixOS", lora_config=None, *args, **kwargs):
         """Initialize LoRA trainer with model and tokenizer setup."""
-        # Setup model and tokenizer
         self.model_name = model_name
+        self.lora_config = lora_config or {}
         logger.info(f"Initializing LoRA trainer for model: {model_name}")
+        
+        # Setup model and tokenizer first
         self.setup_model()
         
         # Initialize parent class with our model and tokenizer

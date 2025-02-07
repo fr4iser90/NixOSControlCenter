@@ -8,10 +8,16 @@ from typing import Dict, Optional, Any
 from ..utils.path_config import ProjectPaths
 from ..training.train_nixos_model import NixOSModelTrainer
 from ..training.modules.trainer_factory import TrainerFactory
+from ..training.modules.visualization import VisualizationManager
+from ..training.modules.dataset_management import DatasetLoader
+from ..data.dataset_manager import DatasetManager
 from .model_info import ModelInfo
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 class TrainingController:
@@ -25,6 +31,13 @@ class TrainingController:
         self.trainer_type = 'lora'  # Default trainer type
         self.start_visualizer = True  # Default visualization setting
         self.visualizer_network_access = False  # Default network access setting
+        
+        # Initialize dataset components
+        self.dataset_manager = DatasetManager()
+        self.dataset_loader = DatasetLoader(
+            self.dataset_manager,
+            str(ProjectPaths.DATASET_DIR)
+        )
         
     def start_training(self):
         """Start or continue model training."""
@@ -101,6 +114,21 @@ class TrainingController:
     ):
         """Start or resume model training with advanced options."""
         try:
+            # Initialize visualization if requested
+            visualizer = None
+            if start_visualizer:
+                visualizer = VisualizationManager(
+                    ProjectPaths(),
+                    network_access=visualizer_network_access
+                )
+            
+            # Load datasets
+            logger.info("Loading training datasets...")
+            if self.test_mode:
+                train_dataset, eval_dataset = self.dataset_loader.load_test_dataset()
+            else:
+                train_dataset, eval_dataset = self.dataset_loader.load_and_validate_processed_datasets()
+            
             # Create trainer using factory
             trainer = TrainerFactory.create_trainer(
                 trainer_type=self.trainer_type,
@@ -109,13 +137,13 @@ class TrainingController:
                     'hyperparameters': hyperparameters or {},
                     'resource_limits': resource_limits or {}
                 },
-                start_visualizer=start_visualizer,
-                visualizer_network_access=visualizer_network_access,
-                test_mode=self.test_mode
+                dataset_manager=self.dataset_manager,
+                visualizer=visualizer,
+                train_dataset=train_dataset,
+                eval_dataset=eval_dataset
             )
             
-            # Setup and start training
-            trainer.setup()
+            # Start training
             trainer.train()
             
         except Exception as e:

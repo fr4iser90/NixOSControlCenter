@@ -3,15 +3,21 @@
 import logging
 from typing import Dict, Any, Optional, Type, Union, List
 from pathlib import Path
+from datasets import Dataset
 
 from ...utils.path_config import ProjectPaths
 from ..trainers.base_trainer import NixOSBaseTrainer
 from ..trainers.lora_trainer import LoRATrainer
 from ..trainers.feedback_trainer import FeedbackTrainer
+from ...data.dataset_manager import DatasetManager
+from .visualization import VisualizationManager
 from .training_config import ConfigManager
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 class TrainerFactory:
@@ -29,8 +35,10 @@ class TrainerFactory:
         trainer_type: str,
         model_path: Union[str, Path],
         config: Optional[Dict[str, Any]] = None,
-        dataset_manager = None,
-        visualizer = None,
+        dataset_manager: Optional[DatasetManager] = None,
+        visualizer: Optional[VisualizationManager] = None,
+        train_dataset: Optional[Dataset] = None,
+        eval_dataset: Optional[Dataset] = None,
         **kwargs
     ) -> NixOSBaseTrainer:
         """Create and configure a trainer instance.
@@ -41,6 +49,8 @@ class TrainerFactory:
             config: Optional configuration override
             dataset_manager: Optional dataset manager instance
             visualizer: Optional visualization manager instance
+            train_dataset: Optional training dataset
+            eval_dataset: Optional evaluation dataset
             **kwargs: Additional trainer arguments
             
         Returns:
@@ -54,6 +64,7 @@ class TrainerFactory:
             # Get trainer class
             trainer_class = cls.TRAINER_TYPES.get(trainer_type)
             if not trainer_class:
+                logger.error(f"Unknown trainer type: {trainer_type}")
                 raise ValueError(f"Unknown trainer type: {trainer_type}")
                 
             # Get and merge configuration
@@ -63,6 +74,7 @@ class TrainerFactory:
                 
             # Validate configuration
             if not ConfigManager.validate_config(base_config):
+                logger.error("Invalid configuration")
                 raise ValueError("Invalid configuration")
                 
             # Create trainer
@@ -70,6 +82,8 @@ class TrainerFactory:
                 'model_name': str(model_path),
                 'dataset_manager': dataset_manager,
                 'visualizer': visualizer,
+                'train_dataset': train_dataset,
+                'eval_dataset': eval_dataset,
                 **kwargs
             }
             
@@ -81,7 +95,7 @@ class TrainerFactory:
             return trainer_class(**trainer_kwargs)
             
         except Exception as e:
-            logger.error(f"Failed to create trainer: {e}")
+            logger.error(f"Failed to create trainer: {str(e)}")
             raise
         
     @classmethod

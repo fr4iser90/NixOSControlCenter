@@ -5,6 +5,9 @@ from pathlib import Path
 import os
 from typing import List, Optional, Dict, Union
 import git
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ProjectPaths:
     """Manages project paths and directory structure."""
@@ -27,8 +30,10 @@ class ProjectPaths:
     # Module directories
     TRAINING_DIR = SCRIPTS_DIR / 'training'
     TRAINING_MODULES_DIR = TRAINING_DIR / 'modules'
+    TRAINERS_DIR = TRAINING_DIR / 'trainers'  # Add trainers directory
     UTILS_DIR = SCRIPTS_DIR / 'utils'
     MONITORING_DIR = SCRIPTS_DIR / 'monitoring'
+    MODEL_DIR = SCRIPTS_DIR / 'model'  # Add model directory
     
     # Visualization directories
     VISUALIZATION_DIR = SCRIPTS_DIR / 'visualization'
@@ -46,6 +51,12 @@ class ProjectPaths:
     CURRENT_MODEL_DIR = MODELS_DIR / 'nixos_model'
     QUANTIZED_MODEL_DIR = MODELS_DIR / 'quantized_model'
     
+    # Additional configuration and logging
+    CONFIG_DIR = LLM_DIR / 'config'
+    TRAINER_CONFIG_DIR = CONFIG_DIR / 'trainers'
+    MODEL_CONFIG_DIR = CONFIG_DIR / 'models'
+    LOGS_DIR = LLM_DIR / 'logs'
+    
     @classmethod
     def setup_python_path(cls) -> None:
         """Setup Python path to include project directories."""
@@ -55,16 +66,25 @@ class ProjectPaths:
     @classmethod
     def ensure_directories(cls) -> None:
         """Create all required directories if they don't exist."""
-        directories = [
-            cls.DATA_DIR, cls.MODELS_DIR, cls.PROCESSED_DIR, cls.RAW_DIR,
-            cls.SCRIPTS_DIR, cls.TRAINING_DIR, cls.TRAINING_MODULES_DIR,
-            cls.UTILS_DIR, cls.MONITORING_DIR, cls.VISUALIZATION_DIR,
-            cls.METRICS_DIR, cls.DATASET_DIR, cls.CONCEPTS_DIR,
-            cls.TRAINING_TASKS_DIR, cls.EXAMPLES_DIR, cls.TROUBLESHOOTING_DIR,
-            cls.OPTIMIZATION_DIR, cls.CURRENT_MODEL_DIR
-        ]
-        for directory in directories:
-            directory.mkdir(parents=True, exist_ok=True)
+        try:
+            directories = [
+                cls.DATA_DIR, cls.MODELS_DIR, cls.PROCESSED_DIR, cls.RAW_DIR,
+                cls.SCRIPTS_DIR, cls.TRAINING_DIR, cls.TRAINING_MODULES_DIR,
+                cls.TRAINERS_DIR, cls.UTILS_DIR, cls.MONITORING_DIR, cls.MODEL_DIR,
+                cls.VISUALIZATION_DIR, cls.METRICS_DIR, cls.DATASET_DIR,
+                cls.CONCEPTS_DIR, cls.TRAINING_TASKS_DIR, cls.EXAMPLES_DIR,
+                cls.TROUBLESHOOTING_DIR, cls.OPTIMIZATION_DIR, cls.CURRENT_MODEL_DIR,
+                cls.QUANTIZED_MODEL_DIR, cls.CONFIG_DIR, cls.TRAINER_CONFIG_DIR,
+                cls.MODEL_CONFIG_DIR, cls.LOGS_DIR
+            ]
+            
+            for directory in directories:
+                directory.mkdir(parents=True, exist_ok=True)
+                logger.debug(f"Ensured directory exists: {directory}")
+                
+        except Exception as e:
+            logger.error(f"Error creating directories: {e}")
+            raise
     
     @classmethod
     def get_model_path(cls, model_name: str, checkpoint: Optional[Union[str, Path]] = None) -> Path:

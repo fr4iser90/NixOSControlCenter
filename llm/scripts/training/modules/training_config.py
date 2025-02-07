@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 """Configuration management for model training."""
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Dict, Any, Optional
 import torch
+import logging
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 @dataclass
 class ModelConfig:
@@ -54,9 +62,9 @@ class ConfigManager:
     def get_default_config() -> Dict[str, Any]:
         """Get default training configuration."""
         return {
-            'model': ModelConfig(),
-            'lora': LoRAConfig(),
-            'training': TrainingConfig()
+            'model': asdict(ModelConfig()),
+            'lora': asdict(LoRAConfig()),
+            'training': asdict(TrainingConfig())
         }
     
     @staticmethod
@@ -77,12 +85,16 @@ class ConfigManager:
     def validate_config(config: Dict[str, Any]) -> bool:
         """Validate configuration settings."""
         try:
-            # Validate model config
-            ModelConfig(**config.get('model', {}))
-            # Validate LoRA config
-            LoRAConfig(**config.get('lora', {}))
-            # Validate training config
-            TrainingConfig(**config.get('training', {}))
+            # Convert dict configs to dataclass instances
+            model_config = ModelConfig(**config.get('model', {}))
+            lora_config = LoRAConfig(**config.get('lora', {}))
+            training_config = TrainingConfig(**config.get('training', {}))
+            
+            # Convert back to dict for consistency
+            config['model'] = asdict(model_config)
+            config['lora'] = asdict(lora_config)
+            config['training'] = asdict(training_config)
+            
             return True
         except Exception as e:
             logger.error(f"Configuration validation failed: {e}")

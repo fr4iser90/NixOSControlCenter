@@ -18,17 +18,22 @@ from scripts.visualization.backend.metrics_manager import MetricsManager
 from scripts.visualization.backend.system_monitor import SystemMonitor
 from scripts.utils.path_config import ProjectPaths
 
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 def find_free_port(start_port=8501, max_attempts=10):
     """Find a free port starting from start_port."""
     for port in range(start_port, start_port + max_attempts):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            try:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.bind(('', port))
                 return port
-            except OSError:
-                continue
+        except OSError:
+            continue
     raise OSError(f"No free ports found between {start_port} and {start_port + max_attempts - 1}")
 
 class VisualizationManager:
