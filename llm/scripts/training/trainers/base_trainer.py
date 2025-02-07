@@ -109,9 +109,13 @@ class NixOSBaseTrainer(Trainer):
             logger.error(f"Training error: {e}")
             raise
             
-    def evaluate(self) -> Dict[str, float]:
+    def evaluate(self, ignore_keys=None, **kwargs) -> Dict[str, float]:
         """Evaluate the model.
         
+        Args:
+            ignore_keys: Optional list of metric keys to ignore
+            **kwargs: Additional evaluation arguments
+            
         Returns:
             Dict containing evaluation metrics
         """
@@ -125,12 +129,18 @@ class NixOSBaseTrainer(Trainer):
             
         logger.info("Starting evaluation...")
         try:
-            metrics = super().evaluate()
+            metrics = super().evaluate(**kwargs)
+            
+            # Remove ignored keys if specified
+            if ignore_keys:
+                for key in ignore_keys:
+                    metrics.pop(key, None)
+                    
             return metrics
         except Exception as e:
             logger.error(f"Evaluation error: {e}")
             raise
-            
+
     def save_model(self, output_dir: str):
         """Save the model.
         

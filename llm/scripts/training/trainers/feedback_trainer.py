@@ -5,6 +5,7 @@ from transformers import TrainerCallback
 import logging
 import warnings
 import torch
+from typing import Dict
 
 # Set up logging
 logging.basicConfig(
@@ -64,6 +65,7 @@ class FeedbackTrainer(NixOSBaseTrainer):
         
         # Initialize feedback collection
         self.feedback_data = []
+        self.feedback_scores = []
         
         # Create metrics callback and initialize metrics manager
         self.metrics_callback = MetricsCallback(self)
@@ -104,12 +106,23 @@ class FeedbackTrainer(NixOSBaseTrainer):
             logger.error(f"Error in feedback training: {e}")
             raise
             
-    def evaluate(self, *args, **kwargs):
-        """Evaluate model with feedback metrics."""
+    def evaluate(self, *args, **kwargs) -> Dict[str, float]:
+        """Evaluate model with feedback metrics.
+        
+        Returns:
+            Dict containing evaluation metrics
+        """
         try:
             logger.info("Starting feedback evaluation")
             result = super().evaluate(*args, **kwargs)
-            logger.info("Feedback evaluation completed successfully")
+            
+            # Add feedback metrics
+            feedback_metrics = {
+                'avg_feedback_score': sum(self.feedback_scores) / len(self.feedback_scores) if self.feedback_scores else 0,
+                'total_feedback': len(self.feedback_data)
+            }
+            result.update(feedback_metrics)
+            
             return result
         except Exception as e:
             logger.error(f"Error in feedback evaluation: {e}")
@@ -162,6 +175,8 @@ class FeedbackTrainer(NixOSBaseTrainer):
                 'score': self._compute_prediction_score(prediction, expected)
             }
             self.dataset_manager.add_feedback(feedback)
+            self.feedback_data.append(feedback)
+            self.feedback_scores.append(feedback['score'])
             
     def _compute_prediction_score(self, prediction, expected):
         """Compute a similarity score between prediction and expected output."""
