@@ -150,6 +150,10 @@ class NixOSModelTester:
         logger.info("Starting interactive chat session. Type 'exit' to end.")
         logger.info("You can ask questions about NixOS, package management, system configuration, etc.")
         
+        # Move model to device
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model = self.model.to(device)
+        
         while True:
             try:
                 # Get user input
@@ -161,19 +165,29 @@ class NixOSModelTester:
                 logger.info("Generating response...")
                 start_time = time.time()
                 
-                inputs = self.tokenizer(user_input, return_tensors="pt", padding=True)
-                inputs = {k: v.to(next(self.model.parameters()).device) for k, v in inputs.items()}
+                # Prepare input
+                inputs = self.tokenizer(user_input, return_tensors="pt")
+                inputs = {k: v.to(device) for k, v in inputs.items()}
                 
-                outputs = self.model.generate(
-                    **inputs,
-                    max_length=512,
-                    num_return_sequences=1,
-                    temperature=0.7,
-                    do_sample=True,
-                    pad_token_id=self.tokenizer.pad_token_id
-                )
-                
-                response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+                # Generate with error handling
+                with torch.no_grad():
+                    try:
+                        outputs = self.model.generate(
+                            **inputs,
+                            max_length=512,
+                            num_return_sequences=1,
+                            temperature=0.7,
+                            do_sample=True,
+                            pad_token_id=self.tokenizer.pad_token_id
+                        )
+                        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+                    except RuntimeError as e:
+                        if "out of memory" in str(e):
+                            logger.error("GPU out of memory. Try a shorter input or free up GPU memory.")
+                            if hasattr(torch.cuda, 'empty_cache'):
+                                torch.cuda.empty_cache()
+                            continue
+                        raise
                 
                 # Print response with timing
                 elapsed = time.time() - start_time
