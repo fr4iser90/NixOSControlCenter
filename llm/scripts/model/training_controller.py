@@ -116,9 +116,8 @@ class TrainingController:
             
             # Start training with options
             self.start_training_with_options(
-                model_name='facebook/opt-125m',  # Base model
+                model_name=model_name,
                 mode='fresh',
-                checkpoint_path=model_dir,
                 start_visualizer=self.start_visualizer,
                 visualizer_network_access=self.visualizer_network_access
             )
@@ -127,45 +126,46 @@ class TrainingController:
             logger.error(f"Error during fresh training: {e}")
             raise
             
-    def start_training_with_options(
-        self,
-        model_name: str,
-        mode: str = 'fresh',
-        checkpoint_path: Optional[Path] = None,
-        dataset_name: Optional[str] = None,
-        hyperparameters: Optional[Dict] = None,
-        resource_limits: Optional[Dict] = None,
-        start_visualizer: bool = True,
-        visualizer_network_access: bool = False
-    ):
-        """Start or resume model training with advanced options."""
+    def start_training_with_options(self, model_name: str, mode: str = 'fresh', **kwargs):
+        """Start training with the given options.
+        
+        Args:
+            model_name: Name of the model
+            mode: Training mode ('fresh' or 'continue')
+            **kwargs: Additional training options
+        """
         try:
-            # Initialize visualization if requested
-            visualizer = None
-            if start_visualizer:
-                visualizer = VisualizationManager(
-                    ProjectPaths(),
-                    network_access=visualizer_network_access
-                )
-            
             # Load datasets
             logger.info("Loading training datasets...")
-            if self.test_mode:
-                train_dataset, eval_dataset = self.dataset_loader.load_test_dataset()
-            else:
-                train_dataset, eval_dataset = self.dataset_loader.load_and_validate_processed_datasets()
+            train_dataset, eval_dataset = self.dataset_loader.load_train_eval_data()
             
-            # Create trainer using factory
+            # Prepare training configuration
+            training_config = {
+                'output_dir': str(self.models_dir / model_name),
+                'evaluation_strategy': 'epoch',
+                'save_strategy': 'epoch',
+                'learning_rate': 2e-5,
+                'per_device_train_batch_size': 4,
+                'per_device_eval_batch_size': 4,
+                'num_train_epochs': 3,
+                'weight_decay': 0.01,
+                'report_to': 'none',
+                'lora': {
+                    'r': 8,
+                    'lora_alpha': 16,
+                    'target_modules': ['q_proj', 'v_proj'],
+                    'lora_dropout': 0.05,
+                    'bias': 'none'
+                }
+            }
+            
+            # Create trainer
             trainer = TrainerFactory.create_trainer(
-                trainer_type=self.trainer_type,
-                model_path=model_name if mode == 'fresh' else checkpoint_path,
-                config={
-                    'hyperparameters': hyperparameters or {},
-                    'resource_limits': resource_limits or {},
-                    'output_dir': str(checkpoint_path) if checkpoint_path else None
-                },
+                trainer_type='lora',
+                model_path='facebook/opt-125m',
+                config=training_config,
                 dataset_manager=self.dataset_manager,
-                visualizer=visualizer,
+                visualizer=self.visualizer,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset
             )
@@ -173,11 +173,8 @@ class TrainingController:
             # Start training
             trainer.train()
             
-            # Save model after training
-            if checkpoint_path:
-                logger.info(f"Saving model to {checkpoint_path}")
-                trainer.save_model(str(checkpoint_path))
-                logger.info("Model saved successfully")
+            # Save the model
+            trainer.save_model(str(self.models_dir / model_name))
             
         except Exception as e:
             logger.error(f"Error during training: {e}")
@@ -235,9 +232,8 @@ class TrainingController:
             
             # Start training with options
             self.start_training_with_options(
-                model_name='facebook/opt-125m',  # Base model
+                model_name=selected_model,
                 mode='continue',
-                checkpoint_path=model_dir,
                 start_visualizer=self.start_visualizer,
                 visualizer_network_access=self.visualizer_network_access
             )

@@ -32,10 +32,18 @@ class LoRATrainer(FeedbackTrainer):
         self.lora_config = lora_config or {}
         self.setup_model()
         
+        # Remove model from kwargs if present to avoid duplicate
+        kwargs.pop('model', None)
+        kwargs.pop('tokenizer', None)
+        
         # Initialize parent class with our model and tokenizer
-        kwargs['model'] = self.model
-        kwargs['tokenizer'] = self.tokenizer
-        super().__init__(model_name=model_name, *args, **kwargs)
+        super().__init__(
+            model_name=model_name,
+            model=self.model,
+            tokenizer=self.tokenizer,
+            *args,
+            **kwargs
+        )
         
     def setup_model(self):
         """Initialize the model with LoRA configuration."""

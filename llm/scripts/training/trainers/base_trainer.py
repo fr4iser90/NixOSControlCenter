@@ -17,6 +17,8 @@ class NixOSBaseTrainer(Trainer):
     
     def __init__(self,
                  model_name: str,
+                 model=None,
+                 tokenizer=None,
                  dataset_manager: Optional[DatasetManager] = None,
                  visualizer: Optional[VisualizationManager] = None,
                  train_dataset: Optional[Dataset] = None,
@@ -27,6 +29,8 @@ class NixOSBaseTrainer(Trainer):
         
         Args:
             model_name: Name or path of the model
+            model: Optional model instance
+            tokenizer: Optional tokenizer instance
             dataset_manager: Optional dataset manager instance
             visualizer: Optional visualization manager instance
             train_dataset: Optional training dataset
@@ -44,12 +48,17 @@ class NixOSBaseTrainer(Trainer):
         # Set up training arguments
         self.setup_training_args(**kwargs)
         
+        # Remove our custom args from kwargs
+        for key in ['model_name', 'dataset_manager', 'visualizer']:
+            kwargs.pop(key, None)
+        
         # Initialize parent class
         super().__init__(
-            model=None,  # Will be set by child classes
+            model=model,
             args=self.training_args,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
+            tokenizer=tokenizer,
             **kwargs
         )
         
@@ -68,8 +77,18 @@ class NixOSBaseTrainer(Trainer):
             'report_to': 'none',
         }
         
-        # Update with provided kwargs
-        default_args.update(kwargs)
+        # Filter out non-training arguments
+        training_kwargs = {k: v for k, v in kwargs.items() 
+                         if k not in ['hyperparameters', 'resource_limits', 'model_name', 
+                                    'dataset_manager', 'visualizer', 'train_dataset', 
+                                    'eval_dataset', 'tokenizer', 'model']}
+        
+        # Update with filtered kwargs
+        default_args.update(training_kwargs)
+        
+        # Store hyperparameters separately
+        self.hyperparameters = kwargs.get('hyperparameters', {})
+        self.resource_limits = kwargs.get('resource_limits', {})
         
         self.training_args = TrainingArguments(**default_args)
         

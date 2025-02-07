@@ -57,18 +57,28 @@ class TrainerFactory:
         try:
             logger.info(f"Creating {trainer_type} trainer for model: {model_path}")
             
+            # Extract LoRA specific config if present
+            lora_config = config.get('lora', {}) if config else {}
+            
             # Prepare trainer configuration
             trainer_config = {
-                'model_name': model_path,  # Pass model_path directly
+                'model_name': str(model_path),
                 'dataset_manager': dataset_manager,
                 'visualizer': visualizer,
                 'train_dataset': train_dataset,
-                'eval_dataset': eval_dataset
+                'eval_dataset': eval_dataset,
+                'output_dir': config.get('output_dir') if config else None,
+                'lora_config': lora_config
             }
             
-            # Update with provided config
+            # Add training configuration if provided
             if config:
-                trainer_config.update(config)
+                # Filter out special config sections
+                training_config = {
+                    k: v for k, v in config.items()
+                    if k not in ['lora', 'output_dir'] and k not in trainer_config
+                }
+                trainer_config.update(training_config)
             
             # Create trainer based on type
             if trainer_type == 'lora':

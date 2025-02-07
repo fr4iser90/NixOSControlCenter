@@ -50,20 +50,36 @@ class MetricsCallback(TrainerCallback):
 class FeedbackTrainer(NixOSBaseTrainer):
     """Trainer that collects feedback during training for dataset improvement."""
     
-    def __init__(self, model_name: str, *args, **kwargs):
+    def __init__(self, model_name: str, model=None, tokenizer=None, *args, **kwargs):
         """Initialize feedback trainer.
         
         Args:
             model_name: Name or path of the model
+            model: Optional model instance
+            tokenizer: Optional tokenizer instance
             *args: Additional positional arguments
             **kwargs: Additional keyword arguments
         """
         logger.info("Initializing feedback trainer")
-        super().__init__(model_name=model_name, *args, **kwargs)
         
         # Initialize feedback collection
         self.feedback_data = []
         self.metrics_callback = MetricsCallback(self)
+        
+        # Remove model/tokenizer from kwargs if present
+        kwargs.pop('model', None)
+        kwargs.pop('tokenizer', None)
+        
+        # Initialize parent class
+        super().__init__(
+            model_name=model_name,
+            model=model,
+            tokenizer=tokenizer,
+            *args,
+            **kwargs
+        )
+        
+        # Add metrics callback
         self.add_callback(self.metrics_callback)
         
         # Handle tokenizer deprecation
