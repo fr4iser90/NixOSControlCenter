@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Factory for creating model trainers."""
 import logging
-from typing import Dict, Any, Optional, Type
+from typing import Dict, Any, Optional, Type, Union, List
 from pathlib import Path
 
 from ..trainers.base_trainer import NixOSBaseTrainer

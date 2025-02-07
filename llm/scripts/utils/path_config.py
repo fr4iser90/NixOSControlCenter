@@ -1,10 +1,14 @@
+#!/usr/bin/env python3
+"""Project path configuration and management."""
 import sys
 from pathlib import Path
 import os
-from typing import List, Optional
+from typing import List, Optional, Dict, Union
 import git
 
 class ProjectPaths:
+    """Manages project paths and directory structure."""
+    
     # Get the project root directory
     CURRENT_DIR = Path(os.getcwd()).resolve()
     PROJECT_ROOT = CURRENT_DIR
@@ -28,7 +32,7 @@ class ProjectPaths:
     
     # Visualization directories
     VISUALIZATION_DIR = SCRIPTS_DIR / 'visualization'
-    METRICS_DIR = MODELS_DIR / 'metrics'  # For storing training metrics and visualization data
+    METRICS_DIR = MODELS_DIR / 'metrics'
     
     # Dataset directories
     DATASET_DIR = PROCESSED_DIR / 'datasets'
@@ -42,120 +46,71 @@ class ProjectPaths:
     CURRENT_MODEL_DIR = MODELS_DIR / 'nixos_model'
     QUANTIZED_MODEL_DIR = MODELS_DIR / 'quantized_model'
     
-    # Dataset files by category
-    # Concepts
-    BASIC_CONCEPTS = CONCEPTS_DIR / 'nixos_concepts.jsonl'
-    ADVANCED_CONCEPTS = CONCEPTS_DIR / 'nixos_advanced_concepts.jsonl'
-    
-    # Training tasks
-    TRAINING_TASKS = TRAINING_TASKS_DIR / 'nixos_training_tasks.jsonl'
-    
-    # Examples
-    PRACTICAL_EXAMPLES = EXAMPLES_DIR / 'nixos_practical_examples.jsonl'
-    
-    # Troubleshooting
-    TROUBLESHOOTING = TROUBLESHOOTING_DIR / 'nixos_troubleshooting.jsonl'
-    
-    # Raw datasets (original data)
-    FLAKE_DATASET = RAW_DIR / 'flake_datasets.jsonl'
-    HOME_MANAGER_DATASET = RAW_DIR / 'home_manager_datasets.jsonl'
-    NIX_DATASET = RAW_DIR / 'nix_datasets.jsonl'
-    NIXOS_DATASET = RAW_DIR / 'nixos_datasets.jsonl'
-    NIXPKGS_DATASET = RAW_DIR / 'nixpkgs_datasets.jsonl'
-    WHAT_IS_NIXOS_DATASET = RAW_DIR / 'what_is_nixos.jsonl'
-
     @classmethod
-    def setup_python_path(cls):
-        """Add project root to Python path."""
+    def setup_python_path(cls) -> None:
+        """Setup Python path to include project directories."""
         if str(cls.PROJECT_ROOT) not in sys.path:
             sys.path.insert(0, str(cls.PROJECT_ROOT))
-            
-    @classmethod
-    def get_git_root(cls):
-        """Get the Git root directory."""
-        try:
-            repo = git.Repo(cls.PROJECT_ROOT, search_parent_directories=True)
-            return Path(repo.working_tree_dir)
-        except:
-            return cls.PROJECT_ROOT
-
-    @classmethod
-    def validate_paths(cls) -> List[str]:
-        """Validate critical paths and return list of missing paths"""
-        missing = []
-        critical_paths = [
-            (cls.PROJECT_ROOT, "Project root directory"),
-            (cls.LLM_DIR, "LLM directory"),
-            (cls.DATA_DIR, "Data directory"),
-        ]
-        
-        for path, desc in critical_paths:
-            if not path.exists():
-                missing.append(f"{desc} not found at: {path}")
-        
-        return missing
-
-    @classmethod
-    def get_checkpoint_pattern(cls) -> Path:
-        """Get pattern for checkpoint directories"""
-        return cls.MODELS_DIR / 'checkpoint-*'
-
-    @classmethod
-    def get_optimization_pattern(cls) -> Path:
-        """Pattern to match optimization dataset files"""
-        return cls.OPTIMIZATION_DIR / 'nixos_optimization_dataset_*.json'
-
+    
     @classmethod
     def ensure_directories(cls) -> None:
-        """Create all necessary directories if they don't exist"""
-        # First validate critical paths
-        missing = cls.validate_paths()
-        if missing:
-            raise FileNotFoundError(
-                "Critical paths are missing. Please ensure the project is properly set up:\n" +
-                "\n".join(missing)
-            )
-        
+        """Create all required directories if they don't exist."""
         directories = [
-            cls.MODELS_DIR,
-            cls.PROCESSED_DIR,
-            cls.RAW_DIR,
-            cls.SCRIPTS_DIR,
-            cls.DATASET_DIR,
-            cls.CONCEPTS_DIR,
-            cls.TRAINING_TASKS_DIR,
-            cls.EXAMPLES_DIR,
-            cls.TROUBLESHOOTING_DIR,
-            cls.OPTIMIZATION_DIR,
-            cls.VISUALIZATION_DIR,
-            cls.METRICS_DIR,
-            cls.TRAINING_DIR,
-            cls.TRAINING_MODULES_DIR,
-            cls.UTILS_DIR,
-            cls.MONITORING_DIR
+            cls.DATA_DIR, cls.MODELS_DIR, cls.PROCESSED_DIR, cls.RAW_DIR,
+            cls.SCRIPTS_DIR, cls.TRAINING_DIR, cls.TRAINING_MODULES_DIR,
+            cls.UTILS_DIR, cls.MONITORING_DIR, cls.VISUALIZATION_DIR,
+            cls.METRICS_DIR, cls.DATASET_DIR, cls.CONCEPTS_DIR,
+            cls.TRAINING_TASKS_DIR, cls.EXAMPLES_DIR, cls.TROUBLESHOOTING_DIR,
+            cls.OPTIMIZATION_DIR, cls.CURRENT_MODEL_DIR
         ]
-        
         for directory in directories:
-            try:
-                directory.mkdir(parents=True, exist_ok=True)
-            except PermissionError:
-                raise PermissionError(f"No permission to create directory: {directory}")
-            except Exception as e:
-                raise Exception(f"Failed to create directory {directory}: {str(e)}")
-                
+            directory.mkdir(parents=True, exist_ok=True)
+    
     @classmethod
-    def get_dataset_files(cls) -> List[Path]:
-        """Get all dataset files that should exist"""
-        return [
-            cls.BASIC_CONCEPTS,
-            cls.ADVANCED_CONCEPTS,
-            cls.TRAINING_TASKS,
-            cls.PRACTICAL_EXAMPLES,
-            cls.TROUBLESHOOTING,
-            cls.FLAKE_DATASET,
-            cls.HOME_MANAGER_DATASET,
-            cls.NIX_DATASET,
-            cls.NIXOS_DATASET,
-            cls.NIXPKGS_DATASET,
-            cls.WHAT_IS_NIXOS_DATASET,
-        ]
+    def get_model_path(cls, model_name: str, checkpoint: Optional[Union[str, Path]] = None) -> Path:
+        """Get the path to a model, optionally with a specific checkpoint."""
+        if checkpoint:
+            return cls.MODELS_DIR / str(model_name) / str(checkpoint)
+        return cls.MODELS_DIR / str(model_name)
+    
+    @classmethod
+    def get_dataset_path(cls, dataset_name: Optional[str] = None) -> Path:
+        """Get the path to a dataset."""
+        if dataset_name:
+            return cls.DATASET_DIR / dataset_name
+        return cls.DATASET_DIR
+    
+    @classmethod
+    def get_metrics_path(cls, model_name: str) -> Path:
+        """Get the path to model metrics."""
+        return cls.METRICS_DIR / model_name
+    
+    @classmethod
+    def get_visualization_path(cls, model_name: str) -> Path:
+        """Get the path for visualization data."""
+        return cls.VISUALIZATION_DIR / model_name
+    
+    @classmethod
+    def get_checkpoint_paths(cls, model_name: Optional[str] = None) -> List[Path]:
+        """Get all checkpoint paths for a model or all models."""
+        if model_name:
+            model_dir = cls.MODELS_DIR / model_name
+            if not model_dir.exists():
+                return []
+            return sorted([d for d in model_dir.glob('checkpoint-*') if d.is_dir()])
+        else:
+            if not cls.MODELS_DIR.exists():
+                return []
+            return sorted([d for d in cls.MODELS_DIR.glob('**/checkpoint-*') if d.is_dir()])
+    
+    @classmethod
+    def get_model_files(cls, model_name: str) -> Dict[str, Path]:
+        """Get paths to important model files."""
+        model_dir = cls.MODELS_DIR / model_name
+        return {
+            'config': model_dir / 'config.json',
+            'model': model_dir / 'pytorch_model.bin',
+            'adapter': model_dir / 'adapter_model.safetensors',
+            'metrics': model_dir / 'metrics.json',
+            'history': model_dir / 'training_history.json'
+        }
