@@ -68,12 +68,13 @@ class FeedbackTrainer(NixOSBaseTrainer):
         self.feedback_data = []
         self.feedback_scores = []
         self.dataset_manager = dataset_manager
+        self.dataset_path = kwargs.pop('dataset_path', None)
         
         # Create metrics callback and initialize metrics manager
         self.metrics_callback = MetricsCallback(self)
         self.metrics_callback.on_init_end(None, None, None)  # Initialize metrics manager
         
-        # Remove model/tokenizer from kwargs if present
+        # Remove our args from kwargs
         kwargs.pop('model', None)
         kwargs.pop('tokenizer', None)
         kwargs.pop('dataset_manager', None)
@@ -135,25 +136,33 @@ class FeedbackTrainer(NixOSBaseTrainer):
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         """Compute loss and collect feedback."""
         try:
-            logger.debug("Computing loss with feedback")
-            loss, outputs = super().compute_loss(model, inputs, return_outputs=True)
+            # Get outputs from model
+            outputs = model(**inputs)
+            loss = outputs.loss
             
-            # Collect feedback during validation
-            if (hasattr(self, 'is_in_eval') and self.is_in_eval and 
-                self.state.is_local_process_zero and outputs is not None):
+            # Only collect feedback during evaluation
+            if hasattr(self, '_in_evaluation') and self._in_evaluation:
                 batch_size = inputs["input_ids"].shape[0]
+                decoder = getattr(self, 'processing_class', None) or getattr(self, 'tokenizer', None)
+                
+                # Process each item in batch
                 for i in range(batch_size):
                     try:
-                        # Get decoder for text processing
-                        decoder = getattr(self, 'processing_class', None) or self.tokenizer
-                        if decoder is None:
+                        if not decoder:
                             logger.warning("No processing_class or tokenizer available for decoding")
                             continue
+                        
+                        # Get example ID from dataset if available
+                        example_id = None
+                        if hasattr(self.eval_dataset, 'data'):
+                            if i < len(self.eval_dataset.data):
+                                example_id = str(i)  # Use index as fallback ID
+                                if 'id' in self.eval_dataset.data[i]:
+                                    example_id = str(self.eval_dataset.data[i]['id'])
                         
                         # Process prediction and expected output
                         prediction = decoder.decode(outputs.logits[i].argmax(dim=-1))
                         expected = decoder.decode(inputs["labels"][i])
-                        example_id = inputs.get("example_ids", [None])[i]
                         
                         # Collect feedback for this prediction
                         self._collect_prediction_feedback(prediction, expected, example_id)
@@ -171,18 +180,28 @@ class FeedbackTrainer(NixOSBaseTrainer):
     
     def _collect_prediction_feedback(self, prediction, expected, example_id):
         """Collect feedback about model predictions."""
+        from ...data.dataset_manager import DatasetFeedback
+        from datetime import datetime
+        
+        # Create feedback object
         feedback = {
-            'example_id': example_id,
-            'prediction': prediction,
-            'expected': expected,
-            'score': self._compute_prediction_score(prediction, expected)
+            'example_id': str(example_id) if example_id else 'unknown',
+            'prediction': prediction.strip(),
+            'expected': expected.strip(),
+            'score': self._compute_prediction_score(prediction, expected),
+            'improvement_suggestions': [],
+            'timestamp': datetime.now().isoformat()
         }
+        
+        # Store feedback locally
         self.feedback_data.append(feedback)
         self.feedback_scores.append(feedback['score'])
         
-        if self.dataset_manager:
+        # Add to dataset manager if available
+        if self.dataset_manager and self.dataset_path:
             try:
-                self.dataset_manager.add_feedback(feedback)
+                dataset_feedback = DatasetFeedback(**feedback)
+                self.dataset_manager.add_feedback(self.dataset_path, dataset_feedback)
             except Exception as e:
                 logger.error(f"Error adding feedback to dataset manager: {e}")
                 
@@ -193,7 +212,7 @@ class FeedbackTrainer(NixOSBaseTrainer):
         
     def evaluation_loop(self, *args, **kwargs):
         """Override evaluation loop to track when we're in evaluation."""
-        self.is_in_eval = True
+        self._in_evaluation = True
         results = super().evaluation_loop(*args, **kwargs)
-        self.is_in_eval = False
+        self._in_evaluation = False
         return results

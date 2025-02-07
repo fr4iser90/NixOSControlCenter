@@ -36,6 +36,7 @@ class TrainerFactory:
         model_path: Union[str, Path],
         config: Optional[Dict[str, Any]] = None,
         dataset_manager: Optional[DatasetManager] = None,
+        dataset_path: Optional[Union[str, Path]] = None,
         visualizer: Optional[VisualizationManager] = None,
         train_dataset: Optional[Dataset] = None,
         eval_dataset: Optional[Dataset] = None
@@ -47,10 +48,11 @@ class TrainerFactory:
             model_path: Path to model or model name
             config: Optional configuration dictionary
             dataset_manager: Optional dataset manager instance
+            dataset_path: Optional path to dataset for feedback collection
             visualizer: Optional visualization manager instance
             train_dataset: Optional training dataset
             eval_dataset: Optional evaluation dataset
-            
+        
         Returns:
             Trainer instance
         """
@@ -61,6 +63,7 @@ class TrainerFactory:
             trainer_config = {
                 'model_name': str(model_path),
                 'dataset_manager': dataset_manager,
+                'dataset_path': dataset_path,
                 'visualizer': visualizer,
                 'train_dataset': train_dataset,
                 'eval_dataset': eval_dataset,

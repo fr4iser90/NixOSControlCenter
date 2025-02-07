@@ -153,15 +153,14 @@ class TrainingController:
             # Ensure output directory is set
             training_config['output_dir'] = str(self.models_dir / model_name)
             
-            # Validate final config
-            ConfigManager.validate_config(training_config)
-            
             # Create trainer
+            model_dir = self.models_dir / model_name
             trainer = TrainerFactory.create_trainer(
                 trainer_type='lora',  # TODO: Make configurable
-                model_path='facebook/opt-125m',  # TODO: Make configurable
+                model_path=str(model_dir) if mode == 'continue' else 'facebook/opt-125m',
                 config=training_config,
                 dataset_manager=self.dataset_manager,
+                dataset_path=ProjectPaths.DATASET_DIR / "training_data.jsonl",
                 visualizer=self.visualizer,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset
