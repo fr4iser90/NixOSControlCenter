@@ -72,6 +72,47 @@ class DatasetLoader:
                     
         return self._prepare_datasets(all_data)
         
+    def load_test_data(self) -> Dataset:
+        """Load test dataset for model evaluation.
+        
+        Returns:
+            Dataset: Test dataset in HuggingFace format
+        """
+        test_dir = self.dataset_dir / "test"
+        if not test_dir.exists():
+            logger.warning(f"No test data directory found at {test_dir}. Using a subset of training data for testing.")
+            # Load training data and split
+            train_data, _ = self.load_and_validate_processed_datasets()
+            # Use last 10% as test data
+            test_size = max(1, int(len(train_data) * 0.1))
+            return Dataset.from_dict(train_data[-test_size:])
+            
+        all_data = []
+        jsonl_files = list(test_dir.rglob("*.jsonl"))
+        
+        if not jsonl_files:
+            logger.warning(f"No JSONL files found in {test_dir}. Using a subset of training data for testing.")
+            # Load training data and split
+            train_data, _ = self.load_and_validate_processed_datasets()
+            # Use last 10% as test data
+            test_size = max(1, int(len(train_data) * 0.1))
+            return Dataset.from_dict(train_data[-test_size:])
+            
+        logger.info(f"Loading {len(jsonl_files)} test datasets")
+        
+        for jsonl_file in jsonl_files:
+            logger.info(f"Loading test dataset: {jsonl_file.relative_to(test_dir)}")
+            with open(jsonl_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        data = json.loads(line)
+                        all_data.append(data)
+                        
+        if not all_data:
+            raise ValueError("No valid test data found")
+            
+        return Dataset.from_list(all_data)
+        
     def _prepare_datasets(self, all_data: List[Dict]) -> Tuple[Dataset, Dataset]:
         """Prepare and tokenize datasets from loaded data."""
         logger.info(f"Total examples loaded: {len(all_data)}")
