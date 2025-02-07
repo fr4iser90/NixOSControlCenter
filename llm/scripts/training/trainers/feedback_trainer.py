@@ -4,6 +4,8 @@ import logging
 import warnings
 import torch
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class MetricsCallback(TrainerCallback):
@@ -44,6 +46,8 @@ class FeedbackTrainer(NixOSBaseTrainer):
     """Trainer that collects feedback during training for dataset improvement."""
     
     def __init__(self, *args, dataset_manager=None, visualizer=None, **kwargs):
+        """Initialize feedback trainer."""
+        logger.info("Initializing feedback trainer")
         # Add metrics callback if visualization is enabled
         if visualizer:
             callbacks = kwargs.get('callbacks', [])
@@ -62,38 +66,62 @@ class FeedbackTrainer(NixOSBaseTrainer):
                 DeprecationWarning
             )
         
+    def train(self, *args, **kwargs):
+        """Train model with feedback loop."""
+        try:
+            logger.info("Starting feedback training loop")
+            result = super().train(*args, **kwargs)
+            logger.info("Feedback training completed successfully")
+            return result
+        except Exception as e:
+            logger.error(f"Error in feedback training: {e}")
+            raise
+            
+    def evaluate(self, *args, **kwargs):
+        """Evaluate model with feedback metrics."""
+        try:
+            logger.info("Starting feedback evaluation")
+            result = super().evaluate(*args, **kwargs)
+            logger.info("Feedback evaluation completed successfully")
+            return result
+        except Exception as e:
+            logger.error(f"Error in feedback evaluation: {e}")
+            raise
+            
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         """Compute loss and collect feedback."""
-        loss, outputs = super().compute_loss(model, inputs, return_outputs=True)
-        
-        # Collect feedback during validation
-        if (hasattr(self, 'is_in_eval') and self.is_in_eval and 
-            self.state.is_local_process_zero and outputs is not None):
-            batch_size = inputs["input_ids"].shape[0]
-            for i in range(batch_size):
-                # Get decoder for text processing
-                decoder = getattr(self, 'processing_class', None) or self.tokenizer
-                if decoder is None:
-                    logger.warning("No processing_class or tokenizer available for decoding")
-                    continue
-                    
-                try:
-                    # Convert logits to token ids safely
-                    logits = outputs.logits[i].detach().cpu()
-                    pred_tokens = logits.argmax(dim=-1).to(torch.int32)
-                    label_tokens = inputs["labels"][i].detach().cpu().to(torch.int32)
-                    
-                    # Decode tokens to text
-                    prediction = decoder.decode(pred_tokens)
-                    expected = decoder.decode(label_tokens)
-                    example_id = f"example_{self.state.global_step}_{i}"
-                    self._collect_prediction_feedback(prediction, expected, example_id)
-                except Exception as e:
-                    logger.error(f"Error collecting feedback: {e}")
-                    
-        if return_outputs:
-            return loss, outputs
-        return loss
+        try:
+            logger.debug("Computing loss with feedback")
+            loss, outputs = super().compute_loss(model, inputs, return_outputs=True)
+            
+            # Collect feedback during validation
+            if (hasattr(self, 'is_in_eval') and self.is_in_eval and 
+                self.state.is_local_process_zero and outputs is not None):
+                batch_size = inputs["input_ids"].shape[0]
+                for i in range(batch_size):
+                    # Get decoder for text processing
+                    decoder = getattr(self, 'processing_class', None) or self.tokenizer
+                    if decoder is None:
+                        logger.warning("No processing_class or tokenizer available for decoding")
+                        continue
+                        
+                    try:
+                        # Convert logits to token ids safely
+                        logits = outputs.logits[i].detach().cpu()
+                        pred_tokens = logits.argmax(dim=-1).to(torch.int32)
+                        label_tokens = inputs["labels"][i].detach().cpu().to(torch.int32)
+                        
+                        # Decode tokens to text
+                        prediction = decoder.decode(pred_tokens)
+                        expected = decoder.decode(label_tokens)
+                        example_id = f"example_{self.state.global_step}_{i}"
+                        self._collect_prediction_feedback(prediction, expected, example_id)
+                    except Exception as e:
+                        logger.error(f"Error collecting feedback: {e}")
+                        
+            if return_outputs:
+                return loss, outputs
+            return loss
     
     def _collect_prediction_feedback(self, prediction, expected, example_id):
         """Collect feedback about model predictions."""

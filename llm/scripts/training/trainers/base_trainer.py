@@ -1,15 +1,20 @@
+#!/usr/bin/env python3
+"""Base trainer class with common NixOS-specific functionality."""
+import logging
 from transformers import Trainer, DataCollatorForLanguageModeling
 import torch
 from ...utils.path_config import ProjectPaths
 import warnings
-import logging
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class NixOSBaseTrainer(Trainer):
     """Base trainer class with common NixOS-specific functionality."""
     
     def __init__(self, *args, **kwargs):
+        """Initialize trainer with NixOS-specific settings."""
         if 'tokenizer' in kwargs:
             # Create data collator with tokenizer
             kwargs['data_collator'] = DataCollatorForLanguageModeling(
@@ -49,13 +54,40 @@ class NixOSBaseTrainer(Trainer):
         """Safely decode token IDs to text."""
         decoder = self.get_decoder()
         if decoder is None:
-            logger.error("No decoder (processing_class or tokenizer) available")
-            return None
+            logger.error("No decoder (processing_class or tokenizer) found")
+            return ""
+        return decoder.decode(token_ids, skip_special_tokens=True)
+        
+    def save_checkpoints(self):
+        """Save model checkpoints."""
         try:
-            return decoder.decode(token_ids)
+            self.save_model()
+            logger.info(f"Model saved to {self.args.output_dir}")
         except Exception as e:
-            logger.error(f"Error decoding text: {str(e)}")
-            return None
+            logger.error(f"Error saving model: {e}")
+            raise
+            
+    def train(self, *args, **kwargs):
+        """Train the model with error handling."""
+        try:
+            logger.info("Starting training...")
+            result = super().train(*args, **kwargs)
+            logger.info("Training completed successfully")
+            return result
+        except Exception as e:
+            logger.error(f"Training error: {e}")
+            raise
+            
+    def evaluate(self, *args, **kwargs):
+        """Evaluate the model with error handling."""
+        try:
+            logger.info("Starting evaluation...")
+            result = super().evaluate(*args, **kwargs)
+            logger.info("Evaluation completed successfully")
+            return result
+        except Exception as e:
+            logger.error(f"Evaluation error: {e}")
+            raise
             
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         """Base loss computation."""
