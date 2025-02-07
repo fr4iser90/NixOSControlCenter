@@ -47,10 +47,29 @@ llm/
 ## 🛠️ Requirements
 
 ### For Normal Usage (Pre-trained Models)
-- Python 3.8+
-- Ollama
-- 8GB RAM minimum
-- 20GB disk space
+
+We provide a system requirements checker to help you verify your setup. Run it with:
+```bash
+python scripts/utils/system_check.py
+```
+
+Requirements vary by platform:
+
+#### NVIDIA Jetson Devices
+- Python 3.8 or higher
+- PyTorch: Download from [NVIDIA's PyTorch for Jetson](https://developer.nvidia.com/embedded/downloads#?search=pytorch)
+- RAM: 7GB+ (Nano/NX), 8GB+ (Orin)
+- 20GB available disk space
+- Ollama (optional, for model deployment)
+
+#### Standard Platforms (PC/Server)
+- Python 3.8 or higher
+- PyTorch 2.2.0: `pip install torch==2.2.0`
+- RAM: 8GB+ (16GB+ recommended)
+- 20GB available disk space
+- Ollama (for model deployment)
+
+The system checker will automatically detect your platform and provide appropriate installation instructions.
 
 ### For Training
 - Python 3.8+
@@ -59,7 +78,6 @@ llm/
 - 100GB disk space
 - Dependencies:
   ```
-  torch>=2.0.0
   transformers>=4.30.0
   datasets>=2.12.0
   accelerate>=0.20.0

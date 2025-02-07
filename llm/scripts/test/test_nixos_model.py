@@ -1,63 +1,55 @@
 #!/usr/bin/env python3
+"""Test script for NixOS model."""
 import torch
 from pathlib import Path
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from peft import LoraConfig, get_peft_model
-from typing import List
-from ..utils.path_config import ProjectPaths
+import logging
+from typing import List, Optional, Dict, Any
+import json
+import time
+
+from scripts.utils.path_config import ProjectPaths
+from scripts.training.modules.model_management import ModelInitializer
+from scripts.monitoring.resource_monitor import ResourceMonitor
+from scripts.training.modules.visualization import VisualizationManager
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class NixOSModelTester:
-    def __init__(self, model_path: str = None):
-        self.model_path = model_path or str(ProjectPaths.CURRENT_MODEL_DIR)
-        # Initialize the tokenizer
-        print(f"Loading tokenizer from facebook/opt-125m...")
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "facebook/opt-125m",
-            padding_side="left",
-            trust_remote_code=True
+    """Test harness for NixOS model."""
+    
+    def __init__(self, model_path: Optional[str] = None, enable_viz: bool = True):
+        """Initialize model tester with optional visualization."""
+        # Initialize paths
+        ProjectPaths.ensure_directories()
+        self.model_path = Path(model_path) if model_path else ProjectPaths.CURRENT_MODEL_DIR
+        
+        # Initialize components
+        self.model_init = ModelInitializer(paths_config=ProjectPaths)
+        self.resource_monitor = ResourceMonitor(ProjectPaths.MODELS_DIR)
+        if enable_viz:
+            self.viz_manager = VisualizationManager(ProjectPaths, network_access=False)
+            self.viz_manager.start_server()
+        
+        # Load model and tokenizer
+        logger.info(f"Loading model from {self.model_path}...")
+        self.model, self.tokenizer = self.model_init.load_model_and_tokenizer(
+            model_path=str(self.model_path),
+            load_in_8bit=False,
+            device_map="auto"
         )
-        self.tokenizer.pad_token = self.tokenizer.eos_token
         
-        self.model = self.load_model(self.model_path)
-        
-        # Apply LoRA config
-        lora_config = LoraConfig(
-            r=8,
-            lora_alpha=32,
-            target_modules=["q_proj", "v_proj"],
-            lora_dropout=0.05,
-            bias="none",
-            task_type="CAUSAL_LM"
-        )
-        
-        # Try to load from checkpoints
-        checkpoint_dir = Path(self.model_path) / "checkpoint-2000"
-        if checkpoint_dir.exists():
-            print(f"Loading from checkpoint: {checkpoint_dir}")
-            self.model = get_peft_model(self.model, lora_config)
-            self.model.load_adapter(checkpoint_dir, "default")
-        else:
-            print("No checkpoint found. Model responses will be random.")
-            self.model = get_peft_model(self.model, lora_config)
-        
+        # Move to GPU if available
         if torch.cuda.is_available():
             self.model = self.model.to("cuda")
         
-    def load_model(self, model_path: str):
-        # Load the model from the specified path
-        print(f"Loading model from {model_path}...")
-        model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            device_map="auto",
-            low_cpu_mem_usage=True
-        )
-        model.config.pad_token_id = self.tokenizer.eos_token_id
-        return model
-
-    def test_model(self, test_prompts: List[str]):
+        logger.info("Model loaded successfully")
+    
+    def test_model(self, test_prompts: List[str], save_results: bool = True) -> List[Dict[str, Any]]:
+        """Test model with a list of prompts and optionally save results."""
         self.model.eval()
         device = next(self.model.parameters()).device
+        results = []
         
         generation_config = {
             "max_new_tokens": 256,
@@ -70,13 +62,18 @@ class NixOSModelTester:
             "max_time": 30.0
         }
         
-        print("\nTesting model with NixOS prompts:")
+        logger.info("\nTesting model with NixOS prompts:")
         with torch.no_grad():
             for i, prompt in enumerate(test_prompts, 1):
-                print(f"\nGenerating response {i}/{len(test_prompts)}...")
+                logger.info(f"\nGenerating response {i}/{len(test_prompts)}...")
                 formatted_prompt = f"### Question: {prompt}\n\n### Answer:"
                 
                 try:
+                    # Start resource monitoring
+                    start_time = time.time()
+                    self.resource_monitor.start_monitoring()
+                    
+                    # Generate response
                     inputs = self.tokenizer(
                         formatted_prompt,
                         return_tensors="pt",
@@ -96,25 +93,85 @@ class NixOSModelTester:
                         skip_special_tokens=True
                     )
                     
-                    print(f"\nPrompt: {prompt}")
-                    print(f"Response: {response}")
-                    print("="*80)
+                    # Stop monitoring and get metrics
+                    elapsed_time = time.time() - start_time
+                    resource_metrics = self.resource_monitor.get_metrics()
+                    
+                    # Store result
+                    result = {
+                        "prompt": prompt,
+                        "response": response,
+                        "metrics": {
+                            "generation_time": elapsed_time,
+                            "resources": resource_metrics
+                        }
+                    }
+                    results.append(result)
+                    
+                    # Update visualization
+                    if hasattr(self, 'viz_manager'):
+                        self.viz_manager.update_metrics({
+                            'test_metrics': {
+                                'generation_time': elapsed_time,
+                                'resources': resource_metrics
+                            }
+                        })
+                    
+                    # Print results
+                    logger.info(f"\nPrompt: {prompt}")
+                    logger.info(f"Response: {response}")
+                    logger.info(f"Generation Time: {elapsed_time:.2f}s")
+                    logger.info("="*80)
+                    
                 except Exception as e:
-                    print(f"Error generating response: {str(e)}")
+                    logger.error(f"Error generating response: {e}")
                     continue
+        
+        if save_results:
+            self._save_results(results)
+        
+        return results
+    
+    def _save_results(self, results: List[Dict[str, Any]]):
+        """Save test results to file."""
+        results_file = self.model_path / "test_results.json"
+        try:
+            with open(results_file, 'w') as f:
+                json.dump(results, f, indent=2)
+            logger.info(f"Test results saved to {results_file}")
+        except Exception as e:
+            logger.error(f"Error saving results: {e}")
+    
+    def cleanup(self):
+        """Cleanup resources."""
+        if hasattr(self, 'viz_manager'):
+            self.viz_manager.cleanup_server()
+        self.resource_monitor.stop_monitoring()
 
 def main():
+    """Main entry point."""
+    # Example test prompts
     test_prompts = [
-        "What is NixOS and how is it different from other Linux distributions?",
-        "How do I create a Python development environment with Poetry in NixOS?",
-        "Explain how to update a NixOS system using flakes.",
-        "How do I debug a broken NixOS configuration?",
-        "Create a basic flake.nix for a Python web server with FastAPI"
+        "What is NixOS and how does it differ from other Linux distributions?",
+        "How do I install a package in NixOS?",
+        "Explain the NixOS configuration system.",
+        "What are flakes in NixOS and how do they work?",
+        "How do I set up a development environment in NixOS?"
     ]
     
-    # Use default path from ProjectPaths
-    tester = NixOSModelTester()
-    tester.test_model(test_prompts)
+    try:
+        # Initialize tester
+        tester = NixOSModelTester()
+        
+        # Run tests
+        results = tester.test_model(test_prompts)
+        
+        # Cleanup
+        tester.cleanup()
+        
+    except Exception as e:
+        logger.error(f"Error during testing: {e}")
+        raise
 
 if __name__ == "__main__":
     main()

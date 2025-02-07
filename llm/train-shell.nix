@@ -49,11 +49,14 @@ let
                   psutil==5.9.8 \
                   requests==2.31.0 \
                   inquirer==3.1.3 \
+                  shap==0.44.0 \
+                  lime==0.2.0.1 \
                   streamlit \
                   plotly \
                   wordcloud==1.9.3 \
                   networkx==3.2.1 \
-                  matplotlib==3.8.2
+                  matplotlib==3.8.2 \
+                  seaborn==0.13.2
       
       # Überprüfe Installation
       echo "Überprüfe Installation..."

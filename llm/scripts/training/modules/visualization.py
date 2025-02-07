@@ -7,6 +7,15 @@ import sys
 import logging
 from pathlib import Path
 
+# Add project root to Python path
+ROOT_DIR = Path(__file__).parent.parent.parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from scripts.visualization.backend.metrics_manager import MetricsManager
+from scripts.visualization.backend.system_monitor import SystemMonitor
+from scripts.utils.path_config import ProjectPaths
+
 logger = logging.getLogger(__name__)
 
 class VisualizationManager:
@@ -17,6 +26,8 @@ class VisualizationManager:
         self.project_paths = project_paths
         self.network_access = network_access
         self.viz_process = None
+        self.metrics_manager = MetricsManager()
+        self.system_monitor = SystemMonitor()
         
     def start_server(self):
         """Start the Streamlit visualization server."""
@@ -89,10 +100,15 @@ class VisualizationManager:
                 self.viz_process = None
                 
     def update_metrics(self, metrics: dict):
-        """Update training metrics in visualization.
-        
-        This is a placeholder - implement based on your specific
-        visualization needs and metrics structure.
-        """
-        # TODO: Implement metrics update logic
-        pass
+        """Update training metrics in visualization."""
+        try:
+            # Save metrics using the metrics manager
+            step = metrics.get('step', 0)
+            self.metrics_manager.save_training_metrics(step, metrics)
+            
+            # Update system metrics if available
+            if 'resources' in metrics:
+                self.system_monitor.update_metrics(metrics['resources'])
+                
+        except Exception as e:
+            logger.error(f"Error updating metrics: {e}")

@@ -1,13 +1,15 @@
+import sys
 from pathlib import Path
 import os
 from typing import List, Optional
+import git
 
 class ProjectPaths:
-    # Get the project root directory (parent of the llm directory)
-    CURRENT_DIR = Path(__file__).resolve().parent
-    PROJECT_ROOT = Path(os.getenv('PROJECT_ROOT', CURRENT_DIR.parent.parent.parent))
+    # Get the project root directory
+    CURRENT_DIR = Path(os.getcwd()).resolve()
+    PROJECT_ROOT = CURRENT_DIR
     
-    # Base directories - no need to append 'llm' since we're already in it
+    # Base directories
     LLM_DIR = PROJECT_ROOT
     
     # Data directories
@@ -17,6 +19,12 @@ class ProjectPaths:
     PROCESSED_DIR = DATA_DIR / 'processed'
     RAW_DIR = DATA_DIR / 'raw'
     SCRIPTS_DIR = LLM_DIR / 'scripts'
+    
+    # Module directories
+    TRAINING_DIR = SCRIPTS_DIR / 'training'
+    TRAINING_MODULES_DIR = TRAINING_DIR / 'modules'
+    UTILS_DIR = SCRIPTS_DIR / 'utils'
+    MONITORING_DIR = SCRIPTS_DIR / 'monitoring'
     
     # Visualization directories
     VISUALIZATION_DIR = SCRIPTS_DIR / 'visualization'
@@ -55,6 +63,21 @@ class ProjectPaths:
     NIXOS_DATASET = RAW_DIR / 'nixos_datasets.jsonl'
     NIXPKGS_DATASET = RAW_DIR / 'nixpkgs_datasets.jsonl'
     WHAT_IS_NIXOS_DATASET = RAW_DIR / 'what_is_nixos.jsonl'
+
+    @classmethod
+    def setup_python_path(cls):
+        """Add project root to Python path."""
+        if str(cls.PROJECT_ROOT) not in sys.path:
+            sys.path.insert(0, str(cls.PROJECT_ROOT))
+            
+    @classmethod
+    def get_git_root(cls):
+        """Get the Git root directory."""
+        try:
+            repo = git.Repo(cls.PROJECT_ROOT, search_parent_directories=True)
+            return Path(repo.working_tree_dir)
+        except:
+            return cls.PROJECT_ROOT
 
     @classmethod
     def validate_paths(cls) -> List[str]:
@@ -106,6 +129,10 @@ class ProjectPaths:
             cls.OPTIMIZATION_DIR,
             cls.VISUALIZATION_DIR,
             cls.METRICS_DIR,
+            cls.TRAINING_DIR,
+            cls.TRAINING_MODULES_DIR,
+            cls.UTILS_DIR,
+            cls.MONITORING_DIR
         ]
         
         for directory in directories:

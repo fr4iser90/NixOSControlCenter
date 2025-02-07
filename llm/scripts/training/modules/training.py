@@ -15,30 +15,39 @@ logger = logging.getLogger(__name__)
 class TrainingManager:
     """Handles model training and checkpointing."""
     
-    def __init__(self, model_name: str, output_dir: Path):
+    def __init__(self, model_name: str, output_dir: Path, test_mode: bool = False):
         """Initialize training manager."""
         self.model_name = model_name
         self.output_dir = output_dir
+        self.test_mode = test_mode
         
     def setup_training_args(self, config: Dict[str, Any] = None) -> TrainingArguments:
         """Set up training arguments with defaults or custom config."""
         default_config = {
             "output_dir": str(self.output_dir),
-            "num_train_epochs": 3,
-            "per_device_train_batch_size": 4,
-            "per_device_eval_batch_size": 4,
-            "gradient_accumulation_steps": 4,
+            "num_train_epochs": 3 if self.test_mode else 10,
+            "per_device_train_batch_size": 1 if self.test_mode else 2,  # Reduced for Jetson
+            "per_device_eval_batch_size": 1 if self.test_mode else 2,   # Reduced for Jetson
+            "gradient_accumulation_steps": 4,  # Increased to compensate for smaller batch
             "evaluation_strategy": "steps",
-            "eval_steps": 100,
+            "eval_steps": 500,  # Further increased to reduce overhead
             "save_strategy": "steps",
-            "save_steps": 100,
-            "save_total_limit": 3,
+            "save_steps": 500,  # Further increased to reduce overhead
+            "save_total_limit": 2,  # Reduced to save disk space
             "learning_rate": 3e-4,
-            "warmup_steps": 100,
-            "logging_steps": 10,
-            "optim": "adamw_torch",  # Using standard PyTorch AdamW optimizer
+            "warmup_steps": 25,  # Reduced for faster start
+            "logging_steps": 50,  # Increased to reduce overhead
+            "optim": "adamw_torch",
             "lr_scheduler_type": "cosine",
-            "report_to": "none"
+            "report_to": "none",
+            "fp16": True,  # Always use mixed precision on Jetson
+            "gradient_checkpointing": True,
+            "torch_compile": False,
+            # Jetson-specific optimizations
+            "dataloader_num_workers": 2,     # Use some parallel loading but not too much
+            "dataloader_pin_memory": True,   # Speed up data transfer to GPU
+            "max_grad_norm": 0.3,           # Help stabilize training
+            "weight_decay": 0.01,           # Help prevent overfitting
         }
         
         if config:

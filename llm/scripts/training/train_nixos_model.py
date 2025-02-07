@@ -13,6 +13,7 @@ from .modules.dataset_management import DatasetLoader
 from .modules.training import TrainingManager
 from .modules.visualization import VisualizationManager
 from .modules.feedback import FeedbackManager
+from .modules.model_interpretation import ModelInterpreter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ class NixOSModelTrainer:
         self.model_initializer = ModelInitializer(ProjectPaths)
         self.dataset_manager = DatasetManager()
         self.dataset_loader = DatasetLoader(self.dataset_manager, self.dataset_dir)
-        self.training_manager = TrainingManager(self.model_name, self.output_dir)
+        self.training_manager = TrainingManager(self.model_name, self.output_dir, test_mode=test_mode)
         self.visualization_manager = VisualizationManager(
             ProjectPaths,
             visualizer_network_access
@@ -63,6 +64,9 @@ class NixOSModelTrainer:
         self.model = None
         self.tokenizer = None
         self.trainer = None
+        
+        # Initialize model interpreter
+        self.model_interpreter = None
         
         self.test_mode = test_mode
         
@@ -77,6 +81,9 @@ class NixOSModelTrainer:
         self.model, self.tokenizer = self.model_initializer.initialize_model(
             self.model_name
         )
+        
+        # Initialize model interpreter
+        self.model_interpreter = ModelInterpreter(self.model, self.tokenizer)
         
         # Load datasets
         logger.info("Loading and preparing datasets...")
@@ -115,12 +122,48 @@ class NixOSModelTrainer:
                 if analysis:
                     self.dataset_manager.apply_improvements(analysis)
                     
+                # Get model interpretation
+                interpretation_results = self.model_interpreter.analyze_errors(
+                    self.dataset_loader.load_test_data()
+                )
+                
+                # Save interpretation results
+                interpretation_path = self.output_dir / "interpretation_results.json"
+                import json
+                with open(interpretation_path, 'w') as f:
+                    json.dump(interpretation_results, f, indent=2)
+                
+                logger.info(f"Training completed. Model saved to {self.output_dir}")
+                logger.info(f"Interpretation results saved to {interpretation_path}")
+                
                 return True
         except Exception as e:
             logger.error(f"Error during training: {e}")
             
         return False
         
+    def explain_prediction(self, text: str):
+        """Generate explanation for a single prediction."""
+        try:
+            explanation = self.model_interpreter.explain_prediction(text)
+            
+            # Save explanation
+            explanations_dir = self.output_dir / "explanations"
+            explanations_dir.mkdir(exist_ok=True)
+            
+            explanation_path = explanations_dir / f"explanation_{hash(text)}.json"
+            import json
+            with open(explanation_path, 'w') as f:
+                json.dump(explanation, f, indent=2)
+            
+            logger.info(f"Explanation saved to {explanation_path}")
+            
+            return explanation
+            
+        except Exception as e:
+            logger.error(f"Explanation failed: {str(e)}")
+            raise
+
     def cleanup(self):
         """Clean up resources."""
         if hasattr(self, 'visualization_manager'):
