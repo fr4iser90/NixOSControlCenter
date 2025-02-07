@@ -38,64 +38,50 @@ class TrainerFactory:
         dataset_manager: Optional[DatasetManager] = None,
         visualizer: Optional[VisualizationManager] = None,
         train_dataset: Optional[Dataset] = None,
-        eval_dataset: Optional[Dataset] = None,
-        **kwargs
+        eval_dataset: Optional[Dataset] = None
     ) -> NixOSBaseTrainer:
-        """Create and configure a trainer instance.
+        """Create a trainer instance based on type.
         
         Args:
-            trainer_type: Type of trainer to create ('base', 'lora', or 'feedback')
-            model_path: Path to model or model identifier
-            config: Optional configuration override
+            trainer_type: Type of trainer to create ('lora' or 'feedback')
+            model_path: Path to model or model name
+            config: Optional configuration dictionary
             dataset_manager: Optional dataset manager instance
             visualizer: Optional visualization manager instance
             train_dataset: Optional training dataset
             eval_dataset: Optional evaluation dataset
-            **kwargs: Additional trainer arguments
             
         Returns:
-            Configured trainer instance
-            
-        Raises:
-            ValueError: If trainer_type is unknown or configuration is invalid
-            Exception: If trainer initialization fails
+            Trainer instance
         """
         try:
-            # Get trainer class
-            trainer_class = cls.TRAINER_TYPES.get(trainer_type)
-            if not trainer_class:
-                logger.error(f"Unknown trainer type: {trainer_type}")
-                raise ValueError(f"Unknown trainer type: {trainer_type}")
-                
-            # Get and merge configuration
-            base_config = ConfigManager.get_default_config()
-            if config:
-                base_config = ConfigManager.merge_config(base_config, config)
-                
-            # Validate configuration
-            if not ConfigManager.validate_config(base_config):
-                logger.error("Invalid configuration")
-                raise ValueError("Invalid configuration")
-                
-            # Create trainer
-            trainer_kwargs = {
+            logger.info(f"Creating {trainer_type} trainer for model: {model_path}")
+            
+            # Prepare trainer configuration
+            trainer_config = {
                 'model_name': str(model_path),
                 'dataset_manager': dataset_manager,
                 'visualizer': visualizer,
                 'train_dataset': train_dataset,
-                'eval_dataset': eval_dataset,
-                **kwargs
+                'eval_dataset': eval_dataset
             }
             
-            # Add configuration-specific arguments
+            # Update with provided config
+            if config:
+                trainer_config.update(config)
+            
+            # Create trainer based on type
             if trainer_type == 'lora':
-                trainer_kwargs['lora_config'] = base_config['lora']
+                trainer = LoRATrainer(**trainer_config)
+            elif trainer_type == 'feedback':
+                trainer = FeedbackTrainer(**trainer_config)
+            else:
+                raise ValueError(f"Unknown trainer type: {trainer_type}")
                 
-            logger.info(f"Creating {trainer_type} trainer for model: {model_path}")
-            return trainer_class(**trainer_kwargs)
+            return trainer
             
         except Exception as e:
-            logger.error(f"Failed to create trainer: {str(e)}")
+            logger.error(f"Failed to create trainer: {e}")
             raise
         
     @classmethod

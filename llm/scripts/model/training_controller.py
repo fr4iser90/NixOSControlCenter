@@ -185,50 +185,125 @@ class TrainingController:
             
     def _continue_training(self):
         """Continue training an existing model."""
-        model_name = self._select_model()
-        if not model_name:
-            return
-            
-        checkpoints = self.model_info.list_checkpoints(model_name)
-        if checkpoints:
-            checkpoint_questions = [
-                inquirer.List('checkpoint',
-                    message="Select checkpoint to continue from:",
-                    choices=['Latest'] + [str(c) for c in checkpoints])
-            ]
-            checkpoint_answers = inquirer.prompt(checkpoint_questions)
-            if not checkpoint_answers:
+        try:
+            # Get available models
+            available_models = self.model_info.get_available_models()
+            if not available_models:
+                logger.info("No existing models found")
                 return
                 
-            checkpoint = checkpoints[-1] if checkpoint_answers['checkpoint'] == 'Latest' else Path(checkpoint_answers['checkpoint'])
-        else:
-            checkpoint = None
+            # Let user select model
+            questions = [
+                inquirer.List('model',
+                    message="Select model:",
+                    choices=available_models)
+            ]
+            answers = inquirer.prompt(questions)
+            if not answers:
+                return
+                
+            selected_model = answers['model']
+            model_dir = self.models_dir / selected_model
             
-        self.start_training_with_options(
-            model_name,
-            mode='continue',
-            checkpoint_path=checkpoint,
-            start_visualizer=self.start_visualizer,
-            visualizer_network_access=self.visualizer_network_access
-        )
-        
+            if not model_dir.exists():
+                logger.error(f"Model directory not found: {model_dir}")
+                return
+                
+            # Get visualization preferences
+            vis_questions = [
+                inquirer.List('visualizer',
+                    message="Would you like to start the visualization server?",
+                    choices=['Yes', 'No'],
+                    default='Yes')
+            ]
+            vis_answers = inquirer.prompt(vis_questions)
+            if not vis_answers:
+                return
+            self.start_visualizer = vis_answers['visualizer'] == 'Yes'
+            
+            if self.start_visualizer:
+                net_questions = [
+                    inquirer.List('network_access',
+                        message="Allow network access to visualization server?",
+                        choices=['Yes (accessible from other devices)', 'No (localhost only)'],
+                        default='No (localhost only)')
+                ]
+                net_answers = inquirer.prompt(net_questions)
+                if not net_answers:
+                    return
+                self.visualizer_network_access = net_answers['network_access'].startswith('Yes')
+            
+            # Start training with options
+            self.start_training_with_options(
+                model_name='facebook/opt-125m',  # Base model
+                mode='continue',
+                checkpoint_path=model_dir,
+                start_visualizer=self.start_visualizer,
+                visualizer_network_access=self.visualizer_network_access
+            )
+            
+        except Exception as e:
+            logger.error(f"Error during continued training: {e}")
+            raise
+            
     def _test_model(self):
         """Test a trained model."""
-        model_name = self._select_model()
-        if not model_name:
-            return
-            
-        # Initialize trainer for testing
         try:
+            # Get available models
+            available_models = self.model_info.get_available_models()
+            if not available_models:
+                logger.info("No existing models found")
+                return
+                
+            # Let user select model
+            questions = [
+                inquirer.List('model',
+                    message="Select model:",
+                    choices=available_models)
+            ]
+            answers = inquirer.prompt(questions)
+            if not answers:
+                return
+                
+            selected_model = answers['model']
+            model_dir = self.models_dir / selected_model
+            
+            if not model_dir.exists():
+                logger.error(f"Model directory not found: {model_dir}")
+                return
+                
+            # Load test dataset
+            logger.info("Loading test dataset...")
+            test_dataset = self.dataset_loader.load_test_data()
+            
+            # Create trainer for testing
             trainer = TrainerFactory.create_trainer(
                 trainer_type=self.trainer_type,
-                model_path=str(self.models_dir / model_name),
-                test_mode=True
+                model_path=str(model_dir),  # Use the trained model path
+                config={
+                    'hyperparameters': {},
+                    'resource_limits': {},
+                    'output_dir': str(model_dir / 'test_results'),
+                    'evaluation_strategy': 'epoch',
+                    'do_train': False,
+                    'do_eval': True
+                },
+                dataset_manager=self.dataset_manager,
+                eval_dataset=test_dataset
             )
-            trainer.setup()
-            trainer.test()
+            
+            # Run evaluation
+            logger.info("Starting model evaluation...")
+            eval_results = trainer.evaluate()
+            
+            # Log results
+            logger.info("Evaluation Results:")
+            for metric, value in eval_results.items():
+                logger.info(f"{metric}: {value}")
+                
         except Exception as e:
             logger.error(f"Error during model testing: {e}")
+            raise
             
     def _select_model(self) -> Optional[str]:
         """Select a model from available models."""

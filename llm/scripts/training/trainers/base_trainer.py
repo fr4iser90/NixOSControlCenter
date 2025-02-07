@@ -140,3 +140,45 @@ class NixOSBaseTrainer(Trainer):
         except Exception as e:
             logger.error(f"Error saving model: {e}")
             raise
+
+    def setup_training_args(self, **kwargs):
+        """Set up training arguments."""
+        default_args = {
+            'output_dir': self.args.output_dir,
+            'evaluation_strategy': 'epoch',
+            'save_strategy': 'epoch',
+            'learning_rate': 2e-5,
+            'per_device_train_batch_size': 4,
+            'per_device_eval_batch_size': 4,
+            'num_train_epochs': 3,
+            'weight_decay': 0.01,
+            'push_to_hub': False,
+            'report_to': 'none',
+        }
+        
+        # Update with provided kwargs
+        default_args.update(kwargs)
+        
+        self.args = self._training_args_class(**default_args)
+        
+    def evaluate(self) -> Dict[str, float]:
+        """Evaluate the model.
+        
+        Returns:
+            Dict containing evaluation metrics
+        """
+        if not self.model:
+            logger.error("Model not initialized")
+            raise ValueError("Model not initialized")
+            
+        if not self.eval_dataset:
+            logger.error("No evaluation dataset provided")
+            raise ValueError("No evaluation dataset provided")
+            
+        logger.info("Starting evaluation...")
+        try:
+            metrics = super().evaluate(self.eval_dataset)
+            return metrics
+        except Exception as e:
+            logger.error(f"Evaluation error: {e}")
+            raise
