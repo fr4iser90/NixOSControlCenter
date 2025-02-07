@@ -64,11 +64,11 @@ class NixOSBaseTrainer(Trainer):
         
     def setup_training_args(self, **kwargs) -> None:
         """Set up training arguments."""
+        # Default training arguments
         default_args = {
             'output_dir': self.output_dir,
             'evaluation_strategy': 'epoch',
             'save_strategy': 'epoch',
-            'learning_rate': 2e-5,
             'per_device_train_batch_size': 4,
             'per_device_eval_batch_size': 4,
             'num_train_epochs': 3,
@@ -77,19 +77,17 @@ class NixOSBaseTrainer(Trainer):
             'report_to': 'none',
         }
         
-        # Filter out non-training arguments
-        training_kwargs = {k: v for k, v in kwargs.items() 
-                         if k not in ['hyperparameters', 'resource_limits', 'model_name', 
-                                    'dataset_manager', 'visualizer', 'train_dataset', 
-                                    'eval_dataset', 'tokenizer', 'model']}
-        
-        # Update with filtered kwargs
-        default_args.update(training_kwargs)
+        # Get training config if provided
+        training_config = kwargs.get('training', {})
+        if training_config:
+            # Update default args with training config
+            default_args.update(training_config)
         
         # Store hyperparameters separately
         self.hyperparameters = kwargs.get('hyperparameters', {})
         self.resource_limits = kwargs.get('resource_limits', {})
         
+        # Create TrainingArguments instance
         self.training_args = TrainingArguments(**default_args)
         
     def train(self, resume_from_checkpoint: Optional[Union[str, bool]] = None):

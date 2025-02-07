@@ -12,7 +12,7 @@ from ..training.modules.visualization import VisualizationManager
 from ..training.modules.dataset_management import DatasetLoader
 from ..data.dataset_manager import DatasetManager
 from .model_info import ModelInfo
-from .config_manager import ConfigManager  # Import ConfigManager
+from ..training.modules.training_config import ConfigManager
 
 # Set up logging
 logging.basicConfig(
@@ -32,6 +32,7 @@ class TrainingController:
         self.trainer_type = 'lora'  # Default trainer type
         self.start_visualizer = True  # Default visualization setting
         self.visualizer_network_access = False  # Default network access setting
+        self.visualizer = None  # Initialize as None
         
         # Initialize dataset components
         self.dataset_manager = DatasetManager()
@@ -82,14 +83,6 @@ class TrainingController:
                 return
                 
             model_name = answers['model_name'].strip()
-            model_dir = self.models_dir / model_name
-            
-            if model_dir.exists():
-                logger.error(f"Model '{model_name}' already exists")
-                return
-                
-            # Create model directory
-            model_dir.mkdir(parents=True, exist_ok=True)
             
             # Get visualization preferences
             vis_questions = [
@@ -114,6 +107,18 @@ class TrainingController:
                 if not net_answers:
                     return
                 self.visualizer_network_access = net_answers['network_access'].startswith('Yes')
+                
+                # Initialize visualizer if requested
+                self.visualizer = VisualizationManager(
+                    ProjectPaths(),
+                    network_access=self.visualizer_network_access
+                )
+                if self.start_visualizer:
+                    self.visualizer.start_server()
+            
+            # Create model directory
+            model_dir = self.models_dir / model_name
+            model_dir.mkdir(parents=True, exist_ok=True)
             
             # Start training with options
             self.start_training_with_options(
@@ -138,7 +143,7 @@ class TrainingController:
         try:
             # Load datasets
             logger.info("Loading training datasets...")
-            train_dataset, eval_dataset = self.dataset_loader.load_train_eval_data()
+            train_dataset, eval_dataset = self.dataset_loader.load_and_validate_processed_datasets()
             
             # Get default config and merge with any overrides
             training_config = ConfigManager.get_default_config()
@@ -224,6 +229,14 @@ class TrainingController:
                 if not net_answers:
                     return
                 self.visualizer_network_access = net_answers['network_access'].startswith('Yes')
+                
+                # Initialize visualizer if requested
+                self.visualizer = VisualizationManager(
+                    ProjectPaths(),
+                    network_access=self.visualizer_network_access
+                )
+                if self.start_visualizer:
+                    self.visualizer.start_server()
             
             # Start training with options
             self.start_training_with_options(

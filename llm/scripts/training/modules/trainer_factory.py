@@ -73,12 +73,8 @@ class TrainerFactory:
                 if trainer_type == 'lora':
                     trainer_config['lora_config'] = config.get('lora', {})
                 
-                # Add training arguments, filtering out special sections
-                training_args = {
-                    k: v for k, v in config.items() 
-                    if k not in ['lora'] and k not in trainer_config
-                }
-                trainer_config.update(training_args)
+                # Add training arguments from training section
+                trainer_config['training'] = config.get('training', {})
             
             # Create trainer based on type
             if trainer_type == 'lora':
