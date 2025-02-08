@@ -23,29 +23,25 @@ from scripts.utils.path_config import ProjectPaths
 class NixOSVisualizer:
     """Main application class for the NixOS Model Training Visualizer."""
     
-    def __init__(self, auto_setup=False):
+    def __init__(self):
         """Initialize visualization components."""
         # Initialize paths and config
         self.paths_config = ProjectPaths()
-        if auto_setup:
-            self.paths_config.ensure_directories()
-            
+        self.paths_config.ensure_directories()
+        
         # Initialize configuration
         self.config = VisualizerConfig()
         
         # Initialize backend services
-        self.metrics_manager = MetricsManager(self.paths_config)
         self.system_monitor = SystemMonitor()
+        self.metrics_manager = MetricsManager(self.paths_config)
         self.dataset_analyzer = DatasetAnalyzer(self.paths_config)
         
         # Initialize frontend views
+        self.system_view = SystemView(self.system_monitor)
         self.training_view = TrainingView(self.metrics_manager)
         self.dataset_view = DatasetView(self.dataset_analyzer)
-        self.system_view = SystemView(self.system_monitor)
         self.history_view = HistoryView(self.metrics_manager)
-        
-        if auto_setup:
-            self.setup_page()
         
     def setup_page(self):
         """Setup the Streamlit page configuration."""
@@ -141,7 +137,7 @@ class NixOSVisualizer:
 
 def main():
     """Main entry point for the visualization dashboard."""
-    visualizer = NixOSVisualizer(auto_setup=True)
+    visualizer = NixOSVisualizer()
     visualizer.run()  # Only run if called directly as script
 
 if __name__ == "__main__":

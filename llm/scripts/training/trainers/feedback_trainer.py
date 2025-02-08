@@ -6,6 +6,8 @@ import logging
 import warnings
 import torch
 from typing import Dict
+from ...visualization.backend.metrics_manager import MetricsManager
+from ...utils.path_config import ProjectPaths
 
 # Set up logging
 logging.basicConfig(
@@ -17,14 +19,15 @@ logger = logging.getLogger(__name__)
 class MetricsCallback(TrainerCallback):
     """Callback to handle training metrics visualization."""
     
-    def __init__(self, trainer):
-        self.trainer = trainer
+    def __init__(self):
+        """Initialize metrics callback."""
+        super().__init__()
         self.metrics_manager = None
+        self.paths_config = ProjectPaths()
         
     def on_init_end(self, args, state, control, **kwargs):
         """Called when trainer initialization ends."""
-        from ...visualization.backend.metrics_manager import MetricsManager
-        self.metrics_manager = MetricsManager()
+        self.metrics_manager = MetricsManager(self.paths_config)
         return control
         
     def on_log(self, args, state, control, logs=None, **kwargs):
@@ -33,19 +36,10 @@ class MetricsCallback(TrainerCallback):
             return control
             
         # Save training metrics
-        metrics = {
-            'loss': logs.get('loss', 0),
-            'learning_rate': logs.get('learning_rate', 0),
-            'epoch': logs.get('epoch', 0)
-        }
-        
-        if 'eval_loss' in logs:
-            metrics['eval_loss'] = logs['eval_loss']
-            
-        self.metrics_manager.save_training_metrics(
-            step=state.global_step,
-            metrics=metrics
-        )
+        try:
+            self.metrics_manager.save_training_metrics(state.global_step, logs)
+        except Exception as e:
+            logger.error(f"Failed to log metrics: {e}")
         return control
 
 class FeedbackTrainer(NixOSBaseTrainer):
@@ -70,9 +64,8 @@ class FeedbackTrainer(NixOSBaseTrainer):
         self.dataset_manager = dataset_manager
         self.dataset_path = kwargs.pop('dataset_path', None)
         
-        # Create metrics callback and initialize metrics manager
-        self.metrics_callback = MetricsCallback(self)
-        self.metrics_callback.on_init_end(None, None, None)  # Initialize metrics manager
+        # Create metrics callback
+        self.metrics_callback = MetricsCallback()
         
         # Remove our args from kwargs
         kwargs.pop('model', None)
