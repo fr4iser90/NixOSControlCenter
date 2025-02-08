@@ -1,4 +1,4 @@
-transformers>=4.40.0
+transformers==4.48.3
 datasets>=2.18.0
 accelerate>=0.27.0
 huggingface-hub>=0.20.0

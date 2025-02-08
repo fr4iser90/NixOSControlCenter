@@ -17,6 +17,7 @@ if str(ROOT_DIR) not in sys.path:
 from scripts.visualization.backend.metrics_manager import MetricsManager
 from scripts.visualization.backend.system_monitor import SystemMonitor
 from scripts.utils.path_config import ProjectPaths
+from ..interfaces.visualization_manager import IVisualizationManager
 
 # Set up logging
 logging.basicConfig(
@@ -36,7 +37,7 @@ def find_free_port(start_port=8501, max_attempts=10):
             continue
     raise OSError(f"No free ports found between {start_port} and {start_port + max_attempts - 1}")
 
-class VisualizationManager:
+class VisualizationManager(IVisualizationManager):
     """Handles visualization server and metrics updates."""
     
     def __init__(self, project_paths, network_access=False):
@@ -106,12 +107,12 @@ class VisualizationManager:
     def _print_access_info(self):
         """Print server access information."""
         if self.network_access:
-            print("\nVisualization dashboard will be available at:")
+            print("\\nVisualization dashboard will be available at:")
             print(f"http://localhost:{self.port} (local)")
-            print(f"http://<your-ip>:{self.port} (network)\n")
+            print(f"http://<your-ip>:{self.port} (network)\\n")
         else:
-            print("\nVisualization dashboard will be available at:")
-            print(f"http://localhost:{self.port}\n")
+            print("\\nVisualization dashboard will be available at:")
+            print(f"http://localhost:{self.port}\\n")
             
     def cleanup_server(self):
         """Cleanup visualization server."""

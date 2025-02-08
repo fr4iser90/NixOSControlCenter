@@ -7,6 +7,8 @@ from dataclasses import dataclass, asdict
 import hashlib
 from datetime import datetime
 from ..utils.path_config import ProjectPaths
+from ..training.interfaces.dataset_manager import IDatasetManager
+from datasets import Dataset
 
 @dataclass
 class DatasetMetrics:
@@ -67,7 +69,7 @@ class DatasetValidator:
             errors.append(f"Failed to read file: {str(e)}")
             
         if errors:
-            self.logger.error(f"Dataset validation failed for {file_path}:\n" + "\n".join(errors))
+            self.logger.error(f"Dataset validation failed for {file_path}:\\n" + "\\n".join(errors))
             return False, errors
             
         return True, []
@@ -117,7 +119,7 @@ class DatasetValidator:
 
     def save_metrics(self, dataset_path: Path, metrics: DatasetMetrics):
         """Save metrics to JSON file."""
-        metrics_file = self.metrics_dir / f"{dataset_path.stem}_metrics.json"
+        metrics_file = self.validator.metrics_dir / f"{dataset_path.stem}_metrics.json"
         with open(metrics_file, 'w', encoding='utf-8') as f:
             json.dump(asdict(metrics), f, indent=2)
 
@@ -125,7 +127,7 @@ class DatasetValidator:
         """Save model feedback for dataset improvement."""
         feedback_file = self.feedback_dir / f"{dataset_path.stem}_feedback.jsonl"
         with open(feedback_file, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(asdict(feedback)) + '\n')
+            f.write(json.dumps(asdict(feedback)) + '\\n')
 
     def analyze_feedback(self, dataset_path: Path) -> Dict[str, Union[int, float, List[str]]]:
         """Analyze collected feedback for a dataset."""
@@ -155,7 +157,7 @@ class DatasetValidator:
             )
         }
 
-class DatasetManager:
+class DatasetManager(IDatasetManager):
     def __init__(self):
         self.validator = DatasetValidator()
         self.logger = logging.getLogger(__name__)
@@ -165,8 +167,8 @@ class DatasetManager:
         # Validate JSONL format and content
         is_valid, errors = self.validator.validate_jsonl(dataset_path)
         if not is_valid:
-            error_msg = "\n".join(errors)
-            self.logger.error(f"Dataset validation failed for {dataset_path}:\n{error_msg}")
+            error_msg = "\\n".join(errors)
+            self.logger.error(f"Dataset validation failed for {dataset_path}:\\n{error_msg}")
             return False, error_msg
 
         # Compute and save metrics
@@ -200,3 +202,17 @@ class DatasetManager:
             "metrics": metrics,
             "feedback_analysis": feedback_analysis
         }
+
+    def load_and_validate_processed_datasets(self) -> Tuple[Dataset, Dataset]:
+        from datasets import load_dataset
+        # Load datasets
+        try:
+            logger.info("Loading training datasets...")
+            train_dataset = load_dataset('json', data_dir='.', data_files='data/processed/datasets/training_data.jsonl', split='train')
+            eval_dataset = load_dataset('json', data_dir='.', data_files='data/processed/datasets/eval_data.jsonl', split='train')
+            logger.info(f"Train dataset has {len(train_dataset)} samples")
+            logger.info(f"Eval dataset has {len(eval_dataset)} samples")
+            return train_dataset, eval_dataset
+        except Exception as e:
+            logger.error(f"Error loading datasets: {e}")
+            raise
