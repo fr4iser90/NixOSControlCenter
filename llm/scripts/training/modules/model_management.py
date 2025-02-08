@@ -17,7 +17,8 @@ class ModelInitializer:
     def __init__(self, paths_config):
         """Initialize with project paths configuration."""
         self.paths_config = paths_config
-        self.base_model_manager = BaseModelManager(paths_config)
+        # Pass the BASE_MODELS_DIR path directly
+        self.base_model_manager = BaseModelManager(paths_config.BASE_MODELS_DIR)
         
     def initialize_model(self, model_name: str, device_config: dict = None):
         """Initialize model based on whether it's new or existing."""
