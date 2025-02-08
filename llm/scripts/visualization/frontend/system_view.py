@@ -70,11 +70,15 @@ class SystemView:
                     st.progress(metrics.get('gpu_memory_used', 0) / metrics.get('gpu_memory_total', 1))
                     st.text("GPU Utilization:")
                     st.progress(metrics.get('gpu_utilization', 0) / 100)
+                    # Show Jetson-specific info if available
+                    if metrics.get('gpu_frequency'):
+                        st.text("GPU Frequency:")
+                        st.info(f"{metrics.get('gpu_frequency', 0):.0f} MHz")
             else:
                 st.metric(
                     "GPU",
                     "Not Available",
-                    help="No CUDA-capable GPU detected"
+                    help="No GPU detected"
                 )
                 
         # Resource History Plots

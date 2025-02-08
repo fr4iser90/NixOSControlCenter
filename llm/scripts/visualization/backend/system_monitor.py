@@ -9,6 +9,7 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import torch
 import subprocess
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +24,61 @@ class SystemMonitor:
         self.memory_history = []
         self.gpu_history = []
         self.disk_history = []
+        self.is_jetson = Path("/sys/devices/soc0/family").exists()
         
+    def _get_jetson_gpu_info(self) -> Dict:
+        """Get GPU information for Jetson devices using Tegra APIs.
+        
+        Returns:
+            Dictionary with GPU metrics
+        """
+        try:
+            # GPU Utilization
+            with open("/sys/devices/gpu.0/load", "r") as f:
+                gpu_util = int(f.read().strip())
+                
+            # GPU Frequency
+            with open("/sys/devices/gpu.0/devfreq/gpu.0/cur_freq", "r") as f:
+                gpu_freq = int(f.read().strip()) / 1000000  # Convert to MHz
+                
+            # GPU Memory
+            total_mem = 0
+            used_mem = 0
+            
+            # Read memory info from sysfs
+            with open("/proc/meminfo", "r") as f:
+                for line in f:
+                    if "MemTotal" in line:
+                        total_mem = int(line.split()[1]) / 1024  # Convert to MB
+                    elif "MemAvailable" in line:
+                        available_mem = int(line.split()[1]) / 1024
+                        used_mem = total_mem - available_mem
+                        
+            return {
+                "gpu_available": True,
+                "gpu_utilization": gpu_util,
+                "gpu_frequency": gpu_freq,
+                "gpu_memory_total": total_mem / 1024,  # Convert to GB
+                "gpu_memory_used": used_mem / 1024
+            }
+        except Exception as e:
+            logger.error(f"Error getting Jetson GPU info: {str(e)}")
+            return {
+                "gpu_available": False,
+                "gpu_utilization": 0,
+                "gpu_memory_total": 0,
+                "gpu_memory_used": 0
+            }
+            
     def _get_gpu_utilization(self) -> float:
-        """Get GPU utilization using nvidia-smi.
+        """Get GPU utilization.
         
         Returns:
             GPU utilization percentage
         """
+        if self.is_jetson:
+            return self._get_jetson_gpu_info()["gpu_utilization"]
+            
         try:
             result = subprocess.run(
                 ['nvidia-smi', '--query-gpu=utilization.gpu', '--format=csv,noheader,nounits'],
@@ -62,26 +111,32 @@ class SystemMonitor:
         
         try:
             # GPU Metrics
-            if torch.cuda.is_available():
+            if self.is_jetson:
+                # Get Jetson GPU metrics
+                gpu_info = self._get_jetson_gpu_info()
+                metrics.update(gpu_info)
+                if gpu_info["gpu_available"]:
+                    logger.info("Jetson GPU detected")
+                    logger.info(f"GPU Utilization: {gpu_info['gpu_utilization']}%")
+                    logger.info(f"GPU Memory: {gpu_info['gpu_memory_used']:.1f}/{gpu_info['gpu_memory_total']:.1f} GB")
+                    if "gpu_frequency" in gpu_info:
+                        logger.info(f"GPU Frequency: {gpu_info['gpu_frequency']} MHz")
+                        
+            elif torch.cuda.is_available():
+                # Standard NVIDIA GPU metrics
                 metrics['gpu_available'] = True
                 for i in range(torch.cuda.device_count()):
-                    # Get GPU properties
                     props = torch.cuda.get_device_properties(i)
-                    gpu_memory = props.total_memory / 1e9  # Convert to GB
+                    gpu_memory = props.total_memory / 1e9
                     gpu_memory_used = torch.cuda.memory_allocated(i) / 1e9
                     
-                    # Update total GPU memory
                     metrics['gpu_memory_total'] += gpu_memory
                     metrics['gpu_memory_used'] += gpu_memory_used
+                    metrics['gpu_utilization'] = self._get_gpu_utilization()
                     
-                    # Get GPU utilization from nvidia-smi
-                    gpu_util = self._get_gpu_utilization()
-                    metrics['gpu_utilization'] = gpu_util
-                    
-                    # Log GPU details for debugging
                     logger.info(f"GPU {i}: {props.name}")
                     logger.info(f"Memory: {gpu_memory_used:.1f}/{gpu_memory:.1f} GB")
-                    logger.info(f"Utilization: {gpu_util}%")
+                    logger.info(f"Utilization: {metrics['gpu_utilization']}%")
                     
                     if gpu_memory_used / gpu_memory > 0.9:
                         metrics['alerts'].append(f"GPU {i} memory usage is above 90%")
@@ -90,13 +145,13 @@ class SystemMonitor:
             metrics['cpu_percent'] = psutil.cpu_percent()
             memory = psutil.virtual_memory()
             metrics['memory_percent'] = memory.percent
-            metrics['memory_used'] = memory.used / 1e9  # Convert to GB
+            metrics['memory_used'] = memory.used / 1e9
             metrics['memory_total'] = memory.total / 1e9
             
             # Disk Metrics
             disk = psutil.disk_usage('/')
             metrics['disk_percent'] = disk.percent
-            metrics['disk_used'] = disk.used / 1e9  # Convert to GB
+            metrics['disk_used'] = disk.used / 1e9
             metrics['disk_total'] = disk.total / 1e9
             
             # Process Information
@@ -128,7 +183,7 @@ class SystemMonitor:
             self.disk_history.append(metrics['disk_percent'])
             if metrics['gpu_available']:
                 self.gpu_history.append(metrics['gpu_utilization'])
-            elif len(self.gpu_history) > 0:  # Add None for consistent length if GPU becomes unavailable
+            elif len(self.gpu_history) > 0:
                 self.gpu_history.append(None)
                 
             # Keep history length fixed

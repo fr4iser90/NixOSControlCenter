@@ -88,7 +88,7 @@ class NixOSVisualizer:
             if auto_refresh:
                 refresh_interval = st.slider(
                     "Refresh interval (seconds)",
-                    min_value=1,
+                    min_value=5,
                     max_value=60,
                     value=self.config.get('refresh_interval', 5)
                 )
