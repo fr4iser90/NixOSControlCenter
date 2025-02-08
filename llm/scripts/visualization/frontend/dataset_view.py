@@ -9,10 +9,19 @@ from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import networkx as nx
 from scripts.utils.path_config import ProjectPaths
+from ..backend.dataset_analyzer import DatasetAnalyzer
 
 class DatasetView:
     """Handles the dataset analysis visualization interface."""
     
+    def __init__(self, dataset_analyzer: DatasetAnalyzer):
+        """Initialize dataset view.
+        
+        Args:
+            dataset_analyzer: Dataset analyzer instance
+        """
+        self.dataset_analyzer = dataset_analyzer
+        
     def display_dataset_analysis(self, stats: Dict, quality_metrics: Dict):
         """Display comprehensive dataset analysis."""
         st.title("Dataset Analysis")

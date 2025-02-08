@@ -25,22 +25,24 @@ class NixOSVisualizer:
     
     def __init__(self, auto_setup=False):
         """Initialize visualization components."""
-        # Ensure directories exist
-        ProjectPaths.ensure_directories()
-        
+        # Initialize paths and config
+        self.paths_config = ProjectPaths()
+        if auto_setup:
+            self.paths_config.ensure_directories()
+            
         # Initialize configuration
         self.config = VisualizerConfig()
         
         # Initialize backend services
-        self.metrics_manager = MetricsManager()
+        self.metrics_manager = MetricsManager(self.paths_config)
         self.system_monitor = SystemMonitor()
-        self.dataset_analyzer = DatasetAnalyzer()
+        self.dataset_analyzer = DatasetAnalyzer(self.paths_config)
         
         # Initialize frontend views
-        self.training_view = TrainingView()
-        self.dataset_view = DatasetView()
-        self.system_view = SystemView()
-        self.history_view = HistoryView()
+        self.training_view = TrainingView(self.metrics_manager)
+        self.dataset_view = DatasetView(self.dataset_analyzer)
+        self.system_view = SystemView(self.system_monitor)
+        self.history_view = HistoryView(self.metrics_manager)
         
         if auto_setup:
             self.setup_page()

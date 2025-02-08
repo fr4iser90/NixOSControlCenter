@@ -4,10 +4,19 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
+from ..backend.metrics_manager import MetricsManager
 
 class TrainingView:
     """Handles the training progress visualization interface."""
     
+    def __init__(self, metrics_manager: MetricsManager):
+        """Initialize training view.
+        
+        Args:
+            metrics_manager: Metrics manager instance
+        """
+        self.metrics_manager = metrics_manager
+        
     def display_training_progress(self, metrics_df: pd.DataFrame):
         """Display comprehensive training progress."""
         st.title("Training Progress")

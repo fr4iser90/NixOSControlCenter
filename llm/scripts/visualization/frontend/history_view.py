@@ -4,10 +4,19 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 from typing import Dict, List
+from ..backend.metrics_manager import MetricsManager
 
 class HistoryView:
     """Handles the training history visualization interface."""
     
+    def __init__(self, metrics_manager: MetricsManager):
+        """Initialize history view.
+        
+        Args:
+            metrics_manager: Metrics manager instance
+        """
+        self.metrics_manager = metrics_manager
+        
     def display_training_history(self, runs: List[Dict]):
         """Display comprehensive training history and comparisons."""
         st.title("Training History")

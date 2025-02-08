@@ -3,10 +3,19 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 from typing import Dict
+from ..backend.system_monitor import SystemMonitor
 
 class SystemView:
     """Handles the system monitoring visualization interface."""
     
+    def __init__(self, system_monitor: SystemMonitor):
+        """Initialize system view.
+        
+        Args:
+            system_monitor: System monitor instance
+        """
+        self.system_monitor = system_monitor
+        
     def display_system_monitor(self, metrics: Dict):
         """Display comprehensive system resource monitoring."""
         st.title("System Monitor")
