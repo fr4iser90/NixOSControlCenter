@@ -5,7 +5,7 @@ import logging
 import inquirer
 import subprocess
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 
 from scripts.utils.path_config import ProjectPaths
 from scripts.training.train_model import LLMHub
