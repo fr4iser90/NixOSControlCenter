@@ -22,12 +22,13 @@ class MetricsCallback(TrainerCallback):
     def __init__(self):
         """Initialize metrics callback."""
         super().__init__()
-        self.metrics_manager = None
         self.paths_config = ProjectPaths()
+        self.metrics_manager = MetricsManager(self.paths_config)
         
     def on_init_end(self, args, state, control, **kwargs):
         """Called when trainer initialization ends."""
-        self.metrics_manager = MetricsManager(self.paths_config)
+        # Ensure metrics directory exists
+        self.paths_config.METRICS_DIR.mkdir(parents=True, exist_ok=True)
         return control
         
     def on_log(self, args, state, control, logs=None, **kwargs):
@@ -37,9 +38,16 @@ class MetricsCallback(TrainerCallback):
             
         # Save training metrics
         try:
+            if self.metrics_manager is None:
+                self.metrics_manager = MetricsManager(self.paths_config)
             self.metrics_manager.save_training_metrics(state.global_step, logs)
         except Exception as e:
             logger.error(f"Failed to log metrics: {e}")
+            # Try to recreate metrics manager if it failed
+            try:
+                self.metrics_manager = MetricsManager(self.paths_config)
+            except Exception as e2:
+                logger.error(f"Failed to recreate metrics manager: {e2}")
         return control
 
 class FeedbackTrainer(NixOSBaseTrainer):
