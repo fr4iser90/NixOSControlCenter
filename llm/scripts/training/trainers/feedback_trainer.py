@@ -89,10 +89,10 @@ class FeedbackTrainer(NixOSBaseTrainer):
             *args,
             **kwargs
         )
-        
+
         # Add metrics callback
-        self.add_callback(self.metrics_callback)
-        
+        self.trainer.add_callback(self.metrics_callback)
+
         # Handle tokenizer deprecation
         if hasattr(self, 'tokenizer') and not hasattr(self, 'processing_class'):
             self.processing_class = self.tokenizer

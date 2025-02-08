@@ -64,7 +64,7 @@ class NixOSBaseTrainer(ITrainer):
         trainer_kwargs = {k: v for k, v in kwargs.items() if k not in custom_args}
         
         # Initialize base Trainer
-        self.trainer = Trainer(
+        trainer = Trainer(
             model=model,
             args=self.training_args,
             train_dataset=train_dataset,
@@ -74,13 +74,14 @@ class NixOSBaseTrainer(ITrainer):
         )
 
         # Wrap the trainer
-        self.trainer = TransformersTrainerWrapper(self.trainer)
-        
+        self.trainer = TransformersTrainerWrapper(trainer)
+
         # Initialize state values needed for resuming training
-        if getattr(self.trainer.trainer.state, 'train_batch_size', None) is None:
+        if hasattr(self.trainer.trainer, 'state') and getattr(self.trainer.trainer.state, 'train_batch_size', None) is None:
             if self.training_args.per_device_train_batch_size is None:
                 self.training_args.per_device_train_batch_size = 1
-            self.trainer.trainer.state.train_batch_size = self.training_args.per_device_train_batch_size * max(1, self.training_args.n_gpu)
+            if hasattr(self.trainer.trainer, 'state'):
+                self.trainer.trainer.state.train_batch_size = self.training_args.per_device_train_batch_size * max(1, self.training_args.n_gpu)
             
     def setup_training_args(self, **kwargs) -> None:
         """Set up training arguments."""
