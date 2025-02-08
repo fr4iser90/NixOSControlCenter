@@ -64,7 +64,6 @@ class LoRATrainer(FeedbackTrainer):
             model_name=model_name,
             model=self.model,
             tokenizer=self.tokenizer,
-            paths_config=paths_config,
             *args,
             **kwargs
         )
