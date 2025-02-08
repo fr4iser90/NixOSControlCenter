@@ -39,7 +39,8 @@ class TrainerFactory:
         dataset_path: Optional[Union[str, Path]] = None,
         visualizer: Optional[VisualizationManager] = None,
         train_dataset: Optional[Dataset] = None,
-        eval_dataset: Optional[Dataset] = None
+        eval_dataset: Optional[Dataset] = None,
+        paths_config: Optional[ProjectPaths] = None
     ) -> NixOSBaseTrainer:
         """Create a trainer instance based on type.
         
@@ -52,6 +53,7 @@ class TrainerFactory:
             visualizer: Optional visualization manager instance
             train_dataset: Optional training dataset
             eval_dataset: Optional evaluation dataset
+            paths_config: Optional project paths configuration
         
         Returns:
             Trainer instance
@@ -78,6 +80,10 @@ class TrainerFactory:
                 
                 # Add training arguments from training section
                 trainer_config['training'] = config.get('training', {})
+            
+            # Add paths config to LoRA trainer
+            if trainer_type == 'lora' and paths_config:
+                trainer_config['paths_config'] = paths_config
             
             # Create trainer based on type
             if trainer_type == 'lora':

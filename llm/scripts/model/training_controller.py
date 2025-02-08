@@ -167,7 +167,8 @@ class TrainingController:
                 dataset_path=ProjectPaths.DATASET_DIR / "training_data.jsonl",
                 visualizer=self.visualizer,
                 train_dataset=train_dataset,
-                eval_dataset=eval_dataset
+                eval_dataset=eval_dataset,
+                paths_config=ProjectPaths()
             )
             
             # Start training
