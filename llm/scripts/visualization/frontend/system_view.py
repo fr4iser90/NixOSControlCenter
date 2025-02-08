@@ -16,12 +16,13 @@ class SystemView:
         """
         self.system_monitor = system_monitor
         
-    def render(self):
-        """Render the system monitoring view."""
-        st.header("System Monitor")
+    def display_system_monitor(self, metrics: Dict):
+        """Display the system monitoring view.
         
-        # Get system metrics
-        metrics = self.system_monitor.get_system_metrics()
+        Args:
+            metrics: System metrics to display
+        """
+        st.header("System Monitor")
         
         # Display alerts if any
         if metrics.get('alerts'):

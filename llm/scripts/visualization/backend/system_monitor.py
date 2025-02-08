@@ -2,6 +2,7 @@
 import psutil
 import logging
 from typing import Dict, List, Optional
+from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -16,6 +17,7 @@ class SystemMonitor:
     def __init__(self):
         """Initialize system monitor."""
         self.history_length = 100  # Keep last 100 measurements
+        self.timestamps = []
         self.cpu_history = []
         self.memory_history = []
         self.gpu_history = []
@@ -54,7 +56,8 @@ class SystemMonitor:
                         gpu_util = torch.cuda.utilization()
                         metrics['gpu_utilization'] = gpu_util
                     except:
-                        pass
+                        # If can't get utilization, estimate from memory usage
+                        metrics['gpu_utilization'] = (gpu_memory_used / gpu_memory) * 100
                         
                     if gpu_memory_used / gpu_memory > 0.9:
                         metrics['alerts'].append(f"GPU {i} memory usage is above 90%")
@@ -93,14 +96,20 @@ class SystemMonitor:
             if metrics['disk_percent'] > 90:
                 metrics['alerts'].append("Disk usage is above 90%")
                 
-            # Update history
+            # Update history with timestamp
+            current_time = datetime.now()
+            self.timestamps.append(current_time)
             self.cpu_history.append(metrics['cpu_percent'])
             self.memory_history.append(metrics['memory_percent'])
             self.disk_history.append(metrics['disk_percent'])
             if metrics['gpu_available']:
                 self.gpu_history.append(metrics['gpu_utilization'])
+            elif len(self.gpu_history) > 0:  # Add None for consistent length if GPU becomes unavailable
+                self.gpu_history.append(None)
                 
             # Keep history length fixed
+            if len(self.timestamps) > self.history_length:
+                self.timestamps.pop(0)
             if len(self.cpu_history) > self.history_length:
                 self.cpu_history.pop(0)
             if len(self.memory_history) > self.history_length:
@@ -122,12 +131,17 @@ class SystemMonitor:
         Returns:
             Plotly figure with CPU, memory, disk, and GPU usage over time
         """
+        if not self.cpu_history:  # No data yet
+            return None
+            
         df = pd.DataFrame({
-            'time': range(len(self.cpu_history)),
+            'time': self.timestamps,
             'CPU': self.cpu_history,
             'Memory': self.memory_history,
             'Disk': self.disk_history
         })
+        
+        has_gpu = len(self.gpu_history) > 0 and any(x is not None for x in self.gpu_history)
         
         fig = make_subplots(
             rows=2, cols=2,
@@ -135,7 +149,7 @@ class SystemMonitor:
                 "CPU Usage",
                 "Memory Usage",
                 "Disk Usage",
-                "GPU Usage" if self.gpu_history else None
+                "GPU Usage" if has_gpu else None
             )
         )
         
@@ -161,7 +175,7 @@ class SystemMonitor:
         )
         
         # GPU Usage if available
-        if self.gpu_history:
+        if has_gpu:
             df['GPU'] = pd.Series(self.gpu_history)
             fig.add_trace(
                 go.Scatter(x=df['time'], y=df['GPU'],
@@ -169,6 +183,7 @@ class SystemMonitor:
                 row=2, col=2
             )
             
+        # Update layout and axes
         fig.update_layout(
             title="System Resource History",
             height=800,
@@ -176,6 +191,11 @@ class SystemMonitor:
             hovermode='x unified'
         )
         
+        # Update all y-axes to show percentages from 0-100
+        for i in range(1, 3):
+            for j in range(1, 3):
+                fig.update_yaxes(range=[0, 100], row=i, col=j)
+                
         return fig
         
     def get_training_processes(self) -> List[Dict]:
@@ -201,6 +221,6 @@ class SystemMonitor:
                         'create_time': process.create_time()
                     })
             except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
+                continue
                 
-        return sorted(training_processes, key=lambda x: x['cpu'], reverse=True)
+        return training_processes
