@@ -45,7 +45,8 @@ class ModelInitializer:
         tokenizer = AutoTokenizer.from_pretrained(
             model_path,
             padding_side="left",
-            trust_remote_code=True
+            trust_remote_code=True,
+            force_download=True
         )
         tokenizer.pad_token = tokenizer.eos_token
         
@@ -61,6 +62,8 @@ class ModelInitializer:
             # Load full model
             model = AutoModelForCausalLM.from_pretrained(
                 model_path,
+                trust_remote_code=True,
+                force_download=True,
                 **device_config
             )
             logger.info("Loaded full model weights")
@@ -75,7 +78,8 @@ class ModelInitializer:
         tokenizer = AutoTokenizer.from_pretrained(
             "facebook/opt-125m",
             padding_side="left",
-            trust_remote_code=True
+            trust_remote_code=True,
+            force_download=True
         )
         tokenizer.pad_token = tokenizer.eos_token
         
@@ -93,6 +97,8 @@ class ModelInitializer:
         """Load the base model with specified configuration."""
         base_model = AutoModelForCausalLM.from_pretrained(
             "facebook/opt-125m",
+            trust_remote_code=True,
+            force_download=True,
             **device_config
         )
         base_model.config.pad_token_id = base_model.config.eos_token_id

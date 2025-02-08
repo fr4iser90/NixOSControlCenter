@@ -13,7 +13,11 @@ class DatasetAnalyzer:
     
     def __init__(self):
         """Initialize analyzer with tokenizer."""
-        self.tokenizer = AutoTokenizer.from_pretrained("facebook/opt-125m")
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            "facebook/opt-125m",
+            trust_remote_code=True,
+            force_download=True
+        )
         
     def analyze_datasets(self) -> Dict[str, Any]:
         """Analyze all datasets and return comprehensive statistics."""

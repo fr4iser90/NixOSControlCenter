@@ -83,7 +83,7 @@ def main():
     manager = ModelManager(test_mode=args.test)
     manager.training_controller.trainer_type = args.trainer_type
     manager.training_controller.start_visualizer = args.visualize
-    manager.training_controller.visualizer_network_access = args.network_access
+    manager.training_controller.visualizer_network_access = args.network_access 
     manager.start_training()
 
 if __name__ == "__main__":

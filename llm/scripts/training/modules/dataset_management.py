@@ -19,7 +19,8 @@ class DatasetLoader:
         self.tokenizer = AutoTokenizer.from_pretrained(
             "facebook/opt-125m",
             padding_side="left",
-            trust_remote_code=True
+            trust_remote_code=True,
+            force_download=True
         )
         self.tokenizer.pad_token = self.tokenizer.eos_token
         

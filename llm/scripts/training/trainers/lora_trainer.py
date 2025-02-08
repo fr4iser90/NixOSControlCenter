@@ -32,11 +32,17 @@ class LoRATrainer(FeedbackTrainer):
         self.lora_config = lora_config or {}
         
         # Load model and tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            trust_remote_code=True,
+            force_download=True
+        )
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
             device_map='auto',
-            torch_dtype=torch.float16
+            torch_dtype=torch.float16,
+            trust_remote_code=True,
+            force_download=True
         )
         
         # Apply LoRA config
@@ -72,7 +78,8 @@ class LoRATrainer(FeedbackTrainer):
             self.tokenizer = AutoTokenizer.from_pretrained(
                 self.model_name,
                 padding_side="left",
-                trust_remote_code=True
+                trust_remote_code=True,
+                force_download=True
             )
             self.tokenizer.pad_token = self.tokenizer.eos_token
             
@@ -81,7 +88,9 @@ class LoRATrainer(FeedbackTrainer):
                 self.model_name,
                 torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
                 device_map="auto",
-                low_cpu_mem_usage=True
+                low_cpu_mem_usage=True,
+                trust_remote_code=True,
+                force_download=True
             )
             base_model.config.pad_token_id = self.tokenizer.eos_token_id
             base_model.config.use_cache = False  # Required for gradient checkpointing
