@@ -70,10 +70,16 @@ class SystemView:
                     st.progress(metrics.get('gpu_memory_used', 0) / metrics.get('gpu_memory_total', 1))
                     st.text("GPU Utilization:")
                     st.progress(metrics.get('gpu_utilization', 0) / 100)
-                    # Show Jetson-specific info if available
-                    if metrics.get('gpu_frequency'):
-                        st.text("GPU Frequency:")
-                        st.info(f"{metrics.get('gpu_frequency', 0):.0f} MHz")
+                    # Show GPU temperature if available
+                    if metrics.get('gpu_temperature'):
+                        st.text("GPU Temperature:")
+                        temp = metrics.get('gpu_temperature')
+                        color = 'normal'
+                        if temp > 85:
+                            color = 'error'
+                        elif temp > 75:
+                            color = 'warning'
+                        st.metric("", f"{temp:.1f}°C", delta=None, delta_color=color)
             else:
                 st.metric(
                     "GPU",

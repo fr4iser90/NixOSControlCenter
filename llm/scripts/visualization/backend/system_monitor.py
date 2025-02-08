@@ -10,6 +10,7 @@ import pandas as pd
 import torch
 import subprocess
 from pathlib import Path
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -26,41 +27,64 @@ class SystemMonitor:
         self.disk_history = []
         self.is_jetson = Path("/sys/devices/soc0/family").exists()
         
+    def _parse_tegrastats(self, output: str) -> Dict:
+        """Parse tegrastats output to get GPU metrics.
+        
+        Args:
+            output: Raw tegrastats output string
+            
+        Returns:
+            Dictionary with parsed GPU metrics
+        """
+        try:
+            # Extract GPU frequency percentage
+            gr3d_match = re.search(r'GR3D_FREQ (\d+)%', output)
+            gpu_util = int(gr3d_match.group(1)) if gr3d_match else 0
+            
+            # Extract RAM usage
+            ram_match = re.search(r'RAM (\d+)/(\d+)MB', output)
+            if ram_match:
+                used_mem = float(ram_match.group(1))
+                total_mem = float(ram_match.group(2))
+            else:
+                used_mem = 0
+                total_mem = 0
+                
+            # Extract GPU temperature
+            gpu_temp_match = re.search(r'gpu@([\d.]+)C', output)
+            gpu_temp = float(gpu_temp_match.group(1)) if gpu_temp_match else 0
+            
+            return {
+                "gpu_available": True,
+                "gpu_utilization": gpu_util,
+                "gpu_temperature": gpu_temp,
+                "gpu_memory_total": total_mem / 1024,  # Convert to GB
+                "gpu_memory_used": used_mem / 1024
+            }
+        except Exception as e:
+            logger.error(f"Error parsing tegrastats: {str(e)}")
+            return {
+                "gpu_available": False,
+                "gpu_utilization": 0,
+                "gpu_memory_total": 0,
+                "gpu_memory_used": 0
+            }
+            
     def _get_jetson_gpu_info(self) -> Dict:
-        """Get GPU information for Jetson devices using Tegra APIs.
+        """Get GPU information for Jetson devices using tegrastats.
         
         Returns:
             Dictionary with GPU metrics
         """
         try:
-            # GPU Utilization
-            with open("/sys/devices/gpu.0/load", "r") as f:
-                gpu_util = int(f.read().strip())
-                
-            # GPU Frequency
-            with open("/sys/devices/gpu.0/devfreq/gpu.0/cur_freq", "r") as f:
-                gpu_freq = int(f.read().strip()) / 1000000  # Convert to MHz
-                
-            # GPU Memory
-            total_mem = 0
-            used_mem = 0
-            
-            # Read memory info from sysfs
-            with open("/proc/meminfo", "r") as f:
-                for line in f:
-                    if "MemTotal" in line:
-                        total_mem = int(line.split()[1]) / 1024  # Convert to MB
-                    elif "MemAvailable" in line:
-                        available_mem = int(line.split()[1]) / 1024
-                        used_mem = total_mem - available_mem
-                        
-            return {
-                "gpu_available": True,
-                "gpu_utilization": gpu_util,
-                "gpu_frequency": gpu_freq,
-                "gpu_memory_total": total_mem / 1024,  # Convert to GB
-                "gpu_memory_used": used_mem / 1024
-            }
+            # Run tegrastats once
+            result = subprocess.run(
+                ['tegrastats', '--interval', '1', '--count', '1'],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            return self._parse_tegrastats(result.stdout)
         except Exception as e:
             logger.error(f"Error getting Jetson GPU info: {str(e)}")
             return {
@@ -112,15 +136,15 @@ class SystemMonitor:
         try:
             # GPU Metrics
             if self.is_jetson:
-                # Get Jetson GPU metrics
+                # Get Jetson GPU metrics using tegrastats
                 gpu_info = self._get_jetson_gpu_info()
                 metrics.update(gpu_info)
                 if gpu_info["gpu_available"]:
                     logger.info("Jetson GPU detected")
                     logger.info(f"GPU Utilization: {gpu_info['gpu_utilization']}%")
                     logger.info(f"GPU Memory: {gpu_info['gpu_memory_used']:.1f}/{gpu_info['gpu_memory_total']:.1f} GB")
-                    if "gpu_frequency" in gpu_info:
-                        logger.info(f"GPU Frequency: {gpu_info['gpu_frequency']} MHz")
+                    if "gpu_temperature" in gpu_info:
+                        logger.info(f"GPU Temperature: {gpu_info['gpu_temperature']:.1f}°C")
                         
             elif torch.cuda.is_available():
                 # Standard NVIDIA GPU metrics
