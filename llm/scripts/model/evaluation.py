@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Optional, Any
 
-from ..training.train_nixos_model import NixOSModelTrainer
+from ..training.train_model import ModelTrainer
 from ..training.modules.model_interpretation import ModelInterpreter
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class ModelEvaluator:
         """Evaluate model performance with detailed metrics."""
         model_path = checkpoint if checkpoint else self.models_dir / model_name
         
-        trainer = NixOSModelTrainer(
+        trainer = ModelTrainer(
             model_name_or_path=model_path,
             test_mode=True
         )
@@ -48,7 +48,7 @@ class ModelEvaluator:
         """Generate model interpretation for a prediction."""
         model_path = checkpoint if checkpoint else self.models_dir / model_name
         
-        trainer = NixOSModelTrainer(
+        trainer = ModelTrainer(
             model_name_or_path=model_path,
             test_mode=True
         )

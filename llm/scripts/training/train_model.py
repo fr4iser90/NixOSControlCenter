@@ -19,7 +19,7 @@ from .modules.trainer_factory import TrainerFactory
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class NixOSModelTrainer:
+class ModelTrainer:
     """Main trainer class orchestrating all components."""
     
     def __init__(
@@ -190,7 +190,7 @@ def main():
     
     args = parser.parse_args()
     
-    trainer = NixOSModelTrainer(
+    trainer = ModelTrainer(
         args.model_name,
         start_visualizer=args.visualize,
         visualizer_network_access=args.network_access,
