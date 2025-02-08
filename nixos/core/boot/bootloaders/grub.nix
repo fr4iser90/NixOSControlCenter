@@ -2,7 +2,9 @@
 
 {
   # Explicitly disable systemd-boot
-  systemd-boot.enable = lib.mkForce false;
+    systemd-boot = {
+      enable = false;
+    };
   
   # Boot loader configuration
   boot.loader = {
