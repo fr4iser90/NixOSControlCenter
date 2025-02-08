@@ -49,8 +49,6 @@ class ProjectPaths:
     
     # Model specific directories
     CURRENT_MODEL_DIR = MODELS_DIR / 'nixos_model'
-    BASE_MODEL_DIR = MODELS_DIR / 'base'
-    BASE_MODEL_PATH = BASE_MODEL_DIR / 'opt-125m'  # Local base model for LoRA
     QUANTIZED_MODEL_DIR = MODELS_DIR / 'quantized_model'
     
     # Additional configuration and logging
@@ -77,7 +75,7 @@ class ProjectPaths:
                 cls.CONCEPTS_DIR, cls.TRAINING_TASKS_DIR, cls.EXAMPLES_DIR,
                 cls.TROUBLESHOOTING_DIR, cls.OPTIMIZATION_DIR, cls.CURRENT_MODEL_DIR,
                 cls.QUANTIZED_MODEL_DIR, cls.CONFIG_DIR, cls.TRAINER_CONFIG_DIR,
-                cls.MODEL_CONFIG_DIR, cls.LOGS_DIR, cls.BASE_MODEL_DIR
+                cls.MODEL_CONFIG_DIR, cls.LOGS_DIR
             ]
             
             for directory in directories:

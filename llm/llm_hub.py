@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LLM Hub for managing and training models."""
+"""Model Manager for LLM Training Center."""
 import warnings
 import argparse
 import logging
@@ -21,7 +21,7 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class LLMHub:
+class ModelManager:
     """Manages model operations, training, and evaluation."""
     
     def __init__(self, test_mode: bool = False):
@@ -80,7 +80,7 @@ def main():
                        help='Allow network access to visualization')
     args = parser.parse_args()
     
-    manager = LLMHub(test_mode=args.test)
+    manager = ModelManager(test_mode=args.test)
     manager.training_controller.trainer_type = args.trainer_type
     manager.training_controller.start_visualizer = args.visualize
     manager.training_controller.visualizer_network_access = args.network_access

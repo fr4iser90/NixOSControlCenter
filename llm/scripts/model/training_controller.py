@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, Optional, Any
 
 from scripts.utils.path_config import ProjectPaths
-from scripts.training.train_model import ModelTrainer
+from scripts.training.train_model import LLMHub
 from scripts.training.modules.trainer_factory import TrainerFactory
 from scripts.training.modules.visualization import VisualizationManager
 from scripts.training.modules.dataset_management import DatasetLoader
@@ -277,10 +277,10 @@ class TrainingController:
             model_path = str(self.models_dir / answers['model'])
             
             # Import here to avoid circular imports
-            from scripts.test.test_model import ModelTester
+            from scripts.test.test_nixos_model import NixOSModelTester
             
             # Initialize tester
-            tester = ModelTester(
+            tester = NixOSModelTester(
                 model_path=model_path,
                 enable_viz=self.start_visualizer
             )

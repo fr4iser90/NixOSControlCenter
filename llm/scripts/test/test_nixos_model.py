@@ -7,7 +7,6 @@ from typing import List, Optional, Dict, Any
 import json
 import time
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel, PeftConfig
 import argparse
 
 from scripts.utils.path_config import ProjectPaths
@@ -18,7 +17,7 @@ from scripts.training.modules.visualization import VisualizationManager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class ModelTester:
+class NixOSModelTester:
     """Test harness for NixOS model."""
     
     def __init__(self, model_path: Optional[str] = None, enable_viz: bool = True):
@@ -27,14 +26,6 @@ class ModelTester:
         ProjectPaths.ensure_directories()
         self.model_path = Path(model_path) if model_path else ProjectPaths.CURRENT_MODEL_DIR
         
-        # Check CUDA availability
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        logger.info(f"Using device: {self.device}")
-        if self.device == "cuda":
-            logger.info(f"GPU: {torch.cuda.get_device_name()}")
-            logger.info(f"Memory allocated: {torch.cuda.memory_allocated(0) / 1024**2:.2f}MB")
-            logger.info(f"Memory cached: {torch.cuda.memory_reserved(0) / 1024**2:.2f}MB")
-        
         # Initialize components
         self.model_init = ModelInitializer(paths_config=ProjectPaths)
         self.resource_monitor = ResourceMonitor(ProjectPaths.MODELS_DIR)
@@ -42,70 +33,18 @@ class ModelTester:
             self.viz_manager = VisualizationManager(ProjectPaths, network_access=False)
             self.viz_manager.start_server()
         
-        # Load model and tokenizer directly
+        # Load model and tokenizer
         logger.info(f"Loading model from {self.model_path}...")
+        device_config = {
+            'torch_dtype': torch.float16 if torch.cuda.is_available() else torch.float32,
+            'device_map': "auto",
+            'low_cpu_mem_usage': True
+        }
+        self.model, self.tokenizer = self.model_init.initialize_model(str(self.model_path), device_config)
         
-        try:
-            # First check if we have a LoRA model
-            adapter_config_path = self.model_path / "adapter_config.json"
-            if adapter_config_path.exists():
-                logger.info("Found LoRA adapter configuration")
-                config = PeftConfig.from_pretrained(self.model_path)
-                
-                # Load base model
-                logger.info(f"Loading base model from {config.base_model_name_or_path}")
-                base_model = AutoModelForCausalLM.from_pretrained(
-                    config.base_model_name_or_path,
-                    torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                    low_cpu_mem_usage=True,
-                    device_map=None  # Disable device map to avoid distributed features
-                )
-                
-                # Load LoRA adapter
-                logger.info("Applying LoRA adapter")
-                self.model = PeftModel.from_pretrained(
-                    base_model,
-                    self.model_path,
-                    torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                    device_map=None  # Disable device map to avoid distributed features
-                )
-                
-                # Move model to device manually
-                self.model = self.model.to(self.device)
-                
-                # Merge LoRA weights for better inference
-                logger.info("Merging LoRA weights for inference")
-                self.model = self.model.merge_and_unload()
-                
-            else:
-                # Load as regular model
-                logger.info("Loading as regular model")
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    self.model_path,
-                    torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                    low_cpu_mem_usage=True,
-                    device_map=None  # Disable device map to avoid distributed features
-                ).to(self.device)
-            
-            # Load tokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                config.base_model_name_or_path if adapter_config_path.exists() else self.model_path,
-                padding_side="left",
-                trust_remote_code=True
-            )
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-            logger.info("Tokenizer loaded successfully")
-            
-            # Log model size
-            total_params = sum(p.numel() for p in self.model.parameters())
-            logger.info(f"Model size: {total_params / 1e6:.2f}M parameters")
-            
-            if self.device == "cuda":
-                logger.info(f"GPU memory after loading: {torch.cuda.memory_allocated(0) / 1024**2:.2f}MB")
-        
-        except Exception as e:
-            logger.error(f"Error loading model: {e}")
-            raise
+        # Move to GPU if available
+        if torch.cuda.is_available():
+            self.model = self.model.to("cuda")
         
         logger.info("Model loaded successfully")
     
@@ -211,19 +150,6 @@ class ModelTester:
         logger.info("Starting interactive chat session. Type 'exit' to end.")
         logger.info("You can ask questions about NixOS, package management, system configuration, etc.")
         
-        # Clear GPU memory at start
-        if self.device == "cuda":
-            torch.cuda.empty_cache()
-            logger.info(f"Initial GPU memory: {torch.cuda.memory_allocated(0) / 1024**2:.2f}MB")
-        
-        # Set model to evaluation mode
-        self.model.eval()
-        
-        # Debug: Print model and tokenizer info
-        logger.info(f"Model type: {type(self.model)}")
-        logger.info(f"Tokenizer type: {type(self.tokenizer)}")
-        logger.info(f"Model device: {next(self.model.parameters()).device}")
-        
         while True:
             try:
                 # Get user input
@@ -235,129 +161,28 @@ class ModelTester:
                 logger.info("Generating response...")
                 start_time = time.time()
                 
-                try:
-                    # Format input to match training data
-                    prompt = (
-                        "Below are questions and answers about NixOS concepts.\n\n"
-                        "Question: What is NixOS?\n"
-                        "Answer: [Basics] NixOS is a Linux distribution that uses the Nix package manager to configure systems declaratively and ensure reproducibility.\n\n"
-                        "Question: What is the Nix Package Manager?\n"
-                        "Answer: [Package Management] The Nix Package Manager is a powerful package manager for Linux and other Unix systems that enables reliable and reproducible package management.\n\n"
-                        "Question: How does Nix handle dependencies?\n"
-                        "Answer: [Package Management] Nix handles dependencies by storing them in isolated paths in /nix/store, ensuring no conflicts between versions or packages.\n\n"
-                        f"Question: {user_input}\n"
-                        "Answer: ["
-                    )
-                    
-                    # Debug: Print prompt
-                    logger.debug(f"Prompt: {prompt}")
-                    
-                    input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.device)
-                    attention_mask = torch.ones_like(input_ids).to(self.device)
-                    
-                    # Debug: Print token info
-                    logger.info(f"Input tokens: {input_ids.shape[1]}")
-                    
-                    # Generate with manual token generation to avoid distributed features
-                    with torch.no_grad():
-                        max_new_tokens = 150  # Shorter max length since answers are concise
-                        output_ids = input_ids
-                        current_length = input_ids.shape[1]
-                        generated_tokens = []
-                        
-                        for i in range(max_new_tokens):
-                            # Forward pass with limited context
-                            context_size = 512
-                            start_idx = max(0, output_ids.shape[1] - context_size)
-                            
-                            outputs = self.model(
-                                input_ids=output_ids[:, start_idx:],
-                                attention_mask=attention_mask[:, start_idx:]
-                            )
-                            logits = outputs.logits[:, -1, :]
-                            
-                            # Temperature sampling
-                            logits = logits / 0.8  # Slightly higher temperature for more focused responses
-                            
-                            # Apply top-k
-                            top_k = 40  # Reduced from 50 for more focused sampling
-                            top_k_logits, top_k_indices = torch.topk(logits, top_k)
-                            
-                            # Apply softmax only to top-k logits
-                            probs = torch.nn.functional.softmax(top_k_logits, dim=-1)
-                            
-                            # Sample from top-k
-                            idx_next = torch.multinomial(probs, num_samples=1)
-                            next_token = top_k_indices.gather(-1, idx_next)
-                            
-                            # Debug: Print token info periodically
-                            if i % 10 == 0:
-                                logger.debug(f"Generated token {i}: {next_token.item()} -> {self.tokenizer.decode([next_token.item()])}")
-                            
-                            # Append to sequence
-                            output_ids = torch.cat([output_ids, next_token], dim=-1)
-                            attention_mask = torch.cat([attention_mask, torch.ones_like(next_token)], dim=-1)
-                            generated_tokens.append(next_token.item())
-                            
-                            # Check if we should stop
-                            if next_token.item() == self.tokenizer.eos_token_id:
-                                logger.debug("Found EOS token, stopping generation")
-                                break
-                            
-                            # Also stop if we see "Question:" or "]" in the last few tokens
-                            if i > 0 and i % 5 == 0:  # Check every 5 tokens
-                                last_output = self.tokenizer.decode(output_ids[0, -20:])
-                                if "Question:" in last_output or "] " in last_output:
-                                    logger.debug("Found end marker, stopping generation")
-                                    break
-                            
-                            current_length += 1
-                            
-                            # Stop if we're not generating anything meaningful
-                            if i >= 5 and len(set(generated_tokens[-5:])) == 1:
-                                logger.debug("Detected repetitive generation, stopping")
-                                break
-                    
-                    # Debug: Print generation stats
-                    logger.info(f"Generated {len(generated_tokens)} new tokens")
-                    
-                    # Decode only the generated part (exclude input)
-                    response = self.tokenizer.decode(output_ids[0][input_ids.shape[1]:], skip_special_tokens=True)
-                    
-                    # Debug: Print raw response
-                    logger.debug(f"Raw response: {response}")
-                    
-                    # Clean up response
-                    response = response.strip()
-                    if "]" in response:
-                        response = response.split("]")[1].strip()
-                    if "Question:" in response:
-                        response = response.split("Question:")[0].strip()
-                    
-                    # Print response with timing
-                    elapsed = time.time() - start_time
-                    if not response:
-                        response = "(The model generated an empty response. This might indicate an issue with the model or the generation process.)"
-                    print(f"\nNixOS Assistant ({elapsed:.2f}s):\n{response}\n")
-                    
-                    # Log GPU memory if available
-                    if self.device == "cuda":
-                        logger.debug(f"GPU memory after generation: {torch.cuda.memory_allocated(0) / 1024**2:.2f}MB")
-                    
-                except RuntimeError as e:
-                    if "out of memory" in str(e):
-                        logger.error("GPU out of memory. Try a shorter input or free up GPU memory.")
-                        if hasattr(torch.cuda, 'empty_cache'):
-                            torch.cuda.empty_cache()
-                    else:
-                        logger.error(f"Error during generation: {e}")
-                        logger.exception("Full traceback:")
-                        
+                inputs = self.tokenizer(user_input, return_tensors="pt", padding=True)
+                inputs = {k: v.to(next(self.model.parameters()).device) for k, v in inputs.items()}
+                
+                outputs = self.model.generate(
+                    **inputs,
+                    max_length=512,
+                    num_return_sequences=1,
+                    temperature=0.7,
+                    do_sample=True,
+                    pad_token_id=self.tokenizer.pad_token_id
+                )
+                
+                response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+                
+                # Print response with timing
+                elapsed = time.time() - start_time
+                print(f"\nNixOS Assistant ({elapsed:.2f}s):\n{response}\n")
+                
             except KeyboardInterrupt:
                 break
             except Exception as e:
                 logger.error(f"Error during chat: {e}")
-                logger.exception("Full traceback:")
                 continue
                 
         logger.info("Chat session ended")
@@ -379,7 +204,7 @@ def main():
     args = parser.parse_args()
     
     # Initialize tester
-    tester = ModelTester(
+    tester = NixOSModelTester(
         model_path=args.model_path,
         enable_viz=not args.no_viz
     )

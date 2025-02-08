@@ -51,45 +51,20 @@ class ModelInitializer:
         
         # Check if we have adapter files
         if (model_path / "adapter_config.json").exists():
-            # Load or download base model
-            base_model_path = self.paths_config.BASE_MODEL_PATH
-            if not base_model_path.exists():
-                logger.info(f"Base model not found at {base_model_path}, downloading from Hugging Face...")
-                model = AutoModelForCausalLM.from_pretrained(
-                    "facebook/opt-125m",
-                    torch_dtype=device_config.get('torch_dtype', torch.float16),
-                    low_cpu_mem_usage=True,
-                    device_map=None
-                )
-                model.save_pretrained(base_model_path)
-                logger.info(f"Base model saved to {base_model_path}")
-            else:
-                logger.info(f"Loading base model from {base_model_path}")
-                model = AutoModelForCausalLM.from_pretrained(
-                    base_model_path,
-                    torch_dtype=device_config.get('torch_dtype', torch.float16),
-                    low_cpu_mem_usage=True,
-                    device_map=None
-                )
-            
-            # Apply LoRA adapter
+            # Load base model and apply LoRA
+            base_model = self._load_base_model(device_config)
             lora_config = self.setup_lora_config()
-            model = get_peft_model(model, lora_config)
+            model = get_peft_model(base_model, lora_config)
             model.load_adapter(model_path, adapter_name="default")
             logger.info("Loaded existing LoRA weights")
         else:
             # Load full model
             model = AutoModelForCausalLM.from_pretrained(
                 model_path,
-                torch_dtype=device_config.get('torch_dtype', torch.float16),
-                low_cpu_mem_usage=True,
-                device_map=None
+                **device_config
             )
+            logger.info("Loaded full model weights")
             
-        # Move model to device
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        model = model.to(device)
-        
         return model, tokenizer
         
     def create_new_model(self, device_config: dict):
