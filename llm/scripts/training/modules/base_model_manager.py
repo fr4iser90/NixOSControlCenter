@@ -176,30 +176,27 @@ class BaseModelManager:
                 
         # Set default device config if none provided
         if device_config is None:
-            device_config = {
-                'torch_dtype': torch.float16 if torch.cuda.is_available() else torch.float32,
-            }
+            device_config = {}
             
-        # Split out from_pretrained specific args
-        pretrained_args = {
-            'trust_remote_code': True,
-            'weights_only': True  # Prevent arbitrary code execution during loading
-        }
+        device_config.setdefault('torch_dtype', torch.float16 if torch.cuda.is_available() else torch.float32)
         
         # Load model and tokenizer
         try:
             logger.info(f"Loading model {model_name}...")
-            model = AutoModelForCausalLM.from_pretrained(
-                model_config["local_path"],
-                **device_config,
-                **pretrained_args
-            )
             
+            # Load tokenizer first
             tokenizer = AutoTokenizer.from_pretrained(
-                model_config["local_path"],
+                model_name,
                 trust_remote_code=True
             )
             tokenizer.pad_token = tokenizer.eos_token
+            
+            # Then load model with device config
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                trust_remote_code=True,
+                **device_config
+            )
             
             return model, tokenizer
             

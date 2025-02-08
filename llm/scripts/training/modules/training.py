@@ -49,7 +49,6 @@ class TrainingManager:
             "max_grad_norm": 0.3,           # Help stabilize training
             "weight_decay": 0.01,           # Help prevent overfitting
             # Security settings
-            "weights_only": True,           # Prevent arbitrary code execution during loading
         }
         
         if config:
