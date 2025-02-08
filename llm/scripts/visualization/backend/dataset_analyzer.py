@@ -7,7 +7,7 @@ from collections import Counter, defaultdict
 import networkx as nx
 import torch
 import logging
-from ..training.modules.model_management import ModelInitializer
+from ...training.modules.model_management import ModelInitializer
 
 logger = logging.getLogger(__name__)
 

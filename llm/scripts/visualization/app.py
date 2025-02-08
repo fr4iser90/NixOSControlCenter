@@ -10,15 +10,15 @@ ROOT_DIR = Path(__file__).parent.parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from llm.scripts.visualization.backend.metrics_manager import MetricsManager
-from llm.scripts.visualization.backend.system_monitor import SystemMonitor
-from llm.scripts.visualization.backend.dataset_analyzer import DatasetAnalyzer
-from llm.scripts.visualization.frontend.training_view import TrainingView
-from llm.scripts.visualization.frontend.dataset_view import DatasetView
-from llm.scripts.visualization.frontend.system_view import SystemView
-from llm.scripts.visualization.frontend.history_view import HistoryView
-from llm.scripts.visualization.utils.config import VisualizerConfig
-from llm.scripts.utils.path_config import ProjectPaths
+from scripts.visualization.backend.metrics_manager import MetricsManager
+from scripts.visualization.backend.system_monitor import SystemMonitor
+from scripts.visualization.backend.dataset_analyzer import DatasetAnalyzer
+from scripts.visualization.frontend.training_view import TrainingView
+from scripts.visualization.frontend.dataset_view import DatasetView
+from scripts.visualization.frontend.system_view import SystemView
+from scripts.visualization.frontend.history_view import HistoryView
+from scripts.visualization.utils.config import VisualizerConfig
+from scripts.utils.path_config import ProjectPaths
 
 class NixOSVisualizer:
     """Main application class for the NixOS Model Training Visualizer."""
