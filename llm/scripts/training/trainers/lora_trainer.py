@@ -32,6 +32,7 @@ class LoRATrainer(FeedbackTrainer):
         # Setup model and tokenizer first
         self.model_name = model_name
         self.lora_config = lora_config or {}
+        self.paths_config = paths_config
         
         # Initialize model manager
         model_manager = ModelInitializer(paths_config)
@@ -63,6 +64,7 @@ class LoRATrainer(FeedbackTrainer):
             model_name=model_name,
             model=self.model,
             tokenizer=self.tokenizer,
+            paths_config=paths_config,
             *args,
             **kwargs
         )

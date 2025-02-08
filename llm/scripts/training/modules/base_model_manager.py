@@ -176,34 +176,25 @@ class BaseModelManager:
                 
         # Set default device config if none provided
         if device_config is None:
-            device_config = {}
+            device_config = {
+                'torch_dtype': torch.float16 if torch.cuda.is_available() else torch.float32,
+                'device_map': "auto",
+                'low_cpu_mem_usage': True
+            }
             
-        device_config.setdefault('torch_dtype', torch.float16 if torch.cuda.is_available() else torch.float32)
-        
         # Load model and tokenizer
-        try:
-            logger.info(f"Loading model {model_name}...")
-            
-            # Load tokenizer first
-            tokenizer = AutoTokenizer.from_pretrained(
-                model_name,
-                trust_remote_code=True
-            )
-            tokenizer.pad_token = tokenizer.eos_token
-            
-            # Then load model with device config
-            model = AutoModelForCausalLM.from_pretrained(
-                model_name,
-                trust_remote_code=True,
-                **device_config
-            )
-            
-            return model, tokenizer
-            
-        except Exception as e:
-            logger.error(f"Failed to load model {model_name}: {e}")
-            raise
-            
+        model = AutoModelForCausalLM.from_pretrained(
+            model_config["local_path"],
+            trust_remote_code=True,
+            **device_config
+        )
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_config["local_path"],
+            trust_remote_code=True
+        )
+        
+        return model, tokenizer
+        
     def list_downloaded_models(self) -> List[Dict]:
         """List all downloaded base models.
         
