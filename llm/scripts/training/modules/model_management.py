@@ -4,6 +4,7 @@ from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import LoraConfig, get_peft_model
 import logging
+from .base_model_manager import BaseModelManager
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ class ModelInitializer:
     def __init__(self, paths_config):
         """Initialize with project paths configuration."""
         self.paths_config = paths_config
+        self.base_model_manager = BaseModelManager(paths_config)
         
     def initialize_model(self, model_name: str, device_config: dict = None):
         """Initialize model based on whether it's new or existing."""
@@ -70,7 +72,7 @@ class ModelInitializer:
         
     def create_new_model(self, device_config: dict):
         """Create a new model instance."""
-        logger.info("Creating new NixOS model based on facebook/opt-125m...")
+        logger.info("Creating new model with active base model...")
         
         # Get or create base model and tokenizer
         base_model = self._get_or_create_base_model(device_config)
@@ -87,11 +89,8 @@ class ModelInitializer:
         """Get existing base model or create new one."""
         if self._base_model is None:
             logger.info("Loading base model...")
-            self._base_model = AutoModelForCausalLM.from_pretrained(
-                "facebook/opt-125m",
-                trust_remote_code=True,
-                force_download=True,
-                **device_config
+            self._base_model, self._base_tokenizer = self.base_model_manager.load_model(
+                device_config=device_config
             )
             self._base_model.config.pad_token_id = self._base_model.config.eos_token_id
             self._base_model.config.use_cache = False
@@ -103,13 +102,7 @@ class ModelInitializer:
         """Get existing tokenizer or create new one."""
         if self._base_tokenizer is None:
             logger.info("Loading tokenizer...")
-            self._base_tokenizer = AutoTokenizer.from_pretrained(
-                "facebook/opt-125m",
-                padding_side="left",
-                trust_remote_code=True,
-                force_download=True
-            )
-            self._base_tokenizer.pad_token = self._base_tokenizer.eos_token
+            _, self._base_tokenizer = self.base_model_manager.load_model()
             
         return self._base_tokenizer
         

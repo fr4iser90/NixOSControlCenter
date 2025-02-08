@@ -15,6 +15,7 @@ from scripts.training.modules.dataset_management import DatasetLoader
 from scripts.data.dataset_manager import DatasetManager
 from scripts.model.model_info import ModelInfo
 from scripts.training.modules.training_config import ConfigManager
+from scripts.training.modules.base_model_manager import BaseModelManager
 
 # Set up logging
 logging.basicConfig(
@@ -37,6 +38,7 @@ class TrainingController:
         self.start_visualizer = True  # Default visualization setting
         self.visualizer_network_access = False  # Default network access setting
         self.visualizer = None  # Initialize as None
+        self.base_model_manager = BaseModelManager(models_dir)
         
         # Initialize dataset components
         self.dataset_manager = DatasetManager()
@@ -44,6 +46,46 @@ class TrainingController:
             self.dataset_manager,
             str(ProjectPaths.DATASET_DIR)
         )
+        
+    def list_base_models(self) -> List[Dict]:
+        """List all downloaded base models."""
+        return self.base_model_manager.list_downloaded_models()
+        
+    def search_base_models(self, query: str = "", min_likes: int = 50) -> List[Dict]:
+        """Search for available base models on HuggingFace Hub.
+        
+        Args:
+            query: Search query
+            min_likes: Minimum number of likes
+            
+        Returns:
+            List of matching models
+        """
+        return self.base_model_manager.search_models(query=query, min_likes=min_likes)
+        
+    def download_base_model(self, model_name: str, force: bool = False) -> bool:
+        """Download a new base model.
+        
+        Args:
+            model_name: Name/ID of model to download
+            force: Force re-download if exists
+            
+        Returns:
+            True if successful
+        """
+        return self.base_model_manager.download_model(model_name, force=force)
+        
+    def set_active_base_model(self, model_name: str):
+        """Set the active base model to use for training.
+        
+        Args:
+            model_name: Name of model to set as active
+        """
+        self.base_model_manager.set_active_model(model_name)
+        
+    def get_active_base_model(self) -> str:
+        """Get name of currently active base model."""
+        return self.base_model_manager.get_active_model_name()
         
     def start_training(self):
         """Start or continue model training."""

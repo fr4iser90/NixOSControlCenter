@@ -16,8 +16,101 @@ from .modules.feedback import FeedbackManager
 from .modules.model_interpretation import ModelInterpreter
 from .modules.trainer_factory import TrainerFactory
 
+import click
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+@click.group()
+def cli():
+    """NixOS AI model training CLI."""
+    pass
+
+@cli.group()
+def base():
+    """Manage base models."""
+    pass
+
+@base.command()
+def list():
+    """List downloaded base models."""
+    try:
+        controller = TrainingController(ProjectPaths())
+        models = controller.list_base_models()
+        
+        if not models:
+            click.echo("No base models downloaded yet.")
+            return
+            
+        click.echo("\nDownloaded base models:")
+        active_model = controller.get_active_base_model()
+        
+        for model in models:
+            active_marker = "* " if model["name"] == active_model else "  "
+            click.echo(f"{active_marker}{model['name']}")
+            click.echo(f"   Description: {model['description']}")
+            click.echo(f"   Path: {model['local_path']}")
+            click.echo()
+            
+    except Exception as e:
+        logger.error(f"Failed to list models: {e}")
+        raise
+
+@base.command()
+@click.argument("query", required=False)
+@click.option("--min-likes", default=50, help="Minimum number of likes")
+def search(query, min_likes):
+    """Search for available base models."""
+    try:
+        controller = TrainingController(ProjectPaths())
+        models = controller.search_base_models(query=query or "", min_likes=min_likes)
+        
+        if not models:
+            click.echo("No models found matching your criteria.")
+            return
+            
+        click.echo("\nAvailable models:")
+        for model in models:
+            click.echo(f"\nName: {model['name']}")
+            if model.get('description'):
+                click.echo(f"Description: {model['description']}")
+            click.echo(f"Likes: {model['likes']}")
+            click.echo(f"Downloads: {model['downloads']}")
+            if model.get('tags'):
+                click.echo(f"Tags: {', '.join(model['tags'])}")
+                
+    except Exception as e:
+        logger.error(f"Search failed: {e}")
+        raise
+
+@base.command()
+@click.argument("model_name")
+@click.option("--force", is_flag=True, help="Force re-download if exists")
+def download(model_name, force):
+    """Download a base model."""
+    try:
+        controller = TrainingController(ProjectPaths())
+        if controller.download_base_model(model_name, force=force):
+            click.echo(f"Successfully downloaded model: {model_name}")
+        else:
+            click.echo(f"Failed to download model: {model_name}")
+            
+    except Exception as e:
+        logger.error(f"Download failed: {e}")
+        raise
+
+@base.command()
+@click.argument("model_name")
+def activate(model_name):
+    """Set active base model for training."""
+    try:
+        controller = TrainingController(ProjectPaths())
+        controller.set_active_base_model(model_name)
+        click.echo(f"Set active base model to: {model_name}")
+        
+    except Exception as e:
+        logger.error(f"Failed to set active model: {e}")
+        raise
 
 class LLMHub:
     """Main trainer class orchestrating all components."""
@@ -206,4 +299,5 @@ def main():
         trainer.cleanup()
         
 if __name__ == "__main__":
-    main()
+    cli.add_command(base)
+    cli()

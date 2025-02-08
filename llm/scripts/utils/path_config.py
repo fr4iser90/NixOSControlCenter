@@ -48,7 +48,7 @@ class ProjectPaths:
     OPTIMIZATION_DIR = DATASET_DIR / 'optimization'
     
     # Model specific directories
-    CURRENT_MODEL_DIR = MODELS_DIR / 'nixos_model'
+    CURRENT_MODEL_DIR = MODELS_DIR / 'nixos_v1'
     QUANTIZED_MODEL_DIR = MODELS_DIR / 'quantized_model'
     
     # Additional configuration and logging

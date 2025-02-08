@@ -153,12 +153,15 @@ class FeedbackTrainer(NixOSBaseTrainer):
                             continue
                         
                         # Get example ID from dataset if available
-                        example_id = None
-                        if hasattr(self.eval_dataset, 'data'):
-                            if i < len(self.eval_dataset.data):
-                                example_id = str(i)  # Use index as fallback ID
-                                if 'id' in self.eval_dataset.data[i]:
-                                    example_id = str(self.eval_dataset.data[i]['id'])
+                        example_id = str(i)  # Default to index as ID
+                        try:
+                            if hasattr(self.eval_dataset, 'data'):
+                                dataset_index = self.eval_dataset.current_index + i if hasattr(self.eval_dataset, 'current_index') else i
+                                if dataset_index < len(self.eval_dataset.data):
+                                    if 'id' in self.eval_dataset.data[dataset_index]:
+                                        example_id = str(self.eval_dataset.data[dataset_index]['id'])
+                        except (AttributeError, IndexError) as e:
+                            logger.debug(f"Could not get example ID from dataset: {e}")
                         
                         # Process prediction and expected output
                         prediction = decoder.decode(outputs.logits[i].argmax(dim=-1))
