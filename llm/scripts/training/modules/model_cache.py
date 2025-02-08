@@ -38,10 +38,13 @@ class ModelCache:
         )
         tokenizer.pad_token = tokenizer.eos_token
         
-        # Load model with device configuration
+        # Load model with device configuration and weights_only=True for security
         if device_config is None:
             device_config = {}
             
+        # Add weights_only to device config
+        device_config["weights_only"] = True
+        
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
             trust_remote_code=True,
