@@ -15,14 +15,13 @@ class BaseModelManager:
     # Default base model
     DEFAULT_BASE_MODEL = "facebook/opt-125m"
     
-    def __init__(self, paths_config):
+    def __init__(self, base_models_dir: Path):
         """Initialize base model manager.
         
         Args:
-            paths_config: Project paths configuration
+            base_models_dir: Path to base models directory
         """
-        self.paths_config = paths_config
-        self.base_models_dir = Path(paths_config.BASE_MODELS_DIR)
+        self.base_models_dir = base_models_dir
         self.base_models_dir.mkdir(parents=True, exist_ok=True)
         self.config_file = self.base_models_dir / "base_models_config.json"
         self.model_configs = self._load_configs()
@@ -112,7 +111,7 @@ class BaseModelManager:
             force: Force re-download even if exists
             
         Returns:
-            True if successful, False otherwise
+            True if successful
         """
         try:
             # Create model directory

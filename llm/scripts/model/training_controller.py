@@ -40,7 +40,9 @@ class TrainingController:
         self.start_visualizer = True  # Default visualization setting
         self.visualizer_network_access = False  # Default network access setting
         self.visualizer = None  # Initialize as None
-        self.base_model_manager = BaseModelManager(self.paths_config.MODELS_DIR)
+        
+        # Initialize base model manager with centralized path
+        self.base_model_manager = BaseModelManager(self.paths_config.BASE_MODELS_DIR)
         
         # Initialize dataset components
         self.dataset_manager = DatasetManager()
