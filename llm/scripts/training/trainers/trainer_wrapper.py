@@ -1,5 +1,5 @@
 from typing import Optional, Union
-from transformers import Trainer
+from transformers import Trainer, TrainerCallback
 from ..interfaces.trainer import ITrainer
 
 class TransformersTrainerWrapper(ITrainer):
@@ -19,3 +19,7 @@ class TransformersTrainerWrapper(ITrainer):
     def save_model(self, output_dir: str, _internal_call=False):
         """Save the model."""
         self.trainer.save_model(output_dir, _internal_call=_internal_call)
+
+    def add_callback(self, callback: TrainerCallback):
+        """Add a callback to the trainer."""
+        self.trainer.add_callback(callback)
