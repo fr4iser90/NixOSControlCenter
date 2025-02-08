@@ -8,11 +8,8 @@ let
     refind = ./bootloaders/refind.nix;
   };
 
-  # Select bootloader configuration
-  selectedLoader = bootloaders.${systemConfig.system.bootloader} or bootloaders.systemd-boot;
-
 in {
-  imports = [ selectedLoader ];
+  imports = [ bootloaders.${systemConfig.system.bootloader} or bootloaders.systemd-boot ];
 
   # Common boot configuration
   boot = {
