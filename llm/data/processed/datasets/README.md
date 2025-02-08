@@ -99,7 +99,7 @@ System optimization examples in JSON format:
 
 ## Usage
 
-1. All datasets are used by the training script at `llm/data/scripts/training/train_nixos_model.py`
+1. All datasets are used by the training script at `llm/data/scripts/training/train_model.py`
 2. The model processes these datasets into question-answer pairs in the format:
    ```
    ### Question: [prompt]

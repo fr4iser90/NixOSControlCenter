@@ -1,26 +1,56 @@
 """Backend component for dataset analysis."""
 import json
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import numpy as np
 from collections import Counter, defaultdict
 import networkx as nx
 import torch
 import logging
-from ...training.modules.model_management import ModelInitializer
+from transformers import PreTrainedTokenizer
+from ...training.modules.base_model_manager import BaseModelManager
+from ...utils.path_config import ProjectPaths
 
 logger = logging.getLogger(__name__)
 
 class DatasetAnalyzer:
     """Analyzes dataset files and computes statistics."""
     
-    def __init__(self, paths_config):
-        """Initialize analyzer with tokenizer."""
-        logger.info("Initializing dataset analyzer")
+    def __init__(self, paths_config: ProjectPaths):
+        """Initialize analyzer.
         
-        # Use model manager to get tokenizer
-        model_manager = ModelInitializer(paths_config)
-        _, self.tokenizer = model_manager.initialize_model("facebook/opt-125m")
+        Args:
+            paths_config: Project paths configuration
+        """
+        logger.info("Initializing dataset analyzer")
+        self.paths_config = paths_config
+        self._base_model_manager = None
+        self._tokenizer = None
+        
+    def set_tokenizer(self, tokenizer: PreTrainedTokenizer):
+        """Set tokenizer for token-based analysis.
+        
+        Args:
+            tokenizer: Tokenizer to use for analysis
+        """
+        self._tokenizer = tokenizer
+        
+    @property
+    def base_model_manager(self):
+        """Lazy initialization of base model manager for default tokenizer."""
+        if self._base_model_manager is None:
+            self._base_model_manager = BaseModelManager(self.paths_config.BASE_MODELS_DIR)
+        return self._base_model_manager
+        
+    def get_tokenizer(self) -> PreTrainedTokenizer:
+        """Get tokenizer for analysis, using base model's tokenizer if none set.
+        
+        Returns:
+            Tokenizer to use for analysis
+        """
+        if self._tokenizer is None:
+            _, self._tokenizer = self.base_model_manager.load_model()
+        return self._tokenizer
         
     def analyze_datasets(self) -> Dict[str, Any]:
         """Analyze all datasets and return comprehensive statistics."""
@@ -28,7 +58,7 @@ class DatasetAnalyzer:
         file_count = 0
         
         # Load all examples
-        for file_path in paths_config.DATASET_DIR.rglob("*.jsonl"):
+        for file_path in self.paths_config.DATASET_DIR.rglob("*.jsonl"):
             file_count += 1
             with open(file_path, 'r') as f:
                 for line in f:
@@ -65,13 +95,24 @@ class DatasetAnalyzer:
         
         return stats
         
-    def compute_quality_metrics(self) -> Dict[str, float]:
-        """Compute quality metrics for the datasets."""
+    def compute_quality_metrics(self, tokenizer: Optional[PreTrainedTokenizer] = None) -> Dict[str, float]:
+        """Compute quality metrics for the datasets.
+        
+        Args:
+            tokenizer: Optional tokenizer to use for token-based metrics.
+                     If not provided, will use default tokenizer.
+        
+        Returns:
+            Dictionary of quality metrics
+        """
         metrics = {}
         all_examples = []
         
+        # Use provided tokenizer or get default
+        analysis_tokenizer = tokenizer if tokenizer else self.get_tokenizer()
+        
         # Load all examples
-        for file_path in paths_config.DATASET_DIR.rglob("*.jsonl"):
+        for file_path in self.paths_config.DATASET_DIR.rglob("*.jsonl"):
             with open(file_path, 'r') as f:
                 for line in f:
                     if line.strip():
@@ -99,7 +140,7 @@ class DatasetAnalyzer:
         unique_tokens = set()
         total_tokens = 0
         for ex in all_examples:
-            tokens = self.tokenizer.tokenize(ex['explanation'])
+            tokens = analysis_tokenizer.tokenize(ex['explanation'])
             unique_tokens.update(tokens)
             total_tokens += len(tokens)
         metrics['token_coverage'] = (len(unique_tokens) / total_tokens) * 100

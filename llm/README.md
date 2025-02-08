@@ -215,7 +215,7 @@ The system checker will automatically detect your platform and provide appropria
    or 
 
    ```bash
-   python -m llm.scripts.training.train_nixos_model
+   python -m llm.scripts.training.train_model
    ```
    - Access training visualization at `http://localhost:8501`
 
