@@ -7,13 +7,18 @@ from typing import Dict, List, Optional
 
 from scripts.utils.path_config import ProjectPaths
 
-
 class MetricsManager:
     """Manages the collection, storage, and retrieval of training metrics."""
     
-    def __init__(self):
-        self.metrics_dir = ProjectPaths.METRICS_DIR
-        self.metrics_dir.mkdir(exist_ok=True)
+    def __init__(self, paths_config: ProjectPaths):
+        """Initialize metrics manager.
+        
+        Args:
+            paths_config: Project paths configuration
+        """
+        self.paths_config = paths_config
+        self.metrics_dir = paths_config.METRICS_DIR
+        self.metrics_dir.mkdir(parents=True, exist_ok=True)
         
     def save_training_metrics(self, step: int, metrics: Dict):
         """Save training metrics to file."""
