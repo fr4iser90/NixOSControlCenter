@@ -19,9 +19,11 @@ class ProjectPaths:
     # Base directories
     LLM_DIR = PROJECT_ROOT
     
+    
     # Data directories
     DATA_DIR = LLM_DIR / 'data'
     MODELS_DIR = LLM_DIR / 'models'
+    BASE_MODELS_DIR = MODELS_DIR / 'base_models'  # Add base models directory
     MODEL_DIR = MODELS_DIR  # Alias for backward compatibility
     PROCESSED_DIR = DATA_DIR / 'processed'
     RAW_DIR = DATA_DIR / 'raw'
@@ -68,7 +70,7 @@ class ProjectPaths:
         """Create all required directories if they don't exist."""
         try:
             directories = [
-                cls.DATA_DIR, cls.MODELS_DIR, cls.PROCESSED_DIR, cls.RAW_DIR,
+                cls.DATA_DIR, cls.MODELS_DIR, cls.BASE_MODELS_DIR, cls.PROCESSED_DIR, cls.RAW_DIR,
                 cls.SCRIPTS_DIR, cls.TRAINING_DIR, cls.TRAINING_MODULES_DIR,
                 cls.TRAINERS_DIR, cls.UTILS_DIR, cls.MONITORING_DIR, cls.MODEL_DIR,
                 cls.VISUALIZATION_DIR, cls.METRICS_DIR, cls.DATASET_DIR,
@@ -134,3 +136,15 @@ class ProjectPaths:
             'metrics': model_dir / 'metrics.json',
             'history': model_dir / 'training_history.json'
         }
+    
+    @classmethod
+    def get_base_model_path(cls, model_name: str) -> Path:
+        """Get path for a specific base model.
+        
+        Args:
+            model_name: Name of the base model
+            
+        Returns:
+            Path to base model directory
+        """
+        return cls.BASE_MODELS_DIR / model_name

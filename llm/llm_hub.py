@@ -33,7 +33,7 @@ class ModelManager:
         # Initialize components
         self.resource_monitor = ResourceMonitor(self.models_dir)
         self.model_info = ModelInfo(self.models_dir)
-        self.training_controller = TrainingController(self.models_dir, test_mode)
+        self.training_controller = TrainingController(test_mode=test_mode)
         self.evaluator = ModelEvaluator(self.models_dir)
         
     def get_model_overview(self, model_name: str):

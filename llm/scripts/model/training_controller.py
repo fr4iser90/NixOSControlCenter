@@ -29,22 +29,24 @@ __all__ = ['TrainingController']
 class TrainingController:
     """Controls model training operations and user interactions."""
     
-    def __init__(self, models_dir: Path, test_mode: bool = False):
+    def __init__(self, test_mode: bool = False):
         """Initialize training controller."""
-        self.models_dir = models_dir
         self.test_mode = test_mode
-        self.model_info = ModelInfo(models_dir)
+        self.paths_config = ProjectPaths()
+        self.paths_config.ensure_directories()
+        
+        self.model_info = ModelInfo(self.paths_config.MODELS_DIR)
         self.trainer_type = 'lora'  # Default trainer type
         self.start_visualizer = True  # Default visualization setting
         self.visualizer_network_access = False  # Default network access setting
         self.visualizer = None  # Initialize as None
-        self.base_model_manager = BaseModelManager(models_dir)
+        self.base_model_manager = BaseModelManager(self.paths_config.MODELS_DIR)
         
         # Initialize dataset components
         self.dataset_manager = DatasetManager()
         self.dataset_loader = DatasetLoader(
             self.dataset_manager,
-            str(ProjectPaths.DATASET_DIR)
+            str(self.paths_config.DATASET_DIR)
         )
         
     def list_base_models(self) -> List[Dict]:
@@ -156,14 +158,14 @@ class TrainingController:
                 
                 # Initialize visualizer if requested
                 self.visualizer = VisualizationManager(
-                    ProjectPaths(),
+                    self.paths_config,
                     network_access=self.visualizer_network_access
                 )
                 if self.start_visualizer:
                     self.visualizer.start_server()
             
             # Create model directory
-            model_dir = self.models_dir / model_name
+            model_dir = self.paths_config.MODELS_DIR / model_name
             model_dir.mkdir(parents=True, exist_ok=True)
             
             # Start training with options
@@ -197,20 +199,20 @@ class TrainingController:
                 training_config = ConfigManager.merge_config(training_config, kwargs)
             
             # Ensure output directory is set
-            training_config['output_dir'] = str(self.models_dir / model_name)
+            training_config['output_dir'] = str(self.paths_config.MODELS_DIR / model_name)
             
             # Create trainer
-            model_dir = self.models_dir / model_name
+            model_dir = self.paths_config.MODELS_DIR / model_name
             trainer = TrainerFactory.create_trainer(
                 trainer_type='lora',  # TODO: Make configurable
                 model_path=str(model_dir) if mode == 'continue' else 'facebook/opt-125m',
                 config=training_config,
                 dataset_manager=self.dataset_manager,
-                dataset_path=ProjectPaths.DATASET_DIR / "training_data.jsonl",
+                dataset_path=self.paths_config.DATASET_DIR / "training_data.jsonl",
                 visualizer=self.visualizer,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset,
-                paths_config=ProjectPaths()
+                paths_config=self.paths_config
             )
             
             # Start training
@@ -220,7 +222,7 @@ class TrainingController:
                 trainer.train()
             
             # Save the model
-            trainer.save_model(str(self.models_dir / model_name))
+            trainer.save_model(str(self.paths_config.MODELS_DIR / model_name))
             
         except Exception as e:
             logger.error(f"Error during training: {e}")
@@ -246,7 +248,7 @@ class TrainingController:
                 return
                 
             selected_model = answers['model']
-            model_dir = self.models_dir / selected_model
+            model_dir = self.paths_config.MODELS_DIR / selected_model
             
             if not model_dir.exists():
                 logger.error(f"Model directory not found: {model_dir}")
@@ -278,7 +280,7 @@ class TrainingController:
                 
                 # Initialize visualizer if requested
                 self.visualizer = VisualizationManager(
-                    ProjectPaths(),
+                    self.paths_config,
                     network_access=self.visualizer_network_access
                 )
                 if self.start_visualizer:
@@ -317,7 +319,7 @@ class TrainingController:
             if not answers:
                 return
                 
-            model_path = str(self.models_dir / answers['model'])
+            model_path = str(self.paths_config.MODELS_DIR / answers['model'])
             
             # Import here to avoid circular imports
             from scripts.test.test_nixos_model import NixOSModelTester
