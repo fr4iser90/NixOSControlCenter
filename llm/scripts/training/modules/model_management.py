@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 class ModelInitializer:
     """Handles model initialization and configuration."""
     
+    _base_model = None
+    _base_tokenizer = None
+    
     def __init__(self, paths_config):
         """Initialize with project paths configuration."""
         self.paths_config = paths_config
@@ -41,19 +44,13 @@ class ModelInitializer:
         """Load an existing model and its tokenizer."""
         logger.info(f"Loading existing model from {model_path}...")
         
-        # Load tokenizer
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_path,
-            padding_side="left",
-            trust_remote_code=True,
-            force_download=True
-        )
-        tokenizer.pad_token = tokenizer.eos_token
-        
         # Check if we have adapter files
         if (model_path / "adapter_config.json").exists():
-            # Load base model and apply LoRA
-            base_model = self._load_base_model(device_config)
+            # Load or reuse base model
+            base_model = self._get_or_create_base_model(device_config)
+            tokenizer = self._get_or_create_tokenizer()
+            
+            # Apply LoRA config and load adapter
             lora_config = self.setup_lora_config()
             model = get_peft_model(base_model, lora_config)
             model.load_adapter(model_path, adapter_name="default")
@@ -66,6 +63,7 @@ class ModelInitializer:
                 force_download=True,
                 **device_config
             )
+            tokenizer = self._get_or_create_tokenizer()
             logger.info("Loaded full model weights")
             
         return model, tokenizer
@@ -74,38 +72,46 @@ class ModelInitializer:
         """Create a new model instance."""
         logger.info("Creating new NixOS model based on facebook/opt-125m...")
         
-        # Initialize tokenizer
-        tokenizer = AutoTokenizer.from_pretrained(
-            "facebook/opt-125m",
-            padding_side="left",
-            trust_remote_code=True,
-            force_download=True
-        )
-        tokenizer.pad_token = tokenizer.eos_token
-        
-        # Load base model
-        model = self._load_base_model(device_config)
+        # Get or create base model and tokenizer
+        base_model = self._get_or_create_base_model(device_config)
+        tokenizer = self._get_or_create_tokenizer()
         
         # Apply LoRA configuration
         lora_config = self.setup_lora_config()
-        model = get_peft_model(model, lora_config)
+        model = get_peft_model(base_model, lora_config)
         model.print_trainable_parameters()
         
         return model, tokenizer
         
-    def _load_base_model(self, device_config: dict):
-        """Load the base model with specified configuration."""
-        base_model = AutoModelForCausalLM.from_pretrained(
-            "facebook/opt-125m",
-            trust_remote_code=True,
-            force_download=True,
-            **device_config
-        )
-        base_model.config.pad_token_id = base_model.config.eos_token_id
-        base_model.config.use_cache = False
-        base_model.gradient_checkpointing_enable()
+    def _get_or_create_base_model(self, device_config: dict):
+        """Get existing base model or create new one."""
+        if self._base_model is None:
+            logger.info("Loading base model...")
+            self._base_model = AutoModelForCausalLM.from_pretrained(
+                "facebook/opt-125m",
+                trust_remote_code=True,
+                force_download=True,
+                **device_config
+            )
+            self._base_model.config.pad_token_id = self._base_model.config.eos_token_id
+            self._base_model.config.use_cache = False
+            self._base_model.gradient_checkpointing_enable()
+            
+        return self._base_model
         
-        return base_model
+    def _get_or_create_tokenizer(self):
+        """Get existing tokenizer or create new one."""
+        if self._base_tokenizer is None:
+            logger.info("Loading tokenizer...")
+            self._base_tokenizer = AutoTokenizer.from_pretrained(
+                "facebook/opt-125m",
+                padding_side="left",
+                trust_remote_code=True,
+                force_download=True
+            )
+            self._base_tokenizer.pad_token = self._base_tokenizer.eos_token
+            
+        return self._base_tokenizer
         
     @staticmethod
     def setup_lora_config():

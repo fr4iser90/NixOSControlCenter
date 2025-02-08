@@ -2,9 +2,10 @@
 """Trainer specifically for LoRA-based model fine-tuning."""
 import torch
 import logging
+from .feedback_trainer import FeedbackTrainer
+from ..modules.model_management import ModelInitializer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import LoraConfig, get_peft_model
-from .feedback_trainer import FeedbackTrainer
 
 # Set up logging
 logging.basicConfig(
@@ -16,11 +17,12 @@ logger = logging.getLogger(__name__)
 class LoRATrainer(FeedbackTrainer):
     """LoRA-specific trainer implementation."""
     
-    def __init__(self, model_name: str, lora_config=None, *args, **kwargs):
+    def __init__(self, model_name: str, paths_config, lora_config=None, *args, **kwargs):
         """Initialize LoRA trainer with model and tokenizer setup.
         
         Args:
             model_name: Name or path of the model to load
+            paths_config: Configuration for model paths
             lora_config: Optional LoRA configuration
             *args: Additional positional arguments
             **kwargs: Additional keyword arguments
@@ -31,19 +33,15 @@ class LoRATrainer(FeedbackTrainer):
         self.model_name = model_name
         self.lora_config = lora_config or {}
         
-        # Load model and tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            trust_remote_code=True,
-            force_download=True
-        )
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            device_map='auto',
-            torch_dtype=torch.float16,
-            trust_remote_code=True,
-            force_download=True
-        )
+        # Initialize model manager
+        model_manager = ModelInitializer(paths_config)
+        
+        # Get model and tokenizer from manager
+        device_config = {
+            'device_map': 'auto',
+            'torch_dtype': torch.float16
+        }
+        self.model, self.tokenizer = model_manager.initialize_model(model_name, device_config)
         
         # Apply LoRA config
         config = LoraConfig(
@@ -69,60 +67,39 @@ class LoRATrainer(FeedbackTrainer):
             **kwargs
         )
         
-    def setup_model(self):
-        """Initialize the model with LoRA configuration."""
+    def load_model(self, model_path: str):
+        """Load a saved model and tokenizer."""
         try:
-            logger.info("Setting up tokenizer...")
+            # Initialize model manager
+            model_manager = ModelInitializer(self.paths_config)
             
-            # Load tokenizer first
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name,
-                padding_side="left",
-                trust_remote_code=True,
-                force_download=True
-            )
-            self.tokenizer.pad_token = self.tokenizer.eos_token
+            # Load model and tokenizer from manager
+            device_config = {
+                'device_map': 'auto',
+                'torch_dtype': torch.float16
+            }
+            self.model, self.tokenizer = model_manager.initialize_model(model_path, device_config)
             
-            # Load base model and tokenizer
-            base_model = AutoModelForCausalLM.from_pretrained(
-                self.model_name,
-                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-                device_map="auto",
-                low_cpu_mem_usage=True,
-                trust_remote_code=True,
-                force_download=True
-            )
-            base_model.config.pad_token_id = self.tokenizer.eos_token_id
-            base_model.config.use_cache = False  # Required for gradient checkpointing
-            
-            # Enable gradient checkpointing
-            base_model.gradient_checkpointing_enable()
-            
-            # Configure LoRA
-            lora_config = LoraConfig(
-                r=16,  # rank
-                lora_alpha=32,
-                target_modules=["q_proj", "v_proj"],
-                lora_dropout=0.05,
-                bias="none",
+            # Apply LoRA config
+            config = LoraConfig(
+                r=self.lora_config.get('r', 8),
+                lora_alpha=self.lora_config.get('lora_alpha', 16),
+                target_modules=self.lora_config.get('target_modules', ['q_proj', 'v_proj']),
+                lora_dropout=self.lora_config.get('lora_dropout', 0.05),
+                bias=self.lora_config.get('bias', 'none'),
                 task_type="CAUSAL_LM"
             )
-            
-            # Create PEFT model
-            self.model = get_peft_model(base_model, lora_config)
+            self.model = get_peft_model(self.model, config)
             
             # Move to GPU if available
             if torch.cuda.is_available():
                 self.model = self.model.to("cuda")
-                torch.backends.cuda.enable_flash_sdp(True)
-                torch.backends.cuda.enable_mem_efficient_sdp(True)
                 
-            logger.info("Model setup complete")
-            
+            logger.info(f"Model loaded from {model_path}")
         except Exception as e:
-            logger.error(f"Error setting up model: {e}")
+            logger.error(f"Error loading model: {e}")
             raise
-
+            
     def save_pretrained(self, output_dir):
         """Save LoRA weights and tokenizer."""
         self.model.save_pretrained(output_dir)

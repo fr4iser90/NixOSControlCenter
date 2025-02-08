@@ -5,19 +5,22 @@ from typing import Dict, List, Any
 import numpy as np
 from collections import Counter, defaultdict
 import networkx as nx
-from transformers import AutoTokenizer
-from scripts.utils.path_config import ProjectPaths
+import torch
+import logging
+from ..training.modules.model_management import ModelInitializer
+
+logger = logging.getLogger(__name__)
 
 class DatasetAnalyzer:
     """Analyzes dataset files and computes statistics."""
     
-    def __init__(self):
+    def __init__(self, paths_config):
         """Initialize analyzer with tokenizer."""
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "facebook/opt-125m",
-            trust_remote_code=True,
-            force_download=True
-        )
+        logger.info("Initializing dataset analyzer")
+        
+        # Use model manager to get tokenizer
+        model_manager = ModelInitializer(paths_config)
+        _, self.tokenizer = model_manager.initialize_model("facebook/opt-125m")
         
     def analyze_datasets(self) -> Dict[str, Any]:
         """Analyze all datasets and return comprehensive statistics."""
@@ -25,7 +28,7 @@ class DatasetAnalyzer:
         file_count = 0
         
         # Load all examples
-        for file_path in ProjectPaths.DATASET_DIR.rglob("*.jsonl"):
+        for file_path in paths_config.DATASET_DIR.rglob("*.jsonl"):
             file_count += 1
             with open(file_path, 'r') as f:
                 for line in f:
@@ -68,7 +71,7 @@ class DatasetAnalyzer:
         all_examples = []
         
         # Load all examples
-        for file_path in ProjectPaths.DATASET_DIR.rglob("*.jsonl"):
+        for file_path in paths_config.DATASET_DIR.rglob("*.jsonl"):
             with open(file_path, 'r') as f:
                 for line in f:
                     if line.strip():
