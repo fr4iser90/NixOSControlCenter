@@ -34,31 +34,48 @@ class SystemView:
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric("CPU Usage", f"{metrics.get('cpu_percent', 0)}%")
+            st.metric(
+                "CPU Usage",
+                f"{metrics.get('cpu_percent', 0):.1f}%",
+                help="Current CPU utilization"
+            )
             
         with col2:
             st.metric(
                 "Memory Usage",
-                f"{metrics.get('memory_percent', 0)}%",
-                f"{metrics.get('memory_used', 0):.1f}/{metrics.get('memory_total', 0):.1f} GB"
+                f"{metrics.get('memory_percent', 0):.1f}%",
+                f"{metrics.get('memory_used', 0):.1f}/{metrics.get('memory_total', 0):.1f} GB",
+                help="Current memory usage and total available memory"
             )
             
         with col3:
             st.metric(
                 "Disk Usage",
-                f"{metrics.get('disk_percent', 0)}%",
-                f"{metrics.get('disk_used', 0):.1f}/{metrics.get('disk_total', 0):.1f} GB"
+                f"{metrics.get('disk_percent', 0):.1f}%",
+                f"{metrics.get('disk_used', 0):.1f}/{metrics.get('disk_total', 0):.1f} GB",
+                help="Current disk usage and total disk space"
             )
             
         with col4:
             if metrics.get('gpu_available'):
                 st.metric(
                     "GPU Usage",
-                    f"{metrics.get('gpu_utilization', 0)}%",
-                    f"{metrics.get('gpu_memory_used', 0):.1f}/{metrics.get('gpu_memory_total', 0):.1f} GB"
+                    f"{metrics.get('gpu_utilization', 0):.1f}%",
+                    f"{metrics.get('gpu_memory_used', 0):.1f}/{metrics.get('gpu_memory_total', 0):.1f} GB",
+                    help="Current GPU utilization and memory usage"
                 )
+                # Show additional GPU info in an expander
+                with st.expander("GPU Details"):
+                    st.text("GPU Memory:")
+                    st.progress(metrics.get('gpu_memory_used', 0) / metrics.get('gpu_memory_total', 1))
+                    st.text("GPU Utilization:")
+                    st.progress(metrics.get('gpu_utilization', 0) / 100)
             else:
-                st.metric("GPU", "Not Available")
+                st.metric(
+                    "GPU",
+                    "Not Available",
+                    help="No CUDA-capable GPU detected"
+                )
                 
         # Resource History Plots
         st.subheader("Resource History")

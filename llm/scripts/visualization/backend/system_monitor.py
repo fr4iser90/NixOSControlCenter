@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
 import torch
+import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,23 @@ class SystemMonitor:
         self.gpu_history = []
         self.disk_history = []
         
+    def _get_gpu_utilization(self) -> float:
+        """Get GPU utilization using nvidia-smi.
+        
+        Returns:
+            GPU utilization percentage
+        """
+        try:
+            result = subprocess.run(
+                ['nvidia-smi', '--query-gpu=utilization.gpu', '--format=csv,noheader,nounits'],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            return float(result.stdout.strip())
+        except:
+            return 0.0
+            
     def get_system_metrics(self) -> Dict:
         """Get current system metrics.
         
@@ -47,18 +65,24 @@ class SystemMonitor:
             if torch.cuda.is_available():
                 metrics['gpu_available'] = True
                 for i in range(torch.cuda.device_count()):
-                    gpu_memory = torch.cuda.get_device_properties(i).total_memory / 1e9  # Convert to GB
+                    # Get GPU properties
+                    props = torch.cuda.get_device_properties(i)
+                    gpu_memory = props.total_memory / 1e9  # Convert to GB
                     gpu_memory_used = torch.cuda.memory_allocated(i) / 1e9
+                    
+                    # Update total GPU memory
                     metrics['gpu_memory_total'] += gpu_memory
                     metrics['gpu_memory_used'] += gpu_memory_used
                     
-                    try:
-                        gpu_util = torch.cuda.utilization()
-                        metrics['gpu_utilization'] = gpu_util
-                    except:
-                        # If can't get utilization, estimate from memory usage
-                        metrics['gpu_utilization'] = (gpu_memory_used / gpu_memory) * 100
-                        
+                    # Get GPU utilization from nvidia-smi
+                    gpu_util = self._get_gpu_utilization()
+                    metrics['gpu_utilization'] = gpu_util
+                    
+                    # Log GPU details for debugging
+                    logger.info(f"GPU {i}: {props.name}")
+                    logger.info(f"Memory: {gpu_memory_used:.1f}/{gpu_memory:.1f} GB")
+                    logger.info(f"Utilization: {gpu_util}%")
+                    
                     if gpu_memory_used / gpu_memory > 0.9:
                         metrics['alerts'].append(f"GPU {i} memory usage is above 90%")
                         
