@@ -2,10 +2,11 @@
 """Trainer specifically for LoRA-based model fine-tuning."""
 import torch
 import logging
-from .feedback_trainer import FeedbackTrainer
 from ..modules.model_management import ModelInitializer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import LoraConfig, get_peft_model
+from .base_trainer import NixOSBaseTrainer
+from .feedback_trainer import FeedbackTrainer
 
 # Set up logging
 logging.basicConfig(
@@ -28,22 +29,22 @@ class LoRATrainer(FeedbackTrainer):
             **kwargs: Additional keyword arguments
         """
         logger.info(f"Initializing LoRA trainer for model: {model_name}")
-        
+
         # Setup model and tokenizer first
         self.model_name = model_name
         self.lora_config = lora_config or {}
         self.paths_config = paths_config
-        
+
         # Initialize model manager
         model_manager = ModelInitializer(paths_config)
-        
+
         # Get model and tokenizer from manager
         device_config = {
             'device_map': 'auto',
             'torch_dtype': torch.float16
         }
         self.model, self.tokenizer = model_manager.initialize_model(model_name, device_config)
-        
+
         # Apply LoRA config
         config = LoraConfig(
             r=self.lora_config.get('r', 8),
@@ -54,11 +55,11 @@ class LoRATrainer(FeedbackTrainer):
             task_type="CAUSAL_LM"
         )
         self.model = get_peft_model(self.model, config)
-        
+
         # Remove model and tokenizer from kwargs to avoid duplicates
         kwargs.pop('model', None)
         kwargs.pop('tokenizer', None)
-        
+
         # Initialize parent class
         super().__init__(
             model_name=model_name,
@@ -67,7 +68,7 @@ class LoRATrainer(FeedbackTrainer):
             *args,
             **kwargs
         )
-        
+
     def load_model(self, model_path: str):
         """Load a saved model and tokenizer."""
         try:
