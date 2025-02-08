@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from huggingface_hub import HfApi, ModelFilter
+from huggingface_hub import HfApi
 
 logger = logging.getLogger(__name__)
 
@@ -81,27 +81,26 @@ class BaseModelManager:
         """
         api = HfApi()
         
-        # Create model filter
-        model_filter = ModelFilter(
-            task=task_type,
-            min_likes=min_likes,
-            model_name=query if query else None
+        # Search models using the new API
+        models = api.list_models(
+            search=query if query else None,
+            filter="task_categories=text-generation",
+            sort="likes",
+            direction=-1,
+            limit=20
         )
         
-        # Search models
-        models = api.list_models(filter=model_filter, limit=20)
-        
-        # Format results
+        # Filter and format results
         results = []
         for model in models:
-            results.append({
-                "name": model.modelId,
-                "description": model.description,
-                "likes": model.likes,
-                "downloads": model.downloads,
-                "tags": model.tags,
-                "pipeline_tag": model.pipeline_tag
-            })
+            if model.likes is not None and model.likes >= min_likes:
+                results.append({
+                    "name": model.id,
+                    "description": model.card_data.get("model-index") if model.card_data else None,
+                    "likes": model.likes,
+                    "downloads": getattr(model, "downloads", 0),
+                    "tags": model.tags
+                })
             
         return results
         
@@ -110,7 +109,7 @@ class BaseModelManager:
         
         Args:
             model_name: Name/ID of model to download
-            force: Force re-download even if already exists
+            force: Force re-download even if exists
             
         Returns:
             True if successful, False otherwise
