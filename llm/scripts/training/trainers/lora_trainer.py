@@ -39,7 +39,8 @@ class LoRATrainer(FeedbackTrainer):
         # Get model and tokenizer from manager
         device_config = {
             'device_map': 'auto',
-            'torch_dtype': torch.float16
+            'torch_dtype': torch.float16,
+            'weights_only': True,  # Prevent arbitrary code execution during loading
         }
         self.model, self.tokenizer = model_manager.initialize_model(model_name, device_config)
         
@@ -76,7 +77,8 @@ class LoRATrainer(FeedbackTrainer):
             # Load model and tokenizer from manager
             device_config = {
                 'device_map': 'auto',
-                'torch_dtype': torch.float16
+                'torch_dtype': torch.float16,
+                'weights_only': True,  # Prevent arbitrary code execution during loading
             }
             self.model, self.tokenizer = model_manager.initialize_model(model_path, device_config)
             
