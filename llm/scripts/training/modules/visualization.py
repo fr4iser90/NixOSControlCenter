@@ -44,7 +44,7 @@ class VisualizationManager:
         self.project_paths = project_paths
         self.network_access = network_access
         self.viz_process = None
-        self.metrics_manager = MetricsManager()
+        self.metrics_manager = MetricsManager(project_paths)
         self.system_monitor = SystemMonitor()
         self.port = None
         
