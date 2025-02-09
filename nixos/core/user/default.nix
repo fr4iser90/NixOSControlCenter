@@ -27,7 +27,7 @@ let
       commands = [{
         command = "ALL";
         options = 
-          if systemConfig.sudo.requirePassword == true then
+          if (systemConfig.sudo != null && systemConfig.sudo.requirePassword == true) then
             [ "PASSWD" ]
           else
             [ "NOPASSWD" ];  # Keine Passwortabfrage, wenn requirePassword nicht gesetzt oder false
@@ -41,6 +41,7 @@ let
       }];
     }]
     else [];  # Keine sudo-Rechte für andere Rollen
+
 
 
   # Automatisches Autologin für den ersten restricted-Admin-User
