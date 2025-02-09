@@ -34,7 +34,6 @@ collect_system_data() {
     init_desktop_env
     init_hardware_config
     init_nix_config
-    init_security_settings
     init_localization
     init_hosting_config
     init_profile_overrides
@@ -132,15 +131,6 @@ init_nix_config() {
         -e "s|@SSH_CLIENT_MANAGER@|false|" \
         -e "s|@SSH_SERVER_MANAGER@|false|" \
         -e "s|@FLAKE_UPDATER@|false|" \
-        "$temp_config"
-}
-
-init_security_settings() {
-    log_debug "Updating security settings..."
-    sed -i \
-        -e "s|@SUDO_REQUIRE_PASS@|false|" \
-        -e "s|@SUDO_TIMEOUT@|15|" \
-        -e "s|@ENABLE_FIREWALL@|false|" \
         "$temp_config"
 }
 

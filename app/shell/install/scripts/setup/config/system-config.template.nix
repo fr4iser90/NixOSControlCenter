@@ -77,19 +77,10 @@
     ssh-server-manager = false;        
     bootentry-manager = false; 
     container-manager = false;  
-    homelab-manager = false;    
+    homelab-manager = true;    
     vm-manager = false;         
     ai-workspace = false;       
   };
-
-  #
-  # Security Settings
-  #
-  sudo = {
-    requirePassword = @SUDO_REQUIRE_PASS@;
-    timeout = @SUDO_TIMEOUT@;
-  };
-  enableFirewall = @ENABLE_FIREWALL@;
 
   #
   # Localization

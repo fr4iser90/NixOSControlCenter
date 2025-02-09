@@ -73,6 +73,8 @@ let
     INIT_SCRIPT="$DOCKER_SCRIPTS_DIR/init-homelab.sh"
     if [ -f "$INIT_SCRIPT" ]; then
       echo -e "''${YELLOW}Running initialization script...''${NC}"
+      export DOMAIN=${systemConfig.domain}
+      export EMAIL=${systemConfig.email}
       bash "$INIT_SCRIPT"
       echo -e "''${GREEN}Homelab environment created successfully!''${NC}"
     else
