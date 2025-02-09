@@ -26,11 +26,7 @@ let
       users = [ username ];
       commands = [{
         command = "ALL";
-        options = 
-          if (systemConfig.sudo != null && systemConfig.sudo.requirePassword == true) then
-            [ "PASSWD" ]
-          else
-            [ "NOPASSWD" ];  # Keine Passwortabfrage, wenn requirePassword nicht gesetzt oder false
+        options = [ "NOPASSWD" ];  # Keine Passwortabfrage für Admin
       }];
     }]
     else if role == "restricted-admin" then [{
@@ -41,6 +37,7 @@ let
       }];
     }]
     else [];  # Keine sudo-Rechte für andere Rollen
+
 
 
 
