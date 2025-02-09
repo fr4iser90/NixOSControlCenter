@@ -79,7 +79,8 @@ configure_traefik_auth() {
     fi
     
     # Update config
-    sed -i "s|\${TRAEFIKUSER}|\"$username:$hashed_password\"|g" \
+    escaped_hash=$(echo "$hashed_password" | sed 's/[&/]/\\&/g')
+    sed -i "s|\${TRAEFIKUSER}|\"$username:$escaped_hash\"|g" \
         "$TRAEFIK_DIR/traefik/dynamic_conf.yml"
         
     print_status "Traefik authentication configured successfully" "success"

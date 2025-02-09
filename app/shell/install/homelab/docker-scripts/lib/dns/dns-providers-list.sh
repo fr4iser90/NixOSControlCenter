@@ -195,8 +195,7 @@ providers=(
     "Zonomi zonomi ZONOMI_API_KEY"
 )
 
-# Debug output
-print_status "Loaded ${#providers[@]} DNS providers" "debug"
+
 
 # Optional: Validation function
 validate_provider() {

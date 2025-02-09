@@ -37,7 +37,7 @@ services:
     networks:
       proxy:
         ipv4_address: 172.40.0.11
-    env_file: env.mysql
+    env_file: mysql.env
     volumes:
       - ./data:/var/lib/mysql
 

@@ -49,18 +49,22 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+escaped_password=$(echo "$password" | sed 's/[\/&]/\\&/g')
+escaped_username=$(echo "$username" | sed 's/[\/&]/\\&/g')
+
 # Update environment file
 new_values=(
-    "GF_SECURITY_ADMIN_USER:$username"
-    "GF_SECURITY_ADMIN_PASSWORD:$password"
+    "GF_SECURITY_ADMIN_USER:$escaped_username"
+    "GF_SECURITY_ADMIN_PASSWORD:$escaped_password"
     "PUID:$USER_UID"
     "PGID:$USER_GID"
 )
 
+
 if update_env_file "$BASE_DIR" "$ENV_FILE" "${new_values[@]}"; then
     print_status "Grafana environment updated successfully" "success"
     if [ "$SHOW_CREDENTIALS" = true ]; then
-        print_status "Username: $username" "info"
+        print_status "Username: $escaped_username" "info"
         print_status "PUID: $USER_UID" "info"
         print_status "PGID: $USER_GID" "info"
     fi

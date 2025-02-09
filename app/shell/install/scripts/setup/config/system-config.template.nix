@@ -70,9 +70,9 @@
   # System Features
   #
   features = {
-    system-logger = false;     
-    system-checks = false;      
-    system-updater = false;    
+    system-logger = true;     
+    system-checks = true;      
+    system-updater = true;    
     ssh-client-manager = false;
     ssh-server-manager = false;        
     bootentry-manager = false; 
