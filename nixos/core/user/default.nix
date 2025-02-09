@@ -12,7 +12,7 @@ let
   # User-spezifische Pakete basierend auf Rolle
   rolePkgs = {
     virtualization = with pkgs; [
-#      docker-compose
+      docker-compose
       virt-manager
       qemu
     ];
