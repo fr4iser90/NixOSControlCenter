@@ -112,5 +112,4 @@
   #
   email = "@EMAIL@";
   domain = "@DOMAIN@";
-  certEmail = "@CERT_EMAIL@";
 }

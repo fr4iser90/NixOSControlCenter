@@ -13,7 +13,6 @@ in {
     sessionVariables = {
       DOMAIN = systemConfig.domain;
       EMAIL = systemConfig.email;
-      CERT_EMAIL = systemConfig.certEmail;
     };
   };
 }

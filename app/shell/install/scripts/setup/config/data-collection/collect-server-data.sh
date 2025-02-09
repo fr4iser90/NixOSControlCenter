@@ -17,21 +17,18 @@ collect_user_data() {
     
     local email="${EMAIL:-}"
     local domain="${DOMAIN:-}"
-    local cert_email="${CERT_EMAIL:-}"
     
     # Prompt for values
-    prompt_value "Please enter the email" "email" "$email"
+    prompt_value "Please enter the certification resolver email" "email" "$email"
     prompt_value "Please enter the domain" "domain" "$domain"
-    prompt_value "Please enter the certification resolver email (or press enter to use the same email)" "cert_email" "$cert_email"
     
-    # Use email as cert_email if not provided
-    cert_email="${cert_email:-$email}"
+
     
     # Save values
-    save_values "$domain" "$email" "$cert_email"
+    save_values "$domain" "$email"
     
     # Update configuration files
-    update_nix_files "$domain" "$email" "$cert_email"
+    update_nix_files "$domain" "$email"
     
     log_success "User data collection complete"
 }
@@ -52,25 +49,23 @@ prompt_value() {
 save_values() {
     local domain="$1"
     local email="$2"
-    local cert_email="$3"
+
     
     # Export for other scripts
     export DOMAIN="$domain"
     export EMAIL="$email"
-    export CERT_EMAIL="$cert_email"
+
     
     # Save to temp file
     cat > "$TEMP_FILE" << EOF
 DOMAIN="$domain"
 EMAIL="$email"
-CERT_EMAIL="$cert_email"
 EOF
 }
 
 update_nix_files() {
     local domain="$1"
     local email="$2"
-    local cert_email="$3"
     
     log_info "Updating configuration files..."
     
@@ -80,7 +75,6 @@ update_nix_files() {
             if sed -i \
                 -e "s/\(domain = \).*/\1\"$domain\";/" \
                 -e "s/\(email = \).*/\1\"$email\";/" \
-                -e "s/\(certEmail = \).*/\1\"$cert_email\";/" \
                 "$nix_file"; then
                 log_success "Updated $(basename "$nix_file")"
             else

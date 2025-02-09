@@ -8,7 +8,6 @@ let
   commonEnvVariables = {
     DOMAIN = systemConfig.domain;
     EMAIL = systemConfig.email;
-    CERT_EMAIL = systemConfig.certEmail;
     TIMEZONE = systemConfig.timeZone;
     DBUS_SESSION_BUS_ADDRESS = "unix:path=/run/user/$UID/bus";
   };

@@ -53,7 +53,6 @@ EOF
         -exec sed -i \
             -e "s|{{EMAIL}}|${HOMELAB_EMAIL}|g" \
             -e "s|{{DOMAIN}}|${HOMELAB_DOMAIN}|g" \
-            -e "s|{{CERTEMAIL}}|${HOMELAB_CERT_EMAIL}|g" \
             -e "s|{{USER}}|${VIRT_USER}|g" \
             {} \;
     

@@ -5,7 +5,6 @@ check_hosting() {
     
     local domain=""
     local email=""
-    local cert_email=""
     local virt_user=""
 
     # Check common config locations
@@ -24,7 +23,6 @@ check_hosting() {
             # Extract values if they exist
             [[ -z "$domain" ]] && domain=$(grep -oP 'domain\s*=\s*"\K[^"]+' "$config" || true)
             [[ -z "$email" ]] && email=$(grep -oP 'email\s*=\s*"\K[^"]+' "$config" || true)
-            [[ -z "$cert_email" ]] && cert_email=$(grep -oP 'certEmail\s*=\s*"\K[^"]+' "$config" || true)
             [[ -z "$virt_user" ]] && virt_user=$(grep -oP 'virtUser\s*=\s*"\K[^"]+' "$config" || true)
         fi
     done
@@ -44,19 +42,16 @@ check_hosting() {
 
     if [[ -z "$email" ]] && command -v git >/dev/null; then
         email=$(git config --global user.email || true)
-        [[ -z "$cert_email" ]] && cert_email="$email"
     fi
 
     # Export für weitere Verarbeitung
     export HOST_DOMAIN="$domain"
     export HOST_EMAIL="$email"
-    export CERT_EMAIL="$cert_email"
     export VIRT_USER="$virt_user"
 
     # Logging
     [[ -n "$domain" ]] && log_info "  Domain: ${domain}"
     [[ -n "$email" ]] && log_info "  Email: ${email}"
-    [[ -n "$cert_email" ]] && log_info "  Cert Email: ${cert_email}"
     [[ -n "$virt_user" ]] && log_info "  Virt User: ${virt_user}"
     
     return 0

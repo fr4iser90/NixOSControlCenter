@@ -10,7 +10,6 @@ setup_homelab_config() {
     virt_user="${VIRT_USER:-}"
     email="${HOST_EMAIL:-}"
     domain="${HOST_DOMAIN:-}"
-    cert_email="${CERT_EMAIL:-}"
     enable_desktop="${ENABLE_DESKTOP:-true}" 
 
     # Optional: Debug output
@@ -54,10 +53,7 @@ collect_homelab_info() {
     
     # Domain configuration
     domain=$(get_domain "$domain") || return 1
-    
-    # SSL cert email
-    cert_email=$(get_cert_email "$email" "$cert_email") || return 1
-    
+        
     # Desktop configuration
     enable_desktop=$(get_desktop_enabled "$enable_desktop") || return 1  # <- HIER
 
@@ -111,14 +107,6 @@ get_domain() {
         fi
         log_error "Invalid domain format"
     done
-}
-
-get_cert_email() {
-    local default_email="$1"
-    local current_cert_email="$2"
-    local cert_email
-    read -ep $'\033[0;34m[?]\033[0m Enter SSL certificate email'"${current_cert_email:+ [$current_cert_email]}"': ' cert_email
-    echo "${cert_email:-${current_cert_email:-$default_email}}"
 }
 
 update_homelab_config() {
@@ -357,12 +345,11 @@ update_email_domain() {
     local config_file="$1"
     
     if ! grep -q "email =" "$config_file"; then
-        sed -i "/^{/a\\  email = \"${email}\";\n  domain = \"${domain}\";\n  certEmail = \"${cert_email}\";" "$config_file"
+        sed -i "/^{/a\\  email = \"${email}\";\n  domain = \"${domain}\";" "$config_file"
     else
         sed -i \
             -e "s/email = \".*\";/email = \"${email}\";/" \
             -e "s/domain = \".*\";/domain = \"${domain}\";/" \
-            -e "s/certEmail = \".*\";/certEmail = \"${cert_email}\";/" \
             "$config_file"
     fi
 }
@@ -381,7 +368,6 @@ export_homelab_vars() {
     export VIRT_USER="$virt_user"
     export HOMELAB_EMAIL="$email"
     export HOMELAB_DOMAIN="$domain"
-    export HOMELAB_CERT_EMAIL="$cert_email"
 }
 
 # Export functions
@@ -392,7 +378,6 @@ export -f get_admin_username
 export -f get_virt_username
 export -f get_email
 export -f get_domain
-export -f get_cert_email
 export -f log_error
 export -f log_success
 export -f log_section

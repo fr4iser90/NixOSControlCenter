@@ -115,7 +115,6 @@ in {
         DOCKER_SCRIPTS_DIR="$VIRT_HOME/docker-scripts"
         HOMELAB_EMAIL="${systemConfig.email}"
         HOMELAB_DOMAIN="${systemConfig.domain}"
-        HOMELAB_CERT_EMAIL="${systemConfig.certEmail}"
         
         ${if cfg.debug then ''
           ${ui.messages.debug "VIRT_USER=$VIRT_USER"}
@@ -145,7 +144,6 @@ in {
           -exec sed -i \
             -e "s|{{EMAIL}}|$HOMELAB_EMAIL|g" \
             -e "s|{{DOMAIN}}|$HOMELAB_DOMAIN|g" \
-            -e "s|{{CERTEMAIL}}|$HOMELAB_CERT_EMAIL|g" \
             -e "s|{{USER}}|$VIRT_USER|g" \
             {} \;
         

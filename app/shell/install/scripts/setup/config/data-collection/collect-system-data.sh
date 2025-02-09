@@ -159,7 +159,6 @@ init_hosting_config() {
     sed -i \
         -e "s|@DOMAIN@|${HOST_DOMAIN:-example.com}|" \
         -e "s|@EMAIL@|${HOST_EMAIL:-admin@example.com}|" \
-        -e "s|@CERT_EMAIL@|${CERT_EMAIL:-admin@example.com}|" \
         -e "s|@VIRT_USER@|${VIRT_USER:-docker}|" \
         "$temp_config"
 }
