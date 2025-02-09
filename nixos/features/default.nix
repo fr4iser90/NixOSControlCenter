@@ -23,7 +23,7 @@ let
 
 in {
   imports = 
-    lib.optionals hasActiveFeatures [
+    lib.optionals hasActiveFeatures || isHomelabSystem [
       ./terminal-ui
       ./command-center
     ]
