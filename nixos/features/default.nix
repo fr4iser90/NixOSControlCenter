@@ -20,42 +20,25 @@ let
 
   # Check if the systemType is set to "homelab"
   isHomelabSystem = (systemConfig.systemType or "") == "homelab";
-  
-  # Check if the homelab-manager feature is enabled
-  isHomelabManagerEnabled = (cfg.homelab-manager or false);
 
 in {
-  # Terminal UI is automatically loaded if features are active
-  imports = lib.optionals hasActiveFeatures [ 
-    ./terminal-ui
-    ./command-center 
-  ] ++ 
-    lib.optionals (cfg.system-checks or false) [
-      ./system-checks
-    ] ++ lib.optionals (cfg.system-updater or false) [
-      ./system-updater
-    ] ++ lib.optionals (cfg.system-logger or false) [
-      ./system-logger
-    ] ++ lib.optionals (cfg.system-config-manager or false) [
-      ./system-config-manager
-    ] ++ lib.optionals (cfg.container-manager or false) [
-      ./container-manager
-    ] ++ lib.optionals (cfg.bootentry-manager or false) [
-      ./bootentry-manager
-    ] ++ lib.optionals (cfg.ssh-client-manager or false) [
-      ./ssh-client-manager
-    ] ++ lib.optionals (cfg.ssh-server-manager or false) [
-      ./ssh-server-manager
-    ] ++ lib.optionals (cfg.vm-manager or false) [
-      ./vm-manager
-    ] ++ lib.optionals (cfg.ai-workspace or false) [
-      ./ai-workspace
-    ];
-
-  # Homelab-Manager is imported if systemType is "homelab" or the feature is enabled
-  imports = imports ++ lib.optionals (isHomelabSystem || isHomelabManagerEnabled) [
-    ./homelab-manager
-  ];
+  imports = 
+    lib.optionals hasActiveFeatures [
+      ./terminal-ui
+      ./command-center
+    ]
+    ++ lib.optionals (cfg.system-checks or false) [ ./system-checks ]
+    ++ lib.optionals (cfg.system-updater or false) [ ./system-updater ]
+    ++ lib.optionals (cfg.system-logger or false) [ ./system-logger ]
+    ++ lib.optionals (cfg.system-config-manager or false) [ ./system-config-manager ]
+    ++ lib.optionals (cfg.container-manager or false) [ ./container-manager ]
+    # Import homelab-manager if the feature is enabled or if systemType is "homelab"
+    ++ lib.optionals ((cfg.homelab-manager or false) || isHomelabSystem) [ ./homelab-manager ]
+    ++ lib.optionals (cfg.bootentry-manager or false) [ ./bootentry-manager ]
+    ++ lib.optionals (cfg.ssh-client-manager or false) [ ./ssh-client-manager ]
+    ++ lib.optionals (cfg.ssh-server-manager or false) [ ./ssh-server-manager ]
+    ++ lib.optionals (cfg.vm-manager or false) [ ./vm-manager ]
+    ++ lib.optionals (cfg.ai-workspace or false) [ ./ai-workspace ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 }
