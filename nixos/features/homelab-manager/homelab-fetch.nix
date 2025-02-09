@@ -1,6 +1,27 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
+  # Debug-Ausgaben mit unterschiedlichen Namen
+  debug1 = builtins.trace "Available users: ${toString (lib.attrNames systemConfig.users)}" null;
+  debug2 = builtins.trace "Users structure: ${builtins.toJSON systemConfig.users}" null;
+
+  # Finde Virtualisierungsbenutzer
+  virtUsers = lib.filterAttrs 
+    (name: user: 
+      let
+        debug3 = builtins.trace "Checking user ${name} with role ${user.role}" null;
+      in 
+      user.role == "virtualization"
+    ) 
+    systemConfig.users;
+  
+  debug4 = builtins.trace "Found virt users: ${toString (lib.attrNames virtUsers)}" null;
+  
+  hasVirtUsers = (lib.length (lib.attrNames virtUsers)) > 0;
+  virtUser = lib.head (lib.attrNames virtUsers);
+
+  debug5 = builtins.trace "Selected virtUser: ${virtUser}" null;
+  
   homelab-fetch = pkgs.writeScriptBin "homelab-fetch" ''
     #!${pkgs.bash}/bin/bash
     
