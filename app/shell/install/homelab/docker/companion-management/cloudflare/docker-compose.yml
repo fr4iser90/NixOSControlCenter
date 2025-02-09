@@ -2,6 +2,9 @@ services:
   cloudflare-companion:
     image: tiredofit/traefik-cloudflare-companion
     container_name: cloudflare-companion
+    environment:
+      - PUID=${UID}
+      - PGID=${GID}
     volumes:
       - ./logs:/logs
       - /var/run/docker.sock:/var/run/docker.sock

@@ -3,7 +3,12 @@
 let
   userConfig = systemConfig.users.${user};
   shellInit = import ../shellInit/${userConfig.defaultShell}Init.nix { inherit pkgs lib; };
-in {
+
+  # get UID and GID 
+  userUID = builtins.getEnv "UID" or null;
+  userGID = builtins.getEnv "GID" or null;
+in
+{
   imports = [ shellInit ];
 
   home = {
@@ -13,6 +18,8 @@ in {
     sessionVariables = {
       DOMAIN = systemConfig.domain;
       EMAIL = systemConfig.email;
+      UID = userUID;
+      GID = userGID;
     };
   };
 }

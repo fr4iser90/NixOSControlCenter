@@ -2,6 +2,9 @@ services:
 
   endlessh:
     container_name: endlessh
+    environment:
+      - PUID=${UID}
+      - PGID=${GID}
     image: shizunge/endlessh-go:latest
     restart: always
     command:
@@ -19,6 +22,9 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus-SSH
+    environment:
+      - PUID=${UID}
+      - PGID=${GID}
     restart: always
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -55,6 +61,9 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: grafana-SSH
+    environment:
+      - PUID=${UID}
+      - PGID=${GID}
     restart: always
     networks:
       proxy:

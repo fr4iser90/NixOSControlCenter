@@ -3,8 +3,8 @@ services:
     image: portainer/portainer-ce:latest
     container_name: portainer
     environment:
-      PUID: '1004'
-      PGID: '131'
+      - PUID=${UID}
+      - PGID=${GID}
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./data:/data

@@ -3,6 +3,9 @@ services:
   wireguard:
     image: lscr.io/linuxserver/wireguard:latest
     container_name: wireguard
+    environment:
+      - PUID=${UID}
+      - PGID=${GID}
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
@@ -26,6 +29,9 @@ services:
   wireguard-ui:
     image: ngoduykhanh/wireguard-ui:latest
     container_name: wireguard-ui
+    environment:
+      - PUID=${UID}
+      - PGID=${GID}
     depends_on:
       - wireguard
     cap_add:

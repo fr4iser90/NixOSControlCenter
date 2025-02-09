@@ -2,6 +2,9 @@ services:
   organizr:
     image: organizr/organizr
     container_name: organizr
+    environment:
+      - PUID=${UID}
+      - PGID=${GID}
     volumes:
       - ./data:/config
     dns:

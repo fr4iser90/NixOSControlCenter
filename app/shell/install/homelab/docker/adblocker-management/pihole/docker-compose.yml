@@ -2,6 +2,9 @@ services:
   pihole:
     image: pihole/pihole:latest
     container_name: pihole
+    environment:
+      - PUID=${UID}
+      - PGID=${GID}
     env_file:
       - pihole.env
     networks:

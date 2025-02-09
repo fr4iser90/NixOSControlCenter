@@ -2,6 +2,9 @@ services:
 
   yourls:
     image: yourls
+    environment:
+      - PUID=${UID}
+      - PGID=${GID}
     restart: always
     container_name: yoURLs
     networks:

@@ -26,19 +26,22 @@ let
       users = [ username ];
       commands = [{
         command = "ALL";
-        options = if systemConfig.sudo.requirePassword or true
-          then [ "PASSWD" ]
-          else [ "NOPASSWD" ];
+        options = 
+          if systemConfig.sudo.requirePassword == true then
+            [ "PASSWD" ]
+          else
+            [ "NOPASSWD" ];  # Keine Passwortabfrage, wenn requirePassword nicht gesetzt oder false
       }];
     }]
     else if role == "restricted-admin" then [{
       users = [ username ];
       commands = [{
         command = "ALL";
-        options = [ "PASSWD" ];
+        options = [ "PASSWD" ];  # Passwortabfrage für eingeschränkte Admins
       }];
     }]
     else [];  # Keine sudo-Rechte für andere Rollen
+
 
   # Automatisches Autologin für den ersten restricted-Admin-User
   autoLoginUser = lib.findFirst 

@@ -3,6 +3,9 @@ services:
   bitwarden:
     image: vaultwarden/server:latest
     container_name: bitwarden
+    environment:
+      - PUID=${UID}
+      - PGID=${GID}
     restart: always
     env_file: bitwarden.env
     volumes:
