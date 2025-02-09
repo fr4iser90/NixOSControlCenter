@@ -16,6 +16,7 @@ let
     (cfg.vm-manager or false)
     (cfg.ai-workspace or false)
     (cfg.tracker or false)
+    (systemConfig.systemType == "homelab")
   ];
 
   # Check if the systemType is set to "homelab"
@@ -23,7 +24,7 @@ let
 
 in {
   imports = 
-    lib.optionals hasActiveFeatures || isHomelabSystem [
+    lib.optionals hasActiveFeatures [
       ./terminal-ui
       ./command-center
     ]
