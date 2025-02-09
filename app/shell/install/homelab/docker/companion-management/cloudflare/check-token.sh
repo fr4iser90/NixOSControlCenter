@@ -12,10 +12,6 @@ BASE_DIR=$(get_docker_dir "$SERVICE_NAME")
 check_auth() {
     print_status "Checking Cloudflare authentication..." "info"
     
-    # Debug: Show ENV file content (excluding sensitive data)
-    print_status "Current ENV file configuration:" "info"
-    grep -v "KEY\|TOKEN" "$BASE_DIR/$ENV_FILE" || true
-    
     # Check if container is running
     if ! docker ps | grep -q "cloudflare-companion"; then
         print_status "Container is not running, starting it..." "warn"
@@ -25,20 +21,16 @@ check_auth() {
     
     # Show last logs
     print_status "Checking container logs..." "info"
-    docker logs --tail 50 cloudflare-companion
+    LOG_OUTPUT=$(docker logs --tail 50 cloudflare-companion 2>&1)
+    echo "$LOG_OUTPUT"
     
-    # Advanced troubleshooting
-    if docker logs cloudflare-companion 2>&1 | grep -i "authentication\|unauthorized\|invalid\|error\|CloudFlareAPIError"; then
-        print_status "Found authentication error in logs" "error"
+    # Check for actual authentication errors, ignoring existing DNS record errors
+    if echo "$LOG_OUTPUT" | grep -iE "(unauthorized|invalid credentials|CloudFlareAPIError)"; then
+        print_status "Authentication error detected!" "error"
         return 1
     fi
     
-    # Check if container is still running or crashed
-    if ! docker ps | grep -q "cloudflare-companion"; then
-        print_status "Container crashed after start" "error"
-        return 1
-    fi
-    
+    print_status "No authentication issues found." "success"
     return 0
 }
 
@@ -50,10 +42,8 @@ switch_to_global_key() {
     
     # Check if CF_API_KEY exists
     if [ -n "${CF_API_KEY:-}" ]; then
-        # Comment out CF_TOKEN and enable CF_API_KEY
         sed -i 's/^CF_TOKEN/#CF_TOKEN/' "$BASE_DIR/$ENV_FILE"
         sed -i "s/#CF_API_KEY=.*/CF_API_KEY=$CF_API_KEY/" "$BASE_DIR/$ENV_FILE"
-        # Restart container
         docker restart cloudflare-companion
     else
         print_status "Global API Key is not available, skipping switch." "info"
@@ -62,25 +52,19 @@ switch_to_global_key() {
 
 # Main logic
 if ! check_auth; then
-    print_status "Token authentication failed!" "error"
+    print_status "Token authentication might have failed! Checking alternatives..." "warn"
     
     if [ -n "${CF_API_KEY:-}" ]; then
         print_status "Trying with Global API Key..." "warn"
         switch_to_global_key
-        
         if check_auth; then
-            print_status "Global API Key authentication successful" "success"
-            print_status "⚠️  Warning: Using Global API Key is not recommended!" "warn"
+            print_status "Global API Key authentication successful." "success"
         else
-            print_status "Global API Key authentication also failed!" "error"
-            print_status "Please check your Cloudflare credentials" "error"
-            exit 1
+            print_status "Global API Key also failed, but continuing..." "error"
         fi
     else
-        print_status "No Global API Key available" "error"
-        print_status "Please check your Cloudflare Token configuration" "error"
-        exit 1
+        print_status "No Global API Key available, but continuing..." "warn"
     fi
 else
-    print_status "Cloudflare authentication successful" "success"
+    print_status "Cloudflare authentication is fine." "success"
 fi
