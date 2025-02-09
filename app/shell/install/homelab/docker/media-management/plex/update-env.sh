@@ -16,7 +16,7 @@ _PLEX_COMPOSE_LOADED=1
 # Script configuration
 SERVICE_NAME="plex"
 COMPOSE_FILE="docker-compose.yml"
-ENV_FILE="pihole.env"
+ENV_FILE="plex.env"
 
 print_header "Updating Plex Docker Compose"
 
