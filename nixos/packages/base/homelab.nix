@@ -11,6 +11,8 @@
     # CLI Essentials
     coreutils
     curl
+    docker 
+    docker-client
     wget
     git
     neovim
