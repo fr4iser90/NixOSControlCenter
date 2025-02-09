@@ -60,6 +60,7 @@ prompt_input() {
                 if [ -n "$CURRENT_SERVICE" ] && [ -n "$CURRENT_USERNAME" ]; then
                     store_service_credentials "$CURRENT_SERVICE" "$CURRENT_USERNAME" "$value"
                     unset CURRENT_USERNAME
+                    unset CURRENT_SERVICE
                 fi
                 echo "$value"
                 return 0

@@ -93,7 +93,7 @@ configure_traefik_ssl() {
     local TRAEFIK_DIR=$(get_docker_dir "traefik-crowdsec")
     
     if validate_email; then
-        sed -i "s|\${CERTEMAIL}|$CERTEMAIL|g" "$TRAEFIK_DIR/traefik/traefik.yml"
+        sed -i "s|\${EMAIL}|$EMAIL|g" "$TRAEFIK_DIR/traefik/traefik.yml"
         print_status "SSL configuration updated" "success"
         return 0
     fi

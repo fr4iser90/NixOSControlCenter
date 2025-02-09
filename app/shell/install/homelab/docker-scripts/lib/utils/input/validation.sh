@@ -17,8 +17,8 @@ validate_domain() {
 
 # Email Validierung
 validate_email() {
-    if [ -z "$CERTEMAIL" ]; then
-        print_status "CERTEMAIL environment variable is not set" "error"
+    if [ -z "$EMAIL" ]; then
+        print_status "EMAIL environment variable is not set" "error"
         return 1
     fi
     return 0
