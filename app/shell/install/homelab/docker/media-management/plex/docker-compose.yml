@@ -6,6 +6,7 @@ services:
     environment:
       - PUID=${UID}
       - PGID=${GID}
+    user: "${UID}:${GID}"  
     env_file:
       - plex.env
     dns:

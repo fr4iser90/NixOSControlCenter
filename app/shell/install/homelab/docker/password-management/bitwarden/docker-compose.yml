@@ -6,6 +6,7 @@ services:
     environment:
       - PUID=${UID}
       - PGID=${GID}
+    user: "${UID}:${GID}"  
     restart: always
     env_file: bitwarden.env
     volumes:

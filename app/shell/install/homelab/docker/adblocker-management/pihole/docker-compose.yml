@@ -4,7 +4,8 @@ services:
     container_name: pihole
     environment:
       - PUID=${UID}
-      - PGID=${GID}
+      - PGID=${GID} 
+    user: "${UID}:${GID}"
     env_file:
       - pihole.env
     networks:

@@ -5,6 +5,7 @@ services:
     environment:
       - PUID=${UID}
       - PGID=${GID}
+    user: "${UID}:${GID}"  
     volumes:
       - ./logs:/logs
       - /var/run/docker.sock:/var/run/docker.sock

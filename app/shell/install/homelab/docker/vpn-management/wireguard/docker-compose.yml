@@ -6,6 +6,7 @@ services:
     environment:
       - PUID=${UID}
       - PGID=${GID}
+    user: "${UID}:${GID}"  
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
@@ -32,6 +33,7 @@ services:
     environment:
       - PUID=${UID}
       - PGID=${GID}
+    user: "${UID}:${GID}"  
     depends_on:
       - wireguard
     cap_add:

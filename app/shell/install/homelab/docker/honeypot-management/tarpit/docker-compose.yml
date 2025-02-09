@@ -5,6 +5,7 @@ services:
     environment:
       - PUID=${UID}
       - PGID=${GID}
+    user: "${UID}:${GID}"  
     image: shizunge/endlessh-go:latest
     restart: always
     command:
@@ -25,6 +26,7 @@ services:
     environment:
       - PUID=${UID}
       - PGID=${GID}
+    user: "${UID}:${GID}"  
     restart: always
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -64,6 +66,7 @@ services:
     environment:
       - PUID=${UID}
       - PGID=${GID}
+    user: "${UID}:${GID}"  
     restart: always
     networks:
       proxy:
