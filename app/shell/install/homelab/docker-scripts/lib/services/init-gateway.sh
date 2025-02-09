@@ -70,8 +70,9 @@ configure_traefik_auth() {
     print_status "Generating secure password hash..." "info"
     
     # Generate hashed password
+    escaped_password=$(echo "$password" | sed 's/[&/]/\\&/g')
     local hashed_password
-    hashed_password=$(nix-shell -p apacheHttpd --command "htpasswd -nbB \"$username\" \"$password\"" | cut -d ':' -f 2)
+    hashed_password=$(nix-shell -p apacheHttpd --command "htpasswd -nbB \"$username\" \"$escaped_password\"" | cut -d ':' -f 2)
     
     if [ -z "$hashed_password" ]; then
         print_status "Failed to generate password hash" "error"
@@ -79,8 +80,8 @@ configure_traefik_auth() {
     fi
     
     # Update config
-    escaped_hash=$(echo "$hashed_password" | sed 's/[&/]/\\&/g')
-    sed -i "s|\${TRAEFIKUSER}|\"$username:$escaped_hash\"|g" \
+    
+    sed -i "s|\${TRAEFIKUSER}|\"$username:$hashed_password\"|g" \
         "$TRAEFIK_DIR/traefik/dynamic_conf.yml"
         
     print_status "Traefik authentication configured successfully" "success"

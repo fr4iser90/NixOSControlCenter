@@ -22,7 +22,6 @@ check_auth() {
     # Show last logs
     print_status "Checking container logs..." "info"
     LOG_OUTPUT=$(docker logs --tail 50 cloudflare-companion 2>&1)
-    echo "$LOG_OUTPUT"
     
     # Check for actual authentication errors, ignoring existing DNS record errors
     if echo "$LOG_OUTPUT" | grep -iE "(unauthorized|invalid credentials|CloudFlareAPIError)"; then

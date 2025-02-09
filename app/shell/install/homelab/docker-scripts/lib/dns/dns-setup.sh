@@ -25,7 +25,7 @@ update_dns_configuration() {
         return 1
     fi
 
-    # 4. Update DDNS configuration
+    # 4. Update DDNS configuration (REDUDNAT?)
     print_status "Updating DDNS configuration..." "info"
     local DDNS_DIR=$(get_docker_dir "ddns-updater")
     if ! bash "$DDNS_DIR/update-ddns-env.sh" || ! bash "$DDNS_DIR/update-ddns-config.sh"; then

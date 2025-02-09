@@ -54,10 +54,13 @@ fi
 # Store credentials
 store_service_credentials "$SERVICE_NAME" "$username" "$password"
 
+escaped_password=$(echo "$password" | sed 's/[\/&]/\\&/g')
+escaped_username=$(echo "$username" | sed 's/[\/&]/\\&/g')
+
 # Define environment variables
 new_values=(
-    "WGUI_USERNAME:$username"
-    "WGUI_PASSWORD:$password"
+    "WGUI_USERNAME:$escaped_username"
+    "WGUI_PASSWORD:$escaped_password"
     "WGUI_MANAGE_START:true"
     "WGUI_MANAGE_RESTART:true"
     "PUID:$USER_UID"
