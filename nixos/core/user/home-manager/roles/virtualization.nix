@@ -5,8 +5,8 @@ let
   shellInit = import ../shellInit/${userConfig.defaultShell}Init.nix { inherit pkgs lib; };
 
   # get UID and GID 
-  userUID = builtins.getEnv "UID" or null;
-  userGID = builtins.getEnv "GID" or null;
+  userUID = let env = builtins.getEnv "UID"; in if env == "" then null else env;
+  userGID = let env = builtins.getEnv "GID"; in if env == "" then null else env;
 in
 {
   imports = [ shellInit ];
