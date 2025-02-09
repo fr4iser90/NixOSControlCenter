@@ -3,7 +3,7 @@
 let
   cfg = systemConfig.features;
 
-  # Prüfe ob mindestens ein Feature aktiv ist
+  # Check if at least one feature is active
   hasActiveFeatures = lib.any (x: x) [
     (cfg.system-checks or false)
     (cfg.system-updater or false)
@@ -18,11 +18,14 @@ let
     (cfg.tracker or false)
   ];
 
-  # Prüfe ob der systemType auf homelab gesetzt ist
+  # Check if the systemType is set to "homelab"
   isHomelabSystem = (systemConfig.systemType or "") == "homelab";
   
+  # Check if the homelab-manager feature is enabled
+  isHomelabManagerEnabled = (cfg.homelab-manager or false);
+
 in {
-  # Terminal-UI wird automatisch geladen, wenn Features aktiv sind
+  # Terminal UI is automatically loaded if features are active
   imports = lib.optionals hasActiveFeatures [ 
     ./terminal-ui
     ./command-center 
@@ -37,8 +40,6 @@ in {
       ./system-config-manager
     ] ++ lib.optionals (cfg.container-manager or false) [
       ./container-manager
-    ] ++ lib.optionals (cfg.homelab-manager or false) [
-      ./homelab-manager
     ] ++ lib.optionals (cfg.bootentry-manager or false) [
       ./bootentry-manager
     ] ++ lib.optionals (cfg.ssh-client-manager or false) [
@@ -50,6 +51,11 @@ in {
     ] ++ lib.optionals (cfg.ai-workspace or false) [
       ./ai-workspace
     ];
+
+  # Homelab-Manager is imported if systemType is "homelab" or the feature is enabled
+  imports = imports ++ lib.optionals (isHomelabSystem || isHomelabManagerEnabled) [
+    ./homelab-manager
+  ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 }
