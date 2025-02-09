@@ -14,7 +14,7 @@ in {
   options.features.command-center = {
     commands = mkOption {
       type = lib.types.listOf types.commandType;
-      default = {};
+      default = [];
       description = "Available commands for the NixOS Control Center";
     };
 
