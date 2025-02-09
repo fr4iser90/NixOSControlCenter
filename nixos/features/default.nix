@@ -16,7 +16,6 @@ let
     (cfg.vm-manager or false)
     (cfg.ai-workspace or false)
     (cfg.tracker or false)
-    (systemConfig.systemType == "homelab")
   ];
 
   # Check if the systemType is set to "homelab"
