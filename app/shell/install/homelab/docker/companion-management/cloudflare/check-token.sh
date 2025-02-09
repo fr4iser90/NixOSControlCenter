@@ -12,28 +12,28 @@ BASE_DIR=$(get_docker_dir "$SERVICE_NAME")
 check_auth() {
     print_status "Checking Cloudflare authentication..." "info"
     
-    # Debug: Zeige ENV-Datei Inhalt (ohne sensitive Daten)
+    # Debug: Show ENV file content (excluding sensitive data)
     print_status "Current ENV file configuration:" "info"
     grep -v "KEY\|TOKEN" "$BASE_DIR/$ENV_FILE" || true
     
-    # Prüfe ob Container läuft
+    # Check if container is running
     if ! docker ps | grep -q "cloudflare-companion"; then
         print_status "Container is not running, starting it..." "warn"
         cd "$BASE_DIR" && docker-compose up -d
         sleep 10
     fi
     
-    # Zeige die letzten Logs
+    # Show last logs
     print_status "Checking container logs..." "info"
     docker logs --tail 50 cloudflare-companion
     
-    # Erweiterte Fehlersuche
+    # Advanced troubleshooting
     if docker logs cloudflare-companion 2>&1 | grep -i "authentication\|unauthorized\|invalid\|error\|CloudFlareAPIError"; then
         print_status "Found authentication error in logs" "error"
         return 1
     fi
     
-    # Prüfe ob Container noch läuft oder crasht
+    # Check if container is still running or crashed
     if ! docker ps | grep -q "cloudflare-companion"; then
         print_status "Container crashed after start" "error"
         return 1
@@ -48,15 +48,19 @@ switch_to_global_key() {
     # Backup current env file
     cp "$BASE_DIR/$ENV_FILE" "$BASE_DIR/${ENV_FILE}.bak"
     
-    # Comment out CF_TOKEN and enable CF_API_KEY
-    sed -i 's/^CF_TOKEN/#CF_TOKEN/' "$BASE_DIR/$ENV_FILE"
-    sed -i "s/#CF_API_KEY=.*/CF_API_KEY=$CF_API_KEY/" "$BASE_DIR/$ENV_FILE"
-    
-    # Restart container
-    docker restart cloudflare-companion
+    # Check if CF_API_KEY exists
+    if [ -n "${CF_API_KEY:-}" ]; then
+        # Comment out CF_TOKEN and enable CF_API_KEY
+        sed -i 's/^CF_TOKEN/#CF_TOKEN/' "$BASE_DIR/$ENV_FILE"
+        sed -i "s/#CF_API_KEY=.*/CF_API_KEY=$CF_API_KEY/" "$BASE_DIR/$ENV_FILE"
+        # Restart container
+        docker restart cloudflare-companion
+    else
+        print_status "Global API Key is not available, skipping switch." "info"
+    fi
 }
 
-# Hauptlogik
+# Main logic
 if ! check_auth; then
     print_status "Token authentication failed!" "error"
     

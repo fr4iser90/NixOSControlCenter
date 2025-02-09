@@ -33,9 +33,6 @@ if ! get_user_info; then
     exit 1
 fi
 
-# Set current service for credentials management
-export CURRENT_SERVICE="wireguard"
-
 # Get WireGuard credentials
 print_status "Setting up WireGuard credentials..." "info"
 

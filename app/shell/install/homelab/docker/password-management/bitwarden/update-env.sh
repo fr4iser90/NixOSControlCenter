@@ -26,9 +26,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Set current service for credentials management
-export CURRENT_SERVICE="bitwarden"
-
 # Validate domain
 print_status "Validating domain..." "info"
 if ! validate_domain; then

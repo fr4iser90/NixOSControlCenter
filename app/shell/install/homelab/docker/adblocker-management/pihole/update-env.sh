@@ -33,9 +33,6 @@ if ! get_user_info; then
     exit 1
 fi
 
-# Set current service for credentials management
-export CURRENT_SERVICE="pihole"
-
 # Generate web password
 print_status "Generating secure Pihole web password..." "info"
 WEBPASSWORD=$(generate_secure_password)

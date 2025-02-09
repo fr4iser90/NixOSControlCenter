@@ -33,8 +33,6 @@ if ! get_user_info; then
     exit 1
 fi
 
-# Set current service for credentials management
-export CURRENT_SERVICE="owncloud_mysql"
 
 # Validate domain
 print_status "Validating domain..." "info"

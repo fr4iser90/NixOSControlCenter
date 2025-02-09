@@ -26,8 +26,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Set current service for logging
-export CURRENT_SERVICE="cloudflare"
 
 # Check if Cloudflare credentials exist FIRST
 print_status "Checking Cloudflare credentials..." "info"

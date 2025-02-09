@@ -4,12 +4,14 @@
 CREDS_FILE="/tmp/homelab_credentials.txt"
 FINAL_CREDS_FILE="$HOME/homelab_credentials.txt"
 
-# Initialize credentials file
+# Initialize credentials file (only if it doesn't exist)
 init_credentials_file() {
-    echo "=== Homelab Service Credentials ===" > "$CREDS_FILE"
-    echo "Generated: $(date)" >> "$CREDS_FILE"
-    echo "=================================" >> "$CREDS_FILE"
-    echo >> "$CREDS_FILE"
+    if [ ! -f "$CREDS_FILE" ]; then
+        echo "=== Homelab Service Credentials ===" > "$CREDS_FILE"
+        echo "Generated: $(date)" >> "$CREDS_FILE"
+        echo "=================================" >> "$CREDS_FILE"
+        echo >> "$CREDS_FILE"
+    fi
 }
 
 # Store credentials for a service

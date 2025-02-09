@@ -57,10 +57,10 @@ prompt_input() {
                 value=$(generate_secure_password)
                 print_status "Auto-generated password" "info"
                 # Speichere Credentials wenn Username vorhanden
-                if [ -n "$CURRENT_SERVICE" ] && [ -n "$CURRENT_USERNAME" ]; then
-                    store_service_credentials "$CURRENT_SERVICE" "$CURRENT_USERNAME" "$value"
+                if [ -n "$SERVICE_NAME" ] && [ -n "$CURRENT_USERNAME" ]; then
+                    store_service_credentials "$SERVICE_NAME" "$CURRENT_USERNAME" "$value"
                     unset CURRENT_USERNAME
-                    unset CURRENT_SERVICE
+                    unset SERVICE_NAME
                 fi
                 echo "$value"
                 return 0
