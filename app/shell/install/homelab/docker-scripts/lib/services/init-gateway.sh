@@ -58,7 +58,7 @@ configure_traefik_auth() {
     print_prompt "Traefik Dashboard Access"
     
     print_status "These credentials will be used to access the Traefik dashboard" "info"
-    
+    export SERVICE_NAME="traefik"
     # Username-Eingabe mit zentraler Logik
     local username
     username=$(prompt_input "Username: " $INPUT_TYPE_USERNAME)
@@ -159,11 +159,6 @@ initialize_gateway() {
 
     # Restart to apply changes
     restart_docker_container "traefik-crowdsec" || return 1
-
-    # Finalisiere Credentials wenn Auto-Setup aktiv war
-    if [ "$AUTO_SETUP" -eq 1 ]; then
-        finalize_credentials_file
-    fi
 
     print_status "Security infrastructure initialized successfully" "success"
     return 0

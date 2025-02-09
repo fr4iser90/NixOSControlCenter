@@ -83,8 +83,8 @@ initialize_services() {
         
         print_status "Initializing $service..." "info"
         
-        # Setze CURRENT_SERVICE für Auto-Credentials
-        export CURRENT_SERVICE="$service"
+        # Setze SERVICE_NAME für Auto-Credentials
+        export SERVICE_NAME="$service"
         
         # Update Environment
         local service_dir="${DOCKER_BASE_DIR}/${category}/${service}"
