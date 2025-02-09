@@ -2,10 +2,7 @@ services:
 
   crowdsec:
     container_name: crowdsec
-    environment:
-      - PUID=${UID}
-      - PGID=${GID}
-    user: "${UID}:${GID}"  
+
     env_file: crowdsec.env
     hostname: crowdsec
     healthcheck:
@@ -34,10 +31,7 @@ services:
 
   traefik:
     container_name: traefik
-    environment:
-      - PUID=${UID}
-      - PGID=${GID}
-    user: "${UID}:${GID}"  
+
     depends_on:
       crowdsec:
         condition: service_healthy
@@ -124,10 +118,7 @@ services:
 
   traefik_crowdsec_bouncer:
     container_name: traefik_crowdsec_bouncer
-    environment:
-      - PUID=${UID}
-      - PGID=${GID}
-    user: "${UID}:${GID}"  
+
     depends_on:
       crowdsec:
         condition: service_healthy
@@ -145,10 +136,7 @@ services:
   ip-updater:
     image: alpine:latest
     container_name: ip-updater
-    environment:
-      - PUID=${UID}
-      - PGID=${GID}
-    user: "${UID}:${GID}"  
+
     restart: unless-stopped
     volumes:
       - ./traefik/dynamic-conf:/dynamic-conf:rw

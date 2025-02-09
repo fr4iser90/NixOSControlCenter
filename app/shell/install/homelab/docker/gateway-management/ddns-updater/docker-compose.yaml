@@ -7,10 +7,7 @@ services:
   ddclient:
     image: lscr.io/linuxserver/ddclient:latest
     container_name: ddclient
-    environment:
-      - PUID=${UID}
-      - PGID=${GID}
-    user: "${UID}:${GID}"  
+
     # Hier die Env-Datei angeben (analog wireguard.env):
     env_file: ddns-updater.env
     volumes:

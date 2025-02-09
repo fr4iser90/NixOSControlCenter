@@ -3,10 +3,6 @@ services:
   plex:
     image: lscr.io/linuxserver/plex:latest
     container_name: plex
-    environment:
-      - PUID=${UID}
-      - PGID=${GID}
-    user: "${UID}:${GID}"  
     env_file:
       - plex.env
     dns:

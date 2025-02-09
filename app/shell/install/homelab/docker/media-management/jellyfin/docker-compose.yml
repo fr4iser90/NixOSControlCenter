@@ -2,10 +2,6 @@ services:
   jellyfin:
     image: lscr.io/linuxserver/jellyfin:latest
     container_name: jellyfin
-    environment:
-      - PUID=${UID}
-      - PGID=${GID}
-    user: "${UID}:${GID}"  
     env_file: jellyfin.env
     volumes:
       - ./jellyfin/library:/config

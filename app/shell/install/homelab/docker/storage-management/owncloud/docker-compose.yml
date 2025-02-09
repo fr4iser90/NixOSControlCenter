@@ -4,10 +4,6 @@ services:
     image: mariadb
     restart: always
     container_name: owncloud-db
-    environment:
-      - PUID=${UID}
-      - PGID=${GID}
-    user: "${UID}:${GID}"  
     networks:
       proxy:
         ipv4_address: 172.40.0.7
@@ -15,10 +11,6 @@ services:
 
   owncloud:
     container_name: owncloud
-    environment:
-      - PUID=${UID}
-      - PGID=${GID}
-    user: "${UID}:${GID}"  
     image: owncloud
     volumes:
       - ./cloud/html:/var/www/html

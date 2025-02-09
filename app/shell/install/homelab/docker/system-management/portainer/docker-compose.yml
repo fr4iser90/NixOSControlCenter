@@ -5,7 +5,6 @@ services:
     environment:
       - PUID=${UID}
       - PGID=${GID}
-    user: "${UID}:${GID}"  
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./data:/data

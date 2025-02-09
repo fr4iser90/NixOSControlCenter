@@ -35,6 +35,7 @@ COLLECTIONS="crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/whitelis
 
 # Define environment variables
 new_values=(
+    "PUID:$USER_UID"
     "PGID:$USER_GID"
     "COLLECTIONS:$COLLECTIONS"
 )

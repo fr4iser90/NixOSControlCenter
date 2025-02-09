@@ -16,6 +16,7 @@ _PLEX_COMPOSE_LOADED=1
 # Script configuration
 SERVICE_NAME="plex"
 COMPOSE_FILE="docker-compose.yml"
+ENV_FILE="pihole.env"
 
 print_header "Updating Plex Docker Compose"
 
@@ -30,10 +31,15 @@ fi
 print_status "Getting user information..." "info"
 get_user_info
 
-# Update compose file
-if update_compose_file "$BASE_DIR" "$COMPOSE_FILE" "$USER_UID" "$USER_GID"; then
-    print_status "Plex Docker Compose file has been updated" "success"
+new_values=(
+    "PUID:$USER_UID"
+    "PGID:$USER_GID"
+)
+
+# Update environment file
+if update_env_file "$BASE_DIR" "$ENV_FILE" "${new_values[@]}"; then
+    print_status "Plex evironment file has been updated" "success"
 else
-    print_status "Failed to update Docker Compose file" "error"
+    print_status "Failed to update environment file" "error"
     exit 1
 fi
