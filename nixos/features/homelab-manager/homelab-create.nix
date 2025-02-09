@@ -30,7 +30,14 @@ let
     YELLOW='\033[1;33m'
     RED='\033[0;31m'
     NC='\033[0m'
-    
+
+    USER_UID=$(id -u $USER)
+    USER_GID=$(id -g $USER)
+
+    # Exportieren der Variablen
+    export USER_UID
+    export USER_GID
+
     # Konfiguration
     VIRT_USER="${virtUser}"
     VIRT_HOME="/home/$VIRT_USER"
@@ -67,6 +74,8 @@ let
             -e "s|{{EMAIL}}|$HOMELAB_EMAIL|g" \
             -e "s|{{DOMAIN}}|$HOMELAB_DOMAIN|g" \
             -e "s|{{USER}}|$VIRT_USER|g" \
+            -e "s|{{UID}}|$USER_UID|g" \
+            -e "s|{{GID}}|$USER_GID|g" \
             {} \;
     
     # Führe Init-Script aus, falls vorhanden

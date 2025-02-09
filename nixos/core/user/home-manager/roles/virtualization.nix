@@ -4,9 +4,6 @@ let
   userConfig = systemConfig.users.${user};
   shellInit = import ../shellInit/${userConfig.defaultShell}Init.nix { inherit pkgs lib; };
 
-  # get UID and GID 
-  userUID = toString userConfig.uid;  # Convert to string if needed
-  userGID = toString userConfig.gid;
 in
 {
   imports = [ shellInit ];
@@ -18,8 +15,6 @@ in
     sessionVariables = {
       DOMAIN = systemConfig.domain;
       EMAIL = systemConfig.email;
-      UID = userUID;
-      GID = userGID;
     };
   };
 }
