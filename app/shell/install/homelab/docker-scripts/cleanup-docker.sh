@@ -20,16 +20,15 @@ safe_docker_cleanup() {
         fi
     done
 
-    # 2. Docker Cleanup
-    print_status "Cleaning Docker resources..." "info"
+    # 2. Docker Cleanup (keine Images entfernen)
+    print_status "Cleaning Docker resources ..." "info"
     docker stop $(docker ps -aq) 2>/dev/null || true
     docker rm $(docker ps -aq) 2>/dev/null || true
     docker network rm $(docker network ls -q) 2>/dev/null || true
     docker volume rm $(docker volume ls -q) 2>/dev/null || true
-    docker rmi $(docker images -q) 2>/dev/null || true
-    docker system prune -f --volumes
+    docker system prune -f  # Achtung: Ohne --all, damit Images bleiben!
 
-    print_status "Safe cleanup completed" "success"
+    print_status "Safe cleanup completed (Images retained)" "success"
 }
 
 full_docker_cleanup() {
@@ -38,7 +37,8 @@ full_docker_cleanup() {
 
     # 1. Normale Cleanup
     safe_docker_cleanup
-    
+    docker rmi $(docker images -q) 2>/dev/null || true
+
     # 2. Information über geschützte Dateien
     print_status "Protected files detected!" "warning"
     print_status "To completely remove all files:" "warning"
@@ -51,7 +51,7 @@ full_docker_cleanup() {
 
 # Cleanup-Auswahl
 echo "Choose cleanup type:"
-echo "1) Safe cleanup (preserves important data)"
+echo "1) Safe cleanup"
 echo "2) Full cleanup (will need manual steps as root)"
 read -p "Enter choice (1/2): " choice
 
