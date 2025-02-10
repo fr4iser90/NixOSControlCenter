@@ -78,9 +78,15 @@ secure_retrieve() {
 }
 
 # Füge diese Funktion hinzu:
-generate_secure_password() {
+generate_auto_password() {
     local length=16
     local chars='!@#$%^&*()_+-=[]{}|;:,.<>?'
     local password=$(nix-shell -p openssl --run "openssl rand -base64 32 | tr -dc 'a-zA-Z0-9${chars}' | head -c ${length}")
     echo "$password"
+}
+
+generate_auto_username() {
+    local length=8
+    local chars='a-zA-Z0-9'
+    nix-shell -p openssl --run "openssl rand -base64 32 | tr -dc '${chars}' | head -c ${length}"
 }

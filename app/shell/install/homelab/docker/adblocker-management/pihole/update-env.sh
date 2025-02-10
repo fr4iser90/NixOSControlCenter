@@ -35,7 +35,7 @@ fi
 
 # Generate web password
 print_status "Generating secure Pihole web password..." "info"
-WEBPASSWORD=$(generate_secure_password)
+WEBPASSWORD=$(generate_auto_password)
 if [ $? -ne 0 ]; then
     print_status "Failed to generate secure password" "error"
     exit 1

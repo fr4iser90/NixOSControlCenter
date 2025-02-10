@@ -43,7 +43,7 @@ fi
 
 # Generate MySQL credentials
 print_status "Generating MySQL credentials..." "info"
-MYSQL_ROOT_PASSWORD=$(generate_secure_password)
+MYSQL_ROOT_PASSWORD=$(generate_auto_password)
 if [ $? -ne 0 ]; then
     print_status "Failed to generate MySQL password" "error"
     exit 1

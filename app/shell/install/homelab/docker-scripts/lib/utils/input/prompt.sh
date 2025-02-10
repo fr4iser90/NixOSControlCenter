@@ -40,7 +40,7 @@ prompt_input() {
     if [ "${AUTO_SETUP:-0}" -eq 1 ]; then
         case $input_type in
             $INPUT_TYPE_USERNAME)
-                value="auto_user_$(generate_random_string 8)"
+                value="auto_user_$(generate_auto_username)"
                 print_status "Auto-generated username" "info"
                 # Speichere temporär für spätere Verwendung
                 CURRENT_USERNAME="$value"
@@ -48,7 +48,7 @@ prompt_input() {
                 return 0
                 ;;
             $INPUT_TYPE_PASSWORD)
-                value=$(generate_secure_password)
+                value=$(generate_auto_password)
                 print_status "Auto-generated password" "info"
                 # Speichere Credentials wenn Username vorhanden
                 if [ -n "$SERVICE_NAME" ] && [ -n "$CURRENT_USERNAME" ]; then
