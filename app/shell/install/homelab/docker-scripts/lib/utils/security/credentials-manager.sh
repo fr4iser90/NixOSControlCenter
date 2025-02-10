@@ -26,6 +26,43 @@ store_service_credentials() {
     echo "-----------------------------------" >> "$CREDS_FILE"
 }
 
+# Retrieve credentials for a given service using only $CREDS_FILE
+retrieve_service_credentials() {
+    local service="$1"
+    local file="$CREDS_FILE"
+
+    # Überprüfen, ob die Datei existiert
+    if [ ! -f "$file" ]; then
+        print_status "Credentials file not found: $file" "error"
+        return 1
+    fi
+
+    # Suchen nach dem Service-Block und extrahiere Username und Password
+    local credentials
+    credentials=$(awk -v srv="$service" '
+        $1 == "Service:" && $2 == srv {
+            getline;
+            if ($1 == "Username:") { username = $2 }
+            getline;
+            if ($1 == "Password:") { password = $2 }
+            print username " " password;
+            exit;
+        }
+    ' "$file")
+
+    # Wenn keine Credentials gefunden wurden, Fehlermeldung ausgeben und weitermachen
+    if [ -z "$credentials" ]; then
+        print_status "No credentials found for service: $service in $file" "error"
+        return 1
+    fi
+
+    # Globale Variablen setzen, damit sie in anderen Funktionen verwendet werden können
+    SERVICE_CREDENTIALS_USERNAME=$(echo "$credentials" | awk '{print $1}')
+    SERVICE_CREDENTIALS_PASSWORD=$(echo "$credentials" | awk '{print $2}')
+
+    return 0
+}
+
 # Finalize credentials file
 finalize_credentials_file() {
     if [ -f "$CREDS_FILE" ]; then

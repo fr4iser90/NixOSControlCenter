@@ -28,7 +28,7 @@ configure_crowdsec_bouncer() {
         (cscli bouncers delete ${BOUNCER_NAME} || true) && \
         cscli bouncers add ${BOUNCER_NAME}
     " | awk 'NR==3 {print $1}')
-
+    
     # Prüfe ob Key generiert wurde
     if [ -z "$CROWDSEC_API_KEY" ]; then
         print_status "Failed to generate CrowdSec bouncer API key" "error"
@@ -59,19 +59,26 @@ configure_traefik_auth() {
     
     print_status "These credentials will be used to access the Traefik dashboard" "info"
     export SERVICE_NAME="traefik"
-    # Username-Eingabe mit zentraler Logik
-    local username
-    username=$(prompt_input "Username: " $INPUT_TYPE_USERNAME)
-    
-    # Passwort-Eingabe mit zentraler Logik
-    local password
-    password=$(prompt_input "Password: " $INPUT_TYPE_PASSWORD)
+
+    local username password
+
+    if [[ "$AUTO_SETUP" == "1" ]]; then
+        # Nur prüfen, ob bereits Credentials existieren, keine Fallback-Erstellung
+        if retrieve_service_credentials "$SERVICE_NAME"; then
+            username="$SERVICE_CREDENTIALS_USERNAME"
+            password="$SERVICE_CREDENTIALS_PASSWORD"
+        else
+            print_status "No existing credentials found, but no fallback will be created." "warning"
+            return 1
+        fi
+    else
+        username=$(prompt_input "Username: " $INPUT_TYPE_USERNAME)
+        password=$(prompt_input "Password: " $INPUT_TYPE_PASSWORD)
+    fi
 
     print_status "Generating secure password hash..." "info"
     
     # Generate hashed password
-    escaped_password=$(echo "$password" | sed 's/[&/]/\\&/g')
-    
     local hashed_password
     hashed_password=$(nix-shell -p apacheHttpd --command "htpasswd -nbB \"$username\" \"$password\"" | cut -d ':' -f 2)
     
@@ -82,16 +89,11 @@ configure_traefik_auth() {
     
     # Update config
     sed -i "s|\${TRAEFIKUSER}|$username:$hashed_password|g" "$TRAEFIK_DIR/traefik/dynamic-conf/dynamic_conf.yml"
-    
-#    sed -i "s|\${TRAEFIKUSER}|\"$username:$hashed_password\"|g" \
-#        "$TRAEFIK_DIR/traefik/dynamic-conf/dynamic_conf.yml"
-        
+
     print_status "Traefik authentication configured successfully" "success"
     print_status "You can now login with:" "info"
     print_status "Username: $username" "info"
     print_status "Password: $password" "info"
-    print_status "$(grep -A2 'basicAuth' "$TRAEFIK_DIR/traefik/dynamic-conf/dynamic_conf.yml")" "info"
-    echo
     return 0
 }
 
