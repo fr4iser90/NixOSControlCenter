@@ -36,7 +36,7 @@ update_dns_config() {
     print_status "Updating ddclient configuration for $DNS_PROVIDER_CODE" "info"
 
     # Entkommentiere nur den passenden Block
-    sed -i -E "/^## /{h;d}; /^#?protocol=$DNS_PROVIDER_CODE/ {x;s/^## /\n/;x;:a;N;/\n## /!ba;s/#//g;s/\\//g}" "$BASE_DIR/$CONF_FILE"
+    sed -i -E "/^## /{h;d}; /^#?protocol=$DNS_PROVIDER_CODE/ {x;s/^## /\n/;x;:a;N;/\n## /!ba;s/#//g;s/\\\\//g}" "$BASE_DIR/$CONF_FILE"
 
     print_status "DDNS configuration updated successfully" "success"
     return 0
