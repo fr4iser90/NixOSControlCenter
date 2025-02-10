@@ -7,9 +7,10 @@ services:
   ddclient:
     image: lscr.io/linuxserver/ddclient:latest
     container_name: ddclient
-
-    # Hier die Env-Datei angeben (analog wireguard.env):
     env_file: ddns-updater.env
     volumes:
       - ./config:/config
     restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1

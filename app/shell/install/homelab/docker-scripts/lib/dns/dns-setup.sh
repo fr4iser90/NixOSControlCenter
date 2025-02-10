@@ -16,7 +16,6 @@ update_dns_configuration() {
 
     # 2. Save provider info
     IFS=' ' read -r provider_name provider_code provider_vars <<< "$selected_provider"
-    export DNS_PROVIDER_NAME="$provider_name"
     export DNS_PROVIDER_CODE="$provider_code"
 
     # 3. Get and save credentials
@@ -25,20 +24,20 @@ update_dns_configuration() {
         return 1
     fi
 
-    # 4. Update DDNS configuration (REDUDNAT?)
-    print_status "Updating DDNS configuration..." "info"
-    local DDNS_DIR=$(get_docker_dir "ddns-updater")
-    if ! bash "$DDNS_DIR/update-ddns-env.sh" || ! bash "$DDNS_DIR/update-ddns-config.sh"; then
-        print_status "Failed to update DDNS configuration" "error"
-        return 1
-    fi
+    # 4. Update DDNS configuration
+#    print_status "Updating DDNS configuration..." "info"
+#    local DDNS_DIR=$(get_docker_dir "ddns-updater")
+#    if ! bash "$DDNS_DIR/update-ddns-config.sh"; then
+#        print_status "Failed to update DDNS configuration" "error"
+#        return 1
+#    fi
 
     # 5. Update companion if available
     if ! update_companion_config "$DNS_PROVIDER_CODE"; then
         return 1
     fi
 
-    print_status "DNS configuration completed with $DNS_PROVIDER_NAME provider" "success"
+    print_status "DNS configuration completed with $DNS_PROVIDER_CODE provider" "success"
     return 0
 }
 

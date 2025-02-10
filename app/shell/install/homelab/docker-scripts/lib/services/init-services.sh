@@ -85,15 +85,6 @@ initialize_services() {
         
         # Setze SERVICE_NAME für Auto-Credentials
         export SERVICE_NAME="$service"
-        
-        # Update Environment
-        local service_dir="${DOCKER_BASE_DIR}/${category}/${service}"
-        if [ -f "${service_dir}/update-env.sh" ]; then
-            bash "${service_dir}/update-env.sh" || {
-                print_status "Failed to update environment for $service" "error"
-                return 1
-            }
-        fi
 
         # Starte Container
         start_docker_container "$service" || {

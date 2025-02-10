@@ -33,30 +33,15 @@ update_dns_config() {
         return 1
     fi
 
-    # Create config directory
-    mkdir -p "$BASE_DIR/config"
-
     print_status "Updating ddclient configuration for $DNS_PROVIDER_CODE" "info"
 
-    # Create ddclient.conf
-    cat > "$BASE_DIR/$CONF_FILE" << EOF
-# Configuration for $DNS_PROVIDER_CODE
-# Generated on $(date)
-daemon=300
-syslog=yes
-mail=root
-mail-failure=root
-pid=/var/run/ddclient.pid
-ssl=yes
-
-protocol=$DNS_PROVIDER_CODE
-use=web, web=checkip.dyndns.org/, web-skip='IP Address'
-$DOMAIN
-EOF
+    # Entkommentiere nur den passenden Block
+    sed -i -E "/^## /{h;d}; /^#?protocol=$DNS_PROVIDER_CODE/ {x;s/^## /\n/;x;:a;N;/\n## /!ba;s/#//g;s/\\//g}" "$BASE_DIR/$CONF_FILE"
 
     print_status "DDNS configuration updated successfully" "success"
     return 0
 }
+
 
 # Run if script is run directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
