@@ -41,7 +41,6 @@ prompt_input() {
         case $input_type in
             $INPUT_TYPE_USERNAME)
                 value="auto_user_$(generate_auto_username)"
-                print_status "Auto-generated username" "info"
                 # Speichere temporär für spätere Verwendung
                 CURRENT_USERNAME="$value"
                 echo "$value"
@@ -49,7 +48,6 @@ prompt_input() {
                 ;;
             $INPUT_TYPE_PASSWORD)
                 value=$(generate_auto_password)
-                print_status "Auto-generated password" "info"
                 # Speichere Credentials wenn Username vorhanden
                 if [ -n "$SERVICE_NAME" ] && [ -n "$CURRENT_USERNAME" ]; then
                     store_service_credentials "$SERVICE_NAME" "$CURRENT_USERNAME" "$value"

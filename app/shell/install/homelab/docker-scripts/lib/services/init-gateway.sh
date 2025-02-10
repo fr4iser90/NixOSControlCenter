@@ -79,7 +79,9 @@ configure_traefik_auth() {
         print_status "Failed to generate password hash" "error"
         return 1
     fi
+    
     echo "Replacing placeholder with: $username:$hashed_password"
+
     # Update config
     sed -i "s|\${TRAEFIKUSER}|$username:$hashed_password|g" "$TRAEFIK_DIR/traefik/dynamic-conf/dynamic_conf.yml"
     
