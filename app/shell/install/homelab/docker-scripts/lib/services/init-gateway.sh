@@ -54,19 +54,23 @@ configure_crowdsec_bouncer() {
 
 # Traefik Security Configuration
 configure_traefik_auth() {
+    print_header "Configuring Traefik Authentication"
+    print_prompt "Traefik Dashboard Access"
+    
     print_status "These credentials will be used to access the Traefik dashboard" "info"
     export SERVICE_NAME="traefik"
 
     local username password
 
     if [[ "$AUTO_SETUP" == "1" ]]; then
-        # Nur prüfen, ob bereits Credentials existieren, keine Fallback-Erstellung
+        # Prüfen, ob bereits Credentials existieren
         if retrieve_service_credentials "$SERVICE_NAME"; then
             username="$SERVICE_CREDENTIALS_USERNAME"
             password="$SERVICE_CREDENTIALS_PASSWORD"
         else
-            print_status "No existing credentials found, but no fallback will be created." "warning"
-            return 1
+            username="auto_user_$(openssl rand -base64 6 | tr -dc 'a-zA-Z0-9')"
+            password=$(openssl rand -base64 16)
+            store_service_credentials "$SERVICE_NAME" "$username" "$password"
         fi
     else
         username=$(prompt_input "Username: " $INPUT_TYPE_USERNAME)
@@ -93,6 +97,7 @@ configure_traefik_auth() {
     print_status "Password: $password" "info"
     return 0
 }
+
 
 configure_traefik_ssl() {
     local TRAEFIK_DIR=$(get_docker_dir "traefik-crowdsec")
