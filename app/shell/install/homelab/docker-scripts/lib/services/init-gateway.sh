@@ -54,9 +54,6 @@ configure_crowdsec_bouncer() {
 
 # Traefik Security Configuration
 configure_traefik_auth() {
-    print_header "Configuring Traefik Authentication"
-    print_prompt "Traefik Dashboard Access"
-    
     print_status "These credentials will be used to access the Traefik dashboard" "info"
     export SERVICE_NAME="traefik"
 
@@ -153,12 +150,13 @@ initialize_gateway() {
         fi
     done
     
+    print_header "Configuring Traefik Authentication"
     # Configure components
     configure_traefik_auth || return 1
     configure_traefik_ssl || return 1
 
     # Start services
-    print_status "Starting Gateway Services..." "info"
+    print_header "Starting Gateway Services..."
     start_docker_container "traefik-crowdsec" || return 1
     start_docker_container "ddns-updater" || return 1
 

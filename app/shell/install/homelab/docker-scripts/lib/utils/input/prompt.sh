@@ -24,12 +24,6 @@ debug() {
     [[ "${DEBUG:-0}" == "1" ]] && echo "DEBUG: $*" >&2
 }
 
-print_prompt() {
-    local message="$1"
-    echo -e "\n${BLUE}==================================================
-        $message        
-==================================================${NC}\n"
-}
 
 # Generic input prompt with validation
 prompt_input() {
