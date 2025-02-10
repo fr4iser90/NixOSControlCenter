@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Credentials Storage File
-CREDS_FILE="/tmp/homelab_credentials.txt"
+CREDS_FILE="$HOME/homelab_tmp_credentials.txt"
 FINAL_CREDS_FILE="$HOME/homelab_credentials.txt"
 
 # Initialize credentials file (only if it doesn't exist)

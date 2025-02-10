@@ -55,31 +55,23 @@ configure_crowdsec_bouncer() {
 # Traefik Security Configuration
 configure_traefik_auth() {
     print_header "Configuring Traefik Authentication"
-    print_prompt "Traefik Dashboard Access"
     
     print_status "These credentials will be used to access the Traefik dashboard" "info"
     export SERVICE_NAME="traefik"
-
-    local username password
-
-    if [[ "$AUTO_SETUP" == "1" ]]; then
-        # Prüfen, ob bereits Credentials existieren
-        if retrieve_service_credentials "$SERVICE_NAME"; then
-            username="$SERVICE_CREDENTIALS_USERNAME"
-            password="$SERVICE_CREDENTIALS_PASSWORD"
-        else
-            username="auto_user_$(openssl rand -base64 6 | tr -dc 'a-zA-Z0-9')"
-            password=$(openssl rand -base64 16)
-            store_service_credentials "$SERVICE_NAME" "$username" "$password"
-        fi
-    else
-        username=$(prompt_input "Username: " $INPUT_TYPE_USERNAME)
-        password=$(prompt_input "Password: " $INPUT_TYPE_PASSWORD)
-    fi
+    
+    # Username-Eingabe mit zentraler Logik
+    local username
+    username=$(prompt_input "Username: " $INPUT_TYPE_USERNAME)
+    
+    # Passwort-Eingabe mit zentraler Logik
+    local password
+    password=$(prompt_input "Password: " $INPUT_TYPE_PASSWORD)
 
     print_status "Generating secure password hash..." "info"
     
     # Generate hashed password
+    escaped_password=$(echo "$password" | sed 's/[&/]/\\&/g')
+    
     local hashed_password
     hashed_password=$(nix-shell -p apacheHttpd --command "htpasswd -nbB \"$username\" \"$password\"" | cut -d ':' -f 2)
     
@@ -87,17 +79,21 @@ configure_traefik_auth() {
         print_status "Failed to generate password hash" "error"
         return 1
     fi
-    
+    echo "Replacing placeholder with: $username:$hashed_password"
     # Update config
     sed -i "s|\${TRAEFIKUSER}|$username:$hashed_password|g" "$TRAEFIK_DIR/traefik/dynamic-conf/dynamic_conf.yml"
-
+    
+#    sed -i "s|\${TRAEFIKUSER}|\"$username:$hashed_password\"|g" \
+#        "$TRAEFIK_DIR/traefik/dynamic-conf/dynamic_conf.yml"
+        
     print_status "Traefik authentication configured successfully" "success"
     print_status "You can now login with:" "info"
     print_status "Username: $username" "info"
     print_status "Password: $password" "info"
+    print_status "$(grep -A2 'basicAuth' "$TRAEFIK_DIR/traefik/dynamic-conf/dynamic_conf.yml")" "info"
+    echo
     return 0
 }
-
 
 configure_traefik_ssl() {
     local TRAEFIK_DIR=$(get_docker_dir "traefik-crowdsec")
@@ -155,13 +151,12 @@ initialize_gateway() {
         fi
     done
     
-    print_header "Configuring Traefik Authentication"
     # Configure components
     configure_traefik_auth || return 1
     configure_traefik_ssl || return 1
 
     # Start services
-    print_header "Starting Gateway Services..."
+    print_status "Starting Gateway Services..." "info"
     start_docker_container "traefik-crowdsec" || return 1
     start_docker_container "ddns-updater" || return 1
 
