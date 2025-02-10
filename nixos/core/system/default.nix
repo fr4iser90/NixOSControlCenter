@@ -24,6 +24,6 @@ with lib;
     };
 
     # Konsolen-Einstellungen (jetzt unter console statt i18n.console)
-    console.keyMap = systemConfig.keyboardLayout;
+    console.keyMap = if systemConfig.keyboardLayout != null && systemConfig.keyboardLayout != "" then systemConfig.keyboardLayout else "us";
   };
 }

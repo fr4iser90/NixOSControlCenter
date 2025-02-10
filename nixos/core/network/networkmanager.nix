@@ -12,7 +12,4 @@
       dns = systemConfig.networkManager.dns or "default";
     };
   };
-
-  # Desktop Integration wenn Desktop vorhanden
-  programs.nm-applet.enable = systemConfig.desktop != null;
 }
