@@ -22,8 +22,9 @@ with lib;
         "de_DE.UTF-8/UTF-8"
       ];
     };
-    console.keyMap = if builtins.hasAttr "keyboardLayout" systemConfig 
+    console.keyMap = if systemConfig ? keyboardLayout 
                     && systemConfig.keyboardLayout != "" 
+                    && systemConfig.keyboardLayout != "(unset)" 
                     then systemConfig.keyboardLayout 
                     else "us";
     # Konsolen-Einstellungen (jetzt unter console statt i18n.console)
