@@ -7,10 +7,6 @@
     ./audio
     ./themes
   ] else [];
-
-  # Globale Tastaturkonfiguration für alle Display-Server
-  console.keyMap = if systemConfig.keyboardLayout != null && systemConfig.keyboardLayout != "" then systemConfig.keyboardLayout else "us";
-
   
   environment = lib.mkIf (systemConfig.desktop.enable or false) {
     variables = {

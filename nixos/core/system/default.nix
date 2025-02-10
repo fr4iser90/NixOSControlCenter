@@ -22,8 +22,11 @@ with lib;
         "de_DE.UTF-8/UTF-8"
       ];
     };
-
+    console.keyMap = if builtins.hasAttr "keyboardLayout" systemConfig 
+                    && systemConfig.keyboardLayout != "" 
+                    then systemConfig.keyboardLayout 
+                    else "us";
     # Konsolen-Einstellungen (jetzt unter console statt i18n.console)
-    console.keyMap = if systemConfig.keyboardLayout != null && systemConfig.keyboardLayout != "" then systemConfig.keyboardLayout else "us";
+#    console.keyMap = if systemConfig.keyboardLayout != null && systemConfig.keyboardLayout != "" then systemConfig.keyboardLayout else "us";
   };
 }
