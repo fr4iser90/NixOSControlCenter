@@ -1,9 +1,4 @@
-version: "3.7"
-
 services:
-  #################################################################
-  # ddclient
-  #################################################################
   ddclient:
     image: lscr.io/linuxserver/ddclient:latest
     container_name: ddclient
