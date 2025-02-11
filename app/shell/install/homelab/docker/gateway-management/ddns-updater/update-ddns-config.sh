@@ -35,8 +35,48 @@ update_dns_config() {
 
     print_status "Updating ddclient configuration for $DNS_PROVIDER_CODE" "info"
 
-    # Entkommentiere nur den passenden Block
-    sed -i -E "/^## /{h;d}; /^#?protocol=$DNS_PROVIDER_CODE/ {x;s/^## /\n/;x;:a;N;/\n## /!ba;s/#//g;s/\\\\//g}" "$BASE_DIR/$CONF_FILE"
+    # Das gewünschte Protokoll entnehmen (z.B. cloudflare, he.net, etc.)
+    protocol_to_uncomment="$DNS_PROVIDER_CODE"
+
+    if [ -z "$protocol_to_uncomment" ]; then
+        print_status "Please provide a protocol (e.g. cloudflare, he.net, etc.)" "error"
+        return 1
+    fi
+
+    # Backup erstellen
+    cp "$BASE_DIR/$CONF_FILE" "$BASE_DIR/$CONF_FILE.bak"
+
+    # Cloudflare-Block entkommentieren, ohne den Rest zu beeinflussen
+    awk -v protocol="$protocol_to_uncomment" '
+    BEGIN {
+        start_block = 0
+        end_block = 0
+    }
+
+    /^##/ {
+        if (start_block && /## /) {
+            end_block = 1
+        }
+        if (end_block) exit
+    }
+
+    /^## / {
+        if (start_block == 0 && tolower($0) ~ tolower(protocol)) {
+            start_block = 1
+        }
+    }
+
+    {
+        if (start_block && !end_block) {
+            sub(/^##\s*/, "");
+            sub(/^#\s*/, "");
+        }
+        print
+    }
+    ' "$BASE_DIR/$CONF_FILE" > "$BASE_DIR/$CONF_FILE.tmp"
+
+    # Originaldatei mit der bearbeiteten Version überschreiben
+    mv "$BASE_DIR/$CONF_FILE.tmp" "$BASE_DIR/$CONF_FILE"
 
     print_status "DDNS configuration updated successfully" "success"
     return 0

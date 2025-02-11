@@ -33,6 +33,7 @@ get_user_info
 new_values=(
     "PUID:$USER_UID"
     "PGID:$USER_GID"
+    "DOMAIN:$DOMAIN"
 )
 
 # Update environment file

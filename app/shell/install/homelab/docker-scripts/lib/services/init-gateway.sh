@@ -73,7 +73,7 @@ configure_traefik_auth() {
     escaped_password=$(echo "$password" | sed 's/[&/]/\\&/g')
     
     local hashed_password
-    hashed_password=$(nix-shell -p apacheHttpd --command "htpasswd -nbB \"$username\" \"$password\"" | cut -d ':' -f 2)
+    hashed_password=$(nix-shell -p apacheHttpd --command "htpasswd -nbm \"$username\" \"$password\"" | cut -d ':' -f 2)
     
     if [ -z "$hashed_password" ]; then
         print_status "Failed to generate password hash" "error"
@@ -83,7 +83,7 @@ configure_traefik_auth() {
     echo "Replacing placeholder with: $username:$hashed_password"
 
     # Update config
-    sed -i "s|\${TRAEFIKUSER}|$username:$hashed_password|g" "$TRAEFIK_DIR/traefik/dynamic-conf/dynamic_conf.yml"
+    sed -i "s|\${TRAEFIKUSER}|\"$username:$hashed_password\"|g" "$TRAEFIK_DIR/traefik/dynamic-conf/dynamic_conf.yml"
     
 #    sed -i "s|\${TRAEFIKUSER}|\"$username:$hashed_password\"|g" \
 #        "$TRAEFIK_DIR/traefik/dynamic-conf/dynamic_conf.yml"
