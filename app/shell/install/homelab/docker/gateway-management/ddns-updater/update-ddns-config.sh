@@ -15,6 +15,7 @@ _DDNS_CONFIG_LOADED=1
 # Script configuration
 SERVICE_NAME="ddns-updater"
 CONF_FILE="config/ddclient.conf"
+ENV_FILE="ddns-updater.env"
 
 print_header "Updating DDNS Configuration"
 
@@ -24,6 +25,27 @@ if [ $? -ne 0 ]; then
     print_status "Failed to get $SERVICE_NAME directory" "error"
     exit 1
 fi
+
+# Lade Umgebungsvariablen aus der ENV-Datei
+load_env_vars() {
+    if [ -f "$BASE_DIR/$ENV_FILE" ]; then
+        export $(grep -v '^#' "$BASE_DIR/$ENV_FILE" | xargs)
+    else
+        print_status "ENV file not found" "error"
+        exit 1
+    fi
+}
+
+# Funktion zum Ersetzen der Platzhalter in der Konfigurationsdatei
+replace_placeholders() {
+    print_status "Replacing placeholders in ddclient.conf..." "info"
+
+    # Überprüfe, ob die Variablen gesetzt sind und ersetze sie nur, wenn sie vorhanden sind
+    [ -n "$DOMAIN" ] && sed -i -e "s/\${DOMAIN}/$DOMAIN/g" "$BASE_DIR/$CONF_FILE"
+    [ -n "$CF_TOKEN" ] && sed -i -e "s/\${CF_TOKEN}/$CF_TOKEN/g" "$BASE_DIR/$CONF_FILE"
+    [ -n "$GANDIV5_PERSONAL_ACCESS_TOKEN" ] && sed -i -e "s/\${GANDIV5_PERSONAL_ACCESS_TOKEN}/$GANDIV5_PERSONAL_ACCESS_TOKEN/g" "$BASE_DIR/$CONF_FILE"
+}
+
 
 update_dns_config() {
     # Validate domain
@@ -45,6 +67,9 @@ update_dns_config() {
 
     # Backup erstellen
     cp "$BASE_DIR/$CONF_FILE" "$BASE_DIR/$CONF_FILE.bak"
+
+    # Platzhalter ersetzen
+    replace_placeholders
 
     # Cloudflare-Block entkommentieren, ohne den Rest zu beeinflussen
     awk -v protocol="$protocol_to_uncomment" '
@@ -82,9 +107,9 @@ update_dns_config() {
     return 0
 }
 
-
 # Run if script is run directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    load_env_vars  # Lade die Umgebungsvariablen
     if ! update_dns_config; then
         exit 1
     fi

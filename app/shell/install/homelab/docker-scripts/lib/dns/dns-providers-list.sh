@@ -75,8 +75,7 @@ providers=(
 
     # G
     "G-Core gcore GCORE_PERMANENT_API_TOKEN"
-    "Gandi v5 gandiv5 GANDIV5_PERSONAL_ACCESS_TOKEN"
-    "Gandi gandi GANDI_API_KEY"
+    "Gandi gandi GANDIV5_PERSONAL_ACCESS_TOKEN"
     "Glesys glesys GLESYS_API_USER GLESYS_API_KEY GLESYS_DOMAIN"
     "GoDaddy godaddy GODADDY_API_KEY GODADDY_API_SECRET"
     "Google Cloud DNS gcloud GCE_PROJECT GCE_SERVICE_ACCOUNT_FILE"
