@@ -39,27 +39,18 @@ load_env_vars() {
 # Funktion zum Ersetzen der Platzhalter in der Konfigurationsdatei
 replace_placeholders() {
     print_status "Replacing placeholders in ddclient.conf..." "info"
-    
-    # Überprüfe, ob die Variablen gesetzt sind und ersetze sie nur, wenn sie vorhanden sind
-    if [ -n "$DOMAIN" ]; then
-        sed -i -e "s/\${DOMAIN}/$DOMAIN/g" "$BASE_DIR/$CONF_FILE"
-    else
-        print_status "DOMAIN variable is not set, skipping replacement." "warn"
-    fi
-    
-    if [ -n "$CF_TOKEN" ]; then
-        sed -i -e "s/\${CF_TOKEN}/$CF_TOKEN/g" "$BASE_DIR/$CONF_FILE"
-    else
-        print_status "CF_TOKEN variable is not set, skipping replacement." "warn"
-    fi
-    
-    if [ -n "$GANDIV5_PERSONAL_ACCESS_TOKEN" ]; then
-        sed -i -e "s/\${GANDIV5_PERSONAL_ACCESS_TOKEN}/$GANDIV5_PERSONAL_ACCESS_TOKEN/g" "$BASE_DIR/$CONF_FILE"
-    else
-        print_status "GANDIV5_PERSONAL_ACCESS_TOKEN variable is not set, skipping replacement." "warn"
-    fi
-}
 
+    # Falls eine Variable nicht gesetzt ist, setze einen Standardwert
+    DOMAIN="${DOMAIN:-defaultdomain.com}"
+    CF_TOKEN="${CF_TOKEN:-default_cf_token}"
+    GANDIV5_PERSONAL_ACCESS_TOKEN="${GANDIV5_PERSONAL_ACCESS_TOKEN:-default_token}"
+
+    # Ersetze die Platzhalter
+    sed -i -e "s/\${DOMAIN}/$DOMAIN/g" \
+           -e "s/\${CF_TOKEN}/$CF_TOKEN/g" \
+           -e "s/\${GANDIV5_PERSONAL_ACCESS_TOKEN}/$GANDIV5_PERSONAL_ACCESS_TOKEN/g" \
+           "$BASE_DIR/$CONF_FILE"
+}
 
 update_dns_config() {
     # Validate domain
