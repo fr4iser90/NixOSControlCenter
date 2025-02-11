@@ -44,6 +44,8 @@ replace_placeholders() {
     DOMAIN="${DOMAIN:-defaultdomain.com}"
     CF_TOKEN="${CF_TOKEN:-default_cf_token}"
     GANDIV5_PERSONAL_ACCESS_TOKEN="${GANDIV5_PERSONAL_ACCESS_TOKEN:-default_token}"
+    PORKBUN_API_KEY="${PORKBUN_API_KEY:-default_api_token}"
+    PORKBUN_SECRET_API_KEY="${PORKBUN_SECRET_API_KEY:-default_secret_api_key}"
 
     # Ersetze die Platzhalter
     sed -i -e "s/\${DOMAIN}/$DOMAIN/g" \
