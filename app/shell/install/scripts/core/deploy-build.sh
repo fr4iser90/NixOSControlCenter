@@ -80,7 +80,8 @@ show_standard_completion_message() {
 
 show_homelab_completion_message() {
    
-    log_success "Building complete! Starting docker homelab setup..."
+    log_success "Building complete!"
+    log_success "Use homelab-fetch as ${virt_user} to start docker homelab setup..."
     read -p "Do you want to switch to ${virt_user} user now? (y/N) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then

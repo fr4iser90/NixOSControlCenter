@@ -14,7 +14,7 @@ update_dns_configuration() {
         return 1
     fi
 
-    # 2. Save provider info
+    # 2. Save provider info   get SHOW_CREDENTIALS from credentials first 
     IFS=' ' read -r provider_name provider_code provider_vars <<< "$selected_provider"
     export DNS_PROVIDER_CODE="$provider_code"
 
