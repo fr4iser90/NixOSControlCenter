@@ -14,6 +14,17 @@ check_network() {
     # Hostname
     hostname=$(hostname)
 
+    if [ "$hostname" = "nixos" ]; then
+        read -p "Hostname is default 'nixos'. Do you want to rename it? (y/n): " rename_choice
+        if [ "$rename_choice" = "y" ]; then
+            read -p "Enter new hostname: " new_hostname
+            if [ -n "$new_hostname" ]; then
+                echo "Setting new hostname to $new_hostname..."
+                hostname="$new_hostname"
+            fi
+        fi
+    fi
+    
     # Ausgabe
     log_info "Network Configuration:"
     log_info "  Hostname: ${hostname}"
