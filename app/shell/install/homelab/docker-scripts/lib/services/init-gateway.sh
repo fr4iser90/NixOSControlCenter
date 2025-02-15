@@ -18,7 +18,9 @@ _SECURITY_SERVICE_LOADED=1
 # CrowdSec Configuration
 configure_crowdsec_bouncer() {
     print_status "Creating new bouncer key in CrowdSec..." "info"
-    
+    sleep 2
+    local MAX_ATTEMPTS=5
+    local ATTEMPTS=0
     local BOUNCER_NAME="traefik-crowdsec-bouncer"
     local CROWDSEC_API_KEY
 
@@ -26,20 +28,28 @@ configure_crowdsec_bouncer() {
         print_status "Waiting for CrowdSec to be running..." "info"
         sleep 1
     done
-    
+
     if docker exec crowdsec cscli bouncers list | grep -q "${BOUNCER_NAME}"; then
         docker exec crowdsec cscli bouncers delete "${BOUNCER_NAME}" || true
     fi
     
     # Bouncer-Key generieren
-    CROWDSEC_API_KEY=$(docker exec crowdsec sh -c "
-        cscli hub update && \
-        cscli bouncers add ${BOUNCER_NAME}
-    " | awk 'NR==3 {print $1}')
-    
+    while [ -z "$CROWDSEC_API_KEY" ] && [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+        CROWDSEC_API_KEY=$(docker exec crowdsec sh -c "
+            cscli hub update && \
+            cscli bouncers add ${BOUNCER_NAME}
+        " | awk 'NR==3 {print $1}')
+
+        if [ -z "$CROWDSEC_API_KEY" ]; then
+            print_status "Failed to generate CrowdSec bouncer API key. Retrying..." "error"
+            ATTEMPTS=$((ATTEMPTS + 1))
+            sleep 1
+        fi
+    done
+
     # Prüfe ob Key generiert wurde
     if [ -z "$CROWDSEC_API_KEY" ]; then
-        print_status "Failed to generate CrowdSec bouncer API key" "error"
+        print_status "Failed to generate CrowdSec bouncer API key after $MAX_ATTEMPTS attempts" "error"
         return 1
     fi
 
