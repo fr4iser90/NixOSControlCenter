@@ -10,7 +10,12 @@
   # Verhindern, dass der PC in den Ruhemodus geht
   services.logind.extraConfig = ''
     HandleLidSwitch=ignore
+    HandleLidSwitchExternalPower=ignore
     IdleAction=ignore
+    IdleActionSec=0
+    SuspendKeyIgnoreInhibited=yes
+    HibernateKeyIgnoreInhibited=yes
+    LidSwitchIgnoreInhibited=yes
   '';
 
   environment.systemPackages = with pkgs; [
