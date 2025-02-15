@@ -34,6 +34,13 @@ load_env_vars() {
         print_status "ENV file not found" "error"
         exit 1
     fi
+
+    # Setze Standardwerte für nicht gesetzte Variablen
+    DOMAIN="${DOMAIN:-default-domain.com}"
+    CF_TOKEN="${CF_TOKEN:-default-cf-token}"
+    GANDIV5_PERSONAL_ACCESS_TOKEN="${GANDIV5_PERSONAL_ACCESS_TOKEN:-default-gandi-token}"
+    PORKBUN_API_KEY="${PORKBUN_API_KEY:-default-porkbun-api-key}"
+    PORKBUN_SECRET_API_KEY="${PORKBUN_SECRET_API_KEY:-default-porkbun-secret-api-key}"
 }
 
 update_dns_config() {
