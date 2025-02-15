@@ -42,7 +42,14 @@ configure_crowdsec_bouncer() {
 
     # Generate new bouncer key
     print_status "Generating new bouncer key..." "info"
-    CROWDSEC_API_KEY=$(docker exec crowdsec cscli bouncers add "${BOUNCER_NAME}" | grep -oP 'API key for .*: \K.*')
+    
+    # Attempt to extract the API key using awk
+    CROWDSEC_API_KEY=$(docker exec crowdsec cscli bouncers add "${BOUNCER_NAME}" | awk 'NR==3 {print $1}')
+    
+    # If awk failed, try using grep
+    if [ -z "$CROWDSEC_API_KEY" ]; then
+        CROWDSEC_API_KEY=$(docker exec crowdsec cscli bouncers add "${BOUNCER_NAME}" | grep -oP 'API key for .*: \K.*')
+    fi
 
     # Check if the key was generated
     if [ -z "$CROWDSEC_API_KEY" ]; then
