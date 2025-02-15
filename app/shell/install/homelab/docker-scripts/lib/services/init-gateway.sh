@@ -23,9 +23,13 @@ configure_crowdsec_bouncer() {
     
     # Separate Funktion für Bouncer-Key mit besserer Fehlerbehandlung
     local CROWDSEC_API_KEY
+    if docker exec crowdsec cscli bouncers list | grep -q "${BOUNCER_NAME}"; then
+        docker exec crowdsec cscli bouncers delete "${BOUNCER_NAME}" || true
+    fi
+    
+    # Bouncer-Key generieren
     CROWDSEC_API_KEY=$(docker exec crowdsec sh -c "
         cscli hub update && \
-        (cscli bouncers delete ${BOUNCER_NAME} || true) && \
         cscli bouncers add ${BOUNCER_NAME}
     " | awk 'NR==3 {print $1}')
     
