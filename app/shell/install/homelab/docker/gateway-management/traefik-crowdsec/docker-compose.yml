@@ -2,7 +2,6 @@ services:
 
   crowdsec:
     container_name: crowdsec
-
     env_file: crowdsec.env
     hostname: crowdsec
     healthcheck:
@@ -31,7 +30,6 @@ services:
 
   traefik:
     container_name: traefik
-
     depends_on:
       crowdsec:
         condition: service_healthy
@@ -118,7 +116,6 @@ services:
 
   traefik_crowdsec_bouncer:
     container_name: traefik_crowdsec_bouncer
-
     depends_on:
       crowdsec:
         condition: service_healthy
@@ -136,7 +133,6 @@ services:
   ip-updater:
     image: alpine:latest
     container_name: ip-updater
-
     restart: unless-stopped
     volumes:
       - ./traefik/dynamic-conf:/dynamic-conf:rw
@@ -159,8 +155,6 @@ services:
           update_ip
           sleep 300
         done'
- 
-
     
 networks:
   proxy:

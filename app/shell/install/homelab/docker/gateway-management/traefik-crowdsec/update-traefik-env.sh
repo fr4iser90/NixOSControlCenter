@@ -34,7 +34,6 @@ get_user_info
 new_values=(
     "PUID:$USER_UID"
     "PGID:$USER_GID"
-    "DNS_PROVIDER:$DNS_PROVIDER_CODE"  # Von DNS Provider Select
 )
 
 # Add all DNS credentials from get_dns_credentials
