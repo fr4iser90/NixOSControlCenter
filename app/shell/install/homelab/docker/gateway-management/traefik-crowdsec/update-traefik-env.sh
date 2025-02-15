@@ -16,6 +16,7 @@ _TRAEFIK_ENV_LOADED=1
 # Script configuration
 SERVICE_NAME="traefik-crowdsec"
 ENV_FILE="traefik.env"
+CONF_FILE="traefik/traefik.yml"
 
 print_header "Updating Traefik Environment"
 
@@ -36,6 +37,10 @@ new_values=(
     "PGID:$USER_GID"
 )
 
+new_traefik_yml_values=(
+    "EMAIL:$EMAIL"
+)    
+
 # Add all DNS credentials from get_dns_credentials
 for var in $(env | grep -E '^(AWS_|CLOUDFLARE_|GOOGLE_|AZURE_|DO_)' | cut -d= -f1); do
     new_values+=("$var:${!var}")
@@ -49,4 +54,9 @@ else
     exit 1
 fi
 
-
+if update_conf_file "$BASE_DIR" "$CONF_FILE" "${new_traefik_yml_values[@]}"; then
+    print_status "Traefik config file has been updated" "success"
+else
+    print_status "Failed to update Traefik config file" "error"
+    exit 1
+fi

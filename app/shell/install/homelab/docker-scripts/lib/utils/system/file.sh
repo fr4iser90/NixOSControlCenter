@@ -27,6 +27,26 @@ update_env_file() {
     fi
 }
 
+update_conf_file() {
+    local base_dir=$1
+    local conf_file=$2
+    shift 2
+    local new_values=("$@")
+
+    if [ -f "$base_dir/$conf_file" ]; then
+        print_status "Updating $conf_file" "info"
+        for entry in "${new_values[@]}"; do
+            local key="${entry%%:*}"
+            local value="${entry#*:}"
+            sed -i "s|^$key:.*|$key: $value|" "$base_dir/$conf_file"
+        done
+        return 0
+    else
+        print_status "File $base_dir/$conf_file does not exist" "error"
+        return 1
+    fi
+}
+
 # Update docker-compose file
 update_compose_file() {
     local base_dir=$1
