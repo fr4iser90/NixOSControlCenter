@@ -18,19 +18,17 @@ _SECURITY_SERVICE_LOADED=1
 # CrowdSec Configuration
 configure_crowdsec_bouncer() {
     print_status "Creating new bouncer key in CrowdSec..." "info"
-    sleep 2
-    local MAX_ATTEMPTS=5
-    local ATTEMPTS=0
+    
     local BOUNCER_NAME="traefik-crowdsec-bouncer"
     local CROWDSEC_API_KEY
 
     # Wait for CrowdSec to be running
     while ! docker ps --filter "name=crowdsec" --filter "status=running" | grep -q crowdsec; do
         print_status "Waiting for CrowdSec to be running..." "info"
-        sleep 1
+        sleep 2
     done
 
-    # Wait for CrowdSec to be ready
+    # Wait for CrowdSec to be ready (cscli must respond)
     while ! docker exec crowdsec cscli bouncers list > /dev/null 2>&1; do
         print_status "Waiting for CrowdSec to be ready..." "info"
         sleep 5
@@ -38,26 +36,17 @@ configure_crowdsec_bouncer() {
 
     # Delete existing bouncer if it exists
     if docker exec crowdsec cscli bouncers list | grep -q "${BOUNCER_NAME}"; then
+        print_status "Deleting existing bouncer: ${BOUNCER_NAME}" "info"
         docker exec crowdsec cscli bouncers delete "${BOUNCER_NAME}" || true
     fi
 
     # Generate new bouncer key
-    while [ -z "$CROWDSEC_API_KEY" ] && [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
-        CROWDSEC_API_KEY=$(docker exec crowdsec cscli bouncers add "${BOUNCER_NAME}" | grep -oP 'API key for .*: \K.*') || {
-            print_status "Failed to generate CrowdSec bouncer API key. Retrying..." "error"
-            ATTEMPTS=$((ATTEMPTS + 1))
-            sleep 1
-            continue
-        }
+    print_status "Generating new bouncer key..." "info"
+    CROWDSEC_API_KEY=$(docker exec crowdsec cscli bouncers add "${BOUNCER_NAME}" | grep -oP 'API key for .*: \K.*')
 
-        if [ -n "$CROWDSEC_API_KEY" ]; then
-            break
-        fi
-    done
-
-    # Check if key was generated
+    # Check if the key was generated
     if [ -z "$CROWDSEC_API_KEY" ]; then
-        print_status "Failed to generate CrowdSec bouncer API key after $MAX_ATTEMPTS attempts" "error"
+        print_status "Failed to generate CrowdSec bouncer API key" "error"
         return 1
     fi
 
@@ -67,13 +56,13 @@ configure_crowdsec_bouncer() {
     # Update bouncer configuration
     local TRAEFIK_DIR
     TRAEFIK_DIR=$(get_docker_dir "traefik-crowdsec")
-
+    
     if ! update_env_file "$TRAEFIK_DIR" "traefik-crowdsec-bouncer.env" \
         "CROWDSEC_BOUNCER_API_KEY:$CROWDSEC_API_KEY"; then
         print_status "Failed to update bouncer configuration" "error"
         return 1
     fi
-
+    
     print_status "CrowdSec Bouncer configured successfully" "success"
     return 0
 }
