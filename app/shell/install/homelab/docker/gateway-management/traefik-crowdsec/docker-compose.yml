@@ -111,7 +111,6 @@ services:
       - ./traefik/traefik.yml:/traefik.yml:ro
       - ./traefik/acme_letsencrypt.json:/acme_letsencrypt.json
       - ./traefik/tls_letsencrypt.json:/tls_letsencrypt.json
-#      - ./traefik/dynamic_conf.yml:/dynamic_conf.yml
       - ./traefik/dynamic-conf:/dynamic-conf:ro
 
   traefik_crowdsec_bouncer:
