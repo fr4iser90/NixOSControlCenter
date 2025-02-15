@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -x
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 DOCKER_SCRIPTS_DIR="/home/docker/docker-scripts"
 
@@ -24,30 +24,38 @@ configure_crowdsec_bouncer() {
     local BOUNCER_NAME="traefik-crowdsec-bouncer"
     local CROWDSEC_API_KEY
 
+    # Wait for CrowdSec to be running
     while ! docker ps --filter "name=crowdsec" --filter "status=running" | grep -q crowdsec; do
         print_status "Waiting for CrowdSec to be running..." "info"
         sleep 1
     done
 
+    # Wait for CrowdSec to be ready
+    while ! docker exec crowdsec cscli bouncers list > /dev/null 2>&1; do
+        print_status "Waiting for CrowdSec to be ready..." "info"
+        sleep 5
+    done
+
+    # Delete existing bouncer if it exists
     if docker exec crowdsec cscli bouncers list | grep -q "${BOUNCER_NAME}"; then
         docker exec crowdsec cscli bouncers delete "${BOUNCER_NAME}" || true
     fi
-    
-    # Bouncer-Key generieren
-    while [ -z "$CROWDSEC_API_KEY" ] && [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
-        CROWDSEC_API_KEY=$(docker exec crowdsec sh -c "
-            cscli hub update && \
-            cscli bouncers add ${BOUNCER_NAME}
-        " | awk 'NR==3 {print $1}')
 
-        if [ -z "$CROWDSEC_API_KEY" ]; then
+    # Generate new bouncer key
+    while [ -z "$CROWDSEC_API_KEY" ] && [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+        CROWDSEC_API_KEY=$(docker exec crowdsec cscli bouncers add "${BOUNCER_NAME}" | grep -oP 'API key for .*: \K.*') || {
             print_status "Failed to generate CrowdSec bouncer API key. Retrying..." "error"
             ATTEMPTS=$((ATTEMPTS + 1))
             sleep 1
+            continue
+        }
+
+        if [ -n "$CROWDSEC_API_KEY" ]; then
+            break
         fi
     done
 
-    # Prüfe ob Key generiert wurde
+    # Check if key was generated
     if [ -z "$CROWDSEC_API_KEY" ]; then
         print_status "Failed to generate CrowdSec bouncer API key after $MAX_ATTEMPTS attempts" "error"
         return 1
@@ -59,13 +67,13 @@ configure_crowdsec_bouncer() {
     # Update bouncer configuration
     local TRAEFIK_DIR
     TRAEFIK_DIR=$(get_docker_dir "traefik-crowdsec")
-    
+
     if ! update_env_file "$TRAEFIK_DIR" "traefik-crowdsec-bouncer.env" \
         "CROWDSEC_BOUNCER_API_KEY:$CROWDSEC_API_KEY"; then
         print_status "Failed to update bouncer configuration" "error"
         return 1
     fi
-    
+
     print_status "CrowdSec Bouncer configured successfully" "success"
     return 0
 }
