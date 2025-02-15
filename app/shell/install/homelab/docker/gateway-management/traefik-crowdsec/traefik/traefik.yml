@@ -23,10 +23,10 @@ entryPoints:
   web:
     address: ":80"
     http:
-      redirections:
-        entryPoint:
-          to: "websecure"
-          scheme: "https"
+      # redirections:
+      #   entryPoint:
+      #     to: "websecure"
+      #     scheme: "https"
       middlewares:
         - traefik-crowdsec-bouncer@file
   websecure:
@@ -94,4 +94,4 @@ accessLog:
     statusCodes:
       - "200-499"
     retryAttempts: true  # Zeigt, ob Anfragen mehrfach probiert wurden
-    minDuration: "10ms"  # Zeigt langsamere Anfragen besser
+    minDuration: "10ms"  # Zeigt langsamere Anfragen

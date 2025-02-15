@@ -17,6 +17,8 @@ _TRAEFIK_ENV_LOADED=1
 SERVICE_NAME="traefik-crowdsec"
 ENV_FILE="traefik.env"
 CONF_FILE="traefik/traefik.yml"
+ACME_LETSENCRYPT="traefik/acme_letsencrypt.json"
+TLS_LETSENCRYPT="traefik/tls_letsencrypt.json"
 
 print_header "Updating Traefik Environment"
 
@@ -26,6 +28,10 @@ if [ $? -ne 0 ]; then
     print_status "Failed to get $SERVICE_NAME directory" "error"
     exit 1
 fi
+
+# Set proper permissions for sensitive files
+print_status "Setting correct permissions for Traefik files..." "info"
+chmod 600 "$BASE_DIR/$ACME_LETSENCRYPT" "$BASE_DIR/$TLS_LETSENCRYPT"
 
 # Get user info
 print_status "Getting user information..." "info"

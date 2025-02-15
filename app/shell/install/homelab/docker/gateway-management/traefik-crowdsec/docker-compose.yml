@@ -37,6 +37,9 @@ services:
     hostname: traefik
     command:
       - "--log.level=DEBUG"
+      - "/bin/sh"
+      - "-c"
+      - "chmod 600 /traefik/acme_letsencrypt.json /traefik/tls_letsencrypt.json && traefik"
     dns:
       - 1.1.1.1
       - 8.8.8.8
@@ -55,6 +58,7 @@ services:
       # Router Konfiguration (deaktiviert durch traefik.enable=false)
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.middlewares=default@file,traefikAuth@file,admin-whitelist@file"
+      - "traefik.http.routers.traefik.priority=1"
       - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
       - "traefik.http.routers.traefik.service=api@internal"
       - "traefik.http.routers.traefik.tls=true"
