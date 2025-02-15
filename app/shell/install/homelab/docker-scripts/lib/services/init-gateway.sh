@@ -20,9 +20,13 @@ configure_crowdsec_bouncer() {
     print_status "Creating new bouncer key in CrowdSec..." "info"
     
     local BOUNCER_NAME="traefik-crowdsec-bouncer"
-    
-    # Separate Funktion für Bouncer-Key mit besserer Fehlerbehandlung
     local CROWDSEC_API_KEY
+
+    while ! docker ps --filter "name=crowdsec" --filter "status=running" | grep -q crowdsec; do
+        print_status "Waiting for CrowdSec to be running..." "info"
+        sleep 1
+    done
+    
     if docker exec crowdsec cscli bouncers list | grep -q "${BOUNCER_NAME}"; then
         docker exec crowdsec cscli bouncers delete "${BOUNCER_NAME}" || true
     fi
