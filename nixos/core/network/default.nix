@@ -4,7 +4,7 @@
 let  
   # Import sub-modules based on configuration
   networkingModules = [
-    ./networkmanager.nix
+#    ./networkmanager.nix
 #    ./firewall.nix
   ];
 in {

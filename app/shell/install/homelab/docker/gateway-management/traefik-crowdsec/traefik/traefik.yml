@@ -1,8 +1,6 @@
-# API and Dashboard Configuration
-# To enable dashboard access, set dashboard: true
 api:
-  dashboard: true    # Dashboard disabled by default for security
-  insecure: false    # Keep false to ensure secure access
+  dashboard: true
+  insecure: false
 metrics:
   prometheus:
     addrouterslabels: true
