@@ -7,6 +7,12 @@
   # Firefox nur aktivieren, wenn Desktop aktiviert ist
   programs.firefox.enable = systemConfig.desktop.enable or false;
 
+  # Verhindern, dass der PC in den Ruhemodus geht
+  services.logind.extraConfig = ''
+    HandleLidSwitch=ignore
+    IdleAction=ignore
+  '';
+  
   environment.systemPackages = with pkgs; [
     # CLI Essentials
     coreutils
