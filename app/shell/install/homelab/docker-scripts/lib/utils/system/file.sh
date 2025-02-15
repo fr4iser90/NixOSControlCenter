@@ -66,3 +66,30 @@ update_compose_file() {
         return 1
     fi
 }
+
+replace_placeholders_in_conf() {
+    local base_dir=$1
+    local conf_file=$2
+    shift 2
+    local -A placeholders=()
+
+    for entry in "$@"; do
+        local key="${entry%%:*}"
+        local value="${entry#*:}"
+        placeholders["$key"]="$value"
+    done
+
+    if [ ! -f "$base_dir/$conf_file" ]; then
+        print_status "File $base_dir/$conf_file does not exist" "error"
+        return 1
+    fi
+
+    for key in "${!placeholders[@]}"; do
+        local value="${placeholders[$key]}"
+        if [ -n "$value" ]; then
+            sed -i "s|\${$key}|$value|g" "$base_dir/$conf_file"
+        fi
+    done
+
+    return 0
+}

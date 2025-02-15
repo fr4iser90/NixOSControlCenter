@@ -24,15 +24,7 @@ update_dns_configuration() {
         return 1
     fi
 
-    # 4. Update DDNS configuration
-#    print_status "Updating DDNS configuration..." "info"
-#    local DDNS_DIR=$(get_docker_dir "ddns-updater")
-#    if ! bash "$DDNS_DIR/update-ddns-config.sh"; then
-#        print_status "Failed to update DDNS configuration" "error"
-#        return 1
-#    fi
-
-    # 5. Update companion if available
+    # 4. Update companion if available
     if ! update_companion_config "$DNS_PROVIDER_CODE"; then
         return 1
     fi

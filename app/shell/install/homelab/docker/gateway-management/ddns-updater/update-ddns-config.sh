@@ -36,24 +36,6 @@ load_env_vars() {
     fi
 }
 
-# Funktion zum Ersetzen der Platzhalter in der Konfigurationsdatei
-replace_placeholders() {
-    print_status "Replacing placeholders in ddclient.conf..." "info"
-
-    # Falls eine Variable nicht gesetzt ist, setze einen Standardwert
-    DOMAIN="${DOMAIN:-defaultdomain.com}"
-    CF_TOKEN="${CF_TOKEN:-default_cf_token}"
-    GANDIV5_PERSONAL_ACCESS_TOKEN="${GANDIV5_PERSONAL_ACCESS_TOKEN:-default_token}"
-    PORKBUN_API_KEY="${PORKBUN_API_KEY:-default_api_token}"
-    PORKBUN_SECRET_API_KEY="${PORKBUN_SECRET_API_KEY:-default_secret_api_key}"
-
-    # Ersetze die Platzhalter
-    sed -i -e "s/\${DOMAIN}/$DOMAIN/g" \
-           -e "s/\${CF_TOKEN}/$CF_TOKEN/g" \
-           -e "s/\${GANDIV5_PERSONAL_ACCESS_TOKEN}/$GANDIV5_PERSONAL_ACCESS_TOKEN/g" \
-           "$BASE_DIR/$CONF_FILE"
-}
-
 update_dns_config() {
     # Validate domain
     print_status "Validating domain..." "info"
@@ -76,7 +58,12 @@ update_dns_config() {
     cp "$BASE_DIR/$CONF_FILE" "$BASE_DIR/$CONF_FILE.bak"
 
     # Platzhalter ersetzen
-    replace_placeholders
+    replace_placeholders_in_conf "$BASE_DIR" "$CONF_FILE" \
+        "DOMAIN:$DOMAIN" \
+        "CF_TOKEN:$CF_TOKEN" \
+        "GANDIV5_PERSONAL_ACCESS_TOKEN:$GANDIV5_PERSONAL_ACCESS_TOKEN" \
+        "PORKBUN_API_KEY:$PORKBUN_API_KEY" \
+        "PORKBUN_SECRET_API_KEY:$PORKBUN_SECRET_API_KEY"
 
     # Cloudflare-Block entkommentieren, ohne den Rest zu beeinflussen
     awk -v protocol="$protocol_to_uncomment" '
@@ -108,6 +95,7 @@ update_dns_config() {
     ' "$BASE_DIR/$CONF_FILE" > "$BASE_DIR/$CONF_FILE.tmp"
 
     # Originaldatei mit der bearbeiteten Version überschreiben
+    mv "$BASE_DIR/$CONF_FILE" "$BASE_DIR/$CONF_FILE.bak"
     mv "$BASE_DIR/$CONF_FILE.tmp" "$BASE_DIR/$CONF_FILE"
 
     print_status "DDNS configuration updated successfully" "success"

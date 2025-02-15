@@ -12,7 +12,7 @@
     HandleLidSwitch=ignore
     IdleAction=ignore
   '';
-  
+
   environment.systemPackages = with pkgs; [
     # CLI Essentials
     coreutils
@@ -31,6 +31,4 @@
     nmap
     gnupg
   ];
-
-
 }
