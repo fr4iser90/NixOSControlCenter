@@ -86,6 +86,17 @@ let
       export EMAIL=${systemConfig.email}
       bash "$INIT_SCRIPT"
       echo -e "''${GREEN}Homelab environment created successfully!''${NC}"
+      
+      # Prompt to disable desktop environment
+      echo -e "''${YELLOW}Do you want to disable the desktop environment by running 'sudo ncc homelab-minimize'?''${NC}"
+      read -p "Type 'y' for yes or 'n' for no: " response
+
+      if [[ "$response" =~ ^[Yy]$ ]]; then
+          echo -e "''${YELLOW}Disabling desktop environment...''${NC}"
+          sudo ncc homelab-minimize
+      else
+          echo -e "''${YELLOW}Skipping desktop environment disable. You can run 'sudo ncc homelab-minimize' later if needed.''${NC}"
+      fi
     else
       echo -e "''${RED}Error: init-homelab.sh not found!''${NC}"
       echo -e "''${YELLOW}Please run homelab-fetch first''${NC}"
