@@ -25,7 +25,7 @@ let
     ${ui.messages.loading "Processing password access request for $USER..."}
 
     # Send notification to administrators
-    if notifications.enable then ''
+    ${if notifications.enable then ''
       MESSAGE="Password access requested by $USER\nReason: $REASON"
       
       ${if notifications.types.email.enable then ''
