@@ -4,5 +4,6 @@
   imports = [
     ./update.nix
     ./feature-manager.nix
+    ./homelab-utils.nix
   ];
 }

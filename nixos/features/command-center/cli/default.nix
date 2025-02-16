@@ -31,6 +31,13 @@ let
   mainScript = pkgs.writeScriptBin "ncc" ''
     #!/usr/bin/env bash
 
+    # SIGINT (Strg+C) abfangen
+    function handle_interrupt() {
+      ${ui.badges.error "Operation cancelled"}
+      exit 0
+    }
+    trap handle_interrupt INT
+    
     # Hilfefunktion anzeigen
     function show_help() {
       ${ui.text.header "NixOS Control Center"}

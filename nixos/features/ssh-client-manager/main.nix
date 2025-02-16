@@ -2,37 +2,13 @@
 
 let
   ui = config.features.terminal-ui.api;
-  cfg = config.services.ssh-manager;
+  cfg = config.services.ssh-client-manager;
   
-  connectScript = pkgs.writeScriptBin "ssh-manager" ''
+  sshClientManagerScript = pkgs.writeScriptBin "ncc-ssh-client-manager-main" ''
     #!${pkgs.bash}/bin/bash
-    
-    # Trap for CTRL+C
-    trap '${ui.messages.error "Operation cancelled"}; exit 0' INT
-    
-    ${cfg.utils}
-
-    connect_to_server() {
-        local full_server="$1"
-        local test_only="''${2:-false}"
         
-        if [[ "$test_only" == "true" ]]; then
-            ${pkgs.openssh}/bin/ssh -o BatchMode=yes -o ConnectTimeout=5 "$full_server" exit 2>/dev/null
-            return $?
-        fi
-        
-        ${pkgs.openssh}/bin/ssh "$full_server"
-    }
-
-    add_ssh_key() {
-        local username="$1"
-        local server="$2"
-        if [[ ! -f "$HOME/.ssh/id_rsa.pub" ]]; then
-            ${ui.messages.info "SSH key not found. Generating a new SSH key."}
-            ${pkgs.openssh}/bin/ssh-keygen -t ${toString cfg.keyType} -b ${toString cfg.keyBits} -f "$HOME/.ssh/id_rsa" -N ""
-        fi
-        ${pkgs.openssh}/bin/ssh-copy-id "$username@$server"
-    }
+    ${cfg.sshClientManagerServerUtils}
+    ${cfg.sshClientManagerKeyUtils}
 
     handle_action() {
         local selection="$1"
@@ -130,6 +106,32 @@ let
   '';
 in {
   config = {
-    environment.systemPackages = [ connectScript ];
+    environment.systemPackages = [
+      sshClientManagerScript  # SSH Client Manager Skript wird als Systempaket hinzugefügt
+    ];
+    
+    features.command-center.commands = [
+      {
+        name = "ssh-client-manager";
+        description = "Manage SSH client connections";
+        category = "network";
+        script = "${sshClientManagerScript}/bin/ncc-ssh-client-manager-main";  # Setze den Pfad zum SSH Client Manager Skript
+        arguments = [
+          "--test"  # Beispielargument, passe es nach Bedarf an
+        ];
+        dependencies = [ pkgs.openssh ];  # Füge hier Pakete hinzu, die für den SSH-Client Manager benötigt werden
+        shortHelp = "Manage and configure SSH clients and connections";
+        longHelp = ''
+          Manage SSH client connections, configure settings, and perform various actions related to SSH.
+          
+          Options:
+            --test       Run a test connection
+        '';
+      }
+    ];
+
+    services.ssh-client-manager = {
+      sshClientManagerScript = sshClientManagerScript;
+    };
   };
 }

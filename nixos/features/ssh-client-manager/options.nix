@@ -3,13 +3,25 @@
 with lib;
 
 let
-  cfg = config.services.ssh-manager;
+  cfg = config.services.ssh-client-manager;
 in {
-  options.services.ssh-manager = {
-    utils = mkOption {
+  options.services.ssh-client-manager = {
+    sshClientManagerKeyUtils = mkOption {
       type = types.str;
       internal = true;
-      description = "SSH manager utility functions";
+      description = "SSH-Key utility functions";
+    };
+
+    sshClientManagerServerUtils = mkOption {
+      type = types.str;
+      internal = true;
+      description = "SSH-Server entry utility functions";
+    };
+
+    sshClientManagerScript = mkOption {
+      type = types.str;
+      internal = true;
+      description = "SSH-Server entry utility functions";
     };
 
     credentialsFile = mkOption {
@@ -81,6 +93,11 @@ in {
           description = "Position and size of the preview window";
         };
       };
+    };
+
+    connectionPreviewScript = mkOption {
+      type = types.package;
+      description = "Script for the FZF preview feature in the SSH Manager.";
     };
   };
 

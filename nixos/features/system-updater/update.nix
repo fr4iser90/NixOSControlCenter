@@ -36,7 +36,7 @@ let
     done
   '';
   
-  updateScript = pkgs.writeScriptBin "ncc-updater" ''
+  systemUpdateMainScript = pkgs.writeScriptBin "ncc-system-update-main" ''
     #!${pkgs.bash}/bin/bash
     set -e
 
@@ -205,7 +205,7 @@ let
     ${ui.tables.keyValue "Backup created in" "$BACKUP_DIR"}
     
     # Check if auto-build is enabled
-    if autoBuild; then
+    if [ "$autoBuild" = "true" ]; then
       ${ui.messages.loading "Auto-build enabled, building configuration..."}
       if sudo ncc build switch --flake /etc/nixos#${hostname}; then
         ${ui.messages.success "System successfully updated and rebuilt!"}
@@ -220,7 +220,7 @@ let
 in {
   config = {
     environment.systemPackages = [ 
-      updateScript
+      systemUpdateMainScript
       pkgs.git 
     ];
 
@@ -235,7 +235,7 @@ in {
         name = "system-update";
         description = "Update NixOS system configuration";
         category = "system";
-        script = "${updateScript}/bin/ncc-updater";
+        script = "${systemUpdateMainScript}/bin/ncc-system-update-main";
         arguments = [
           "--auto-build"
           "--source"
