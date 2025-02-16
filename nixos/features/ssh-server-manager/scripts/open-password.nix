@@ -60,7 +60,7 @@ in {
     };
   };
 
-  config = mkIf cfg.enable {
+  config = {
     environment.systemPackages = [ openPasswordScript ];
 
     features.command-center.commands = [

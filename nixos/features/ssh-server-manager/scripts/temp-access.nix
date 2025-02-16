@@ -53,7 +53,7 @@ in {
     };
   };
 
-  config = mkIf cfg.enable {
+  config = {
     environment.systemPackages = [ tempAccessScript ];
 
     features.command-center.commands = [

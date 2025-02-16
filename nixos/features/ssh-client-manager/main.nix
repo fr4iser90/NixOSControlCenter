@@ -32,6 +32,7 @@ let
                         if connect_to_server "$username@$server_ip" true; then
                             ${ui.messages.success "Connection successful!"}
                             add_ssh_key "$username" "$server_ip"
+                            connect_to_server "$username@$server_ip"
                         else
                             ${ui.messages.error "Could not connect to server. Please check credentials."}
                         fi
@@ -40,6 +41,7 @@ let
                     local server=''${selection%% *}
                     local user=''${selection#* (}
                     user=''${user%)*}
+                    add_ssh_key "$user" "$server"
                     connect_to_server "$user@$server"
                 fi
                 ;;
@@ -72,7 +74,8 @@ let
                     ${ui.messages.info "Testing connection..."}
                     if connect_to_server "$username@$server_ip" true; then
                         ${ui.messages.success "Connection successful!"}
-                        add_ssh_key "$username" "$server_ip"
+                        add_ssh_key "$user" "$server"
+                        connect_to_server "$user@$server"
                     else
                         ${ui.messages.error "Could not connect to server. Please check credentials."}
                     fi

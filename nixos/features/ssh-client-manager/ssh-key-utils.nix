@@ -23,11 +23,19 @@ let
     add_ssh_key() {
         local username="$1"
         local server="$2"
+
+        # Überprüfen, ob ein SSH-Schlüssel bereits vorhanden ist
         if [[ ! -f "$HOME/.ssh/id_rsa.pub" ]]; then
             ${ui.messages.info "SSH key not found. Generating a new SSH key."}
             ${pkgs.openssh}/bin/ssh-keygen -t ${toString cfg.keyType} -b ${toString cfg.keyBits} -f "$HOME/.ssh/id_rsa" -N ""
         fi
-        ${pkgs.openssh}/bin/ssh-copy-id "$username@$server"
+
+        # Überprüfen, ob der Schlüssel bereits auf dem Remote-Server autorisiert ist
+        local pubkey=$(cat "$HOME/.ssh/id_rsa.pub")
+        if ! ssh "$username@$server" "grep -Fxq '$pubkey' ~/.ssh/authorized_keys"; then
+            ${ui.messages.info "Copying SSH key to the remote server..."}
+            ${pkgs.openssh}/bin/ssh-copy-id -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
+        fi
     }
 
     rotate_ssh_key() {
