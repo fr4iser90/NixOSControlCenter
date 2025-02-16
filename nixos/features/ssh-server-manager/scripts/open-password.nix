@@ -25,26 +25,27 @@ let
     ${ui.messages.loading "Processing password access request for $USER..."}
 
     # Send notification to administrators
-    if ${notifications.enable}; then
+    if notifications.enable then ''
       MESSAGE="Password access requested by $USER\nReason: $REASON"
       
       ${if notifications.types.email.enable then ''
         ${pkgs.mailutils}/bin/mail -s "SSH Password Access Request" ${notifications.types.email.address} <<< "$MESSAGE"
       '' else ""}
-      
+
       ${if notifications.types.desktop.enable then ''
         ${pkgs.libnotify}/bin/notify-send \
           -u critical \
           "SSH Password Access Request" \
           "$MESSAGE"
       '' else ""}
-      
+
       ${if notifications.types.webhook.enable then ''
         ${pkgs.curl}/bin/curl -X POST \
           -H 'Content-Type: application/json' \
           -d '{"message": "$MESSAGE"}' \
           ${notifications.types.webhook.url}
       '' else ""}
+    '' else ""}
     fi
 
     ${ui.messages.success "Password access request processed. Administrators have been notified."}
