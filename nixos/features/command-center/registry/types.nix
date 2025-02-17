@@ -10,6 +10,12 @@
         example = "vm-start";
       };
 
+      type = lib.mkOption {
+        type = lib.types.enum [ "command" "manager" ];
+        default = "command";
+        description = "Defines whether this is a standalone command or a command manager with subcommands";
+      };
+
       description = lib.mkOption {
         type = lib.types.str;
         description = "Short description of what the command does";
@@ -21,7 +27,6 @@
         description = "Executable script for this command";
       };
 
-      # Optional fields
       category = lib.mkOption {
         type = lib.types.str;
         default = "other";
@@ -43,7 +48,6 @@
         example = [ "qemu" "libvirt" ];
       };
 
-      # Additional useful fields we could add:
       shortHelp = lib.mkOption {
         type = lib.types.str;
         default = "";
@@ -70,57 +74,10 @@
         description = "Whether the command needs user interaction";
       };
 
-      # System updater specific options
-      autoBuild = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = "Whether to automatically build after updates";
-      };
-
-      updateSources = lib.mkOption {
-        type = lib.types.listOf (lib.types.submodule {
-          options = {
-            name = lib.mkOption {
-              type = lib.types.str;
-              description = "Source name";
-            };
-            url = lib.mkOption {
-              type = lib.types.str;
-              description = "Source URL";
-            };
-            branches = lib.mkOption {
-              type = lib.types.listOf lib.types.str;
-              default = ["main"];
-              description = "Available branches";
-            };
-          };
-        });
-        default = [];
-        description = "Available update sources";
-      };
-
-      backupSettings = lib.mkOption {
-        type = lib.types.submodule {
-          options = {
-            enabled = lib.mkOption {
-              type = lib.types.bool;
-              default = true;
-              description = "Whether to create backups";
-            };
-            retention = lib.mkOption {
-              type = lib.types.int;
-              default = 5;
-              description = "Number of backups to keep";
-            };
-            directory = lib.mkOption {
-              type = lib.types.str;
-              default = "/var/backup/nixos";
-              description = "Backup directory path";
-            };
-          };
-        };
-        default = {};
-        description = "Backup configuration settings";
+      priority = lib.mkOption {
+        type = lib.types.int;
+        default = 100;
+        description = "Sorting priority for fzf results (lower = more important)";
       };
     };
   };

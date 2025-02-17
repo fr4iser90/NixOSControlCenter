@@ -3,6 +3,25 @@
 with lib;
 
 let
+  backupSettings = {
+    enabled = true;
+    retention = 5;
+    directory = "/var/backup/nixos";
+  };
+
+  updateSources = [
+    {
+      name = "remote";
+      url = "https://github.com/fr4iser90/NixOsControlCenter.git";
+      branches = [ "main" "develop" "experimental" ];
+    }
+    {
+      name = "local";
+      url = "/home/${username}/Documents/Git/NixOsControlCenter/nixos";
+      branches = [];
+    }
+  ];
+
   ui = config.features.terminal-ui.api;
   commandCenter = config.features.command-center;
 
@@ -49,7 +68,7 @@ let
 
     # Konfiguration
     NIXOS_DIR="/etc/nixos"
-    BACKUP_ROOT="/var/backup/nixos"
+    BACKUP_ROOT="${backupSettings.directory}"
     
     ${ui.text.header "NixOS System Update"}
     ${ui.messages.info "Select update source:"}
@@ -225,9 +244,9 @@ in {
     ];
 
     system.activationScripts.nixosBackupDir = ''
-      mkdir -p /var/backup/nixos
-      chmod 700 /var/backup/nixos
-      chown root:root /var/backup/nixos
+      mkdir -p ${backupSettings.directory}
+      chmod 700 ${backupSettings.directory}
+      chown root:root ${backupSettings.directory}
     '';
 
     features.command-center.commands = [
@@ -251,24 +270,6 @@ in {
             --source        Update source (remote or local)
             --branch        Branch name for remote updates
         '';
-        autoBuild = false;
-        updateSources = [
-          {
-            name = "remote";
-            url = "https://github.com/fr4iser90/NixOsControlCenter.git";
-            branches = [ "main" "develop" "experimental" ];
-          }
-          {
-            name = "local";
-            url = "/home/${username}/Documents/Git/NixOsControlCenter/nixos";
-            branches = [];
-          }
-        ];
-        backupSettings = {
-          enabled = true;
-          retention = 5;
-          directory = "/var/backup/nixos";
-        };
       }
     ];
   };
