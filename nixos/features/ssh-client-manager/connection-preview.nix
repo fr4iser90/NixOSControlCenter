@@ -44,13 +44,13 @@ let
       echo "Connection Status:"
       echo "================="
       if ${pkgs.openssh}/bin/ssh -o BatchMode=yes -o ConnectTimeout=5 "$user@$server" exit 2>/dev/null; then
-        echo "✓ Connected"
+        echo "✓ Credentials valid"
         echo ""
         echo "Server Details:"
         echo "=============="
         ${pkgs.openssh}/bin/ssh -o BatchMode=yes "$user@$server" "uname -a" 2>/dev/null || echo "Unable to fetch system info"
       else
-        echo "✗ Unreachable"
+        echo "✗ Credentials invalid or Unreachable"
       fi
       
       echo ""

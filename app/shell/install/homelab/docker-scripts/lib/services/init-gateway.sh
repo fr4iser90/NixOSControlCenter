@@ -106,8 +106,6 @@ configure_traefik_auth() {
     # Update config
     sed -i "s|\${TRAEFIKUSER}|\"$username:$hashed_password\"|g" "$TRAEFIK_DIR/traefik/dynamic-conf/base-config.yml"
     
-#    sed -i "s|\${TRAEFIKUSER}|\"$username:$hashed_password\"|g" \
-#        "$TRAEFIK_DIR/traefik/dynamic-conf/base-config.yml"
         
     print_status "Traefik authentication configured successfully" "success"
     print_status "You can now login with:" "info"

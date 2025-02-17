@@ -6,7 +6,7 @@ SHOW_CREDENTIALS=false  # Default: mask credentials
 # Function to ask for credential visibility preference
 ask_credential_preference() {
     print_header "Credential Visibility"
-    print_status "Do you want to see sensitive information during setup?" "info"
+    print_status "Do you want to see sensitive information during setup? MASKING NOT WORKING ACTUALLY!" "info"
     print_status "This includes passwords, API keys, and tokens" "info"
     print_status "Default is masked (recommended)" "info"
     echo

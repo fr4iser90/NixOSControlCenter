@@ -3,7 +3,6 @@ services:
   wireguard:
     image: lscr.io/linuxserver/wireguard:latest
     container_name: wireguard
-
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
@@ -27,7 +26,6 @@ services:
   wireguard-ui:
     image: ngoduykhanh/wireguard-ui:latest
     container_name: wireguard-ui
-
     depends_on:
       - wireguard
     cap_add:
