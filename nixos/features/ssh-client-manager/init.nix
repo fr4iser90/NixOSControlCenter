@@ -10,23 +10,10 @@ let
     CREDS_FILE="$USER_HOME/.creds"
 
     # Create home directory if it doesn't exist
-    if [[ ! -d "$USER_HOME" ]]; then
-      echo "Creating home directory for user ${user}..."
-      mkdir -p "$USER_HOME"
-      chown ${user}:${user} "$USER_HOME"
-      chmod 700 "$USER_HOME"
-    fi
+    [[ -d "$USER_HOME" ]] || { mkdir -p "$USER_HOME"; chown ${user}:${user} "$USER_HOME"; chmod 700 "$USER_HOME"; }
 
     # Create .creds file if it doesn't exist
-    if [[ ! -f "$CREDS_FILE" ]]; then
-      echo "Creating .creds file for user ${user}..."
-      touch "$CREDS_FILE"
-      chown ${user}:${user} "$CREDS_FILE"
-      chmod 600 "$CREDS_FILE"
-      echo "Credentials file created at $CREDS_FILE"
-    else
-      echo "Credentials file already exists for user ${user}."
-    fi
+    [[ -f "$CREDS_FILE" ]] || { touch "$CREDS_FILE"; chown ${user}:${user} "$CREDS_FILE"; chmod 600 "$CREDS_FILE"; }
   '';
 in {
   config = {
