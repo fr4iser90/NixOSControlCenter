@@ -20,5 +20,7 @@ pkgs.mkShell {
       echo "Restarting shell with root privileges..."
       exec sudo "$(which nix-shell)" "$@"
     fi
+    echo "Starting install script..."
+    install
   '';
 }

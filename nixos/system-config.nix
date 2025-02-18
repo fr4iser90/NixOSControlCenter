@@ -4,23 +4,23 @@
   #
   systemType = "desktop";
   hostName = "Gaming";
+
   system = {
     channel = "stable";  # oder "stable"
     version = "24.11";     # optional, für spezifische Version
     bootloader = "systemd-boot";
   };
-
   #
-  # Profile Modules
+  # Packages Modules
   #
   packageModules = {
     gaming = {
-      streaming = true;
-      emulation = true;
+      streaming = false;
+      emulation = false;
     };
     development = {
-      game = true;
-      web = true;
+      game = false;
+      web = false;
     };
     server = {
       docker = false;
@@ -53,7 +53,7 @@
     display = {
       manager = "sddm";
       server = "wayland";
-      session = "plasma"; 
+      session = "plasma";
     };
     theme = {
       dark = true;
@@ -67,9 +67,6 @@
   hardware = {
     cpu = "intel";
     gpu = "amd";
-    memory = {
-      sizeGB = 32;
-    };
   };
 
   #
@@ -82,27 +79,18 @@
   # Features
   #
   features = {
-    system-logger = false;      # Optional
-    system-checks = false;      # Optional 
-    system-updater = false;     # Optional
-    system-config-manager = false; # Optional
-    ssh-client-manager = false; # Optional
-    ssh-server-manager = false; # Optional
-    bootentry-manager = false;  # Optional 
-    container-manager = false;   # Optional
-    homelab-manager = false;    # Optional
-    vm-manager = false;         # Optional
-    ai-workspace = false;       # Optional
+    system-logger = false;     
+    system-checks = false;      
+    system-updater = false;   
+    system-config-manager = false; 
+    ssh-client-manager = false;
+    ssh-server-manager = false;        
+    bootentry-manager = false; 
+    container-manager = false;  
+    homelab-manager = false;    
+    vm-manager = false;         
+    ai-workspace = false;       
   };
-
-  #
-  # Security Settings
-  #
-  sudo = {
-    requirePassword = false;
-    timeout = 15;
-  };
-  enableFirewall = false;
 
   #
   # Localization
@@ -125,5 +113,4 @@
   #
   email = "example@example.com";
   domain = "example.com";
-  certEmail = "example@example.com";
 }
