@@ -62,10 +62,10 @@ let
 
   # Lingering-Konfiguration basierend auf Rolle
   roleLingering = {
-    virtualization = true;    # Docker/VM-User brauchen Lingering
-    admin = false;           # Admins normalerweise nicht
-    guest = false;           # Gäste definitiv nicht
-    restricted-admin = false; # Restricted Admins auch nicht
+    virtualization = true;
+    admin = false;           
+    guest = false;           
+    restricted-admin = false; 
   };
 
 in {
