@@ -30,10 +30,10 @@ let
                         save_new_server "$server_ip" "$username"
                         ${ui.messages.info "Testing connection..."}
                         if connect_to_server "$username@$server_ip" true; then
-                            ${ui.messages.success "Connection successful!"}
                             add_ssh_key "$username" "$server_ip"
                             connect_to_server "$username@$server_ip"
                         else
+                            ${ui.messages.error "Connection failed. SSH key not copied."}
                             ${ui.messages.error "Could not connect to server. Please check credentials."}
                         fi
                     fi
@@ -41,8 +41,15 @@ let
                     local server=''${selection%% *}
                     local user=''${selection#* (}
                     user=''${user%)*}
-                    add_ssh_key "$user" "$server"
-                    connect_to_server "$user@$server"
+                    if connect_to_server "$user@$server" true; then
+                        add_ssh_key "$user" "$server"
+                        connect_to_server "$user@$server"
+                        ${ui.messages.success "Connection successful!"}
+                    else
+                        ${ui.messages.error "Connection failed. SSH key not copied."}
+                        ${ui.messages.error "Could not connect to server. Please check credentials."}
+                        return 1
+                fi
                 fi
                 ;;
             "delete")
@@ -74,8 +81,8 @@ let
                     ${ui.messages.info "Testing connection..."}
                     if connect_to_server "$username@$server_ip" true; then
                         ${ui.messages.success "Connection successful!"}
-                        add_ssh_key "$user" "$server"
-                        connect_to_server "$user@$server"
+                        add_ssh_key "$username" "$server_ip"
+                        connect_to_server "$username@$server_ip"
                     else
                         ${ui.messages.error "Could not connect to server. Please check credentials."}
                     fi
