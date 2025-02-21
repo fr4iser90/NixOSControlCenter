@@ -10,8 +10,11 @@ let
     #!${pkgs.bash}/bin/bash
 
     LOCKFILE="/tmp/ssh-temp-open.lock"
-    exec 200>$LOCKFILE
-    flock -n 200 || { ${ui.messages.error "Another instance is running."}; exit 1; }
+    exec 200>"$LOCKFILE"
+    if ! flock -n 200; then
+      ${ui.messages.error "Another instance is running."}
+      exit 1
+    fi
 
     USER="$1"
     if [ -z "$USER" ]; then
