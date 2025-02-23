@@ -34,7 +34,7 @@ let
 
     connect_to_server() {
         local full_server="$1"
-        local test_only="${2:-false}"
+        local test_only="''${2:-false}"
         
         if [[ "$test_only" == "true" ]]; then
             ${pkgs.openssh}/bin/ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$full_server" exit 2>/dev/null
