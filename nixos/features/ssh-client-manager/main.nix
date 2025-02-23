@@ -27,27 +27,28 @@ let
                     echo -n "Enter username: "
                     read -r username
                     if [[ -n "$server_ip" && -n "$username" ]]; then
-                        save_new_server "$server_ip" "$username"
                         ${ui.messages.info "Testing connection..."}
                         if connect_to_server "$username@$server_ip" true; then
+                            save_new_server "$server_ip" "$username"
                             add_ssh_key "$username" "$server_ip"
                             connect_to_server "$username@$server_ip"
                         else
-                            ${ui.messages.error "Connection failed. SSH key not copied."}
-                            ${ui.messages.error "Could not connect to server. Please check credentials."}
+                            ${ui.messages.error "Connection test failed. Server not saved."}
                         fi
                     fi
                 else
                     local server=''${selection%% *}
                     local user=''${selection#* (}
                     user=''${user%)*}
+                    ${ui.messages.info "Testing connection to $user@$server..."}
                     if connect_to_server "$user@$server" true; then
                         add_ssh_key "$user" "$server"
                         connect_to_server "$user@$server"
                         ${ui.messages.success "Connection successful!"}
                     else
-                        ${ui.messages.error "Connection failed. SSH key not copied."}
-                        ${ui.messages.error "Could not connect to server. Please check credentials."}
+                        ${ui.messages.error "Connection test failed"}
+                        ${ui.messages.info "Trying direct connection without key..."}
+                        connect_to_server "$user@$server"
                         return 1
                 fi
                 fi

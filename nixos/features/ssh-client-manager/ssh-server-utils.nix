@@ -35,15 +35,20 @@ let
     connect_to_server() {
         local full_server="$1"
         local test_only="''${2:-false}"
+        local status=0
         
         if [[ "$test_only" == "true" ]]; then
-            ${pkgs.openssh}/bin/ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$full_server" exit 2>/dev/null
-            return $?
+            ${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$full_server" exit 2>&1 | tee /tmp/ssh-test.log
+            status=$?
+            if [[ $status -ne 0 ]]; then
+                ${ui.messages.error "Connection test failed. Check credentials and network"}
+            fi
+            return $status
         fi
         
         ${pkgs.openssh}/bin/ssh -o StrictHostKeyChecking=no "$full_server"
     }
-
+    
     select_server() {
         local servers_list="$1"
         local selection action
