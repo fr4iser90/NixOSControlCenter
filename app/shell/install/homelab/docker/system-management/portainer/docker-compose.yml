@@ -28,7 +28,7 @@ services:
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
       
       # Maximale Sicherheit mit allen Middlewares
-      - "traefik.http.routers.portainer.middlewares=default@file,traefikAuth@file,admin-whitelist@file,rate-limit@docker"
+      - "traefik.http.routers.portainer.middlewares=default@file,traefikAuth@file,admin-whitelist@file" # ,rate-limit@docker"
       
       # Sticky Sessions
       - "traefik.http.services.portainer.loadbalancer.sticky.cookie.httpOnly=true"

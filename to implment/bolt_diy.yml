@@ -1,0 +1,95 @@
+services:
+  app-prod:
+    image: bolt-ai:production
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: bolt-ai-production
+    env_file: ".env.local"
+    environment:
+      - NODE_ENV=production
+      - COMPOSE_PROFILES=production
+      - PORT=5173
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - HuggingFace_API_KEY=${HuggingFace_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPEN_ROUTER_API_KEY=${OPEN_ROUTER_API_KEY}
+      - GOOGLE_GENERATIVE_AI_API_KEY=${GOOGLE_GENERATIVE_AI_API_KEY}
+      - OLLAMA_API_BASE_URL=${OLLAMA_API_BASE_URL}
+      - XAI_API_KEY=${XAI_API_KEY}
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY}
+      - TOGETHER_API_BASE_URL=${TOGETHER_API_BASE_URL}
+      - AWS_BEDROCK_CONFIG=${AWS_BEDROCK_CONFIG}
+      - VITE_LOG_LEVEL=${VITE_LOG_LEVEL:-debug}
+      - DEFAULT_NUM_CTX=${DEFAULT_NUM_CTX:-32768}
+      - RUNNING_IN_DOCKER=true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: pnpm run dockerstart
+    profiles:
+      - production
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.bolt-prod.entrypoints=websecure"
+      - "traefik.http.routers.bolt-prod.rule=Host(`bolt-prod.${DOMAIN}`)"
+      - "traefik.http.routers.bolt-prod.tls=true"
+      - "traefik.http.routers.bolt-prod.tls.certresolver=http_resolver"
+      - "traefik.http.services.bolt-prod.loadbalancer.server.port=5173"
+      - "traefik.http.routers.bolt-prod.middlewares=default@file,traefikAuth@file,rate-limit@docker"
+
+  app-dev:
+    image: bolt-ai:development
+    build:
+      target: bolt-ai-development
+    environment:
+      - NODE_ENV=development
+      - VITE_HMR_PROTOCOL=ws
+      - VITE_HMR_HOST=localhost
+      - VITE_HMR_PORT=5173
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      - PORT=5173
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - HuggingFace_API_KEY=${HuggingFace_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPEN_ROUTER_API_KEY=${OPEN_ROUTER_API_KEY}
+      - XAI_API_KEY=${XAI_API_KEY}
+      - GOOGLE_GENERATIVE_AI_API_KEY=${GOOGLE_GENERATIVE_AI_API_KEY}
+      - OLLAMA_API_BASE_URL=${OLLAMA_API_BASE_URL}
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY}
+      - TOGETHER_API_BASE_URL=${TOGETHER_API_BASE_URL}
+      - AWS_BEDROCK_CONFIG=${AWS_BEDROCK_CONFIG}
+      - VITE_LOG_LEVEL=${VITE_LOG_LEVEL:-debug}
+      - DEFAULT_NUM_CTX=${DEFAULT_NUM_CTX:-32768}
+      - RUNNING_IN_DOCKER=true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+        consistency: cached
+      - /app/node_modules
+    command: pnpm run dev --host 0.0.0.0
+    profiles: ["development", "default"]
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.bolt-dev.entrypoints=websecure"
+      - "traefik.http.routers.bolt-dev.rule=Host(`bolt-dev.${DOMAIN}`)"
+      - "traefik.http.routers.bolt-dev.tls=true"
+      - "traefik.http.routers.bolt-dev.tls.certresolver=http_resolver"
+      - "traefik.http.routers.bolt-dev.service=bolt-dev"
+      - "traefik.http.services.bolt-dev.loadbalancer.server.port=5173"
+      - "traefik.http.routers.bolt-dev.middlewares=default@file,traefikAuth@file" #,rate-limit@docker"
+
+networks:
+  proxy:
+    external: true

@@ -23,10 +23,10 @@ entryPoints:
   web:
     address: ":80"
     http:
-      # redirections:
-      #   entryPoint:
-      #     to: "websecure"
-      #     scheme: "https"
+       redirections:
+         entryPoint:
+           to: "websecure"
+           scheme: "https"
       middlewares:
         - traefik-crowdsec-bouncer@file
   websecure:
