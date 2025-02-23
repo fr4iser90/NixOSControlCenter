@@ -54,7 +54,7 @@ services:
       - "traefik.http.services.wireguard-ui.loadbalancer.server.port=5000"
       
       # Maximale Sicherheit mit allen Middlewares
-      - "traefik.http.routers.wireguard-ui.middlewares=default@file,traefikAuth@file,admin-whitelist@file,rate-limit@docker"
+      - "traefik.http.routers.wireguard-ui.middlewares=default@file,traefikAuth@file,admin-whitelist@file" #,rate-limit@docker"
       
       # Sticky Sessions
       - "traefik.http.services.wireguard-ui.loadbalancer.sticky.cookie.httpOnly=true"

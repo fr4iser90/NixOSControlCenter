@@ -34,14 +34,14 @@ let
 
     connect_to_server() {
         local full_server="$1"
-        local test_only="''${2:-false}"
+        local test_only="${2:-false}"
         
         if [[ "$test_only" == "true" ]]; then
-            ${pkgs.openssh}/bin/ssh -o BatchMode=yes -o ConnectTimeout=5 "$full_server" exit 2>/dev/null
+            ${pkgs.openssh}/bin/ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$full_server" exit 2>/dev/null
             return $?
         fi
         
-        ${pkgs.openssh}/bin/ssh "$full_server"
+        ${pkgs.openssh}/bin/ssh -o StrictHostKeyChecking=no "$full_server"
     }
 
     select_server() {
