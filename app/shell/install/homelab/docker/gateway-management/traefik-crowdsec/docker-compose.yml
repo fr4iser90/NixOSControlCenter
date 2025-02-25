@@ -91,9 +91,10 @@ services:
       - "traefik.http.middlewares.security-headers.headers.customResponseHeaders.X-Robots-Tag=noindex,nofollow"
       
       # Rate Limiting
-      - "traefik.http.middlewares.rate-limit.ratelimit.average=10"
-      - "traefik.http.middlewares.rate-limit.ratelimit.burst=50"
+      - "traefik.http.middlewares.rate-limit.ratelimit.average=100"
+      - "traefik.http.middlewares.rate-limit.ratelimit.burst=200"
       - "traefik.http.middlewares.rate-limit.ratelimit.period=1m"
+
 
     networks:
       crowdsec:
