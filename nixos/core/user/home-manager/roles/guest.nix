@@ -15,5 +15,6 @@ in {
   # Eingeschränkte Berechtigungen
   home.sessionVariables = {
     PATH = lib.mkForce "$HOME/.local/bin:/usr/bin:/bin";  # Eingeschränkter PATH
+    # DOCKER_HOST = "unix:///run/user/$userid/docker.sock";
   };
 }

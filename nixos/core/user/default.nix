@@ -36,10 +36,14 @@ let
         options = [ "PASSWD" ];  # Passwortabfrage für eingeschränkte Admins
       }];
     }]
-    else [];  # Keine sudo-Rechte für andere Rollen
-
-
-
+    else if role == "virtualization" then [{
+      users = [ username ];
+      commands = [
+        { command = "/run/current-system/sw/bin/docker swarm *"; options = [ "NOPASSWD" ]; }
+        { command = "/run/current-system/sw/bin/docker node *"; options = [ "NOPASSWD" ]; }
+      ];
+    }]
+    else [];
 
   # Automatisches Autologin für den ersten restricted-Admin-User
   autoLoginUser = lib.findFirst 
