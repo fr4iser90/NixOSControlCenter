@@ -15,8 +15,6 @@ A comprehensive tool for managing packages, configurations, and devices on NixOS
 
 ### System Requirements
 - NixOS (tested on 24.11)
-- systemd-boot
-- Supported GPUs: AMD, Intel, NVIDIA-Intel
 
 ### Quick Install
 ```bash
@@ -26,6 +24,9 @@ sudo nix-shell
 ```
 
 ## Project Structure
+
+<details>
+<summary>Click to expand</summary>
 
 The project is organized into these main components:
 
@@ -72,6 +73,8 @@ The project is organized into these main components:
   - `INSTALL.md`: Installation guide
   - `PROJECT_STRUCTURE.md`: Detailed structure
   - `USAGE.md`: Usage instructions
+
+</details>
 
 For complete project structure, see [PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)
 
