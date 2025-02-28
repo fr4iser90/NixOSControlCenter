@@ -1,3 +1,3 @@
 [submodule "rescue-kit"]
-    path = rescue-kit
-    url = https://github.com/fr4iser90/NixOSControlCenter-RescueKit
+	path = rescue-kit
+	url = https://github.com/fr4iser90/NixOSControlCenter-RescueKit
