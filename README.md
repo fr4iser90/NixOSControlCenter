@@ -10,7 +10,6 @@ A comprehensive tool for managing packages, configurations, and devices on NixOS
 - **Package Management**: Unified package management interface
 - **Device Management**: Hardware configuration and monitoring
 - **Modular Architecture**: Extensible through Nix modules
-- **Development Environment**: Integrated development shell with all dependencies
 
 ## Installation
 
@@ -23,48 +22,12 @@ A comprehensive tool for managing packages, configurations, and devices on NixOS
 ```bash
 git clone https://github.com/fr4iser90/NixOSControlCenter.git
 cd NixOSControlCenter
-sudo nix-shell install-shell.nix
-install
+sudo nix-shell
 ```
-
-For detailed installation instructions, see [INSTALL.md](docs/INSTALL.md)
-
-## Development Setup
-
-1. Start development shell:
-```bash
-nix-shell dev-shell.nix
-```
-
-2. Available commands:
-```bash
-show-help
-```
-
-For more details, see [DEVELOPMENT.md](docs/DEVELOPMENT.md)
 
 ## Project Structure
 
 The project is organized into these main components:
-
-- **app/**: Main application code
-  - `modules/`: App-specific modules
-  - `python/`: Python application
-    - `src/`: Source code
-      - `backend/`: Backend services and models
-      - `config/`: Configuration files
-      - `frontend/`: Frontend components
-    - `tests/`: Test suites
-    - `ui/`: UI definitions and components
-  - `shell/`: Shell environments
-    - `dev/`: Development environment
-    - `install/`: Installation environment
-
-- **docs/**: Project documentation
-  - `DEVELOPMENT.md`: Development setup
-  - `INSTALL.md`: Installation guide
-  - `PROJECT_STRUCTURE.md`: Detailed structure
-  - `USAGE.md`: Usage instructions
 
 - **nixos/**: NixOS configurations
   - `core/`: Core system functionality
@@ -73,6 +36,7 @@ The project is organized into these main components:
     - `network/`: Network configuration
     - `system/`: System management
     - `user/`: User management
+  - `custom/`: Custom configurations
   - `desktop/`: Desktop environment
     - `audio/`: Audio configuration
     - `display-managers/`: Display managers
@@ -81,13 +45,33 @@ The project is organized into these main components:
     - `themes/`: Visual customization
   - `features/`: System features
     - `ai-workspace/`: AI development tools
+    - `bootentry-manager/`: Boot entry management
+    - `command-center/`: Command center
     - `container-manager/`: Container management
     - `homelab-manager/`: Homelab configuration
     - `ssh-client-manager/`: SSH client management
+    - `ssh-server-manager/`: SSH server management
     - `system-checks/`: System validation
+    - `system-config-manager/`: System configuration management
+    - `system-logger/`: System logging
+    - `system-updater/`: System updates
+    - `terminal-ui/`: Terminal UI components
+    - `vm-manager/`: VM management
   - `packages/`: System packages
     - `base/`: Base system packages
     - `modules/`: Package modules
+
+- **shell/**: Shell environments and scripts
+  - `homelab/`: Homelab management scripts
+  - `hooks/`: Shell hooks
+  - `packages/`: Shell package definitions
+  - `scripts/`: Various utility scripts
+
+- **docs/**: Project documentation
+  - `DEVELOPMENT.md`: Development setup
+  - `INSTALL.md`: Installation guide
+  - `PROJECT_STRUCTURE.md`: Detailed structure
+  - `USAGE.md`: Usage instructions
 
 For complete project structure, see [PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)
 

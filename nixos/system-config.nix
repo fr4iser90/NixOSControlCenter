@@ -3,7 +3,7 @@
   # System Type & Profile
   #
   systemType = "desktop";
-  hostName = "Gaming";
+  hostName = "WorkStation";
 
   system = {
     channel = "stable";  # oder "stable"
@@ -32,16 +32,11 @@
   # User Management
   # 
   users = {
-    "test" = {
-      role = "admin";
+    "fr4iser" = {
+      role = "restricted-admin";
       defaultShell = "zsh";
       autoLogin = false;
-    };
-    "test2" = {
-      role = "admin";
-      defaultShell = "zsh";
-      autoLogin = false;
-    };
+    };  
   };
 
   #
@@ -49,14 +44,14 @@
   #
   desktop = {
     enable = true;
-    environment = "plasma";
+    environment = "plasma";        # [plasma/gnome/xfce]
     display = {
-      manager = "sddm";
-      server = "wayland";
-      session = "plasma";
+      manager = "sddm";      # [sddm/gdm/lightdm]
+      server = "wayland";    # [wayland/x11/hybrid]
+      session = "plasma";          # [plasma/gnome]
     };
     theme = {
-      dark = true;
+      dark = true;             # [true/false]
     };
     audio = "pipewire";
   };
@@ -66,7 +61,7 @@
   #
   hardware = {
     cpu = "intel";
-    gpu = "amd";
+    gpu = "intel";
   };
 
   #
@@ -76,18 +71,17 @@
   buildLogLevel = "minimal";
 
   #
-  # Features
+  # System Features
   #
   features = {
-    system-logger = false;     
-    system-checks = false;      
-    system-updater = false;   
-    system-config-manager = false; 
+    system-logger = true;     
+    system-checks = true;      
+    system-updater = true;    
     ssh-client-manager = false;
     ssh-server-manager = false;        
     bootentry-manager = false; 
     container-manager = false;  
-    homelab-manager = false;    
+    homelab-manager = true;    
     vm-manager = false;         
     ai-workspace = false;       
   };
@@ -98,7 +92,7 @@
   timeZone = "Europe/Berlin";
   locales = [ "en_US.UTF-8" ];
   keyboardLayout = "de";
-  keyboardOptions = "eurosign";
+  keyboardOptions = "terminate";
 
   #
   # Profile Overrides

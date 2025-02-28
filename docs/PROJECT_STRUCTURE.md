@@ -1,37 +1,366 @@
-# Project Structure
+# Detailed Project Structure
 
-```tree
-# Main Project Structure
-NixOsControlCenter/
-├── app/                     # Application components
-│   ├── modules/             # Application-specific modules
-│   ├── python/              # Python GUI application
-│   │   ├── src/             # Source code
-│   │   │   ├── backend/     # Backend services and logic
-│   │   │   ├── frontend/    # Frontend components and UI
-│   │   │   └── config/      # Configuration management
-│   │   ├── tests/           # Test suites
-│   │   └── ui/              # UI definitions and assets
-│   └── shell/               # Shell environments
-│       ├── dev/             # Development environment setup
-│       └── install/         # Installation environment setup
-│
-├── docs/                    # Project documentation
-│   ├── DEVELOPMENT.md       # Development setup guide
-│   ├── INSTALL.md           # Installation instructions
-│   ├── USAGE.md             # User manual
-│   └── PROJECT_STRUCTURE.md # This document
-│
-├── nixos/                   # NixOS configuration management
-│   ├── core/                # Core system configuration
-│   ├── desktop/             # Desktop environment setup
-│   ├── features/            # Feature modules
-│   ├── packages/            # Package collections
-│   ├── flake.nix            # Main Nix flake configuration
-│   └── system-config.nix    # System-wide configuration
-│
-├── CHANGELOG.md             # Project changelog
-├── dev-shell.nix            # Development shell setup
-├── install-shell.nix        # Installation shell setup
-├── LICENSE                  # Project license
-└── README.md                # Main project documentation
+The project is organized into these main components:
+
+## nixos/
+NixOS configurations
+- **core/**: Core system functionality
+  - **boot/**: Bootloader configuration
+    - **bootloaders/**: Specific bootloader configurations
+      - `grub.nix`
+      - `refind.nix`
+      - `systemd-boot.nix`
+    - `default.nix`
+  - **hardware/**: Hardware-specific settings
+    - **cpu/**: CPU configurations
+      - `amd.nix`
+      - `default.nix`
+      - `intel.nix`
+      - `none.nix`
+      - `vm-gpu.nix`
+    - **gpu/**: GPU configurations
+      - `amd.nix`
+      - `default.nix`
+      - `intel.nix`
+      - `nvidia-intel.nix`
+      - `nvidia.nix`
+      - `vm-gpu.nix`
+    - **memory/**: Memory configurations
+      - `default.nix`
+  - **network/**: Network configuration
+    - `default.nix`
+    - `firewall.nix`
+    - **lib/**: Network rules
+      - `rules.nix`
+    - **recommendations/**: Network service recommendations
+      - `services.nix`
+  - **system/**: System management
+    - `default.nix`
+  - **user/**: User management
+    - `default.nix`
+    - **home-manager/**: Home manager configurations
+      - **roles/**
+      - **shellInit/**
+    - `password-manager.nix`
+- **custom/**: Custom configurations
+  - `default.nix`
+  - `README.md`
+- **desktop/**: Desktop environment
+  - **audio/**: Audio configuration
+    - `alsa.nix`
+    - `default.nix`
+    - `pipewire.nix`
+    - `pulseaudio.nix`
+  - **display-managers/**: Display managers
+    - `default.nix`
+    - **gdm/**: GDM configurations
+      - `default.nix`
+      - `packages.nix`
+      - `settings.nix`
+    - **lightdm/**: LightDM configurations
+      - `default.nix`
+      - `packages.nix`
+      - `settings.nix`
+    - **sddm/**: SDDM configurations
+      - `default.nix`
+      - `packages.nix`
+      - `settings.nix`
+  - **display-servers/**: Display servers
+    - `default.nix`
+    - **wayland/**: Wayland configurations
+      - `base.nix`
+      - `default.nix`
+      - `extensions.nix`
+    - **x11/**: X11 configurations
+      - `base.nix`
+      - `default.nix`
+      - `extensions.nix`
+  - **environments/**: Desktop environments
+    - `default.nix`
+    - **gnome/**: GNOME configurations
+      - `default.nix`
+      - `packages.nix`
+      - `settings.nix`
+    - **plasma/**: Plasma configurations
+      - `default.nix`
+      - `packages.nix`
+      - `settings.nix`
+    - **xfce/**: XFCE configurations
+      - `default.nix`
+      - `packages.nix`
+      - `settings.nix`
+  - **themes/**: Visual customization
+    - **color-schemes/**: Color schemes
+      - `default.nix`
+      - **schemes/**
+    - **cursors/**: Cursor themes
+      - `default.nix`
+    - `default.nix`
+    - **fonts/**: Font configurations
+      - `default.nix`
+    - **icons/**: Icon themes
+      - `default.nix`
+- **features/**: System features
+  - **ai-workspace/**: AI development tools
+    - **containers/**: AI containers
+      - **databases/**
+      - `default.nix`
+      - **ollama/**
+      - **training/**
+    - `default.nix`
+    - **llm/**: Large language models
+      - **api/**
+      - `default.nix`
+      - **training/**
+    - **schemas/**: AI schemas
+      - `default.nix`
+      - **postgres/**
+      - **vector/**
+    - **services/**: AI services
+      - `huggingface.nix`
+      - `ollama.nix`
+  - **bootentry-manager/**: Boot entry management
+    - `default.nix`
+    - **lib/**: Boot entry libraries
+      - `common.nix`
+      - `types.nix`
+    - **providers/**: Boot entry providers
+      - `grub.nix`
+      - `refind.nix`
+      - `systemd-boot.nix`
+  - **command-center/**: Command center
+    - **cli/**: Command line interface
+      - `command-preview.nix`
+      - `default.nix`
+      - `manager-preview.nix`
+    - `default.nix`
+    - **registry/**: Command registry
+      - `default.nix`
+      - `types.nix`
+  - **container-manager/**: Container management
+    - `default.nix`
+    - **docker/**: Docker configurations
+      - **containers/**
+    - **manager/**: Container manager
+      - `base.nix`
+      - `default.nix`
+      - `networks.nix`
+      - `security-options.nix`
+      - `selection.nix`
+      - `volumes.nix`
+    - **oci-container/**: OCI container configurations
+      - **containers/**
+      - `default.nix`
+      - **modules/**
+      - `README.md`
+    - **podman/**: Podman configurations
+      - `container-manager.nix`
+      - **containers/**
+      - `default.nix`
+      - **modules/**
+      - `README.md`
+  - **homelab-manager/**: Homelab configuration
+    - `default.nix`
+    - `homelab-create.nix`
+    - `homelab-delete.nix`
+    - `homelab-fetch.nix`
+    - `homelab-status.nix`
+    - `homelab-update.nix`
+  - **ssh-client-manager/**: SSH client management
+    - `connection-preview.nix`
+    - `default.nix`
+    - `init.nix`
+    - `main.nix`
+    - `options.nix`
+    - `ssh-key-utils.nix`
+    - `ssh-server-utils.nix`
+  - **ssh-server-manager/**: SSH server management
+    - `auth.nix`
+    - `default.nix`
+    - `monitoring.nix`
+    - `notifications.nix`
+    - **scripts/**: SSH server scripts
+      - `monitor.nix`
+      - `open-password.nix`
+      - `temp-access.nix`
+  - **system-checks/**: System validation
+    - `default.nix`
+    - **postbuild/**: Post-build checks
+      - `default.nix`
+    - **prebuild/**: Pre-build checks
+      - **checks/**
+      - `default.nix`
+      - **lib/**
+  - **system-config-manager/**: System configuration management
+    - `default.nix`
+  - **system-logger/**: System logging
+    - **collectors/**: Log collectors
+      - `bootentries.nix`
+      - `bootloader.nix`
+      - `desktop.nix`
+      - `network.nix`
+      - `packages.nix`
+      - `profile.nix`
+      - `services.nix`
+      - `sound.nix`
+      - `system-config.nix`
+      - `virtualization.nix`
+    - `default.nix`
+  - **system-updater/**: System updates
+    - `default.nix`
+    - `desktop-manager.nix`
+    - `feature-manager.nix`
+    - `homelab-utils.nix`
+    - `update.nix`
+  - **terminal-ui/**: Terminal UI components
+    - `colors.nix`
+    - **components/**: UI components
+      - `boxes.nix`
+      - `default.nix`
+      - `lists.nix`
+      - `progress.nix`
+      - `tables.nix`
+    - **core/**: Core UI components
+      - `default.nix`
+      - `layout.nix`
+      - `text.nix`
+    - `default.nix`
+    - **interactive/**: Interactive UI components
+      - `default.nix`
+      - `prompts.nix`
+      - `spinners.nix`
+    - **status/**: Status UI components
+      - `badges.nix`
+      - `default.nix`
+      - `messages.nix`
+  - **vm-manager/**: VM management
+    - **base/**: Base VM configurations
+      - **config/**
+    - **containers/**: VM containers
+      - `default.nix`
+      - **engines/**
+      - **templates/**
+    - **core/**: Core VM configurations
+      - `default.nix`
+      - `monitoring.nix`
+      - `networking.nix`
+      - `storage.nix`
+    - `default.nix`
+    - **iso-manager/**: ISO management
+      - `hash-collector.nix`
+      - `iso-download.nix`
+      - `iso-validation.nix`
+    - **lib/**: VM libraries
+      - `default.nix`
+      - `distros.nix`
+      - `iso-manager.nix`
+      - `networking.nix`
+      - `port-manager.nix`
+      - `storage.nix`
+      - `types.nix`
+      - `vm.nix`
+    - **machines/**: VM machines
+      - **drivers/**
+    - **testing/**: VM testing
+      - `default.nix`
+
+## shell/
+Shell environments and scripts
+- **homelab/**: Homelab management scripts
+  - **docker/**: Docker configurations
+    - **adblocker-management/**: Adblocker management
+      - **pihole/**
+    - **companion-management/**: Companion management
+      - **cloudflare/**
+    - **dashboard-management/**: Dashboard management
+      - **organizr/**
+    - **gateway-management/**: Gateway management
+      - **ddns-updater**
+      - **traefik-crowdsec/**
+    - **honeypot-management/**: Honeypot management
+      - **tarpit/**
+    - **media-management/**: Media management
+      - **jellyfin/**
+      - **plex/**
+    - **password-management/**: Password management
+      - **bitwarden/**
+    - **storage-management/**: Storage management
+      - **owncloud/**
+    - **system-management/**: System management
+      - **portainer/**
+      - **watchtower/**
+    - **url-management/**: URL management
+      - **yourls/**
+    - **vpn-management/**: VPN management
+      - **wireguard/**
+  - **docker-scripts/**: Docker scripts
+    - `cleanup-docker.sh`
+    - `init-homelab.sh`
+    - **lib/**: Docker script libraries
+      - **core/**
+      - **dns/**
+      - **services/**
+      - **utils/**
+- **hooks/**: Shell hooks
+  - `default.nix`
+  - `env.nix`
+  - `env-paths.nix`
+  - `env-system.nix`
+  - `env-temp.nix`
+  - `ui-aliases.nix`
+  - `ui-info.nix`
+  - `ui-welcome.nix`
+- **packages/**: Shell package definitions
+  - `default.nix`
+  - `python.nix`
+  - `system.nix`
+- **scripts/**: Various utility scripts
+  - **checks/**: System checks
+    - **hardware/**: Hardware checks
+      - `cpu.sh`
+      - `gpu.sh`
+      - `memory.sh`
+      - `storage.sh`
+    - **system/**: System checks
+      - `bootloader.sh`
+      - `hosting.sh`
+      - `locale.sh`
+      - `network.sh`
+      - `users.sh`
+  - **core/**: Core scripts
+    - `deploy-build.sh`
+    - `external-deploy.sh`
+    - `imports.sh`
+    - `init.sh`
+  - **lib/**: Script libraries
+    - `colors.sh`
+    - `logging.sh`
+    - **security/**: Security scripts
+      - `password-check.sh`
+      - `setup-permissions.sh`
+    - **system/**: System scripts
+      - `dependencies.sh`
+    - `utils.sh`
+  - **setup/**: Setup scripts
+    - **config/**: Configuration scripts
+      - **data-collection/**
+      - `secrets-setup.sh`
+      - `system-config.template.nix`
+    - **modes/**: Setup modes
+      - `desktop/`
+      - `homelab/`
+      - `profiles/`
+      - `server/`
+  - **tmp/**: Temporary scripts
+    - `nixos-backup/`
+    - `nixos-install/`
+  - **ui/**: UI scripts
+    - **prompts/**: UI prompts
+      - `common.sh`
+      - **descriptions/**
+      - **formatting/**
+      - `setup-mode.sh`
+      - `setup-options.sh`
+      - `setup-rules.sh`
+      - `validate-mode.sh`
+    - `prompts.sh`

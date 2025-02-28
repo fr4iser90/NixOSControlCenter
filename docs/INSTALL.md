@@ -18,13 +18,7 @@ cd NixOSControlCenter
 2. Start installation environment
 
 ```bash
-sudo nix-shell install-shell.nix
-```
-
-3. Run installer ( in nix-shell)
-
-```bash
-install
+sudo nix-shell
 ```
 
 ## Installation Steps
@@ -42,10 +36,6 @@ install
    - Setup will search for passwords and copy them
    - add new user or reconfigure config via /etc/nixos/system-config.nix
 
-## Post-Installation
-
-- Test your configuration: `sudo check-and-build`
-- Update system: `sudo update-nixos-flake`
 
 ## Troubleshooting
 
