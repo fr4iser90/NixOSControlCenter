@@ -26,8 +26,8 @@ let
     #!${pkgs.bash}/bin/bash
     
     # Konfiguration
-    REPO_URL="https://github.com/fr4iser90/NixOsControlCenter.git"
-    HOMELAB_PATH="app/shell/install/homelab"
+    REPO_URL="https://github.com/fr4iser90/NixOsControlCenter-HomeLab.git"
+    HOMELAB_PATH="app/shell/install/homelab" # not needed anymore
     TEMP_DIR="/tmp/homelab-fetch"
     VIRT_HOME="/home/${virtUser}"
     
@@ -54,7 +54,7 @@ let
     fi
     
     cd "$VIRT_HOME"
-    cp -r "$TEMP_DIR/$HOMELAB_PATH"/* "$VIRT_HOME/"
+    cp -r "$TEMP_DIR"/* "$VIRT_HOME/"
     
     # Berechtigungen setzen für alle kopierten Dateien
     find "$VIRT_HOME" -type d -exec chmod 755 {} \;
