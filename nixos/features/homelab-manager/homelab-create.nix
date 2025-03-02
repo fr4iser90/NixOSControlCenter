@@ -79,7 +79,7 @@ let
             {} \;
     
     # Führe Init-Script aus, falls vorhanden
-    INIT_SCRIPT="$DOCKER_SCRIPTS_DIR/init-homelab.sh"
+    INIT_SCRIPT="$DOCKER_SCRIPTS_DIR/bin/init-homelab.sh"
     if [ -f "$INIT_SCRIPT" ]; then
       echo -e "''${YELLOW}Running initialization script...''${NC}"
       export DOMAIN=${systemConfig.domain}
