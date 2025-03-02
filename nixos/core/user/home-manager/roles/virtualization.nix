@@ -15,8 +15,6 @@ in
     sessionVariables = {
       DOMAIN = systemConfig.domain;
       EMAIL = systemConfig.email;
-      UID = "${toString (builtins.getEnv "UID")}";
-      GID = "${toString (builtins.getEnv "GID")}";
     };
   };
 }
