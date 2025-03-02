@@ -12,12 +12,12 @@ let
   updateSources = [
     {
       name = "remote";
-      url = "https://github.com/fr4iser90/NixOsControlCenter.git";
+      url = "https://github.com/fr4iser90/NixOSControlCenter.git";
       branches = [ "main" "develop" "experimental" ];
     }
     {
       name = "local";
-      url = "/home/${username}/Documents/Git/NixOsControlCenter/nixos";
+      url = "/home/${username}/Documents/Git/NixOSControlCenter/nixos";
       branches = [];
     }
   ];
@@ -82,7 +82,7 @@ let
       case $source_choice in
         1)
           # Remote update configuration
-          REPO_URL="https://github.com/fr4iser90/NixOsControlCenter.git"
+          REPO_URL="https://github.com/fr4iser90/NixOSControlCenter.git"
           TEMP_DIR="/tmp/nixos-update"
           
           ${ui.text.header "NixOS System Update - Remote"}
@@ -138,7 +138,7 @@ let
         2)
           # Local update configuration
           ${ui.text.header "NixOS System Update - Local"}
-          SOURCE_DIR="/home/${username}/Documents/Git/NixOsControlCenter/nixos"
+          SOURCE_DIR="/home/${username}/Documents/Git/NixOSControlCenter/nixos"
           
           if [ ! -d "$SOURCE_DIR" ]; then
             ${ui.messages.error "Local source directory not found!"}

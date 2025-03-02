@@ -12,6 +12,7 @@ let
   # User-spezifische Pakete basierend auf Rolle
   rolePkgs = {
     virtualization = with pkgs; [
+      docker
       docker-compose
       virt-manager
       qemu
@@ -51,6 +52,9 @@ let
     null
     (builtins.attrNames systemConfig.users);
 
+  hasVirtualizationUser = lib.any (user: systemConfig.users.${user}.role == "virtualization") 
+    (builtins.attrNames systemConfig.users);
+    
   # TTY-Autologin-Konfiguration
   autoLoginService = if autoLoginUser != null then {
     "getty@tty1" = {
@@ -134,7 +138,7 @@ in {
 
   # Dynamische TTY-Konfiguration
   systemd.services = autoLoginService;
-
+  virtualisation.docker.enable = hasVirtualizationUser;
   # Aktiviere die Shells auf System-Level
   programs = {
     zsh.enable = lib.any (user: systemConfig.users.${user}.defaultShell == "zsh") 

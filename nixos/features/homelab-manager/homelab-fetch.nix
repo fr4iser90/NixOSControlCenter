@@ -26,7 +26,7 @@ let
     #!${pkgs.bash}/bin/bash
     
     # Konfiguration
-    REPO_URL="https://github.com/fr4iser90/NixOsControlCenter-HomeLab.git"
+    REPO_URL="https://github.com/fr4iser90/NixOSControlCenter-HomeLab.git"
     HOMELAB_PATH="app/shell/install/homelab" # not needed anymore
     TEMP_DIR="/tmp/homelab-fetch"
     VIRT_HOME="/home/${virtUser}"

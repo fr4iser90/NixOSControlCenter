@@ -10,7 +10,7 @@ let
 in
 
 pkgs.mkShell {
-  name = "NixOsControlCenter-InstallShell";
+  name = "NixOSControlCenter-InstallShell";
   inherit (packages) buildInputs;
   shellHook = ''
     ${hooks.shellHook}
