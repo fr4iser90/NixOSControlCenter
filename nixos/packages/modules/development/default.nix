@@ -3,6 +3,7 @@
 {
   environment.systemPackages = with pkgs; [
     vscode
+    code-cursor
     git
     git-credential-manager
     delta
