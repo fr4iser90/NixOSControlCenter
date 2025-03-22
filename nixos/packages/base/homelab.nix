@@ -8,18 +8,6 @@
   # Enable Firefox only if desktop environment is enabled
   programs.firefox.enable = systemConfig.desktop.enable or false;
 
-  # Prevent system from going to sleep
-  powerManagement.enable = false;  # Disable power management features
-  services.logind.extraConfig = ''
-    HandleLidSwitch=ignore  # Ignore laptop lid close events
-    HandleLidSwitchExternalPower=ignore  # Ignore lid close when on AC power
-    IdleAction=ignore  # Disable automatic suspend on idle
-    IdleActionSec=0  # Set idle timeout to 0 seconds
-    SuspendKeyIgnoreInhibited=yes  # Allow suspend key even when inhibited
-    HibernateKeyIgnoreInhibited=yes  # Allow hibernate key even when inhibited
-    LidSwitchIgnoreInhibited=yes  # Allow lid switch even when inhibited
-  '';
-
   # System packages to install
   environment.systemPackages = with pkgs; [
     docker          # Docker container runtime
