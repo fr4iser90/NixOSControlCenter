@@ -26,31 +26,53 @@ let
                     read -r server_ip
                     echo -n "Enter username: "
                     read -r username
+                    
                     if [[ -n "$server_ip" && -n "$username" ]]; then
+                        # Get password once and store it temporarily
+                        ${ui.messages.info "Enter password (will be used for initial connections):"}
+                        TEMP_PASSWORD="$(get_password_input "Password: ")"
+                        echo # Add newline after password input
+                        
                         ${ui.messages.info "Testing connection..."}
-                        if connect_to_server "$username@$server_ip" true; then
+                        if connect_to_server "$username@$server_ip" true true; then
                             save_new_server "$server_ip" "$username"
-                            add_ssh_key "$username" "$server_ip"
+                            
+                            # Use the cached password for key setup
+                            add_ssh_key_with_password "$username" "$server_ip" "$TEMP_PASSWORD"
+                            
+                            # Connect using the key (should work without password now)
                             connect_to_server "$username@$server_ip"
                         else
                             ${ui.messages.error "Connection test failed. Server not saved."}
                         fi
+                        # Clear the password when done with all operations
+                        clear_temp_password
                     fi
                 else
                     local server=''${selection%% *}
                     local user=''${selection#* (}
                     user=''${user%)*}
-                    ${ui.messages.info "Testing connection to $user@$server..."}
+                    
+                    # For existing servers, first try key-based auth
+                    ${ui.messages.info "Trying connection to $user@$server..."}
                     if connect_to_server "$user@$server" true; then
-                        add_ssh_key "$user" "$server"
+                        ${ui.messages.success "Key-based authentication successful!"}
                         connect_to_server "$user@$server"
-                        ${ui.messages.success "Connection successful!"}
                     else
-                        ${ui.messages.error "Connection test failed"}
-                        ${ui.messages.info "Trying direct connection without key..."}
-                        connect_to_server "$user@$server"
-                        return 1
-                fi
+                        # If key auth fails, ask for password and try again
+                        ${ui.messages.info "Key-based authentication failed. Enter password:"}
+                        TEMP_PASSWORD="$(get_password_input "Password: ")"
+                        echo # Add newline
+                        
+                        if connect_to_server "$user@$server" true true; then
+                            ${ui.messages.success "Password authentication successful!"}
+                            add_ssh_key_with_password "$user" "$server" "$TEMP_PASSWORD"
+                            connect_to_server "$user@$server"
+                        else
+                            ${ui.messages.error "Connection failed with both key and password."}
+                        fi
+                        clear_temp_password
+                    fi
                 fi
                 ;;
             "delete")

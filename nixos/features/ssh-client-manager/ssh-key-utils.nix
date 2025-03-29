@@ -74,6 +74,30 @@ let
       chmod 600 "$backup_dir"/*
       ${ui.messages.success "SSH keys backed up to $backup_dir"}
     }
+
+    # New function that uses a provided password for SSH key copying
+    add_ssh_key_with_password() {
+        local username="$1"
+        local server="$2"
+        local password="$3"
+
+        # Überprüfen, ob ein SSH-Schlüssel bereits vorhanden ist
+        if [[ ! -f "$HOME/.ssh/id_rsa.pub" ]]; then
+            ${ui.messages.info "SSH key not found. Generating a new SSH key."}
+            ${pkgs.openssh}/bin/ssh-keygen -t ${toString cfg.keyType} -b ${toString cfg.keyBits} -f "$HOME/.ssh/id_rsa" -N ""
+        fi
+
+        # Use the provided password with sshpass
+        ${ui.messages.info "Copying SSH key to the remote server..."}
+        if [[ -n "$password" ]]; then
+            ${pkgs.sshpass}/bin/sshpass -p "$password" ${pkgs.openssh}/bin/ssh-copy-id -o StrictHostKeyChecking=no -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
+            return $?
+        else
+            # Fall back to standard method if no password provided
+            ${pkgs.openssh}/bin/ssh-copy-id -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
+            return $?
+        fi
+    }
   '';
 in {
   config = {

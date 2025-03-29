@@ -6,6 +6,8 @@ let
 
   sshClientManagerServerUtils = ''
     CREDS_FILE="/home/$USER/${cfg.credentialsFile}"
+    # Temporary password storage (in memory only)
+    TEMP_PASSWORD=""
 
     load_saved_servers() {
         if [[ -f "$CREDS_FILE" ]]; then
@@ -32,13 +34,25 @@ let
         echo "$input"
     }
 
+    get_password_input() {
+        local prompt="$1"
+        echo -n "$prompt"
+        read -rs input
+        echo "$input"
+    }
+
     connect_to_server() {
         local full_server="$1"
         local test_only="''${2:-false}"
+        local use_password="''${3:-false}"
         local status=0
         
         if [[ "$test_only" == "true" ]]; then
-            ${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$full_server" exit 2>&1 | tee /tmp/ssh-test.log
+            if [[ "$use_password" == "true" && -n "$TEMP_PASSWORD" ]]; then
+                ${pkgs.sshpass}/bin/sshpass -p "$TEMP_PASSWORD" ${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$full_server" exit 2>&1 | tee /tmp/ssh-test.log
+            else
+                ${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$full_server" exit 2>&1 | tee /tmp/ssh-test.log
+            fi
             status=$?
             if [[ $status -ne 0 ]]; then
                 ${ui.messages.error "Connection test failed. Check credentials and network"}
@@ -46,7 +60,33 @@ let
             return $status
         fi
         
-        ${pkgs.openssh}/bin/ssh -o StrictHostKeyChecking=no "$full_server"
+        if [[ "$use_password" == "true" && -n "$TEMP_PASSWORD" ]]; then
+            ${pkgs.sshpass}/bin/sshpass -p "$TEMP_PASSWORD" ${pkgs.openssh}/bin/ssh -o StrictHostKeyChecking=no "$full_server"
+        else
+            ${pkgs.openssh}/bin/ssh -o StrictHostKeyChecking=no "$full_server"
+        fi
+    }
+    
+    # Function to share an SSH key using the cached password
+    share_ssh_key() {
+        local username="$1"
+        local server="$2"
+        
+        if [[ -n "$TEMP_PASSWORD" ]]; then
+            # Use the cached password with sshpass
+            ${ui.messages.info "Copying SSH key to the remote server..."}
+            ${pkgs.sshpass}/bin/sshpass -p "$TEMP_PASSWORD" ${pkgs.openssh}/bin/ssh-copy-id -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
+            return $?
+        else
+            # Fall back to standard method
+            ${pkgs.openssh}/bin/ssh-copy-id -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
+            return $?
+        fi
+    }
+    
+    # Clear the password after use
+    clear_temp_password() {
+        TEMP_PASSWORD=""
     }
     
     select_server() {
@@ -114,5 +154,8 @@ in {
     services.ssh-client-manager = {
       sshClientManagerServerUtils = sshClientManagerServerUtils;
     };
+    environment.systemPackages = [
+      pkgs.sshpass  # Add sshpass as a dependency
+    ];
   };
 }
