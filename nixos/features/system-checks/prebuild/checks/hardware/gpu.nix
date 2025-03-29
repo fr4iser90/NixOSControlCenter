@@ -14,6 +14,8 @@ let
     
     # Physical hardware detection first
     declare -A gpu_types
+    amd_count=0
+    
     while IFS= read -r line; do
         bus_id=$(echo "$line" | cut -d' ' -f1)
         vendor_id=$(${pkgs.pciutils}/bin/lspci -n -s "$bus_id" | awk '{print $3}' | cut -d':' -f1)
@@ -21,8 +23,11 @@ let
         
         case "$vendor_id" in
             "10de") gpu_types["nvidia"]=1 ;; # NVIDIA
-            "1002") gpu_types["amd"]=1 ;;    # AMD
-            "8086") gpu_types["intel"]=1 ;;   # Intel
+            "1002") 
+                gpu_types["amd"]=1 
+                amd_count=$((amd_count + 1))
+                ;; # AMD
+            "8086") gpu_types["intel"]=1 ;; # Intel
         esac
         
         # Immer GPU-Info anzeigen
@@ -32,12 +37,15 @@ let
         ${ui.tables.keyValue "Vendor ID" "$vendor_id"}
     done < <(${pkgs.pciutils}/bin/lspci | grep -E "VGA|3D|Display")
 
+    # Debug info
+    echo "AMD GPU count: $amd_count"
+    
     # Determine GPU configuration
     if [[ ''${gpu_types["nvidia"]-0} -eq 1 && ''${gpu_types["intel"]-0} -eq 1 ]]; then
         DETECTED="nvidia-intel"
     elif [[ ''${gpu_types["amd"]-0} -eq 1 && ''${gpu_types["intel"]-0} -eq 1 ]]; then
         DETECTED="amd-intel"
-    elif [[ $(echo ''${!gpu_types[@]} | grep -o "amd" | wc -l) -eq 2 ]]; then
+    elif [[ $amd_count -eq 2 ]]; then
         DETECTED="amd-amd"
     elif [[ ''${gpu_types["nvidia"]-0} -eq 1 ]]; then
         DETECTED="nvidia"

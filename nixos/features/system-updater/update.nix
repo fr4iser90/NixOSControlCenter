@@ -29,7 +29,8 @@ let
   username = head (attrNames systemConfig.users);
   hostname = systemConfig.hostName;
   autoBuild = systemConfig.features.system-updater.auto-build or false;
-  # Function to prompt for build
+  systemChecks = systemConfig.features.system-checks or false;
+  # Function to prompt for build - with conditional build command
   prompt_build = ''
     while true; do
       printf "Do you want to build and switch to the new configuration? (y/n): "
@@ -37,7 +38,7 @@ let
       case $build_choice in
         y|Y)
           ${ui.messages.loading "Building system configuration..."}
-          if sudo nixos-rebuild switch --flake /etc/nixos#${hostname}; then
+          if ${if systemChecks then "sudo ncc build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}; then
             ${ui.messages.success "System successfully updated and rebuilt!"}
           else
             ${ui.messages.error "Build failed! Check logs for details."}
@@ -45,7 +46,7 @@ let
           break
           ;;
         n|N)
-          ${ui.messages.info "Skipping build. You can manually run: sudo ncc-build switch --flake /etc/nixos#${hostname}"}
+          ${ui.messages.info "Skipping build. You can manually run: ${if systemChecks then "sudo ncc build switch" else "sudo nixos-rebuild switch"} --flake /etc/nixos#${hostname}"}
           break
           ;;
         *)
@@ -223,10 +224,10 @@ let
     ${ui.messages.success "Update completed successfully!"}
     ${ui.tables.keyValue "Backup created in" "$BACKUP_DIR"}
     
-    # Check if auto-build is enabled
+    # Check if auto-build is enabled - also update this part
     if [ "$autoBuild" = "true" ]; then
       ${ui.messages.loading "Auto-build enabled, building configuration..."}
-      if sudo ncc build switch --flake /etc/nixos#${hostname}; then
+      if ${if systemChecks then "sudo ncc build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}; then
         ${ui.messages.success "System successfully updated and rebuilt!"}
       else
         ${ui.messages.error "Auto-build failed! Check logs for details."}

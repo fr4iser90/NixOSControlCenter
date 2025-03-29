@@ -35,12 +35,7 @@
   hardware.enableRedistributableFirmware = true;
   hardware.amdgpu = {
     initrd.enable = true;
-    opencl = true;
-    loadInInitrd = true;
-    amdvlk = true;
-    # Enable DRI for better performance
-    driSupport = true;
-    driSupport32Bit = true;
+    opencl.enable = true;
   };
   
   hardware.graphics = {
@@ -50,8 +45,8 @@
       vulkan-validation-layers
       mesa
       amdvlk
-      rocm-opencl-icd
-      rocm-opencl-runtime
+      rocmPackages.rocm-runtime
+      rocmPackages.rocm-thunk
     ];
   };
 
