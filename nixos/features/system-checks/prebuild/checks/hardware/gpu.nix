@@ -6,7 +6,9 @@ let
   prebuildScript = pkgs.writeScriptBin "prebuild-check-gpu" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
-        
+    
+    ${ui.text.header "GPU Configuration Check"}
+    
     # Initialize DETECTED with a default value
     DETECTED="generic"
     
@@ -84,9 +86,15 @@ let
       ${ui.messages.warning "GPU configuration mismatch!"}
       ${ui.messages.warning "System configured for $CONFIGURED but detected $DETECTED"}
 
-      # Update configuration
-      sed -i "s/gpu = \"$CONFIGURED\"/gpu = \"$DETECTED\"/" /etc/nixos/system-config.nix
-      ${ui.badges.success "Configuration updated."}
+      # Ask for confirmation
+      read -p "Update GPU configuration to $DETECTED? [y/N] " response
+      if [[ "$response" =~ ^[Yy]$ ]]; then
+        # Update configuration
+        sed -i "s/gpu = \"$CONFIGURED\"/gpu = \"$DETECTED\"/" /etc/nixos/system-config.nix
+        ${ui.badges.success "Configuration updated."}
+      else
+        ${ui.badges.info "Configuration left unchanged."}
+      fi
     else
       ${ui.badges.success "GPU configuration matches hardware."}
     fi
@@ -96,7 +104,33 @@ let
 
 in {
   config = {
-    environment.systemPackages = [ prebuildScript ];  # Nur Script installieren
+    environment.systemPackages = [ prebuildScript ];
+    features.command-center.commands = [
+      {
+        name = "check-gpu";
+        category = "system-checks";
+        description = "Check GPU configuration before system rebuild";
+        script = "${prebuildScript}/bin/prebuild-check-gpu";
+        shortHelp = "check-gpu - Verify GPU configuration";
+        longHelp = ''
+          Check GPU configuration before system rebuild
+          
+          Checks:
+          - Detects installed GPU hardware
+          - Compares with configured GPU setting
+          - Can update system-config.nix if needed
+          
+          Supports detection of:
+          - NVIDIA, AMD, Intel graphics
+          - Hybrid configurations
+          - Virtual machine graphics
+          
+          Interactive: Yes (for updating configuration)
+        '';
+        interactive = true;
+        dependencies = [ "system-checks" ];
+      }
+    ];
   };
 }
 
