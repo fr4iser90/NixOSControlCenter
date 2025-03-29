@@ -37,6 +37,8 @@ let
         DETECTED="nvidia-intel"
     elif [[ ''${gpu_types["amd"]-0} -eq 1 && ''${gpu_types["intel"]-0} -eq 1 ]]; then
         DETECTED="amd-intel"
+    elif [[ $(echo ''${!gpu_types[@]} | grep -o "amd" | wc -l) -eq 2 ]]; then
+        DETECTED="amd-amd"
     elif [[ ''${gpu_types["nvidia"]-0} -eq 1 ]]; then
         DETECTED="nvidia"
     elif [[ ''${gpu_types["amd"]-0} -eq 1 ]]; then

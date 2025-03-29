@@ -27,6 +27,9 @@ let
     "qxl-virtual" = ./vm-gpu.nix;
     "virtio-virtual" = ./vm-gpu.nix;
     "basic-virtual" = ./vm-gpu.nix;
+    
+    # Add the dual AMD configuration
+    "amd-amd" = ./amd-amd.nix;
   };
 
 in {
