@@ -8,6 +8,7 @@ check_gpu_info() {
     declare -A gpu_types
     local primary_bus_id=""
     local secondary_bus_id=""
+    local amd_count=0  # Counter for AMD GPUs
     
     # Physical hardware detection first
     while IFS= read -r line; do
@@ -22,7 +23,12 @@ check_gpu_info() {
                 ;;
             "1002")  # AMD
                 gpu_types["amd"]=1
-                [ -z "$primary_bus_id" ] && primary_bus_id="$bus_id"
+                ((amd_count++))  # Increment AMD GPU counter
+                if [ -z "$primary_bus_id" ]; then
+                    primary_bus_id="$bus_id"
+                elif [ -z "$secondary_bus_id" ]; then
+                    secondary_bus_id="$bus_id"
+                fi
                 ;;
             "8086")  # Intel
                 gpu_types["intel"]=1
@@ -38,6 +44,11 @@ check_gpu_info() {
         fi
     done < <(lspci | grep -E "VGA|3D|Display")
 
+    # Debug info for AMD detection
+    if [ "${DEBUG:-false}" = true ]; then
+        log_debug "Detected AMD GPUs: $amd_count"
+    fi
+
     # Determine GPU configuration
     if [ "${gpu_types["nvidia"]-0}" -eq 1 ] && [ "${gpu_types["intel"]-0}" -eq 1 ]; then
         gpu_config="nvidia-intel"
@@ -46,7 +57,12 @@ check_gpu_info() {
     elif [ "${gpu_types["nvidia"]-0}" -eq 1 ]; then
         gpu_config="nvidia"
     elif [ "${gpu_types["amd"]-0}" -eq 1 ]; then
-        gpu_config="amd"
+        # Check for dual AMD GPUs
+        if [ "$amd_count" -ge 2 ]; then
+            gpu_config="amd-amd"
+        else
+            gpu_config="amd"
+        fi
     elif [ "${gpu_types["intel"]-0}" -eq 1 ]; then
         gpu_config="intel"
     fi
