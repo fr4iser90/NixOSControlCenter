@@ -5,5 +5,6 @@
     ./update.nix
     ./feature-manager.nix
     ./homelab-utils.nix
+    ./channel-manager.nix
   ];
 }

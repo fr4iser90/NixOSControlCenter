@@ -72,13 +72,14 @@ let
     BACKUP_ROOT="${backupSettings.directory}"
     
     ${ui.text.header "NixOS System Update"}
-    ${ui.messages.info "Select update source:"}
+    ${ui.messages.info "Select update source or action:"}
     
-    echo "1) Remote repository"
-    echo "2) Local directory"
+    echo "1) Update Configuration (Remote Repository)"
+    echo "2) Update Configuration (Local Directory)"
+    echo "3) Update Channels (flake inputs)"
     
     while true; do
-      printf "Select source (1-2): "
+      printf "Select option (1-3): "
       read source_choice
       case $source_choice in
         1)
@@ -148,6 +149,18 @@ let
           
           ${ui.tables.keyValue "Using local directory" "$SOURCE_DIR"}
           break
+          ;;
+        3)
+          # Execute the separate channel update script
+          ${ui.text.header "NixOS Channel Update"}
+          ${ui.messages.info "Executing ncc-update-channels..."}
+          # The ncc-update-channels script should handle its own sudo checks and messages
+          if sudo ncc-update-channels; then
+            ${ui.messages.success "Channel update process finished."}
+          else
+            ${ui.messages.error "Channel update process failed."}
+          fi
+          exit 0 # Exit after channel update is done
           ;;
         *)
           ${ui.messages.error "Invalid selection"}
