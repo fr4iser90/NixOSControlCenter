@@ -6,7 +6,7 @@ system-config.nix.backup.*
 build-gaming.sh
 ./continue
 ./continue/config.json
-
+NCC-Hackathon/
 
 
 # Exclude everything in the nixos/custom/ directory...

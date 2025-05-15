@@ -14,86 +14,73 @@ generate_preview() {
     local clean_selection
     clean_selection=$(clean_selection_string "$selection") || return 1
     
-    # Check if option is available
-    if is_disabled "$clean_selection"; then
-        log_error "This option is not available with the current selection"
-        return 1
-    fi
-    
     # Generate preview sections
-    local preview
-    preview=$(
-        generate_header "$clean_selection"
-        generate_description "$clean_selection"
-        generate_features "$clean_selection"
-        generate_dependencies "$clean_selection"
-    )
+    generate_header "$clean_selection"
+    generate_description "$clean_selection"
+    generate_features "$clean_selection"
+    generate_dependencies "$clean_selection"
     
-    echo "$preview"
     return 0
 }
+export -f generate_preview
 
 clean_selection_string() {
-    local selection="$1"
-    # Remove disabled marker and tree characters
-    echo "$selection" | sed -e 's/^⛔ //' -e 's/^[ │├└─]*//'
+    echo "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/ /-/g' | tr '[:upper:]' '[:lower:]'
 }
+export -f clean_selection_string
 
 generate_header() {
-    local selection="$1"
-    local desc_type="${SETUP_TYPES[$selection]:-CUSTOM SETUP}"
-    
-    cat << EOF
-┌$("printf '%.0s─' $(seq 1 $PREVIEW_WIDTH))┐
-│ SYSTEM TYPE: $desc_type$(printf '%.*s' $((PREVIEW_WIDTH - 14 - ${#desc_type})) " ")│
-└$("printf '%.0s─' $(seq 1 $PREVIEW_WIDTH))┘
-
-EOF
+    local title="$1"
+    echo -e "\\033[1;34m${title}\\033[0m" # Bold Blue
+    echo "------------------------------------"
 }
+export -f generate_header
 
 generate_description() {
     local selection="$1"
-    local description="${SETUP_DESCRIPTIONS[$selection]:-No description available}"
-    
-    cat << EOF
-Description:
-$description
-
-EOF
+    echo # Empty line for spacing
+    get_setup_description "$selection"
 }
+export -f generate_description
 
 generate_features() {
     local selection="$1"
-    local features="${SETUP_FEATURES[$selection]:-}"
     
-    if [[ -n "$features" ]]; then
-        echo "Features:"
-        echo "$features" | tr '|' '\n' | sed 's/^/• /'
-        echo
+    echo # Empty line
+    echo -e "\\033[1mType:\\033[0m ${SETUP_TYPES[$selection]:-N/A}"
+    echo -e "\\033[1mFeatures:\\033[0m"
+    local features_text=${SETUP_FEATURES[$selection]:-N/A}
+    if [[ "$features_text" == "N/A" || -z "$features_text" ]]; then
+        echo "  - No specific features listed."
+    else
+        echo "$features_text" | tr '|' '\n' | sed 's/^/  - /' # Convert | to newlines and indent
     fi
 }
+export -f generate_features
 
 generate_dependencies() {
     local selection="$1"
-    local deps
     
-    # Get dependencies
-    mapfile -t deps < <(activate_dependencies "$selection")
-    
-    echo "Selected Module:"
-    echo "• $selection"
-    echo
-    
-    if ((${#deps[@]} > 1)); then
-        echo "Required Dependencies:"
-        for dep in "${deps[@]}"; do
-            if [[ "$dep" != "$selection" ]]; then
-                echo "• $dep (required)"
-            fi
+    # Check for dependencies
+    if [[ -n "${REQUIRES[$selection]:-}" ]]; then
+        echo # Empty line
+        echo -e "\\033[1mDependencies:\\033[0m"
+        # Use activate_dependencies to get the full list
+        local deps
+        deps=$(activate_dependencies "$selection")
+        for dep in $deps; do
+            # Skip self-dependency in display if present
+            [[ "$dep" == "$selection" ]] && continue
+            local display_dep_name
+            display_dep_name=$(get_display_name "$dep")
+            echo "  - $display_dep_name"
         done
-        echo
+    else
+        echo # Empty line
+        echo -e "\\033[1mDependencies:\\033[0m None"
     fi
 }
+export -f generate_dependencies
 
 # Check script execution
 check_script_execution "CORE_DIR" "generate_preview"

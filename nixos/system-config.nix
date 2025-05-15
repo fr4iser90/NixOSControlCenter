@@ -3,7 +3,7 @@
   # System Type & Profile
   #
   systemType = "desktop";
-  hostName = "WorkStation";
+  hostName = "GamingBed";
 
   system = {
     channel = "stable";  # oder "stable"
@@ -60,8 +60,8 @@
   # Hardware Configuration
   #
   hardware = {
-    cpu = "intel";
-    gpu = "intel";
+    cpu = "amd";
+    gpu = "amd-amd";
   };
 
   #
