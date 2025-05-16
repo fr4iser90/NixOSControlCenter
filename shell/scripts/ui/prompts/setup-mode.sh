@@ -78,14 +78,8 @@ select_setup_mode() {
     return 0
 }
 
-# The is_disabled function is no longer needed as it's handled in the preview script
-is_disabled() {
-    return 1
-}
-
 # Export functions and variables
 export -f select_setup_mode
-export -f is_disabled
 
 # Nur ausführen wenn direkt aufgerufen
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

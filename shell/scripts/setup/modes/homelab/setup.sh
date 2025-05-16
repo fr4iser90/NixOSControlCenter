@@ -9,9 +9,6 @@ setup_homelab() {
     # 2. Deploy Config
     deploy_config
 
-
-    
-    log_success "Homelab setup complete"
     return 0
 }
 

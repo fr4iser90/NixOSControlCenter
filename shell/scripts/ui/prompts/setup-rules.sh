@@ -52,25 +52,4 @@ check_conflicts() {
     return 0
 }
 
-is_disabled() {
-    local item="$1"
-    
-    # Basis-Module sind immer verfügbar
-    [[ "$item" == "Desktop" || "$item" == "Server" || "$item" == "HomelabServer" ]] && return 1
-    
-    # Wenn keine Auswahl, nichts ist deaktiviert
-    [ ${#selected[@]} -eq 0 ] && return 1
-    
-    # Prüfe Server/Desktop Konflikte
-    if [[ "$item" == "Server"* && " ${selected[*]} " =~ " Desktop " ]]; then
-        return 0
-    fi
-    
-    if [[ "$item" == "Desktop"* && " ${selected[*]} " =~ " Server " ]]; then
-        return 0
-    fi
-    
-    return 1
-}
-
-export -f is_disabled
+export -f check_conflicts

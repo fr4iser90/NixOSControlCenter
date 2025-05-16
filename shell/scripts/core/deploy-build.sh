@@ -90,14 +90,9 @@ show_homelab_completion_message() {
     return 0
 }
 
-build_system() {
-    deploy_config
-}
-
 # Export functions
 export -f deploy_config
 export -f deploy_base_config
-export -f build_system
 export -f show_standard_completion_message
 export -f show_homelab_completion_message
 

@@ -5,21 +5,15 @@
 log_info "Starting Hackathon Server setup..."
 
 setup_hackathon() {
-    log_section "Hackathon Server Setup"
+    log_section "Hackathon Setup"
     
-    # 1. Basic Configuration
+    # 1. User Setup (macht bereits alles was wir brauchen)
     setup_hackathon_config || return 1
     
-    # 2. System Level Setup
-    setup_system_requirements || return 1
+    # 2. Deploy Config
+    deploy_config
     
-    # 3. Gateway Setup (Traefik + CrowdSec)
-    setup_gateway || return 1
-    
-    # 4. Hackathon Services Setup
-    setup_hackathon_services || return 1
-    
-    log_success "Hackathon Server setup complete"
+    log_success "Hackathon setup complete"
     return 0
 }
 

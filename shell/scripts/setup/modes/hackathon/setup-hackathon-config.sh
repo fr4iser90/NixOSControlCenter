@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
 setup_hackathon_config() {
-    log_section "Hackathon Server Configuration"
+    log_section "Hackathon Configuration"
 
     # Initialize variables with existing data
     admin_user="$(logname)"
     email="${HOST_EMAIL:-}"
     domain="${HOST_DOMAIN:-}"
     
-    # Collect hackathon information
+    # Collect homelab information
     collect_hackathon_info || return 1
     
     # Update system configuration
