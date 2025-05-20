@@ -8,7 +8,11 @@
     libva-utils
     vaapiVdpau
     libvdpau-va-gl
-    rocmPackages.rocm-smi # System Management Interface
+    rocmPackages.rocm-smi
+    glxinfo
+    vulkan-tools
+    clinfo
+    gdb
   ];
 
   boot = {
@@ -18,12 +22,14 @@
   
   # Erweiterte Sitzungsvariablen
   environment.sessionVariables = {
-    WLR_DRM_DEVICES = "/dev/dri/card1";
-    WLR_NO_HARDWARE_CURSORS = "1";
-    WLR_DRM_NO_ATOMIC = "1";
-    AMD_VULKAN_ICD = "RADV";
-    RADV_PERFTEST = "aco";
-    MESA_SHADER_CACHE_DIR = "$HOME/.cache/mesa_shader_cache"; 
+    LIBVA_DRIVER_NAME = "radeonsi";
+    VDPAU_DRIVER = "radeonsi";
+    # WLR_DRM_DEVICES = "/dev/dri/card1";
+    # WLR_NO_HARDWARE_CURSORS = "1";
+    # WLR_DRM_NO_ATOMIC = "1";
+    # AMD_VULKAN_ICD = "RADV";
+    # RADV_PERFTEST = "aco";
+    # MESA_SHADER_CACHE_DIR = "$HOME/.cache/mesa_shader_cache";
   };
   hardware.enableRedistributableFirmware = true;
 
@@ -32,9 +38,9 @@
     enable = true;  # Aktiviert OpenGL-Unterstützung
     extraPackages = with pkgs; [
       vulkan-loader       # Vulkan-Lader
-      vulkan-validation-layers
       mesa                # Mesa-Treiber
-      amdvlk
+      # vulkan-validation-layers
+      # amdvlk  # Uncomment ONLY if you need AMDVLK for a specific reason
     ];
   };
 
