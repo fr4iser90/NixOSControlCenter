@@ -48,7 +48,6 @@ The project is organized into these main components:
     - `ai-workspace/`: AI development tools
     - `bootentry-manager/`: Boot entry management
     - `command-center/`: Command center
-    - `container-manager/`: Container management
     - `homelab-manager/`: Homelab configuration
     - `ssh-client-manager/`: SSH client management
     - `ssh-server-manager/`: SSH server management

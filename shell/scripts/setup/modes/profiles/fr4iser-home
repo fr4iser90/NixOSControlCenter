@@ -83,7 +83,6 @@
     ssh-client-manager = true;
     ssh-server-manager = true;        
     bootentry-manager = false; 
-    container-manager = false;  
     homelab-manager = true;    
     vm-manager = false;         
     ai-workspace = false;       

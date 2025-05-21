@@ -21,28 +21,4 @@ in {
     ./hackathon-cleanup.nix
   ] else [];
 
-  # Aktiviere Container-Manager, wenn Hackathon-Manager aktiviert ist
-  config = lib.mkIf hasHackathonUsers {
-    containerManager.containerManager = "docker";
-    containerManager.networks = {
-      hackathon = {
-        subnet = "172.60.0.0/16";
-        gateway = "172.60.0.1";
-      };
-    };
-    
-    # Stelle sicher, dass die notwendigen Pakete installiert sind
-    environment.systemPackages = with pkgs; [
-      docker-compose
-      git
-      jq
-      curl
-    ];
-    
-    # Firewall-Konfiguration für Hackathon-Plattform
-    networking.firewall = {
-      allowedTCPPorts = [ 80 443 8080 ];
-      allowedUDPPorts = [ 53 ];
-    };
-  };
 }

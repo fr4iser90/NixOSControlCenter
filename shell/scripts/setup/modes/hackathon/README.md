@@ -20,17 +20,7 @@ Here's a detailed architecture diagram for the hackathon platform:
    - Integrate with system-config.nix for feature activation
    - Set up PostgreSQL database schema for users, projects, and hackathons
 
-2. __Container Environment__
 
-   - Extend container-manager to support project templates
-   - Implement resource limits and isolation for participant containers
-   - Create base container images for common project types (web, mobile, etc.)
-
-3. __Reverse Proxy Configuration__
-
-   - Set up Traefik with automatic SSL and subdomain routing
-   - Implement dynamic configuration for project domains
-   - Configure security headers and rate limiting
 
 ### Phase 2: User Interfaces (2-3 weeks)
 

@@ -75,8 +75,7 @@
     system-updater = true;    
     ssh-client-manager = false;
     ssh-server-manager = false;        
-    bootentry-manager = false; 
-    container-manager = false;  
+    bootentry-manager = false;  
     homelab-manager = true;    
     vm-manager = false;         
     ai-workspace = false;       

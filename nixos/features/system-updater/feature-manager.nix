@@ -17,7 +17,6 @@ let
     "ssh-client-manager"
     "ssh-server-manager"
     "bootentry-manager"
-    "container-manager"
     "homelab-manager"
     "vm-manager"
     "ai-workspace"

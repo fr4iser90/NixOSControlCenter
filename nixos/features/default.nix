@@ -8,7 +8,6 @@ let
     (cfg.system-checks or false)
     (cfg.system-updater or false)
     (cfg.system-logger or false)
-    (cfg.container-manager or false)
     (cfg.system-config-manager or false)
     (cfg.homelab-manager or false)
     (cfg.bootentry-manager or false)
@@ -31,8 +30,6 @@ in {
     ++ lib.optionals (cfg.system-updater or false) [ ./system-updater ]
     ++ lib.optionals (cfg.system-logger or false) [ ./system-logger ]
     ++ lib.optionals (cfg.system-config-manager or false) [ ./system-config-manager ]
-    ++ lib.optionals (cfg.container-manager or false) [ ./container-manager ]
-    # Import homelab-manager if the feature is enabled or if systemType is "homelab"
     ++ lib.optionals ((cfg.homelab-manager or false) || isHomelabSystem) [ ./homelab-manager ]
     ++ lib.optionals (cfg.bootentry-manager or false) [ ./bootentry-manager ]
     ++ lib.optionals (cfg.ssh-client-manager or false) [ ./ssh-client-manager ]
