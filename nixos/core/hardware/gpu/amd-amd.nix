@@ -8,7 +8,11 @@
     libva-utils
     vaapiVdpau
     libvdpau-va-gl
-    rocmPackages.rocm-smi # System Management Interface
+    rocmPackages.rocm-smi
+    glxinfo
+    vulkan-tools
+    clinfo
+    gdb
   ];
 
   boot = {
@@ -19,15 +23,16 @@
   # Session variables optimized for dual AMD GPUs
   environment.sessionVariables = {
     # Use discrete GPU for Wayland by default
-    WLR_DRM_DEVICES = "/dev/dri/card0:/dev/dri/card1";
-    WLR_NO_HARDWARE_CURSORS = "1";
-    WLR_DRM_NO_ATOMIC = "1";
-    AMD_VULKAN_ICD = "RADV";
+    # WLR_DRM_DEVICES = "/dev/dri/card0:/dev/dri/card1";
+    # WLR_NO_HARDWARE_CURSORS = "1";
+    # WLR_DRM_NO_ATOMIC = "1";
+    # AMD_VULKAN_ICD = "RADV";
     # Optimized for RDNA2 architecture (RX 6600M)
-    RADV_PERFTEST = "aco,sam";
-    MESA_SHADER_CACHE_DIR = "$HOME/.cache/mesa_shader_cache";
+    # RADV_PERFTEST = "aco,sam";
+    # MESA_SHADER_CACHE_DIR = "$HOME/.cache/mesa_shader_cache";
     # For video acceleration
     LIBVA_DRIVER_NAME = "radeonsi";
+    VDPAU_DRIVER = "radeonsi";
     # For power management
     AMDGPU_PSTATE = "auto";
   };
@@ -42,11 +47,11 @@
     enable = true;
     extraPackages = with pkgs; [
       vulkan-loader
-      vulkan-validation-layers
+      # vulkan-validation-layers
       mesa
-      amdvlk
-      rocmPackages.rocm-runtime
-      rocmPackages.rocm-thunk
+      # amdvlk
+      # rocmPackages.rocm-runtime
+      # rocmPackages.rocm-thunk
     ];
   };
 
