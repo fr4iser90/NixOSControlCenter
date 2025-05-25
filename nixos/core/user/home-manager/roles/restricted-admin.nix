@@ -7,7 +7,6 @@ in {
   imports = [ shellInit ];
 
   home = {
-    stateVersion = systemConfig.system.version;
     username = user;
     homeDirectory = lib.mkForce "/home/${user}";
   };

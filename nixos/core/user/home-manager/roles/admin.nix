@@ -8,7 +8,6 @@ in {
   imports = [ shellInit ];
 
   home = {
-    stateVersion = systemConfig.system.version;
     username = user;
     homeDirectory = "/home/${user}";
   };
