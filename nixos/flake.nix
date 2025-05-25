@@ -3,11 +3,11 @@
 
   inputs = {
     # Dynamische Inputs basierend auf Konfiguration
-    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-25.05";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     
     # Home-Manager Inputs für verschiedene Versionen
-    home-manager-stable.url = "github:nix-community/home-manager/release-24.11";
+    home-manager-stable.url = "github:nix-community/home-manager/release-25.05";
     home-manager-unstable.url = "github:nix-community/home-manager";
   };
 
@@ -29,6 +29,11 @@
     home-manager = if systemConfig.system.channel == "stable"
                    then home-manager-stable
                    else home-manager-unstable;
+
+    # Set stateVersion once for both system and home-manager
+    stateVersion = if systemConfig.system.channel == "stable"
+      then "25.05"
+      else "25.11"; # Use latest stable for unstable as well, or set to a default
     
     pkgs = import nixpkgs { 
       inherit system;
@@ -55,7 +60,7 @@
         modules = systemModules ++ [      
           {
             # System Version
-            system.stateVersion = systemConfig.system.version;
+            system.stateVersion = stateVersion;
 
             nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
@@ -80,10 +85,10 @@
                       user = username;
                     })
                   ];
-                  home = {
+                    home = {
                     username = username;
                     homeDirectory = "/home/${username}";
-                    stateVersion = systemConfig.system.version;
+                    stateVersion = stateVersion;
                   };
               }) systemConfig.users;
             };

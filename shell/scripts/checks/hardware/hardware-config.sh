@@ -19,26 +19,37 @@ check_hardware_config() {
 
   echo "Detected disk: $DISK"
 
-  # 1. Check for hardware-configuration.nix
+  # 2. Check for hardware-configuration.nix
   if [ -f /mnt/etc/nixos/hardware-configuration.nix ] || [ -f /etc/nixos/hardware-configuration.nix ]; then
     echo "hardware-configuration.nix found. Exiting."
     return 0
   fi
 
-  # 2. Check if partitions exist
-  if ! lsblk -f | grep -q "${BOOT_PART}"; then
-    echo "Partitioning disk $DISK..."
-    parted -s "$DISK" mklabel gpt
-    parted -s "$DISK" mkpart ESP fat32 1MiB 1025MiB
-    parted -s "$DISK" set 1 esp on
-    parted -s "$DISK" mkpart primary ext4 1025MiB 100%
-    mkfs.fat -F 32 "$BOOT_PART"
-    mkfs.ext4 -L nixos "$ROOT_PART"
-  else
-    echo "Partitions already exist on $DISK."
+  # 3. Check if partitions exist and are formatted
+  BOOT_OK=$(lsblk -f | grep -E "${BOOT_PART}.*vfat")
+  ROOT_OK=$(lsblk -f | grep -E "${ROOT_PART}.*ext4")
+
+  if [ -n "$BOOT_OK" ] && [ -n "$ROOT_OK" ]; then
+    echo "Disk $DISK is already correctly partitioned and formatted. Skipping hardware setup."
+    return 0
   fi
 
-  # 3. Mount partitions
+  # 4. Partition and format if needed
+  echo "Partitioning disk $DISK..."
+  echo "WARNING: This will destroy all data on $DISK!"
+  read -p 'Type "YES" to continue: ' confirm
+  if [ "$confirm" != "YES" ]; then
+    echo "Aborted partitioning."
+    return 1
+  fi
+  parted -s "$DISK" mklabel gpt
+  parted -s "$DISK" mkpart ESP fat32 1MiB 1025MiB
+  parted -s "$DISK" set 1 esp on
+  parted -s "$DISK" mkpart primary ext4 1025MiB 100%
+  mkfs.fat -F 32 "$BOOT_PART"
+  mkfs.ext4 -L nixos "$ROOT_PART"
+
+  # 5. Mount partitions
   if ! mount | grep -q "/mnt "; then
     mount "$ROOT_PART" /mnt
   fi
@@ -47,12 +58,12 @@ check_hardware_config() {
     mount "$BOOT_PART" /mnt/boot
   fi
 
-  # 4. Generate hardware config
+  # 6. Generate hardware config
   if [ ! -f /mnt/etc/nixos/hardware-configuration.nix ]; then
     nixos-generate-config --root /mnt
   fi
 
-  # 5. Copy config to /etc/nixos/ if possible
+  # 7. Copy config to /etc/nixos/ if possible
   if [ -f /mnt/etc/nixos/hardware-configuration.nix ]; then
     mkdir -p /etc/nixos
     cp /mnt/etc/nixos/hardware-configuration.nix /etc/nixos/
