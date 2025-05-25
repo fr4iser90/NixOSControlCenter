@@ -13,6 +13,6 @@ in {
   
   # Eingeschränkte Admin-Berechtigungen
   home.sessionVariables = {
-    SUDO_ASKPASS = "${pkgs.ksshaskpass}/bin/ksshaskpass";
+    # SUDO_ASKPASS = "${pkgs.ksshaskpass}/bin/ksshaskpass";
   };
 }
