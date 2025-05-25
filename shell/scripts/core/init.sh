@@ -7,6 +7,7 @@ source "$CORE_DIR/imports.sh"
 main() {
     log_header "NixOS System Setup"
     
+    check_hardware_config
     # Collect system information
     collect_system_data || {
         log_error "System data collection failed"

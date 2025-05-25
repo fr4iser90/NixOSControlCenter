@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Always run hardware config/partition check before anything else
+"$(dirname "$0")"/../../../checks/hardware/hardware-config.sh
+
 setup_desktop() {
     log_section "Desktop Modules Setup"
 

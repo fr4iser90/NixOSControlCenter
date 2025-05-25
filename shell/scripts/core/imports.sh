@@ -50,6 +50,7 @@ import_file "$LIB_DIR/logging.sh"
 # 2. System Information Collection
 import_file "$CHECKS_DIR/hardware/cpu.sh"      
 import_file "$CHECKS_DIR/hardware/gpu.sh"      
+import_file "$CHECKS_DIR/hardware/hardware-config.sh"
 import_file "$CHECKS_DIR/system/hosting.sh"    
 import_file "$CHECKS_DIR/system/locale.sh"     
 import_file "$CHECKS_DIR/system/users.sh"      
