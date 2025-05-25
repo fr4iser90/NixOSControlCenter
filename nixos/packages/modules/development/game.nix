@@ -9,8 +9,8 @@
 
     # 3D Modeling & Animation
     blender
-    maya
-
+    # maya broken
+ 
     # 2D Art & Animation
     krita
     aseprite
