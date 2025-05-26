@@ -75,7 +75,7 @@ let
                         connect_to_server "$user@$server"
                     else
                         # Try password authentication and automatic key setup
-                        ${ui.messages.info "Key-based authentication failed. Attempting password authentication..."}
+                        ${ui.messages.info "Attempting password authentication..."}
                         TEMP_PASSWORD="$(get_password_input "Password: ")"
                         echo # Add newline
                         
