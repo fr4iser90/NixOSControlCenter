@@ -87,6 +87,14 @@ let
             ${pkgs.openssh}/bin/ssh-keygen -t ${toString cfg.keyType} -b ${toString cfg.keyBits} -f "$HOME/.ssh/id_rsa" -N ""
         fi
 
+        # Check if the key is already present on the remote server
+        local pubkey
+        pubkey=$(cat "$HOME/.ssh/id_rsa.pub")
+        if ssh -o StrictHostKeyChecking=no "$username@$server" "grep -Fxq '$pubkey' ~/.ssh/authorized_keys"; then
+            ${ui.messages.success "SSH key is already present on $server"}
+            return 0
+        fi
+
         # Use the provided password with sshpass
         ${ui.messages.info "Copying SSH key to the remote server..."}
         if [[ -n "$password" ]]; then

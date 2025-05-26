@@ -89,12 +89,10 @@ let
                                     ${ui.messages.success "Key-based authentication is now set up! You can log in without a password from now on."}
                                     connect_to_server "$user@$server"
                                 else
-                                    ${ui.messages.warning "Key-based authentication failed after key setup. Connecting with password..."}
-                                    connect_to_server "$user@$server" false true
+                                    ${ui.messages.warning "Key-based authentication failed after key setup. Please check the server's SSH configuration or authorized_keys."}
                                 fi
                             else
-                                ${ui.messages.warning "Failed to copy SSH key. Connecting with password..."}
-                                connect_to_server "$user@$server" false true
+                                ${ui.messages.warning "Failed to copy SSH key. Please check your password and server configuration."}
                             fi
                         else
                             ${ui.messages.error "Connection failed. Server may not have password authentication enabled."}
