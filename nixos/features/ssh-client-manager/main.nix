@@ -41,9 +41,9 @@ let
                             add_ssh_key_with_password "$username" "$server_ip" "$TEMP_PASSWORD"
                             
                             # Immediately test key-based login after key setup
-                            if connect_to_server "$username@$server_ip" true; then
+                            if connect_to_server "$username@$server_ip" true false true; then
                                 ${ui.messages.success "Key-based authentication is now set up! You can log in without a password from now on."}
-                                connect_to_server "$username@$server_ip"
+                                connect_to_server "$username@$server_ip" false false true
                             else
                                 ${ui.messages.warning "Key-based authentication failed after key setup. Please check the server's SSH configuration."}
                             fi
@@ -70,9 +70,9 @@ let
                     
                     # For existing servers, first try key-based auth
                     ${ui.messages.info "Trying connection to $user@$server..."}
-                    if connect_to_server "$user@$server" true; then
+                    if connect_to_server "$user@$server" true false true; then
                         ${ui.messages.success "Key-based authentication successful!"}
-                        connect_to_server "$user@$server"
+                        connect_to_server "$user@$server" false false true
                     else
                         # If key auth fails, ask for password and try again
                         ${ui.messages.info "Key-based authentication failed. Password will only be asked once and used for all steps (connection and key setup)."}
@@ -83,9 +83,9 @@ let
                             ${ui.messages.success "Password authentication successful!"}
                             add_ssh_key_with_password "$user" "$server" "$TEMP_PASSWORD"
                             # Immediately test key-based login after key setup
-                            if connect_to_server "$user@$server" true; then
+                            if connect_to_server "$user@$server" true false true; then
                                 ${ui.messages.success "Key-based authentication is now set up! You can log in without a password from now on."}
-                                connect_to_server "$user@$server"
+                                connect_to_server "$user@$server" false false true
                             else
                                 ${ui.messages.warning "Key-based authentication failed after key setup. Please check the server's SSH configuration."}
                             fi

@@ -45,6 +45,7 @@ let
         local full_server="$1"
         local test_only="''${2:-false}"
         local use_password="''${3:-false}"
+        local force_key_auth="''${4:-false}"
         local status=0
         
         if [[ "$test_only" == "true" ]]; then
@@ -62,6 +63,9 @@ let
         
         if [[ "$use_password" == "true" && -n "$TEMP_PASSWORD" ]]; then
             ${pkgs.sshpass}/bin/sshpass -p "$TEMP_PASSWORD" ${pkgs.openssh}/bin/ssh -o StrictHostKeyChecking=no "$full_server"
+        elif [[ "$force_key_auth" == "true" ]]; then
+            # Force key-based authentication only, disable password auth
+            ${pkgs.openssh}/bin/ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=no -o PubkeyAuthentication=yes -o PreferredAuthentications=publickey "$full_server"
         else
             ${pkgs.openssh}/bin/ssh -o StrictHostKeyChecking=no "$full_server"
         fi
