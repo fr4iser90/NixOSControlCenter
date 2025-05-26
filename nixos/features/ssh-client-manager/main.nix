@@ -41,9 +41,9 @@ let
                             add_ssh_key_with_password "$username" "$server_ip" "$TEMP_PASSWORD"
                             
                             # Immediately test key-based login after key setup
-                            if connect_to_server "$username@$server_ip" true false true; then
+                            if connect_to_server "$username@$server_ip" true; then
                                 ${ui.messages.success "Key-based authentication is now set up! You can log in without a password from now on."}
-                                connect_to_server "$username@$server_ip" false false true
+                                connect_to_server "$username@$server_ip"
                             else
                                 ${ui.messages.warning "Key-based authentication failed after key setup. Please check the server's SSH configuration."}
                             fi
@@ -70,37 +70,35 @@ let
                     
                     # For existing servers, first try key-based auth
                     ${ui.messages.info "Trying connection to $user@$server..."}
-                    if connect_to_server "$user@$server" true false true; then
+                    if connect_to_server "$user@$server" true; then
                         ${ui.messages.success "Key-based authentication successful!"}
-                        connect_to_server "$user@$server" false false true
+                        connect_to_server "$user@$server"
                     else
-                        # If key auth fails, ask for password and try again
-                        ${ui.messages.info "Key-based authentication failed. Password will only be asked once and used for all steps (connection and key setup)."}
+                        # Try password authentication and automatic key setup
+                        ${ui.messages.info "Key-based authentication failed. Attempting password authentication..."}
                         TEMP_PASSWORD="$(get_password_input "Password: ")"
                         echo # Add newline
                         
                         if connect_to_server "$user@$server" true true; then
                             ${ui.messages.success "Password authentication successful!"}
-                            add_ssh_key_with_password "$user" "$server" "$TEMP_PASSWORD"
-                            # Immediately test key-based login after key setup
-                            if connect_to_server "$user@$server" true false true; then
-                                ${ui.messages.success "Key-based authentication is now set up! You can log in without a password from now on."}
-                                connect_to_server "$user@$server" false false true
+                            
+                            # Try to copy SSH key
+                            if add_ssh_key_with_password "$user" "$server" "$TEMP_PASSWORD"; then
+                                # Test key-based login after key setup
+                                if connect_to_server "$user@$server" true; then
+                                    ${ui.messages.success "Key-based authentication is now set up! You can log in without a password from now on."}
+                                    connect_to_server "$user@$server"
+                                else
+                                    ${ui.messages.warning "Key-based authentication failed after key setup. Connecting with password..."}
+                                    connect_to_server "$user@$server" false true
+                                fi
                             else
-                                ${ui.messages.warning "Key-based authentication failed after key setup. Please check the server's SSH configuration."}
+                                ${ui.messages.warning "Failed to copy SSH key. Connecting with password..."}
+                                connect_to_server "$user@$server" false true
                             fi
                         else
-                            ${ui.messages.error "Connection failed with both key and password."}
-                            ${ui.messages.info ""}
-                            ${ui.messages.info "This might be because:"}
-                            ${ui.messages.info "1. Server has password authentication disabled"}
-                            ${ui.messages.info "2. Incorrect password"}
-                            ${ui.messages.info "3. Network connectivity issues"}
-                            ${ui.messages.info ""}
-                            ${ui.messages.info "If the server has password auth disabled, ask the admin to run:"}
-                            ${ui.messages.info "  ssh-grant-access $user 300"}
-                            ${ui.messages.info "Or request access with:"}
-                            ${ui.messages.info "  ssh-request-access $user \"Need to copy SSH keys\""}
+                            ${ui.messages.error "Connection failed. Server may not have password authentication enabled."}
+                            ${ui.messages.info "Ask the admin to run: ssh-grant-access $user 300"}
                         fi
                         clear_temp_password
                     fi

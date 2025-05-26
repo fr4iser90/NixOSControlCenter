@@ -90,12 +90,22 @@ let
         # Use the provided password with sshpass
         ${ui.messages.info "Copying SSH key to the remote server..."}
         if [[ -n "$password" ]]; then
-            ${pkgs.sshpass}/bin/sshpass -p "$password" ${pkgs.openssh}/bin/ssh-copy-id -o StrictHostKeyChecking=no -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
-            return $?
+            if ${pkgs.sshpass}/bin/sshpass -p "$password" ${pkgs.openssh}/bin/ssh-copy-id -o StrictHostKeyChecking=no -i "$HOME/.ssh/id_rsa.pub" "$username@$server"; then
+                ${ui.messages.success "SSH key successfully copied to $server"}
+                return 0
+            else
+                ${ui.messages.error "Failed to copy SSH key to $server"}
+                return 1
+            fi
         else
             # Fall back to standard method if no password provided
-            ${pkgs.openssh}/bin/ssh-copy-id -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
-            return $?
+            if ${pkgs.openssh}/bin/ssh-copy-id -i "$HOME/.ssh/id_rsa.pub" "$username@$server"; then
+                ${ui.messages.success "SSH key successfully copied to $server"}
+                return 0
+            else
+                ${ui.messages.error "Failed to copy SSH key to $server"}
+                return 1
+            fi
         fi
     }
   '';
