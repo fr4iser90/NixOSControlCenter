@@ -9,6 +9,7 @@
     git         # Distributed version control system
     neovim      # Modern text editor for configuration and scripting
     htop        # Interactive process viewer
+    unzip
     tmux        # Terminal multiplexer for managing multiple terminal sessions
     tree        # Display directory structures in a tree-like format
     fzf         # Fuzzy finder for quick file and command searching

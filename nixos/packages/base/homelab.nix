@@ -15,6 +15,7 @@
     coreutils       # Basic file, shell, and text manipulation utilities
     curl            # Command-line tool for transferring data with URLs
     wget            # Command-line utility for downloading files from the web
+    unzip
     git             # Distributed version control system
     neovim          # Modern text editor for configuration and scripting
     htop            # Interactive process viewer

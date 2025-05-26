@@ -12,8 +12,10 @@ in {
     ./monitoring.nix
     ./notifications.nix
     ./scripts/monitor.nix
-    ./scripts/temp-access.nix
-    ./scripts/open-password.nix
+    ./scripts/request-access.nix
+    ./scripts/approve-request.nix
+    ./scripts/list-requests.nix
+    ./scripts/grant-access.nix
   ];
 
   options.features.ssh-server-manager = {
@@ -26,10 +28,11 @@ in {
         Password authentication is disabled by default.
 
         If you don't have a public key set up:
-        1. Ask the host to run: ssh-temp-open USERNAME
-        2. Then try connecting again
+        1. Request access: ssh-request-access USERNAME "reason"
+        2. Wait for admin approval
+        3. Or ask admin to run: ssh-grant-access USERNAME
 
-        Or contact the administrator for help.
+        For help: ssh-list-requests (admins only)
         ===============================================
       '';
       description = "SSH login banner text";

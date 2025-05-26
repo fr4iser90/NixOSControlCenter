@@ -13,5 +13,6 @@
     fzf
     # office
     libreoffice
+    unzip
   ];
 }

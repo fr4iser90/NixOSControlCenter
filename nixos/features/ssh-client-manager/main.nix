@@ -49,6 +49,16 @@ let
                             fi
                         else
                             ${ui.messages.error "Connection test failed. Server not saved."}
+                            ${ui.messages.info ""}
+                            ${ui.messages.info "This might be because:"}
+                            ${ui.messages.info "1. Server has password authentication disabled"}
+                            ${ui.messages.info "2. Network connectivity issues"}
+                            ${ui.messages.info "3. Incorrect credentials"}
+                            ${ui.messages.info ""}
+                            ${ui.messages.info "If the server has password auth disabled, ask the admin to run:"}
+                            ${ui.messages.info "  ssh-grant-access $username 300"}
+                            ${ui.messages.info "Or request access with:"}
+                            ${ui.messages.info "  ssh-request-access $username \"Need to copy SSH keys\""}
                         fi
                         # Clear the password when done with all operations
                         clear_temp_password
@@ -81,6 +91,16 @@ let
                             fi
                         else
                             ${ui.messages.error "Connection failed with both key and password."}
+                            ${ui.messages.info ""}
+                            ${ui.messages.info "This might be because:"}
+                            ${ui.messages.info "1. Server has password authentication disabled"}
+                            ${ui.messages.info "2. Incorrect password"}
+                            ${ui.messages.info "3. Network connectivity issues"}
+                            ${ui.messages.info ""}
+                            ${ui.messages.info "If the server has password auth disabled, ask the admin to run:"}
+                            ${ui.messages.info "  ssh-grant-access $user 300"}
+                            ${ui.messages.info "Or request access with:"}
+                            ${ui.messages.info "  ssh-request-access $user \"Need to copy SSH keys\""}
                         fi
                         clear_temp_password
                     fi
