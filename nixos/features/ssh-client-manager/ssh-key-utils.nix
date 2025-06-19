@@ -4,7 +4,12 @@ let
   ui = config.features.terminal-ui.api;
   cfg = config.services.ssh-client-manager;
 
+  # SSH Key Utilities
+  # This module provides functions for managing SSH keys and key-based authentication
   sshClientManagerKeyUtils = ''
+    # Generate a new SSH key for a specific server
+    # Parameters: server
+    # Creates a server-specific key file and optionally copies it to the server
     generate_ssh_key() {
       local server="$1"
       local key_file="/home/$USER/.ssh/id_rsa_''${server//./_}"
@@ -20,17 +25,20 @@ let
       fi
     }
 
+    # Add SSH key to remote server for key-based authentication
+    # Parameters: username, server
+    # Checks if key exists, generates one if needed, and copies to server
     add_ssh_key() {
         local username="$1"
         local server="$2"
 
-        # Überprüfen, ob ein SSH-Schlüssel bereits vorhanden ist
+        # Check if SSH key already exists, generate new one if not
         if [[ ! -f "$HOME/.ssh/id_rsa.pub" ]]; then
             ${ui.messages.info "SSH key not found. Generating a new SSH key."}
             ${pkgs.openssh}/bin/ssh-keygen -t ${toString cfg.keyType} -b ${toString cfg.keyBits} -f "$HOME/.ssh/id_rsa" -N ""
         fi
 
-        # Überprüfen, ob der Schlüssel bereits auf dem Remote-Server autorisiert ist
+        # Check if the key is already authorized on the remote server
         local pubkey=$(cat "$HOME/.ssh/id_rsa.pub")
         if ! ssh "$username@$server" "grep -Fxq '$pubkey' ~/.ssh/authorized_keys"; then
             ${ui.messages.info "Copying SSH key to the remote server..."}
@@ -38,6 +46,9 @@ let
         fi
     }
 
+    # Rotate SSH key for a specific server
+    # Parameters: server
+    # Creates new key, copies to server, backs up old key
     rotate_ssh_key() {
       local server="$1"
       local old_key="/home/$USER/.ssh/id_rsa_''${server//./_}"
@@ -65,6 +76,8 @@ let
       fi
     }
 
+    # Backup all SSH keys to timestamped directory
+    # Creates backup directory with current timestamp
     backup_ssh_keys() {
       local backup_dir="/home/$USER/.ssh/backups/$(date +%Y%m%d_%H%M%S)"
       
@@ -75,13 +88,15 @@ let
       ${ui.messages.success "SSH keys backed up to $backup_dir"}
     }
 
-    # New function that uses a provided password for SSH key copying
+    # Add SSH key to remote server using provided password
+    # Parameters: username, server, password
+    # Uses sshpass to copy key without interactive password prompt
     add_ssh_key_with_password() {
         local username="$1"
         local server="$2"
         local password="$3"
 
-        # Überprüfen, ob ein SSH-Schlüssel bereits vorhanden ist
+        # Check if SSH key exists, generate new one if not
         if [[ ! -f "$HOME/.ssh/id_rsa.pub" ]]; then
             ${ui.messages.info "SSH key not found. Generating a new SSH key."}
             ${pkgs.openssh}/bin/ssh-keygen -t ${toString cfg.keyType} -b ${toString cfg.keyBits} -f "$HOME/.ssh/id_rsa" -N ""
@@ -95,7 +110,7 @@ let
             return 0
         fi
 
-        # Use the provided password with sshpass
+        # Use the provided password with sshpass to copy key
         ${ui.messages.info "Copying SSH key to the remote server..."}
         if [[ -n "$password" ]]; then
             if ${pkgs.sshpass}/bin/sshpass -p "$password" ${pkgs.openssh}/bin/ssh-copy-id -o StrictHostKeyChecking=no -i "$HOME/.ssh/id_rsa.pub" "$username@$server"; then

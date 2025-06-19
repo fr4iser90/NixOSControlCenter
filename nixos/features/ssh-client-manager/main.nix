@@ -4,12 +4,17 @@ let
   ui = config.features.terminal-ui.api;
   cfg = config.services.ssh-client-manager;
   
+  # Main SSH Client Manager Script
+  # This script provides the interactive interface for managing SSH connections
   sshClientManagerScript = pkgs.writeScriptBin "ncc-ssh-client-manager-main" ''
     #!${pkgs.bash}/bin/bash
         
+    # Include server utilities and key utilities
     ${cfg.sshClientManagerServerUtils}
     ${cfg.sshClientManagerKeyUtils}
 
+    # Handle different actions based on user selection
+    # Parameters: selection (server choice), action (connect/delete/edit/new)
     handle_action() {
         local selection="$1"
         local action="$2"
@@ -22,32 +27,38 @@ let
         case "$action" in
             "connect")
                 if [[ "$selection" == "Add new server" ]]; then
+                    # Add new server workflow
                     echo -n "Enter server IP/hostname: "
                     read -r server_ip
                     echo -n "Enter username: "
                     read -r username
                     
                     if [[ -n "$server_ip" && -n "$username" ]]; then
-                        # Get password once and store it temporarily
+                        # Get password once and store it temporarily for all operations
                         ${ui.messages.info "Password will only be asked once and used for all steps (connection and key setup)."}
                         TEMP_PASSWORD="$(get_password_input "Password: ")"
                         echo # Add newline after password input
                         
+                        # Test connection with password authentication
                         ${ui.messages.info "Testing connection..."}
                         if connect_to_server "$username@$server_ip" true true; then
+                            # Connection successful, save server and setup SSH keys
                             save_new_server "$server_ip" "$username"
                             
-                            # Use the cached password for key setup
+                            # Use the cached password for SSH key setup
                             add_ssh_key_with_password "$username" "$server_ip" "$TEMP_PASSWORD"
                             
-                            # Immediately test key-based login after key setup
+                            # Test key-based authentication after key setup
                             if connect_to_server "$username@$server_ip" true; then
                                 ${ui.messages.success "Key-based authentication is now set up! You can log in without a password from now on."}
                                 connect_to_server "$username@$server_ip"
                             else
                                 ${ui.messages.warning "Key-based authentication failed after key setup. Please check the server's SSH configuration."}
+                                # Connect with password since key setup failed
+                                connect_to_server "$username@$server_ip" false true
                             fi
                         else
+                            # Connection test failed - provide helpful error messages
                             ${ui.messages.error "Connection test failed. Server not saved."}
                             ${ui.messages.info ""}
                             ${ui.messages.info "This might be because:"}
@@ -60,29 +71,32 @@ let
                             ${ui.messages.info "Or request access with:"}
                             ${ui.messages.info "  ssh-request-access $username \"Need to copy SSH keys\""}
                         fi
-                        # Clear the password when done with all operations
+                        # Clear the password from memory when done
                         clear_temp_password
                     fi
                 else
+                    # Connect to existing server workflow
                     local server=''${selection%% *}
                     local user=''${selection#* (}
                     user=''${user%)*}
                     
-                    # For existing servers, first try key-based auth
+                    # First try key-based authentication for existing servers
                     ${ui.messages.info "Trying connection to $user@$server..."}
                     if connect_to_server "$user@$server" true; then
+                        # Key-based authentication successful
                         ${ui.messages.success "Key-based authentication successful!"}
                         connect_to_server "$user@$server"
                     else
-                        # Try password authentication and automatic key setup
+                        # Key-based auth failed, try password authentication
                         ${ui.messages.info "Attempting password authentication..."}
                         TEMP_PASSWORD="$(get_password_input "Password: ")"
                         echo # Add newline
                         
                         if connect_to_server "$user@$server" true true; then
+                            # Password authentication successful
                             ${ui.messages.success "Password authentication successful!"}
                             
-                            # Try to copy SSH key
+                            # Try to copy SSH key to enable future key-based auth
                             if add_ssh_key_with_password "$user" "$server" "$TEMP_PASSWORD"; then
                                 # Test key-based login after key setup
                                 if connect_to_server "$user@$server" true; then
@@ -90,11 +104,16 @@ let
                                     connect_to_server "$user@$server"
                                 else
                                     ${ui.messages.warning "Key-based authentication failed after key setup. Please check the server's SSH configuration or authorized_keys."}
+                                    # Connect with password since key setup failed
+                                    connect_to_server "$user@$server" false true
                                 fi
                             else
                                 ${ui.messages.warning "Failed to copy SSH key. Please check your password and server configuration."}
+                                # Connect with password since key setup failed
+                                connect_to_server "$user@$server" false true
                             fi
                         else
+                            # Password authentication failed
                             ${ui.messages.error "Connection failed. Server may not have password authentication enabled."}
                             ${ui.messages.info "Ask the admin to run: ssh-grant-access $user 300"}
                         fi
@@ -103,6 +122,7 @@ let
                 fi
                 ;;
             "delete")
+                # Delete server from credentials file
                 if [[ "$selection" != "Add new server" ]]; then
                     local server=''${selection%% *}
                     ${ui.messages.loading "Deleting server..."}
@@ -111,6 +131,7 @@ let
                 fi
                 ;;
             "edit")
+                # Edit server username in credentials file
                 if [[ "$selection" != "Add new server" ]]; then
                     local server=''${selection%% *}
                     local old_user=''${selection#* (}
@@ -124,17 +145,31 @@ let
                 fi
                 ;;
             "new")
+                # Quick add new server workflow
                 local server_ip="$(get_user_input "Enter server IP/hostname: ")"
                 local username="$(get_user_input "Enter username: ")"
                 if [[ -n "$server_ip" && -n "$username" ]]; then
                     save_new_server "$server_ip" "$username"
                     ${ui.messages.info "Testing connection..."}
                     if connect_to_server "$username@$server_ip" true; then
+                        # Key-based auth works, setup keys and connect
                         ${ui.messages.success "Connection successful!"}
                         add_ssh_key "$username" "$server_ip"
                         connect_to_server "$username@$server_ip"
                     else
-                        ${ui.messages.error "Could not connect to server. Please check credentials."}
+                        # Key-based auth failed, try password auth
+                        ${ui.messages.info "Key-based authentication failed. Trying password authentication..."}
+                        TEMP_PASSWORD="$(get_password_input "Password: ")"
+                        echo # Add newline
+                        
+                        if connect_to_server "$username@$server_ip" true true; then
+                            ${ui.messages.success "Password authentication successful!"}
+                            add_ssh_key_with_password "$username" "$server_ip" "$TEMP_PASSWORD"
+                            connect_to_server "$username@$server_ip" false true
+                        else
+                            ${ui.messages.error "Could not connect to server. Please check credentials."}
+                        fi
+                        clear_temp_password
                     fi
                 fi
                 ;;
@@ -144,13 +179,14 @@ let
         esac
     }
 
+    # Main function - entry point of the script
     main() {
         # Get both selection and action from select_server
         local servers_list="$(load_saved_servers)"
         local selection
         local action
         
-        # Read both lines from select_server
+        # Read both lines from select_server (selection and action)
         { read -r selection; read -r action; } < <(select_server "$servers_list")
         
         # Don't show error if user just pressed enter on Add new server
@@ -159,17 +195,21 @@ let
             exit 0
         fi
         
+        # Handle the selected action
         handle_action "$selection" "$action"
     }
 
+    # Start the main function
     main
   '';
 in {
   config = {
+    # Add the SSH client manager script to system packages
     environment.systemPackages = [
-      sshClientManagerScript  # SSH Client Manager Skript wird als Systempaket hinzugefügt
+      sshClientManagerScript  # SSH Client Manager Script wird als Systempaket hinzugefügt
     ];
     
+    # Register the command in the command center
     features.command-center.commands = [
       {
         name = "ssh-client-manager";
@@ -190,6 +230,7 @@ in {
       }
     ];
 
+    # Store the script reference in the service configuration
     services.ssh-client-manager = {
       sshClientManagerScript = sshClientManagerScript;
     };

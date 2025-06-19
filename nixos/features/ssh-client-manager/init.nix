@@ -4,6 +4,8 @@ let
   ui = config.features.terminal-ui.api;
   cfg = config.services.ssh-client-manager;
 
+  # Setup user credentials file for each configured user
+  # This function creates the necessary directory structure and credentials file
   setupUserCreds = user: ''
     # Path to user's home directory and .creds file
     USER_HOME="/home/${user}"
@@ -17,10 +19,11 @@ let
   '';
 in {
   config = {
+    # System activation script to setup SSH client manager for all users
     system.activationScripts.sshManagerSetup = let
       configuredUsers = lib.attrNames systemConfig.users;
     in ''
-      # Erstelle .creds für konfigurierte Benutzer
+      # Create .creds files for configured users
       ${lib.concatMapStrings setupUserCreds configuredUsers}
     '';
   };

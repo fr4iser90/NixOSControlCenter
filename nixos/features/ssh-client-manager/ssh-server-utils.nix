@@ -5,10 +5,16 @@ let
   cfg = config.services.ssh-client-manager;
 
   sshClientManagerServerUtils = ''
+    # SSH Client Manager Server Utilities
+    # This module provides core functions for managing SSH server connections
+    
+    # Path to user's credentials file where server entries are stored
     CREDS_FILE="/home/$USER/${cfg.credentialsFile}"
-    # Temporary password storage (in memory only)
+    # Temporary password storage (in memory only) - used to avoid multiple password prompts
     TEMP_PASSWORD=""
 
+    # Load saved servers from credentials file
+    # Returns the contents of the credentials file or creates a new one if it doesn't exist
     load_saved_servers() {
         if [[ -f "$CREDS_FILE" ]]; then
             cat "$CREDS_FILE"
@@ -20,6 +26,8 @@ let
         fi
     }
 
+    # Save a new server entry to credentials file
+    # Parameters: server_ip, username
     save_new_server() {
         local server_ip="$1"
         local username="$2"
@@ -27,6 +35,8 @@ let
         ${ui.messages.success "New server saved."}
     }
 
+    # Get user input with prompt
+    # Parameters: prompt text
     get_user_input() {
         local prompt="$1"
         echo -n "$prompt"
@@ -34,6 +44,8 @@ let
         echo "$input"
     }
 
+    # Get password input (hidden) with prompt
+    # Parameters: prompt text
     get_password_input() {
         local prompt="$1"
         echo -n "$prompt"
@@ -41,6 +53,11 @@ let
         echo "$input"
     }
 
+    # Connect to SSH server with various authentication methods
+    # Parameters:
+    #   $1: full_server (user@host)
+    #   $2: test_only (true/false) - if true, only test connection, don't establish session
+    #   $3: use_password (true/false) - if true, use cached password with sshpass
     connect_to_server() {
         local full_server="$1"
         local test_only="''${2:-false}"
@@ -49,43 +66,62 @@ let
         
         if [[ "$test_only" == "true" ]]; then
             if [[ "$use_password" == "true" && -n "$TEMP_PASSWORD" ]]; then
-                ${pkgs.sshpass}/bin/sshpass -p "$TEMP_PASSWORD" ${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$full_server" exit 2>&1 | tee /tmp/ssh-test.log
+                # Use password authentication with sshpass for test connection
+                # Create temporary password file for sshpass (more reliable than -p flag)
+                local temp_pass_file=$(mktemp)
+                echo "$TEMP_PASSWORD" > "$temp_pass_file"
+                ${pkgs.sshpass}/bin/sshpass -f "$temp_pass_file" ${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$full_server" exit 2>&1 | tee /tmp/ssh-test.log
+                status=$?
+                rm -f "$temp_pass_file"
             else
+                # Use key-based authentication for test connection
                 ${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$full_server" exit 2>&1 | tee /tmp/ssh-test.log
+                status=$?
             fi
-            status=$?
             return $status
         fi
         
+        # Full connection (not test mode)
         if [[ "$use_password" == "true" && -n "$TEMP_PASSWORD" ]]; then
-            ${pkgs.sshpass}/bin/sshpass -p "$TEMP_PASSWORD" ${pkgs.openssh}/bin/ssh -o StrictHostKeyChecking=no "$full_server"
+            # Use password authentication with sshpass for full connection
+            local temp_pass_file=$(mktemp)
+            echo "$TEMP_PASSWORD" > "$temp_pass_file"
+            ${pkgs.sshpass}/bin/sshpass -f "$temp_pass_file" ${pkgs.openssh}/bin/ssh -o StrictHostKeyChecking=no "$full_server"
+            local result=$?
+            rm -f "$temp_pass_file"
+            return $result
         else
+            # Use key-based authentication for full connection
             ${pkgs.openssh}/bin/ssh -o StrictHostKeyChecking=no "$full_server"
         fi
     }
     
-    # Function to share an SSH key using the cached password
+    # Share SSH key to remote server using cached password
+    # Parameters: username, server
     share_ssh_key() {
         local username="$1"
         local server="$2"
         
         if [[ -n "$TEMP_PASSWORD" ]]; then
-            # Use the cached password with sshpass
+            # Use the cached password with sshpass for key sharing
             ${ui.messages.info "Copying SSH key to the remote server..."}
             ${pkgs.sshpass}/bin/sshpass -p "$TEMP_PASSWORD" ${pkgs.openssh}/bin/ssh-copy-id -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
             return $?
         else
-            # Fall back to standard method
+            # Fall back to standard method (will prompt for password)
             ${pkgs.openssh}/bin/ssh-copy-id -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
             return $?
         fi
     }
     
-    # Clear the password after use
+    # Clear the temporary password from memory for security
     clear_temp_password() {
         TEMP_PASSWORD=""
     }
     
+    # Interactive server selection using fzf (fuzzy finder)
+    # Parameters: servers_list
+    # Returns: selected server and action
     select_server() {
         local servers_list="$1"
         local selection action
@@ -130,6 +166,7 @@ let
         echo "$action"
     }
 
+    # Delete a server from the credentials file
     delete_server() {
         local servers_list="$(load_saved_servers)"
         local selected="$(select_server "$servers_list")"
@@ -152,7 +189,7 @@ in {
       sshClientManagerServerUtils = sshClientManagerServerUtils;
     };
     environment.systemPackages = [
-      pkgs.sshpass  # Add sshpass as a dependency
+      pkgs.sshpass  # Add sshpass as a dependency for password automation
     ];
   };
 }
