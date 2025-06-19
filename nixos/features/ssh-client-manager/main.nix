@@ -36,42 +36,26 @@ let
                     
                     if [[ -n "$server_ip" && -n "$username" ]]; then
                         # Get password once and store it temporarily for all operations
-                        ${ui.messages.info "Password will only be asked once and used for all steps (connection and key setup)."}
+                        ${ui.messages.info "Password will only be asked once and used for key setup."}
                         local password="$(get_password_input "Password: ")"
                         echo # Add newline after password input
                         set_temp_password "$password"
                         
-                        # Test connection with password authentication
-                        ${ui.messages.info "Testing connection..."}
-                        if connect_to_server "$username@$server_ip" true true; then
-                            # Connection successful, save server and setup SSH keys
-                            save_new_server "$server_ip" "$username"
-                            
-                            # Use the cached password for SSH key setup
-                            add_ssh_key_with_password "$username" "$server_ip" "$password"
-                            
-                            # Test key-based authentication after key setup
-                            if connect_to_server "$username@$server_ip" true; then
-                                ${ui.messages.success "Key-based authentication is now set up! You can log in without a password from now on."}
-                                connect_to_server "$username@$server_ip"
-                            else
-                                ${ui.messages.warning "Key-based authentication failed after key setup. Please check the server's SSH configuration."}
-                                # Connect with password since key setup failed
-                                connect_to_server "$username@$server_ip" false true
-                            fi
+                        # Save server and setup SSH keys directly (no password test)
+                        save_new_server "$server_ip" "$username"
+                        
+                        # Setup SSH keys directly (this will ask for password once)
+                        ${ui.messages.info "Setting up SSH keys for passwordless login..."}
+                        add_ssh_key_with_password "$username" "$server_ip" "$password"
+                        
+                        # Test key-based authentication after key setup
+                        if connect_to_server "$username@$server_ip" true; then
+                            ${ui.messages.success "Key-based authentication is now set up! You can log in without a password from now on."}
+                            connect_to_server "$username@$server_ip"
                         else
-                            # Connection test failed - provide helpful error messages
-                            ${ui.messages.error "Connection test failed. Server not saved."}
-                            ${ui.messages.info ""}
-                            ${ui.messages.info "This might be because:"}
-                            ${ui.messages.info "1. Server has password authentication disabled"}
-                            ${ui.messages.info "2. Network connectivity issues"}
-                            ${ui.messages.info "3. Incorrect credentials"}
-                            ${ui.messages.info ""}
-                            ${ui.messages.info "If the server has password auth disabled, ask the admin to run:"}
-                            ${ui.messages.info "  ssh-grant-access $username 300"}
-                            ${ui.messages.info "Or request access with:"}
-                            ${ui.messages.info "  ssh-request-access $username \"Need to copy SSH keys\""}
+                            ${ui.messages.warning "Key-based authentication failed after key setup. Please check the server's SSH configuration."}
+                            # Connect with password since key setup failed
+                            connect_to_server "$username@$server_ip" false true
                         fi
                         # Clear the password from memory when done
                         clear_temp_password
@@ -89,33 +73,25 @@ let
                         ${ui.messages.success "Key-based authentication successful!"}
                         connect_to_server "$user@$server"
                     else
-                        # Key-based auth failed, try password auth and setup keys
-                        ${ui.messages.info "Key-based authentication failed. Trying password authentication..."}
+                        # Key-based auth failed, setup keys directly (no password test)
+                        ${ui.messages.info "Key-based authentication failed. Setting up SSH keys for passwordless login..."}
                         local password="$(get_password_input "Password: ")"
                         echo # Add newline
                         set_temp_password "$password"
                         
-                        if connect_to_server "$user@$server" true true; then
-                            ${ui.messages.success "Password authentication successful!"}
-                            
-                            # Always try to setup SSH keys after successful password auth
-                            ${ui.messages.info "Setting up SSH keys for future passwordless login..."}
-                            if add_ssh_key_with_password "$user" "$server" "$password"; then
-                                # Test if key-based auth now works
-                                if connect_to_server "$user@$server" true; then
-                                    ${ui.messages.success "SSH key setup successful! You can now connect without password."}
-                                    connect_to_server "$user@$server"
-                                else
-                                    ${ui.messages.warning "SSH key setup completed but key-based auth still fails. Connecting with password."}
-                                    connect_to_server "$user@$server" false true
-                                fi
+                        # Setup SSH keys directly (this will ask for password once)
+                        if add_ssh_key_with_password "$user" "$server" "$password"; then
+                            # Test if key-based auth now works
+                            if connect_to_server "$user@$server" true; then
+                                ${ui.messages.success "SSH key setup successful! You can now connect without password."}
+                                connect_to_server "$user@$server"
                             else
-                                ${ui.messages.warning "SSH key setup failed. Connecting with password."}
+                                ${ui.messages.warning "SSH key setup completed but key-based auth still fails. Connecting with password."}
                                 connect_to_server "$user@$server" false true
                             fi
                         else
-                            ${ui.messages.error "Connection failed. Server may not have password authentication enabled."}
-                            ${ui.messages.info "Ask the admin to run: ssh-grant-access $user 300"}
+                            ${ui.messages.warning "SSH key setup failed. Connecting with password."}
+                            connect_to_server "$user@$server" false true
                         fi
                         clear_temp_password
                     fi
@@ -157,19 +133,15 @@ let
                         add_ssh_key "$username" "$server_ip"
                         connect_to_server "$username@$server_ip"
                     else
-                        # Key-based auth failed, try password auth
-                        ${ui.messages.info "Key-based authentication failed. Trying password authentication..."}
+                        # Key-based auth failed, setup keys directly (no password test)
+                        ${ui.messages.info "Key-based authentication failed. Setting up SSH keys for passwordless login..."}
                         local password="$(get_password_input "Password: ")"
                         echo # Add newline
                         set_temp_password "$password"
                         
-                        if connect_to_server "$username@$server_ip" true true; then
-                            ${ui.messages.success "Password authentication successful!"}
-                            add_ssh_key_with_password "$username" "$server_ip" "$password"
-                            connect_to_server "$username@$server_ip" false true
-                        else
-                            ${ui.messages.error "Could not connect to server. Please check credentials."}
-                        fi
+                        # Setup SSH keys directly (this will ask for password once)
+                        add_ssh_key_with_password "$username" "$server_ip" "$password"
+                        connect_to_server "$username@$server_ip" false true
                         clear_temp_password
                     fi
                 fi
