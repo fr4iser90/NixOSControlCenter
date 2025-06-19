@@ -37,16 +37,11 @@ let
             ssh_opts="$ssh_opts -o ConnectTimeout=5"
             
             if [[ "$use_password" == "true" && -n "$TEMP_PASSWORD" ]]; then
-                # Use password authentication for test connection (no sshpass)
+                # Use password authentication for test connection (normal SSH prompt)
                 ssh_opts="$ssh_opts -o PreferredAuthentications=password -o PubkeyAuthentication=no"
                 
-                # Use expect-like functionality to provide password
-                expect << EOF > /tmp/ssh-test.log 2>&1
-                spawn ${pkgs.openssh}/bin/ssh $ssh_opts "$full_server" exit
-                expect "password:"
-                send "$TEMP_PASSWORD\r"
-                expect eof
-                EOF
+                # Use normal SSH with password prompt (no automation)
+                ${pkgs.openssh}/bin/ssh $ssh_opts "$full_server" exit > /tmp/ssh-test.log 2>&1
                 status=$?
             else
                 # Use key-based authentication for test connection
@@ -60,14 +55,9 @@ let
         
         # Full connection (not test mode)
         if [[ "$use_password" == "true" && -n "$TEMP_PASSWORD" ]]; then
-            # Use password authentication for full connection (no sshpass)
+            # Use password authentication for full connection (normal SSH prompt)
             ssh_opts="$ssh_opts -o PreferredAuthentications=password -o PubkeyAuthentication=no"
-            expect << EOF
-            spawn ${pkgs.openssh}/bin/ssh $ssh_opts "$full_server"
-            expect "password:"
-            send "$TEMP_PASSWORD\r"
-            interact
-            EOF
+            ${pkgs.openssh}/bin/ssh $ssh_opts "$full_server"
             local result=$?
             return $result
         else
@@ -102,15 +92,10 @@ let
         local server="$2"
         local password="$3"
         
-        if [[ -n "$password" ]]; then
-            # Use expect-like functionality to provide password (no sshpass)
-            echo "$password" | ${pkgs.openssh}/bin/ssh-copy-id -o StrictHostKeyChecking=no -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
-            local result=$?
-            return $result
-        else
-            ${pkgs.openssh}/bin/ssh-copy-id -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
-            return $?
-        fi
+        # Always use normal ssh-copy-id with password prompt (no automation)
+        # The password parameter is ignored - user must type password manually
+        ${pkgs.openssh}/bin/ssh-copy-id -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
+        return $?
     }
 
     # Check if SSH key is already authorized on server

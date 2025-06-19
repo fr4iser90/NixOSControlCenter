@@ -120,8 +120,5 @@ in {
     services.ssh-client-manager = {
       sshClientManagerServerUtils = sshClientManagerServerUtils;
     };
-    environment.systemPackages = [
-      pkgs.sshpass  # Add sshpass as a dependency for password automation
-    ];
   };
 }
