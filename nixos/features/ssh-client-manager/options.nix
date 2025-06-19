@@ -105,6 +105,7 @@ in {
     environment.systemPackages = [ 
       pkgs.fzf
       pkgs.openssh
+      pkgs.sshpass
     ];
   };
 }
