@@ -135,7 +135,6 @@ in {
     environment.systemPackages = [ 
       pkgs.fzf      # Fuzzy finder for interactive selection
       pkgs.openssh  # SSH client and server tools
-      pkgs.sshpass  # Non-interactive SSH password authentication
     ];
   };
 }

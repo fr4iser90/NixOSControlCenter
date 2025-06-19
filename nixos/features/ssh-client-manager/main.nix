@@ -82,9 +82,43 @@ let
                     local user=''${selection#* (}
                     user=''${user%)*}
                     
-                    # Try to connect directly - SSH will handle authentication automatically
+                    # Try to connect directly first (key-based auth)
                     ${ui.messages.info "Connecting to $user@$server..."}
-                    connect_to_server "$user@$server"
+                    if connect_to_server "$user@$server" true; then
+                        # Key-based authentication successful
+                        ${ui.messages.success "Key-based authentication successful!"}
+                        connect_to_server "$user@$server"
+                    else
+                        # Key-based auth failed, try password auth and setup keys
+                        ${ui.messages.info "Key-based authentication failed. Trying password authentication..."}
+                        local password="$(get_password_input "Password: ")"
+                        echo # Add newline
+                        set_temp_password "$password"
+                        
+                        if connect_to_server "$user@$server" true true; then
+                            ${ui.messages.success "Password authentication successful!"}
+                            
+                            # Always try to setup SSH keys after successful password auth
+                            ${ui.messages.info "Setting up SSH keys for future passwordless login..."}
+                            if add_ssh_key_with_password "$user" "$server" "$password"; then
+                                # Test if key-based auth now works
+                                if connect_to_server "$user@$server" true; then
+                                    ${ui.messages.success "SSH key setup successful! You can now connect without password."}
+                                    connect_to_server "$user@$server"
+                                else
+                                    ${ui.messages.warning "SSH key setup completed but key-based auth still fails. Connecting with password."}
+                                    connect_to_server "$user@$server" false true
+                                fi
+                            else
+                                ${ui.messages.warning "SSH key setup failed. Connecting with password."}
+                                connect_to_server "$user@$server" false true
+                            fi
+                        else
+                            ${ui.messages.error "Connection failed. Server may not have password authentication enabled."}
+                            ${ui.messages.info "Ask the admin to run: ssh-grant-access $user 300"}
+                        fi
+                        clear_temp_password
+                    fi
                 fi
                 ;;
             "delete")

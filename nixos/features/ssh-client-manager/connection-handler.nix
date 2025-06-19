@@ -37,17 +37,21 @@ let
             ssh_opts="$ssh_opts -o ConnectTimeout=5"
             
             if [[ "$use_password" == "true" && -n "$TEMP_PASSWORD" ]]; then
-                # Use password authentication with sshpass for test connection
-                local temp_pass_file=$(mktemp)
-                echo "$TEMP_PASSWORD" > "$temp_pass_file"
+                # Use password authentication for test connection (no sshpass)
                 ssh_opts="$ssh_opts -o PreferredAuthentications=password -o PubkeyAuthentication=no"
                 
-                # Capture output to file and exit status separately
-                ${pkgs.sshpass}/bin/sshpass -f "$temp_pass_file" ${pkgs.openssh}/bin/ssh $ssh_opts "$full_server" exit > /tmp/ssh-test.log 2>&1
+                # Use expect-like functionality to provide password
+                expect << EOF > /tmp/ssh-test.log 2>&1
+                spawn ${pkgs.openssh}/bin/ssh $ssh_opts "$full_server" exit
+                expect "password:"
+                send "$TEMP_PASSWORD\r"
+                expect eof
+                EOF
                 status=$?
-                rm -f "$temp_pass_file"
             else
                 # Use key-based authentication for test connection
+                # Force BatchMode=yes to prevent password prompts and detect real key auth
+                ssh_opts="$ssh_opts -o BatchMode=yes"
                 ${pkgs.openssh}/bin/ssh $ssh_opts "$full_server" exit > /tmp/ssh-test.log 2>&1
                 status=$?
             fi
@@ -56,13 +60,15 @@ let
         
         # Full connection (not test mode)
         if [[ "$use_password" == "true" && -n "$TEMP_PASSWORD" ]]; then
-            # Use password authentication with sshpass for full connection
-            local temp_pass_file=$(mktemp)
-            echo "$TEMP_PASSWORD" > "$temp_pass_file"
+            # Use password authentication for full connection (no sshpass)
             ssh_opts="$ssh_opts -o PreferredAuthentications=password -o PubkeyAuthentication=no"
-            ${pkgs.sshpass}/bin/sshpass -f "$temp_pass_file" ${pkgs.openssh}/bin/ssh $ssh_opts "$full_server"
+            expect << EOF
+            spawn ${pkgs.openssh}/bin/ssh $ssh_opts "$full_server"
+            expect "password:"
+            send "$TEMP_PASSWORD\r"
+            interact
+            EOF
             local result=$?
-            rm -f "$temp_pass_file"
             return $result
         else
             # Use key-based authentication for full connection
@@ -97,11 +103,9 @@ let
         local password="$3"
         
         if [[ -n "$password" ]]; then
-            local temp_pass_file=$(mktemp)
-            echo "$password" > "$temp_pass_file"
-            ${pkgs.sshpass}/bin/sshpass -f "$temp_pass_file" ${pkgs.openssh}/bin/ssh-copy-id -o StrictHostKeyChecking=no -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
+            # Use expect-like functionality to provide password (no sshpass)
+            echo "$password" | ${pkgs.openssh}/bin/ssh-copy-id -o StrictHostKeyChecking=no -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
             local result=$?
-            rm -f "$temp_pass_file"
             return $result
         else
             ${pkgs.openssh}/bin/ssh-copy-id -i "$HOME/.ssh/id_rsa.pub" "$username@$server"
