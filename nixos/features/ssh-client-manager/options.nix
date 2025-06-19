@@ -22,6 +22,13 @@ in {
       description = "SSH-Server entry utility functions";
     };
 
+    # Internal option for the centralized connection handler (set by connection-handler.nix)
+    sshConnectionHandler = mkOption {
+      type = types.str;
+      internal = true;
+      description = "Centralized SSH connection handler functions";
+    };
+
     # Internal option for the main SSH client manager script (set by main.nix)
     sshClientManagerScript = mkOption {
       type = types.str;

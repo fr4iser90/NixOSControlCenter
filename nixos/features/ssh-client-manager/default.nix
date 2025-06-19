@@ -12,6 +12,7 @@
     ./connection-preview.nix  # FZF preview functionality
     ./ssh-key-utils.nix      # SSH key management utilities
     ./ssh-server-utils.nix   # Server connection utilities
+    ./connection-handler.nix # Centralized connection handler
   ];
 
 }

@@ -7,6 +7,10 @@ let
   # This script provides detailed information about SSH servers in the FZF preview window
   connectionPreviewScript = pkgs.writeScriptBin "ssh-connection-preview" ''
     #!${pkgs.bash}/bin/bash
+    
+    # Include connection handler
+    ${cfg.sshConnectionHandler}
+    
     line="$1"
     
     if [[ "$line" == "Add new server" ]]; then
@@ -52,12 +56,12 @@ let
       echo ""
       echo "Connection Status:"
       echo "================="
-      if ${pkgs.openssh}/bin/ssh -o BatchMode=yes -o ConnectTimeout=5 "$user@$server" exit 2>/dev/null; then
+      if test_connection_status "$user" "$server"; then
         echo "✓ Credentials valid"
         echo ""
         echo "Server Details:"
         echo "=============="
-        ${pkgs.openssh}/bin/ssh -o BatchMode=yes "$user@$server" "uname -a" 2>/dev/null || echo "Unable to fetch system info"
+        get_server_info "$user" "$server"
       else
         echo "✗ Credentials invalid or Unreachable"
       fi

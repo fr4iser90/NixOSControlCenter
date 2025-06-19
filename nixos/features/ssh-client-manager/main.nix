@@ -9,9 +9,10 @@ let
   sshClientManagerScript = pkgs.writeScriptBin "ncc-ssh-client-manager-main" ''
     #!${pkgs.bash}/bin/bash
         
-    # Include server utilities and key utilities
+    # Include server utilities, key utilities, and connection handler
     ${cfg.sshClientManagerServerUtils}
     ${cfg.sshClientManagerKeyUtils}
+    ${cfg.sshConnectionHandler}
 
     # Handle different actions based on user selection
     # Parameters: selection (server choice), action (connect/delete/edit/new)
@@ -36,8 +37,9 @@ let
                     if [[ -n "$server_ip" && -n "$username" ]]; then
                         # Get password once and store it temporarily for all operations
                         ${ui.messages.info "Password will only be asked once and used for all steps (connection and key setup)."}
-                        TEMP_PASSWORD="$(get_password_input "Password: ")"
+                        local password="$(get_password_input "Password: ")"
                         echo # Add newline after password input
+                        set_temp_password "$password"
                         
                         # Test connection with password authentication
                         ${ui.messages.info "Testing connection..."}
@@ -46,7 +48,7 @@ let
                             save_new_server "$server_ip" "$username"
                             
                             # Use the cached password for SSH key setup
-                            add_ssh_key_with_password "$username" "$server_ip" "$TEMP_PASSWORD"
+                            add_ssh_key_with_password "$username" "$server_ip" "$password"
                             
                             # Test key-based authentication after key setup
                             if connect_to_server "$username@$server_ip" true; then
@@ -80,45 +82,9 @@ let
                     local user=''${selection#* (}
                     user=''${user%)*}
                     
-                    # First try key-based authentication for existing servers
-                    ${ui.messages.info "Trying connection to $user@$server..."}
-                    if connect_to_server "$user@$server" true; then
-                        # Key-based authentication successful
-                        ${ui.messages.success "Key-based authentication successful!"}
-                        connect_to_server "$user@$server"
-                    else
-                        # Key-based auth failed, try password authentication
-                        ${ui.messages.info "Attempting password authentication..."}
-                        TEMP_PASSWORD="$(get_password_input "Password: ")"
-                        echo # Add newline
-                        
-                        if connect_to_server "$user@$server" true true; then
-                            # Password authentication successful
-                            ${ui.messages.success "Password authentication successful!"}
-                            
-                            # Try to copy SSH key to enable future key-based auth
-                            if add_ssh_key_with_password "$user" "$server" "$TEMP_PASSWORD"; then
-                                # Test key-based login after key setup
-                                if connect_to_server "$user@$server" true; then
-                                    ${ui.messages.success "Key-based authentication is now set up! You can log in without a password from now on."}
-                                    connect_to_server "$user@$server"
-                                else
-                                    ${ui.messages.warning "Key-based authentication failed after key setup. Please check the server's SSH configuration or authorized_keys."}
-                                    # Connect with password since key setup failed
-                                    connect_to_server "$user@$server" false true
-                                fi
-                            else
-                                ${ui.messages.warning "Failed to copy SSH key. Please check your password and server configuration."}
-                                # Connect with password since key setup failed
-                                connect_to_server "$user@$server" false true
-                            fi
-                        else
-                            # Password authentication failed
-                            ${ui.messages.error "Connection failed. Server may not have password authentication enabled."}
-                            ${ui.messages.info "Ask the admin to run: ssh-grant-access $user 300"}
-                        fi
-                        clear_temp_password
-                    fi
+                    # Try to connect directly - SSH will handle authentication automatically
+                    ${ui.messages.info "Connecting to $user@$server..."}
+                    connect_to_server "$user@$server"
                 fi
                 ;;
             "delete")
@@ -159,12 +125,13 @@ let
                     else
                         # Key-based auth failed, try password auth
                         ${ui.messages.info "Key-based authentication failed. Trying password authentication..."}
-                        TEMP_PASSWORD="$(get_password_input "Password: ")"
+                        local password="$(get_password_input "Password: ")"
                         echo # Add newline
+                        set_temp_password "$password"
                         
                         if connect_to_server "$username@$server_ip" true true; then
                             ${ui.messages.success "Password authentication successful!"}
-                            add_ssh_key_with_password "$username" "$server_ip" "$TEMP_PASSWORD"
+                            add_ssh_key_with_password "$username" "$server_ip" "$password"
                             connect_to_server "$username@$server_ip" false true
                         else
                             ${ui.messages.error "Could not connect to server. Please check credentials."}

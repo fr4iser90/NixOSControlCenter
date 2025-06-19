@@ -5,7 +5,7 @@ let
   cfg = config.services.ssh-client-manager;
 
   # SSH Key Utilities
-  # This module provides functions for managing SSH keys and key-based authentication
+  # This module provides functions for managing SSH keys (NOT connections)
   sshClientManagerKeyUtils = ''
     # Generate a new SSH key for a specific server
     # Parameters: server
@@ -102,33 +102,13 @@ let
             ${pkgs.openssh}/bin/ssh-keygen -t ${toString cfg.keyType} -b ${toString cfg.keyBits} -f "$HOME/.ssh/id_rsa" -N ""
         fi
 
-        # Check if the key is already present on the remote server
-        local pubkey
-        pubkey=$(cat "$HOME/.ssh/id_rsa.pub")
-        if ssh -o StrictHostKeyChecking=no "$username@$server" "grep -Fxq '$pubkey' ~/.ssh/authorized_keys"; then
-            ${ui.messages.success "SSH key is already present on $server"}
+        # Use the centralized connection handler for key copying
+        if copy_ssh_key_with_password "$username" "$server" "$password"; then
+            ${ui.messages.success "SSH key successfully copied to $server"}
             return 0
-        fi
-
-        # Use the provided password with sshpass to copy key
-        ${ui.messages.info "Copying SSH key to the remote server..."}
-        if [[ -n "$password" ]]; then
-            if ${pkgs.sshpass}/bin/sshpass -p "$password" ${pkgs.openssh}/bin/ssh-copy-id -o StrictHostKeyChecking=no -i "$HOME/.ssh/id_rsa.pub" "$username@$server"; then
-                ${ui.messages.success "SSH key successfully copied to $server"}
-                return 0
-            else
-                ${ui.messages.error "Failed to copy SSH key to $server"}
-                return 1
-            fi
         else
-            # Fall back to standard method if no password provided
-            if ${pkgs.openssh}/bin/ssh-copy-id -i "$HOME/.ssh/id_rsa.pub" "$username@$server"; then
-                ${ui.messages.success "SSH key successfully copied to $server"}
-                return 0
-            else
-                ${ui.messages.error "Failed to copy SSH key to $server"}
-                return 1
-            fi
+            ${ui.messages.error "Failed to copy SSH key to $server"}
+            return 1
         fi
     }
   '';
