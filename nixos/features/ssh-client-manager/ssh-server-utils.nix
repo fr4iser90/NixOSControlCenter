@@ -46,8 +46,9 @@ let
     # Parameters: prompt text
     get_password_input() {
         local prompt="$1"
-        echo -n "$prompt"
+        echo -n "$prompt " >&2
         read -rs input
+        echo ""  # Add a newline after input for clarity
         echo "$input"
     }
     
