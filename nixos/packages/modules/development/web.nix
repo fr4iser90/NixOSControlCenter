@@ -27,7 +27,8 @@
     postman                # GUI tool for API testing
     httpie                 # CLI tool for testing HTTP requests
     curl                   # Versatile HTTP client for testing APIs
-
+    jq
+    
     # Frontend Tools
     sass                   # CSS preprocessor
     less                   # CSS preprocessor

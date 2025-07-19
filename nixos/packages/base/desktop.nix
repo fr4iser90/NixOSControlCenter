@@ -14,5 +14,6 @@
     # office
     libreoffice
     unzip
+    appimage-run
   ];
 }
