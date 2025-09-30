@@ -7,6 +7,7 @@ This directory contains custom NixOS configurations that are automatically impor
 1. Add `.nix` files to this directory
 2. The configurations will be automatically imported and applied
 3. Files are imported in alphabetical order
+4. Files with prefix `example_` are ignored (use for examples/documentation only)
 
 ## Examples
 
@@ -71,19 +72,21 @@ The following examples demonstrate how to create custom configurations:
 
 ## Import System
 
-The `default.nix` file automatically imports all `.nix` files in this directory:
+The `default.nix` file automatically imports all `.nix` files in this directory (except `example_` prefixed files):
 
 ```nix
 let
   currentDir = toString ./.;
-  nixFiles = builtins.attrNames (lib.filterAttrs 
-    (_: v: lib.hasSuffix ".nix" v) 
-    (builtins.readDir currentDir));
+  # Load all .nix files in current directory except default.nix and example_ files
+  nixFiles = builtins.filter
+    (name: name != "default.nix" && lib.hasSuffix ".nix" name && !lib.hasPrefix "example_" name)
+    (builtins.attrNames (builtins.readDir currentDir));
   
-  imports = map (file: currentDir + "/${file}") nixFiles;
+  # Create import paths relative to current directory
+  imports = map (file: ./. + "/${file}") nixFiles;
 in
 {
-  imports = if nixFiles == [] then [] else imports;
+  imports = imports;
 }
 ```
 

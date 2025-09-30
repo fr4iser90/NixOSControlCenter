@@ -9,10 +9,6 @@ build-gaming.sh
 ./continue/config.json
 NCC-Hackathon/
 
-
-# Exclude everything in the nixos/custom/ directory...
-nixos/custom/**
-
 # ...but explicitly allow specific files to be tracked
 !nixos/custom/default.nix
 !nixos/custom/README.md
