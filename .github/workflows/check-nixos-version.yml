@@ -11,10 +11,14 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      issues: write
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
 
       - name: Get current version from flake.nix
         id: current
@@ -54,10 +58,13 @@ jobs:
         if: steps.check.outputs.needs_update == 'true'
         uses: peter-evans/create-pull-request@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Use PAT if available, otherwise fallback to GITHUB_TOKEN
+          token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           commit-message: "chore: update NixOS version to ${{ steps.latest.outputs.version }}"
           title: "Update NixOS version to ${{ steps.latest.outputs.version }}"
           body: |
             Updates NixOS from ${{ steps.current.outputs.version }} to ${{ steps.latest.outputs.version }}
           branch: update-nixos-${{ steps.latest.outputs.version }}
+          delete-branch: true
+          labels: automated,dependencies
 
