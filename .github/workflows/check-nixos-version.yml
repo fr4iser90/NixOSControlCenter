@@ -50,9 +50,44 @@ jobs:
         run: |
           CURRENT="${{ steps.current.outputs.version }}"
           LATEST="${{ steps.latest.outputs.version }}"
+          
+          echo "Updating from ${CURRENT} to ${LATEST}"
+          
+          # Verify variables are set
+          if [ -z "$CURRENT" ] || [ -z "$LATEST" ]; then
+            echo "Error: CURRENT or LATEST is empty!"
+            echo "CURRENT: '$CURRENT'"
+            echo "LATEST: '$LATEST'"
+            exit 1
+          fi
+          
+          # Replace nixpkgs-stable version
           sed -i "s/nixos-${CURRENT}/nixos-${LATEST}/g" nixos/flake.nix
+          
+          # Replace home-manager-stable version
           sed -i "s/release-${CURRENT}/release-${LATEST}/g" nixos/flake.nix
-          sed -i "s/\"${CURRENT}\"/\"${LATEST}\"/g" nixos/flake.nix
+          
+          # Replace stateVersion for stable channel
+          sed -i "s/then \"${CURRENT}\"/then \"${LATEST}\"/g" nixos/flake.nix
+          
+          # Update unstable stateVersion to match latest stable
+          # Find current unstable version and replace it
+          UNSTABLE_CURRENT=$(grep -oP 'else "\K[0-9]+\.[0-9]+' nixos/flake.nix | head -1)
+          if [ -n "$UNSTABLE_CURRENT" ]; then
+            sed -i "s/else \"${UNSTABLE_CURRENT}\"/else \"${LATEST}\"/g" nixos/flake.nix
+          fi
+          
+          echo "✓ Successfully updated to ${LATEST}"
+          
+          # Verify changes
+          echo "Verifying changes:"
+          git diff nixos/flake.nix || true
+          
+          # Check if version was actually updated
+          if ! grep -q "nixos-${LATEST}" nixos/flake.nix; then
+            echo "Error: Version update failed!"
+            exit 1
+          fi
 
       - name: Create Pull Request
         if: steps.check.outputs.needs_update == 'true'
