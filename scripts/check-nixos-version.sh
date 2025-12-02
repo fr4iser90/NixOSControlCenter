@@ -28,16 +28,16 @@ echo "Fetching latest version..."
 LATEST=""
 
 if [ -z "$LATEST" ]; then
-    GITHUB_PAGE=$(curl -s "https://github.com/NixOS/nixpkgs/branches" 2>/dev/null)
-    if [ -n "$GITHUB_PAGE" ]; then
-        LATEST=$(echo "$GITHUB_PAGE" | grep -oE 'nixos-[0-9]+\.[0-9]+' | sed 's/nixos-//' | sort -V | tail -1)
+    API_RESPONSE=$(curl -s "https://api.github.com/repos/NixOS/nixpkgs/branches?per_page=100" 2>/dev/null)
+    if [ -n "$API_RESPONSE" ]; then
+        LATEST=$(echo "$API_RESPONSE" | grep '"name"' | grep -E '(nixos-|release-)' | grep -oE '[0-9]+\.[0-9]+' | sort -V | tail -1)
     fi
 fi
 
 if [ -z "$LATEST" ]; then
-    API_RESPONSE=$(curl -s "https://api.github.com/repos/NixOS/nixpkgs/branches?per_page=100" 2>/dev/null)
-    if [ -n "$API_RESPONSE" ]; then
-        LATEST=$(echo "$API_RESPONSE" | grep -oE '"name"\s*:\s*"nixos-[0-9]+\.[0-9]+"' | grep -oE '[0-9]+\.[0-9]+' | sort -V | tail -1)
+    GITHUB_PAGE=$(curl -s "https://github.com/NixOS/nixpkgs/branches" 2>/dev/null)
+    if [ -n "$GITHUB_PAGE" ]; then
+        LATEST=$(echo "$GITHUB_PAGE" | grep -oE 'nixos-[0-9]+\.[0-9]+' | sed 's/nixos-//' | sort -V | tail -1)
     fi
 fi
 
