@@ -1,11 +1,9 @@
 { config, lib, pkgs, ... }:
 
 {
-  # Standard nix-command-not-found deaktivieren
   programs.command-not-found.enable = false;
 
-  # Unser globales Fallback-Skript
-  environment.etc."nix_command_not_found".text = ''
+  environment.interactiveShellInit = ''
     run_in_project_shell() {
         local cmd="$1"
         shift
@@ -36,9 +34,5 @@
             return 127
         }
     }
-  '';
-
-  environment.interactiveShellInit = ''
-    source /etc/nix_command_not_found
   '';
 }

@@ -38,5 +38,14 @@
     # Backend Tools
     #express                # Lightweight web framework for Node.js
     #fastify                # High-performance Node.js framework
+
+    # Testing & E2E
+    chromium                # Browser for Playwright testing
   ];
+
+  # Environment variables for Playwright
+  environment.variables = {
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
+    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH = "${pkgs.chromium}/bin/chromium";
+  };
 }
