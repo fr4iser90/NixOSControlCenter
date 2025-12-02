@@ -2,9 +2,8 @@ name: Check NixOS Version Updates
 
 on:
   schedule:
-    # Run every Monday at 00:00 UTC
-    - cron: '0 0 * * 1'
-  workflow_dispatch: # Allow manual trigger
+    - cron: '0 0 * * 1'  # Every Monday at 00:00 UTC
+  workflow_dispatch:
 
 jobs:
   check-version:
@@ -16,87 +15,49 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Nix
-        uses: cachix/install-nix-action@v25
-
-      - name: Get current NixOS version from flake.nix
-        id: current-version
+      - name: Get current version from flake.nix
+        id: current
         run: |
-          CURRENT_VERSION=$(grep -oP 'nixos-\K[0-9]+\.[0-9]+' nixos/flake.nix | head -1)
-          echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          echo "Current version: $CURRENT_VERSION"
+          CURRENT=$(grep -oP 'nixos-\K[0-9]+\.[0-9]+' nixos/flake.nix | head -1)
+          echo "version=$CURRENT" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT"
 
-      - name: Get latest NixOS stable version
-        id: latest-version
+      - name: Get latest stable version from GitHub API
+        id: latest
         run: |
-          # Get the latest stable NixOS version from nixpkgs releases
-          LATEST=$(curl -s https://api.github.com/repos/NixOS/nixpkgs/branches | \
+          LATEST=$(curl -s "https://api.github.com/repos/NixOS/nixpkgs/branches?per_page=100" | \
             grep -oP '"name":\s*"nixos-\K[0-9]+\.[0-9]+' | \
             sort -V | tail -1)
-          
-          if [ -z "$LATEST" ]; then
-            # Fallback: check nixpkgs channels
-            LATEST=$(curl -s https://channels.nixos.org/nixos-*/git-revision | \
-              grep -oP 'nixos-\K[0-9]+\.[0-9]+' | \
-              sort -V | tail -1)
-          fi
-          
-          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+          echo "version=$LATEST" >> $GITHUB_OUTPUT
           echo "Latest version: $LATEST"
 
-      - name: Compare versions
-        id: compare
+      - name: Check if update needed
+        id: check
         run: |
-          CURRENT="${{ steps.current-version.outputs.current }}"
-          LATEST="${{ steps.latest-version.outputs.latest }}"
-          
-          if [ "$CURRENT" != "$LATEST" ]; then
+          if [ "${{ steps.current.outputs.version }}" != "${{ steps.latest.outputs.version }}" ]; then
             echo "needs_update=true" >> $GITHUB_OUTPUT
-            echo "New version available: $CURRENT -> $LATEST"
           else
             echo "needs_update=false" >> $GITHUB_OUTPUT
-            echo "Already on latest version: $CURRENT"
           fi
 
       - name: Update flake.nix
-        if: steps.compare.outputs.needs_update == 'true'
+        if: steps.check.outputs.needs_update == 'true'
         run: |
-          CURRENT="${{ steps.current-version.outputs.current }}"
-          LATEST="${{ steps.latest-version.outputs.latest }}"
-          
-          # Replace version in flake.nix
+          CURRENT="${{ steps.current.outputs.version }}"
+          LATEST="${{ steps.latest.outputs.version }}"
           sed -i "s/nixos-${CURRENT}/nixos-${LATEST}/g" nixos/flake.nix
           sed -i "s/release-${CURRENT}/release-${LATEST}/g" nixos/flake.nix
           sed -i "s/\"${CURRENT}\"/\"${LATEST}\"/g" nixos/flake.nix
-          
-          echo "Updated flake.nix: $CURRENT -> $LATEST"
 
       - name: Create Pull Request
-        if: steps.compare.outputs.needs_update == 'true'
+        if: steps.check.outputs.needs_update == 'true'
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update NixOS version to ${{ steps.latest-version.outputs.latest }}"
-          title: "Update NixOS version to ${{ steps.latest-version.outputs.latest }}"
+          commit-message: "chore: update NixOS version to ${{ steps.latest.outputs.version }}"
+          title: "Update NixOS version to ${{ steps.latest.outputs.version }}"
           body: |
-            ## NixOS Version Update
-            
-            This PR updates the NixOS version from `${{ steps.current-version.outputs.current }}` to `${{ steps.latest-version.outputs.latest }}`.
-            
-            ### Changes
-            - Updated `nixpkgs-stable` to `nixos-${{ steps.latest-version.outputs.latest }}`
-            - Updated `home-manager-stable` to `release-${{ steps.latest-version.outputs.latest }}`
-            - Updated `stateVersion` to `${{ steps.latest-version.outputs.latest }}`
-            
-            ### Next Steps
-            - Review the changes
-            - Test the configuration locally
-            - Merge when ready
-            
-            *This PR was automatically created by the [Check NixOS Version Updates](.github/workflows/check-nixos-version.yml) workflow.*
-          branch: update-nixos-version-${{ steps.latest-version.outputs.latest }}
-          delete-branch: true
+            Updates NixOS from ${{ steps.current.outputs.version }} to ${{ steps.latest.outputs.version }}
+          branch: update-nixos-${{ steps.latest.outputs.version }}
 
