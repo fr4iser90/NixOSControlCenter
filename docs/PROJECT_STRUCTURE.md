@@ -100,6 +100,31 @@ NixOS configurations
       - `default.nix`
     - **icons/**: Icon themes
       - `default.nix`
+- **packages/**: System packages
+  - **base/**: Base system packages
+    - `desktop.nix` - Base packages for desktop systems
+    - `server.nix` - Base packages for server systems
+    - `homelab.nix` - Base packages for homelab systems
+  - **features/**: Package features (flat structure)
+    - `streaming.nix` - Gaming streaming tools
+    - `emulation.nix` - Retro gaming emulation
+    - `game-dev.nix` - Game development tools
+    - `web-dev.nix` - Web development tools
+    - `python-dev.nix` - Python development environment
+    - `system-dev.nix` - System development tools
+    - `docker.nix` - Docker (root)
+    - `docker-rootless.nix` - Docker (rootless)
+    - `database.nix` - Database services
+    - `web-server.nix` - Web server
+    - `mail-server.nix` - Mail server
+    - `qemu-vm.nix` - QEMU/KVM virtual machines
+    - `virt-manager.nix` - Virtualization GUI
+  - **presets/**: Predefined feature combinations
+    - `gaming-desktop.nix` - Gaming desktop preset
+    - `dev-workstation.nix` - Development workstation preset
+    - `homelab-server.nix` - Homelab server preset
+  - `metadata.nix` - Feature metadata (systemTypes, groups, conflicts, dependencies)
+  - `default.nix` - Main package loading logic
 - **features/**: System features
   - **ai-workspace/**: AI development tools
     - **containers/**: AI containers

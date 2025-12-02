@@ -11,22 +11,14 @@
     bootloader = "@BOOTLOADER@";
   };
   #
-  # Packages Modules
+  # Package Modules
   #
-  packageModules = {
-    gaming = {
-      streaming = @GAMING_STREAMING@;
-      emulation = @GAMING_EMULATION@;
-    };
-    development = {
-      game = @DEV_GAME@;
-      web = @DEV_WEB@;
-    };
-    server = {
-      docker = @SERVER_DOCKER@;
-      web = @SERVER_WEB@;
-    };
-  };
+  # Option 1: Package Modules direkt
+  packageModules = [ @PACKAGE_MODULES@ ];
+  
+  # Option 2: Preset verwenden (alternative zu packageModules)
+  preset = @PRESET@;
+  additionalPackageModules = [ @ADDITIONAL_PACKAGE_MODULES@ ];
 
   #
   # User Management

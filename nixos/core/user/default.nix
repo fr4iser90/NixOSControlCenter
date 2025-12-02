@@ -138,7 +138,7 @@ in {
 
   # Dynamische TTY-Konfiguration
   systemd.services = autoLoginService;
-  virtualisation.docker.enable = hasVirtualizationUser;
+  
   # Aktiviere die Shells auf System-Level
   programs = {
     zsh.enable = lib.any (user: systemConfig.users.${user}.defaultShell == "zsh") 

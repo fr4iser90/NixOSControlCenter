@@ -38,23 +38,38 @@ add_root_options() {
 add_desktop_branch() {
     local -n tree_ref=$1
     
-    # Gaming branch
-    tree_ref+=("$TREE_INDENT$TREE_BRANCH Gaming")
-    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH Gaming-Streaming")
-    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_LAST Gaming-Emulation")
+    # Gaming Features
+    tree_ref+=("$TREE_INDENT$TREE_BRANCH Gaming Features")
+    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH streaming")
+    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_LAST emulation")
     
-    # Development branch
-    tree_ref+=("$TREE_INDENT$TREE_LAST Development")
-    tree_ref+=("$TREE_INDENT   $TREE_BRANCH Development-Web")
-    tree_ref+=("$TREE_INDENT   $TREE_LAST Development-Game")
+    # Development Features
+    tree_ref+=("$TREE_INDENT$TREE_BRANCH Development Features")
+    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH web-dev")
+    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH game-dev")
+    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH python-dev")
+    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_LAST system-dev")
+    
+    # Virtualization Features (Desktop)
+    tree_ref+=("$TREE_INDENT$TREE_LAST Virtualization Features")
+    tree_ref+=("$TREE_INDENT   $TREE_BRANCH qemu-vm")
+    tree_ref+=("$TREE_INDENT   $TREE_LAST virt-manager")
 }
 
 add_server_branch() {
     local -n tree_ref=$1
     
-    # Server options
-    tree_ref+=("$TREE_INDENT$TREE_BRANCH Docker")
-    tree_ref+=("$TREE_INDENT$TREE_LAST Database")
+    # Virtualization Features (Server)
+    tree_ref+=("$TREE_INDENT$TREE_BRANCH Virtualization Features")
+    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH docker")
+    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH docker-rootless")
+    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_LAST qemu-vm")
+    
+    # Server Features
+    tree_ref+=("$TREE_INDENT$TREE_BRANCH Server Features")
+    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH database")
+    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH web-server")
+    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_LAST mail-server")
 }
 
 # Check script execution

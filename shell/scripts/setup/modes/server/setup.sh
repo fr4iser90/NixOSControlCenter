@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
 setup_server() {
-    log_section "Server Modules Setup"
+    log_section "Server Features Setup"
     
     # Skip the setup type ("Server")
     shift
     
-    # Validate remaining modules
+    # Validate remaining features
     if [[ $# -eq 0 ]]; then
-        log_error "No modules provided"
+        log_error "No features provided"
         return 1
     fi
     
@@ -17,15 +17,14 @@ setup_server() {
     
     # Update configuration
     update_server_system_type || return 1
-    reset_module_states || return 1
-    process_server_modules "$@" || return 1
-    
+    reset_feature_states || return 1
+    process_server_features "$@" || return 1
 
     # Export system type for deployment
     export SYSTEM_TYPE="server"
     deploy_config
 
-    log_success "Server profile modules updated"
+    log_success "Server profile features updated"
 }
 
 backup_config() {
@@ -47,64 +46,104 @@ update_server_system_type() {
     return 0
 }
 
-reset_module_states() {
-    log_debug "Resetting module states"
+reset_feature_states() {
+    log_debug "Resetting feature states"
     
-    local module_updates=(
-        '/server = {/,/};/s/docker = .*;/docker = false;/'
-        '/server = {/,/};/s/database = .*;/database = false;/'
-    )
-    
-    for update in "${module_updates[@]}"; do
-        sed -i "$update" "$SYSTEM_CONFIG_FILE" || {
-            log_error "Failed to reset module states"
+    # Setze packageModules auf leere Liste
+    # Prüfe ob packageModules bereits existiert
+    if grep -q "packageModules = \[" "$SYSTEM_CONFIG_FILE"; then
+        # Ersetze bestehende packageModules-Liste
+        sed -i '/packageModules = \[/,/\];/c\  packageModules = [];' "$SYSTEM_CONFIG_FILE" || {
+            log_error "Failed to reset packageModules"
             return 1
         }
+    else
+        # Füge packageModules-Liste hinzu (nach systemType)
+        sed -i '/systemType = "server";/a\  packageModules = [];' "$SYSTEM_CONFIG_FILE" || {
+            log_error "Failed to add packageModules list"
+            return 1
+        }
+    fi
+    
+    # Setze preset auf null falls vorhanden
+    if grep -q "preset = " "$SYSTEM_CONFIG_FILE"; then
+        sed -i 's/preset = .*;/preset = null;/' "$SYSTEM_CONFIG_FILE"
+    fi
+    
+    return 0
+}
+
+process_server_features() {
+    log_debug "Processing selected features"
+    
+    local feature
+    for feature in "$@"; do
+        enable_server_feature "$feature" || return 1
     done
     
     return 0
 }
 
-process_server_modules() {
-    log_debug "Processing selected modules"
+enable_server_feature() {
+    local feature_input="$1"
+    local feature_name
     
-    local module
-    for module in "$@"; do
-        enable_server_module "$module" || return 1
-    done
-    
-    return 0
-}
-
-enable_server_module() {
-    local module="$1"
-    local update_command
-    
-    case "$module" in
-        "Docker")  
-            update_command='/server = {/,/};/s/docker = .*;/docker = true;/'
+    # Map alte Namen zu neuen Feature-Namen
+    case "$feature_input" in
+        "None")
+            log_debug "None selected, keeping all features disabled"
+            return 0
             ;;
-        "Database")  
-            update_command='/server = {/,/};/s/database = .*;/database = true;/'
+        "Docker"|"docker")
+            feature_name="docker-rootless"  # Default zu rootless
+            ;;
+        "docker-rootless")
+            feature_name="docker-rootless"
+            ;;
+        "Database"|"database")
+            feature_name="database"
+            ;;
+        "web-server")
+            feature_name="web-server"
+            ;;
+        "mail-server")
+            feature_name="mail-server"
             ;;
         *)
-            log_error "Unknown module: $module"
-            return 1
+            # Fallback: Verwende Input direkt als Feature-Name
+            feature_name="$feature_input"
             ;;
     esac
     
-    sed -i "$update_command" "$SYSTEM_CONFIG_FILE" || {
-        log_error "Failed to enable module: $module"
-        return 1
-    }
+    # Füge Feature zur Liste hinzu
+    # Prüfe ob Feature bereits in der Liste ist
+    if grep -q "\"$feature_name\"" "$SYSTEM_CONFIG_FILE"; then
+        log_debug "Feature $feature_name already in list"
+        return 0
+    fi
     
-    log_success "Enabled module: $module"
+    # Füge Feature zur Liste hinzu
+    if grep -q "packageModules = \[\];" "$SYSTEM_CONFIG_FILE"; then
+        # Liste ist leer, ersetze
+        sed -i "s/packageModules = \[\];/packageModules = [ \"$feature_name\" ];/" "$SYSTEM_CONFIG_FILE" || {
+            log_error "Failed to add feature: $feature_name"
+            return 1
+        }
+    else
+        # Liste hat bereits Features, füge hinzu
+        sed -i "s/];/ \"$feature_name\" ];/" "$SYSTEM_CONFIG_FILE" || {
+            log_error "Failed to add feature: $feature_name"
+            return 1
+        }
+    fi
+    
+    log_success "Enabled feature: $feature_name"
     return 0
 }
 
 # Export functions
 export -f setup_server
-export -f enable_server_module
+export -f enable_server_feature
 
 # Check script execution
 check_script_execution "SYSTEM_CONFIG_FILE" "setup_server $*"

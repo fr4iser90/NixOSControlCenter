@@ -2,16 +2,12 @@
 
 {
   # Basic configuration for Homelab setup
-  services.openssh.enable = true;  # Enable SSH server for remote access
-  virtualisation.docker.enable = true;  # Enable Docker container support
-  
+  services.openssh.enable = true;  # Enable SSH server for remote access  
   # Enable Firefox only if desktop environment is enabled
   programs.firefox.enable = systemConfig.desktop.enable or false;
 
   # System packages to install
   environment.systemPackages = with pkgs; [
-    docker          # Docker container runtime
-    docker-client   # Docker CLI client
     coreutils       # Basic file, shell, and text manipulation utilities
     curl            # Command-line tool for transferring data with URLs
     wget            # Command-line utility for downloading files from the web

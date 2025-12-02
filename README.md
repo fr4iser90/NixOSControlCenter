@@ -59,7 +59,9 @@ The project is organized into these main components:
     - `vm-manager/`: VM management
   - `packages/`: System packages
     - `base/`: Base system packages
-    - `modules/`: Package modules
+    - `features/`: Package features (flache Struktur)
+    - `presets/`: Vordefinierte Feature-Kombinationen
+    - `metadata.nix`: Feature-Metadaten (systemTypes, groups, conflicts)
 
 - **shell/**: Shell environments and scripts
   - `homelab/`: Homelab management scripts

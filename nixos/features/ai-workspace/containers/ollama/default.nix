@@ -9,7 +9,10 @@ in
 
 {
   virtualisation = {
-    docker.enable = true;
+    # Docker wird jetzt über Module gesteuert (docker.nix oder docker-rootless.nix)
+    # WICHTIG: OCI-Containers brauchen root Docker (weil sie als systemd services laufen)!
+    # docker.enable = true;  # DEAKTIVIERT - verwende docker.nix Modul stattdessen
+    
     oci-containers = {
       backend = "docker";
       containers = {

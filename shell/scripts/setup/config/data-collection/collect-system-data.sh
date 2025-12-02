@@ -64,14 +64,11 @@ init_system_type() {
 }
 
 init_profile_modules() {
-    log_debug "Updating profile modules..."
+    log_debug "Updating profile package modules..."
     sed -i \
-        -e "s|@GAMING_STREAMING@|false|" \
-        -e "s|@GAMING_EMULATION@|false|" \
-        -e "s|@DEV_GAME@|false|" \
-        -e "s|@DEV_WEB@|false|" \
-        -e "s|@SERVER_DOCKER@|false|" \
-        -e "s|@SERVER_WEB@|false|" \
+        -e "s|@PACKAGE_MODULES@||" \
+        -e "s|@PRESET@|null|" \
+        -e "s|@ADDITIONAL_PACKAGE_MODULES@||" \
         "$temp_config"
 }
 
