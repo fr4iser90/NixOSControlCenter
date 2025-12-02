@@ -30,9 +30,23 @@ jobs:
       - name: Get latest stable version from GitHub API
         id: latest
         run: |
-          LATEST=$(curl -s "https://api.github.com/repos/NixOS/nixpkgs/branches?per_page=100" | \
-            grep -oP '"name":\s*"nixos-\K[0-9]+\.[0-9]+' | \
-            sort -V | tail -1)
+          echo "Fetching branches from GitHub API..."
+          API_RESPONSE=$(curl -s "https://api.github.com/repos/NixOS/nixpkgs/branches?per_page=100")
+          
+          if [ -z "$API_RESPONSE" ]; then
+            echo "Error: Failed to fetch from GitHub API"
+            exit 1
+          fi
+          
+          LATEST=$(echo "$API_RESPONSE" | grep -oP '"name":\s*"nixos-\K[0-9]+\.[0-9]+' | sort -V | tail -1)
+          
+          if [ -z "$LATEST" ]; then
+            echo "Error: Could not find latest stable version"
+            echo "API response sample:"
+            echo "$API_RESPONSE" | head -20
+            exit 1
+          fi
+          
           echo "version=$LATEST" >> $GITHUB_OUTPUT
           echo "Latest version: $LATEST"
 
@@ -70,10 +84,11 @@ jobs:
           # Replace stateVersion for stable channel
           sed -i "s/then \"${CURRENT}\"/then \"${LATEST}\"/g" nixos/flake.nix
           
-          # Update unstable stateVersion to match latest stable
-          # Find current unstable version and replace it
-          UNSTABLE_CURRENT=$(grep -oP 'else "\K[0-9]+\.[0-9]+' nixos/flake.nix | head -1)
-          if [ -n "$UNSTABLE_CURRENT" ]; then
+          # Update unstable stateVersion to match latest stable (optional)
+          # Only update if unstable version exists and is different
+          UNSTABLE_CURRENT=$(grep -oP 'else "\K[0-9]+\.[0-9]+' nixos/flake.nix | head -1 || echo "")
+          if [ -n "$UNSTABLE_CURRENT" ] && [ "$UNSTABLE_CURRENT" != "$LATEST" ]; then
+            echo "Updating unstable version from ${UNSTABLE_CURRENT} to ${LATEST}"
             sed -i "s/else \"${UNSTABLE_CURRENT}\"/else \"${LATEST}\"/g" nixos/flake.nix
           fi
           
