@@ -30,17 +30,17 @@ let
         plasma5 = {
           name = "KDE Plasma";
           getUrl = mkNixosUrl;
-          defaultVersion = "25.05";
+          defaultVersion = "25.11";
         };
         gnome = {
           name = "GNOME";
           getUrl = mkNixosUrl;
-          defaultVersion = "25.05";
+          defaultVersion = "25.11";
         };
         xfce = {
           name = "XFCE";
           getUrl = mkNixosUrl;
-          defaultVersion = "25.05";
+          defaultVersion = "25.11";
         };
       };
     };

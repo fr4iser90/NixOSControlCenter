@@ -7,7 +7,7 @@
 
   system = {
     channel = "stable";  # oder "stable"
-    version = "25.05";     # optional, für spezifische Version
+    version = "25.11";     # optional, für spezifische Version
     bootloader = "@BOOTLOADER@";
   };
   #
