@@ -1,0 +1,63 @@
+name: Check NixOS Version Updates
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # Every Monday at 00:00 UTC
+  workflow_dispatch:
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get current version from flake.nix
+        id: current
+        run: |
+          CURRENT=$(grep -oP 'nixos-\K[0-9]+\.[0-9]+' nixos/flake.nix | head -1)
+          echo "version=$CURRENT" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT"
+
+      - name: Get latest stable version from GitHub API
+        id: latest
+        run: |
+          LATEST=$(curl -s "https://api.github.com/repos/NixOS/nixpkgs/branches?per_page=100" | \
+            grep -oP '"name":\s*"nixos-\K[0-9]+\.[0-9]+' | \
+            sort -V | tail -1)
+          echo "version=$LATEST" >> $GITHUB_OUTPUT
+          echo "Latest version: $LATEST"
+
+      - name: Check if update needed
+        id: check
+        run: |
+          if [ "${{ steps.current.outputs.version }}" != "${{ steps.latest.outputs.version }}" ]; then
+            echo "needs_update=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs_update=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update flake.nix
+        if: steps.check.outputs.needs_update == 'true'
+        run: |
+          CURRENT="${{ steps.current.outputs.version }}"
+          LATEST="${{ steps.latest.outputs.version }}"
+          sed -i "s/nixos-${CURRENT}/nixos-${LATEST}/g" nixos/flake.nix
+          sed -i "s/release-${CURRENT}/release-${LATEST}/g" nixos/flake.nix
+          sed -i "s/\"${CURRENT}\"/\"${LATEST}\"/g" nixos/flake.nix
+
+      - name: Create Pull Request
+        if: steps.check.outputs.needs_update == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update NixOS version to ${{ steps.latest.outputs.version }}"
+          title: "Update NixOS version to ${{ steps.latest.outputs.version }}"
+          body: |
+            Updates NixOS from ${{ steps.current.outputs.version }} to ${{ steps.latest.outputs.version }}
+          branch: update-nixos-${{ steps.latest.outputs.version }}
+
