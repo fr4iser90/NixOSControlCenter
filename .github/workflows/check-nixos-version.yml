@@ -23,17 +23,19 @@ jobs:
       - name: Get current version from flake.nix
         id: current
         run: |
+          set -e
           if [ ! -f nixos/flake.nix ]; then
             echo "Error: nixos/flake.nix not found!"
             exit 1
           fi
           
-          CURRENT=$(grep -oP 'nixos-\K[0-9]+\.[0-9]+' nixos/flake.nix | head -1)
+          # Use sed instead of grep -P for better compatibility
+          CURRENT=$(grep 'nixos-' nixos/flake.nix | grep -oE 'nixos-[0-9]+\.[0-9]+' | head -1 | sed 's/nixos-//')
           
           if [ -z "$CURRENT" ]; then
             echo "Error: Could not find current version in flake.nix"
-            echo "File content:"
-            cat nixos/flake.nix | head -15
+            echo "Relevant lines:"
+            grep 'nixos-' nixos/flake.nix | head -3
             exit 1
           fi
           
@@ -43,20 +45,27 @@ jobs:
       - name: Get latest stable version from GitHub API
         id: latest
         run: |
+          set -e
           echo "Fetching branches from GitHub API..."
-          API_RESPONSE=$(curl -s "https://api.github.com/repos/NixOS/nixpkgs/branches?per_page=100")
           
-          if [ -z "$API_RESPONSE" ]; then
-            echo "Error: Failed to fetch from GitHub API"
+          # Fetch with error handling
+          if ! API_RESPONSE=$(curl -s -f "https://api.github.com/repos/NixOS/nixpkgs/branches?per_page=100"); then
+            echo "Error: Failed to fetch from GitHub API (curl failed)"
             exit 1
           fi
           
-          LATEST=$(echo "$API_RESPONSE" | grep -oP '"name":\s*"nixos-\K[0-9]+\.[0-9]+' | sort -V | tail -1)
+          if [ -z "$API_RESPONSE" ]; then
+            echo "Error: Empty response from GitHub API"
+            exit 1
+          fi
+          
+          # Extract versions using sed (more compatible than grep -P)
+          LATEST=$(echo "$API_RESPONSE" | grep -oE '"name":\s*"nixos-[0-9]+\.[0-9]+"' | sed 's/.*nixos-\([0-9]\+\.[0-9]\+\).*/\1/' | sort -V | tail -1)
           
           if [ -z "$LATEST" ]; then
             echo "Error: Could not find latest stable version"
-            echo "API response sample:"
-            echo "$API_RESPONSE" | head -20
+            echo "Found branches with 'nixos-':"
+            echo "$API_RESPONSE" | grep -oE '"name":\s*"[^"]*nixos-[^"]*"' | head -10
             exit 1
           fi
           
@@ -113,7 +122,7 @@ jobs:
           
           # Update unstable stateVersion to match latest stable (optional)
           # Only update if unstable version exists and is different
-          UNSTABLE_CURRENT=$(grep -oP 'else "\K[0-9]+\.[0-9]+' nixos/flake.nix | head -1 || echo "")
+          UNSTABLE_CURRENT=$(grep 'else "' nixos/flake.nix | grep -oE '[0-9]+\.[0-9]+' | head -1 || echo "")
           if [ -n "$UNSTABLE_CURRENT" ] && [ "$UNSTABLE_CURRENT" != "$LATEST" ]; then
             echo "Updating unstable version from ${UNSTABLE_CURRENT} to ${LATEST}"
             sed -i "s/else \"${UNSTABLE_CURRENT}\"/else \"${LATEST}\"/g" nixos/flake.nix
