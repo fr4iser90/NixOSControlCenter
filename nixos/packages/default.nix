@@ -1,14 +1,9 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  # Helper functions
-  findModules = dir:
-    let
-      files = builtins.readDir dir;
-      nixFiles = lib.filterAttrs (n: v: v == "regular" && lib.hasSuffix ".nix" n) files;
-      modules = lib.mapAttrs (n: _: import (dir + "/${n}")) nixFiles;
-    in modules;
-
+  # Load metadata
+  metadata = import ./metadata.nix;
+  
   # Load base packages
   basePackages = {
     desktop = import ./base/desktop.nix;
@@ -28,86 +23,90 @@ let
   # - true → Backward-Kompatibilität → "rootless" (Default)
   # - "root" → root Docker (für Swarm/OCI-Containers)
   # - "rootless" → rootless Docker (sicherer, Default)
-  getDockerMode = dockerConfig:
+  getDockerMode = dockerFeature:
     let
       # AI-Workspace braucht root (OCI-Containers)
       needsRoot = systemConfig.features.ai-workspace or false;
       
-      # Normalisiere docker Config
-      dockerValue = if dockerConfig == true then "rootless"  # Backward-Kompatibilität
-                    else if dockerConfig == false then false
-                    else dockerConfig;  # "root" oder "rootless"
+      # Wenn "docker" Feature aktiv → root
+      # Wenn "docker-rootless" Feature aktiv → rootless
+      dockerValue = if dockerFeature == "docker" then "root"
+                    else if dockerFeature == "docker-rootless" then "rootless"
+                    else false;
     in
       if dockerValue == false then false
       else if needsRoot then "root"  # AI-Workspace überschreibt zu root
       else dockerValue;  # User-Auswahl oder Default "rootless"
 
-  # AUTOMATISCHE DOCKER-AKTIVIERUNG basierend auf systemType
-  # Docker wird automatisch aktiviert, außer wenn explizit deaktiviert
-  # - Desktop → rootless Docker (sicherer)
-  # - Homelab → rootless Docker (sicherer, reicht für Single-Server)
-  # - Server → rootless Docker (sicherer)
-  # - AI-Workspace aktiv → root Docker (OCI-Containers brauchen root)
-  # - Docker Swarm → root Docker (Swarm braucht root, rootless Swarm ist experimentell)
-  # - Explizit docker = false → kein Docker
-  # - Explizit docker = "root" → root Docker (für Swarm/OCI-Containers)
-  
-  # Sammle alle Docker-Configs aus allen Modulen
-  allDockerConfigs = lib.mapAttrsToList (moduleName: moduleConfig:
-    moduleConfig.docker or null
-  ) systemConfig.packageModules;
-  
-  # Finde explizite Docker-Config (wenn gesetzt)
-  explicitDockerConfig = lib.findFirst (x: x != null) null allDockerConfigs;
-  
-  # Bestimme ob Docker automatisch aktiviert werden soll
-  shouldAutoEnableDocker = 
-    # Wenn explizit false → kein Docker
-    if explicitDockerConfig == false then false
-    # Wenn explizit gesetzt → verwende das
-    else if explicitDockerConfig != null then explicitDockerConfig
-    # Sonst: Automatisch aktivieren basierend auf systemType
-    else "rootless";  # Default: rootless für alle systemTypes
+  # Lade Preset wenn gesetzt
+  presetConfig = if systemConfig.preset or null != null then
+    import (./presets + "/${systemConfig.preset}.nix")
+  else null;
 
-  # Extract active modules from systemConfig
-  activeModules = lib.flatten (lib.mapAttrsToList (moduleName: moduleConfig:
+  # Kombiniere Preset-Features + zusätzliche Package Modules + direkte Package Modules
+  allFeatures = 
+    (presetConfig.features or [])
+    ++ (systemConfig.additionalPackageModules or [])
+    ++ (systemConfig.packageModules or []);
+
+  # Entferne Duplikate
+  uniqueFeatures = lib.unique allFeatures;
+
+  # Filtere Features nach systemType
+  validFeatures = lib.filter (feature:
+    let meta = metadata.features.${feature} or {};
+    in lib.elem systemConfig.systemType (meta.systemTypes or [])
+  ) uniqueFeatures;
+
+  # Prüfe Conflicts
+  checkConflicts = features:
     let
-      # ALWAYS load the base module if any sub-module is active
-      baseModule = if (lib.any (x: x == true || (lib.isString x && x != "")) (lib.attrValues moduleConfig))
-                  then [ ./modules/${moduleName}/default.nix ]
-                  else [];
-      
-      # Load sub-modules - spezielle Behandlung für Docker
-      subModules = lib.mapAttrsToList (subName: enabled:
-        if subName == "docker" then
-          # Docker: Verwende automatische Aktivierung wenn nicht explizit gesetzt
-          let dockerValue = if enabled == null then shouldAutoEnableDocker else enabled;
-              dockerMode = getDockerMode dockerValue;
-          in if dockerMode == false then null
-             else if dockerMode == "root" then ./modules/server/${subName}.nix
-             else ./modules/server/${subName}-rootless.nix
-        else if enabled == true || (lib.isString enabled && enabled != "") then
-          ./modules/${moduleName}/${subName}.nix
-        else null
-      ) moduleConfig;
+      conflicts = lib.flatten (map (f:
+        let meta = metadata.features.${f} or {};
+        in meta.conflicts or []
+      ) features);
+      hasConflict = lib.any (f: lib.elem f features) conflicts;
     in
-    # Filter null values and merge lists
-    baseModule ++ (builtins.filter (x: x != null) subModules)
-  ) systemConfig.packageModules);
+      if hasConflict then
+        throw "Feature conflict detected! Conflicting features: ${lib.concatStringsSep ", " (lib.intersectLists features conflicts)}"
+      else features;
 
-  # Wenn Docker automatisch aktiviert werden soll, füge es zu den Imports hinzu
-  dockerModule = if shouldAutoEnableDocker != false then
-    let dockerMode = getDockerMode shouldAutoEnableDocker;
-    in if dockerMode == "root" then [ ./modules/server/docker.nix ]
-       else [ ./modules/server/docker-rootless.nix ]
-    else [];
+  # Auflösen von Dependencies
+  resolveDependencies = features:
+    let
+      allDeps = lib.flatten (map (f:
+        let meta = metadata.features.${f} or {};
+        in meta.dependencies or []
+      ) features);
+      # Füge Dependencies hinzu, die noch nicht in der Liste sind
+      missingDeps = lib.filter (d: !lib.elem d features) allDeps;
+    in
+      if missingDeps == [] then features
+      else resolveDependencies (features ++ missingDeps);
+
+  # Finale Feature-Liste
+  finalFeatures = checkConflicts (resolveDependencies validFeatures);
+
+  # Lade Feature-Module
+  featureModules = map (feature:
+    ./features/${feature}.nix
+  ) finalFeatures;
+
+  # Spezielle Behandlung für Docker: Bestimme welches Docker-Feature aktiv ist
+  dockerFeature = lib.findFirst (f: f == "docker" || f == "docker-rootless") null finalFeatures;
+  dockerMode = getDockerMode dockerFeature;
+
+  # Docker-Module (wird separat behandelt, da es systemConfig-basierte Logik braucht)
+  dockerModule = if dockerMode == false then []
+    else if dockerMode == "root" then [ ./features/docker.nix ]
+    else [ ./features/docker-rootless.nix ];
 
 in {
   imports = 
-    # Load base system package
-    [ (basePackages.${systemConfig.systemType} or (throw "Unknown system type: ${systemConfig.systemType}")) ] 
-    # Load active modules + their base modules
-    ++ activeModules
-    # Automatisch Docker aktivieren wenn gewünscht
+    # Base für systemType
+    [ (basePackages.${systemConfig.systemType} or (throw "Unknown system type: ${systemConfig.systemType}")) ]
+    # Feature-Module (ohne Docker, da separat behandelt)
+    ++ (lib.filter (m: !lib.hasSuffix "/docker.nix" (toString m) && !lib.hasSuffix "/docker-rootless.nix" (toString m)) featureModules)
+    # Docker-Module separat hinzufügen
     ++ dockerModule;
 }

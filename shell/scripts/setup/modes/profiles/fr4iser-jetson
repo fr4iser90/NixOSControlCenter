@@ -11,22 +11,14 @@
   };
 
   #
-  # Profile Modules
+  # Package Modules
   #
-  packageModules = {
-    gaming = {
-      streaming = true;
-      emulation = true;
-    };
-    development = {
-      game = true;
-      web = true;
-    };
-    server = {
-      docker = false;
-      web = false;
-    };
-  };
+  packageModules = [
+    "streaming"
+    "emulation"
+    "game-dev"
+    "web-dev"
+  ];
 
   #
   # User Management

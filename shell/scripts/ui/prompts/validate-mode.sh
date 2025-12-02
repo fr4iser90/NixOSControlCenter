@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 
 validate_selection() {
     local selections=("$@")
@@ -8,20 +9,24 @@ validate_selection() {
         return 1
     fi
 
-    # Example: Check for required base modules
-    local required_modules=("Desktop" "Server")
-    for required in "${required_modules[@]}"; do
-        if [[ ! " ${selections[@]} " =~ " $required " ]]; then
-            echo "Error: $required is required."
-            return 1
-        fi
-    done
-
-    # Example: Check for conflicting selections
-    if [[ " ${selections[@]} " =~ " Gaming " && " ${selections[@]} " =~ " Server " ]]; then
-        echo "Error: 'Gaming' and 'Server' cannot be selected together."
+    # Check for feature conflicts
+    # Docker conflicts
+    if [[ " ${selections[@]} " =~ " docker " && " ${selections[@]} " =~ " docker-rootless " ]]; then
+        echo "Error: 'docker' and 'docker-rootless' cannot be selected together."
+        return 1
+    fi
+    
+    if [[ " ${selections[@]} " =~ " docker " && " ${selections[@]} " =~ " podman " ]]; then
+        echo "Error: 'docker' and 'podman' cannot be selected together."
+        return 1
+    fi
+    
+    if [[ " ${selections[@]} " =~ " docker-rootless " && " ${selections[@]} " =~ " podman " ]]; then
+        echo "Error: 'docker-rootless' and 'podman' cannot be selected together."
         return 1
     fi
 
     return 0
 }
+
+export -f validate_selection

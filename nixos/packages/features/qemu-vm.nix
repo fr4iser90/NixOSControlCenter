@@ -1,11 +1,9 @@
-# development/virtualization.nix
+# qemu-vm.nix
+# QEMU/KVM Virtual Machines
+
 { config, lib, pkgs, ... }:
 {
   environment.systemPackages = with pkgs; [
-    # GUI Tools
-    virt-viewer    # SPICE/VNC clients for VM display
-    virt-manager   # Graphical interface to manage virtual machines
-
     # CLI Tools
     qemu          # Full virtualization solution
     spice-vdagent # SPICE client for better integration
@@ -20,3 +18,4 @@
     lsof          # Debugging open files and ports
   ];
 }
+

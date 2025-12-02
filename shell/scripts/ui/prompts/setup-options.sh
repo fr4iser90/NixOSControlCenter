@@ -18,41 +18,33 @@ PREDEFINED_PROFILE_OPTIONS=(
     "Hackathon Server"
 )
 
-# Hauptkategorien für Custom Setup (vorher MAIN_OPTIONS)
+# Hauptkategorien für Custom Setup
 CUSTOM_BASE_MODES=(
     "Desktop"
     "Server"
 )
 
-# Unterkategorien direkt mit Display-Namen (bleibt gleich für Custom Setup)
+# Feature-Optionen für Custom Setup (neue Struktur)
+# Backward-Kompatibilität: Alte Namen funktionieren noch, werden intern gemappt
 declare -A -g SUB_OPTIONS=(
-    ["Desktop"]="None|Gaming-Streaming|Gaming-Emulation|Development-Web|Development-Game"
-    ["Server"]="None|Docker|Database"
+    ["Desktop"]="None|streaming|emulation|web-dev|game-dev|python-dev|system-dev"
+    ["Server"]="None|docker|docker-rootless|database|web-server|mail-server"
 )
 
-# Moduloptionen (bleibt gleich für Custom Setup)
+# Preset-Optionen (für Preset-Auswahl)
+declare -a PRESET_OPTIONS=(
+    "gaming-desktop"
+    "dev-workstation"
+    "homelab-server"
+)
+
+# Moduloptionen (veraltet, wird nicht mehr verwendet)
 declare -A -g MODULE_OPTIONS=(
     ["Gaming Module"]="None|Streaming|Emulation"
     ["Development Module"]="None|Web|Game"
 )
 
-# Verfügbare Optionen (Display-Namen) - DIESE LISTE MUSS ÜBERARBEITET ODER ENTFERNT WERDEN
-# Da die Logik sich ändert, ist eine flache Liste aller Optionen ggf. nicht mehr sinnvoll
-# SETUP_OPTIONS=(
-#     "Desktop"
-#     "Server"
-#     "HomelabServer"
-#     "HackathonServer"
-# "Custom Setup" # Dieser Begriff wird jetzt anders verwendet
-#     "Gaming-Streaming"
-#     "Gaming-Emulation"
-#     "Development-Web"
-#     "Development-Game"
-#     "Docker"
-#     "Database"
-# )
-
-# Hilfsfunktionen für Name-Konvertierung (bleiben bestehen)
+# Hilfsfunktionen für Name-Konvertierung
 get_internal_name() {
     local display_name="$1"
     local options="$2"
@@ -93,9 +85,9 @@ get_display_name() {
 
 export -a INSTALL_TYPE_OPTIONS
 export -a PREDEFINED_PROFILE_OPTIONS
-export -a CUSTOM_BASE_MODES # Vorher MAIN_OPTIONS
+export -a CUSTOM_BASE_MODES
+export -a PRESET_OPTIONS
 export -A SUB_OPTIONS
 export -A MODULE_OPTIONS
-# export -a SETUP_OPTIONS # Auskommentiert, da überarbeitet werden muss
 export -f get_internal_name
 export -f get_display_name
