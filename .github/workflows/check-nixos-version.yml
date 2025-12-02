@@ -23,7 +23,20 @@ jobs:
       - name: Get current version from flake.nix
         id: current
         run: |
+          if [ ! -f nixos/flake.nix ]; then
+            echo "Error: nixos/flake.nix not found!"
+            exit 1
+          fi
+          
           CURRENT=$(grep -oP 'nixos-\K[0-9]+\.[0-9]+' nixos/flake.nix | head -1)
+          
+          if [ -z "$CURRENT" ]; then
+            echo "Error: Could not find current version in flake.nix"
+            echo "File content:"
+            cat nixos/flake.nix | head -15
+            exit 1
+          fi
+          
           echo "version=$CURRENT" >> $GITHUB_OUTPUT
           echo "Current version: $CURRENT"
 
@@ -53,10 +66,24 @@ jobs:
       - name: Check if update needed
         id: check
         run: |
-          if [ "${{ steps.current.outputs.version }}" != "${{ steps.latest.outputs.version }}" ]; then
+          CURRENT="${{ steps.current.outputs.version }}"
+          LATEST="${{ steps.latest.outputs.version }}"
+          
+          echo "Comparing versions:"
+          echo "  Current: $CURRENT"
+          echo "  Latest:  $LATEST"
+          
+          if [ -z "$CURRENT" ] || [ -z "$LATEST" ]; then
+            echo "Error: Version comparison failed - one or both versions are empty"
+            exit 1
+          fi
+          
+          if [ "$CURRENT" != "$LATEST" ]; then
             echo "needs_update=true" >> $GITHUB_OUTPUT
+            echo "Update needed: $CURRENT -> $LATEST"
           else
             echo "needs_update=false" >> $GITHUB_OUTPUT
+            echo "Already on latest version: $CURRENT"
           fi
 
       - name: Update flake.nix
