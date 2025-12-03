@@ -63,6 +63,13 @@
 | **Environment** | Environment Variables | `environment-config.nix` |
 | **Storage** | Disk Management, Mounts | `storage-config.nix` |
 | **Virtualization** | Docker, VM, Container Configs | `virtualization-config.nix` |
+| **Identity** | LDAP, Active Directory, SSO | `identity-config.nix` |
+| **Certificates** | PKI, SSL/TLS, Certificate Management | `certificates-config.nix` |
+| **Compliance** | GDPR, HIPAA, SOC2, etc. | `compliance-config.nix` |
+| **High Availability** | HA, Clustering, Load Balancing | `ha-config.nix` |
+| **Disaster Recovery** | DR, RTO, RPO, Failover | `disaster-recovery-config.nix` |
+| **Secrets** | Secrets Management, Vault | `secrets-config.nix` |
+| **Multi-Tenancy** | Multi-Tenant, Isolation | `multi-tenant-config.nix` |
 
 ---
 
@@ -75,7 +82,8 @@ nixos/
   system-config.nix              # MINIMAL - nur kritische Werte (7 Werte)
   configs/
     # Core Configs (häufig verwendet)
-    desktop-config.nix           # Desktop + Lokalisierung
+    desktop-config.nix           # Desktop Environment
+    localization-config.nix      # Locales, Keyboard Layout
     hardware-config.nix          # Hardware (CPU, GPU, Memory)
     features-config.nix         # Features (system-logger, etc.)
     packages-config.nix         # Package-Modules + Presets
@@ -97,6 +105,15 @@ nixos/
     virtualization-config.nix  # Docker, VM, Container Configs (optional)
     hosting-config.nix         # Email, Domain, Certificates (optional)
     environment-config.nix    # Environment Variables (optional)
+    
+    # Enterprise Features
+    identity-config.nix       # LDAP, Active Directory, SSO (optional)
+    certificates-config.nix   # PKI, SSL/TLS, Certificate Management (optional)
+    compliance-config.nix     # GDPR, HIPAA, SOC2, etc. (optional)
+    ha-config.nix            # High Availability, Clustering (optional)
+    disaster-recovery-config.nix  # DR, RTO, RPO, Failover (optional)
+    secrets-config.nix       # Secrets Management, Vault (optional)
+    multi-tenant-config.nix  # Multi-Tenant, Isolation (optional)
     
     # Overrides & Custom
     overrides-config.nix       # Overrides (optional)
@@ -151,7 +168,13 @@ nixos/
     };
     audio = "pipewire";            # [pipewire/pulseaudio/alsa]
   };
-  
+}
+```
+
+### 2.3a configs/localization-config.nix (optional - kann auch in desktop-config.nix)
+
+```nix
+{
   # Lokalisierung
   locales = [ "en_US.UTF-8" ];
   keyboardLayout = "de";           # [de/us/etc.]
@@ -805,6 +828,346 @@ nixos/
 }
 ```
 
+### 2.20 configs/identity-config.nix (optional - Enterprise)
+
+```nix
+{
+  # Identity Management (Enterprise - typische Optionen)
+  # identity = {
+  #   # LDAP Integration
+  #   ldap = {
+  #     enable = false;                   # [true/false] - LDAP aktivieren
+  #     server = "ldap://ldap.example.com";  # LDAP-Server URL
+  #     baseDN = "dc=example,dc=com";     # Base DN
+  #     bindDN = "cn=admin,dc=example,dc=com";  # Bind DN
+  #     bindPasswordFile = "/etc/nixos/secrets/ldap.password";  # Passwort-Datei
+  #     userFilter = "(uid=%u)";          # User-Filter
+  #     groupFilter = "(memberUid=%u)";   # Group-Filter
+  #     ssl = true;                        # [true/false] - SSL/TLS verwenden
+  #   };
+  #   
+  #   # Active Directory Integration
+  #   activeDirectory = {
+  #     enable = false;                   # [true/false] - AD aktivieren
+  #     domain = "example.com";           # AD Domain
+  #     realm = "EXAMPLE.COM";            # AD Realm
+  #     server = "dc.example.com";        # AD Server
+  #     bindUser = "admin@example.com";   # Bind User
+  #     bindPasswordFile = "/etc/nixos/secrets/ad.password";  # Passwort-Datei
+  #   };
+  #   
+  #   # SSO (Single Sign-On)
+  #   sso = {
+  #     enable = false;                   # [true/false] - SSO aktivieren
+  #     provider = "keycloak";            # [keycloak/okta/auth0] - SSO Provider
+  #     server = "https://sso.example.com";  # SSO Server URL
+  #     clientId = "nixos-control-center";  # Client ID
+  #     clientSecretFile = "/etc/nixos/secrets/sso.secret";  # Client Secret
+  #   };
+  #   
+  #   # MFA (Multi-Factor Authentication)
+  #   mfa = {
+  #     enable = false;                   # [true/false] - MFA aktivieren
+  #     method = "totp";                  # [totp/sms/email/hardware] - MFA Methode
+  #     required = false;                  # [true/false] - MFA erforderlich
+  #   };
+  # };
+}
+```
+
+### 2.21 configs/certificates-config.nix (optional - Enterprise)
+
+```nix
+{
+  # Certificate Management (Enterprise - typische Optionen)
+  # certificates = {
+  #   # PKI (Public Key Infrastructure)
+  #   pki = {
+  #     enable = false;                   # [true/false] - PKI aktivieren
+  #     caCert = "/etc/nixos/certs/ca.crt";  # CA Certificate
+  #     caKey = "/etc/nixos/secrets/ca.key";  # CA Private Key
+  #     validity = 365;                    # Tage - Zertifikat-Gültigkeit
+  #   };
+  #   
+  #   # SSL/TLS Certificates
+  #   ssl = {
+  #     enable = true;                     # [true/false] - SSL/TLS aktivieren
+  #     certificates = [
+  #       {
+  #         domain = "example.com";        # Domain
+  #         certFile = "/etc/nixos/certs/example.com.crt";  # Certificate File
+  #         keyFile = "/etc/nixos/secrets/example.com.key";  # Private Key File
+  #         chainFile = "/etc/nixos/certs/example.com.chain.crt";  # Chain File (optional)
+  #       }
+  #     ];
+  #   };
+  #   
+  #   # Let's Encrypt / ACME
+  #   acme = {
+  #     enable = false;                   # [true/false] - ACME aktivieren
+  #     email = "admin@example.com";      # Email für Let's Encrypt
+  #     server = "https://acme-v02.api.letsencrypt.org/directory";  # ACME Server
+  #     domains = [ "example.com" "*.example.com" ];  # Domains
+  #     renewBefore = 30;                 # Tage - Erneuern vor Ablauf
+  #   };
+  #   
+  #   # Certificate Rotation
+  #   rotation = {
+  #     enable = true;                     # [true/false] - Automatische Rotation
+  #     schedule = "monthly";              # [daily/weekly/monthly] - Rotations-Schedule
+  #     autoRenew = true;                  # [true/false] - Automatische Erneuerung
+  #   };
+  # };
+}
+```
+
+### 2.22 configs/compliance-config.nix (optional - Enterprise)
+
+```nix
+{
+  # Compliance (Enterprise - typische Optionen)
+  # compliance = {
+  #   # Compliance-Frameworks
+  #   frameworks = {
+  #     gdpr = {
+  #       enable = false;                 # [true/false] - GDPR Compliance
+  #       dataRetention = 90;              # Tage - Daten-Retention
+  #       rightToErasure = true;           # [true/false] - Recht auf Löschung
+  #       dataPortability = true;          # [true/false] - Daten-Portabilität
+  #     };
+  #     
+  #     hipaa = {
+  #       enable = false;                 # [true/false] - HIPAA Compliance
+  #       encryption = true;               # [true/false] - Verschlüsselung erforderlich
+  #       auditLogging = true;             # [true/false] - Audit-Logging erforderlich
+  #       accessControl = true;            # [true/false] - Zugriffskontrolle erforderlich
+  #     };
+  #     
+  #     soc2 = {
+  #       enable = false;                 # [true/false] - SOC2 Compliance
+  #       type = "Type II";                # [Type I/Type II] - SOC2 Typ
+  #       controls = [ "CC6.1" "CC6.2" ];  # SOC2 Controls
+  #     };
+  #     
+  #     iso27001 = {
+  #       enable = false;                 # [true/false] - ISO 27001 Compliance
+  #       controls = [ "A.9.1" "A.9.2" ];  # ISO 27001 Controls
+  #     };
+  #   };
+  #   
+  #   # Compliance-Reporting
+  #   reporting = {
+  #     enable = true;                     # [true/false] - Compliance-Reports
+  #     schedule = "monthly";              # [daily/weekly/monthly] - Report-Schedule
+  #     format = "pdf";                    # [pdf/html/json] - Report-Format
+  #     recipients = [ "compliance@example.com" ];  # Report-Empfänger
+  #   };
+  #   
+  #   # Compliance-Audit
+  #   audit = {
+  #     enable = true;                     # [true/false] - Compliance-Audit
+  #     schedule = "quarterly";            # [monthly/quarterly/yearly] - Audit-Schedule
+  #     autoRemediation = false;           # [true/false] - Automatische Behebung
+  #   };
+  # };
+}
+```
+
+### 2.23 configs/ha-config.nix (optional - Enterprise)
+
+```nix
+{
+  # High Availability (Enterprise - typische Optionen)
+  # ha = {
+  #   enable = false;                      # [true/false] - HA aktivieren
+  #   
+  #   # Clustering
+  #   cluster = {
+  #     enable = false;                   # [true/false] - Cluster aktivieren
+  #     nodes = [                          # Cluster-Nodes
+  #       { host = "node1.example.com"; role = "primary"; }
+  #       { host = "node2.example.com"; role = "secondary"; }
+  #       { host = "node3.example.com"; role = "secondary"; }
+  #     ];
+  #     quorum = 2;                        # Quorum-Anzahl
+  #   };
+  #   
+  #   # Load Balancing
+  #   loadBalancer = {
+  #     enable = false;                   # [true/false] - Load Balancer aktivieren
+  #     algorithm = "round-robin";        # [round-robin/least-connections/ip-hash] - LB Algorithmus
+  #     healthCheck = {
+  #       enable = true;                   # [true/false] - Health Checks
+  #       interval = 10;                   # Sekunden - Check-Intervall
+  #       timeout = 5;                     # Sekunden - Timeout
+  #       retries = 3;                     # Anzahl - Wiederholungen
+  #     };
+  #   };
+  #   
+  #   # Failover
+  #   failover = {
+  #     enable = false;                   # [true/false] - Failover aktivieren
+  #     mode = "automatic";               # [automatic/manual] - Failover-Modus
+  #     detectionTime = 30;                # Sekunden - Failover-Erkennungszeit
+  #     recoveryTime = 60;                # Sekunden - Recovery-Zeit
+  #   };
+  #   
+  #   # Shared Storage
+  #   sharedStorage = {
+  #     enable = false;                   # [true/false] - Shared Storage
+  #     type = "nfs";                      # [nfs/ceph/glusterfs] - Storage-Typ
+  #     server = "storage.example.com";    # Storage-Server
+  #     mountPoint = "/mnt/shared";        # Mount-Punkt
+  #   };
+  # };
+}
+```
+
+### 2.24 configs/disaster-recovery-config.nix (optional - Enterprise)
+
+```nix
+{
+  # Disaster Recovery (Enterprise - typische Optionen)
+  # disasterRecovery = {
+  #   enable = false;                      # [true/false] - DR aktivieren
+  #   
+  #   # RTO (Recovery Time Objective)
+  #   rto = {
+  #     critical = 1;                      # Stunden - RTO für kritische Systeme
+  #     important = 4;                     # Stunden - RTO für wichtige Systeme
+  #     standard = 24;                     # Stunden - RTO für Standard-Systeme
+  #   };
+  #   
+  #   # RPO (Recovery Point Objective)
+  #   rpo = {
+  #     critical = 15;                     # Minuten - RPO für kritische Systeme
+  #     important = 60;                    # Minuten - RPO für wichtige Systeme
+  #     standard = 240;                    # Minuten - RPO für Standard-Systeme
+  #   };
+  #   
+  #   # Backup-Strategie
+  #   backupStrategy = {
+  #     frequency = "hourly";              # [hourly/daily/weekly] - Backup-Frequenz
+  #     retention = {
+  #       hourly = 24;                    # Stunden - Hourly Backups behalten
+  #       daily = 30;                      # Tage - Daily Backups behalten
+  #       weekly = 12;                     # Wochen - Weekly Backups behalten
+  #       monthly = 12;                    # Monate - Monthly Backups behalten
+  #     };
+  #   };
+  #   
+  #   # DR-Site
+  #   drSite = {
+  #     enable = false;                   # [true/false] - DR-Site aktivieren
+  #     location = "remote";               # [local/remote/cloud] - DR-Site Location
+  #     replication = {
+  #       enable = true;                   # [true/false] - Replikation aktivieren
+  #       method = "async";                # [sync/async] - Replikations-Methode
+  #       interval = 60;                   # Sekunden - Replikations-Intervall
+  #     };
+  #   };
+  #   
+  #   # Failover-Tests
+  #   failoverTests = {
+  #     enable = true;                     # [true/false] - Failover-Tests
+  #     schedule = "quarterly";            # [monthly/quarterly/yearly] - Test-Schedule
+  #     automated = false;                 # [true/false] - Automatisierte Tests
+  #   };
+  # };
+}
+```
+
+### 2.25 configs/secrets-config.nix (optional - Enterprise)
+
+```nix
+{
+  # Secrets Management (Enterprise - typische Optionen)
+  # secrets = {
+  #   # Vault Integration
+  #   vault = {
+  #     enable = false;                   # [true/false] - Vault aktivieren
+  #     server = "https://vault.example.com";  # Vault Server URL
+  #     tokenFile = "/etc/nixos/secrets/vault.token";  # Vault Token File
+  #     mountPath = "secret";             # Vault Mount Path
+  #   };
+  #   
+  #   # Secret Rotation
+  #   rotation = {
+  #     enable = true;                     # [true/false] - Secret Rotation
+  #     schedule = "monthly";               # [daily/weekly/monthly] - Rotations-Schedule
+  #     autoRotate = true;                 # [true/false] - Automatische Rotation
+  #   };
+  #   
+  #   # Secret Storage
+  #   storage = {
+  #     backend = "file";                  # [file/vault/aws-secrets-manager] - Storage Backend
+  #     path = "/etc/nixos/secrets";       # Pfad für File-Backend
+  #     encryption = true;                 # [true/false] - Verschlüsselung
+  #     encryptionKeyFile = "/etc/nixos/secrets/encryption.key";  # Verschlüsselungs-Key
+  #   };
+  #   
+  #   # Secret Access Control
+  #   accessControl = {
+  #     enable = true;                     # [true/false] - Zugriffskontrolle
+  #     audit = true;                      # [true/false] - Audit-Logging
+  #     roles = {                          # Rollen-basierte Zugriffe
+  #       admin = [ ".*" ];                # Admin hat Zugriff auf alles
+  #       operator = [ "secrets/app/.*" ];  # Operator nur auf App-Secrets
+  #     };
+  #   };
+  # };
+}
+```
+
+### 2.26 configs/multi-tenant-config.nix (optional - Enterprise)
+
+```nix
+{
+  # Multi-Tenancy (Enterprise - typische Optionen)
+  # multiTenant = {
+  #   enable = false;                      # [true/false] - Multi-Tenancy aktivieren
+  #   
+  #   # Tenant-Isolation
+  #   isolation = {
+  #     network = true;                    # [true/false] - Network-Isolation
+  #     storage = true;                    # [true/false] - Storage-Isolation
+  #     compute = true;                    # [true/false] - Compute-Isolation
+  #     namespace = true;                  # [true/false] - Namespace-Isolation
+  #   };
+  #   
+  #   # Resource Quotas
+  #   quotas = {
+  #     enable = true;                     # [true/false] - Resource Quotas
+  #     default = {
+  #       cpu = "2";                       # CPU-Limit pro Tenant
+  #       memory = "4G";                    # Memory-Limit pro Tenant
+  #       storage = "100G";                # Storage-Limit pro Tenant
+  #       network = "1Gbps";               # Network-Limit pro Tenant
+  #     };
+  #   };
+  #   
+  #   # Tenant-Management
+  #   tenants = [
+  #     {
+  #       id = "tenant1";                   # Tenant ID
+  #       name = "Tenant 1";                # Tenant Name
+  #       quotas = {
+  #         cpu = "4";
+  #         memory = "8G";
+  #         storage = "200G";
+  #       };
+  #     }
+  #   ];
+  #   
+  #   # Billing/Metering
+  #   metering = {
+  #     enable = false;                   # [true/false] - Resource Metering
+  #     granularity = "hourly";            # [hourly/daily/monthly] - Metering-Granularität
+  #   };
+  # };
+}
+```
+
 ---
 
 ## Phase 3: flake.nix Merging-Logik
@@ -819,6 +1182,8 @@ let
   # 2. Lade optionale Configs (falls vorhanden)
   desktopConfig = if builtins.pathExists ./configs/desktop-config.nix
     then import ./configs/desktop-config.nix else {};
+  localizationConfig = if builtins.pathExists ./configs/localization-config.nix
+    then import ./configs/localization-config.nix else {};
   hardwareConfig = if builtins.pathExists ./configs/hardware-config.nix
     then import ./configs/hardware-config.nix else {};
   featuresConfig = if builtins.pathExists ./configs/features-config.nix
@@ -849,6 +1214,20 @@ let
     then import ./configs/hosting-config.nix else {};
   environmentConfig = if builtins.pathExists ./configs/environment-config.nix
     then import ./configs/environment-config.nix else {};
+  identityConfig = if builtins.pathExists ./configs/identity-config.nix
+    then import ./configs/identity-config.nix else {};
+  certificatesConfig = if builtins.pathExists ./configs/certificates-config.nix
+    then import ./configs/certificates-config.nix else {};
+  complianceConfig = if builtins.pathExists ./configs/compliance-config.nix
+    then import ./configs/compliance-config.nix else {};
+  haConfig = if builtins.pathExists ./configs/ha-config.nix
+    then import ./configs/ha-config.nix else {};
+  disasterRecoveryConfig = if builtins.pathExists ./configs/disaster-recovery-config.nix
+    then import ./configs/disaster-recovery-config.nix else {};
+  secretsConfig = if builtins.pathExists ./configs/secrets-config.nix
+    then import ./configs/secrets-config.nix else {};
+  multiTenantConfig = if builtins.pathExists ./configs/multi-tenant-config.nix
+    then import ./configs/multi-tenant-config.nix else {};
   overridesConfig = if builtins.pathExists ./configs/overrides-config.nix
     then import ./configs/overrides-config.nix else {};
   
@@ -856,6 +1235,7 @@ let
   # Reihenfolge ist wichtig: spätere Configs überschreiben frühere
   systemConfig = baseConfig
     // desktopConfig
+    // localizationConfig
     // hardwareConfig
     // featuresConfig
     // packagesConfig
@@ -871,6 +1251,13 @@ let
     // virtualizationConfig
     // hostingConfig
     // environmentConfig
+    // identityConfig
+    // certificatesConfig
+    // complianceConfig
+    // haConfig
+    // disasterRecoveryConfig
+    // secretsConfig
+    // multiTenantConfig
     // overridesConfig;
 in {
   # ... rest bleibt gleich
@@ -881,8 +1268,9 @@ in {
 
 **Warum diese Reihenfolge?**
 1. `baseConfig` - Basis (kritische Werte)
-2. `desktopConfig` - Desktop + Lokalisierung
-3. `hardwareConfig` - Hardware
+2. `desktopConfig` - Desktop Environment
+3. `localizationConfig` - Lokalisierung (optional)
+4. `hardwareConfig` - Hardware
 4. `featuresConfig` - Features
 5. `packagesConfig` - Packages
 6. `networkConfig` - Netzwerk
@@ -897,7 +1285,14 @@ in {
 15. `virtualizationConfig` - Virtualization (optional)
 16. `hostingConfig` - Hosting (optional)
 17. `environmentConfig` - Environment (optional)
-18. `overridesConfig` - Overrides (optional, sollte zuletzt kommen)
+18. `identityConfig` - Identity/LDAP/AD (optional)
+19. `certificatesConfig` - Certificates/PKI (optional)
+20. `complianceConfig` - Compliance (optional)
+21. `haConfig` - High Availability (optional)
+22. `disasterRecoveryConfig` - Disaster Recovery (optional)
+23. `secretsConfig` - Secrets Management (optional)
+24. `multiTenantConfig` - Multi-Tenancy (optional)
+25. `overridesConfig` - Overrides (optional, sollte zuletzt kommen)
 
 **Regel:** Spätere Configs überschreiben frühere bei Konflikten.
 
@@ -938,9 +1333,12 @@ mkdir -p /etc/nixos/configs
 
 **Zu configs/desktop-config.nix:**
 - `desktop.*`
+
+**Zu configs/localization-config.nix (optional):**
 - `locales`
 - `keyboardLayout`
 - `keyboardOptions`
+- (Hinweis: Kann auch in desktop-config.nix integriert werden, separate Datei für bessere Modularität)
 
 **Zu configs/hardware-config.nix:**
 - `hardware.*`
@@ -998,6 +1396,46 @@ mkdir -p /etc/nixos/configs
 
 **Zu configs/storage-config.nix (optional):**
 - Storage-Konfiguration (zukünftig)
+
+**Zu configs/identity-config.nix (optional - Enterprise):**
+- LDAP/Active Directory Integration
+- SSO-Konfiguration
+- MFA-Einstellungen
+
+**Zu configs/certificates-config.nix (optional - Enterprise):**
+- PKI-Konfiguration
+- SSL/TLS Certificates
+- Let's Encrypt/ACME
+- Certificate Rotation
+
+**Zu configs/compliance-config.nix (optional - Enterprise):**
+- GDPR, HIPAA, SOC2, ISO27001 Compliance
+- Compliance-Reporting
+- Compliance-Audit
+
+**Zu configs/ha-config.nix (optional - Enterprise):**
+- Clustering
+- Load Balancing
+- Failover
+- Shared Storage
+
+**Zu configs/disaster-recovery-config.nix (optional - Enterprise):**
+- RTO/RPO-Ziele
+- Backup-Strategie
+- DR-Site-Konfiguration
+- Failover-Tests
+
+**Zu configs/secrets-config.nix (optional - Enterprise):**
+- Vault Integration
+- Secret Rotation
+- Secret Storage
+- Access Control
+
+**Zu configs/multi-tenant-config.nix (optional - Enterprise):**
+- Tenant-Isolation
+- Resource Quotas
+- Tenant-Management
+- Billing/Metering
 
 ### 4.4 Schritt 4: Ändere flake.nix
 
@@ -1096,7 +1534,7 @@ nixos-rebuild dry-run --flake /etc/nixos#Gaming
 
 - [ ] Alle systemConfig Werte analysiert
 - [ ] Struktur definiert
-- [ ] Config-Dateien definiert
+- [ ] Config-Dateien definiert (27 Configs: 6 Core + 10 Standard + 7 Enterprise + 2 Additional + 1 Base + 1 Overrides)
 - [ ] Merging-Logik definiert
 - [ ] Migration-Plan erstellt
 - [ ] Setup-Skripte Anpassung geplant
@@ -1104,4 +1542,59 @@ nixos-rebuild dry-run --flake /etc/nixos#Gaming
 - [ ] Dokumentation geplant
 
 **NUR WENN ALLES GEHACKT IST: Implementierung starten!**
+
+---
+
+## Zusammenfassung: Vollständiger Plan
+
+### Config-Struktur (27 Config-Dateien):
+
+**1. system-config.nix** (MUSS - 7 kritische Werte)
+- systemType, hostName, system.channel, system.bootloader, allowUnfree, users, timeZone
+
+**Core Configs (6):**
+- desktop-config.nix
+- localization-config.nix (optional, kann in desktop-config.nix integriert werden)
+- hardware-config.nix
+- features-config.nix
+- packages-config.nix
+- network-config.nix
+
+**Standard Configs (10):**
+- security-config.nix
+- performance-config.nix
+- storage-config.nix
+- monitoring-config.nix
+- backup-config.nix
+- logging-config.nix
+- update-config.nix
+- services-config.nix
+- virtualization-config.nix
+- environment-config.nix
+
+**Enterprise Configs (7):**
+- identity-config.nix (LDAP/AD/SSO)
+- certificates-config.nix (PKI/SSL/TLS)
+- compliance-config.nix (GDPR/HIPAA/SOC2)
+- ha-config.nix (High Availability)
+- disaster-recovery-config.nix (DR/RTO/RPO)
+- secrets-config.nix (Vault/Secrets Management)
+- multi-tenant-config.nix (Multi-Tenancy)
+
+**Additional (3):**
+- hosting-config.nix
+- overrides-config.nix
+
+### Alle Platzhalter enthalten:
+- ✅ Typische End-User-Optionen
+- ✅ Enterprise-Optionen
+- ✅ Kommentare mit möglichen Werten
+- ✅ Defaults angegeben
+
+### Plan ist vollständig für:
+- ✅ Home-User (Core + Standard Configs)
+- ✅ Power-User (alle Configs)
+- ✅ Enterprise (inkl. Enterprise Configs)
+
+**Der Plan ist vollständig und bereit für die Implementierung!**
 
