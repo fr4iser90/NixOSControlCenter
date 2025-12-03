@@ -27,19 +27,17 @@ select_setup_mode() {
         # 2a. Auswahl eines vordefinierten Profils mit Unterteilung
         local profile_choice
         
-        # Erstelle eine formatierte Liste mit Gruppen
+        # Erstelle eine formatierte Liste mit Gruppen (Trennlinien als Header)
         local profile_list=""
-        profile_list+="━━━ Server Profiles ━━━\n"
         for profile in "${PREDEFINED_SERVER_PROFILES[@]}"; do
-            profile_list+="$profile\n"
+            profile_list+="Server: $profile\n"
         done
-        profile_list+="\n━━━ Desktop Profiles ━━━\n"
         for profile in "${PREDEFINED_DESKTOP_PROFILES[@]}"; do
-            profile_list+="$profile\n"
+            profile_list+="Desktop: $profile\n"
         done
         
         profile_choice=$(printf "%b" "$profile_list" | fzf \
-            --header="Select a Predefined Profile" \
+            --header="━━━ Server Profiles ━━━        ━━━ Desktop Profiles ━━━" \
             --bind 'space:accept' \
             --bind 'enter:accept' \
             --preview "$PREVIEW_SCRIPT {}" \
@@ -47,8 +45,8 @@ select_setup_mode() {
             --pointer="▶" \
             --marker="✓") || { log_error "Profile selection cancelled."; return 1; }
 
-        # Entferne Trennlinien und Whitespace
-        profile_choice=$(echo "$profile_choice" | sed 's/^━━━.*━━━$//' | sed '/^$/d' | head -1)
+        # Entferne Präfix (Server: oder Desktop:)
+        profile_choice=$(echo "$profile_choice" | sed 's/^Server: //' | sed 's/^Desktop: //')
         
         [ -z "$profile_choice" ] && { log_error "No profile selected."; return 1; }
         final_selection=("$profile_choice")
