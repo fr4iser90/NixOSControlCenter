@@ -18,7 +18,6 @@ in
     nvidiaSettings = true;
     open = false; # Explicitly set to false for pre-Turing GPU
     package = nvidiaPackage;
-    support32Bit = true; # Required for x86_64 systems
 #    powerManagement.enable = true;     # efi error 
     prime = {
       sync.enable = true;
