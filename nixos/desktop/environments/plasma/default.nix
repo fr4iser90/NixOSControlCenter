@@ -8,9 +8,6 @@
   # Wayland Support
   programs.xwayland.enable = true;
 
-  # Alte Plasma 5 Pakete entfernen
-  environment.plasma5.excludePackages = [ "*" ];
-
   # Notwendige Services
   services.dbus.enable = true;
   
