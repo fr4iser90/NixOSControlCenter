@@ -17,29 +17,32 @@ main() {
     # Get user's setup mode selection
     log_section "Setup Mode"
     
-    if ! selected_modules=$(select_setup_mode); then
+    if ! selected_modules_raw=$(select_setup_mode); then
         log_error "Setup mode selection failed"
         exit 1
     fi
     
-    # Parse selected modules into array
-    IFS=' ' read -ra selected_modules <<< "$selected_modules"
-    if [[ ${#selected_modules[@]} -eq 0 ]]; then
+    if [[ -z "$selected_modules_raw" ]]; then
         log_error "No setup mode selected"
         exit 1
     fi
     
-    log_info "Selected modules: ${selected_modules[*]}"
+    log_info "Selected modules: $selected_modules_raw"
     
-    # Check if this is a predefined profile
-    local first_selection="${selected_modules[0]}"
+    # Check if this is a predefined profile FIRST (before splitting)
     local profile_file
     
-    if profile_file=$(get_predefined_profile_file "$first_selection"); then
+    if profile_file=$(get_predefined_profile_file "$selected_modules_raw"); then
         # This is a predefined profile - load it directly
         setup_predefined_profile "$profile_file" || exit 1
+    elif [[ "$selected_modules_raw" == "Homelab Server" ]]; then
+        # Homelab Server uses setup_homelab
+        setup_homelab "$selected_modules_raw" || exit 1
     else
-        # This is a custom setup
+        # This is a custom setup - now split into array
+        IFS=' ' read -ra selected_modules <<< "$selected_modules_raw"
+        local first_selection="${selected_modules[0]}"
+        
         case "$first_selection" in
             "Desktop") 
                 setup_desktop "${selected_modules[@]}" || exit 1

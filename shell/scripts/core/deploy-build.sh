@@ -60,7 +60,10 @@ deploy_base_config() {
 
     # Build and switch
     log_success "Build system..."
-    nixos-rebuild switch --flake /etc/nixos#$(hostname)
+    # Get hostname from system-config.nix, fallback to system hostname
+    local config_hostname
+    config_hostname=$(grep -m 1 'hostName = ' "$SYSTEM_CONFIG_FILE" 2>/dev/null | sed 's/.*hostName = "\(.*\)";.*/\1/' || echo "$(hostname)")
+    nixos-rebuild switch --flake /etc/nixos#"${config_hostname}"
 
 
     # BREAKPOINT HERE!
