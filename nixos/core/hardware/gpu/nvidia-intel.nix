@@ -31,6 +31,7 @@ in
 
   hardware.graphics = {
     enable = true;
+    enable32Bit = true; # Required for x86_64 systems with NVIDIA
     extraPackages = with pkgs; [
       nvidiaPackage
     ];
