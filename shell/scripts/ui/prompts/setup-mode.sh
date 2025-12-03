@@ -24,16 +24,32 @@ select_setup_mode() {
     [ -z "$install_type_choice" ] && { log_error "No installation type selected."; return 1; }
 
     if [[ "$install_type_choice" == "Install a Predefined Profile" ]]; then
-        # 2a. Auswahl eines vordefinierten Profils
+        # 2a. Auswahl eines vordefinierten Profils mit Unterteilung
         local profile_choice
-        profile_choice=$(printf "%s\n" "${PREDEFINED_PROFILE_OPTIONS[@]}" | fzf \
+        
+        # Erstelle eine formatierte Liste mit Gruppen
+        local profile_list=""
+        profile_list+="━━━ Server Profiles ━━━\n"
+        for profile in "${PREDEFINED_SERVER_PROFILES[@]}"; do
+            profile_list+="$profile\n"
+        done
+        profile_list+="\n━━━ Desktop Profiles ━━━\n"
+        for profile in "${PREDEFINED_DESKTOP_PROFILES[@]}"; do
+            profile_list+="$profile\n"
+        done
+        
+        profile_choice=$(printf "%b" "$profile_list" | fzf \
             --header="Select a Predefined Profile" \
             --bind 'space:accept' \
+            --bind 'enter:accept' \
             --preview "$PREVIEW_SCRIPT {}" \
             --preview-window="right:50%:wrap" \
             --pointer="▶" \
             --marker="✓") || { log_error "Profile selection cancelled."; return 1; }
 
+        # Entferne Trennlinien und Whitespace
+        profile_choice=$(echo "$profile_choice" | sed 's/^━━━.*━━━$//' | sed '/^$/d' | head -1)
+        
         [ -z "$profile_choice" ] && { log_error "No profile selected."; return 1; }
         final_selection=("$profile_choice")
 

@@ -18,7 +18,8 @@ pkgs.mkShell {
     # Check if we have root rights
     if [[ $EUID -ne 0 ]]; then
       echo "Restarting shell with root privileges..."
-      exec sudo "$(which nix-shell)" "$@"
+      # Preserve current directory and pass shell.nix path explicitly
+      exec sudo -E env "PATH=$PATH" "$(which nix-shell)" "$(pwd)/shell.nix"
     fi
     echo "Starting install script..."
     install

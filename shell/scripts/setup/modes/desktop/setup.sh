@@ -91,7 +91,7 @@ enable_desktop_feature() {
     local feature_input="$1"
     local feature_name
     
-    # Map alte Namen zu neuen Feature-Namen
+    # Map alte Namen zu neuen Feature-Namen (inkl. Server-Features)
     case "$feature_input" in
         "None")
             log_debug "None selected, keeping all features disabled"
@@ -114,6 +114,19 @@ enable_desktop_feature() {
             ;;
         "system-dev")
             feature_name="system-dev"
+            ;;
+        # Server-Features die auch auf Desktop verfügbar sind
+        "docker")
+            feature_name="docker"
+            ;;
+        "docker-rootless")
+            feature_name="docker-rootless"
+            ;;
+        "database")
+            feature_name="database"
+            ;;
+        "web-server")
+            feature_name="web-server"
             ;;
         *)
             # Fallback: Verwende Input direkt als Feature-Name

@@ -10,12 +10,22 @@ INSTALL_TYPE_OPTIONS=(
     "Configure a Custom Setup"
 )
 
-PREDEFINED_PROFILE_OPTIONS=(
+# Server Profile
+PREDEFINED_SERVER_PROFILES=(
+    "Homelab Server"
+    "Fr4iser Jetson Nano"
+)
+
+# Desktop Profile
+PREDEFINED_DESKTOP_PROFILES=(
     "Fr4iser Personal Desktop"
     "Gira Personal Desktop"
-    "Fr4iser Jetson Nano"
-    "Homelab Server"
-    "Hackathon Server"
+)
+
+# Combined for backward compatibility
+PREDEFINED_PROFILE_OPTIONS=(
+    "${PREDEFINED_SERVER_PROFILES[@]}"
+    "${PREDEFINED_DESKTOP_PROFILES[@]}"
 )
 
 # Hauptkategorien für Custom Setup
@@ -25,9 +35,9 @@ CUSTOM_BASE_MODES=(
 )
 
 # Feature-Optionen für Custom Setup (neue Struktur)
-# Backward-Kompatibilität: Alte Namen funktionieren noch, werden intern gemappt
+# Desktop kann jetzt auch Server-Features auswählen
 declare -A -g SUB_OPTIONS=(
-    ["Desktop"]="None|streaming|emulation|web-dev|game-dev|python-dev|system-dev"
+    ["Desktop"]="None|streaming|emulation|web-dev|game-dev|python-dev|system-dev|docker|docker-rootless|database|web-server"
     ["Server"]="None|docker|docker-rootless|database|web-server|mail-server"
 )
 
@@ -83,11 +93,20 @@ get_display_name() {
     echo "$internal_name" | sed 's/\b\(.\)/\u\1/g'
 }
 
+# Helper function to check if profile is disabled
+is_profile_disabled() {
+    local profile="$1"
+    [[ "$profile" == *"(disabled)"* ]]
+}
+
 export -a INSTALL_TYPE_OPTIONS
 export -a PREDEFINED_PROFILE_OPTIONS
+export -a PREDEFINED_SERVER_PROFILES
+export -a PREDEFINED_DESKTOP_PROFILES
 export -a CUSTOM_BASE_MODES
 export -a PRESET_OPTIONS
 export -A SUB_OPTIONS
 export -A MODULE_OPTIONS
 export -f get_internal_name
 export -f get_display_name
+export -f is_profile_disabled
