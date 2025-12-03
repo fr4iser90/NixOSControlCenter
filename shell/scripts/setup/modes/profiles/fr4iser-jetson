@@ -5,8 +5,7 @@
   systemType = "desktop";
   hostName = "Gaming";
   system = {
-    channel = "stable";  # oder "stable"
-    version = "24.11";     # optional, für spezifische Version
+    channel = "stable";  # [stable/unstable] - Version wird in flake.nix definiert
     bootloader = "systemd-boot";
   };
 

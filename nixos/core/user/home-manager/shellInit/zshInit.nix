@@ -36,7 +36,7 @@
       theme = "agnoster";
     };
 
-    initContent = ''
+    initExtra = ''
       # Disable NOMATCH behavior
       setopt NO_NOMATCH
       

@@ -25,7 +25,12 @@ generate_preview() {
 export -f generate_preview
 
 clean_selection_string() {
-    echo "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/ /-/g' | tr '[:upper:]' '[:lower:]'
+    # Remove emojis and clean up selection string
+    echo "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+        -e 's/📦 //' -e 's/🔧 //' -e 's/⚙️  //' \
+        -e 's/📁 //' -e 's/📋 //' -e 's/🔄 //' \
+        -e 's/🖥️  //' -e 's/🤖 //' \
+        -e 's/ /-/g' | tr '[:upper:]' '[:lower:]'
 }
 export -f clean_selection_string
 

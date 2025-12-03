@@ -29,17 +29,76 @@ main() {
     
     log_info "Selected modules: $selected_modules_raw"
     
-    # Check if this is a predefined profile FIRST (before splitting)
-    local profile_file
-    
-    if profile_file=$(get_predefined_profile_file "$selected_modules_raw"); then
+    # Check for Advanced Options first (LOAD_PROFILE: or IMPORT_CONFIG:)
+    if [[ "$selected_modules_raw" =~ ^LOAD_PROFILE: ]]; then
+        # Load profile from file
+        local profile_path="${selected_modules_raw#LOAD_PROFILE:}"
+        setup_predefined_profile "$profile_path" || exit 1
+        
+    elif [[ "$selected_modules_raw" =~ ^IMPORT_CONFIG: ]]; then
+        # Import from existing config
+        local config_path="${selected_modules_raw#IMPORT_CONFIG:}"
+        log_info "Importing configuration from: $config_path"
+        if [[ -f "$config_path" ]]; then
+            backup_file "$SYSTEM_CONFIG_FILE" 2>/dev/null || true
+            ensure_dir "$(dirname "$SYSTEM_CONFIG_FILE")"
+            cp "$config_path" "$SYSTEM_CONFIG_FILE" || {
+                log_error "Failed to import configuration"
+                exit 1
+            }
+            log_success "Configuration imported successfully"
+            
+            # Export system type for deployment
+            local system_type
+            system_type=$(grep -m 1 'systemType = ' "$SYSTEM_CONFIG_FILE" | sed 's/.*systemType = "\(.*\)";.*/\1/' || echo "desktop")
+            export SYSTEM_TYPE="$system_type"
+            deploy_config
+        else
+            log_error "Configuration file not found: $config_path"
+            exit 1
+        fi
+        
+    # Check if this is a predefined profile (legacy support)
+    elif profile_file=$(get_predefined_profile_file "$selected_modules_raw"); then
         # This is a predefined profile - load it directly
         setup_predefined_profile "$profile_file" || exit 1
+        
+    elif [[ "$selected_modules_raw" == "Desktop" ]]; then
+        # Desktop preset - load desktop preset file
+        local desktop_preset="$SETUP_DIR/modes/presets/desktop.nix"
+        if [[ -f "$desktop_preset" ]]; then
+            setup_predefined_profile "$desktop_preset" || exit 1
+        else
+            log_error "Desktop preset not found: $desktop_preset"
+            exit 1
+        fi
+        
+    elif [[ "$selected_modules_raw" == "Server" ]]; then
+        # Server preset - load server preset file
+        local server_preset="$SETUP_DIR/modes/presets/server.nix"
+        if [[ -f "$server_preset" ]]; then
+            setup_predefined_profile "$server_preset" || exit 1
+        else
+            log_error "Server preset not found: $server_preset"
+            exit 1
+        fi
+        
     elif [[ "$selected_modules_raw" == "Homelab Server" ]]; then
         # Homelab Server uses setup_homelab
         setup_homelab "$selected_modules_raw" || exit 1
+        
+    elif [[ "$selected_modules_raw" == "Jetson Nano" ]]; then
+        # Jetson Nano preset - load fr4iser-jetson profile
+        local jetson_profile="$SETUP_DIR/modes/profiles/fr4iser-jetson"
+        if [[ -f "$jetson_profile" ]]; then
+            setup_predefined_profile "$jetson_profile" || exit 1
+        else
+            log_error "Jetson Nano profile not found: $jetson_profile"
+            exit 1
+        fi
+        
     else
-        # This is a custom setup - now split into array
+        # This is a custom setup or preset - now split into array
         IFS=' ' read -ra selected_modules <<< "$selected_modules_raw"
         local first_selection="${selected_modules[0]}"
         
@@ -118,6 +177,24 @@ setup_predefined_profile() {
         log_error "Failed to copy profile file"
         return 1
     }
+    
+    # Set hostname if it's null or not set
+    if grep -q 'hostName = null;' "$SYSTEM_CONFIG_FILE" || ! grep -q 'hostName = ' "$SYSTEM_CONFIG_FILE"; then
+        local current_hostname
+        current_hostname=$(hostname)
+        if [[ -n "$current_hostname" ]]; then
+            if grep -q 'hostName = null;' "$SYSTEM_CONFIG_FILE"; then
+                sed -i "s/hostName = null;/hostName = \"$current_hostname\";/" "$SYSTEM_CONFIG_FILE" || {
+                    log_warn "Failed to update hostname"
+                }
+            else
+                # Insert hostname after systemType
+                sed -i "/systemType = /a\  hostName = \"$current_hostname\";" "$SYSTEM_CONFIG_FILE" || {
+                    log_warn "Failed to add hostname"
+                }
+            fi
+        fi
+    fi
     
     log_success "Predefined profile applied successfully"
     

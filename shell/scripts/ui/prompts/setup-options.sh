@@ -6,20 +6,38 @@ declare -g -A MODULE_OPTIONS
 
 # Neue Struktur für die Auswahl
 INSTALL_TYPE_OPTIONS=(
-    "Install a Predefined Profile"
-    "Configure a Custom Setup"
+    "📦 Presets"
+    "🔧 Custom Setup"
+    "⚙️  Advanced Options"
 )
 
-# Server Profile
+# System Presets (öffentliche, wiederverwendbare Konfigurationen)
+SYSTEM_PRESETS=(
+    "Desktop"
+    "Server"
+    "Homelab Server"
+)
+
+# Device Presets (geräte-spezifische Konfigurationen)
+DEVICE_PRESETS=(
+    "Jetson Nano"
+)
+
+# Advanced Options
+ADVANCED_OPTIONS=(
+    "📁 Load Profile from File"
+    "📋 Show Available Profiles"
+    "🔄 Import from Existing Config"
+)
+
+# Legacy: Für Backward Compatibility (wird nicht mehr in UI angezeigt)
 PREDEFINED_SERVER_PROFILES=(
     "Homelab Server"
     "Fr4iser Jetson Nano"
 )
 
-# Desktop Profile
+# Desktop Profile (persönliche Profile entfernt - jetzt in Advanced Options)
 PREDEFINED_DESKTOP_PROFILES=(
-    "Fr4iser Personal Desktop"
-    "Gira Personal Desktop"
 )
 
 # Combined for backward compatibility
@@ -100,6 +118,9 @@ is_profile_disabled() {
 }
 
 export -a INSTALL_TYPE_OPTIONS
+export -a SYSTEM_PRESETS
+export -a DEVICE_PRESETS
+export -a ADVANCED_OPTIONS
 export -a PREDEFINED_PROFILE_OPTIONS
 export -a PREDEFINED_SERVER_PROFILES
 export -a PREDEFINED_DESKTOP_PROFILES

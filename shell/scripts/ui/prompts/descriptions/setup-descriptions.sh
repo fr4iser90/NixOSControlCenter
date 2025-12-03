@@ -3,24 +3,26 @@
 # Definiere die Beschreibungen
 declare -g -A SETUP_DESCRIPTIONS=(
     # Installation Types
+    ["📦 presets"]="Ready-to-use system configurations. Choose from system presets (Desktop, Server, Homelab) or device-specific presets (Jetson Nano, etc.)."
+    ["🔧 custom setup"]="Select a base system (Desktop or Server) and then add specific features to customize your installation step-by-step."
+    ["⚙️  advanced options"]="Advanced configuration options including loading profiles from files, viewing available profiles, and importing existing configurations."
+    
+    # Legacy (for backward compatibility)
     ["install-a-predefined-profile"]="Choose from a list of ready-to-go system configurations tailored for specific use cases or hardware."
     ["configure-a-custom-setup"]="Select a base system (Desktop or Server) and then add specific features to customize your installation."
 
-    # Predefined Profiles
-    ["fr4iser-personal-desktop"]="A personalized desktop environment for fr4iser, including common applications and development tools."
-    ["gira-personal-desktop"]="A personalized desktop environment for Gira, optimized for their workflow and preferences."
-    ["fr4iser-jetson-nano"]="A specialized setup for the NVIDIA Jetson Nano, configured for AI/ML development and robotics."
-    ["homelab-server"]="Sets up a versatile home server for services like media streaming, network storage, and home automation."
-    ["hackathon-server"]="Deploys a dedicated server environment for hosting hackathon events, including participant project management and judging tools."
-
-    # Presets
-    ["gaming-desktop"]="Gaming Desktop preset with streaming and emulation features."
-    ["dev-workstation"]="Development Workstation preset with web, Python, and game development tools."
-    ["homelab-server-preset"]="Homelab Server preset with Docker, database, and web server."
-
-    # Custom Setup Base Modes
-    ["desktop"]="Installs a full desktop environment with a graphical interface, suitable for daily use, gaming, or development work."
-    ["server"]="Installs a command-line based server system, optimized for hosting services, applications, or websites."
+    # System Presets (aktuell verwendete Presets)
+    ["desktop"]="Base desktop environment with graphical interface, suitable for daily use, gaming, or development work."
+    ["server"]="Base server system with command-line interface, optimized for hosting services, applications, or websites."
+    ["homelab server"]="Complete homelab setup with Docker, databases, web servers, and home automation services."
+    
+    # Device Presets
+    ["jetson nano"]="Specialized setup for NVIDIA Jetson Nano, configured for AI/ML development, robotics, and GPU optimization."
+    
+    # Advanced Options
+    ["📁 load profile from file"]="Load a custom profile configuration from a file path. Supports relative paths (profiles/name) or absolute paths."
+    ["📋 show available profiles"]="Browse and select from available profile files in the profiles directory."
+    ["🔄 import from existing config"]="Import settings from an existing system-config.nix file."
 
     # Desktop Features (neue Struktur)
     ["streaming"]="Gaming streaming tools (OBS Studio, etc.)"
@@ -51,19 +53,13 @@ declare -g -A SETUP_TYPES=(
     ["install-a-predefined-profile"]="Meta Selection"
     ["configure-a-custom-setup"]="Meta Selection"
     
-    # Predefined Profiles
-    ["fr4iser-personal-desktop"]="Predefined Desktop Profile"
-    ["gira-personal-desktop"]="Predefined Desktop Profile"
-    ["fr4iser-jetson-nano"]="Predefined Specialized Profile"
-    ["homelab-server"]="Predefined Server Profile"
-    ["hackathon-server"]="Predefined Server Profile"
+    # System Presets
+    ["homelab server"]="System Preset"
     
-    # Presets
-    ["gaming-desktop"]="Preset"
-    ["dev-workstation"]="Preset"
-    ["homelab-server-preset"]="Preset"
+    # Device Presets
+    ["jetson nano"]="Device Preset"
     
-    # Base Modes
+    # Base Modes (für Custom Setup)
     ["desktop"]="Base System"
     ["server"]="Base System"
     
@@ -96,19 +92,13 @@ declare -g -A SETUP_FEATURES=(
     ["install-a-predefined-profile"]="Ready-to-use system configurations|Optimized for specific use cases|Pre-configured settings"
     ["configure-a-custom-setup"]="Flexible base system selection|Modular features|Custom configuration options"
     
-    # Predefined Profiles
-    ["fr4iser-personal-desktop"]="Development Environment|Common Applications|Personalized Settings|Dotfiles Integration"
-    ["gira-personal-desktop"]="Optimized Workflow|Custom Applications|Personal Preferences"
-    ["fr4iser-jetson-nano"]="NVIDIA Jetson Support|AI/ML Development Tools|Robotics Framework|GPU Optimization"
-    ["homelab-server"]="Media Streaming|Network Storage|Home Automation|Service Management"
-    ["hackathon-server"]="Project Management|Participant Registration|Judging System|Event Management"
+    # System Presets
+    ["homelab server"]="Docker|Database|Web Server|Home Automation|Media Streaming|Network Storage"
     
-    # Presets
-    ["gaming-desktop"]="Streaming Tools|Emulation|Game Development"
-    ["dev-workstation"]="Web Development|Python|Game Development|Build Tools"
-    ["homelab-server-preset"]="Docker|Database|Web Server"
+    # Device Presets
+    ["jetson nano"]="NVIDIA Jetson Support|AI/ML Development Tools|Robotics Framework|GPU Optimization"
     
-    # Base Modes
+    # Base Modes (für Custom Setup)
     ["desktop"]="Graphical Interface|Basic Applications|Network Management|Printer Support"
     ["server"]="Command-line Interface|SSH Access|System Monitoring|Backup Tools"
     

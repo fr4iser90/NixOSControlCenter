@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 
 # Always run hardware config/partition check before anything else
-"$(dirname "$0")"/../../../checks/hardware/hardware-config.sh
+if [[ -n "${CHECKS_DIR:-}" ]]; then
+    source "$CHECKS_DIR/hardware/hardware-config.sh"
+else
+    # Fallback if CHECKS_DIR is not set
+    "$(dirname "$0")"/../../checks/hardware/hardware-config.sh
+fi
 
 setup_desktop() {
     log_section "Desktop Features Setup"

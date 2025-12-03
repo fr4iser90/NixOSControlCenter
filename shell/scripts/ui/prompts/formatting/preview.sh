@@ -7,8 +7,12 @@ source "$SCRIPT_DIR/../setup-options.sh"
 
 selection="$1"
 
-# Clean up selection string
-clean_selection=$(echo "$selection" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/ /-/g' | tr '[:upper:]' '[:lower:]')
+# Clean up selection string (handle emojis and special characters)
+clean_selection=$(echo "$selection" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+    -e 's/📦 //' -e 's/🔧 //' -e 's/⚙️  //' \
+    -e 's/📁 //' -e 's/📋 //' -e 's/🔄 //' \
+    -e 's/🖥️  //' -e 's/🤖 //' \
+    -e 's/ /-/g' | tr '[:upper:]' '[:lower:]')
 
 # Header
 echo -e "\\033[1;34m${selection}\\033[0m"

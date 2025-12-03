@@ -2,7 +2,6 @@
   description = "NixOS Configuration with Home Manager";
 
   inputs = {
-    # Dynamische Inputs basierend auf Konfiguration
     nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-25.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     
@@ -31,6 +30,7 @@
                    else home-manager-unstable;
 
     # Set stateVersion once for both system and home-manager
+    # NOTE: Version wird oben in inputs definiert - hier nur stateVersion setzen
     stateVersion = if systemConfig.system.channel == "stable"
       then "25.11"
       else "25.11"; # Use latest stable for unstable as well, or set to a default

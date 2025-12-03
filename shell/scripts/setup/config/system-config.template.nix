@@ -6,8 +6,7 @@
   hostName = "@HOSTNAME@";
 
   system = {
-    channel = "stable";  # oder "stable"
-    version = "25.11";     # optional, für spezifische Version
+    channel = "stable";  # [stable/unstable] - Version wird in flake.nix definiert
     bootloader = "@BOOTLOADER@";
   };
   #

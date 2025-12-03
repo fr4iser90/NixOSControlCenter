@@ -61,9 +61,9 @@ echo "This will update:"
 echo "  - nixpkgs-stable: nixos-$CURRENT -> nixos-$LATEST"
 echo "  - home-manager-stable: release-$CURRENT -> release-$LATEST"
 echo "  - stateVersion: \"$CURRENT\" -> \"$LATEST\""
-echo "  - system-config.template.nix: version \"$CURRENT\" -> \"$LATEST\""
 echo "  - vm-manager/lib/distros.nix: defaultVersion \"$CURRENT\" -> \"$LATEST\""
 echo ""
+
 
 # Ask for confirmation
 read -p "Do you want to update? (y/n): " -n 1 -r
@@ -93,12 +93,7 @@ if [ -n "$UNSTABLE_CURRENT" ] && [ "$UNSTABLE_CURRENT" != "$LATEST" ]; then
 fi
 
 # Update other files with version references
-TEMPLATE_FILE="$REPO_ROOT/shell/scripts/setup/config/system-config.template.nix"
-if [ -f "$TEMPLATE_FILE" ]; then
-    sed -i "s/version = \"${CURRENT}\"/version = \"${LATEST}\"/g" "$TEMPLATE_FILE"
-    echo "Updated: system-config.template.nix"
-fi
-
+# Note: system.version was removed from profiles - version is now only in flake.nix
 DISTROS_FILE="$REPO_ROOT/nixos/features/vm-manager/lib/distros.nix"
 if [ -f "$DISTROS_FILE" ]; then
     sed -i "s/defaultVersion = \"${CURRENT}\"/defaultVersion = \"${LATEST}\"/g" "$DISTROS_FILE"
@@ -109,10 +104,10 @@ echo ""
 echo "✓ Updated successfully!"
 echo ""
 echo "Changes:"
-git --no-pager diff "$FLAKE_FILE" "$TEMPLATE_FILE" "$DISTROS_FILE" 2>/dev/null || git --no-pager diff "$FLAKE_FILE" || true
+git --no-pager diff "$FLAKE_FILE" "$DISTROS_FILE" 2>/dev/null || git --no-pager diff "$FLAKE_FILE" || true
 echo ""
 echo "Next steps:"
 echo "  1. Review the changes above"
-echo "  2. If everything looks good, commit: git add nixos/flake.nix shell/scripts/setup/config/system-config.template.nix nixos/features/vm-manager/lib/distros.nix && git commit -m 'chore: update NixOS version to $LATEST'"
+echo "  2. If everything looks good, commit: git add nixos/flake.nix nixos/features/vm-manager/lib/distros.nix && git commit -m 'chore: update NixOS version to $LATEST'"
 echo "  3. If something is wrong, restore: cp $FLAKE_FILE.bak $FLAKE_FILE"
 

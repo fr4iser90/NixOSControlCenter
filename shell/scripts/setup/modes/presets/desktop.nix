@@ -1,37 +1,28 @@
 {
   #
-  # System Type & Profile
+  # Desktop Preset - Base Desktop Configuration
+  # Minimal desktop setup without additional features
   #
   systemType = "desktop";
-  hostName = "fr4iser-Desktop";
+  hostName = null;  # Will be set from current hostname
 
   system = {
-    channel = "unstable";  # [stable/unstable] - Version wird in flake.nix definiert
+    channel = "stable";  # [stable/unstable] - Version wird in flake.nix definiert
     bootloader = "systemd-boot";
   };
-  #
-  # Package Modules
-  #
-  packageModules = [
-    "streaming"
-    "emulation"
-    "game-dev"
-    "web-dev"
-  ];
 
   #
-  # User Management
+  # Package Modules - Empty (base desktop only)
+  #
+  packageModules = [];
+
+  #
+  # User Management - Will be set during setup
   # 
-  users = {
-    "fr4iser" = {
-      role = "admin";
-      defaultShell = "zsh";
-      autoLogin = true;
-    };  
-  };
+  users = {};
 
   #
-  # Desktop Environment
+  # Desktop Environment - Default settings
   #
   desktop = {
     enable = true;
@@ -48,39 +39,36 @@
   };
 
   #
-  # Hardware Configuration
+  # Hardware Configuration - Will be detected
   #
   hardware = {
-    memory = {
-      sizeGB = 62;
-    };
-    cpu = "amd";
-    gpu = "amd-amd";
+    cpu = null;  # Will be detected
+    gpu = null;  # Will be detected
   };
 
   #
   # Nix Configuration
   #
-  allowUnfree = true;
+  allowUnfree = false;
   buildLogLevel = "minimal";
 
   #
-  # System Features
+  # System Features - Base features only
   #
   features = {
     system-logger = true;     
     system-checks = true;      
     system-updater = true;    
-    ssh-client-manager = true;
-    ssh-server-manager = true;        
+    ssh-client-manager = false;
+    ssh-server-manager = false;        
     bootentry-manager = false; 
-    homelab-manager = true;    
+    homelab-manager = false;    
     vm-manager = false;         
     ai-workspace = false;       
   };
 
   #
-  # Localization
+  # Localization - Default
   #
   timeZone = "Europe/Berlin";
   locales = [ "en_US.UTF-8" ];
@@ -92,7 +80,7 @@
   #
   overrides = {
     enableSSH = null;
-    enableSteam = true;
+    enableSteam = false;
   };
 
   #
@@ -101,3 +89,4 @@
   email = "example@example.com";
   domain = "example.com";
 }
+
