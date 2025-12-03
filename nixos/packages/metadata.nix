@@ -1,5 +1,6 @@
 # Feature Metadata
-# Definiert Metadaten für alle Features: systemTypes, groups, dependencies, conflicts
+# Defines metadata for all features: systemTypes, groups, dependencies, conflicts
+# Legacy migration support: legacyPath maps old packageModules structure to new feature names
 
 { lib, ... }:
 
@@ -29,6 +30,7 @@
       description = "Game development tools (engines, IDEs)";
       dependencies = [];
       conflicts = [];
+      legacyPath = "development.game";  # Migration: development.game → game-dev
     };
     
     web-dev = {
@@ -37,6 +39,7 @@
       description = "Web development tools (Node, npm, IDEs)";
       dependencies = [];
       conflicts = [];
+      legacyPath = "development.web";  # Migration: development.web → web-dev
     };
     
     python-dev = {
@@ -45,6 +48,7 @@
       description = "Python development environment";
       dependencies = [];
       conflicts = [];
+      legacyPath = "development.python";  # Migration: development.python → python-dev
     };
     
     system-dev = {
@@ -53,6 +57,7 @@
       description = "System development tools (cmake, ninja, gcc, clang)";
       dependencies = [];
       conflicts = [];
+      legacyPath = "development.system";  # Migration: development.system → system-dev
     };
     
     # Virtualization Features
@@ -70,6 +75,7 @@
       description = "Rootless Docker (safer, default)";
       dependencies = [];
       conflicts = [ "docker" "podman" ];
+      legacyPath = "server.docker";  # Migration: server.docker → docker-rootless (default)
     };
     
     qemu-vm = {
@@ -78,6 +84,8 @@
       description = "QEMU/KVM virtual machines";
       dependencies = [];
       conflicts = [];
+      legacyPath = "development.virtualization";  # Migration: development.virtualization → qemu-vm (+ virt-manager on desktop)
+      legacyHandler = "multi-feature";  # Generates multiple features: qemu-vm + virt-manager (desktop only)
     };
     
     virt-manager = {
@@ -103,6 +111,7 @@
       description = "Web server (nginx, apache)";
       dependencies = [];
       conflicts = [];
+      legacyPath = "server.web";  # Migration: server.web → web-server
     };
     
     mail-server = {
@@ -111,6 +120,7 @@
       description = "Mail server";
       dependencies = [];
       conflicts = [];
+      legacyPath = "server.mail";  # Migration: server.mail → mail-server
     };
   };
 }
