@@ -2,8 +2,6 @@
 # Defines metadata for all features: systemTypes, groups, dependencies, conflicts
 # Legacy migration support: legacyPath maps old packageModules structure to new feature names
 
-{ lib, ... }:
-
 {
   features = {
     # Gaming Features
