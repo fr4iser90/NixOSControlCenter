@@ -133,12 +133,12 @@ let
   else x: x;
 
   # Combine preset features + additional features + migrated features + new features
+  # Note: systemConfig.features is a Set for system features (ai-workspace, etc.), not package features
   allFeatures = 
     (presetConfig.features or [])
     ++ (systemConfig.additionalPackageModules or [])
     ++ (warnMigration migratedFeatures)
-    ++ (if !isOldStructure then (systemConfig.packageModules or []) else [])
-    ++ (systemConfig.features or []);
+    ++ (if !isOldStructure then (systemConfig.packageModules or []) else []);
 
   # Remove duplicates
   uniqueFeatures = lib.unique allFeatures;
