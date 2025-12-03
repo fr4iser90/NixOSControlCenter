@@ -11,6 +11,7 @@ in
     modesetting.enable = true;
     nvidiaSettings = true;
     package = nvidiaPackage;
+    support32Bit = true; # Required for x86_64 systems
   } // lib.mkIf requiresOpenFlag {
     open = true;  # Wird nur hinzugefügt wenn Version >= 560
   };
