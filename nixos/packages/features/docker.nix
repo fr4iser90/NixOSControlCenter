@@ -16,6 +16,8 @@
   virtualisation.docker = {
     enable = true;
     enableOnBoot = true;
+    # Disable deprecated enableNvidia (use hardware.nvidia-container-toolkit.enable instead)
+    enableNvidia = false;
     # Optional: Automatisches Cleanup von alten Containern/Images
     autoPrune = {
       enable = true;
