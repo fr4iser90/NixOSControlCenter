@@ -4,40 +4,6 @@
 # echo "DEBUG in setup-mode.sh:"
 # declare -p SUB_OPTIONS # This might be sourced from setup-options.sh now
 
-# Helper: Build preset options array (for state machine)
-build_preset_options_array() {
-    local -n output_array="$1"
-    output_array=()
-    
-    # Add System Presets
-    for preset in "${SYSTEM_PRESETS[@]}"; do
-        output_array+=("$preset")
-    done
-    
-    # Add Device Presets if any exist
-    if [[ ${#DEVICE_PRESETS[@]} -gt 0 ]]; then
-        for preset in "${DEVICE_PRESETS[@]}"; do
-            output_array+=("$preset")
-        done
-    fi
-}
-
-# Helper: Build feature options array (for state machine)
-build_feature_options_array() {
-    local -n output_array="$1"
-    output_array=()
-    
-    for group in "${FEATURE_GROUPS[@]}"; do
-        group_name="${group%%:*}"
-        group_features="${group#*:}"
-        output_array+=("$group_name")  # Add group header
-        IFS='|' read -ra features <<< "$group_features"
-        for feature in "${features[@]}"; do
-            output_array+=("  $feature")  # Indented features
-        done
-    done
-}
-
 select_setup_mode() {
     local install_type_choice
     local final_selection=()
@@ -46,82 +12,65 @@ select_setup_mode() {
     local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local PREVIEW_SCRIPT="$SCRIPT_DIR/formatting/preview.sh"
 
-    # Step 1: Installation type selection (with back navigation)
-    while true; do
-        local result
-        result=$(prompt_select "install_type" INSTALL_TYPE_OPTIONS \
-            "Choose installation method" "$PREVIEW_SCRIPT")
-        local exit_code=$?
-        
-        if [[ "$result" == "BACK" ]]; then
-            # Already at first step, exit completely
-            log_error "Installation type selection cancelled."
-            return 1
-        elif [[ "$result" == "EXIT" ]]; then
-            log_error "Installation type selection cancelled."
-            return 1
-        else
-            install_type_choice="$result"
-            break
-        fi
-    done
+    # 1. Auswahl des Installationstyps
+    install_type_choice=$(printf "%s\n" "${INSTALL_TYPE_OPTIONS[@]}" | fzf \
+        --header="Choose installation method" \
+        --bind 'space:accept' \
+        --preview "$PREVIEW_SCRIPT {}" \
+        --preview-window="right:50%:wrap" \
+        --pointer="▶" \
+        --marker="✓") || { log_error "Installation type selection cancelled."; return 1; }
 
     [ -z "$install_type_choice" ] && { log_error "No installation type selected."; return 1; }
 
     if [[ "$install_type_choice" == "📦 Presets" ]]; then
-        # Build preset options array
-        local PRESET_OPTIONS_ARRAY
-        build_preset_options_array PRESET_OPTIONS_ARRAY
+        # Build preset list with prefixes (no headers, no emojis)
+        local preset_list=""
         
-        # Step 2: Preset selection (with back navigation)
-        while true; do
-            local result
-            result=$(prompt_select "preset" PRESET_OPTIONS_ARRAY \
-                "Select preset" "$PREVIEW_SCRIPT")
-            local exit_code=$?
-            
-            if [[ "$result" == "BACK" ]]; then
-                # Go back to installation type selection
-                pop_navigation  # Remove preset step
-                continue  # Loop back to Step 1
-            elif [[ "$result" == "EXIT" ]]; then
-                log_error "Preset selection cancelled."
-                return 1
-            else
-                local preset_choice="$result"
-                
-                # Validate it's a real preset
-                if ! printf "%s\n" "${SYSTEM_PRESETS[@]}" "${DEVICE_PRESETS[@]}" | grep -q "^${preset_choice}$"; then
-                    log_error "Invalid preset selected: $preset_choice"
-                    continue  # Try again
-                fi
-                
-                [ -z "$preset_choice" ] && { log_error "No preset selected."; continue; }
-                final_selection=("$preset_choice")
-                break
-            fi
+        # System Presets mit Präfix
+        for preset in "${SYSTEM_PRESETS[@]}"; do
+            preset_list+="$(format_item_with_prefix "System" "$preset")\n"
         done
+        
+        # Device Presets mit Präfix
+        if [[ ${#DEVICE_PRESETS[@]} -gt 0 ]]; then
+            for preset in "${DEVICE_PRESETS[@]}"; do
+                preset_list+="$(format_item_with_prefix "Device" "$preset")\n"
+            done
+        fi
+        
+        # Show presets with fzf
+        local preset_choice
+        preset_choice=$(printf "%b" "$preset_list" | fzf \
+            --header="Select preset" \
+            --bind 'space:accept' \
+            --preview "$PREVIEW_SCRIPT {}" \
+            --preview-window="right:50%:wrap" \
+            --pointer="▶" \
+            --marker="✓") || { log_error "Preset selection cancelled."; return 1; }
+        
+        # Remove prefix from selection
+        preset_choice=$(remove_prefix "$preset_choice")
+        
+        # Validate it's a real preset
+        if ! printf "%s\n" "${SYSTEM_PRESETS[@]}" "${DEVICE_PRESETS[@]}" | grep -q "^${preset_choice}$"; then
+            log_error "Invalid preset selected: $preset_choice"
+            return 1
+        fi
+        
+        [ -z "$preset_choice" ] && { log_error "No preset selected."; return 1; }
+        final_selection=("$preset_choice")
 
-    elif [[ "$install_type_choice" == "⚙️  Advanced Options" ]]; then
-        # Step 2: Advanced Option selection (with back navigation)
-        while true; do
-            local result
-            result=$(prompt_select "advanced_option" ADVANCED_OPTIONS \
-                "Advanced Options" "$PREVIEW_SCRIPT")
-            local exit_code=$?
-            
-            if [[ "$result" == "BACK" ]]; then
-                # Go back to installation type selection
-                pop_navigation  # Remove advanced option step
-                continue  # Loop back to Step 1
-            elif [[ "$result" == "EXIT" ]]; then
-                log_error "Advanced option selection cancelled."
-                return 1
-            else
-                local advanced_choice="$result"
-                break
-            fi
-        done
+    elif [[ "$install_type_choice" == "⚙️ Advanced Options" ]]; then
+        # 2b. Advanced Option auswählen
+        local advanced_choice
+        advanced_choice=$(printf "%s\n" "${ADVANCED_OPTIONS[@]}" | fzf \
+            --header="Advanced Options" \
+            --bind 'space:accept' \
+            --preview "$PREVIEW_SCRIPT {}" \
+            --preview-window="right:50%:wrap" \
+            --pointer="▶" \
+            --marker="✓") || { log_error "Advanced option selection cancelled."; return 1; }
 
         [ -z "$advanced_choice" ] && { log_error "No advanced option selected."; return 1; }
         
@@ -180,33 +129,14 @@ select_setup_mode() {
                 return 1
             fi
             
-            # Build profile options array
-            local PROFILE_OPTIONS_ARRAY=()
-            while IFS= read -r -d '' profile_file; do
-                local profile_name=$(basename "$profile_file")
-                [[ -n "$profile_name" ]] && PROFILE_OPTIONS_ARRAY+=("$profile_name")
-            done < <(find "$profiles_dir" -type f -print0 2>/dev/null)
-            
-            # Step 3: Profile selection (with back navigation)
-            while true; do
-                local result
-                local preview_cmd="cat $profiles_dir/{} 2>/dev/null || echo 'Preview not available'"
-                result=$(prompt_select "profile" PROFILE_OPTIONS_ARRAY \
-                    "Available Profiles (Select one to load)" \
-                    "$preview_cmd")
-                local exit_code=$?
-                
-                if [[ "$result" == "BACK" ]]; then
-                    # Go back to advanced options
-                    continue  # Loop back
-                elif [[ "$result" == "EXIT" ]]; then
-                    log_error "Profile selection cancelled."
-                    return 1
-                else
-                    local selected_profile="$result"
-                    break
-                fi
-            done
+            local selected_profile
+            selected_profile=$(printf "%b" "$profile_list" | fzf \
+                --header="Available Profiles (Select one to load)" \
+                --bind 'space:accept' \
+                --preview "cat $profiles_dir/{} 2>/dev/null || echo 'Preview not available'" \
+            --preview-window="right:50%:wrap" \
+            --pointer="▶" \
+            --marker="✓") || { log_error "Profile selection cancelled."; return 1; }
 
             if [[ -n "$selected_profile" ]]; then
                 final_selection=("LOAD_PROFILE:$profiles_dir/$selected_profile")
@@ -230,46 +160,39 @@ select_setup_mode() {
     elif [[ "$install_type_choice" == "🔧 Custom Install" ]]; then
         # Unified Feature Selection - keine Desktop/Server-Trennung mehr
         
-        # Build feature options array
-        local FEATURE_OPTIONS_ARRAY
-        build_feature_options_array FEATURE_OPTIONS_ARRAY
-        
-        # Step 2: Feature selection (multi-select with back navigation)
-        while true; do
-            local result
-            result=$(prompt_multi_select "features" FEATURE_OPTIONS_ARRAY \
-                "Select features (Space to select, Enter to confirm)" \
-                "$PREVIEW_SCRIPT")
-            local exit_code=$?
+        # Zeige Features mit Präfixen (keine Header, keine Emojis)
+        local feature_list=""
+        for group in "${FEATURE_GROUPS[@]}"; do
+            group_name="${group%%:*}"
+            group_features="${group#*:}"
             
-            if [[ "$result" == "BACK" ]]; then
-                # Go back to installation type selection
-                pop_navigation  # Remove features step
-                continue  # Loop back to Step 1
-            elif [[ "$result" == "EXIT" ]]; then
-                log_error "Feature selection cancelled."
-                return 1
-            else
-                # Filtere nur Features (keine Gruppennamen)
-                local selected_features=()
-                while IFS= read -r choice; do
-                    # Überspringe Gruppennamen (enthalten Emojis)
-                    if [[ ! "$choice" =~ ^[🖥️📦🎮🐳💾] ]]; then
-                        # Entferne führende Leerzeichen
-                        choice=$(echo "$choice" | sed 's/^  //')
-                        [[ -n "$choice" ]] && selected_features+=("$choice")
-                    fi
-                done <<< "$result"
-                
-                # Check if any features selected
-                if [[ ${#selected_features[@]} -eq 0 ]]; then
-                    log_error "No features selected."
-                    continue  # Try again
-                fi
-                
-                break
-            fi
+            # Emoji entfernen aus group_name (falls noch vorhanden)
+            clean_group_name=$(echo "$group_name" | sed 's/^[🖥️📦🎮🐳💾] *//')
+            
+            IFS='|' read -ra features <<< "$group_features"
+            for feature in "${features[@]}"; do
+                feature_list+="$(format_item_with_prefix "$clean_group_name" "$feature")\n"
+            done
         done
+        
+        # Feature-Auswahl mit fzf
+        local feature_choices_string=""
+        feature_choices_string=$(printf "%b" "$feature_list" | fzf \
+            --multi \
+            --header="Select features (Space to select, Enter to confirm)" \
+            --bind 'tab:toggle,space:toggle,ctrl-a:toggle-all' \
+            --preview "$PREVIEW_SCRIPT {}" \
+            --preview-window="right:50%:wrap" \
+            --pointer="▶" \
+            --marker="✓") || { log_error "Feature selection cancelled."; return 1; }
+
+        # Filtere Features und entferne Präfixe
+        local selected_features=()
+        while IFS= read -r choice; do
+            # Präfix entfernen
+            clean_choice=$(remove_prefix "$choice")
+            [[ -n "$clean_choice" ]] && selected_features+=("$clean_choice")
+        done <<< "$feature_choices_string"
         
         # Auto Conflict Resolution
         selected_features=($(resolve_conflicts "${selected_features[@]}"))
@@ -374,8 +297,6 @@ export -f select_setup_mode
 export -f detect_system_type
 export -f resolve_conflicts
 export -f resolve_dependencies
-export -f build_preset_options_array
-export -f build_feature_options_array
 
 # Nur ausführen wenn direkt aufgerufen
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

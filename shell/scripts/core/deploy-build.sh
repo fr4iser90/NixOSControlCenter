@@ -35,11 +35,10 @@ deploy_base_config() {
     # Copy configurations
     cp -r "${NIXOS_CONFIG_DIR}"/* "$nixos_dir/"
     
-    # Copy system files
+    # Copy system files (system-specific files that should be preserved)
     local system_files=(
         "hardware-configuration.nix"
         "flake.lock"
-        "flake.nix"
         ".system-config.previous.json"
     )
     
@@ -55,6 +54,13 @@ deploy_base_config() {
         log_info "Copying secrets directory"
         cp -r "/etc/nixos/secrets" "$nixos_dir/"
     }
+    
+    # Backup flake.nix from /etc/nixos/ before overwriting with repo version
+    if [ -f "/etc/nixos/flake.nix" ]; then
+        backup_file "/etc/nixos/flake.nix" || {
+            log_warn "Failed to backup existing flake.nix, continuing anyway..."
+        }
+    fi
     
     # Deploy directly
     log_info "Copying configuration..."
@@ -75,7 +81,12 @@ deploy_base_config() {
     else
       config_hostname=$(hostname)
     fi
-    nixos-rebuild switch --flake /etc/nixos#"${config_hostname}"
+    # Set HOME to /root if running as root to avoid Nix warning about $HOME ownership
+    if [ "$EUID" -eq 0 ]; then
+        HOME=/root nixos-rebuild switch --flake /etc/nixos#"${config_hostname}"
+    else
+        nixos-rebuild switch --flake /etc/nixos#"${config_hostname}"
+    fi
 
 
     # BREAKPOINT HERE!

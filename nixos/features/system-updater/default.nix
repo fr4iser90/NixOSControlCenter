@@ -6,7 +6,6 @@
     ./feature-manager.nix
     ./homelab-utils.nix
     ./channel-manager.nix
-    ./config-migration.nix
-    ./config-validator.nix
+    # config-migration.nix and config-validator.nix are imported directly in update.nix, not as modules
   ];
 }

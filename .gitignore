@@ -52,7 +52,8 @@ tmp/
 *.bak
 *.old
 *.log
-
+*.backup.*
+nixos/configs/*
 # Build artifacts
 # If you build distributions (e.g., wheels, eggs), exclude these directories/files.
 dist/

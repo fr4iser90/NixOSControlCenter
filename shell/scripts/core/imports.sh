@@ -64,7 +64,6 @@ import_file "$LIB_DIR/security/setup-permissions.sh"
 import_file "$LIB_DIR/system/dependencies.sh"
 
 # 5. User Interface Components
-import_file "$PROMPTS_DIR/state-machine.sh"  # State Machine (must be first)
 import_file "$PROMPTS_DIR/common.sh"                        
 import_file "$PROMPTS_DIR/descriptions/setup-descriptions.sh" 
 import_file "$PROMPTS_DIR/setup-options.sh"                
@@ -73,7 +72,8 @@ import_file "$PROMPTS_DIR/validate-mode.sh"
 import_file "$PROMPTS_DIR/setup-mode.sh"                   
 import_file "$PROMPTS_DIR/formatting/setup-formatting.sh"    
 import_file "$PROMPTS_DIR/formatting/setup-preview.sh"      
-import_file "$PROMPTS_DIR/formatting/setup-tree.sh"         
+import_file "$PROMPTS_DIR/formatting/setup-tree.sh"
+import_file "$PROMPTS_DIR/formatting/list-formatter.sh"         
 
 # 6. Core System Components
 import_file "$CORE_DIR/deploy-build.sh"                    

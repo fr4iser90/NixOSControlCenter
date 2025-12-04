@@ -8,7 +8,7 @@ declare -g -A MODULE_OPTIONS
 INSTALL_TYPE_OPTIONS=(
     "📦 Presets"
     "🔧 Custom Install"
-    "⚙️  Advanced Options"
+    "⚙️ Advanced Options"
 )
 
 # System Presets (öffentliche, wiederverwendbare Konfigurationen)
@@ -62,14 +62,14 @@ ALL_FEATURES=(
     "qemu-vm" "virt-manager"
 )
 
-# Feature-Gruppen für UI
+# Feature-Gruppen für UI (ohne Emojis - werden als Präfix verwendet)
 FEATURE_GROUPS=(
-    "🖥️  Desktop Environment:plasma|gnome|xfce"
-    "📦 Development:web-dev|game-dev|python-dev|system-dev"
-    "🎮 Gaming & Media:streaming|emulation"
-    "🐳 Containerization:docker|docker-rootless|podman"
-    "💾 Services:database|web-server|mail-server"
-    "🖥️  Virtualization:qemu-vm|virt-manager"
+    "Desktop Environment:plasma|gnome|xfce"
+    "Development:web-dev|game-dev|python-dev|system-dev"
+    "Gaming & Media:streaming|emulation"
+    "Containerization:docker|docker-rootless|podman"
+    "Services:database|web-server|mail-server"
+    "Virtualization:qemu-vm|virt-manager"
 )
 
 # Exklusive Gruppen (nur eins auswählbar)
