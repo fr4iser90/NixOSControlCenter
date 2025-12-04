@@ -103,14 +103,14 @@ show_homelab_completion_message() {
                        echo "")
         fi
     fi
-    
+   
     log_success "Building complete!"
     if [[ -n "$virt_user" ]]; then
-        log_success "Use homelab-fetch as ${virt_user} to start docker homelab setup..."
-        read -p "Do you want to switch to ${virt_user} user now? (y/N) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            su - "${virt_user}"
+    log_success "Use homelab-fetch as ${virt_user} to start docker homelab setup..."
+    read -p "Do you want to switch to ${virt_user} user now? (y/N) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        su - "${virt_user}"
         fi
     else
         log_success "Homelab configuration deployed. Run 'homelab-fetch' as your virtualization or admin user to start setup."

@@ -184,7 +184,7 @@ select_setup_mode() {
             --preview-window="right:50%:wrap" \
             --pointer="▶" \
             --marker="✓") || { log_error "Feature selection cancelled."; return 1; }
-        
+
         # Filtere nur Features (keine Gruppennamen)
         local selected_features=()
         while IFS= read -r choice; do

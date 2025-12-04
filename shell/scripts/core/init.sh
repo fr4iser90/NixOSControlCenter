@@ -116,21 +116,21 @@ main() {
             setup_custom "${selected_modules[@]}" || exit 1
         else
             # Legacy: Desktop/Server/Homelab (for backward compatibility)
-            case "$first_selection" in
-                "Desktop") 
-                    setup_desktop "${selected_modules[@]}" || exit 1
-                    ;;
-                "Server")  
-                    setup_server "${selected_modules[@]}" || exit 1
-                    ;;
-                "Homelab") 
-                    setup_homelab "${selected_modules[@]}" || exit 1
-                    ;;
-                *)         
-                    log_error "Invalid setup type: $first_selection"
-                    exit 1
-                    ;;
-            esac
+        case "$first_selection" in
+            "Desktop") 
+                setup_desktop "${selected_modules[@]}" || exit 1
+                ;;
+            "Server")  
+                setup_server "${selected_modules[@]}" || exit 1
+                ;;
+            "Homelab") 
+                setup_homelab "${selected_modules[@]}" || exit 1
+                ;;
+            *)         
+                log_error "Invalid setup type: $first_selection"
+                exit 1
+                ;;
+        esac
         fi
     fi
     

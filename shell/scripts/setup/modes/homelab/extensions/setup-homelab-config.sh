@@ -99,7 +99,7 @@ EOF
 setup_homelab_config() {
     log_section "Homelab Configuration"
 
-    declare -g virt_password=""
+    declare -g virt_password=""   
     declare -g swarm_role="none"
     declare -g use_extra_user="no"
     # Initialize variables with existing data
@@ -129,8 +129,15 @@ collect_homelab_info() {
     # Admin user
     admin_user=$(get_admin_username "$admin_user") || return 1
     
-    # Swarm role selection
-    swarm_role=$(get_swarm_role) || return 1
+    # Homelab type selection (Single-Server vs Multi-Server)
+    local homelab_type=$(get_homelab_type) || return 1
+    
+    # Swarm role selection (only if Multi-Server)
+    if [[ "$homelab_type" == "swarm" ]]; then
+        swarm_role=$(get_swarm_role) || return 1
+    else
+        swarm_role="none"
+    fi
     declare -g swarm_role="$swarm_role"
     
     # Docker mode detection (for user setup default)
@@ -141,12 +148,12 @@ collect_homelab_info() {
         # Swarm requires Extra User
         use_extra_user="yes"
         declare -g use_extra_user="$use_extra_user"
-        virt_user=$(get_virt_username "$virt_user") || return 1
+    virt_user=$(get_virt_username "$virt_user") || return 1
         get_virt_password || return 1
         if [[ "$admin_user" == "$virt_user" ]]; then
             log_error "Admin user and virtualization user cannot be the same!"
-            return 1
-        fi
+        return 1
+    fi
     else
         # Single-Server: Ask for user setup
         use_extra_user=$(get_docker_user_setup "$docker_mode") || return 1
@@ -154,9 +161,9 @@ collect_homelab_info() {
         if [[ "$use_extra_user" == "yes" ]]; then
             virt_user=$(get_virt_username "$virt_user") || return 1
             get_virt_password || return 1
-            if [[ "$admin_user" == "$virt_user" ]]; then
-                log_error "Admin user and virtualization user cannot be the same!"
-                return 1
+    if [[ "$admin_user" == "$virt_user" ]]; then
+        log_error "Admin user and virtualization user cannot be the same!"
+        return 1
             fi
         else
             # Use main user as admin (no extra user)
@@ -197,30 +204,60 @@ get_virt_username() {
     echo "${username:-${default_user:-docker}}"
 }
 
+get_homelab_type() {
+    local selected
+    selected=$(printf "%s\n" "Single-Server" "Multi-Server (Docker Swarm)" | fzf \
+        --header="Select homelab type" \
+        --height=10 \
+        --pointer="▶" \
+        --marker="✓" \
+        --select-1) || {
+        log_error "Selection cancelled"
+        return 1
+    }
+    
+    case "$selected" in
+        "Single-Server")
+            echo "single"
+            return 0
+            ;;
+        "Multi-Server (Docker Swarm)")
+            echo "swarm"
+            return 0
+            ;;
+        *)
+            log_error "Invalid selection"
+            return 1
+            ;;
+    esac
+}
+
 get_swarm_role() {
-    local response
-    while true; do
-        read -ep $'\033[0;34m[?]\033[0m Docker Swarm setup? (none/manager/worker) [none]: ' response
-        response="${response:-none}"
-        
-        case "${response,,}" in
-            none|"")
-                echo "none"
-                return 0
-                ;;
-            manager)
-                echo "manager"
-                return 0
-                ;;
-            worker)
-                echo "worker"
-                return 0
-                ;;
-            *)
-                log_error "Please answer: none, manager, or worker"
-                ;;
-        esac
-    done
+    local selected
+    selected=$(printf "%s\n" "Manager" "Worker" | fzf \
+        --header="Select Swarm role" \
+        --height=8 \
+        --pointer="▶" \
+        --marker="✓" \
+        --select-1) || {
+        log_error "Selection cancelled"
+        return 1
+    }
+    
+    case "$selected" in
+        "Manager")
+            echo "manager"
+            return 0
+            ;;
+        "Worker")
+            echo "worker"
+            return 0
+            ;;
+        *)
+            log_error "Invalid selection"
+            return 1
+            ;;
+    esac
 }
 
 detect_docker_mode() {
@@ -303,9 +340,9 @@ get_domain() {
 update_homelab_config() {
     # Hash password and create password file (only if extra user)
     if [[ -n "$virt_user" ]]; then
-        if ! create_password_file; then
-            log_error "Failed to create password file"
-            return 1
+    if ! create_password_file; then
+        log_error "Failed to create password file"
+        return 1
         fi
     fi
     
@@ -522,6 +559,7 @@ export -f get_admin_username
 export -f get_virt_username
 export -f get_email
 export -f get_domain
+export -f get_homelab_type
 export -f get_swarm_role
 export -f detect_docker_mode
 export -f get_docker_user_setup

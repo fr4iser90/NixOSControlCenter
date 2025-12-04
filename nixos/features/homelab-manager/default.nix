@@ -8,7 +8,7 @@ let
   virtUsers = lib.filterAttrs 
     (name: user: user.role == "virtualization") 
     systemConfig.users;
-  
+
   # Fallback: Find admin users if no virtualization user
   adminUsers = lib.filterAttrs 
     (name: user: user.role == "admin") 

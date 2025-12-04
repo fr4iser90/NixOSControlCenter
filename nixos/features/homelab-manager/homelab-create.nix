@@ -3,7 +3,7 @@
 let
   # Check if Swarm is active
   isSwarmMode = (systemConfig.homelab.swarm or null) != null;
-  
+
   # Find virtualization users (preferred)
   virtUsers = lib.filterAttrs 
     (name: user: user.role == "virtualization") 
