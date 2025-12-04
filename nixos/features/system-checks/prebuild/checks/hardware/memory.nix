@@ -30,7 +30,7 @@ let
   hardware = {
     cpu = "$existing_cpu";
     gpu = "$existing_gpu";
-    memory = {
+    ram = {
       sizeGB = $memory_gb;
     };
   };
@@ -68,7 +68,7 @@ EOF
     fi
     
     # Get configured memory size
-    if ! CONFIGURED_GB=$(grep -A2 'memory = {' "${hardwareConfigPath}" | grep 'sizeGB' | grep -o '[0-9]\+' | head -1); then
+    if ! CONFIGURED_GB=$(grep -A2 'ram = {' "${hardwareConfigPath}" | grep 'sizeGB' | grep -o '[0-9]\+' | head -1); then
       ${ui.messages.info "Memory size not configured in hardware-config.nix"}
       
       # Ask for confirmation before adding

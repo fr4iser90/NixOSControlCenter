@@ -1,7 +1,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  memoryInGB = systemConfig.hardware.memory.sizeGB or 32;  # Default to 32GB if not set
+  memoryInGB = systemConfig.hardware.ram.sizeGB or 32;  # Default to 32GB if not set
 
 
   # Automatic configuration based on available RAM

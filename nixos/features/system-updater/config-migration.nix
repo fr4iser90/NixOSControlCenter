@@ -160,7 +160,7 @@ LOCEOF
     if ${pkgs.jq}/bin/jq -e '.hardware // empty | length > 0' <<< "$OLD_CONFIG_JSON" >/dev/null 2>&1; then
       CPU=$(${pkgs.jq}/bin/jq -r '.hardware.cpu // "none"' <<< "$OLD_CONFIG_JSON")
       GPU=$(${pkgs.jq}/bin/jq -r '.hardware.gpu // "none"' <<< "$OLD_CONFIG_JSON")
-      MEMORY=$(${pkgs.jq}/bin/jq -r '.hardware.memory.sizeGB // empty' <<< "$OLD_CONFIG_JSON")
+      MEMORY=$(${pkgs.jq}/bin/jq -r '.hardware.ram.sizeGB // empty' <<< "$OLD_CONFIG_JSON")
       
       cat > "$CONFIGS_DIR/hardware-config.nix" <<HWEOF
 {
@@ -170,7 +170,7 @@ LOCEOF
 HWEOF
       if [ -n "$MEMORY" ] && [ "$MEMORY" != "null" ] && [ "$MEMORY" != "" ]; then
         cat >> "$CONFIGS_DIR/hardware-config.nix" <<HWEOF
-    memory = {
+    ram = {
       sizeGB = $MEMORY;
     };
 HWEOF

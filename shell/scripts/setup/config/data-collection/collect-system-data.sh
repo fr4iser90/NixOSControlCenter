@@ -194,7 +194,7 @@ init_hardware_config() {
     gpu = \"$gpu\";"
     if [[ -n "$memory_gb" ]]; then
         content+="
-    memory = {
+    ram = {
       sizeGB = $memory_gb;
     };"
     fi

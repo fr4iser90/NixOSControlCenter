@@ -63,16 +63,16 @@ let
     cat > "$config_file" <<EOF
 {
   features = {
-    system-logger = ${features["system-logger"]};
-    system-checks = ${features["system-checks"]};
-    system-updater = ${features["system-updater"]};
-    system-config-manager = ${features["system-config-manager"]};
-    ssh-client-manager = ${features["ssh-client-manager"]};
-    ssh-server-manager = ${features["ssh-server-manager"]};
-    bootentry-manager = ${features["bootentry-manager"]};
-    homelab-manager = ${features["homelab-manager"]};
-    vm-manager = ${features["vm-manager"]};
-    ai-workspace = ${features["ai-workspace"]};
+    system-logger = ''${features["system-logger"]};
+    system-checks = ''${features["system-checks"]};
+    system-updater = ''${features["system-updater"]};
+    system-config-manager = ''${features["system-config-manager"]};
+    ssh-client-manager = ''${features["ssh-client-manager"]};
+    ssh-server-manager = ''${features["ssh-server-manager"]};
+    bootentry-manager = ''${features["bootentry-manager"]};
+    homelab-manager = ''${features["homelab-manager"]};
+    vm-manager = ''${features["vm-manager"]};
+    ai-workspace = ''${features["ai-workspace"]};
   };
 }
 EOF

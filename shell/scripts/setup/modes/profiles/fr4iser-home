@@ -51,11 +51,11 @@
   # Hardware Configuration
   #
   hardware = {
-    memory = {
+    ram = {
       sizeGB = 62;
     };
     cpu = "amd";
-    gpu = "amd-amd";
+    gpu = "amd";
   };
 
   #

@@ -58,7 +58,7 @@
   hardware = {
     cpu = "intel";
     gpu = "nvidia";
-    memory = {
+    ram = {
       sizeGB = 8;
     };
   };

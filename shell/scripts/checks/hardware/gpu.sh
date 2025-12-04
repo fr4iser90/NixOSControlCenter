@@ -11,38 +11,49 @@ check_gpu_info() {
     local amd_count=0  # Counter for AMD GPUs
     
     # Physical hardware detection first
+    # Filter by device class code to only get actual GPUs:
+    # 0300 = VGA compatible controller
+    # 0302 = 3D controller
+    # 0380 = Display controller
     while IFS= read -r line; do
         local bus_id=$(echo "$line" | cut -d' ' -f1)
+        local class_code=$(lspci -n -s "$bus_id" | awk '{print $2}' | cut -d':' -f1)
         local vendor_id=$(lspci -n -s "$bus_id" | awk '{print $3}' | cut -d':' -f1)
         local device=$(echo "$line" | sed 's/.*: //')
         
-        case "$vendor_id" in
-            "10de")  # NVIDIA
-                gpu_types["nvidia"]=1
-                [ -z "$primary_bus_id" ] && primary_bus_id="$bus_id"
-                ;;
-            "1002")  # AMD
-                gpu_types["amd"]=1
-                ((amd_count++))  # Increment AMD GPU counter
-                if [ -z "$primary_bus_id" ]; then
-                    primary_bus_id="$bus_id"
-                elif [ -z "$secondary_bus_id" ]; then
-                    secondary_bus_id="$bus_id"
+        # Only process actual GPU device classes (not audio controllers, etc.)
+        case "$class_code" in
+            "0300"|"0302"|"0380")  # VGA, 3D, or Display controller
+                case "$vendor_id" in
+                    "10de")  # NVIDIA
+                        gpu_types["nvidia"]=1
+                        [ -z "$primary_bus_id" ] && primary_bus_id="$bus_id"
+                        ;;
+                    "1002")  # AMD
+                        gpu_types["amd"]=1
+                        ((amd_count++))  # Increment AMD GPU counter
+                        if [ -z "$primary_bus_id" ]; then
+                            primary_bus_id="$bus_id"
+                        elif [ -z "$secondary_bus_id" ]; then
+                            secondary_bus_id="$bus_id"
+                        fi
+                        ;;
+                    "8086")  # Intel
+                        gpu_types["intel"]=1
+                        [ -z "$secondary_bus_id" ] && secondary_bus_id="$bus_id"
+                        ;;
+                esac
+
+                if [ "${DEBUG:-false}" = true ]; then
+                    log_debug "Found GPU:"
+                    log_debug "  Device: $device"
+                    log_debug "  Bus ID: $bus_id"
+                    log_debug "  Vendor ID: $vendor_id"
+                    log_debug "  Class Code: $class_code"
                 fi
                 ;;
-            "8086")  # Intel
-                gpu_types["intel"]=1
-                [ -z "$secondary_bus_id" ] && secondary_bus_id="$bus_id"
-                ;;
         esac
-
-        if [ "${DEBUG:-false}" = true ]; then
-            log_debug "Found GPU:"
-            log_debug "  Device: $device"
-            log_debug "  Bus ID: $bus_id"
-            log_debug "  Vendor ID: $vendor_id"
-        fi
-    done < <(lspci | grep -E "VGA|3D|Display")
+    done < <(lspci -nn | grep -E "\[0300\]|\[0302\]|\[0380\]")
 
     # Debug info for AMD detection
     if [ "${DEBUG:-false}" = true ]; then

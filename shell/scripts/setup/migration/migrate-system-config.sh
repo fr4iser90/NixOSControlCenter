@@ -15,15 +15,16 @@ migrate_system_config() {
         return 0
     fi
     
-    # Check if new structure already exists (configs/ directory exists)
-    if [[ -d "$configs_dir" ]] && [[ -n "$(ls -A "$configs_dir"/*.nix 2>/dev/null)" ]]; then
-        log_info "New structure already exists, no migration needed"
+    # 1. VALIDIERUNG ZUERST: Prüfe ob system-config.nix der Spezifikation entspricht
+    if validate_system_config "$config_file"; then
+        log_info "system-config.nix is valid, no migration needed"
         return 0
     fi
     
-    # Check if old structure exists (non-minimal system-config.nix)
+    # 2. Wenn Validierung FAILED → Diagnose: Warum? (alte Struktur?)
     if ! is_old_structure "$config_file"; then
-        log_info "system-config.nix is already minimal, no migration needed"
+        log_warn "system-config.nix validation failed, but structure unknown"
+        log_info "Skipping migration, manual intervention may be required"
         return 0
     fi
     
@@ -60,6 +61,40 @@ migrate_system_config() {
     
     log_success "Migration completed successfully!"
     return 0
+}
+
+# Validate system-config.nix against specification
+validate_system_config() {
+    local config_file="$1"
+    local errors=0
+    
+    # Check for required critical values (from config-validator.nix)
+    local critical_values=("systemType" "hostName" "system.channel" "system.bootloader" "allowUnfree" "users" "timeZone")
+    for value in "${critical_values[@]}"; do
+        if ! nix-instantiate --eval --strict -E "(import $config_file).$value or null" >/dev/null 2>&1; then
+            log_debug "Missing required value: $value"
+            errors=$((errors + 1))
+        fi
+    done
+    
+    # Check for non-critical values (should NOT be in system-config.nix)
+    if grep -q "packageModules = " "$config_file" 2>/dev/null || \
+       grep -q "desktop = {" "$config_file" 2>/dev/null || \
+       grep -q "hardware = {" "$config_file" 2>/dev/null || \
+       grep -q "features = {" "$config_file" 2>/dev/null; then
+        log_debug "Non-critical values found in system-config.nix (should be in configs/)"
+        errors=$((errors + 1))
+    fi
+    
+    # Check if minimal (< 30 lines)
+    local line_count=$(wc -l < "$config_file" 2>/dev/null || echo "0")
+    if [[ "$line_count" -gt 30 ]]; then
+        log_debug "system-config.nix has more than 30 lines (should be minimal)"
+        errors=$((errors + 1))
+    fi
+    
+    # Return 0 if valid, 1 if invalid
+    return $errors
 }
 
 # Check if old structure exists
@@ -417,13 +452,13 @@ create_hardware_config() {
     if command -v jq >/dev/null 2>&1; then
         cpu=$(echo "$json" | jq -r '.hardware.cpu // "none"')
         gpu=$(echo "$json" | jq -r '.hardware.gpu // "none"')
-        memory=$(echo "$json" | jq -r '.hardware.memory.sizeGB // empty')
+        memory=$(echo "$json" | jq -r '.hardware.ram.sizeGB // empty')
     else
         # Fallback: Extract from Nix file directly
         local config_file="${SYSTEM_CONFIG_FILE:-/etc/nixos/system-config.nix}"
         cpu=$(grep -o 'cpu.*=.*"[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
         gpu=$(grep -o 'gpu.*=.*"[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
-        memory=$(grep -A2 'memory = {' "$config_file" 2>/dev/null | grep 'sizeGB' | grep -o '[0-9]\+' || echo "")
+        memory=$(grep -A2 'ram = {' "$config_file" 2>/dev/null | grep 'sizeGB' | grep -o '[0-9]\+' || echo "")
     fi
     
     cat > "$configs_dir/hardware-config.nix" <<EOF
@@ -435,7 +470,7 @@ EOF
     
     if [[ -n "$memory" && "$memory" != "null" && "$memory" != "" ]]; then
         cat >> "$configs_dir/hardware-config.nix" <<EOF
-    memory = {
+    ram = {
       sizeGB = $memory;
     };
 EOF
@@ -542,22 +577,51 @@ EOF
   preset = "$preset";
 EOF
         if [[ -n "$additional" && "$additional" != "[]" ]]; then
-            local additional_list=$(echo "$additional" | sed 's/^/    "/;s/ /"\n    "/g;s/$/"/')
-            cat >> "$configs_dir/packages-config.nix" <<EOF
+            # Filter out empty strings and format properly
+            local additional_list=""
+            for module in $additional; do
+                # Skip empty strings
+                [[ -z "$module" ]] && continue
+                if [[ -z "$additional_list" ]]; then
+                    additional_list="    \"$module\""
+                else
+                    additional_list="$additional_list\n    \"$module\""
+                fi
+            done
+            if [[ -n "$additional_list" ]]; then
+                cat >> "$configs_dir/packages-config.nix" <<EOF
   additionalPackageModules = [
 $additional_list
   ];
 EOF
+            fi
         fi
     else
         if [[ -n "$package_modules" && "$package_modules" != "[]" ]]; then
-            local modules_list=$(echo "$package_modules" | sed 's/^/    "/;s/ /"\n    "/g;s/$/"/')
-            cat >> "$configs_dir/packages-config.nix" <<EOF
+            # Filter out empty strings and format properly
+            local modules_list=""
+            for module in $package_modules; do
+                # Skip empty strings
+                [[ -z "$module" ]] && continue
+                if [[ -z "$modules_list" ]]; then
+                    modules_list="    \"$module\""
+                else
+                    modules_list="$modules_list\n    \"$module\""
+                fi
+            done
+            if [[ -n "$modules_list" ]]; then
+                cat >> "$configs_dir/packages-config.nix" <<EOF
   # Package modules directly
   packageModules = [
 $modules_list
   ];
 EOF
+            else
+                cat >> "$configs_dir/packages-config.nix" <<EOF
+  # Package modules (empty)
+  packageModules = [];
+EOF
+            fi
         else
             cat >> "$configs_dir/packages-config.nix" <<EOF
   # Package modules (empty)
@@ -713,6 +777,7 @@ EOF
 
 # Export functions
 export -f migrate_system_config
+export -f validate_system_config
 export -f is_old_structure
 export -f migrate_to_new_structure
 

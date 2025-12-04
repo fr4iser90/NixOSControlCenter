@@ -21,7 +21,7 @@ let
     
     if [ -f "$config_file" ]; then
       existing_gpu=$(grep -o 'gpu = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
-      existing_memory=$(grep -A2 'memory = {' "$config_file" 2>/dev/null || echo "")
+      existing_memory=$(grep -A2 'ram = {' "$config_file" 2>/dev/null || echo "")
     fi
     
     # Write complete hardware-config.nix

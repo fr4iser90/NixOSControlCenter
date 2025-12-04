@@ -10,6 +10,7 @@
   mkdir -p $INSTALL_BACKUP
   
   # Debug Settings
-  export INSTALL_DEBUG=0
+  # INSTALL_DEBUG levels: 0=DEBUG, 1=INFO (default), 2=WARN, 3=ERROR
+  export INSTALL_DEBUG=1
   export INSTALL_VERBOSE=1
 ''

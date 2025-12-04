@@ -21,7 +21,7 @@ let
     
     if [ -f "$config_file" ]; then
       existing_cpu=$(grep -o 'cpu = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
-      existing_memory=$(grep -A2 'memory = {' "$config_file" 2>/dev/null || echo "")
+      existing_memory=$(grep -A2 'ram = {' "$config_file" 2>/dev/null || echo "")
     fi
     
     # Write complete hardware-config.nix
@@ -57,29 +57,40 @@ EOF
     DETECTED="none"
     
     # Physical hardware detection first
+    # Filter by device class code to only get actual GPUs:
+    # 0300 = VGA compatible controller
+    # 0302 = 3D controller
+    # 0380 = Display controller
     declare -A gpu_types
     amd_count=0
     
     while IFS= read -r line; do
         bus_id=$(echo "$line" | cut -d' ' -f1)
+        class_code=$(${pkgs.pciutils}/bin/lspci -n -s "$bus_id" | awk '{print $2}' | cut -d':' -f1)
         vendor_id=$(${pkgs.pciutils}/bin/lspci -n -s "$bus_id" | awk '{print $3}' | cut -d':' -f1)
         device=$(echo "$line" | sed 's/.*: //')
         
-        case "$vendor_id" in
-            "10de") gpu_types["nvidia"]=1 ;; # NVIDIA
-            "1002") 
-                gpu_types["amd"]=1 
-                amd_count=$((amd_count + 1))
-                ;; # AMD
-            "8086") gpu_types["intel"]=1 ;; # Intel
+        # Only process actual GPU device classes (not audio controllers, etc.)
+        case "$class_code" in
+            "0300"|"0302"|"0380")  # VGA, 3D, or Display controller
+                case "$vendor_id" in
+                    "10de") gpu_types["nvidia"]=1 ;; # NVIDIA
+                    "1002") 
+                        gpu_types["amd"]=1 
+                        amd_count=$((amd_count + 1))
+                        ;; # AMD
+                    "8086") gpu_types["intel"]=1 ;; # Intel
+                esac
+                
+                # Immer GPU-Info anzeigen
+                ${ui.messages.info "Found GPU:"}
+                ${ui.tables.keyValue "Device" "$device"}
+                ${ui.tables.keyValue "Bus ID" "$bus_id"}
+                ${ui.tables.keyValue "Vendor ID" "$vendor_id"}
+                ${ui.tables.keyValue "Class Code" "$class_code"}
+                ;;
         esac
-        
-        # Immer GPU-Info anzeigen
-        ${ui.messages.info "Found GPU:"}
-        ${ui.tables.keyValue "Device" "$device"}
-        ${ui.tables.keyValue "Bus ID" "$bus_id"}
-        ${ui.tables.keyValue "Vendor ID" "$vendor_id"}
-    done < <(${pkgs.pciutils}/bin/lspci | grep -E "VGA|3D|Display")
+    done < <(${pkgs.pciutils}/bin/lspci -nn | grep -E "\[0300\]|\[0302\]|\[0380\]")
 
     # Debug info
     echo "AMD GPU count: $amd_count"
