@@ -64,6 +64,7 @@ import_file "$LIB_DIR/security/setup-permissions.sh"
 import_file "$LIB_DIR/system/dependencies.sh"
 
 # 5. User Interface Components
+import_file "$PROMPTS_DIR/state-machine.sh"  # State Machine (must be first)
 import_file "$PROMPTS_DIR/common.sh"                        
 import_file "$PROMPTS_DIR/descriptions/setup-descriptions.sh" 
 import_file "$PROMPTS_DIR/setup-options.sh"                

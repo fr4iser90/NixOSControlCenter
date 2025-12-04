@@ -205,18 +205,20 @@ get_virt_username() {
 }
 
 get_homelab_type() {
-    local selected
-    selected=$(printf "%s\n" "Single-Server" "Multi-Server (Docker Swarm)" | fzf \
-        --header="Select homelab type" \
-        --height=10 \
-        --pointer="▶" \
-        --marker="✓" \
-        --select-1) || {
+    local HOMELAB_TYPE_OPTIONS=("Single-Server" "Multi-Server (Docker Swarm)")
+    local result
+    
+    result=$(prompt_select "homelab_type" HOMELAB_TYPE_OPTIONS \
+        "Select homelab type" "" \
+        "--height=10" "--select-1")
+    local exit_code=$?
+    
+    if [[ "$result" == "BACK" || "$result" == "EXIT" ]]; then
         log_error "Selection cancelled"
         return 1
-    }
+    fi
     
-    case "$selected" in
+    case "$result" in
         "Single-Server")
             echo "single"
             return 0
@@ -233,18 +235,20 @@ get_homelab_type() {
 }
 
 get_swarm_role() {
-    local selected
-    selected=$(printf "%s\n" "Manager" "Worker" | fzf \
-        --header="Select Swarm role" \
-        --height=8 \
-        --pointer="▶" \
-        --marker="✓" \
-        --select-1) || {
+    local SWARM_ROLE_OPTIONS=("Manager" "Worker")
+    local result
+    
+    result=$(prompt_select "swarm_role" SWARM_ROLE_OPTIONS \
+        "Select Swarm role" "" \
+        "--height=8" "--select-1")
+    local exit_code=$?
+    
+    if [[ "$result" == "BACK" || "$result" == "EXIT" ]]; then
         log_error "Selection cancelled"
         return 1
-    }
+    fi
     
-    case "$selected" in
+    case "$result" in
         "Manager")
             echo "manager"
             return 0

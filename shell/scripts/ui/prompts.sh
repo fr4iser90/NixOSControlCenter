@@ -4,6 +4,9 @@
 
 # --- Source All Necessary Prompt Components --- #
 
+# 0. State Machine (must be loaded first - used by all prompts)
+source "$DOCKER_SCRIPTS_DIR/ui/prompts/state-machine.sh"
+
 # 1. Common utilities and base fzf options
 source "$DOCKER_SCRIPTS_DIR/ui/prompts/common.sh"
 
@@ -32,6 +35,9 @@ source "$DOCKER_SCRIPTS_DIR/ui/prompts/validation/validate-mode.sh"
 # --- Main Prompt Function --- #
 show_prompts() {
     log_section "Setup Configuration"
+    
+    # Initialize state machine for navigation
+    init_state_machine
     
     local selected_config
     selected_config=$(select_setup_mode)
