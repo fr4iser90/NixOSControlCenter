@@ -1,28 +1,61 @@
 #!/usr/bin/env bash
 
-enable_docker() {
-    # Füge "docker-rootless" zu packageModules-Liste hinzu (Default)
-    # Prüfe ob packageModules-Liste existiert
-    if ! grep -q "packageModules = \[" "$SYSTEM_CONFIG_FILE"; then
-        # Füge packageModules-Liste hinzu
-        sed -i '/systemType = ".*";/a\  packageModules = [];' "$SYSTEM_CONFIG_FILE"
+# Helper function to update packages-config.nix
+update_packages_config() {
+    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/configs/packages-config.nix"
+    local package_modules="$1"
+    
+    # Create configs directory if it doesn't exist
+    mkdir -p "$(dirname "$config_file")"
+    
+    # Read existing package modules if config exists
+    local existing_modules=""
+    if [ -f "$config_file" ]; then
+        # Extract existing modules from the file
+        existing_modules=$(grep -A 100 'packageModules = \[' "$config_file" | grep -o '"[^"]*"' | tr -d '"' | tr '\n' ' ' | sed 's/ $//')
     fi
     
-    # Prüfe ob docker-rootless bereits in der Liste ist
-    if ! grep -q "\"docker-rootless\"" "$SYSTEM_CONFIG_FILE"; then
-        # Füge hinzu
-        if grep -q "packageModules = \[\];" "$SYSTEM_CONFIG_FILE"; then
-            sed -i 's/packageModules = \[\];/packageModules = [ "docker-rootless" ];/' "$SYSTEM_CONFIG_FILE"
-        else
-            sed -i 's/];/ "docker-rootless" ];/' "$SYSTEM_CONFIG_FILE"
+    # Add or remove docker-rootless
+    if [[ "$2" == "add" ]]; then
+        if [[ "$existing_modules" != *"docker-rootless"* ]]; then
+            if [[ -n "$existing_modules" ]]; then
+                existing_modules="$existing_modules docker-rootless"
+            else
+                existing_modules="docker-rootless"
+            fi
         fi
+    elif [[ "$2" == "remove" ]]; then
+        existing_modules=$(echo "$existing_modules" | sed 's/docker-rootless//g' | sed 's/  / /g' | sed 's/^ //' | sed 's/ $//')
     fi
+    
+    # Build modules list
+    local modules_list=""
+    if [[ -n "$existing_modules" ]]; then
+        modules_list=$(echo "$existing_modules" | sed 's/^/    "/;s/$/"/' | sed 's/ /"\n    "/g')
+    fi
+    
+    # Write complete packages-config.nix
+    cat > "$config_file" <<EOF
+{
+  # Package-Modules
+  packageModules = [
+$modules_list
+  ];
+}
+EOF
+}
+
+enable_docker() {
+    # Add docker-rootless to packages-config.nix
+    update_packages_config "" "add"
 }
 
 reset_docker_state() {
-    # Entferne docker-rootless aus packageModules-Liste
-    sed -i 's/ "docker-rootless"//' "$SYSTEM_CONFIG_FILE"
-    sed -i 's/"docker-rootless" //' "$SYSTEM_CONFIG_FILE"
-    # Falls Liste leer wird, setze auf []
-    sed -i 's/packageModules = \[ "docker-rootless" \];/packageModules = [];/' "$SYSTEM_CONFIG_FILE"
+    # Remove docker-rootless from packages-config.nix
+    update_packages_config "" "remove"
 }
+
+# Export functions
+export -f enable_docker
+export -f reset_docker_state
+export -f update_packages_config

@@ -6,7 +6,7 @@
   features = {
     # Gaming Features
     streaming = {
-      systemTypes = [ "desktop" "homelab" ];
+      systemTypes = [ "desktop" ];
       group = "gaming";
       description = "Gaming streaming tools (OBS, etc.)";
       dependencies = [];
@@ -14,7 +14,7 @@
     };
     
     emulation = {
-      systemTypes = [ "desktop" "homelab" ];
+      systemTypes = [ "desktop" ];
       group = "gaming";
       description = "Retro gaming emulation";
       dependencies = [];
@@ -23,7 +23,7 @@
     
     # Development Features
     game-dev = {
-      systemTypes = [ "desktop" "server" "homelab" ];
+      systemTypes = [ "desktop" "server" ];
       group = "development";
       description = "Game development tools (engines, IDEs)";
       dependencies = [];
@@ -32,7 +32,7 @@
     };
     
     web-dev = {
-      systemTypes = [ "desktop" "server" "homelab" ];
+      systemTypes = [ "desktop" "server" ];
       group = "development";
       description = "Web development tools (Node, npm, IDEs)";
       dependencies = [];
@@ -41,7 +41,7 @@
     };
     
     python-dev = {
-      systemTypes = [ "desktop" "server" "homelab" ];
+      systemTypes = [ "desktop" "server" ];
       group = "development";
       description = "Python development environment";
       dependencies = [];
@@ -50,7 +50,7 @@
     };
     
     system-dev = {
-      systemTypes = [ "desktop" "server" "homelab" ];
+      systemTypes = [ "desktop" "server" ];
       group = "development";
       description = "System development tools (cmake, ninja, gcc, clang)";
       dependencies = [];
@@ -60,7 +60,7 @@
     
     # Virtualization Features
     docker = {
-      systemTypes = [ "server" "homelab" ];
+      systemTypes = [ "server" ];
       group = "virtualization";
       description = "Docker with root (for Swarm/OCI)";
       dependencies = [];
@@ -68,7 +68,7 @@
     };
     
     docker-rootless = {
-      systemTypes = [ "desktop" "server" "homelab" ];
+      systemTypes = [ "desktop" "server" ];
       group = "virtualization";
       description = "Rootless Docker (safer, default)";
       dependencies = [];
@@ -77,7 +77,7 @@
     };
     
     qemu-vm = {
-      systemTypes = [ "desktop" "server" "homelab" ];
+      systemTypes = [ "desktop" "server" ];
       group = "virtualization";
       description = "QEMU/KVM virtual machines";
       dependencies = [];
@@ -96,7 +96,7 @@
     
     # Server Features
     database = {
-      systemTypes = [ "server" "homelab" ];
+      systemTypes = [ "server" ];
       group = "server";
       description = "Database services (PostgreSQL, MySQL)";
       dependencies = [];
@@ -104,7 +104,7 @@
     };
     
     web-server = {
-      systemTypes = [ "server" "homelab" ];
+      systemTypes = [ "server" ];
       group = "server";
       description = "Web server (nginx, apache)";
       dependencies = [];
@@ -119,6 +119,46 @@
       dependencies = [];
       conflicts = [];
       legacyPath = "server.mail";  # Migration: server.mail → mail-server
+    };
+    
+    # Desktop Environments - NICHT als Features in packages/features/!
+    # Sie sind bereits in nixos/desktop/environments/ (komplexe Struktur)
+    # Metadata nur für Custom Install UI-Auswahl
+    # Werden über desktop-config.nix konfiguriert, nicht über packageModules
+    plasma = {
+      systemTypes = [ "desktop" ];
+      group = "desktop-environment";
+      description = "KDE Plasma desktop environment";
+      dependencies = [];
+      conflicts = [ "gnome" "xfce" ];
+      # WICHTIG: Kein Feature-File in packages/features/!
+      # Desktop Environment ist in nixos/desktop/environments/plasma/
+      # Custom Install schreibt desktop.environment = "plasma" in desktop-config.nix
+    };
+    
+    gnome = {
+      systemTypes = [ "desktop" ];
+      group = "desktop-environment";
+      description = "GNOME desktop environment";
+      dependencies = [];
+      conflicts = [ "plasma" "xfce" ];
+    };
+    
+    xfce = {
+      systemTypes = [ "desktop" ];
+      group = "desktop-environment";
+      description = "XFCE desktop environment";
+      dependencies = [];
+      conflicts = [ "plasma" "gnome" ];
+    };
+    
+    # Podman - EINFACHES Feature → gehört in packages/features/
+    podman = {
+      systemTypes = [ "server" ];
+      group = "virtualization";
+      description = "Podman containerization";
+      dependencies = [];
+      conflicts = [ "docker" "docker-rootless" ];
     };
   };
 }

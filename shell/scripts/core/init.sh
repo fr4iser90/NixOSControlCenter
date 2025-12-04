@@ -8,6 +8,14 @@ main() {
     log_header "NixOS System Setup"
     
     check_hardware_config
+    
+    # Check and migrate old system-config.nix structure (automatic)
+    if [[ -f "$SYSTEM_CONFIG_FILE" ]] && command -v migrate_system_config >/dev/null 2>&1; then
+        migrate_system_config || {
+            log_warn "Migration failed, continuing with setup..."
+        }
+    fi
+    
     # Collect system information
     collect_system_data || {
         log_error "System data collection failed"
@@ -102,21 +110,28 @@ main() {
         IFS=' ' read -ra selected_modules <<< "$selected_modules_raw"
         local first_selection="${selected_modules[0]}"
         
-        case "$first_selection" in
-            "Desktop") 
-                setup_desktop "${selected_modules[@]}" || exit 1
-                ;;
-            "Server")  
-                setup_server "${selected_modules[@]}" || exit 1
-                ;;
-            "Homelab") 
-                setup_homelab "${selected_modules[@]}" || exit 1
-                ;;
-            *)         
-                log_error "Invalid setup type: $first_selection"
-                exit 1
-                ;;
-        esac
+        # Check if it's a system type (desktop/server) - new unified custom install
+        if [[ "$first_selection" =~ ^(desktop|server)$ ]]; then
+            # Unified custom install
+            setup_custom "${selected_modules[@]}" || exit 1
+        else
+            # Legacy: Desktop/Server/Homelab (for backward compatibility)
+            case "$first_selection" in
+                "Desktop") 
+                    setup_desktop "${selected_modules[@]}" || exit 1
+                    ;;
+                "Server")  
+                    setup_server "${selected_modules[@]}" || exit 1
+                    ;;
+                "Homelab") 
+                    setup_homelab "${selected_modules[@]}" || exit 1
+                    ;;
+                *)         
+                    log_error "Invalid setup type: $first_selection"
+                    exit 1
+                    ;;
+            esac
+        fi
     fi
     
     log_success "Setup complete! 🎉"

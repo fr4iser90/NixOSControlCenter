@@ -159,38 +159,54 @@ select_setup_mode() {
             final_selection=("IMPORT_CONFIG:$existing_config")
         fi
 
-    elif [[ "$install_type_choice" == "🔧 Custom Setup" ]]; then
-        # 2b. Auswahl des Basis-Modus (Desktop/Server)
-        local custom_base_choice
-        custom_base_choice=$(printf "%s\n" "${CUSTOM_BASE_MODES[@]}" | fzf \
-            --header="Choose the base for your custom setup" \
-            --bind 'space:accept' \
+    elif [[ "$install_type_choice" == "🔧 Custom Install" ]]; then
+        # Unified Feature Selection - keine Desktop/Server-Trennung mehr
+        
+        # Zeige Features in gruppierter Form
+        local feature_list=""
+        for group in "${FEATURE_GROUPS[@]}"; do
+            group_name="${group%%:*}"
+            group_features="${group#*:}"
+            feature_list+="$group_name\n"
+            IFS='|' read -ra features <<< "$group_features"
+            for feature in "${features[@]}"; do
+                feature_list+="  $feature\n"
+            done
+        done
+        
+        # Feature-Auswahl mit fzf
+        local feature_choices_string=""
+        feature_choices_string=$(printf "%b" "$feature_list" | fzf \
+            --multi \
+            --header="Select features (Space to select, Enter to confirm)" \
+            --bind 'tab:toggle,space:toggle,ctrl-a:toggle-all' \
             --preview "$PREVIEW_SCRIPT {}" \
             --preview-window="right:50%:wrap" \
             --pointer="▶" \
-            --marker="✓") || { log_error "Custom base mode selection cancelled."; return 1; }
-
-        [ -z "$custom_base_choice" ] && { log_error "No custom base mode selected."; return 1; }
-        final_selection=("$custom_base_choice")
-
-        # 3b. Modulauswahl für den Custom Base Mode
-        local module_choices_string=""
-        if [[ -n "${SUB_OPTIONS["$custom_base_choice"]:-}" ]]; then
-            module_choices_string=$(echo -n "${SUB_OPTIONS["$custom_base_choice"]}" | tr '|' '\n' | fzf \
-                --multi \
-                --header="Select modules for $custom_base_choice (Space to select, Enter to confirm)" \
-                --bind 'tab:toggle,space:toggle,ctrl-a:toggle-all' \
-                --preview "$PREVIEW_SCRIPT {}" \
-                --preview-window="right:50%:wrap" \
-                --pointer="▶" \
-                --marker="✓")
-        fi
-
-        if [[ -n "$module_choices_string" ]]; then
-            while IFS= read -r choice; do
-                [[ "$choice" != "None" && -n "$choice" ]] && final_selection+=("$choice")
-            done <<< "$module_choices_string"
-        fi
+            --marker="✓") || { log_error "Feature selection cancelled."; return 1; }
+        
+        # Filtere nur Features (keine Gruppennamen)
+        local selected_features=()
+        while IFS= read -r choice; do
+            # Überspringe Gruppennamen (enthalten Emojis)
+            if [[ ! "$choice" =~ ^[🖥️📦🎮🐳💾] ]]; then
+                # Entferne führende Leerzeichen
+                choice=$(echo "$choice" | sed 's/^  //')
+                [[ -n "$choice" ]] && selected_features+=("$choice")
+            fi
+        done <<< "$feature_choices_string"
+        
+        # Auto Conflict Resolution
+        selected_features=($(resolve_conflicts "${selected_features[@]}"))
+        
+        # Auto Dependency Resolution
+        selected_features=($(resolve_dependencies "${selected_features[@]}"))
+        
+        # System-Typ automatisch erkennen
+        local system_type=$(detect_system_type "${selected_features[@]}")
+        
+        # Finale Auswahl: System-Typ + Features
+        final_selection=("$system_type" "${selected_features[@]}")
     else
         log_error "Invalid installation type: $install_type_choice"
         return 1
@@ -200,8 +216,89 @@ select_setup_mode() {
     return 0
 }
 
+# System-Typ automatisch erkennen
+detect_system_type() {
+    local features=("$@")
+    local system_type=""
+    
+    # Desktop Environment gewählt → Desktop
+    for feature in "${features[@]}"; do
+        if [[ "$feature" =~ ^(plasma|gnome|xfce)$ ]]; then
+            system_type="desktop"
+            break
+        fi
+    done
+    
+    # Server-Features (ohne Desktop-Env) → Server
+    if [[ -z "$system_type" ]]; then
+        for feature in "${features[@]}"; do
+            if [[ "$feature" =~ ^(database|web-server|mail-server|docker|docker-rootless|podman)$ ]]; then
+                system_type="server"
+                break
+            fi
+        done
+    fi
+    
+    # Fallback: Wenn nichts erkannt → desktop (Standard)
+    if [[ -z "$system_type" ]]; then
+        system_type="desktop"
+    fi
+    
+    echo "$system_type"
+}
+
+# Conflict Resolution
+resolve_conflicts() {
+    local features=("$@")
+    local resolved=()
+    
+    for feature in "${features[@]}"; do
+        local conflicts="${FEATURE_CONFLICTS[$feature]:-}"
+        if [[ -n "$conflicts" ]]; then
+            IFS='|' read -ra conflict_list <<< "$conflicts"
+            local has_conflict=false
+            for conflict in "${conflict_list[@]}"; do
+                if [[ " ${features[*]} " =~ " $conflict " ]]; then
+                    has_conflict=true
+                    break
+                fi
+            done
+            if [[ "$has_conflict" == "false" ]]; then
+                resolved+=("$feature")
+            fi
+        else
+            resolved+=("$feature")
+        fi
+    done
+    
+    printf '%s\n' "${resolved[@]}"
+}
+
+# Dependency Resolution
+resolve_dependencies() {
+    local features=("$@")
+    local resolved=("${features[@]}")
+    
+    for feature in "${features[@]}"; do
+        local deps="${FEATURE_DEPENDENCIES[$feature]:-}"
+        if [[ -n "$deps" ]]; then
+            IFS='|' read -ra dep_list <<< "$deps"
+            for dep in "${dep_list[@]}"; do
+                if [[ ! " ${resolved[*]} " =~ " $dep " ]]; then
+                    resolved+=("$dep")
+                fi
+            done
+        fi
+    done
+    
+    printf '%s\n' "${resolved[@]}"
+}
+
 # Export functions and variables
 export -f select_setup_mode
+export -f detect_system_type
+export -f resolve_conflicts
+export -f resolve_dependencies
 
 # Nur ausführen wenn direkt aufgerufen
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

@@ -50,7 +50,11 @@ When any feature is active, the following core components are automatically load
 
 ### Special Configuration
 
-- **Homelab System**: Special handling when `systemConfig.systemType` is set to "homelab"
+- **Homelab Manager**: Auto-activated when:
+  - `features.homelab-manager = true` (manual activation), OR
+  - `homelab.swarm == null` (Single-Server homelab), OR
+  - `homelab.swarm.role == "manager"` (Swarm Manager)
+  - Does NOT activate if `homelab.swarm.role == "worker"` (Swarm Worker)
 - **Nix Experimental Features**: Enables `nix-command` and `flakes` features
 
 ### Configuration Options

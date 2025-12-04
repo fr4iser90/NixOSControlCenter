@@ -7,7 +7,7 @@ declare -g -A MODULE_OPTIONS
 # Neue Struktur für die Auswahl
 INSTALL_TYPE_OPTIONS=(
     "📦 Presets"
-    "🔧 Custom Setup"
+    "🔧 Custom Install"
     "⚙️  Advanced Options"
 )
 
@@ -46,14 +46,54 @@ PREDEFINED_PROFILE_OPTIONS=(
     "${PREDEFINED_DESKTOP_PROFILES[@]}"
 )
 
-# Hauptkategorien für Custom Setup
-CUSTOM_BASE_MODES=(
-    "Desktop"
-    "Server"
+# Alle Features (16 Features: 3 Desktop-Envs + 13 Package Features)
+ALL_FEATURES=(
+    # Desktop Environments
+    "plasma" "gnome" "xfce"
+    # Development
+    "web-dev" "game-dev" "python-dev" "system-dev"
+    # Gaming & Media
+    "streaming" "emulation"
+    # Containerization
+    "docker" "docker-rootless" "podman"
+    # Services
+    "database" "web-server" "mail-server"
+    # Virtualization
+    "qemu-vm" "virt-manager"
 )
 
-# Feature-Optionen für Custom Setup (neue Struktur)
-# Desktop kann jetzt auch Server-Features auswählen
+# Feature-Gruppen für UI
+FEATURE_GROUPS=(
+    "🖥️  Desktop Environment:plasma|gnome|xfce"
+    "📦 Development:web-dev|game-dev|python-dev|system-dev"
+    "🎮 Gaming & Media:streaming|emulation"
+    "🐳 Containerization:docker|docker-rootless|podman"
+    "💾 Services:database|web-server|mail-server"
+    "🖥️  Virtualization:qemu-vm|virt-manager"
+)
+
+# Exklusive Gruppen (nur eins auswählbar)
+declare -A -g EXCLUSIVE_GROUPS=(
+    ["desktop-environment"]="plasma|gnome|xfce"
+    ["containerization"]="docker|docker-rootless|podman"
+)
+
+# Dependencies (automatisch hinzufügen)
+declare -A -g FEATURE_DEPENDENCIES=(
+    ["virt-manager"]="qemu-vm"
+)
+
+# Conflicts (automatisch abwählen)
+declare -A -g FEATURE_CONFLICTS=(
+    ["docker"]="docker-rootless|podman"
+    ["docker-rootless"]="docker|podman"
+    ["podman"]="docker|docker-rootless"
+    ["plasma"]="gnome|xfce"
+    ["gnome"]="plasma|xfce"
+    ["xfce"]="plasma|gnome"
+)
+
+# Legacy: Für Backward Compatibility (wird nicht mehr in UI angezeigt)
 declare -A -g SUB_OPTIONS=(
     ["Desktop"]="None|streaming|emulation|web-dev|game-dev|python-dev|system-dev|docker|docker-rootless|database|web-server"
     ["Server"]="None|docker|docker-rootless|database|web-server|mail-server"
@@ -124,10 +164,14 @@ export -a ADVANCED_OPTIONS
 export -a PREDEFINED_PROFILE_OPTIONS
 export -a PREDEFINED_SERVER_PROFILES
 export -a PREDEFINED_DESKTOP_PROFILES
-export -a CUSTOM_BASE_MODES
+export -a ALL_FEATURES
+export -a FEATURE_GROUPS
 export -a PRESET_OPTIONS
 export -A SUB_OPTIONS
 export -A MODULE_OPTIONS
+export -A EXCLUSIVE_GROUPS
+export -A FEATURE_DEPENDENCIES
+export -A FEATURE_CONFLICTS
 export -f get_internal_name
 export -f get_display_name
 export -f is_profile_disabled

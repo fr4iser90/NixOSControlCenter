@@ -1,26 +1,28 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  # Debug-Ausgaben mit unterschiedlichen Namen
-  debug1 = builtins.trace "Available users: ${toString (lib.attrNames systemConfig.users)}" null;
-  debug2 = builtins.trace "Users structure: ${builtins.toJSON systemConfig.users}" null;
-
-  # Finde Virtualisierungsbenutzer
+  # Check if Swarm is active
+  isSwarmMode = (systemConfig.homelab.swarm or null) != null;
+  
+  # Find virtualization users (preferred)
   virtUsers = lib.filterAttrs 
-    (name: user: 
-      let
-        debug3 = builtins.trace "Checking user ${name} with role ${user.role}" null;
-      in 
-      user.role == "virtualization"
-    ) 
+    (name: user: user.role == "virtualization") 
     systemConfig.users;
   
-  debug4 = builtins.trace "Found virt users: ${toString (lib.attrNames virtUsers)}" null;
+  # Fallback: Find admin users if no virtualization user
+  adminUsers = lib.filterAttrs 
+    (name: user: user.role == "admin") 
+    systemConfig.users;
   
   hasVirtUsers = (lib.length (lib.attrNames virtUsers)) > 0;
-  virtUser = lib.head (lib.attrNames virtUsers);
-
-  debug5 = builtins.trace "Selected virtUser: ${virtUser}" null;
+  hasAdminUsers = (lib.length (lib.attrNames adminUsers)) > 0;
+  
+  # Fallback: Admin user if no virtualization user (only for Single-Server)
+  virtUser = if hasVirtUsers then 
+    (lib.head (lib.attrNames virtUsers))
+  else if (hasAdminUsers && !isSwarmMode) then
+    (lib.head (lib.attrNames adminUsers))  # Only if NOT Swarm
+  else null;
   
   homelab-fetch = pkgs.writeScriptBin "homelab-fetch" ''
     #!${pkgs.bash}/bin/bash

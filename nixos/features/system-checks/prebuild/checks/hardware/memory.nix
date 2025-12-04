@@ -2,6 +2,41 @@
 
 let
   ui = config.features.terminal-ui.api;
+  hardwareConfigPath = "/etc/nixos/configs/hardware-config.nix";
+
+  # Helper function to update hardware-config.nix
+  updateHardwareConfig = pkgs.writeShellScriptBin "update-hardware-config" ''
+    #!${pkgs.bash}/bin/bash
+    set -euo pipefail
+    
+    local config_file="$1"
+    local memory_gb="$2"
+    
+    # Create configs directory if it doesn't exist
+    mkdir -p "$(dirname "$config_file")"
+    
+    # Read existing config if it exists
+    local existing_cpu="none"
+    local existing_gpu="none"
+    
+    if [ -f "$config_file" ]; then
+      existing_cpu=$(grep -o 'cpu = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
+      existing_gpu=$(grep -o 'gpu = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
+    fi
+    
+    # Write complete hardware-config.nix
+    cat > "$config_file" <<EOF
+{
+  hardware = {
+    cpu = "$existing_cpu";
+    gpu = "$existing_gpu";
+    memory = {
+      sizeGB = $memory_gb;
+    };
+  };
+}
+EOF
+  '';
 
   prebuildScript = pkgs.writeScriptBin "prebuild-check-memory" ''
     #!${pkgs.bash}/bin/bash
@@ -17,27 +52,15 @@ let
     ${ui.messages.info "System Memory:"}
     ${ui.tables.keyValue "Total RAM" "$DETECTED_GB GB"}
     
-    if [ ! -f /etc/nixos/system-config.nix ]; then
-      ${ui.messages.error "system-config.nix not found"}
-      exit 1
-    fi
-    
-    # Check if memory section exists
-    if ! grep -q 'memory = {' /etc/nixos/system-config.nix; then
-      ${ui.messages.info "Memory configuration not found"}
+    # Check if hardware-config.nix exists
+    if [ ! -f "${hardwareConfigPath}" ]; then
+      ${ui.messages.info "hardware-config.nix not found, creating it..."}
       
-      # Ask for confirmation before adding
-      read -p "Add memory configuration to system-config.nix? [y/N] " response
+      # Ask for confirmation before creating
+      read -p "Create hardware-config.nix with detected memory? [y/N] " response
       if [[ "$response" =~ ^[Yy]$ ]]; then
-        # Find hardware section and add memory configuration
-        if ! grep -q 'hardware = {' /etc/nixos/system-config.nix; then
-          ${ui.messages.error "Hardware section not found in system-config.nix"}
-          exit 1
-        fi
-        
-        # Use sudo to ensure we have permission
-        sudo sed -i '/hardware = {/a\    memory = {\n      sizeGB = '"$DETECTED_GB"';\n    };' /etc/nixos/system-config.nix
-        ${ui.badges.success "Memory configuration added."}
+        ${updateHardwareConfig}/bin/update-hardware-config "${hardwareConfigPath}" "$DETECTED_GB"
+        ${ui.badges.success "hardware-config.nix created."}
       else
         ${ui.badges.info "Configuration left unchanged."}
       fi
@@ -45,14 +68,13 @@ let
     fi
     
     # Get configured memory size
-    if ! CONFIGURED_GB=$(grep -A2 'memory = {' /etc/nixos/system-config.nix | grep 'sizeGB' | grep -o '[0-9]\+'); then
-      ${ui.messages.info "Memory size not configured"}
+    if ! CONFIGURED_GB=$(grep -A2 'memory = {' "${hardwareConfigPath}" | grep 'sizeGB' | grep -o '[0-9]\+' | head -1); then
+      ${ui.messages.info "Memory size not configured in hardware-config.nix"}
       
       # Ask for confirmation before adding
       read -p "Add memory size configuration? [y/N] " response
       if [[ "$response" =~ ^[Yy]$ ]]; then
-        # Use sudo to ensure we have permission
-        sudo sed -i '/memory = {/a\      sizeGB = '"$DETECTED_GB"';' /etc/nixos/system-config.nix
+        ${updateHardwareConfig}/bin/update-hardware-config "${hardwareConfigPath}" "$DETECTED_GB"
         ${ui.badges.success "Memory size configuration added."}
       else
         ${ui.badges.info "Configuration left unchanged."}
@@ -73,8 +95,7 @@ let
       # Ask for confirmation
       read -p "Update memory configuration to $DETECTED_GB GB? [y/N] " response
       if [[ "$response" =~ ^[Yy]$ ]]; then
-        # Use sudo to ensure we have permission
-        sudo sed -i "s/sizeGB = $CONFIGURED_GB/sizeGB = $DETECTED_GB/" /etc/nixos/system-config.nix
+        ${updateHardwareConfig}/bin/update-hardware-config "${hardwareConfigPath}" "$DETECTED_GB"
         ${ui.badges.success "Configuration updated."}
       else
         ${ui.badges.info "Configuration left unchanged."}
@@ -88,7 +109,7 @@ let
 
 in {
   config = {
-    environment.systemPackages = [ prebuildScript ];
+    environment.systemPackages = [ prebuildScript updateHardwareConfig ];
     features.command-center.commands = [
       {
         name = "check-memory";
@@ -102,7 +123,7 @@ in {
           Checks:
           - Detects installed RAM size
           - Compares with configured memory setting
-          - Can update system-config.nix if needed
+          - Can update hardware-config.nix if needed
           
           Interactive: Yes (for updating configuration)
         '';

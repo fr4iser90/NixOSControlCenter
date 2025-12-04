@@ -6,11 +6,19 @@ deploy_config() {
     # Basic deployment for all types
     deploy_base_config || return 1
     
-    # Special handling for homelab
-    if [[ -z "${SYSTEM_TYPE:-}" ]]; then
-        log_error "SYSTEM_TYPE is not set"
-        return 1
-    elif [[ "${SYSTEM_TYPE}" == "homelab" ]]; then
+    # Check if homelab-manager is enabled
+    local has_homelab=false
+    if [[ -f "$SYSTEM_CONFIG_FILE" ]]; then
+        # Check if homelab block exists or homelab-manager feature is enabled
+        if grep -q "homelab" "$SYSTEM_CONFIG_FILE" || \
+           grep -q "homelab-manager.*=.*true" "$SYSTEM_CONFIG_FILE" 2>/dev/null || \
+           [[ -f "$(dirname "$SYSTEM_CONFIG_FILE")/configs/features-config.nix" ]] && \
+           grep -q "homelab-manager.*=.*true" "$(dirname "$SYSTEM_CONFIG_FILE")/configs/features-config.nix" 2>/dev/null; then
+            has_homelab=true
+        fi
+    fi
+    
+    if [[ "$has_homelab" == "true" ]] && [[ -n "${VIRT_USER:-}" ]]; then
         show_homelab_completion_message || return 1
     else
         show_standard_completion_message || return 1
@@ -62,7 +70,11 @@ deploy_base_config() {
     log_success "Build system..."
     # Get hostname from system-config.nix, fallback to system hostname
     local config_hostname
-    config_hostname=$(grep -m 1 'hostName = ' "$SYSTEM_CONFIG_FILE" 2>/dev/null | sed 's/.*hostName = "\(.*\)";.*/\1/' || echo "$(hostname)")
+    if [ -f "$SYSTEM_CONFIG_FILE" ]; then
+      config_hostname=$(grep -m 1 'hostName = ' "$SYSTEM_CONFIG_FILE" 2>/dev/null | sed 's/.*hostName = "\(.*\)";.*/\1/' || echo "$(hostname)")
+    else
+      config_hostname=$(hostname)
+    fi
     nixos-rebuild switch --flake /etc/nixos#"${config_hostname}"
 
 
@@ -82,13 +94,26 @@ show_standard_completion_message() {
 }
 
 show_homelab_completion_message() {
-   
+    local virt_user="${VIRT_USER:-}"
+    if [[ -z "$virt_user" ]]; then
+        # Try to find virtualization or admin user from system-config.nix
+        if [[ -f "$SYSTEM_CONFIG_FILE" ]]; then
+            virt_user=$(grep -A 5 'role = "virtualization"' "$SYSTEM_CONFIG_FILE" 2>/dev/null | grep -oP '"\K[^"]+' | head -1 || \
+                       grep -A 5 'role = "admin"' "$SYSTEM_CONFIG_FILE" 2>/dev/null | grep -oP '"\K[^"]+' | head -1 || \
+                       echo "")
+        fi
+    fi
+    
     log_success "Building complete!"
-    log_success "Use homelab-fetch as ${virt_user} to start docker homelab setup..."
-    read -p "Do you want to switch to ${virt_user} user now? (y/N) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        su - "${virt_user}"
+    if [[ -n "$virt_user" ]]; then
+        log_success "Use homelab-fetch as ${virt_user} to start docker homelab setup..."
+        read -p "Do you want to switch to ${virt_user} user now? (y/N) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            su - "${virt_user}"
+        fi
+    else
+        log_success "Homelab configuration deployed. Run 'homelab-fetch' as your virtualization or admin user to start setup."
     fi
     return 0
 }

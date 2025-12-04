@@ -17,8 +17,20 @@ let
     (cfg.tracker or false)
   ];
 
-  # Check if the systemType is set to "homelab"
-  isHomelabSystem = (systemConfig.systemType or "") == "homelab";
+  # Check if homelab-manager should be auto-activated
+  # Auto-activate if:
+  # - features.homelab-manager = true (manual activation), OR
+  # - homelab.swarm == null (Single-Server), OR
+  # - homelab.swarm.role == "manager" (Swarm Manager)
+  # Do NOT activate if homelab.swarm.role == "worker" (Swarm Worker)
+  homelabSwarm = systemConfig.homelab.swarm or null;
+  isSwarmManager = homelabSwarm != null && (homelabSwarm.role or null) == "manager";
+  isSwarmWorker = homelabSwarm != null && (homelabSwarm.role or null) == "worker";
+  isSingleServer = homelabSwarm == null;
+  
+  shouldActivateHomelabManager = (cfg.homelab-manager or false)  # Manual activation
+    || (isSingleServer && (systemConfig.homelab or null) != null)  # Single-Server homelab
+    || isSwarmManager;  # Swarm Manager
 
 in {
   imports = 
@@ -30,7 +42,7 @@ in {
     ++ lib.optionals (cfg.system-updater or false) [ ./system-updater ]
     ++ lib.optionals (cfg.system-logger or false) [ ./system-logger ]
     ++ lib.optionals (cfg.system-config-manager or false) [ ./system-config-manager ]
-    ++ lib.optionals ((cfg.homelab-manager or false) || isHomelabSystem) [ ./homelab-manager ]
+    ++ lib.optionals shouldActivateHomelabManager [ ./homelab-manager ]
     ++ lib.optionals (cfg.bootentry-manager or false) [ ./bootentry-manager ]
     ++ lib.optionals (cfg.ssh-client-manager or false) [ ./ssh-client-manager ]
     ++ lib.optionals (cfg.ssh-server-manager or false) [ ./ssh-server-manager ]

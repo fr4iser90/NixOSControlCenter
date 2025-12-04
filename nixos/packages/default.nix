@@ -8,7 +8,6 @@ let
   basePackages = {
     desktop = import ./base/desktop.nix;
     server = import ./base/server.nix;
-    homelab = import ./base/homelab.nix;
   };
 
   # Docker mode logic: Determine if root or rootless Docker should be used

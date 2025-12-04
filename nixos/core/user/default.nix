@@ -10,13 +10,10 @@ let
   };
 
   # User-spezifische Pakete basierend auf Rolle
+  # NOTE: Docker, QEMU, virt-manager etc. werden von Features installiert!
+  # User-Rollen geben nur Berechtigungen (Gruppen, Sudo), keine Pakete!
   rolePkgs = {
-    virtualization = with pkgs; [
-      docker
-      docker-compose
-      virt-manager
-      qemu
-    ];
+    virtualization = [];  # Pakete kommen von docker.nix, qemu-vm.nix, virt-manager.nix Features
     admin = [];  # Basis-Admin-Pakete
     guest = [];  # Basis-Guest-Pakete
   };

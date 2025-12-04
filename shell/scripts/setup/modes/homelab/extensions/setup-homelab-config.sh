@@ -1,10 +1,107 @@
 #!/usr/bin/env bash
 
+# Helper to update hosting-config.nix
+update_hosting_config() {
+    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/configs/hosting-config.nix"
+    local email_value="$1"
+    local domain_value="$2"
+    
+    # Create configs directory if it doesn't exist
+    mkdir -p "$(dirname "$config_file")"
+    
+    # Write hosting-config.nix
+    cat > "$config_file" <<EOF
+{
+  email = "$email_value";
+  domain = "$domain_value";
+}
+EOF
+}
+
+# Helper to update system-config.nix (users, systemType, and homelab block)
+update_system_config() {
+    local temp_file=$(mktemp)
+    local users_block="$1"
+    local system_type="$2"
+    local homelab_block="${3:-}"
+    
+    # Read existing system-config.nix
+    if [ -f "$SYSTEM_CONFIG_FILE" ]; then
+        cp "$SYSTEM_CONFIG_FILE" "$temp_file"
+    else
+        # Create minimal system-config.nix if it doesn't exist
+        cat > "$temp_file" <<EOF
+{
+  systemType = "$system_type";
+  hostName = "$(hostname)";
+  system = {
+    channel = "stable";
+    bootloader = "systemd-boot";
+  };
+  allowUnfree = true;
+  users = {};
+  timeZone = "Europe/Berlin";
+}
+EOF
+    fi
+    
+    # Update systemType
+    sed -i "s/systemType = \".*\";/systemType = \"$system_type\";/" "$temp_file"
+    
+    # Update users block
+    # Remove existing users block
+    awk '
+    BEGIN { skip = 0; }
+    /^  users = {/ { skip = 1; next; }
+    /^  };/ { if (skip) { skip = 0; next; } }
+    { if (!skip) print; }
+    ' "$temp_file" > "${temp_file}.tmp"
+    mv "${temp_file}.tmp" "$temp_file"
+    
+    # Remove existing homelab block if present
+    awk '
+    BEGIN { skip = 0; }
+    /^  homelab = {/ { skip = 1; next; }
+    /^  };/ { if (skip) { skip = 0; next; } }
+    { if (!skip) print; }
+    ' "$temp_file" > "${temp_file}.tmp"
+    mv "${temp_file}.tmp" "$temp_file"
+    
+    # Insert new users block before timeZone
+    if grep -q "timeZone" "$temp_file"; then
+        sed -i "/timeZone = /i\\  users = {\n$users_block\n  };" "$temp_file"
+    else
+        # Append at end before closing brace
+        sed -i '$ i\  users = {\n'"$users_block"'\n  };' "$temp_file"
+    fi
+    
+    # Insert homelab block after users block (if provided)
+    if [[ -n "$homelab_block" ]]; then
+        if grep -q "users = {" "$temp_file"; then
+            sed -i "/^  };$/a\\$homelab_block" "$temp_file"
+        else
+            sed -i '$ i\'"$homelab_block" "$temp_file"
+        fi
+    fi
+    
+    # Apply changes
+    if [[ -w "$SYSTEM_CONFIG_FILE" ]]; then
+        mv "$temp_file" "$SYSTEM_CONFIG_FILE"
+    else
+        sudo mv "$temp_file" "$SYSTEM_CONFIG_FILE" || {
+            log_error "Failed to update system-config.nix"
+            rm "$temp_file"
+            return 1
+        }
+    fi
+}
+
 setup_homelab_config() {
     log_section "Homelab Configuration"
 
-
-    declare -g virt_password=""   
+    declare -g virt_password=""
+    declare -g swarm_role="none"
+    declare -g use_extra_user="no"
     # Initialize variables with existing data
     admin_user="$(logname)"
     virt_user="${VIRT_USER:-}"
@@ -32,20 +129,39 @@ collect_homelab_info() {
     # Admin user
     admin_user=$(get_admin_username "$admin_user") || return 1
     
-    # Virtualization user
-    virt_user=$(get_virt_username "$virt_user") || return 1
-
-    # Virtualization user password
-    get_virt_password  # Direkt aufrufen, nicht in Subshell
-    local pw_result=$?
-    if [[ $pw_result -ne 0 ]]; then
-        return 1
-    fi
+    # Swarm role selection
+    swarm_role=$(get_swarm_role) || return 1
+    declare -g swarm_role="$swarm_role"
     
-    # Validate usernames
-    if [[ "$admin_user" == "$virt_user" ]]; then
-        log_error "Admin user and virtualization user cannot be the same!"
-        return 1
+    # Docker mode detection (for user setup default)
+    docker_mode=$(detect_docker_mode) || docker_mode="docker-rootless"
+    
+    # User setup: Extra User vs Main User
+    if [[ "$swarm_role" != "none" ]]; then
+        # Swarm requires Extra User
+        use_extra_user="yes"
+        declare -g use_extra_user="$use_extra_user"
+        virt_user=$(get_virt_username "$virt_user") || return 1
+        get_virt_password || return 1
+        if [[ "$admin_user" == "$virt_user" ]]; then
+            log_error "Admin user and virtualization user cannot be the same!"
+            return 1
+        fi
+    else
+        # Single-Server: Ask for user setup
+        use_extra_user=$(get_docker_user_setup "$docker_mode") || return 1
+        declare -g use_extra_user="$use_extra_user"
+        if [[ "$use_extra_user" == "yes" ]]; then
+            virt_user=$(get_virt_username "$virt_user") || return 1
+            get_virt_password || return 1
+            if [[ "$admin_user" == "$virt_user" ]]; then
+                log_error "Admin user and virtualization user cannot be the same!"
+                return 1
+            fi
+        else
+            # Use main user as admin (no extra user)
+            virt_user=""
+        fi
     fi
     
     # Email configuration
@@ -55,7 +171,7 @@ collect_homelab_info() {
     domain=$(get_domain "$domain") || return 1
         
     # Desktop configuration
-    enable_desktop=$(get_desktop_enabled "$enable_desktop") || return 1  # <- HIER
+    enable_desktop=$(get_desktop_enabled "$enable_desktop") || return 1
 
     return 0
 }
@@ -79,6 +195,81 @@ get_virt_username() {
     local username
     read -ep $'\033[0;34m[?]\033[0m Enter virtualization username(docker)'"${default_user:+ [$default_user]}"': ' username
     echo "${username:-${default_user:-docker}}"
+}
+
+get_swarm_role() {
+    local response
+    while true; do
+        read -ep $'\033[0;34m[?]\033[0m Docker Swarm setup? (none/manager/worker) [none]: ' response
+        response="${response:-none}"
+        
+        case "${response,,}" in
+            none|"")
+                echo "none"
+                return 0
+                ;;
+            manager)
+                echo "manager"
+                return 0
+                ;;
+            worker)
+                echo "worker"
+                return 0
+                ;;
+            *)
+                log_error "Please answer: none, manager, or worker"
+                ;;
+        esac
+    done
+}
+
+detect_docker_mode() {
+    # Check packages-config.nix for docker feature
+    local packages_config="$(dirname "$SYSTEM_CONFIG_FILE")/configs/packages-config.nix"
+    if [[ -f "$packages_config" ]]; then
+        if grep -q '"docker"' "$packages_config"; then
+            echo "docker"
+            return 0
+        elif grep -q '"docker-rootless"' "$packages_config"; then
+            echo "docker-rootless"
+            return 0
+        fi
+    fi
+    # Default to docker-rootless
+    echo "docker-rootless"
+    return 0
+}
+
+get_docker_user_setup() {
+    local docker_mode="$1"  # "docker" or "docker-rootless"
+    local default_response
+    
+    # Determine default based on Docker mode
+    if [[ "$docker_mode" == "docker" ]]; then
+        default_response="y"  # Root Docker → Extra User (default)
+    else
+        default_response="n"  # Rootless Docker → Main User (default)
+    fi
+    
+    local response
+    while true; do
+        read -ep $'\033[0;34m[?]\033[0m Use separate user for Docker? (y/n)'" [${default_response}]: " response
+        response="${response:-${default_response}}"
+        
+        case "${response,,}" in
+            y|yes)
+                echo "yes"
+                return 0
+                ;;
+            n|no)
+                echo "no"
+                return 0
+                ;;
+            *)
+                log_error "Please answer yes or no"
+                ;;
+        esac
+    done
 }
 
 get_email() {
@@ -110,45 +301,70 @@ get_domain() {
 }
 
 update_homelab_config() {
-    # Create temp file
-    local temp_file=$(mktemp)
-    cp "$SYSTEM_CONFIG_FILE" "$temp_file" || return 1
-    
-    # Hash password and create password file
-    if ! create_password_file; then
-        log_error "Failed to create password file"
-        rm "$temp_file"
-        return 1
-    fi
-    
-    # Update configurations
-    update_users_homelab_block "$temp_file" || return 1
-    update_email_domain "$temp_file" || return 1
-    update_system_type "$temp_file" || return 1
-   
-
-    # Verify changes
-    if diff "$SYSTEM_CONFIG_FILE" "$temp_file" >/dev/null; then
-        log_error "Failed to update system configuration"
-        rm "$temp_file"
-        return 1
-    fi
-    
-    # Apply changes
-    if [[ -w "$SYSTEM_CONFIG_FILE" ]]; then
-        mv "$temp_file" "$SYSTEM_CONFIG_FILE"
-    else
-        if command -v sudo >/dev/null 2>&1; then
-            sudo mv "$temp_file" "$SYSTEM_CONFIG_FILE"
-        else
-            if command -v doas >/dev/null 2>&1; then
-                doas mv "$temp_file" "$SYSTEM_CONFIG_FILE"
-            else
-                log_error "Cannot write to $SYSTEM_CONFIG_FILE (no sudo/doas available)"
-                rm "$temp_file"
-                return 1
-            fi
+    # Hash password and create password file (only if extra user)
+    if [[ -n "$virt_user" ]]; then
+        if ! create_password_file; then
+            log_error "Failed to create password file"
+            return 1
         fi
+    fi
+    
+    # Build users block
+    local users_block="    \"$admin_user\" = {
+      role = \"admin\";
+      defaultShell = \"zsh\";
+      autoLogin = false;
+    };"
+    
+    if [[ -n "$virt_user" ]]; then
+        users_block="$users_block
+    \"$virt_user\" = {
+      role = \"virtualization\";
+      defaultShell = \"zsh\";
+      autoLogin = true;
+    };"
+    fi
+    
+    # Build homelab block (if Swarm or Single-Server)
+    local homelab_block=""
+    if [[ "$swarm_role" != "none" ]]; then
+        homelab_block="  homelab = {
+    swarm = {
+      role = \"$swarm_role\";
+    };
+  };"
+    else
+        # Single-Server: homelab block without swarm
+        homelab_block="  homelab = {};"
+    fi
+    
+    # Update system-config.nix (users, systemType, and homelab block)
+    update_system_config "$users_block" "server" "$homelab_block" || return 1
+    
+    # Update hosting-config.nix (email and domain)
+    update_hosting_config "$email" "$domain" || return 1
+    
+    # Update desktop-config.nix if desktop setting is needed
+    if [[ "$enable_desktop" == "false" ]]; then
+        local desktop_config="$(dirname "$SYSTEM_CONFIG_FILE")/configs/desktop-config.nix"
+        mkdir -p "$(dirname "$desktop_config")"
+        cat > "$desktop_config" <<EOF
+{
+  desktop = {
+    enable = false;
+    environment = "plasma";
+    display = {
+      manager = "sddm";
+      server = "wayland";
+      session = "plasma";
+    };
+    theme = {
+      dark = true;
+    };
+    audio = "pipewire";
+  };
+}
+EOF
     fi
     
     return 0
@@ -290,80 +506,8 @@ get_desktop_enabled() {
     done
 }
 
-update_desktop_enabled() {
-    local config_file="$1"
-    local enable_desktop="$2"
-    
-    sed -i "s/enableDesktop = .*\;/enableDesktop = ${enable_desktop};/" "$config_file"
-
-}
-
-update_users_homelab_block() {
-    local config_file="$1"
-    
-    # Create a temporary file
-    local temp_file="${config_file}.tmp"
-    
-    # First, remove any existing users blocks (including malformed ones)
-    awk '
-    BEGIN { skip = 0; }
-    /^  users = {/ { skip = 1; next; }
-    /^  };/ { if (skip) { skip = 0; next; } }
-    /^  #[ ]*$/ { next; }
-    { if (!skip) print; }
-    ' "$config_file" > "$temp_file"
-    
-    # Now insert our new users block at the right position
-    awk -v admin_user="$admin_user" -v virt_user="$virt_user" '
-    /^  # User Management$/ {
-        print;
-        print "  users = {";
-        print "    \"" admin_user "\" = {";
-        print "      role = \"admin\";";
-        print "      defaultShell = \"zsh\";";
-        print "      autoLogin = false;";
-        print "    };";
-        if (virt_user != "") {
-            print "    \"" virt_user "\" = {";
-            print "      role = \"virtualization\";";
-            print "      defaultShell = \"zsh\";";
-            print "      autoLogin = true;";
-            print "    };";
-        }
-        print "  };";
-        next;
-    }
-    { print }
-    ' "$temp_file" > "${config_file}.new"
-    
-    # Apply changes
-    mv "${config_file}.new" "$config_file"
-    rm -f "$temp_file"
-}
-
-update_email_domain() {
-    local config_file="$1"
-    
-    if ! grep -q "email =" "$config_file"; then
-        sed -i "/^{/a\\  email = \"${email}\";\n  domain = \"${domain}\";" "$config_file"
-    else
-        sed -i \
-            -e "s/email = \".*\";/email = \"${email}\";/" \
-            -e "s/domain = \".*\";/domain = \"${domain}\";/" \
-            "$config_file"
-    fi
-}
-
-update_system_type() {
-    local config_file="$1"
-    sed -i "s/systemType = \".*\";/systemType = \"homelab\";/" "$config_file"
-}
-
-
-
-
 export_homelab_vars() {
-    export SYSTEM_TYPE="homelab"
+    export SYSTEM_TYPE="server"
     export ADMIN_USER="$admin_user"
     export VIRT_USER="$virt_user"
     export HOMELAB_EMAIL="$email"
@@ -378,13 +522,17 @@ export -f get_admin_username
 export -f get_virt_username
 export -f get_email
 export -f get_domain
+export -f get_swarm_role
+export -f detect_docker_mode
+export -f get_docker_user_setup
 export -f log_error
 export -f log_success
 export -f log_section
-export -f setup_homelab_config
 export -f update_users_homelab_block
 export -f update_email_domain
 export -f update_system_type
 export -f export_homelab_vars
 export -f create_password_file
 export -f get_virt_password
+export -f update_hosting_config
+export -f update_system_config

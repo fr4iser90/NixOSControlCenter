@@ -82,7 +82,13 @@ import_file "$SETUP_DIR/config/secrets-setup.sh"
 import_file "$SETUP_DIR/config/data-collection/collect-system-data.sh"  
 import_file "$SETUP_DIR/config/data-collection/collect-server-data.sh"  
 
+# 8. Migration (wenn vorhanden)
+if [[ -f "$SETUP_DIR/migration/migrate-system-config.sh" ]]; then
+    import_file "$SETUP_DIR/migration/migrate-system-config.sh"
+fi
+
 # Load modules for each mode
 load_mode_modules "desktop"
 load_mode_modules "server"
 load_mode_modules "homelab"
+load_mode_modules "custom"

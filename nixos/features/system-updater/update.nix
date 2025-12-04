@@ -56,6 +56,10 @@ let
     done
   '';
   
+  # Import migration and validation tools
+  migration = import ./config-migration.nix { inherit pkgs lib; };
+  validator = import ./config-validator.nix { inherit pkgs lib; };
+  
   systemUpdateMainScript = pkgs.writeScriptBin "ncc-system-update-main" ''
     #!${pkgs.bash}/bin/bash
     set -e
@@ -67,11 +71,39 @@ let
       exit 1
     fi
 
-    # Konfiguration
+    # Configuration
     NIXOS_DIR="/etc/nixos"
     BACKUP_ROOT="${backupSettings.directory}"
     
     ${ui.text.header "NixOS System Update"}
+    
+    # Step 1: Validate and migrate system-config.nix if needed
+    ${ui.messages.loading "Validating system configuration..."}
+    
+    # Run validation
+    if ${validator.validateSystemConfig}/bin/ncc-validate-config 2>&1; then
+      ${ui.messages.success "Configuration validation passed"}
+    else
+      VALIDATION_EXIT=$?
+      if [ $VALIDATION_EXIT -eq 1 ]; then
+        ${ui.messages.warning "Configuration validation found issues"}
+        ${ui.messages.info "Attempting automatic migration..."}
+        
+        # Try migration
+        if ${migration.migrateSystemConfig}/bin/ncc-migrate-config 2>&1; then
+          ${ui.messages.success "Migration completed successfully!"}
+          # Re-validate after migration
+          if ${validator.validateSystemConfig}/bin/ncc-validate-config 2>&1; then
+            ${ui.messages.success "Configuration is now valid"}
+          else
+            ${ui.messages.warning "Configuration still has issues after migration"}
+          fi
+        else
+          ${ui.messages.warning "Migration failed or not needed"}
+        fi
+      fi
+    fi
+    
     ${ui.messages.info "Select update source or action:"}
     
     echo "1) Update Configuration (Remote Repository)"
@@ -254,6 +286,8 @@ in {
   config = {
     environment.systemPackages = [ 
       systemUpdateMainScript
+      migration.migrateSystemConfig
+      validator.validateSystemConfig
       pkgs.git 
     ];
 

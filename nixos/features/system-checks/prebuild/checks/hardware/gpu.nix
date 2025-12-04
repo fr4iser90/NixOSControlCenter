@@ -2,6 +2,50 @@
 
 let
   ui = config.features.terminal-ui.api;
+  hardwareConfigPath = "/etc/nixos/configs/hardware-config.nix";
+
+  # Helper function to update hardware-config.nix
+  updateHardwareConfig = pkgs.writeShellScriptBin "update-hardware-config" ''
+    #!${pkgs.bash}/bin/bash
+    set -euo pipefail
+    
+    local config_file="$1"
+    local gpu_value="$2"
+    
+    # Create configs directory if it doesn't exist
+    mkdir -p "$(dirname "$config_file")"
+    
+    # Read existing config if it exists
+    local existing_cpu="none"
+    local existing_memory=""
+    
+    if [ -f "$config_file" ]; then
+      existing_cpu=$(grep -o 'cpu = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
+      existing_memory=$(grep -A2 'memory = {' "$config_file" 2>/dev/null || echo "")
+    fi
+    
+    # Write complete hardware-config.nix
+    if [ -n "$existing_memory" ]; then
+      cat > "$config_file" <<EOF
+{
+  hardware = {
+    cpu = "$existing_cpu";
+    gpu = "$gpu_value";
+$existing_memory
+  };
+}
+EOF
+    else
+      cat > "$config_file" <<EOF
+{
+  hardware = {
+    cpu = "$existing_cpu";
+    gpu = "$gpu_value";
+  };
+}
+EOF
+    fi
+  '';
 
   prebuildScript = pkgs.writeScriptBin "prebuild-check-gpu" ''
     #!${pkgs.bash}/bin/bash
@@ -10,7 +54,7 @@ let
     ${ui.text.header "GPU Configuration Check"}
     
     # Initialize DETECTED with a default value
-    DETECTED="generic"
+    DETECTED="none"
     
     # Physical hardware detection first
     declare -A gpu_types
@@ -56,18 +100,18 @@ let
     fi
 
     # Only check for VM if no physical GPU was detected
-    if [ "$DETECTED" = "generic" ]; then
+    if [ "$DETECTED" = "none" ]; then
         if command -v ${pkgs.systemd}/bin/systemd-detect-virt &> /dev/null; then
             virt_type=$(${pkgs.systemd}/bin/systemd-detect-virt || echo "none")
             
             if [ "$virt_type" != "none" ]; then
                 # Check for virtual GPU types
                 if ${pkgs.pciutils}/bin/lspci | grep -qi "qxl"; then
-                    DETECTED="qxl-virtual"
+                    DETECTED="vm-gpu"
                 elif ${pkgs.pciutils}/bin/lspci | grep -qi "virtio"; then
-                    DETECTED="virtio-virtual"
+                    DETECTED="vm-gpu"
                 else
-                    DETECTED="basic-virtual"
+                    DETECTED="vm-gpu"
                 fi
                 
                 # Immer VM-Info anzeigen
@@ -77,13 +121,23 @@ let
         fi
     fi
     
-    if [ ! -f /etc/nixos/system-config.nix ]; then
-      ${ui.messages.error "system-config.nix not found"}
-      exit 1
+    # Check if hardware-config.nix exists
+    if [ ! -f "${hardwareConfigPath}" ]; then
+      ${ui.messages.info "hardware-config.nix not found, creating it..."}
+      
+      # Ask for confirmation
+      read -p "Create hardware-config.nix with detected GPU? [y/N] " response
+      if [[ "$response" =~ ^[Yy]$ ]]; then
+        ${updateHardwareConfig}/bin/update-hardware-config "${hardwareConfigPath}" "$DETECTED"
+        ${ui.badges.success "hardware-config.nix created."}
+      else
+        ${ui.badges.info "Configuration left unchanged."}
+      fi
+      exit 0
     fi
     
-    if ! CONFIGURED=$(grep 'gpu =' /etc/nixos/system-config.nix | cut -d'"' -f2); then
-      ${ui.messages.error "Could not find GPU configuration in system-config.nix"}
+    if ! CONFIGURED=$(grep 'gpu =' "${hardwareConfigPath}" | cut -d'"' -f2); then
+      ${ui.messages.error "Could not find GPU configuration in hardware-config.nix"}
       exit 1
     fi
     
@@ -99,8 +153,7 @@ let
       # Ask for confirmation
       read -p "Update GPU configuration to $DETECTED? [y/N] " response
       if [[ "$response" =~ ^[Yy]$ ]]; then
-        # Update configuration
-        sed -i "s/gpu = \"$CONFIGURED\"/gpu = \"$DETECTED\"/" /etc/nixos/system-config.nix
+        ${updateHardwareConfig}/bin/update-hardware-config "${hardwareConfigPath}" "$DETECTED"
         ${ui.badges.success "Configuration updated."}
       else
         ${ui.badges.info "Configuration left unchanged."}
@@ -114,7 +167,7 @@ let
 
 in {
   config = {
-    environment.systemPackages = [ prebuildScript ];
+    environment.systemPackages = [ prebuildScript updateHardwareConfig ];
     features.command-center.commands = [
       {
         name = "check-gpu";
@@ -128,7 +181,7 @@ in {
           Checks:
           - Detects installed GPU hardware
           - Compares with configured GPU setting
-          - Can update system-config.nix if needed
+          - Can update hardware-config.nix if needed
           
           Supports detection of:
           - NVIDIA, AMD, Intel graphics
@@ -143,4 +196,3 @@ in {
     ];
   };
 }
-

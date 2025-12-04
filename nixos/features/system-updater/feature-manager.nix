@@ -7,7 +7,7 @@ let
   commandCenter = config.features.command-center;
   hostname = systemConfig.hostName;
   autoBuild = systemConfig.features.system-updater.auto-build or false;
-  featureConfigPath = "/etc/nixos/system-config.nix";
+  featureConfigPath = "/etc/nixos/configs/features-config.nix";
   
   featureList = [
     "system-logger"
@@ -22,9 +22,60 @@ let
     "ai-workspace"
   ];
 
+  # Helper to read current feature status from features-config.nix
   getFeatureStatus = feature: ''
-    ${pkgs.nix}/bin/nix-instantiate --eval --strict -E \
-      "(import ${featureConfigPath}).features.${feature} or false"
+    if [ -f "${featureConfigPath}" ]; then
+      ${pkgs.nix}/bin/nix-instantiate --eval --strict -E \
+        "(import ${featureConfigPath}).features.${feature} or false" 2>/dev/null || echo "false"
+    else
+      echo "false"
+    fi
+  '';
+
+  # Helper to update features-config.nix
+  updateFeaturesConfig = pkgs.writeShellScriptBin "update-features-config" ''
+    #!${pkgs.bash}/bin/bash
+    set -euo pipefail
+    
+    local config_file="${featureConfigPath}"
+    local feature="$1"
+    local value="$2"
+    
+    # Create configs directory if it doesn't exist
+    mkdir -p "$(dirname "$config_file")"
+    
+    # Read existing feature states
+    declare -A features
+    for f in ${toString featureList}; do
+      if [ -f "$config_file" ]; then
+        status=$(${pkgs.nix}/bin/nix-instantiate --eval --strict -E \
+          "(import $config_file).features.$f or false" 2>/dev/null || echo "false")
+        features["$f"]="$status"
+      else
+        features["$f"]="false"
+      fi
+    done
+    
+    # Update the specific feature
+    features["$feature"]="$value"
+    
+    # Write complete features-config.nix
+    cat > "$config_file" <<EOF
+{
+  features = {
+    system-logger = ${features["system-logger"]};
+    system-checks = ${features["system-checks"]};
+    system-updater = ${features["system-updater"]};
+    system-config-manager = ${features["system-config-manager"]};
+    ssh-client-manager = ${features["ssh-client-manager"]};
+    ssh-server-manager = ${features["ssh-server-manager"]};
+    bootentry-manager = ${features["bootentry-manager"]};
+    homelab-manager = ${features["homelab-manager"]};
+    vm-manager = ${features["vm-manager"]};
+    ai-workspace = ${features["ai-workspace"]};
+  };
+}
+EOF
   '';
 
   formatFeatureList = pkgs.writeScript "format-features" ''
@@ -36,25 +87,11 @@ let
   '';
 
   enableFeature = feature: ''
-    tmp_file=$(mktemp)
-    # Use if statement directly in sed command
-    if ! ${pkgs.gnused}/bin/sed -i \
-      "s/    ${feature} = \(true\|false\);/    ${feature} = true;/g" \
-      ${featureConfigPath}; then
-      ${ui.messages.error "Failed to update feature ${feature}"}
-      exit 1
-    fi
+    ${updateFeaturesConfig}/bin/update-features-config "$feature" "true"
   '';
 
   disableFeature = feature: ''
-    tmp_file=$(mktemp)
-    # Use if statement directly in sed command
-    if ! ${pkgs.gnused}/bin/sed -i \
-      "s/    ${feature} = \(true\|false\);/    ${feature} = false;/g" \
-      ${featureConfigPath}; then
-      ${ui.messages.error "Failed to update feature ${feature}"}
-      exit 1
-    fi
+    ${updateFeaturesConfig}/bin/update-features-config "$feature" "false"
   '';
 
   featureScript = pkgs.writeScriptBin "ncc-feature-manager" ''
@@ -109,7 +146,7 @@ let
 
 in {
   config = {
-    environment.systemPackages = [ featureScript ];
+    environment.systemPackages = [ featureScript updateFeaturesConfig ];
 
     features.command-center.commands = [
       {
@@ -118,7 +155,7 @@ in {
         category = "system";
         script = "${featureScript}/bin/ncc-feature-manager";
         arguments = [];
-        dependencies = [ "fzf" "nix" "gnused" ];
+        dependencies = [ "fzf" "nix" ];
         shortHelp = "feature-manager - Toggle NixOS features";
         longHelp = ''
           Interactive feature toggler using fzf for selection.

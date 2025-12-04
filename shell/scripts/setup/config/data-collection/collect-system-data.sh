@@ -3,8 +3,6 @@
 collect_system_data() {
     log_section "Collecting System Information"
     
-    local temp_config="${INSTALL_TMP}/../system-config.nix.tmp"
-
     # Hardware checks
     log_info "Checking Hardware..."
     check_cpu_info || return 1
@@ -17,151 +15,302 @@ collect_system_data() {
     check_bootloader || return 1
     check_hosting || return 1
 
-    # Backup existing config
+    # Backup existing configs
     [[ -f "$SYSTEM_CONFIG_FILE" ]] && backup_file "$SYSTEM_CONFIG_FILE"
-
-
-    # Create temp config from template
-    cp "$SYSTEM_CONFIG_TEMPLATE" "$temp_config" || {
-        log_error "Failed to create temp config"
-        return 1
+    [[ -d "$(dirname "$SYSTEM_CONFIG_FILE")/configs" ]] && {
+        log_info "Backing up existing configs directory..."
+        cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/configs" "$(dirname "$SYSTEM_CONFIG_FILE")/configs.backup.$(date +%s)" 2>/dev/null || true
     }
 
-    init_system_type
-    init_profile_modules
-    init_primary_user
-    init_users_block
-    init_desktop_env
+    # Ensure configs directory exists
+    ensure_dir "$(dirname "$SYSTEM_CONFIG_FILE")/configs"
+
+    # Create all config files
+    init_system_config
+    init_packages_config
+    init_desktop_config
+    init_localization_config
     init_hardware_config
-    init_nix_config
-    init_localization
+    init_features_config
+    init_logging_config
     init_hosting_config
-    init_profile_overrides
+    init_overrides_config
 
-    # Activate new configuration
-    if [[ -s "$temp_config" ]]; then
-        ensure_dir "$(dirname "$SYSTEM_CONFIG_FILE")"
-        mv "$temp_config" "$SYSTEM_CONFIG_FILE" || {
-            log_error "Failed to move config file"
-            return 1
-        }
-        log_success "System configuration updated at $SYSTEM_CONFIG_FILE"
-    else
-        log_error "Generated config is empty!"
-        restore_backup
-        return 1
-    fi
+    log_success "System configuration files created"
 }
 
-# Helper functions for each section
-init_system_type() {
-    log_debug "Updating system type..."
-    sed -i \
-        -e "s|@SYSTEM_TYPE@|desktop|" \
-        -e "s|@HOSTNAME@|$(hostname)|" \
-        -e "s|@BOOTLOADER@|$BOOT_TYPE|" \
-        "$temp_config"
+# Helper function to write Nix config file
+write_nix_config() {
+    local config_file="$1"
+    local content="$2"
+    
+    ensure_dir "$(dirname "$config_file")"
+    cat > "$config_file" <<EOF
+$content
+EOF
+    log_debug "Created config file: $config_file"
 }
 
-init_profile_modules() {
-    log_debug "Updating profile package modules..."
-    sed -i \
-        -e "s|@PACKAGE_MODULES@||" \
-        -e "s|@PRESET@|null|" \
-        -e "s|@ADDITIONAL_PACKAGE_MODULES@||" \
-        "$temp_config"
-}
-
-init_primary_user() {
-    log_debug "Updating primary user..."
+# Create minimal system-config.nix
+init_system_config() {
+    log_debug "Creating system-config.nix..."
     local current_user=$(whoami)
-    local current_shell=$(basename $(getent passwd $current_user | cut -d: -f7))
+    local current_shell=$(basename $(getent passwd $current_user | cut -d: -f7) 2>/dev/null || echo "bash")
     local user_role="admin"
     
-    sed -i \
-        -e "s|@PRIMARY_USER@|$current_user|" \
-        -e "s|@PRIMARY_ROLE@|$user_role|" \
-        -e "s|@PRIMARY_SHELL@|$current_shell|" \
-        -e "s|@PRIMARY_AUTOLOGIN@|false|" \
-        -e 's|@PRIMARY_GROUPS@|"wheel" "networkmanager"|' \
-        -e 's|@PRIMARY_PASS@|""|' \
-        -e 's|@PRIMARY_SSH_KEYS@||' \
-        -e 's|@PRIMARY_TTY@||' \
-        "$temp_config"
+    # Build users block
+    local users_block=""
+    if [[ -n "${ALL_USERS:-}" ]]; then
+        users_block="$ALL_USERS"
+    else
+        users_block="    \"$current_user\" = {
+      role = \"$user_role\";
+      defaultShell = \"$current_shell\";
+      autoLogin = false;
+    };"
+    fi
+    
+    write_nix_config "$SYSTEM_CONFIG_FILE" "{
+  # System-Identität
+  systemType = \"${SYSTEM_TYPE:-desktop}\";
+  hostName = \"$(hostname)\";
+  
+  # System-Version
+  system = {
+    channel = \"stable\";
+    bootloader = \"${BOOT_TYPE:-systemd-boot}\";
+  };
+  
+  # Nix-Config
+  allowUnfree = true;
+  
+  # User-Management
+  users = {
+$users_block
+  };
+  
+  # TimeZone
+  timeZone = \"${SYSTEM_TIMEZONE:-Europe/Berlin}\";
+}
+"
 }
 
-init_users_block() {
-    log_debug "Updating users block..."
-    echo "$ALL_USERS" > "${INSTALL_TMP}/users.tmp"
-    sed -i -e '/^[[:space:]]*@USERS@/r '"${INSTALL_TMP}/users.tmp" \
-           -e '/^[[:space:]]*@USERS@/d' "$temp_config"
-    rm "${INSTALL_TMP}/users.tmp"
+# Create packages-config.nix
+init_packages_config() {
+    log_debug "Creating packages-config.nix..."
+    local package_modules="${PACKAGE_MODULES:-}"
+    local preset="${PRESET:-null}"
+    local additional_modules="${ADDITIONAL_PACKAGE_MODULES:-}"
+    
+    local content="{"
+    if [[ -n "$package_modules" ]]; then
+        content+="
+  # Package-Modules direkt
+  packageModules = [ $package_modules ];"
+    elif [[ "$preset" != "null" ]]; then
+        content+="
+  # Preset verwenden
+  preset = \"$preset\";"
+        if [[ -n "$additional_modules" ]]; then
+            content+="
+  additionalPackageModules = [ $additional_modules ];"
+        fi
+    else
+        content+="
+  # Package-Modules (leer - wird später konfiguriert)
+  packageModules = [];"
+    fi
+    content+="
+}
+"
+    
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/packages-config.nix" "$content"
 }
 
-init_desktop_env() {
-    log_debug "Updating desktop environment..."
-    sed -i \
-        -e "s|@ENABLE_DESKTOP@|true|" \
-        -e "s|@DESKTOP@|plasma|" \
-        -e "s|@DISPLAY_MGR@|sddm|" \
-        -e "s|@DISPLAY_SERVER@|wayland|" \
-        -e "s|@SESSION@|plasma|" \
-        -e "s|@DARK_MODE@|true|" \
-        "$temp_config"
+# Create desktop-config.nix
+init_desktop_config() {
+    log_debug "Creating desktop-config.nix..."
+    local enable_desktop="${ENABLE_DESKTOP:-true}"
+    local desktop="${DESKTOP:-plasma}"
+    local display_mgr="${DISPLAY_MGR:-sddm}"
+    local display_server="${DISPLAY_SERVER:-wayland}"
+    local session="${SESSION:-plasma}"
+    local dark_mode="${DARK_MODE:-true}"
+    local audio="${AUDIO:-pipewire}"
+    
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/desktop-config.nix" "{
+  # Desktop-Environment
+  desktop = {
+    enable = $enable_desktop;
+    environment = \"$desktop\";
+    display = {
+      manager = \"$display_mgr\";
+      server = \"$display_server\";
+      session = \"$session\";
+    };
+    theme = {
+      dark = $dark_mode;
+    };
+    audio = \"$audio\";
+  };
+}
+"
 }
 
+# Create localization-config.nix
+init_localization_config() {
+    log_debug "Creating localization-config.nix..."
+    local locale="${SYSTEM_LOCALE:-en_US.UTF-8}"
+    local keyboard_layout="${SYSTEM_KEYBOARD_LAYOUT:-us}"
+    local keyboard_options="${SYSTEM_KEYBOARD_OPTIONS:-}"
+    
+    local content="{"
+    content+="
+  # Lokalisierung
+  locales = [ \"$locale\" ];
+  keyboardLayout = \"$keyboard_layout\";"
+    if [[ -n "$keyboard_options" ]]; then
+        content+="
+  keyboardOptions = \"$keyboard_options\";"
+    fi
+    content+="
+}
+"
+    
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/localization-config.nix" "$content"
+}
+
+# Create hardware-config.nix
 init_hardware_config() {
-    log_debug "Updating hardware configuration..."
-    sed -i \
-        -e "s|@CPU@|$CPU_VENDOR|" \
-        -e "s|@GPU@|$GPU_CONFIG|" \
-        "$temp_config"
+    log_debug "Creating hardware-config.nix..."
+    local cpu="${CPU_VENDOR:-none}"
+    local gpu="${GPU_CONFIG:-none}"
+    local memory_gb="${MEMORY_GB:-}"
+    
+    local content="{"
+    content+="
+  hardware = {
+    cpu = \"$cpu\";
+    gpu = \"$gpu\";"
+    if [[ -n "$memory_gb" ]]; then
+        content+="
+    memory = {
+      sizeGB = $memory_gb;
+    };"
+    fi
+    content+="
+  };
+}
+"
+    
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/hardware-config.nix" "$content"
 }
 
-init_nix_config() {
-    log_debug "Updating Nix configuration..."
-    sed -i \
-        -e "s|@ALLOW_UNFREE@|true|" \
-        -e "s|@BUILD_LOG_LEVEL@|minimal|" \
-        -e "s|@ENTRY_MANAGEMENT@|false|" \
-        -e "s|@PREBUILD_CHECKS@|false|" \
-        -e "s|@SSH_CLIENT_MANAGER@|false|" \
-        -e "s|@SSH_SERVER_MANAGER@|false|" \
-        -e "s|@FLAKE_UPDATER@|false|" \
-        "$temp_config"
+# Create features-config.nix
+init_features_config() {
+    log_debug "Creating features-config.nix..."
+    local system_logger="${SYSTEM_LOGGER:-true}"
+    local system_checks="${SYSTEM_CHECKS:-true}"
+    local system_updater="${SYSTEM_UPDATER:-true}"
+    local ssh_client="${SSH_CLIENT_MANAGER:-false}"
+    local ssh_server="${SSH_SERVER_MANAGER:-false}"
+    local bootentry="${BOOTENTRY_MANAGER:-false}"
+    local homelab="${HOMELAB_MANAGER:-false}"
+    local vm="${VM_MANAGER:-false}"
+    local ai="${AI_WORKSPACE:-false}"
+    
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/features-config.nix" "{
+  features = {
+    system-logger = $system_logger;
+    system-checks = $system_checks;
+    system-updater = $system_updater;
+    ssh-client-manager = $ssh_client;
+    ssh-server-manager = $ssh_server;
+    bootentry-manager = $bootentry;
+    homelab-manager = $homelab;
+    vm-manager = $vm;
+    ai-workspace = $ai;
+  };
+}
+"
 }
 
-init_localization() {
-    log_debug "Updating localization..."
-    sed -i \
-        -e "s|@TIMEZONE@|$SYSTEM_TIMEZONE|" \
-        -e "s|@LOCALE@|$SYSTEM_LOCALE|" \
-        -e "s|@KEYBOARD_LAYOUT@|$SYSTEM_KEYBOARD_LAYOUT|" \
-        -e "s|@KEYBOARD_OPTIONS@|$SYSTEM_KEYBOARD_OPTIONS|" \
-        "$temp_config"
+# Create logging-config.nix
+init_logging_config() {
+    log_debug "Creating logging-config.nix..."
+    local build_log_level="${BUILD_LOG_LEVEL:-minimal}"
+    
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/logging-config.nix" "{
+  # Build-Logging
+  buildLogLevel = \"$build_log_level\";
+}
+"
 }
 
+# Create hosting-config.nix
 init_hosting_config() {
-    log_debug "Updating hosting configuration..."
-    sed -i \
-        -e "s|@DOMAIN@|${HOST_DOMAIN:-example.com}|" \
-        -e "s|@EMAIL@|${HOST_EMAIL:-admin@example.com}|" \
-        -e "s|@VIRT_USER@|${VIRT_USER:-docker}|" \
-        "$temp_config"
+    log_debug "Creating hosting-config.nix..."
+    local domain="${HOST_DOMAIN:-}"
+    local email="${HOST_EMAIL:-}"
+    
+    if [[ -z "$domain" && -z "$email" ]]; then
+        # Skip if no hosting info
+        return 0
+    fi
+    
+    local content="{"
+    if [[ -n "$email" ]]; then
+        content+="
+  email = \"$email\";"
+    fi
+    if [[ -n "$domain" ]]; then
+        content+="
+  domain = \"$domain\";"
+    fi
+    content+="
+}
+"
+    
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/hosting-config.nix" "$content"
 }
 
-init_profile_overrides() {
-    log_debug "Updating profile overrides..."
-    sed -i \
-        -e "s|@OVERRIDE_SSH@|null|" \
-        -e "s|@OVERRIDE_STEAM@|true|" \
-        "$temp_config"
+# Create overrides-config.nix
+init_overrides_config() {
+    log_debug "Creating overrides-config.nix..."
+    local override_ssh="${OVERRIDE_SSH:-null}"
+    local override_steam="${OVERRIDE_STEAM:-true}"
+    
+    local content="{"
+    content+="
+  overrides = {"
+    if [[ "$override_ssh" != "null" ]]; then
+        content+="
+    enableSSH = $override_ssh;"
+    else
+        content+="
+    enableSSH = null;"
+    fi
+    content+="
+    enableSteam = $override_steam;
+  };
+}
+"
+    
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/overrides-config.nix" "$content"
 }
 
 restore_backup() {
     if [[ -f "${SYSTEM_CONFIG_FILE}.backup" ]]; then
         mv "${SYSTEM_CONFIG_FILE}.backup" "$SYSTEM_CONFIG_FILE"
         log_info "Restored backup configuration"
+    fi
+    if [[ -d "$(dirname "$SYSTEM_CONFIG_FILE")/configs.backup."* ]]; then
+        local backup_dir=$(ls -td "$(dirname "$SYSTEM_CONFIG_FILE")/configs.backup."* 2>/dev/null | head -1)
+        if [[ -n "$backup_dir" ]]; then
+            rm -rf "$(dirname "$SYSTEM_CONFIG_FILE")/configs"
+            mv "$backup_dir" "$(dirname "$SYSTEM_CONFIG_FILE")/configs"
+            log_info "Restored backup configs directory"
+        fi
     fi
 }
 

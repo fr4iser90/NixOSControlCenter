@@ -6,46 +6,57 @@ let
   ui = config.features.terminal-ui.api;
   commandCenter = config.features.command-center;
   hostname = systemConfig.hostName;
-  configPath = "/etc/nixos/system-config.nix";
+  desktopConfigPath = "/etc/nixos/configs/desktop-config.nix";
 
-  minimizeScript = pkgs.writeScriptBin "ncc-homelab-minimize" ''
+  # Helper to update desktop-config.nix
+  updateDesktopConfig = pkgs.writeShellScriptBin "update-desktop-config" ''
     #!${pkgs.bash}/bin/bash
-    set -e
+    set -euo pipefail
     
-    # Sudo check
-    if [ "$EUID" -ne 0 ]; then
-      echo "Error: This script must be run as root (use sudo)"
-      exit 1
+    local config_file="${desktopConfigPath}"
+    local enable_value="$1"
+    
+    # Create configs directory if it doesn't exist
+    mkdir -p "$(dirname "$config_file")"
+    
+    # Read existing desktop config if it exists
+    local existing_env="plasma"
+    local existing_display_mgr="sddm"
+    local existing_display_server="wayland"
+    local existing_session="plasma"
+    local existing_dark="true"
+    local existing_audio="pipewire"
+    
+    if [ -f "$config_file" ]; then
+      existing_env=$(grep -o 'environment = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "plasma")
+      existing_display_mgr=$(grep -o 'manager = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "sddm")
+      existing_display_server=$(grep -o 'server = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "wayland")
+      existing_session=$(grep -o 'session = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "plasma")
+      existing_dark=$(grep -o 'dark = [^;]*' "$config_file" 2>/dev/null | grep -o '[^=]*$' | tr -d ' ' || echo "true")
+      existing_audio=$(grep -o 'audio = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "pipewire")
     fi
-
-    echo "Disabling desktop..."
-    if ! ${pkgs.gnused}/bin/sed -i \
-      's/\(\s*enable\s*=\s*\)\(true\|false\)\s*;/\1false;/' ${configPath}; then
-      echo "Failed to disable desktop"
-      exit 1
-    fi
-
-    echo "Enabling SSH Client & Server Manager..."
-    if ! ${pkgs.gnused}/bin/sed -i \
-      's/\(\s*ssh-client-manager\s*=\s*\)\(true\|false\)\s*;/\1true;/' ${configPath}; then
-      echo "Failed to enable SSH Client Manager"
-      exit 1
-    fi
-
-    if ! ${pkgs.gnused}/bin/sed -i \
-      's/\(\s*ssh-server-manager\s*=\s*\)\(true\|false\)\s*;/\1true;/' ${configPath}; then
-      echo "Failed to enable SSH Server Manager"
-      exit 1
-    fi
-
-    echo "Applying changes with nixos-rebuild..."
-    if sudo nixos-rebuild switch --flake /etc/nixos#${hostname}; then
-      echo "System successfully minimized!"
-    else
-      echo "Rebuild failed! Check logs for details."
-      exit 1
-    fi
+    
+    # Write complete desktop-config.nix
+    cat > "$config_file" <<EOF
+{
+  # Desktop-Environment
+  desktop = {
+    enable = $enable_value;
+    environment = "$existing_env";
+    display = {
+      manager = "$existing_display_mgr";
+      server = "$existing_display_server";
+      session = "$existing_session";
+    };
+    theme = {
+      dark = $existing_dark;
+    };
+    audio = "$existing_audio";
+  };
+}
+EOF
   '';
+
   enableDesktopScript = pkgs.writeScriptBin "enable-desktop" ''
     #!${pkgs.bash}/bin/bash
     set -e
@@ -59,10 +70,10 @@ let
     # Enable or disable desktop
     if [ "$1" == "disable" ]; then
       echo "Disabling desktop..."
-      ${pkgs.gnused}/bin/sed -i 's/desktop.enable = true;/desktop.enable = false;/g' /etc/nixos/configuration.nix
+      ${updateDesktopConfig}/bin/update-desktop-config "false"
     elif [ "$1" == "enable" ]; then
       echo "Enabling desktop..."
-      ${pkgs.gnused}/bin/sed -i 's/desktop.enable = false;/desktop.enable = true;/g' /etc/nixos/configuration.nix
+      ${updateDesktopConfig}/bin/update-desktop-config "true"
     else
       echo "Invalid option. Use 'enable' or 'disable'."
       exit 1
@@ -70,26 +81,28 @@ let
 
     # Apply the changes
     echo "Rebuilding system..."
-    sudo nixos-rebuild switch
+    sudo nixos-rebuild switch --flake /etc/nixos#${hostname}
 
     echo "Desktop configuration updated successfully!"
   '';
 
 in {
   config = {
-    environment.systemPackages = [ desktopManagerScript ];
+    environment.systemPackages = [ enableDesktopScript updateDesktopConfig ];
 
     features.command-center.commands = [
       {
         name = "desktop-manager";
-        description = "Dekstop manager";
+        description = "Enable or disable desktop environment";
         category = "system";
-        script = "${desktopManagerScript}/bin/ncc-desktop-manager";
-        arguments = [];
-        dependencies = [ "nix" "gnused" ];
-        shortHelp = "homelab-minimize - Disable desktop and enable SSH";
+        script = "${enableDesktopScript}/bin/enable-desktop";
+        arguments = [ "enable|disable" ];
+        dependencies = [ "nix" ];
+        shortHelp = "Enable or disable the desktop environment";
         longHelp = ''
-
+          Allows enabling or disabling the desktop environment:
+          - "enable" to activate the desktop
+          - "disable" to deactivate the desktop
           Requires sudo privileges and triggers system rebuild.
         '';
       }
