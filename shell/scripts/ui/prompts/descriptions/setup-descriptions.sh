@@ -12,9 +12,9 @@ declare -g -A SETUP_DESCRIPTIONS=(
     ["configure-a-custom-setup"]="Select a base system (Desktop or Server) and then add specific features to customize your installation."
 
     # System Presets (aktuell verwendete Presets)
-    ["desktop"]="Base desktop environment with graphical interface, suitable for daily use, gaming, or development work."
-    ["server"]="Base server system with command-line interface, optimized for hosting services, applications, or websites."
-    ["homelab server"]="Complete homelab setup with Docker, databases, web servers, and home automation services."
+    ["desktop"]="Base desktop environment with GUI (Plasma). Includes basic desktop tools. No services (Docker, databases, etc.). Perfect for workstation, gaming PC, or development machine."
+    ["server"]="Minimal server system with CLI only. Includes SSH server and base server tools. No services (Docker, databases, etc.). Perfect for minimal server or custom setup."
+    ["homelab server"]="Server system with CLI. Pre-configured with Docker (rootless), databases, and web servers. Ready for self-hosted services and home automation."
     
     # Device Presets
     ["jetson nano"]="Specialized setup for NVIDIA Jetson Nano, configured for AI/ML development, robotics, and GPU optimization."
@@ -93,14 +93,14 @@ declare -g -A SETUP_FEATURES=(
     ["configure-a-custom-setup"]="Flexible base system selection|Modular features|Custom configuration options"
     
     # System Presets
-    ["homelab server"]="Docker|Database|Web Server|Home Automation|Media Streaming|Network Storage"
+    ["homelab server"]="Docker (rootless)|Database (PostgreSQL/MySQL)|Web Server (nginx/apache)|SSH Server|Ready for Services|No GUI (CLI only)"
     
     # Device Presets
     ["jetson nano"]="NVIDIA Jetson Support|AI/ML Development Tools|Robotics Framework|GPU Optimization"
     
     # Base Modes (für Custom Setup)
-    ["desktop"]="Graphical Interface|Basic Applications|Network Management|Printer Support"
-    ["server"]="Command-line Interface|SSH Access|System Monitoring|Backup Tools"
+    ["desktop"]="Graphical Interface (Plasma)|Basic Desktop Applications|Network Management|Printer Support|No Services (add via Custom Install)"
+    ["server"]="Command-line Interface|SSH Server Enabled|System Monitoring Tools|Backup Tools|No Services (add via Custom Install)"
     
     # Desktop Features
     ["streaming"]="OBS Studio|Streaming Tools|Performance Tweaks"

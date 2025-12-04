@@ -24,44 +24,48 @@ select_setup_mode() {
     [ -z "$install_type_choice" ] && { log_error "No installation type selected."; return 1; }
 
     if [[ "$install_type_choice" == "📦 Presets" ]]; then
-        # 2a. Preset-Typ auswählen
-        local preset_type_choice
-        preset_type_choice=$(printf "%s\n" "🖥️  System Presets" "🤖 Device Presets" | fzf \
-            --header="Select preset category" \
+        # Build grouped preset list (like Custom Install features)
+        local preset_list=""
+        preset_list+="🖥️  System Presets\n"
+        for preset in "${SYSTEM_PRESETS[@]}"; do
+            preset_list+="  $preset\n"
+        done
+        
+        # Add Device Presets if any exist
+        if [[ ${#DEVICE_PRESETS[@]} -gt 0 ]]; then
+            preset_list+="\n🤖 Device Presets\n"
+            for preset in "${DEVICE_PRESETS[@]}"; do
+                preset_list+="  $preset\n"
+            done
+        fi
+        
+        # Show grouped presets with fzf
+        local preset_choice
+        preset_choice=$(printf "%b" "$preset_list" | fzf \
+            --header="Select preset" \
             --bind 'space:accept' \
             --preview "$PREVIEW_SCRIPT {}" \
             --preview-window="right:50%:wrap" \
             --pointer="▶" \
-            --marker="✓") || { log_error "Preset type selection cancelled."; return 1; }
-
-        if [[ "$preset_type_choice" == "🖥️  System Presets" ]]; then
-            # System Presets auswählen
-            local preset_choice
-            preset_choice=$(printf "%s\n" "${SYSTEM_PRESETS[@]}" | fzf \
-                --header="Select system preset" \
-                --bind 'space:accept' \
-                --preview "$PREVIEW_SCRIPT {}" \
-                --preview-window="right:50%:wrap" \
-                --pointer="▶" \
-                --marker="✓") || { log_error "Preset selection cancelled."; return 1; }
-            
-            [ -z "$preset_choice" ] && { log_error "No preset selected."; return 1; }
-            final_selection=("$preset_choice")
-            
-        elif [[ "$preset_type_choice" == "🤖 Device Presets" ]]; then
-            # Device Presets auswählen
-            local preset_choice
-            preset_choice=$(printf "%s\n" "${DEVICE_PRESETS[@]}" | fzf \
-                --header="Select device preset" \
-                --bind 'space:accept' \
-                --preview "$PREVIEW_SCRIPT {}" \
-                --preview-window="right:50%:wrap" \
-                --pointer="▶" \
-                --marker="✓") || { log_error "Preset selection cancelled."; return 1; }
-            
-            [ -z "$preset_choice" ] && { log_error "No preset selected."; return 1; }
-            final_selection=("$preset_choice")
+            --marker="✓") || { log_error "Preset selection cancelled."; return 1; }
+        
+        # Filter out group headers (lines starting with emoji)
+        if [[ "$preset_choice" =~ ^[🖥️🤖] ]]; then
+            log_error "Cannot select category header. Please select a preset."
+            return 1
         fi
+        
+        # Remove indentation
+        preset_choice=$(echo "$preset_choice" | sed 's/^  //')
+        
+        # Validate it's a real preset
+        if ! printf "%s\n" "${SYSTEM_PRESETS[@]}" "${DEVICE_PRESETS[@]}" | grep -q "^${preset_choice}$"; then
+            log_error "Invalid preset selected: $preset_choice"
+            return 1
+        fi
+        
+        [ -z "$preset_choice" ] && { log_error "No preset selected."; return 1; }
+        final_selection=("$preset_choice")
 
     elif [[ "$install_type_choice" == "⚙️  Advanced Options" ]]; then
         # 2b. Advanced Option auswählen
