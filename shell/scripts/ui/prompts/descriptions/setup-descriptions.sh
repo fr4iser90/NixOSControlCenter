@@ -3,9 +3,9 @@
 # Definiere die Beschreibungen
 declare -g -A SETUP_DESCRIPTIONS=(
     # Installation Types
-    ["📦 presets"]="Ready-to-use system configurations. Choose from system presets (Desktop, Server, Homelab) or device-specific presets (Jetson Nano, etc.)."
-    ["🔧 custom setup"]="Select a base system (Desktop or Server) and then add specific features to customize your installation step-by-step."
-    ["⚙️  advanced options"]="Advanced configuration options including loading profiles from files, viewing available profiles, and importing existing configurations."
+    ["presets"]="Ready-to-use system configurations. Choose from system presets (Desktop, Server, Homelab) or device-specific presets (Jetson Nano, etc.)."
+    ["custom setup"]="Select a base system (Desktop or Server) and then add specific features to customize your installation step-by-step."
+    ["advanced options"]="Advanced configuration options including loading profiles from files, viewing available profiles, and importing existing configurations."
     
     # Legacy (for backward compatibility)
     ["install-a-predefined-profile"]="Choose from a list of ready-to-go system configurations tailored for specific use cases or hardware."
@@ -20,9 +20,15 @@ declare -g -A SETUP_DESCRIPTIONS=(
     ["jetson nano"]="Specialized setup for NVIDIA Jetson Nano, configured for AI/ML development, robotics, and GPU optimization."
     
     # Advanced Options
-    ["📁 load profile from file"]="Load a custom profile configuration from a file path. Supports relative paths (profiles/name) or absolute paths."
-    ["📋 show available profiles"]="Browse and select from available profile files in the profiles directory."
-    ["🔄 import from existing config"]="Import settings from an existing system-config.nix file."
+    ["load profile from file"]="Load a custom profile configuration from a file path. Supports relative paths (profiles/name) or absolute paths."
+    ["show available profiles"]="Browse and select from available profile files in the profiles directory."
+    ["import from existing config"]="Import settings from an existing system-config.nix file."
+    
+    # Desktop Environments (for Custom Install Step 2)
+    ["plasma (kde)"]="Plasma Desktop Environment (KDE). Modern, feature-rich, highly customizable desktop with extensive configuration options. Best for power users."
+    ["gnome"]="GNOME Desktop Environment. Clean, modern, touch-friendly interface. Focuses on simplicity and ease of use. Great for productivity."
+    ["xfce"]="XFCE Desktop Environment. Lightweight, fast, traditional desktop. Perfect for older hardware or users who prefer a classic desktop experience."
+    ["none"]="No desktop environment. Server-like setup with CLI only. Perfect for headless servers or minimal installations."
 
     # Desktop Features (neue Struktur)
     ["streaming"]="Gaming streaming tools (OBS Studio, etc.)"
@@ -99,8 +105,8 @@ declare -g -A SETUP_FEATURES=(
     ["jetson nano"]="NVIDIA Jetson Support|AI/ML Development Tools|Robotics Framework|GPU Optimization"
     
     # Base Modes (für Custom Setup)
-    ["desktop"]="Graphical Interface (Plasma)|Basic Desktop Applications|Network Management|Printer Support|No Services (add via Custom Install)"
-    ["server"]="Command-line Interface|SSH Server Enabled|System Monitoring Tools|Backup Tools|No Services (add via Custom Install)"
+    ["desktop"]="Desktop system with graphical interface. You will choose a desktop environment (Plasma, GNOME, or XFCE) in the next step. Includes basic desktop applications, network management, and printer support. No services (add via features)."
+    ["server"]="Server system with command-line interface only. No graphical interface. Includes SSH server, system monitoring tools, and backup tools. No services (add via features)."
     
     # Desktop Features
     ["streaming"]="OBS Studio|Streaming Tools|Performance Tweaks"

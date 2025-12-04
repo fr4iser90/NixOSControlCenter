@@ -157,14 +157,56 @@ select_setup_mode() {
             final_selection=("IMPORT_CONFIG:$existing_config")
         fi
 
-    elif [[ "$install_type_choice" == "🔧 Custom Install" ]]; then
-        # Unified Feature Selection - keine Desktop/Server-Trennung mehr
+    elif [[ "$install_type_choice" == "🔧 Custom Setup" ]]; then
+        # STEP 1: System Type Selection
+        log_info "Step 1/3: Select system type"
+        local system_type_choice
+        system_type_choice=$(printf "%s\n" "Desktop" "Server" | fzf \
+            --header="Select system type" \
+            --bind 'space:accept' \
+            --preview "$PREVIEW_SCRIPT {}" \
+            --preview-window="right:50%:wrap" \
+            --pointer="▶" \
+            --marker="✓") || { log_error "System type selection cancelled."; return 1; }
         
-        # Zeige Features mit Präfixen (keine Header, keine Emojis)
+        # Convert to lowercase
+        local system_type="${system_type_choice,,}"
+        log_info "Selected system type: $system_type"
+        
+        # STEP 2: Desktop Environment Selection (nur bei Desktop)
+        local desktop_env=""
+        if [[ "$system_type" == "desktop" ]]; then
+            log_info "Step 2/3: Select desktop environment"
+            local de_choice
+            de_choice=$(printf "%s\n" "Plasma (KDE)" "GNOME" "XFCE" "None" | fzf \
+                --header="Select desktop environment" \
+                --bind 'space:accept' \
+                --preview "$PREVIEW_SCRIPT {}" \
+                --preview-window="right:50%:wrap" \
+                --pointer="▶" \
+                --marker="✓") || { log_error "Desktop environment selection cancelled."; return 1; }
+            
+            # Convert to internal name
+            case "$de_choice" in
+                "Plasma (KDE)") desktop_env="plasma" ;;
+                "GNOME") desktop_env="gnome" ;;
+                "XFCE") desktop_env="xfce" ;;
+                "None") desktop_env="" ;;
+            esac
+            log_info "Selected desktop environment: ${desktop_env:-None}"
+        fi
+        
+        # STEP 3: Feature Selection (OHNE Desktop Environment)
+        log_info "Step ${desktop_env:+3/3:}${desktop_env:-2/2:} Select features"
         local feature_list=""
         for group in "${FEATURE_GROUPS[@]}"; do
             group_name="${group%%:*}"
             group_features="${group#*:}"
+            
+            # Skip Desktop Environment group (bereits in Schritt 2 gewählt)
+            if [[ "$group_name" == "Desktop Environment" ]]; then
+                continue
+            fi
             
             # Emoji entfernen aus group_name (falls noch vorhanden)
             clean_group_name=$(echo "$group_name" | sed 's/^[🖥️📦🎮🐳💾] *//')
@@ -194,14 +236,16 @@ select_setup_mode() {
             [[ -n "$clean_choice" ]] && selected_features+=("$clean_choice")
         done <<< "$feature_choices_string"
         
-        # Auto Conflict Resolution
+        # Auto Conflict Resolution (nur für Containerization)
         selected_features=($(resolve_conflicts "${selected_features[@]}"))
         
         # Auto Dependency Resolution
         selected_features=($(resolve_dependencies "${selected_features[@]}"))
         
-        # System-Typ automatisch erkennen
-        local system_type=$(detect_system_type "${selected_features[@]}")
+        # Desktop Environment hinzufügen (wenn gewählt)
+        if [[ -n "$desktop_env" ]]; then
+            selected_features=("$desktop_env" "${selected_features[@]}")
+        fi
         
         # Finale Auswahl: System-Typ + Features
         final_selection=("$system_type" "${selected_features[@]}")

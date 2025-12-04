@@ -7,7 +7,7 @@ declare -g -A MODULE_OPTIONS
 # Neue Struktur für die Auswahl
 INSTALL_TYPE_OPTIONS=(
     "📦 Presets"
-    "🔧 Custom Install"
+    "🔧 Custom Setup"
     "⚙️ Advanced Options"
 )
 
