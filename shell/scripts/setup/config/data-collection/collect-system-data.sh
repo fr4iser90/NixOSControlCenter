@@ -71,6 +71,9 @@ init_system_config() {
     fi
     
     write_nix_config "$SYSTEM_CONFIG_FILE" "{
+  # Configuration Schema Version
+  configVersion = \"2.0\";
+  
   # System-Identität
   systemType = \"${SYSTEM_TYPE:-desktop}\";
   hostName = \"$(hostname)\";

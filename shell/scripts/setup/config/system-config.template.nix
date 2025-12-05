@@ -1,4 +1,7 @@
 {
+  # Configuration Schema Version
+  configVersion = "2.0";
+  
   # System-Identität
   systemType = "@SYSTEM_TYPE@";
   hostName = "@HOSTNAME@";
