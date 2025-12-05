@@ -225,21 +225,29 @@ PKGEOF
 PKGEOF
         ADDITIONAL=$(${pkgs.jq}/bin/jq -r '.additionalPackageModules // [] | if type == "array" then . | join(" ") else "[]" end' <<< "$OLD_CONFIG_JSON")
         if [ -n "$ADDITIONAL" ] && [ "$ADDITIONAL" != "[]" ]; then
-          ADDITIONAL_LIST=$(echo "$ADDITIONAL" | sed 's/^/    "/;s/ /"\n    "/g;s/$/"/')
           cat >> "$CONFIGS_DIR/packages-config.nix" <<PKGEOF
   additionalPackageModules = [
-$ADDITIONAL_LIST
+PKGEOF
+          for module in $ADDITIONAL; do
+            [ -z "$module" ] && continue
+            echo "    \"$module\"" >> "$CONFIGS_DIR/packages-config.nix"
+          done
+          cat >> "$CONFIGS_DIR/packages-config.nix" <<PKGEOF
   ];
 PKGEOF
         fi
       else
         PACKAGE_MODULES=$(${pkgs.jq}/bin/jq -r '.packageModules // [] | if type == "array" then . | join(" ") else "[]" end' <<< "$OLD_CONFIG_JSON")
         if [ -n "$PACKAGE_MODULES" ] && [ "$PACKAGE_MODULES" != "[]" ]; then
-          MODULES_LIST=$(echo "$PACKAGE_MODULES" | sed 's/^/    "/;s/ /"\n    "/g;s/$/"/')
           cat >> "$CONFIGS_DIR/packages-config.nix" <<PKGEOF
   # Package modules directly
   packageModules = [
-$MODULES_LIST
+PKGEOF
+          for module in $PACKAGE_MODULES; do
+            [ -z "$module" ] && continue
+            echo "    \"$module\"" >> "$CONFIGS_DIR/packages-config.nix"
+          done
+          cat >> "$CONFIGS_DIR/packages-config.nix" <<PKGEOF
   ];
 PKGEOF
         else

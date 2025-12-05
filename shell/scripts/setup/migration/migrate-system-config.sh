@@ -578,50 +578,40 @@ EOF
 EOF
         if [[ -n "$additional" && "$additional" != "[]" ]]; then
             # Filter out empty strings and format properly
-            local additional_list=""
+            cat >> "$configs_dir/packages-config.nix" <<EOF
+  additionalPackageModules = [
+EOF
+            local first=true
             for module in $additional; do
                 # Skip empty strings
                 [[ -z "$module" ]] && continue
-                if [[ -z "$additional_list" ]]; then
-                    additional_list="    \"$module\""
-                else
-                    additional_list="$additional_list\n    \"$module\""
-                fi
+                echo "    \"$module\"" >> "$configs_dir/packages-config.nix"
             done
-            if [[ -n "$additional_list" ]]; then
-                cat >> "$configs_dir/packages-config.nix" <<EOF
-  additionalPackageModules = [
-$additional_list
+            cat >> "$configs_dir/packages-config.nix" <<EOF
   ];
 EOF
-            fi
         fi
     else
         if [[ -n "$package_modules" && "$package_modules" != "[]" ]]; then
             # Filter out empty strings and format properly
-            local modules_list=""
+            cat >> "$configs_dir/packages-config.nix" <<EOF
+  # Package modules directly
+  packageModules = [
+EOF
+            local first=true
             for module in $package_modules; do
                 # Skip empty strings
                 [[ -z "$module" ]] && continue
-                if [[ -z "$modules_list" ]]; then
-                    modules_list="    \"$module\""
+                if [[ "$first" == "true" ]]; then
+                    echo "    \"$module\"" >> "$configs_dir/packages-config.nix"
+                    first=false
                 else
-                    modules_list="$modules_list\n    \"$module\""
+                    echo "    \"$module\"" >> "$configs_dir/packages-config.nix"
                 fi
             done
-            if [[ -n "$modules_list" ]]; then
-                cat >> "$configs_dir/packages-config.nix" <<EOF
-  # Package modules directly
-  packageModules = [
-$modules_list
+            cat >> "$configs_dir/packages-config.nix" <<EOF
   ];
 EOF
-            else
-                cat >> "$configs_dir/packages-config.nix" <<EOF
-  # Package modules (empty)
-  packageModules = [];
-EOF
-            fi
         else
             cat >> "$configs_dir/packages-config.nix" <<EOF
   # Package modules (empty)
