@@ -2,7 +2,7 @@
   description = "Homelab Server";
   systemTypes = [ "server" ];
   features = [
-    "docker-rootless"
+    "docker"
     "database"
     "web-server"
   ];

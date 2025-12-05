@@ -101,8 +101,7 @@ setup_server() {
         
         # Map feature names
         case "$feature" in
-            "Docker"|"docker") feature_name="docker-rootless" ;;
-            "docker-rootless") feature_name="docker-rootless" ;;
+            "Docker"|"docker") feature_name="docker" ;;
             "Database"|"database") feature_name="database" ;;
             "web-server") feature_name="web-server" ;;
             "mail-server") feature_name="mail-server" ;;

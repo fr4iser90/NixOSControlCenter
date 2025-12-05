@@ -274,7 +274,7 @@ detect_system_type() {
     # Server-Features (ohne Desktop-Env) → Server
     if [[ -z "$system_type" ]]; then
         for feature in "${features[@]}"; do
-            if [[ "$feature" =~ ^(database|web-server|mail-server|docker|docker-rootless|podman)$ ]]; then
+            if [[ "$feature" =~ ^(database|web-server|mail-server|docker|podman)$ ]]; then
                 system_type="server"
                 break
             fi

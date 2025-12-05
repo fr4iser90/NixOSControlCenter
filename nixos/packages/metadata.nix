@@ -60,20 +60,12 @@
     
     # Virtualization Features
     docker = {
-      systemTypes = [ "server" ];
-      group = "virtualization";
-      description = "Docker with root (for Swarm/OCI)";
-      dependencies = [];
-      conflicts = [ "docker-rootless" "podman" ];
-    };
-    
-    docker-rootless = {
       systemTypes = [ "desktop" "server" ];
       group = "virtualization";
-      description = "Rootless Docker (safer, default)";
+      description = "Docker containerization. Automatically uses rootless (safer, default). Uses root only if Docker Swarm or AI-Workspace is active.";
       dependencies = [];
-      conflicts = [ "docker" "podman" ];
-      legacyPath = "server.docker";  # Migration: server.docker → docker-rootless (default)
+      conflicts = [ "podman" ];
+      legacyPath = "server.docker";  # Migration: server.docker → docker (automatic rootless)
     };
     
     qemu-vm = {

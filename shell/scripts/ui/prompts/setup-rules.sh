@@ -10,9 +10,8 @@ declare -A REQUIRES=(
 # Feature Conflicts (neue Struktur)
 # Format: ["feature"]="conflict1 conflict2"
 declare -A CONFLICTS=(
-    ["docker"]="docker-rootless podman"
-    ["docker-rootless"]="docker podman"
-    ["podman"]="docker docker-rootless"
+    ["docker"]="podman"
+    ["podman"]="docker"
 )
 
 # Einfache Funktion zum Aktivieren der Abhängigkeiten

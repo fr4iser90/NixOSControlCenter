@@ -39,8 +39,7 @@ declare -g -A SETUP_DESCRIPTIONS=(
     ["system-dev"]="System development tools (cmake, ninja, gcc, clang)"
 
     # Server Features (neue Struktur)
-    ["docker"]="Docker containerization (root, for Swarm/OCI)"
-    ["docker-rootless"]="Docker containerization (rootless, safer, default)"
+    ["docker"]="Docker containerization. Automatically uses rootless (safer, default). Uses root only if Docker Swarm or AI-Workspace is active."
     ["database"]="Database services (PostgreSQL, MySQL, etc.)"
     ["web-server"]="Web server (nginx, apache)"
     ["mail-server"]="Mail server"
@@ -118,7 +117,6 @@ declare -g -A SETUP_FEATURES=(
     
     # Server Features
     ["docker"]="Container Runtime|Compose Support|Network Management|Volume Management"
-    ["docker-rootless"]="Container Runtime (Rootless)|Compose Support|Safer Default"
     ["database"]="PostgreSQL|MySQL/MariaDB|Redis Cache|Backup Tools"
     ["web-server"]="Nginx|Apache|Web Server Tools"
     ["mail-server"]="Mail Server|SMTP|IMAP|POP3"

@@ -203,11 +203,9 @@ detect_and_setup_docker_users() {
     for feature in "${features[@]}"; do
         if [[ "$feature" == "docker" ]]; then
             docker_feature="docker"
-            docker_mode="docker"
-            break
-        elif [[ "$feature" == "docker-rootless" ]]; then
-            docker_feature="docker-rootless"
-            docker_mode="docker-rootless"
+            # Docker mode wird automatisch in getDockerMode entschieden (rootless default, root bei Swarm/AI-Workspace)
+            # Für User Setup: rootless ist Standard (kein extra user nötig)
+            docker_mode="docker-rootless"  # Default für User Setup
             break
         fi
     done
@@ -246,15 +244,11 @@ detect_and_setup_docker_users() {
 
 # Get Docker user setup preference
 get_docker_user_setup() {
-    local docker_mode="$1"  # "docker" or "docker-rootless"
-    local default_response
+    local docker_mode="$1"  # "docker" (wird automatisch rootless oder root)
+    local default_response="n"  # Rootless Docker (Standard) → Main User (default)
     
-    # Determine default based on Docker mode
-    if [[ "$docker_mode" == "docker" ]]; then
-        default_response="y"  # Root Docker → Extra User (default)
-    else
-        default_response="n"  # Rootless Docker → Main User (default)
-    fi
+    # Check if Swarm is active (dann braucht man root, aber das wird automatisch gemacht)
+    # Für User Setup: rootless ist Standard
     
     local response
     while true; do
@@ -280,7 +274,7 @@ get_docker_user_setup() {
 # Setup Docker users in system-config.nix
 setup_docker_users() {
     local user_setup_mode="$1"  # "extra" or "main"
-    local docker_mode="$2"  # "docker" or "docker-rootless"
+    local docker_mode="$2"  # "docker" (wird automatisch rootless oder root entschieden)
     
     local main_user="$(logname)"
     local virt_user=""

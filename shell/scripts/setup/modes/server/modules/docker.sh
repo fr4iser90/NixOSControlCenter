@@ -15,17 +15,17 @@ update_packages_config() {
         existing_modules=$(grep -A 100 'packageModules = \[' "$config_file" | grep -o '"[^"]*"' | tr -d '"' | tr '\n' ' ' | sed 's/ $//')
     fi
     
-    # Add or remove docker-rootless
+    # Add or remove docker
     if [[ "$2" == "add" ]]; then
-        if [[ "$existing_modules" != *"docker-rootless"* ]]; then
+        if [[ "$existing_modules" != *"docker"* ]]; then
             if [[ -n "$existing_modules" ]]; then
-                existing_modules="$existing_modules docker-rootless"
+                existing_modules="$existing_modules docker"
             else
-                existing_modules="docker-rootless"
+                existing_modules="docker"
             fi
         fi
     elif [[ "$2" == "remove" ]]; then
-        existing_modules=$(echo "$existing_modules" | sed 's/docker-rootless//g' | sed 's/  / /g' | sed 's/^ //' | sed 's/ $//')
+        existing_modules=$(echo "$existing_modules" | sed 's/docker//g' | sed 's/  / /g' | sed 's/^ //' | sed 's/ $//')
     fi
     
     # Build modules list
@@ -46,12 +46,12 @@ EOF
 }
 
 enable_docker() {
-    # Add docker-rootless to packages-config.nix
+    # Add docker to packages-config.nix
     update_packages_config "" "add"
 }
 
 reset_docker_state() {
-    # Remove docker-rootless from packages-config.nix
+    # Remove docker from packages-config.nix
     update_packages_config "" "remove"
 }
 

@@ -116,7 +116,6 @@ setup_desktop() {
             "python-dev") feature_name="python-dev" ;;
             "system-dev") feature_name="system-dev" ;;
             "docker") feature_name="docker" ;;
-            "docker-rootless") feature_name="docker-rootless" ;;
             "database") feature_name="database" ;;
             "web-server") feature_name="web-server" ;;
             *) feature_name="$feature" ;;

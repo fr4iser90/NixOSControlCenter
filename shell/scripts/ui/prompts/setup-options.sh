@@ -55,7 +55,7 @@ ALL_FEATURES=(
     # Gaming & Media
     "streaming" "emulation"
     # Containerization
-    "docker" "docker-rootless" "podman"
+    "docker" "podman"
     # Services
     "database" "web-server" "mail-server"
     # Virtualization
@@ -67,7 +67,7 @@ FEATURE_GROUPS=(
     "Desktop Environment:plasma|gnome|xfce"
     "Development:web-dev|game-dev|python-dev|system-dev"
     "Gaming & Media:streaming|emulation"
-    "Containerization:docker|docker-rootless|podman"
+    "Containerization:docker|podman"
     "Services:database|web-server|mail-server"
     "Virtualization:qemu-vm|virt-manager"
 )
@@ -75,7 +75,7 @@ FEATURE_GROUPS=(
 # Exklusive Gruppen (nur eins auswählbar)
 declare -A -g EXCLUSIVE_GROUPS=(
     ["desktop-environment"]="plasma|gnome|xfce"
-    ["containerization"]="docker|docker-rootless|podman"
+    ["containerization"]="docker|podman"
 )
 
 # Dependencies (automatisch hinzufügen)
@@ -85,9 +85,8 @@ declare -A -g FEATURE_DEPENDENCIES=(
 
 # Conflicts (automatisch abwählen)
 declare -A -g FEATURE_CONFLICTS=(
-    ["docker"]="docker-rootless|podman"
-    ["docker-rootless"]="docker|podman"
-    ["podman"]="docker|docker-rootless"
+    ["docker"]="podman"
+    ["podman"]="docker"
     ["plasma"]="gnome|xfce"
     ["gnome"]="plasma|xfce"
     ["xfce"]="plasma|gnome"
@@ -95,8 +94,8 @@ declare -A -g FEATURE_CONFLICTS=(
 
 # Legacy: Für Backward Compatibility (wird nicht mehr in UI angezeigt)
 declare -A -g SUB_OPTIONS=(
-    ["Desktop"]="None|streaming|emulation|web-dev|game-dev|python-dev|system-dev|docker|docker-rootless|database|web-server"
-    ["Server"]="None|docker|docker-rootless|database|web-server|mail-server"
+    ["Desktop"]="None|streaming|emulation|web-dev|game-dev|python-dev|system-dev|docker|database|web-server"
+    ["Server"]="None|docker|database|web-server|mail-server"
 )
 
 # Preset-Optionen (für Preset-Auswahl)

@@ -62,7 +62,6 @@ add_server_branch() {
     # Virtualization Features (Server)
     tree_ref+=("$TREE_INDENT$TREE_BRANCH Virtualization Features")
     tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH docker")
-    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH docker-rootless")
     tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_LAST qemu-vm")
     
     # Server Features

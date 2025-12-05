@@ -141,7 +141,7 @@ collect_homelab_info() {
     declare -g swarm_role="$swarm_role"
     
     # Docker mode detection (for user setup default)
-    docker_mode=$(detect_docker_mode) || docker_mode="docker-rootless"
+    docker_mode=$(detect_docker_mode) || docker_mode="docker"
     
     # User setup: Extra User vs Main User
     if [[ "$swarm_role" != "none" ]]; then
@@ -205,28 +205,24 @@ get_virt_username() {
 }
 
 get_homelab_type() {
-    local selected
-    selected=$(printf "%s\n" "Single-Server" "Multi-Server (Docker Swarm)" | fzf \
-        --header="Select homelab type" \
-        --height=10 \
-        --pointer="▶" \
-        --marker="✓" \
-        --select-1) || {
-        log_error "Selection cancelled"
-        return 1
-    }
+    local response
+    local default_response="n"
     
-    case "$selected" in
-        "Single-Server")
-            echo "single"
-            return 0
-            ;;
-        "Multi-Server (Docker Swarm)")
+    read -ep $'\033[0;34m[?]\033[0m Use Multi-Server (Docker Swarm)? (y/n)'" [${default_response}]: " response
+    response="${response:-${default_response}}"
+    response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
+    
+    case "$response" in
+        y|yes)
             echo "swarm"
             return 0
             ;;
+        n|no)
+            echo "single"
+            return 0
+            ;;
         *)
-            log_error "Invalid selection"
+            log_error "Invalid response. Please enter 'y' or 'n'."
             return 1
             ;;
     esac
@@ -268,17 +264,18 @@ detect_docker_mode() {
             echo "docker"
             return 0
         elif grep -q '"docker-rootless"' "$packages_config"; then
-            echo "docker-rootless"
+            # Backward compatibility: docker-rootless → docker
+            echo "docker"
             return 0
         fi
     fi
-    # Default to docker-rootless
-    echo "docker-rootless"
+    # Default to docker (wird automatisch rootless, außer bei Swarm/AI-Workspace)
+    echo "docker"
     return 0
 }
 
 get_docker_user_setup() {
-    local docker_mode="$1"  # "docker" or "docker-rootless"
+    local docker_mode="$1"  # "docker" (wird automatisch rootless oder root entschieden)
     local default_response
     
     # Determine default based on Docker mode

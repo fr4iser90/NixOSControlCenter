@@ -14,28 +14,30 @@ let
   #
   # Default strategy:
   # - Default: "rootless" (safer, sufficient for most cases)
+  # - Swarm active → automatically "root" (Docker Swarm requires root)
   # - AI-Workspace active → automatically "root" (OCI containers need root)
-  # - User can explicitly choose "root" for Swarm
+  # - Otherwise: "rootless" (automatic default)
   #
   # Supported values:
   # - false → no Docker
-  # - true → Backward compatibility → "rootless" (Default)
   # - "root" → root Docker (for Swarm/OCI containers)
   # - "rootless" → rootless Docker (safer, Default)
   getDockerMode = dockerFeature:
     let
-      # AI-Workspace needs root (OCI containers)
-      needsRoot = systemConfig.features.ai-workspace or false;
+      # Swarm needs root (Docker Swarm requires root)
+      needsRootForSwarm = (systemConfig.homelab.swarm or null) != null;
       
-      # If "docker" feature active → root
-      # If "docker-rootless" feature active → rootless
-      dockerValue = if dockerFeature == "docker" then "root"
-                    else if dockerFeature == "docker-rootless" then "rootless"
-                    else false;
+      # AI-Workspace needs root (OCI containers)
+      needsRootForAI = systemConfig.features.ai-workspace or false;
+      
+      # If "docker" feature active → check if root is needed
+      dockerValue = if dockerFeature == "docker" then
+        if needsRootForSwarm || needsRootForAI then "root"
+        else "rootless"  # Default: rootless
+      else if dockerFeature == "docker-rootless" then "rootless"  # Backward compatibility
+      else false;
     in
-      if dockerValue == false then false
-      else if needsRoot then "root"  # AI-Workspace overrides to root
-      else dockerValue;  # User choice or Default "rootless"
+      dockerValue;
 
   # Load preset if set
   presetConfig = if systemConfig.preset or null != null then

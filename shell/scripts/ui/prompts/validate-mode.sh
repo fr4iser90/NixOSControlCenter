@@ -11,18 +11,8 @@ validate_selection() {
 
     # Check for feature conflicts
     # Docker conflicts
-    if [[ " ${selections[@]} " =~ " docker " && " ${selections[@]} " =~ " docker-rootless " ]]; then
-        echo "Error: 'docker' and 'docker-rootless' cannot be selected together."
-        return 1
-    fi
-    
     if [[ " ${selections[@]} " =~ " docker " && " ${selections[@]} " =~ " podman " ]]; then
         echo "Error: 'docker' and 'podman' cannot be selected together."
-        return 1
-    fi
-    
-    if [[ " ${selections[@]} " =~ " docker-rootless " && " ${selections[@]} " =~ " podman " ]]; then
-        echo "Error: 'docker-rootless' and 'podman' cannot be selected together."
         return 1
     fi
 
