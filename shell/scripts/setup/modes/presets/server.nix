@@ -80,7 +80,6 @@
   #
   overrides = {
     enableSSH = true;  # Server typically needs SSH
-    enableSteam = false;
   };
 
   #

@@ -80,7 +80,6 @@
   #
   overrides = {
     enableSSH = null;
-    enableSteam = false;
   };
 
   #

@@ -114,6 +114,9 @@ let
 
 in {
   config = {
+    # Enable terminal-ui dependency
+    features.terminal-ui.enable = true;
+    
     environment.systemPackages = [
       mainScript   # Hauptbefehl
       nixcc        # Alternative Namen

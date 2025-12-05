@@ -37,9 +37,9 @@ let
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
     
-    local config_file="${featureConfigPath}"
-    local feature="$1"
-    local value="$2"
+    config_file="${featureConfigPath}"
+    feature="$1"
+    value="$2"
     
     # Create configs directory if it doesn't exist
     mkdir -p "$(dirname "$config_file")"

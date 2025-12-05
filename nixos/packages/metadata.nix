@@ -21,6 +21,14 @@
       conflicts = [];
     };
     
+    gaming = {
+      systemTypes = [ "desktop" ];
+      group = "gaming";
+      description = "Gaming launchers and communication (Steam, Epic, GOG, Discord)";
+      dependencies = [];
+      conflicts = [];
+    };
+    
     # Development Features
     game-dev = {
       systemTypes = [ "desktop" "server" ];

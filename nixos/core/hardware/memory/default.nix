@@ -1,10 +1,15 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  memoryInGB = systemConfig.hardware.ram.sizeGB or 32;  # Default to 32GB if not set
+  # Memory configuration: only enable if hardware.ram.sizeGB is explicitly set
+  # If not set, memory management features are DISABLED
+  # Set hardware.ram.sizeGB in configs/hardware-config.nix or enable system-checks to auto-detect
+  memoryInGB = systemConfig.hardware.ram.sizeGB or null;
 
+  # Only enable memory management if RAM size is configured
+  enableMemoryManagement = memoryInGB != null;
 
-  # Automatic configuration based on available RAM
+  # Automatic configuration based on available RAM (only if enabled)
   memoryConfig = 
     if memoryInGB >= 60 then {
       swappiness = 5;      # Minimal swap usage for high-memory systems
@@ -21,13 +26,20 @@ let
       zramPercent = 35;    # Higher zram to compensate for less RAM
       tmpfsPercent = 50;   # Moderate tmpfs allocation
       minFreeKb = 131072;  # Reserve 128MB for system operations
-    } else {
+    } else if memoryInGB != null then {
       swappiness = 60;     # Aggressive swap usage for low-memory systems
       zramPercent = 50;    # Maximum zram compression
       tmpfsPercent = 25;   # Conservative tmpfs allocation
       minFreeKb = 65536;   # Reserve 64MB for system operations
+    } else {
+      # Not configured - return empty/default values (won't be used anyway)
+      swappiness = 60;
+      zramPercent = 0;
+      tmpfsPercent = 0;
+      minFreeKb = 0;
     };
-in {
+in
+lib.mkIf enableMemoryManagement {
   boot = {
     # Kernel parameters for memory management
     kernelParams = [

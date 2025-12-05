@@ -82,6 +82,7 @@ let
 
 in {
   imports = [
+    ./checks/hardware/utils.nix  # Shared update-hardware-config script
     ./checks/hardware/gpu.nix
     ./checks/hardware/cpu.nix
     ./checks/hardware/memory.nix
@@ -89,6 +90,9 @@ in {
   ];
 
   config = {
+    # Enable terminal-ui dependency
+    features.terminal-ui.enable = true;
+    
     # Command Center Registration
     features.command-center.commands = [
     {

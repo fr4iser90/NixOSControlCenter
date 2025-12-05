@@ -452,13 +452,16 @@ create_hardware_config() {
     if command -v jq >/dev/null 2>&1; then
         cpu=$(echo "$json" | jq -r '.hardware.cpu // "none"')
         gpu=$(echo "$json" | jq -r '.hardware.gpu // "none"')
-        memory=$(echo "$json" | jq -r '.hardware.ram.sizeGB // empty')
+        # Support both v1.0 (hardware.memory.sizeGB) and v2.0 (hardware.ram.sizeGB)
+        memory=$(echo "$json" | jq -r '.hardware.ram.sizeGB // .hardware.memory.sizeGB // empty')
     else
         # Fallback: Extract from Nix file directly
         local config_file="${SYSTEM_CONFIG_FILE:-/etc/nixos/system-config.nix}"
         cpu=$(grep -o 'cpu.*=.*"[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
         gpu=$(grep -o 'gpu.*=.*"[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
-        memory=$(grep -A2 'ram = {' "$config_file" 2>/dev/null | grep 'sizeGB' | grep -o '[0-9]\+' || echo "")
+        # Support both v1.0 (memory) and v2.0 (ram)
+        memory=$(grep -A2 'ram = {' "$config_file" 2>/dev/null | grep 'sizeGB' | grep -o '[0-9]\+' || \
+                 grep -A2 'memory = {' "$config_file" 2>/dev/null | grep 'sizeGB' | grep -o '[0-9]\+' || echo "")
     fi
     
     cat > "$configs_dir/hardware-config.nix" <<EOF
@@ -710,16 +713,13 @@ create_overrides_config() {
     local json="$2"
     
     local ssh_override="null"
-    local steam_override="false"
     
     if command -v jq >/dev/null 2>&1; then
         ssh_override=$(echo "$json" | jq -r '.overrides.enableSSH // "null"')
-        steam_override=$(echo "$json" | jq -r '.overrides.enableSteam // false')
     else
         # Fallback: Extract from Nix file directly
         local config_file="${SYSTEM_CONFIG_FILE:-/etc/nixos/system-config.nix}"
         ssh_override=$(grep -o 'enableSSH.*=.*[^;]*' "$config_file" 2>/dev/null | grep -oE '(true|false|null)' | head -1 || echo "null")
-        steam_override=$(grep -o 'enableSteam.*=.*[^;]*' "$config_file" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo "false")
     fi
     
     cat > "$configs_dir/overrides-config.nix" <<EOF
@@ -733,7 +733,6 @@ EOF
         echo "    enableSSH = null;" >> "$configs_dir/overrides-config.nix"
     fi
     
-    echo "    enableSteam = $steam_override;" >> "$configs_dir/overrides-config.nix"
     echo "  };" >> "$configs_dir/overrides-config.nix"
     echo "}" >> "$configs_dir/overrides-config.nix"
     

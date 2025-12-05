@@ -19,94 +19,48 @@
   }: let
     system = "x86_64-linux";
     
-    # Check if old structure exists (fallback for compatibility)
-    # If system-config.nix still has all values, it will still work
-    # (will be overridden by optional configs if present)
+    # Helper function to load config if it exists
+    loadConfig = configName:
+      if builtins.pathExists ./configs/${configName}-config.nix
+      then import ./configs/${configName}-config.nix
+      else {};
+    
+    # List of optional config files (in merge order)
+    optionalConfigs = [
+      "desktop"
+      "localization"
+      "hardware"
+      "features"
+      "packages"
+      "network"
+      "security"
+      "performance"
+      "storage"
+      "monitoring"
+      "backup"
+      "logging"
+      "update"
+      "services"
+      "virtualization"
+      "hosting"
+      "environment"
+      "identity"
+      "certificates"
+      "compliance"
+      "ha"
+      "disaster-recovery"
+      "secrets"
+      "multi-tenant"
+      "overrides"
+    ];
     
     # 1. Load minimal system-config (MUST exist)
     # If old structure: contains all values, will be overridden by optional configs
     baseConfig = import ./system-config.nix;
     
-    # 2. Load optional configs (if present)
-    desktopConfig = if builtins.pathExists ./configs/desktop-config.nix
-      then import ./configs/desktop-config.nix else {};
-    localizationConfig = if builtins.pathExists ./configs/localization-config.nix
-      then import ./configs/localization-config.nix else {};
-    hardwareConfig = if builtins.pathExists ./configs/hardware-config.nix
-      then import ./configs/hardware-config.nix else {};
-    featuresConfig = if builtins.pathExists ./configs/features-config.nix
-      then import ./configs/features-config.nix else {};
-    packagesConfig = if builtins.pathExists ./configs/packages-config.nix
-      then import ./configs/packages-config.nix else {};
-    networkConfig = if builtins.pathExists ./configs/network-config.nix
-      then import ./configs/network-config.nix else {};
-    securityConfig = if builtins.pathExists ./configs/security-config.nix
-      then import ./configs/security-config.nix else {};
-    performanceConfig = if builtins.pathExists ./configs/performance-config.nix
-      then import ./configs/performance-config.nix else {};
-    storageConfig = if builtins.pathExists ./configs/storage-config.nix
-      then import ./configs/storage-config.nix else {};
-    monitoringConfig = if builtins.pathExists ./configs/monitoring-config.nix
-      then import ./configs/monitoring-config.nix else {};
-    backupConfig = if builtins.pathExists ./configs/backup-config.nix
-      then import ./configs/backup-config.nix else {};
-    loggingConfig = if builtins.pathExists ./configs/logging-config.nix
-      then import ./configs/logging-config.nix else {};
-    updateConfig = if builtins.pathExists ./configs/update-config.nix
-      then import ./configs/update-config.nix else {};
-    servicesConfig = if builtins.pathExists ./configs/services-config.nix
-      then import ./configs/services-config.nix else {};
-    virtualizationConfig = if builtins.pathExists ./configs/virtualization-config.nix
-      then import ./configs/virtualization-config.nix else {};
-    hostingConfig = if builtins.pathExists ./configs/hosting-config.nix
-      then import ./configs/hosting-config.nix else {};
-    environmentConfig = if builtins.pathExists ./configs/environment-config.nix
-      then import ./configs/environment-config.nix else {};
-    identityConfig = if builtins.pathExists ./configs/identity-config.nix
-      then import ./configs/identity-config.nix else {};
-    certificatesConfig = if builtins.pathExists ./configs/certificates-config.nix
-      then import ./configs/certificates-config.nix else {};
-    complianceConfig = if builtins.pathExists ./configs/compliance-config.nix
-      then import ./configs/compliance-config.nix else {};
-    haConfig = if builtins.pathExists ./configs/ha-config.nix
-      then import ./configs/ha-config.nix else {};
-    disasterRecoveryConfig = if builtins.pathExists ./configs/disaster-recovery-config.nix
-      then import ./configs/disaster-recovery-config.nix else {};
-    secretsConfig = if builtins.pathExists ./configs/secrets-config.nix
-      then import ./configs/secrets-config.nix else {};
-    multiTenantConfig = if builtins.pathExists ./configs/multi-tenant-config.nix
-      then import ./configs/multi-tenant-config.nix else {};
-    overridesConfig = if builtins.pathExists ./configs/overrides-config.nix
-      then import ./configs/overrides-config.nix else {};
-    
-    # 3. Merge: baseConfig is overridden by optional configs
+    # 2. Load and merge all optional configs
     # Order is important: later configs override earlier ones
-    systemConfig = baseConfig
-      // desktopConfig
-      // localizationConfig
-      // hardwareConfig
-      // featuresConfig
-      // packagesConfig
-      // networkConfig
-      // securityConfig
-      // performanceConfig
-      // storageConfig
-      // monitoringConfig
-      // backupConfig
-      // loggingConfig
-      // updateConfig
-      // servicesConfig
-      // virtualizationConfig
-      // hostingConfig
-      // environmentConfig
-      // identityConfig
-      // certificatesConfig
-      // complianceConfig
-      // haConfig
-      // disasterRecoveryConfig
-      // secretsConfig
-      // multiTenantConfig
-      // overridesConfig;
+    systemConfig = baseConfig // builtins.foldl' (acc: configName: acc // loadConfig configName) {} optionalConfigs;
     
     # Wähle das richtige nixpkgs und home-manager basierend auf der Konfiguration
     nixpkgs = if systemConfig.system.channel == "stable"

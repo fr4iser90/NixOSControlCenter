@@ -6,10 +6,10 @@
 
   environment.systemPackages = with pkgs; [
     libva-utils
-    vaapiVdpau
+    libva-vdpau-driver
     libvdpau-va-gl
     rocmPackages.rocm-smi
-    glxinfo
+    mesa-demos
     vulkan-tools
     clinfo
     gdb

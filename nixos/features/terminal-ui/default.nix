@@ -24,6 +24,15 @@ let
     inherit (cfg) config;
   };
 
+  # API definition - always available
+  apiValue = {
+    inherit colors;
+    inherit (core) text layout;
+    inherit (components) lists tables progress boxes;
+    inherit (interactive) prompts spinners;
+    inherit (status) messages badges;
+  };
+
 in {
   options.features.terminal-ui = {
     enable = lib.mkEnableOption "terminal UI";
@@ -36,13 +45,7 @@ in {
 
     api = lib.mkOption {
       type = lib.types.attrs;
-      default = {
-        inherit colors;
-        inherit (core) text layout;
-        inherit (components) lists tables progress boxes;
-        inherit (interactive) prompts spinners;
-        inherit (status) messages badges;
-      };
+      default = apiValue;
       description = "Terminal UI API für andere Features";
     };
 
@@ -66,13 +69,8 @@ in {
     };
   };
 
-  config = lib.mkIf cfg.enable {
-    features.terminal-ui.api = {
-      inherit colors;
-      inherit (core) text layout;
-      inherit (components) lists tables progress boxes;
-      inherit (interactive) prompts spinners;
-      inherit (status) messages badges;
-    };
+  config = {
+    # API always available, not just when enable = true
+    features.terminal-ui.api = apiValue;
   };
 }

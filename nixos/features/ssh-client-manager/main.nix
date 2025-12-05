@@ -177,6 +177,9 @@ let
   '';
 in {
   config = {
+    # Enable terminal-ui dependency
+    features.terminal-ui.enable = true;
+    
     # Add the SSH client manager script to system packages
     environment.systemPackages = [
       sshClientManagerScript  # SSH Client Manager Script wird als Systempaket hinzugefügt

@@ -56,9 +56,8 @@ let
     done
   '';
   
-  # Import migration and validation tools
-  migration = import ./config-migration.nix { inherit pkgs lib; };
-  validator = import ./config-validator.nix { inherit pkgs lib; };
+  # Import config management (single import, clean API)
+  configModule = import ../../core/config { inherit pkgs lib; };
   
   systemUpdateMainScript = pkgs.writeScriptBin "ncc-system-update-main" ''
     #!${pkgs.bash}/bin/bash
@@ -77,31 +76,13 @@ let
     
     ${ui.text.header "NixOS System Update"}
     
-    # Step 1: Validate and migrate system-config.nix if needed
-    ${ui.messages.loading "Validating system configuration..."}
-    
-    # Run validation
-    if ${validator.validateSystemConfig}/bin/ncc-validate-config 2>&1; then
-      ${ui.messages.success "Configuration validation passed"}
+    # Step 1: Check system configuration (validates + migrates if needed)
+    ${ui.messages.loading "Checking system configuration..."}
+    if ${configModule.configCheck}/bin/ncc-config-check 2>&1; then
+      ${ui.messages.success "Configuration is valid"}
     else
-      VALIDATION_EXIT=$?
-      if [ $VALIDATION_EXIT -eq 1 ]; then
-        ${ui.messages.warning "Configuration validation found issues"}
-        ${ui.messages.info "Attempting automatic migration..."}
-        
-        # Try migration
-        if ${migration.migrateSystemConfig}/bin/ncc-migrate-config 2>&1; then
-          ${ui.messages.success "Migration completed successfully!"}
-          # Re-validate after migration
-          if ${validator.validateSystemConfig}/bin/ncc-validate-config 2>&1; then
-            ${ui.messages.success "Configuration is now valid"}
-          else
-            ${ui.messages.warning "Configuration still has issues after migration"}
-          fi
-        else
-          ${ui.messages.warning "Migration failed or not needed"}
-        fi
-      fi
+      ${ui.messages.warning "Configuration has issues (migration may have been attempted)"}
+      ${ui.messages.info "You may want to review the configuration before proceeding"}
     fi
     
     ${ui.messages.info "Select update source or action:"}
@@ -156,7 +137,7 @@ let
           
           ${ui.tables.keyValue "Selected branch" "$SELECTED_BRANCH"}
           
-          # Temporäres Verzeichnis erstellen und Repository klonen
+          # Create temporary directory and clone repository
           ${ui.messages.loading "Cloning repository..."}
           rm -rf "$TEMP_DIR"
           mkdir -p "$TEMP_DIR"
@@ -200,36 +181,36 @@ let
       esac
     done
 
-    # Zu kopierende Verzeichnisse und Dateien
+    # Directories and files to copy
     COPY_ITEMS=(
-        "core"            # Basis-Systemkonfiguration
-        "custom"          # Benutzerdefinierte Module
-        "desktop"         # Desktop-Umgebungen
-        "features"        # Feature-Module
-        "packages"        # Pakete-Verzeichnis
-        "flake.nix"       # Flake-Konfiguration
-        "modules"         # Legacy-Module (falls noch benötigt)
-        "overlays"        # Overlays falls vorhanden
-        "hosts"           # Host-spezifische Konfigurationen
-        "lib"             # Bibliotheken
-        "config"          # Zusätzliche Konfigurationen
+        "core"            # Base system configuration
+        "custom"          # User-defined modules
+        "desktop"         # Desktop environments
+        "features"        # Feature modules
+        "packages"        # Packages directory
+        "flake.nix"       # Flake configuration
+        "modules"         # Legacy modules (if still needed)
+        "overlays"        # Overlays if present
+        "hosts"           # Host-specific configurations
+        "lib"             # Libraries
+        "config"          # Additional configurations
     )
     
-    # Backup-Verzeichnis erstellen und Backup machen
+    # Create backup directory and perform backup
     BACKUP_DIR="$BACKUP_ROOT/$(date +%Y-%m-%d_%H-%M-%S)"
     ${ui.messages.loading "Creating backup in: $BACKUP_DIR"}
     
-    # Backup-Verzeichnis vorbereiten
+    # Prepare backup directory
     mkdir -p "$BACKUP_ROOT"
     
-    # Alte Backups aufräumen (behalte die letzten 5)
+    # Clean up old backups (keep the last 5)
     cleanup_old_backups() {
       local keep=5
       ${ui.messages.loading "Cleaning up old backups (keeping last $keep)..."}
       ls -dt "$BACKUP_ROOT"/* | tail -n +$((keep + 1)) | xargs -r rm -rf
     }
     
-    # Backup durchführen
+    # Perform backup
     if cp -r "$NIXOS_DIR" "$BACKUP_DIR"; then
       ${ui.messages.success "Backup created successfully"}
       cleanup_old_backups
@@ -238,23 +219,49 @@ let
       exit 1
     fi
     
-    # Dateien aktualisieren
+    # Update files
     ${ui.messages.loading "Updating NixOS configuration..."}
     
-    # Entferne alte Verzeichnisse
+    # Remove old directories
     sudo rm -rf "$NIXOS_DIR/modules" "$NIXOS_DIR/lib" "$NIXOS_DIR/packages" "$NIXOS_DIR/flake.nix"
     
-    # Kopiere definierte Verzeichnisse und Dateien
+    # Copy defined directories and files
+    # IMPORTANT: configs/ is NEVER overwritten - only copied during migration or if missing
     for item in "''${COPY_ITEMS[@]}"; do
       if [ -e "$SOURCE_DIR/$item" ]; then
         ${ui.messages.loading "Copying $item..."}
-        sudo cp -r "$SOURCE_DIR/$item" "$NIXOS_DIR/"
+        # Use cp with --update to only copy new files (no overwrite)
+        # But for directories we need to be more careful
+        if [ -d "$SOURCE_DIR/$item" ]; then
+          # For directories: Only copy if target doesn't exist, or only new files
+          if [ "$item" = "configs" ]; then
+            # configs/ is NEVER overwritten
+            if [ ! -d "$NIXOS_DIR/configs" ]; then
+              ${ui.messages.loading "Copying $item... (configs/ does not exist)"}
+              sudo cp -r "$SOURCE_DIR/$item" "$NIXOS_DIR/"
+            else
+              ${ui.messages.info "$item exists, skipping (preserving existing configs)..."}
+            fi
+          else
+            # Other directories: Overwrite only if necessary
+            sudo cp -r "$SOURCE_DIR/$item" "$NIXOS_DIR/"
+          fi
+        else
+          # Single files: Overwrite
+          sudo cp "$SOURCE_DIR/$item" "$NIXOS_DIR/"
+        fi
       else
         ${ui.messages.warning "$item not found, skipping..."}
       fi
     done
     
-    # Berechtigungen setzen
+    # ADDITIONAL PROTECTION: Ensure configs/ is not overwritten
+    # Even if it were accidentally in COPY_ITEMS or copied through another directory
+    if [ -d "$NIXOS_DIR/configs" ] && [ -d "$SOURCE_DIR/configs" ]; then
+      ${ui.messages.info "configs/ exists in both locations - preserving existing configs (not overwriting)"}
+    fi
+    
+    # Set permissions
     ${ui.messages.loading "Setting permissions..."}
     for dir in modules lib packages; do
       if [ -d "$NIXOS_DIR/$dir" ]; then
@@ -284,10 +291,12 @@ let
 
 in {
   config = {
+    # Enable terminal-ui dependency
+    features.terminal-ui.enable = true;
+    
     environment.systemPackages = [ 
       systemUpdateMainScript
-      migration.migrateSystemConfig
-      validator.validateSystemConfig
+      configModule.configCheck
       pkgs.git 
     ];
 

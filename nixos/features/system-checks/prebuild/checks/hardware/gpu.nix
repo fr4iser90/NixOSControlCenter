@@ -3,49 +3,9 @@
 let
   ui = config.features.terminal-ui.api;
   hardwareConfigPath = "/etc/nixos/configs/hardware-config.nix";
-
-  # Helper function to update hardware-config.nix
-  updateHardwareConfig = pkgs.writeShellScriptBin "update-hardware-config" ''
-    #!${pkgs.bash}/bin/bash
-    set -euo pipefail
-    
-    local config_file="$1"
-    local gpu_value="$2"
-    
-    # Create configs directory if it doesn't exist
-    mkdir -p "$(dirname "$config_file")"
-    
-    # Read existing config if it exists
-    local existing_cpu="none"
-    local existing_memory=""
-    
-    if [ -f "$config_file" ]; then
-      existing_cpu=$(grep -o 'cpu = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
-      existing_memory=$(grep -A2 'ram = {' "$config_file" 2>/dev/null || echo "")
-    fi
-    
-    # Write complete hardware-config.nix
-    if [ -n "$existing_memory" ]; then
-      cat > "$config_file" <<EOF
-{
-  hardware = {
-    cpu = "$existing_cpu";
-    gpu = "$gpu_value";
-$existing_memory
-  };
-}
-EOF
-    else
-      cat > "$config_file" <<EOF
-{
-  hardware = {
-    cpu = "$existing_cpu";
-    gpu = "$gpu_value";
-  };
-}
-EOF
-    fi
-  '';
+  
+  # Use the shared update-hardware-config script from utils.nix
+  # It will be automatically available via systemPackages
 
   prebuildScript = pkgs.writeScriptBin "prebuild-check-gpu" ''
     #!${pkgs.bash}/bin/bash
@@ -82,7 +42,7 @@ EOF
                     "8086") gpu_types["intel"]=1 ;; # Intel
                 esac
                 
-                # Immer GPU-Info anzeigen
+                # Always show GPU info
                 ${ui.messages.info "Found GPU:"}
                 ${ui.tables.keyValue "Device" "$device"}
                 ${ui.tables.keyValue "Bus ID" "$bus_id"}
@@ -125,7 +85,7 @@ EOF
                     DETECTED="vm-gpu"
                 fi
                 
-                # Immer VM-Info anzeigen
+                # Always show VM info
                 ${ui.messages.info "Virtual Machine: $virt_type"}
                 ${ui.messages.info "Virtual Display: $DETECTED"}
             fi
@@ -139,7 +99,7 @@ EOF
       # Ask for confirmation
       read -p "Create hardware-config.nix with detected GPU? [y/N] " response
       if [[ "$response" =~ ^[Yy]$ ]]; then
-        ${updateHardwareConfig}/bin/update-hardware-config "${hardwareConfigPath}" "$DETECTED"
+        update-hardware-config "${hardwareConfigPath}" "gpu" "$DETECTED"
         ${ui.badges.success "hardware-config.nix created."}
       else
         ${ui.badges.info "Configuration left unchanged."}
@@ -152,7 +112,7 @@ EOF
       exit 1
     fi
     
-    # Immer Konfiguration anzeigen
+    # Always show configuration
     ${ui.text.subHeader "GPU Configuration:"}
     ${ui.tables.keyValue "Detected" "$DETECTED"}
     ${ui.tables.keyValue "Configured" "$CONFIGURED"}
@@ -164,7 +124,7 @@ EOF
       # Ask for confirmation
       read -p "Update GPU configuration to $DETECTED? [y/N] " response
       if [[ "$response" =~ ^[Yy]$ ]]; then
-        ${updateHardwareConfig}/bin/update-hardware-config "${hardwareConfigPath}" "$DETECTED"
+        update-hardware-config "${hardwareConfigPath}" "gpu" "$DETECTED"
         ${ui.badges.success "Configuration updated."}
       else
         ${ui.badges.info "Configuration left unchanged."}
@@ -178,7 +138,7 @@ EOF
 
 in {
   config = {
-    environment.systemPackages = [ prebuildScript updateHardwareConfig ];
+    environment.systemPackages = [ prebuildScript ];
     features.command-center.commands = [
       {
         name = "check-gpu";

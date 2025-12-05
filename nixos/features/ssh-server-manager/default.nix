@@ -41,7 +41,10 @@ in {
 
   };
 
-  config = {
+  config = lib.mkIf cfg.enable {
+    # Enable terminal-ui dependency
+    features.terminal-ui.enable = true;
+    
     services.openssh = {
       enable = true;
       settings = {

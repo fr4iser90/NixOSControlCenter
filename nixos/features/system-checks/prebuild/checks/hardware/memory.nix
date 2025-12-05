@@ -3,40 +3,9 @@
 let
   ui = config.features.terminal-ui.api;
   hardwareConfigPath = "/etc/nixos/configs/hardware-config.nix";
-
-  # Helper function to update hardware-config.nix
-  updateHardwareConfig = pkgs.writeShellScriptBin "update-hardware-config" ''
-    #!${pkgs.bash}/bin/bash
-    set -euo pipefail
-    
-    local config_file="$1"
-    local memory_gb="$2"
-    
-    # Create configs directory if it doesn't exist
-    mkdir -p "$(dirname "$config_file")"
-    
-    # Read existing config if it exists
-    local existing_cpu="none"
-    local existing_gpu="none"
-    
-    if [ -f "$config_file" ]; then
-      existing_cpu=$(grep -o 'cpu = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
-      existing_gpu=$(grep -o 'gpu = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
-    fi
-    
-    # Write complete hardware-config.nix
-    cat > "$config_file" <<EOF
-{
-  hardware = {
-    cpu = "$existing_cpu";
-    gpu = "$existing_gpu";
-    ram = {
-      sizeGB = $memory_gb;
-    };
-  };
-}
-EOF
-  '';
+  
+  # Use the shared update-hardware-config script from utils.nix
+  # It will be automatically available via systemPackages
 
   prebuildScript = pkgs.writeScriptBin "prebuild-check-memory" ''
     #!${pkgs.bash}/bin/bash
@@ -59,7 +28,7 @@ EOF
       # Ask for confirmation before creating
       read -p "Create hardware-config.nix with detected memory? [y/N] " response
       if [[ "$response" =~ ^[Yy]$ ]]; then
-        ${updateHardwareConfig}/bin/update-hardware-config "${hardwareConfigPath}" "$DETECTED_GB"
+        update-hardware-config "${hardwareConfigPath}" "memory" "$DETECTED_GB"
         ${ui.badges.success "hardware-config.nix created."}
       else
         ${ui.badges.info "Configuration left unchanged."}
@@ -74,7 +43,7 @@ EOF
       # Ask for confirmation before adding
       read -p "Add memory size configuration? [y/N] " response
       if [[ "$response" =~ ^[Yy]$ ]]; then
-        ${updateHardwareConfig}/bin/update-hardware-config "${hardwareConfigPath}" "$DETECTED_GB"
+        update-hardware-config "${hardwareConfigPath}" "memory" "$DETECTED_GB"
         ${ui.badges.success "Memory size configuration added."}
       else
         ${ui.badges.info "Configuration left unchanged."}
@@ -95,7 +64,7 @@ EOF
       # Ask for confirmation
       read -p "Update memory configuration to $DETECTED_GB GB? [y/N] " response
       if [[ "$response" =~ ^[Yy]$ ]]; then
-        ${updateHardwareConfig}/bin/update-hardware-config "${hardwareConfigPath}" "$DETECTED_GB"
+        update-hardware-config "${hardwareConfigPath}" "memory" "$DETECTED_GB"
         ${ui.badges.success "Configuration updated."}
       else
         ${ui.badges.info "Configuration left unchanged."}
@@ -109,7 +78,7 @@ EOF
 
 in {
   config = {
-    environment.systemPackages = [ prebuildScript updateHardwareConfig ];
+    environment.systemPackages = [ prebuildScript ];
     features.command-center.commands = [
       {
         name = "check-memory";

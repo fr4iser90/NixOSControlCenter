@@ -13,6 +13,7 @@
   # Package Modules
   #
   packageModules = [
+    "gaming"
     "streaming"
     "emulation"
     "game-dev"
@@ -92,7 +93,6 @@
   #
   overrides = {
     enableSSH = null;
-    enableSteam = true;
   };
 
   #

@@ -278,7 +278,6 @@ init_hosting_config() {
 init_overrides_config() {
     log_debug "Creating overrides-config.nix..."
     local override_ssh="${OVERRIDE_SSH:-null}"
-    local override_steam="${OVERRIDE_STEAM:-true}"
     
     local content="{"
     content+="
@@ -291,7 +290,6 @@ init_overrides_config() {
     enableSSH = null;"
     fi
     content+="
-    enableSteam = $override_steam;
   };
 }
 "
