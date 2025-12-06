@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.services.ssh-client-manager;
+  cfg = config.features.ssh-client-manager;
 
   # Connection Preview Script
   # This script provides detailed information about SSH servers in the FZF preview window
@@ -84,7 +84,7 @@ let
 
 in {
   config = {
-    services.ssh-client-manager = {
+    features.ssh-client-manager = {
       connectionPreviewScript = connectionPreviewScript;
     };
   };

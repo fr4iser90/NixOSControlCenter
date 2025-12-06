@@ -4,35 +4,32 @@
 {
   features = {
     "system-updater" = {
-      dependencies = [ "terminal-ui" "command-center" ];
+      dependencies = [];  # cli-formatter and command-center are Core, no dependencies needed
       conflicts = [];
     };
     "system-checks" = {
-      dependencies = [ "terminal-ui" ];
+      dependencies = [];  # cli-formatter is Core, no dependency needed
       conflicts = [];
     };
     "system-logger" = {
-      dependencies = [ "terminal-ui" ];
+      dependencies = [];  # cli-formatter is Core, no dependency needed
       conflicts = [];
     };
     "ssh-client-manager" = {
-      dependencies = [ "terminal-ui" ];
+      dependencies = [];  # cli-formatter is Core, no dependency needed
       conflicts = [];
     };
     "ssh-server-manager" = {
-      dependencies = [ "terminal-ui" "command-center" ];
+      dependencies = [];  # cli-formatter and command-center are Core, no dependencies needed
       conflicts = [];
     };
-    "command-center" = {
-      dependencies = [ "terminal-ui" ];
-      conflicts = [];
-    };
+    # "command-center" removed (now core/command-center)
     "system-config-manager" = {
       dependencies = [];
       conflicts = [];
     };
     "system-discovery" = {
-      dependencies = [ "terminal-ui" "command-center" ];
+      dependencies = [];  # cli-formatter and command-center are Core, no dependencies needed
       conflicts = [];
     };
     "bootentry-manager" = {
@@ -51,10 +48,7 @@
       dependencies = [];
       conflicts = [];
     };
-    "terminal-ui" = {
-      dependencies = [];
-      conflicts = [];
-    };
+    # "terminal-ui" removed (now core/cli-formatter)
   };
 }
 

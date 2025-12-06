@@ -1,12 +1,14 @@
-{ pkgs, cfg }:
+{ pkgs, lib, cfg }:
+
+with lib;
 
 pkgs.writeShellScriptBin "scan-credentials" ''
   #!${pkgs.bash}/bin/bash
   set -euo pipefail
   
   OUTPUT_FILE="$1"
-  INCLUDE_PRIVATE="${toString (cfg.scanners.credentials.includePrivateKeys or false)}"
-  KEY_TYPES="${toString (cfg.scanners.credentials.keyTypes or [ "ssh" "gpg" ])}"
+  INCLUDE_PRIVATE="${if cfg.scanners.credentials.includePrivateKeys then "true" else "false"}"
+  KEY_TYPES="${concatStringsSep " " cfg.scanners.credentials.keyTypes}"
   
   echo "🔐 Scanning credentials (will be encrypted)..."
   

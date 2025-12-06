@@ -1,4 +1,4 @@
-{ pkgs, lib, ui, ... }:
+{ pkgs, lib, formatter, ... }:
 
 let
   schema = import ./config-schema.nix { inherit lib; };
@@ -45,21 +45,21 @@ let
     
     # Check if system-config.nix exists
     if [ ! -f "$SYSTEM_CONFIG" ]; then
-      ${ui.messages.error "system-config.nix not found at $SYSTEM_CONFIG"}
+      ${formatter.messages.error "system-config.nix not found at $SYSTEM_CONFIG"}
       exit 1
     fi
     
     if [ "$VERBOSE" = "true" ]; then
-      ${ui.messages.info "Validating system-config.nix..."}
+      ${formatter.messages.info "Validating system-config.nix..."}
     fi
     
     # Validate Nix syntax
     if ! ${pkgs.nix}/bin/nix-instantiate --parse "$SYSTEM_CONFIG" >/dev/null 2>&1; then
-      ${ui.messages.error "system-config.nix has invalid Nix syntax"}
+      ${formatter.messages.error "system-config.nix has invalid Nix syntax"}
       ERRORS=$((ERRORS + 1))
     else
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.success "Nix syntax is valid"}
+        ${formatter.messages.success "Nix syntax is valid"}
       fi
     fi
     
@@ -72,9 +72,9 @@ let
     EXPECTED_CONFIG_FILES_MAP='${expectedConfigFilesJson}'
     
     if [ "$VERBOSE" = "true" ]; then
-      ${ui.messages.success "Detected config version: $CONFIG_VERSION"}
-      ${ui.messages.success "Current supported version: $CURRENT_VERSION"}
-      ${ui.messages.info "Supported versions: $SUPPORTED_VERSIONS"}
+      ${formatter.messages.success "Detected config version: $CONFIG_VERSION"}
+      ${formatter.messages.success "Current supported version: $CURRENT_VERSION"}
+      ${formatter.messages.info "Supported versions: $SUPPORTED_VERSIONS"}
     fi
     
     # Check if version is supported
@@ -88,7 +88,7 @@ let
     
     if [ "$VERSION_SUPPORTED" = "false" ]; then
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.warning "Config version $CONFIG_VERSION not recognized (assuming v1.0)"}
+        ${formatter.messages.warning "Config version $CONFIG_VERSION not recognized (assuming v1.0)"}
       fi
       CONFIG_VERSION="1.0"
     fi
@@ -96,8 +96,8 @@ let
     # Check if migration is needed (version mismatch)
     if [ "$CONFIG_VERSION" != "$CURRENT_VERSION" ]; then
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.warning "Config version $CONFIG_VERSION does not match current version $CURRENT_VERSION"}
-        ${ui.messages.info "Migration needed - this will be handled automatically"}
+        ${formatter.messages.warning "Config version $CONFIG_VERSION does not match current version $CURRENT_VERSION"}
+        ${formatter.messages.info "Migration needed - this will be handled automatically"}
       fi
       # Count as error to trigger migration in config-check
       ERRORS=$((ERRORS + 1))
@@ -111,12 +111,12 @@ let
       if ! ${pkgs.nix}/bin/nix-instantiate --eval --strict -E \
         "(import $SYSTEM_CONFIG).$field or null" >/dev/null 2>&1; then
         if [ "$VERBOSE" = "true" ]; then
-          ${ui.messages.warning "Required field '$field' not found in system-config.nix (v$CONFIG_VERSION)"}
+          ${formatter.messages.warning "Required field '$field' not found in system-config.nix (v$CONFIG_VERSION)"}
         fi
         WARNINGS=$((WARNINGS + 1))
       else
         if [ "$VERBOSE" = "true" ]; then
-          ${ui.messages.success "$field found"}
+          ${formatter.messages.success "$field found"}
         fi
       fi
     done
@@ -131,8 +131,8 @@ let
       LINE_COUNT=$(wc -l < "$SYSTEM_CONFIG" 2>/dev/null || echo "0")
       if [ "$LINE_COUNT" -gt "$MAX_LINES" ]; then
         if [ "$VERBOSE" = "true" ]; then
-          ${ui.messages.warning "system-config.nix has more than $MAX_LINES lines (should be minimal for v$CONFIG_VERSION)"}
-          ${ui.messages.info "Consider running 'ncc-migrate-config' to migrate to modular structure"}
+          ${formatter.messages.warning "system-config.nix has more than $MAX_LINES lines (should be minimal for v$CONFIG_VERSION)"}
+          ${formatter.messages.info "Consider running 'ncc-migrate-config' to migrate to modular structure"}
         fi
         WARNINGS=$((WARNINGS + 1))
       fi
@@ -143,9 +143,9 @@ let
       if grep -q "$field = {" "$SYSTEM_CONFIG" 2>/dev/null || \
          grep -q "$field = " "$SYSTEM_CONFIG" 2>/dev/null; then
         if [ "$VERBOSE" = "true" ]; then
-          ${ui.messages.warning "Non-critical field '$field' found in system-config.nix (v$CONFIG_VERSION)"}
-          ${ui.messages.info "This should be in separate configs/ files"}
-          ${ui.messages.info "Consider running 'ncc-migrate-config' to migrate to modular structure"}
+          ${formatter.messages.warning "Non-critical field '$field' found in system-config.nix (v$CONFIG_VERSION)"}
+          ${formatter.messages.info "This should be in separate configs/ files"}
+          ${formatter.messages.info "Consider running 'ncc-migrate-config' to migrate to modular structure"}
         fi
         WARNINGS=$((WARNINGS + 1))
       fi
@@ -157,11 +157,11 @@ let
       # v2.0+ expects configs dir
       if [ ! -d "$CONFIGS_DIR" ]; then
         if [ "$VERBOSE" = "true" ]; then
-          ${ui.messages.info "configs/ directory does not exist (recommended for modular config v$CONFIG_VERSION)"}
+          ${formatter.messages.info "configs/ directory does not exist (recommended for modular config v$CONFIG_VERSION)"}
         fi
       else
         if [ "$VERBOSE" = "true" ]; then
-          ${ui.messages.success "configs/ directory exists"}
+          ${formatter.messages.success "configs/ directory exists"}
         fi
         
         # Get expected config files for this version
@@ -173,10 +173,10 @@ let
             CONFIG_BASENAME=$(basename "$config_file")
             if ${pkgs.nix}/bin/nix-instantiate --parse "$config_file" >/dev/null 2>&1; then
               if [ "$VERBOSE" = "true" ]; then
-                ${ui.messages.success "  $CONFIG_BASENAME syntax is valid"}
+                ${formatter.messages.success "  $CONFIG_BASENAME syntax is valid"}
               fi
             else
-              ${ui.messages.error "  $CONFIG_BASENAME has invalid Nix syntax"}
+              ${formatter.messages.error "  $CONFIG_BASENAME has invalid Nix syntax"}
               ERRORS=$((ERRORS + 1))
             fi
           fi
@@ -187,31 +187,31 @@ let
     # If v1.0, suggest migration
     if [ "$CONFIG_VERSION" = "1.0" ] && [ "$CONFIG_VERSION" != "$CURRENT_VERSION" ]; then
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.info "v1.0 structure detected (monolithic)"}
-        ${ui.messages.info "Consider running 'ncc-migrate-config' to migrate to v$CURRENT_VERSION (modular structure)"}
+        ${formatter.messages.info "v1.0 structure detected (monolithic)"}
+        ${formatter.messages.info "Consider running 'ncc-migrate-config' to migrate to v$CURRENT_VERSION (modular structure)"}
       fi
     fi
     
     # Summary
     if [ "$VERBOSE" = "true" ]; then
-      ${ui.text.newline}
-      ${ui.text.section "Validation Summary"}
+      ${formatter.text.newline}
+      ${formatter.text.section "Validation Summary"}
     fi
     if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.success "All checks passed!"}
+        ${formatter.messages.success "All checks passed!"}
       fi
       exit 0
     else
       if [ $ERRORS -gt 0 ]; then
-        ${ui.messages.error "Found $ERRORS error(s)"}
+        ${formatter.messages.error "Found $ERRORS error(s)"}
         if [ "$VERBOSE" = "false" ]; then
-          ${ui.messages.info "Run with --verbose to see details"}
+          ${formatter.messages.info "Run with --verbose to see details"}
         fi
       fi
       if [ $WARNINGS -gt 0 ]; then
         if [ "$VERBOSE" = "true" ]; then
-          ${ui.messages.warning "Found $WARNINGS warning(s)"}
+          ${formatter.messages.warning "Found $WARNINGS warning(s)"}
         fi
       fi
       exit 1

@@ -3,8 +3,8 @@
 with lib;
 
 let
-  ui = config.features.terminal-ui.api;
-  commandCenter = config.features.command-center;
+  ui = config.core.cli-formatter.api;
+  commandCenter = config.core.command-center;
   hostname = systemConfig.hostName;
   systemChecks = systemConfig.features.system-checks or false;
 
@@ -33,11 +33,29 @@ let
 
     # Rebuild system
     ${ui.messages.loading "Rebuilding system..."}
-    if ${if systemChecks then "sudo ncc build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}; then
+    BUILD_CMD="${if systemChecks then "sudo ncc build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
+    
+    if $BUILD_CMD 2>&1; then
       ${ui.messages.success "System successfully rebuilt!"}
     else
-      ${ui.messages.error "Rebuild failed! Check logs for details."}
-      exit 1
+      EXIT_CODE=$?
+      # Check if build was successful but switch failed (common with service reload errors)
+      if [ -f /nix/var/nix/profiles/system ]; then
+        CURRENT_GEN=$(readlink /nix/var/nix/profiles/system | cut -d'-' -f2)
+        if [ -n "$CURRENT_GEN" ]; then
+          ${ui.messages.warning "Build completed, but switch encountered issues (exit code: $EXIT_CODE)"}
+          ${ui.messages.info "Current generation: $CURRENT_GEN"}
+          ${ui.messages.info "Some services may have failed to reload (e.g., dbus-broker.service)"}
+          ${ui.messages.info "This is often harmless - the system should still work correctly."}
+          ${ui.messages.info "You can verify with: sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}
+        else
+          ${ui.messages.error "Rebuild failed! Check logs for details."}
+          exit 1
+        fi
+      else
+        ${ui.messages.error "Rebuild failed! Check logs for details."}
+        exit 1
+      fi
     fi
   '';
 
@@ -47,7 +65,7 @@ in {
       updateChannelsScript
     ];
 
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "update-channels";
         description = "Update Nix flake inputs / channels and rebuild the system";

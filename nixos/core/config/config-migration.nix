@@ -1,4 +1,4 @@
-{ pkgs, lib, ui, ... }:
+{ pkgs, lib, formatter, ... }:
 
 let
   schema = import ./config-schema.nix { inherit lib; };
@@ -63,7 +63,7 @@ let
     
     # Check if system-config.nix exists
     if [ ! -f "$SYSTEM_CONFIG" ]; then
-      ${ui.messages.error "system-config.nix not found at $SYSTEM_CONFIG"}
+      ${formatter.messages.error "system-config.nix not found at $SYSTEM_CONFIG"}
       exit 1
     fi
     
@@ -75,28 +75,28 @@ let
     # Check if we got valid JSON (not an error message)
     if ! echo "$OLD_CONFIG_JSON" | "$JQ_BIN" . >/dev/null 2>&1; then
       # Not valid JSON - it's an error message from nix-instantiate
-      ${ui.messages.error "Could not load system-config.nix"}
+      ${formatter.messages.error "Could not load system-config.nix"}
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.info "File: $SYSTEM_CONFIG"}
+        ${formatter.messages.info "File: $SYSTEM_CONFIG"}
         CURRENT_USER=$(whoami)
         FILE_PERMS=$(ls -l "$SYSTEM_CONFIG" 2>/dev/null || echo 'cannot check')
-        ${ui.messages.info "Current user: $CURRENT_USER"}
-        ${ui.messages.info "File permissions: $FILE_PERMS"}
-        ${ui.text.newline}
-        ${ui.messages.info "Nix error:"}
+        ${formatter.messages.info "Current user: $CURRENT_USER"}
+        ${formatter.messages.info "File permissions: $FILE_PERMS"}
+        ${formatter.text.newline}
+        ${formatter.messages.info "Nix error:"}
         echo "$OLD_CONFIG_JSON" | head -10
-        ${ui.text.newline}
+        ${formatter.text.newline}
       fi
-      ${ui.messages.info "This migration requires sudo to read protected files."}
-      ${ui.messages.info "Run: sudo ncc-migrate-config"}
+      ${formatter.messages.info "This migration requires sudo to read protected files."}
+      ${formatter.messages.info "Run: sudo ncc-migrate-config"}
       exit 1
     fi
     
     # Check if JSON is empty
     if [ "$OLD_CONFIG_JSON" = "{}" ] || [ "$OLD_CONFIG_JSON" = "null" ]; then
-      ${ui.messages.error "system-config.nix loaded but is empty"}
+      ${formatter.messages.error "system-config.nix loaded but is empty"}
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.info "File: $SYSTEM_CONFIG"}
+        ${formatter.messages.info "File: $SYSTEM_CONFIG"}
       fi
       exit 1
     fi
@@ -112,7 +112,7 @@ let
     MIGRATION_PLANS='${migrationPlansJson}'
     
     if [ "$VERBOSE" = "true" ]; then
-      ${ui.messages.info "Detected config version: $CONFIG_VERSION"}
+      ${formatter.messages.info "Detected config version: $CONFIG_VERSION"}
     fi
     
     # Check if version is supported
@@ -126,9 +126,9 @@ let
     
     if [ "$VERSION_SUPPORTED" = "false" ]; then
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.warning "Config version $CONFIG_VERSION not recognized"}
-        ${ui.messages.info "Supported versions: $SUPPORTED_VERSIONS"}
-        ${ui.messages.info "Assuming v$MIN_SUPPORTED"}
+        ${formatter.messages.warning "Config version $CONFIG_VERSION not recognized"}
+        ${formatter.messages.info "Supported versions: $SUPPORTED_VERSIONS"}
+        ${formatter.messages.info "Assuming v$MIN_SUPPORTED"}
       fi
       CONFIG_VERSION="$MIN_SUPPORTED"
     fi
@@ -136,7 +136,7 @@ let
     # Check if already on current version
     if [ "$CONFIG_VERSION" = "$CURRENT_VERSION" ]; then
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.info "Config is already on version $CURRENT_VERSION, no migration needed"}
+        ${formatter.messages.info "Config is already on version $CURRENT_VERSION, no migration needed"}
       fi
       exit 0
     fi
@@ -160,10 +160,10 @@ let
         2>/dev/null || echo "[]")
       
       if [ "$CHAIN_JSON" = "[]" ] || [ -z "$CHAIN_JSON" ]; then
-        ${ui.messages.error "No migration path from version $CONFIG_VERSION to $CURRENT_VERSION"}
+        ${formatter.messages.error "No migration path from version $CONFIG_VERSION to $CURRENT_VERSION"}
         if [ "$VERBOSE" = "true" ]; then
-          ${ui.messages.info "Supported versions: $SUPPORTED_VERSIONS"}
-          ${ui.messages.info "Current version: $CURRENT_VERSION"}
+          ${formatter.messages.info "Supported versions: $SUPPORTED_VERSIONS"}
+          ${formatter.messages.info "Current version: $CURRENT_VERSION"}
         fi
         exit 1
       fi
@@ -173,14 +173,14 @@ let
       CHAIN_ARRAY=($CHAIN_STEPS)
       
       if [ ''${#CHAIN_ARRAY[@]} -lt 2 ]; then
-        ${ui.messages.error "Invalid migration chain"}
+        ${formatter.messages.error "Invalid migration chain"}
         exit 1
       fi
       
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.info "Detected config version: $CONFIG_VERSION"}
-        ${ui.messages.info "Found migration chain (will migrate step by step)"}
-        ${ui.messages.info "Starting chain migration..."}
+        ${formatter.messages.info "Detected config version: $CONFIG_VERSION"}
+        ${formatter.messages.info "Found migration chain (will migrate step by step)"}
+        ${formatter.messages.info "Starting chain migration..."}
       fi
       CURRENT_STEP="$CONFIG_VERSION"
       
@@ -188,14 +188,14 @@ let
       mkdir -p "$CONFIGS_DIR"
       cp "$SYSTEM_CONFIG" "$BACKUP_FILE_CHAIN"
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.info "Backup created: $BACKUP_FILE_CHAIN"}
+        ${formatter.messages.info "Backup created: $BACKUP_FILE_CHAIN"}
       fi
       for i in ''$(seq 1 ''$((''${#CHAIN_ARRAY[@]} - 1))); do
         NEXT_STEP="''${CHAIN_ARRAY[$i]}"
         if [ "$VERBOSE" = "true" ]; then
-          ${ui.text.newline}
+          ${formatter.text.newline}
           CHAIN_LENGTH=$((''${#CHAIN_ARRAY[@]} - 1))
-          ${ui.messages.info "Migrating step $i/$CHAIN_LENGTH: v$CURRENT_STEP → v$NEXT_STEP"}
+          ${formatter.messages.info "Migrating step $i/$CHAIN_LENGTH: v$CURRENT_STEP → v$NEXT_STEP"}
         fi
         
         # Reload config for this step
@@ -203,16 +203,16 @@ let
         
         # Check if we got valid JSON
         if ! echo "$OLD_CONFIG_JSON" | "$JQ_BIN" . >/dev/null 2>&1; then
-          ${ui.messages.error "Could not reload config for step $CURRENT_STEP -> $NEXT_STEP"}
+          ${formatter.messages.error "Could not reload config for step $CURRENT_STEP -> $NEXT_STEP"}
           if [ "$VERBOSE" = "true" ]; then
             ERROR_MSG=$(echo "$OLD_CONFIG_JSON" | head -5)
-            ${ui.messages.info "Error: $ERROR_MSG"}
+            ${formatter.messages.info "Error: $ERROR_MSG"}
           fi
           exit 1
         fi
         
         if [ "$OLD_CONFIG_JSON" = "{}" ] || [ "$OLD_CONFIG_JSON" = "null" ]; then
-          ${ui.messages.error "Config is empty after previous migration step"}
+          ${formatter.messages.error "Config is empty after previous migration step"}
           exit 1
         fi
         
@@ -220,7 +220,7 @@ let
         MIGRATION_PLAN=''$(echo "$MIGRATION_PLANS" | "$JQ_BIN" -r ".\"$CURRENT_STEP\".\"$NEXT_STEP\" // null")
         
         if [ "$MIGRATION_PLAN" = "null" ] || [ -z "$MIGRATION_PLAN" ]; then
-          ${ui.messages.error "No migration plan found for $CURRENT_STEP -> $NEXT_STEP"}
+          ${formatter.messages.error "No migration plan found for $CURRENT_STEP -> $NEXT_STEP"}
           exit 1
         fi
         
@@ -281,7 +281,7 @@ let
         
         # Only overwrite if we extracted fields
         if [ "$FIELDS_EXTRACTED_STEP" -eq 0 ]; then
-          ${ui.messages.error "Could not extract any fields in step $CURRENT_STEP -> $NEXT_STEP"}
+          ${formatter.messages.error "Could not extract any fields in step $CURRENT_STEP -> $NEXT_STEP"}
           rm -f "$TEMP_STEP_CONFIG"
           exit 1
         fi
@@ -354,15 +354,15 @@ let
       done
       
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.text.newline}
+        ${formatter.text.newline}
       fi
       exit 0
     fi
     
     if [ "$VERBOSE" = "true" ]; then
-      ${ui.messages.info "Detected config version: $CONFIG_VERSION"}
-      ${ui.messages.info "Migrating to version: $MIGRATION_TARGET"}
-      ${ui.messages.info "Starting migration from v$CONFIG_VERSION to v$MIGRATION_TARGET..."}
+      ${formatter.messages.info "Detected config version: $CONFIG_VERSION"}
+      ${formatter.messages.info "Migrating to version: $MIGRATION_TARGET"}
+      ${formatter.messages.info "Starting migration from v$CONFIG_VERSION to v$MIGRATION_TARGET..."}
     fi
     
     # Create configs directory
@@ -371,26 +371,26 @@ let
     # Create backup
     BACKUP_FILE="$SYSTEM_CONFIG.backup.''$(date +%Y%m%d_%H%M%S)"
     if ! cp "$SYSTEM_CONFIG" "$BACKUP_FILE"; then
-      ${ui.messages.error "Failed to create backup"}
+      ${formatter.messages.error "Failed to create backup"}
       exit 1
     fi
     if [ "$VERBOSE" = "true" ]; then
-      ${ui.messages.info "Backup created: $BACKUP_FILE"}
+      ${formatter.messages.info "Backup created: $BACKUP_FILE"}
     fi
     
     # Get migration plan from schema
     MIGRATION_PLAN=''$(echo "$MIGRATION_PLANS" | "$JQ_BIN" -r ".\"$CONFIG_VERSION\".\"$MIGRATION_TARGET\" // null")
     
     if [ "$MIGRATION_PLAN" = "null" ] || [ -z "$MIGRATION_PLAN" ]; then
-      ${ui.messages.error "No migration plan found for $CONFIG_VERSION -> $MIGRATION_TARGET"}
+      ${formatter.messages.error "No migration plan found for $CONFIG_VERSION -> $MIGRATION_TARGET"}
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.info "Please add migration plan to schema!"}
+        ${formatter.messages.info "Please add migration plan to schema!"}
       fi
       exit 1
     fi
     
     if [ "$VERBOSE" = "true" ]; then
-      ${ui.messages.info "Loaded migration plan from schema"}
+      ${formatter.messages.info "Loaded migration plan from schema"}
     fi
     
     # Get fieldsToKeep from migration plan
@@ -456,22 +456,22 @@ let
     
     if [ "$FIELDS_EXTRACTED" -eq 0 ]; then
       FIELD_COUNT=''$(echo "$OLD_CONFIG_JSON" | "$JQ_BIN" 'keys | length' 2>/dev/null || echo "0")
-      ${ui.messages.error "Could not extract any required fields from old config"}
-      ${ui.messages.warning "Migration ABORTED to prevent data loss"}
+      ${formatter.messages.error "Could not extract any required fields from old config"}
+      ${formatter.messages.warning "Migration ABORTED to prevent data loss"}
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.text.newline}
-        ${ui.messages.info "Debug info:"}
-        ${ui.messages.info "- Fields extracted: $FIELDS_EXTRACTED"}
-        ${ui.messages.info "- Temp file lines: $TEMP_LINE_COUNT (should be > 4)"}
-        ${ui.messages.info "- Old config had $FIELD_COUNT field(s)"}
-        ${ui.messages.info "- fieldsToKeep: $FIELDS_TO_KEEP"}
+        ${formatter.text.newline}
+        ${formatter.messages.info "Debug info:"}
+        ${formatter.messages.info "- Fields extracted: $FIELDS_EXTRACTED"}
+        ${formatter.messages.info "- Temp file lines: $TEMP_LINE_COUNT (should be > 4)"}
+        ${formatter.messages.info "- Old config had $FIELD_COUNT field(s)"}
+        ${formatter.messages.info "- fieldsToKeep: $FIELDS_TO_KEEP"}
         OLD_KEYS=$(echo "$OLD_CONFIG_JSON" | "$JQ_BIN" -c 'keys' 2>/dev/null | head -c 200 || echo 'ERROR reading JSON')
-        ${ui.messages.info "- Old config keys: $OLD_KEYS"}
-        ${ui.text.newline}
-        ${ui.messages.info "Possible causes:"}
-        ${ui.messages.info "1. jq extraction failed (check errors above)"}
-        ${ui.messages.info "2. Field names don't match (check fieldsToKeep in migration plan)"}
-        ${ui.messages.info "3. Old config structure is different than expected"}
+        ${formatter.messages.info "- Old config keys: $OLD_KEYS"}
+        ${formatter.text.newline}
+        ${formatter.messages.info "Possible causes:"}
+        ${formatter.messages.info "1. jq extraction failed (check errors above)"}
+        ${formatter.messages.info "2. Field names don't match (check fieldsToKeep in migration plan)"}
+        ${formatter.messages.info "3. Old config structure is different than expected"}
       fi
       rm -f "$TEMP_CONFIG"
       exit 1
@@ -479,10 +479,10 @@ let
     
     # Additional safety check: temp file should have more than just configVersion
     if [ "$TEMP_LINE_COUNT" -le 4 ]; then
-      ${ui.messages.error "Temp file only contains configVersion, no other fields extracted"}
-      ${ui.messages.warning "Migration ABORTED to prevent data loss"}
+      ${formatter.messages.error "Temp file only contains configVersion, no other fields extracted"}
+      ${formatter.messages.warning "Migration ABORTED to prevent data loss"}
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.info "Temp file content:"}
+        ${formatter.messages.info "Temp file content:"}
         cat "$TEMP_CONFIG"
       fi
       rm -f "$TEMP_CONFIG"
@@ -490,8 +490,8 @@ let
     fi
     
     if [ "$VERBOSE" = "true" ]; then
-      ${ui.messages.info "Created minimal system-config.nix using fieldsToKeep from schema"}
-      ${ui.messages.info "Successfully extracted $FIELDS_EXTRACTED required field(s)"}
+      ${formatter.messages.info "Created minimal system-config.nix using fieldsToKeep from schema"}
+      ${formatter.messages.info "Successfully extracted $FIELDS_EXTRACTED required field(s)"}
     fi
     
     # CRITICAL: Process fieldsToMigrate BEFORE overwriting system-config.nix
@@ -509,7 +509,7 @@ let
       
       if [ -z "$TARGET_FILE" ]; then
         if [ "$VERBOSE" = "true" ]; then
-          ${ui.messages.warning "No targetFile for field $field_name, skipping"}
+          ${formatter.messages.warning "No targetFile for field $field_name, skipping"}
         fi
         continue
       fi
@@ -530,14 +530,14 @@ let
         # Check if original field exists
         if ! "$JQ_BIN" -e ".$field_name // empty | length > 0" <<< "$OLD_CONFIG_JSON" >/dev/null 2>&1; then
           if [ "$VERBOSE" = "true" ]; then
-            ${ui.messages.info "Field $field_name not found in old config, skipping"}
+            ${formatter.messages.info "Field $field_name not found in old config, skipping"}
           fi
           continue
         fi
       fi
       
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.info "Migrating field $field_name to $TARGET_FILE"}
+        ${formatter.messages.info "Migrating field $field_name to $TARGET_FILE"}
       fi
       
       # Apply field mappings first (e.g., hardware.memory -> hardware.ram)
@@ -613,7 +613,7 @@ let
         echo "$NEW_CONFIG_NIX" >> "$CONFIGS_DIR/$TARGET_FILE"
         echo "}" >> "$CONFIGS_DIR/$TARGET_FILE"
         if [ "$VERBOSE" = "true" ]; then
-          ${ui.messages.info "Created $TARGET_FILE"}
+          ${formatter.messages.info "Created $TARGET_FILE"}
         fi
       fi
     done
@@ -623,7 +623,7 @@ let
     mv "$TEMP_CONFIG" "$SYSTEM_CONFIG"
     
     if [ "$VERBOSE" = "true" ]; then
-      ${ui.messages.info "Backup saved at: $BACKUP_FILE"}
+      ${formatter.messages.info "Backup saved at: $BACKUP_FILE"}
     fi
   '';
 

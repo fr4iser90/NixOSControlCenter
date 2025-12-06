@@ -1,5 +1,9 @@
 { pkgs, cfg, ui }:
 
+let
+  jq = "${pkgs.jq}/bin/jq";
+in
+
 pkgs.writeShellScriptBin "restore-snapshot" ''
   #!${pkgs.bash}/bin/bash
   set -euo pipefail
@@ -80,21 +84,21 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
   
   ${ui.text.header "Restoring from Snapshot"}
   ${ui.tables.keyValue "Snapshot" "$SNAPSHOT_FILE"}
-  ${ui.tables.keyValue "Timestamp" "$(${pkgs.jq}/bin/jq -r '.metadata.timestamp // "unknown"' <<< "$SNAPSHOT_DATA")"}
+  ${ui.tables.keyValue "Timestamp" "$(echo \"$SNAPSHOT_DATA\" | ${jq} -r '.metadata.timestamp // \"unknown\"')"}
   
   # Restore browsers
   if [ "$RESTORE_BROWSERS" = "true" ]; then
     ${ui.text.newline}
     ${ui.text.subHeader "Restoring Browsers"}
     
-    BROWSERS=$(${pkgs.jq}/bin/jq -c '.browsers.items[]?' <<< "$SNAPSHOT_DATA" || echo "")
+    BROWSERS=$(echo "$SNAPSHOT_DATA" | ${jq} -c '.browsers.items[]?' || echo "")
     
     if [ -z "$BROWSERS" ]; then
       ${ui.messages.warning "No browser data found in snapshot"}
     else
       while IFS= read -r browser_json; do
-        BROWSER_NAME=$(${pkgs.jq}/bin/jq -r '.browser // "unknown"' <<< "$browser_json")
-        PROFILE=$(${pkgs.jq}/bin/jq -r '.profile // "default"' <<< "$browser_json")
+        BROWSER_NAME=$(echo "$browser_json" | ${jq} -r '.browser // "unknown"')
+        PROFILE=$(echo "$browser_json" | ${jq} -r '.profile // "default"')
         
         ${ui.text.normal "  $BROWSER_NAME ($PROFILE)"}
         
@@ -110,7 +114,7 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
               PROFILE_DIR=$(find "$firefox_dir" -maxdepth 1 -type d -name "*$PROFILE*" | head -1)
               
               if [ -n "$PROFILE_DIR" ] && [ -d "$PROFILE_DIR" ]; then
-                BOOKMARKS=$(${pkgs.jq}/bin/jq -c '.bookmarks.items[]?' <<< "$browser_json" || echo "")
+                BOOKMARKS=$(echo "$browser_json" | ${jq} -c '.bookmarks.items[]?' || echo "")
                 
                 if [ -n "$BOOKMARKS" ] && [ -f "$PROFILE_DIR/places.sqlite" ]; then
                   ${ui.messages.info "    Restoring bookmarks..."}
@@ -122,8 +126,8 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
                     # Restore bookmarks
                     BOOKMARK_COUNT=0
                     while IFS= read -r bookmark_json; do
-                      TITLE=$(${pkgs.jq}/bin/jq -r '.title // ""' <<< "$bookmark_json")
-                      URL=$(${pkgs.jq}/bin/jq -r '.url // ""' <<< "$bookmark_json")
+                      TITLE=$(echo "$bookmark_json" | ${jq} -r '.title // ""')
+                      URL=$(echo "$bookmark_json" | ${jq} -r '.url // ""')
                       
                       if [ -n "$TITLE" ] && [ -n "$URL" ]; then
                         # Check if bookmark already exists
@@ -157,7 +161,7 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
                     
                     ${ui.messages.success "    Restored $BOOKMARK_COUNT bookmarks"}
                   else
-                    BOOKMARK_COUNT=$(${pkgs.jq}/bin/jq '.bookmarks.count // 0' <<< "$browser_json")
+                    BOOKMARK_COUNT=$(echo "$browser_json" | ${jq} '.bookmarks.count // 0')
                     ${ui.messages.info "    Would restore $BOOKMARK_COUNT bookmarks (dry-run)"}
                   fi
                 fi
@@ -180,7 +184,7 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
               PROFILE_DIR="$chrome_dir/$PROFILE"
               
               if [ -d "$PROFILE_DIR" ]; then
-                BOOKMARKS=$(${pkgs.jq}/bin/jq -c '.bookmarks.items[]?' <<< "$browser_json" || echo "")
+                BOOKMARKS=$(echo "$browser_json" | ${jq} -c '.bookmarks.items[]?' || echo "")
                 
                 if [ -n "$BOOKMARKS" ]; then
                   ${ui.messages.info "    Restoring bookmarks..."}
@@ -195,20 +199,20 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
                     EXISTING_BOOKMARKS=$(cat "$PROFILE_DIR/Bookmarks" 2>/dev/null || echo '{"roots":{}}')
                     
                     # Merge bookmarks
-                    MERGED_BOOKMARKS=$(${pkgs.jq}/bin/jq --argjson new "$BOOKMARKS" '
+                    MERGED_BOOKMARKS=$(echo "$EXISTING_BOOKMARKS" | ${jq} --argjson new "$BOOKMARKS" '
                       .roots.bookmark_bar.children += ($new | map({
                         name: .title,
                         type: "url",
                         url: .url
                       }))
-                    ' <<< "$EXISTING_BOOKMARKS")
+                    ')
                     
                     echo "$MERGED_BOOKMARKS" > "$PROFILE_DIR/Bookmarks"
                     
-                    BOOKMARK_COUNT=$(${pkgs.jq}/bin/jq 'length' <<< "$BOOKMARKS")
+                    BOOKMARK_COUNT=$(echo "$BOOKMARKS" | ${jq} 'length')
                     ${ui.messages.success "    Restored $BOOKMARK_COUNT bookmarks"}
                   else
-                    BOOKMARK_COUNT=$(${pkgs.jq}/bin/jq '.bookmarks.count // 0' <<< "$browser_json")
+                    BOOKMARK_COUNT=$(echo "$browser_json" | ${jq} '.bookmarks.count // 0')
                     ${ui.messages.info "    Would restore $BOOKMARK_COUNT bookmarks (dry-run)"}
                   fi
                 fi
@@ -218,9 +222,9 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
         fi
         
         # List extensions (can't auto-install, but show list)
-        EXTENSIONS=$(${pkgs.jq}/bin/jq -c '.extensions.items[]?' <<< "$browser_json" || echo "")
+        EXTENSIONS=$(echo "$browser_json" | ${jq} -c '.extensions.items[]?' || echo "")
         if [ -n "$EXTENSIONS" ]; then
-          EXT_COUNT=$(${pkgs.jq}/bin/jq '.extensions.count // 0' <<< "$browser_json")
+          EXT_COUNT=$(echo "$browser_json" | ${jq} '.extensions.count // 0')
           ${ui.messages.info "    Found $EXT_COUNT extensions (install manually from browser store)"}
         fi
       done <<< "$BROWSERS"
@@ -232,20 +236,20 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
     ${ui.text.newline}
     ${ui.text.subHeader "Restoring IDEs"}
     
-    IDES=$(${pkgs.jq}/bin/jq -c '.ides.items[]?' <<< "$SNAPSHOT_DATA" || echo "")
+    IDES=$(echo "$SNAPSHOT_DATA" | ${jq} -c '.ides.items[]?' || echo "")
     
     if [ -z "$IDES" ]; then
       ${ui.messages.warning "No IDE data found in snapshot"}
     else
       while IFS= read -r ide_json; do
-        IDE_NAME=$(${pkgs.jq}/bin/jq -r '.ide // "unknown"' <<< "$ide_json")
-        IDE_PATH=$(${pkgs.jq}/bin/jq -r '.path // ""' <<< "$ide_json")
+        IDE_NAME=$(echo "$ide_json" | ${jq} -r '.ide // "unknown"')
+        IDE_PATH=$(echo "$ide_json" | ${jq} -r '.path // ""')
         
         ${ui.text.normal "  $IDE_NAME"}
         
         # VS Code settings
         if [[ "$IDE_NAME" =~ "VS Code" ]] && [ -n "$IDE_PATH" ] && [ -d "$IDE_PATH" ]; then
-          SETTINGS=$(${pkgs.jq}/bin/jq '.settings // {}' <<< "$ide_json")
+          SETTINGS=$(echo "$ide_json" | ${jq} '.settings // {}')
           
           if [ "$DRY_RUN" = "false" ] && [ "$SETTINGS" != "{}" ]; then
             SETTINGS_FILE="$IDE_PATH/User/settings.json"
@@ -254,7 +258,7 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
             # Merge with existing settings
             if [ -f "$SETTINGS_FILE" ]; then
               EXISTING_SETTINGS=$(cat "$SETTINGS_FILE")
-              MERGED_SETTINGS=$(${pkgs.jq}/bin/jq -s '.[0] * .[1]' <<< "$SETTINGS $EXISTING_SETTINGS")
+              MERGED_SETTINGS=$(echo "$SETTINGS $EXISTING_SETTINGS" | ${jq} -s '.[0] * .[1]')
               echo "$MERGED_SETTINGS" > "$SETTINGS_FILE"
             else
               echo "$SETTINGS" > "$SETTINGS_FILE"
@@ -267,9 +271,9 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
         fi
         
         # List extensions/plugins
-        EXTENSIONS=$(${pkgs.jq}/bin/jq -c '.extensions.items[]? // .plugins.items[]?' <<< "$ide_json" || echo "")
+        EXTENSIONS=$(echo "$ide_json" | ${jq} -c '.extensions.items[]? // .plugins.items[]?' || echo "")
         if [ -n "$EXTENSIONS" ]; then
-          EXT_COUNT=$(${pkgs.jq}/bin/jq '.extensions.count // .plugins.count // 0' <<< "$ide_json")
+          EXT_COUNT=$(echo "$ide_json" | ${jq} '.extensions.count // .plugins.count // 0')
           ${ui.messages.info "    Found $EXT_COUNT extensions/plugins (install manually)"}
         fi
       done <<< "$IDES"
@@ -281,7 +285,7 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
     ${ui.text.newline}
     ${ui.text.subHeader "Restoring Desktop Settings"}
     
-    DESKTOP=$(${pkgs.jq}/bin/jq '.desktop // {}' <<< "$SNAPSHOT_DATA")
+    DESKTOP=$(echo "$SNAPSHOT_DATA" | ${jq} '.desktop // {}')
     
     if [ "$DESKTOP" = "{}" ]; then
       ${ui.messages.warning "No desktop data found in snapshot"}
@@ -289,10 +293,10 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
       if [ "$DRY_RUN" = "false" ]; then
         # Restore theme settings
         if command -v gsettings >/dev/null 2>&1; then
-          DARK_MODE=$(${pkgs.jq}/bin/jq -r '.theme.dark // false' <<< "$DESKTOP")
-          CURSOR_THEME=$(${pkgs.jq}/bin/jq -r '.theme.cursor // ""' <<< "$DESKTOP")
-          ICON_THEME=$(${pkgs.jq}/bin/jq -r '.theme.icon // ""' <<< "$DESKTOP")
-          GTK_THEME=$(${pkgs.jq}/bin/jq -r '.theme.gtk // ""' <<< "$DESKTOP")
+          DARK_MODE=$(echo "$DESKTOP" | ${jq} -r '.theme.dark // false')
+          CURSOR_THEME=$(echo "$DESKTOP" | ${jq} -r '.theme.cursor // ""')
+          ICON_THEME=$(echo "$DESKTOP" | ${jq} -r '.theme.icon // ""')
+          GTK_THEME=$(echo "$DESKTOP" | ${jq} -r '.theme.gtk // ""')
           
           if [ "$DARK_MODE" = "true" ]; then
             gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null || true

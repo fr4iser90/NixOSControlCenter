@@ -1,7 +1,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  ui = config.features.terminal-ui.api;
+  ui = config.core.cli-formatter.api;
   
   prebuildScript = pkgs.writeScriptBin "prebuild-check-users" ''
     #!${pkgs.bash}/bin/bash
@@ -67,7 +67,7 @@ let
 in {
   config = {
     environment.systemPackages = [ prebuildScript ];
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "check-users";
         category = "system-checks";

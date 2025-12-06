@@ -1,4 +1,6 @@
-{ pkgs, cfg }:
+{ pkgs, lib, cfg }:
+
+with lib;
 
 pkgs.writeShellScriptBin "upload-to-github" ''
   #!${pkgs.bash}/bin/bash

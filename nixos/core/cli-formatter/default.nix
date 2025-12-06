@@ -1,7 +1,7 @@
 { config, lib, ... }:
 
 let
-  cfg = config.features.terminal-ui;
+  cfg = config.core.cli-formatter;
   colors = import ./colors.nix;
   
   core = import ./core { 
@@ -34,19 +34,19 @@ let
   };
 
 in {
-  options.features.terminal-ui = {
-    enable = lib.mkEnableOption "terminal UI";
+  options.core.cli-formatter = {
+    enable = lib.mkEnableOption "CLI formatter";
     
     config = lib.mkOption {
       type = lib.types.attrs;
       default = {};
-      description = "Terminal UI configuration options";
+      description = "CLI formatter configuration options";
     };
 
     api = lib.mkOption {
       type = lib.types.attrs;
       default = apiValue;
-      description = "Terminal UI API für andere Features";
+      description = "CLI formatter API für andere Features";
     };
 
     components = lib.mkOption {
@@ -60,17 +60,17 @@ in {
           };
           template = lib.mkOption {
             type = lib.types.lines;
-            description = "Component template using terminal-ui API";
+            description = "Component template using CLI formatter API";
           };
         };
       });
       default = {};
-      description = "Custom terminal UI components";
+      description = "Custom CLI formatter components";
     };
   };
 
   config = {
     # API always available, not just when enable = true
-    features.terminal-ui.api = apiValue;
+    core.cli-formatter.api = apiValue;
   };
 }

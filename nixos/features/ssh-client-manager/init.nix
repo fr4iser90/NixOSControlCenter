@@ -1,8 +1,8 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  ui = config.features.terminal-ui.api;
-  cfg = config.services.ssh-client-manager;
+  ui = config.core.cli-formatter.api;
+  cfg = config.features.ssh-client-manager;
 
   # Setup user credentials file for each configured user
   # This function creates the necessary directory structure and credentials file

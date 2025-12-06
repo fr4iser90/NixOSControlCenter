@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = config.features.ssh-server-manager.monitor;
-  ui = config.features.terminal-ui.api;
+  ui = config.core.cli-formatter.api;
 
   monitorScript = pkgs.writeScriptBin "ssh-monitor" ''
     #!${pkgs.bash}/bin/bash
@@ -90,7 +90,7 @@ in {
   config = mkIf cfg.enable {
     environment.systemPackages = [ monitorScript ];
 
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "ssh-monitor";
         description = "Monitor SSH connections in real-time";

@@ -121,10 +121,19 @@ EOF
   '';
 
 in {
-  environment.systemPackages = [
-    updateDesktopConfig
-    updateFeaturesConfig
-    (pkgs.writeShellScriptBin "ncc-config" ''
+  imports = [
+    ./options.nix
+  ];
+
+  config = mkMerge [
+    {
+      features.system-config-manager.enable = mkDefault (systemConfig.features.system-config-manager or false);
+    }
+    (mkIf cfg.enable {
+      environment.systemPackages = [
+        updateDesktopConfig
+        updateFeaturesConfig
+        (pkgs.writeShellScriptBin "ncc-config" ''
       case "$1" in
         set)
           case "$2" in
@@ -162,5 +171,7 @@ in {
           ;;
       esac
     '')
+      ];
+    })
   ];
 }

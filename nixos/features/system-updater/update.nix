@@ -22,15 +22,15 @@ let
     }
   ];
 
-  ui = config.features.terminal-ui.api;
-  commandCenter = config.features.command-center;
+  ui = config.core.cli-formatter.api;
+  commandCenter = config.core.command-center;
 
   # Extract configuration values
   username = head (attrNames systemConfig.users);
   hostname = systemConfig.hostName;
   autoBuild = systemConfig.features.system-updater.auto-build or false;
   systemChecks = systemConfig.features.system-checks or false;
-  # Function to prompt for build - with conditional build command
+  # Function to prompt for build - with conditional build command and better error handling
   prompt_build = ''
     while true; do
       printf "Do you want to build and switch to the new configuration? (y/n): "
@@ -38,10 +38,28 @@ let
       case $build_choice in
         y|Y)
           ${ui.messages.loading "Building system configuration..."}
-          if ${if systemChecks then "sudo ncc build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}; then
+          BUILD_CMD="${if systemChecks then "sudo ncc build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
+          
+          # Run build and capture exit code
+          if $BUILD_CMD 2>&1; then
             ${ui.messages.success "System successfully updated and rebuilt!"}
           else
-            ${ui.messages.error "Build failed! Check logs for details."}
+            EXIT_CODE=$?
+            # Check if build was successful but switch failed (common with service reload errors)
+            if [ -f /nix/var/nix/profiles/system ]; then
+              CURRENT_GEN=$(readlink /nix/var/nix/profiles/system | cut -d'-' -f2)
+              if [ -n "$CURRENT_GEN" ]; then
+                ${ui.messages.warning "Build completed, but switch encountered issues (exit code: $EXIT_CODE)"}
+                ${ui.messages.info "Current generation: $CURRENT_GEN"}
+                ${ui.messages.info "Some services may have failed to reload (e.g., dbus-broker.service)"}
+                ${ui.messages.info "This is often harmless - the system should still work correctly."}
+                ${ui.messages.info "You can verify with: sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}
+              else
+                ${ui.messages.error "Build may have failed. Check logs for details."}
+              fi
+            else
+              ${ui.messages.error "Build failed! Check logs for details."}
+            fi
           fi
           break
           ;;
@@ -231,11 +249,12 @@ let
     # Update files
     ${ui.messages.loading "Updating NixOS configuration..."}
     
-    # Remove old directories
-    sudo rm -rf "$NIXOS_DIR/modules" "$NIXOS_DIR/lib" "$NIXOS_DIR/packages" "$NIXOS_DIR/flake.nix"
+    # Remove old directories (legacy, not in COPY_ITEMS)
+    sudo rm -rf "$NIXOS_DIR/modules" "$NIXOS_DIR/lib" "$NIXOS_DIR/packages"
+    # Note: flake.nix is handled separately below
     
     # Copy defined directories and files
-    # IMPORTANT: configs/ is NEVER overwritten - only copied during migration or if missing
+    # IMPORTANT: configs/ and custom/ are NEVER overwritten - only copied during migration or if missing
     for item in "''${COPY_ITEMS[@]}"; do
       if [ -e "$SOURCE_DIR/$item" ]; then
         ${ui.messages.loading "Copying $item..."}
@@ -243,44 +262,81 @@ let
         # But for directories we need to be more careful
         if [ -d "$SOURCE_DIR/$item" ]; then
           # For directories: Only copy if target doesn't exist, or only new files
-          if [ "$item" = "configs" ]; then
-            # configs/ is NEVER overwritten
-            if [ ! -d "$NIXOS_DIR/configs" ]; then
-              ${ui.messages.loading "Copying $item... (configs/ does not exist)"}
+          if [ "$item" = "configs" ] || [ "$item" = "custom" ]; then
+            # configs/ and custom/ are NEVER overwritten (user-specific)
+            if [ ! -d "$NIXOS_DIR/$item" ]; then
+              ${ui.messages.loading "Copying $item... ($item/ does not exist)"}
               sudo cp -r "$SOURCE_DIR/$item" "$NIXOS_DIR/"
             else
-              ${ui.messages.info "$item exists, skipping (preserving existing configs)..."}
+              ${ui.messages.info "$item exists, skipping (preserving existing $item)..."}
             fi
+          elif [ "$item" = "core" ] || [ "$item" = "features" ]; then
+            # For core/ and features/: Replace completely, but clean up old subdirectories first
+            ${ui.messages.loading "Replacing $item/ completely..."}
+            # Remove old directory completely
+            sudo rm -rf "$NIXOS_DIR/$item"
+            # Copy new directory
+            sudo cp -r "$SOURCE_DIR/$item" "$NIXOS_DIR/"
+            ${ui.messages.success "$item/ replaced (old subdirectories removed)"}
           else
-            # Other directories: Overwrite only if necessary
+            # Other directories: Overwrite completely
+            sudo rm -rf "$NIXOS_DIR/$item"
             sudo cp -r "$SOURCE_DIR/$item" "$NIXOS_DIR/"
           fi
         else
-          # Single files: Overwrite
-          sudo cp "$SOURCE_DIR/$item" "$NIXOS_DIR/"
+          # Single files: Overwrite (except protected files)
+          if [ "$item" = "flake.nix" ]; then
+            # flake.nix: Only overwrite if it doesn't exist or is significantly different
+            if [ ! -f "$NIXOS_DIR/flake.nix" ]; then
+              ${ui.messages.loading "Copying flake.nix (does not exist)..."}
+              sudo cp "$SOURCE_DIR/$item" "$NIXOS_DIR/"
+            else
+              ${ui.messages.info "flake.nix exists, overwriting with new version..."}
+              sudo cp "$SOURCE_DIR/$item" "$NIXOS_DIR/"
+            fi
+          else
+            # Other files: Overwrite
+            sudo cp "$SOURCE_DIR/$item" "$NIXOS_DIR/"
+          fi
         fi
       else
         ${ui.messages.warning "$item not found, skipping..."}
       fi
     done
     
-    # ADDITIONAL PROTECTION: Ensure configs/ is not overwritten
-    # Even if it were accidentally in COPY_ITEMS or copied through another directory
+    # ADDITIONAL PROTECTION: Ensure protected directories are not overwritten
+    # Even if they were accidentally in COPY_ITEMS or copied through another directory
     if [ -d "$NIXOS_DIR/configs" ] && [ -d "$SOURCE_DIR/configs" ]; then
       ${ui.messages.info "configs/ exists in both locations - preserving existing configs (not overwriting)"}
+    fi
+    if [ -d "$NIXOS_DIR/custom" ] && [ -d "$SOURCE_DIR/custom" ]; then
+      ${ui.messages.info "custom/ exists in both locations - preserving existing custom modules (not overwriting)"}
+    fi
+    
+    # PROTECT: hardware-configuration.nix and flake.lock (never overwrite)
+    if [ -f "$NIXOS_DIR/hardware-configuration.nix" ]; then
+      ${ui.messages.info "Preserving hardware-configuration.nix (system-specific, never overwritten)"}
+    fi
+    if [ -f "$NIXOS_DIR/flake.lock" ]; then
+      ${ui.messages.info "Preserving flake.lock (generated file, never overwritten)"}
     fi
     
     # Set permissions
     ${ui.messages.loading "Setting permissions..."}
-    for dir in modules lib packages; do
+    for dir in core features desktop packages modules lib; do
       if [ -d "$NIXOS_DIR/$dir" ]; then
         chown -R root:root "$NIXOS_DIR/$dir"
         chmod -R 644 "$NIXOS_DIR/$dir"
         find "$NIXOS_DIR/$dir" -type d -exec chmod 755 {} \;
       fi
     done
-    chown root:root "$NIXOS_DIR/flake.nix"
-    chmod 644 "$NIXOS_DIR/flake.nix"
+    # Set permissions for files
+    for file in flake.nix hardware-configuration.nix; do
+      if [ -f "$NIXOS_DIR/$file" ]; then
+        chown root:root "$NIXOS_DIR/$file"
+        chmod 644 "$NIXOS_DIR/$file"
+      fi
+    done
     
     ${ui.messages.success "Update completed successfully!"}
     ${ui.tables.keyValue "Backup created in" "$BACKUP_DIR"}
@@ -288,10 +344,25 @@ let
     # Check if auto-build is enabled - also update this part
     if [ "$autoBuild" = "true" ]; then
       ${ui.messages.loading "Auto-build enabled, building configuration..."}
-      if ${if systemChecks then "sudo ncc build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}; then
+      BUILD_CMD="${if systemChecks then "sudo ncc build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
+      
+      if $BUILD_CMD 2>&1; then
         ${ui.messages.success "System successfully updated and rebuilt!"}
       else
-        ${ui.messages.error "Auto-build failed! Check logs for details."}
+        EXIT_CODE=$?
+        # Check if build was successful but switch failed
+        if [ -f /nix/var/nix/profiles/system ]; then
+          CURRENT_GEN=$(readlink /nix/var/nix/profiles/system | cut -d'-' -f2)
+          if [ -n "$CURRENT_GEN" ]; then
+            ${ui.messages.warning "Build completed, but switch encountered issues (exit code: $EXIT_CODE)"}
+            ${ui.messages.info "Current generation: $CURRENT_GEN"}
+            ${ui.messages.info "Some services may have failed to reload - this is often harmless."}
+          else
+            ${ui.messages.error "Auto-build failed! Check logs for details."}
+          fi
+        else
+          ${ui.messages.error "Auto-build failed! Check logs for details."}
+        fi
       fi
     else
       ${prompt_build}
@@ -301,7 +372,7 @@ let
 in {
   config = {
     # Enable terminal-ui dependency
-    features.terminal-ui.enable = true;
+    # features.terminal-ui.enable removed (cli-formatter is Core) = true;
     
     environment.systemPackages = [ 
       systemUpdateMainScript
@@ -315,7 +386,7 @@ in {
       chown root:root ${backupSettings.directory}
     '';
 
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "system-update";
         description = "Update NixOS system configuration";

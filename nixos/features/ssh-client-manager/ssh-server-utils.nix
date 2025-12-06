@@ -1,8 +1,8 @@
 { config, lib, pkgs, ... }:
 
 let
-  ui = config.features.terminal-ui.api;
-  cfg = config.services.ssh-client-manager;
+  ui = config.core.cli-formatter.api;
+  cfg = config.features.ssh-client-manager;
 
   sshClientManagerServerUtils = ''
     # SSH Client Manager Server Utilities
@@ -71,7 +71,7 @@ let
             --header="Available SSH Servers" \
             --header-first \
             ${lib.optionalString cfg.fzf.preview.enable ''
-              --preview "${config.services.ssh-client-manager.connectionPreviewScript}/bin/ssh-connection-preview {}" \
+              --preview "${config.features.ssh-client-manager.connectionPreviewScript}/bin/ssh-connection-preview {}" \
               --preview-window="${cfg.fzf.preview.position}"
             ''} \
             --expect=ctrl-x,ctrl-e,ctrl-n,enter 2>/dev/null)
@@ -118,7 +118,7 @@ let
   '';
 in {
   config = {
-    services.ssh-client-manager = {
+    features.ssh-client-manager = {
       sshClientManagerServerUtils = sshClientManagerServerUtils;
     };
   };

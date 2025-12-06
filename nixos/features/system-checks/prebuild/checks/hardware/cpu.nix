@@ -1,7 +1,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  ui = config.features.terminal-ui.api;
+  ui = config.core.cli-formatter.api;
   hardwareConfigPath = "/etc/nixos/configs/hardware-config.nix";
   
   # Use the shared update-hardware-config script from utils.nix

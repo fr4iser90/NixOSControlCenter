@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = config.features.system-logger;
-  ui = config.features.terminal-ui.api;
+  ui = config.core.cli-formatter.api;
   
   # Report Level Definition
   reportLevels = {
@@ -12,27 +12,6 @@ let
     standard = 2;
     detailed = 3;
     full = 4;
-  };
-
-  # Collector-spezifische Optionen
-  mkCollectorOptions = name: {
-    enable = mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Enable the ${name} collector";
-    };
-
-    detailLevel = mkOption {
-      type = lib.types.nullOr (lib.types.enum (attrNames reportLevels));
-      default = null;
-      description = "Override detail level for ${name} collector";
-    };
-
-    priority = mkOption {
-      type = lib.types.int;
-      default = 100;
-      description = "Execution priority for ${name} collector";
-    };
   };
 
   # Verfügbare Collectors
@@ -59,34 +38,14 @@ let
   );
 
 in {
-  options.features.system-logger = {
-    enable = mkEnableOption "system logger";
-    
-    defaultDetailLevel = mkOption {
-      type = lib.types.enum (attrNames reportLevels);
-      default = "standard";
-      description = "Default detail level for all reports";
-    };
-
-    collectors = mkOption {
-      type = lib.types.submodule {
-        options = listToAttrs (map (name: {
-          name = name;
-          value = mkOption {
-            type = lib.types.submodule {
-              options = mkCollectorOptions name;
-            };
-            default = {};
-            description = "Configuration for the ${name} collector";
-          };
-        }) availableCollectors);
-      };
-      default = {};
-      description = "Collector-specific configurations";
-    };
-  };
+  imports = [
+    ./options.nix
+  ];
 
   config = mkMerge [
+    {
+      features.system-logger.enable = mkDefault (systemConfig.features.system-logger or true);
+    }
     # Default-Konfiguration
     {
       features.system-logger = {
@@ -102,7 +61,7 @@ in {
     # Bedingte Konfiguration
     (mkIf cfg.enable {
       # Abhängigkeit von terminal-ui
-      features.terminal-ui.enable = true;
+      # features.terminal-ui.enable removed (cli-formatter is Core) = true;
 
       system.activationScripts.systemReport = {
         deps = [];

@@ -1,11 +1,11 @@
 { config, lib, pkgs, ... }:
 
 let
-  # Zugriff auf die Terminal-UI-API
-  ui = config.features.terminal-ui.api;
+  # Zugriff auf die CLI-Formatter-API
+  ui = config.core.cli-formatter.api;
 
   # Befehle aus der Konfiguration
-  cfg = config.features.command-center;
+  cfg = config.core.command-center;
 
   # Generiert Case-Blöcke für Befehlsausführung
   generateExecCase = cmd: ''
@@ -114,8 +114,7 @@ let
 
 in {
   config = {
-    # Enable terminal-ui dependency
-    features.terminal-ui.enable = true;
+    # CLI formatter is Core, no enable needed
     
     environment.systemPackages = [
       mainScript   # Hauptbefehl

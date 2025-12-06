@@ -3,53 +3,76 @@
 with lib;
 
 let
-
+  # CLI formatter API (Core module, always available)
+  ui = config.core.cli-formatter.api;
   
-  # Import scanner modules
+  # Feature configuration
+  cfg = config.features.system-discovery;
+  
+  # Import scanner modules (only those that don't use cfg can be in outer let)
   desktopScanner = import ./scanners/desktop.nix { inherit pkgs; };
   steamScanner = import ./scanners/steam.nix { inherit pkgs; };
-  credentialsScanner = import ./scanners/credentials.nix { inherit pkgs cfg; };
   packagesScanner = import ./scanners/packages.nix { inherit pkgs; };
   browserScanner = import ./scanners/browser.nix { inherit pkgs; };
   ideScanner = import ./scanners/ide.nix { inherit pkgs; };
   
-  # Snapshot generator
-  snapshotGenerator = import ./snapshot-generator.nix { 
-    inherit pkgs cfg;
-    scanners = {
-      desktop = desktopScanner;
-      steam = steamScanner;
-      credentials = credentialsScanner;
-      packages = packagesScanner;
-      browser = browserScanner;
-      ide = ideScanner;
-    };
-  };
+  # Note: Handlers and scanners that use cfg must be in mkIf cfg.enable block
   
-  # Encryption handler
-  encryptionHandler = import ./encryption.nix { 
-    inherit pkgs cfg;
-  };
-  
-  # GitHub upload handler
-  githubHandler = import ./github-upload.nix { 
-    inherit pkgs cfg;
-  };
-  
-  # GitHub download handler
-  githubDownloadHandler = import ./github-download.nix { 
-    inherit pkgs cfg;
-  };
-  
-  # Restore handler
-  restoreHandler = import ./restore.nix { 
-    inherit pkgs cfg ui;
-  };
-  
-  # Main discovery command scripts (for command-center registration)
-  discoverScript = pkgs.writeShellScriptBin "ncc-discover-main" ''
-    #!${pkgs.bash}/bin/bash
-    set -euo pipefail
+in {
+  imports = [
+    ./options.nix
+  ];
+
+  config = mkMerge [
+    # Default configuration - map systemConfig.features.system-discovery to config.features.system-discovery.enable
+    {
+      features.system-discovery = {
+        enable = mkDefault (systemConfig.features.system-discovery or false);
+      };
+    }
+    
+    # Feature implementation (only when enabled)
+    (mkIf cfg.enable (let
+      # Import scanner that uses cfg
+      credentialsScanner = import ./scanners/credentials.nix { inherit pkgs lib cfg; };
+      
+      # Snapshot generator
+      snapshotGenerator = import ./snapshot-generator.nix { 
+        inherit pkgs cfg;
+        scanners = {
+          desktop = desktopScanner;
+          steam = steamScanner;
+          credentials = credentialsScanner;
+          packages = packagesScanner;
+          browser = browserScanner;
+          ide = ideScanner;
+        };
+      };
+      
+      # Encryption handler
+      encryptionHandler = import ./encryption.nix { 
+        inherit pkgs lib cfg;
+      };
+      
+      # GitHub upload handler
+      githubHandler = import ./github-upload.nix { 
+        inherit pkgs lib cfg;
+      };
+      
+      # GitHub download handler
+      githubDownloadHandler = import ./github-download.nix { 
+        inherit pkgs lib cfg;
+      };
+      
+      # Restore handler
+      restoreHandler = import ./restore.nix { 
+        inherit pkgs cfg ui;
+      };
+      
+      # Main discovery command scripts (for command-center registration)
+      discoverScript = pkgs.writeShellScriptBin "ncc-discover-main" ''
+        #!${pkgs.bash}/bin/bash
+        set -euo pipefail
     
     SNAPSHOT_DIR="${cfg.snapshotDir}"
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -70,14 +93,14 @@ let
     ${ui.messages.success "Snapshot created: $SNAPSHOT_FILE"}
     
     # Encrypt if enabled
-    if [ "${toString cfg.encryption.enable}" = "true" ]; then
+    if [ "${if cfg.encryption.enable then "true" else "false"}" = "true" ]; then
       ${ui.messages.info "Encrypting snapshot..."}
       ${encryptionHandler}/bin/encrypt-snapshot \
         --input "$SNAPSHOT_FILE" \
         --method "${cfg.encryption.method}" \
-        ${optionalString (cfg.encryption.sops.keysFile != null) "--sops-keys ${cfg.encryption.sops.keysFile}"} \
-        ${optionalString (cfg.encryption.sops.ageKeyFile != null) "--age-key ${cfg.encryption.sops.ageKeyFile}"} \
-        ${optionalString (cfg.encryption.fido2.device != null) "--fido2-device ${cfg.encryption.fido2.device}"}
+        ${optionalString (cfg.encryption.sops.keysFile != "") "--sops-keys ${cfg.encryption.sops.keysFile}"} \
+        ${optionalString (cfg.encryption.sops.ageKeyFile != "") "--age-key ${cfg.encryption.sops.ageKeyFile}"} \
+        ${optionalString (cfg.encryption.fido2.device != "") "--fido2-device ${cfg.encryption.fido2.device}"}
       
       ENCRYPTED_FILE="$SNAPSHOT_FILE.encrypted"
       ${ui.messages.success "Encrypted snapshot: $ENCRYPTED_FILE"}
@@ -85,12 +108,12 @@ let
     fi
     
     # Upload to GitHub if enabled
-    if [ "${toString cfg.github.enable}" = "true" ] && [ -n "${cfg.github.repository}" ]; then
+    if [ "${if cfg.github.enable then "true" else "false"}" = "true" ] && [ -n "${cfg.github.repository}" ]; then
       ${ui.messages.info "Uploading to GitHub..."}
       ${githubHandler}/bin/upload-to-github \
         --repository "${cfg.github.repository}" \
         --branch "${cfg.github.branch}" \
-        ${optionalString (cfg.github.tokenFile != null) "--token-file ${cfg.github.tokenFile}"} \
+        ${optionalString (cfg.github.tokenFile != "") "--token-file ${cfg.github.tokenFile}"} \
         --snapshot "$SNAPSHOT_FILE${optionalString cfg.encryption.enable ".encrypted"}"
       
       ${ui.messages.success "Uploaded to GitHub"}
@@ -181,9 +204,9 @@ let
     trap "rm -rf $TEMP_DIR" EXIT
     
     FETCH_ARGS=()
-    [ -n "${cfg.github.repository or ""}" ] && FETCH_ARGS+=("--repository" "${cfg.github.repository}")
-    [ -n "${cfg.github.branch or ""}" ] && FETCH_ARGS+=("--branch" "${cfg.github.branch}")
-    [ -n "${cfg.github.tokenFile or ""}" ] && FETCH_ARGS+=("--token-file" "${cfg.github.tokenFile}")
+    [ -n "${cfg.github.repository}" ] && FETCH_ARGS+=("--repository" "${cfg.github.repository}")
+    [ -n "${cfg.github.branch}" ] && FETCH_ARGS+=("--branch" "${cfg.github.branch}")
+    [ -n "${cfg.github.tokenFile}" ] && FETCH_ARGS+=("--token-file" "${cfg.github.tokenFile}")
     [ -n "$SNAPSHOT_NAME" ] && FETCH_ARGS+=("--snapshot" "$SNAPSHOT_NAME")
     FETCH_ARGS+=("$@")
     
@@ -207,239 +230,8 @@ let
       exit 1
     fi
   '';
-
-in {
-  options.features.system-discovery = {
-    enable = mkEnableOption "system discovery and snapshot";
-    
-    scanInterval = mkOption {
-      type = types.nullOr types.str;
-      default = null;
-      description = "Systemd timer interval for automatic scanning (e.g., 'daily', 'weekly', 'monthly')";
-      example = "daily";
-    };
-    
-    snapshotDir = mkOption {
-      type = types.str;
-      default = "/var/lib/nixos-control-center/snapshots";
-      description = "Directory where snapshots are stored";
-    };
-    
-    encryption = {
-      enable = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Enable encryption for snapshots";
-      };
-      
-      method = mkOption {
-        type = types.enum [ "sops" "fido2" "both" ];
-        default = "both";
-        description = "Encryption method: sops, fido2, or both";
-      };
-      
-      sops = {
-        keysFile = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "Path to sops keys file";
-        };
-        
-        ageKeyFile = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "Path to age key file for sops";
-        };
-      };
-      
-      fido2 = {
-        device = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "FIDO2 device path (e.g., /dev/hidraw0)";
-        };
-        
-        pin = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "FIDO2 PIN (leave null to prompt interactively)";
-        };
-      };
-    };
-    
-    github = {
-      enable = mkOption {
-        type = types.bool;
-        default = false;
-        description = "Enable automatic upload to GitHub";
-      };
-      
-      repository = mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        description = "GitHub repository (format: owner/repo)";
-      };
-      
-      branch = mkOption {
-        type = types.str;
-        default = "main";
-        description = "Git branch to push to";
-      };
-      
-      tokenFile = mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        description = "Path to file containing GitHub token (encrypted with sops recommended)";
-      };
-    };
-    
-    scanners = {
-      desktop = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Scan desktop settings (themes, dark mode, cursor, etc.)";
-      };
-      
-      steam = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Scan installed Steam games";
-      };
-      
-      credentials = mkOption {
-        type = types.submodule {
-          options = {
-            enable = mkOption {
-              type = types.bool;
-              default = true;
-              description = "Enable credential scanning";
-            };
-            
-            includePrivateKeys = mkOption {
-              type = types.bool;
-              default = false;
-              description = "⚠️ WARNING: Include private keys in encrypted snapshot (security risk!)";
-            };
-            
-            keyTypes = mkOption {
-              type = types.listOf (types.enum [ "ssh" "gpg" ]);
-              default = [ "ssh" "gpg" ];
-              description = "Which key types to scan";
-            };
-            
-            requireFIDO2 = mkOption {
-              type = types.bool;
-              default = true;
-              description = "Require FIDO2 encryption if private keys are included";
-            };
-          };
-        };
-        default = {
-          enable = true;
-          includePrivateKeys = false;
-          keyTypes = [ "ssh" "gpg" ];
-          requireFIDO2 = true;
-        };
-        description = "Credential scanner configuration";
-      };
-      
-      packages = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Scan installed packages";
-      };
-      
-      browser = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Scan browser extensions, tabs, and settings";
-      };
-      
-      ide = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Scan IDE extensions, plugins, and settings";
-      };
-    };
-    
-    audit = {
-      enable = mkOption {
-        type = types.bool;
-        default = false;
-        description = "Enable audit logging";
-      };
-      
-      logFile = mkOption {
-        type = types.str;
-        default = "/var/log/ncc-discovery-audit.log";
-        description = "Path to audit log file";
-      };
-      
-      logLevel = mkOption {
-        type = types.enum [ "debug" "info" "warn" "error" ];
-        default = "info";
-        description = "Audit log level";
-      };
-    };
-    
-    retention = {
-      maxSnapshots = mkOption {
-        type = types.nullOr types.int;
-        default = null;
-        description = "Maximum number of snapshots to keep (null = unlimited)";
-      };
-      
-      maxAge = mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        description = "Maximum age of snapshots (e.g., '90d', '12w', '1y')";
-      };
-      
-      compressOld = mkOption {
-        type = types.bool;
-        default = false;
-        description = "Compress snapshots older than retention period";
-      };
-    };
-    
-    compliance = {
-      enable = mkOption {
-        type = types.bool;
-        default = false;
-        description = "Enable compliance checks";
-      };
-      
-      requireEncryption = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Fail if encryption is disabled";
-      };
-      
-      requireGitHubBackup = mkOption {
-        type = types.bool;
-        default = false;
-        description = "Require GitHub backup to be enabled";
-      };
-      
-      dataClassification = mkOption {
-        type = types.enum [ "public" "internal" "confidential" "restricted" ];
-        default = "internal";
-        description = "Data classification level";
-      };
-    };
-  };
-
-  config = mkMerge [
-    # Default configuration - map systemConfig.features.system-discovery to config.features.system-discovery.enable
-    {
-      features.system-discovery = {
-        enable = mkDefault (systemConfig.features.system-discovery or false);
-      };
-    }
-    
-    # Register commands in command-center (only when feature is enabled)
-    (mkIf cfg.enable {
-      features.command-center.commands = [
+    in {
+      core.command-center.commands = [
         {
           name = "discover";
           description = "Scan system and create encrypted snapshot";
@@ -533,17 +325,15 @@ in {
           '';
         }
       ];
-    })
-    
-    # Feature implementation (only when enabled)
-    (mkIf cfg.enable {
+      
+      # Feature implementation
       # Create snapshot directory
       systemd.tmpfiles.rules = [
         "d ${cfg.snapshotDir} 0755 root root -"
       ];
       
       # Optional: Systemd timer for automatic scanning
-      systemd.timers.ncc-discover = mkIf (cfg.scanInterval != null) {
+      systemd.timers.ncc-discover = mkIf (cfg.scanInterval != "") {
         wantedBy = [ "timers.target" ];
         timerConfig = {
           OnCalendar = cfg.scanInterval;
@@ -551,63 +341,61 @@ in {
         };
       };
       
-      systemd.services.ncc-discover = mkIf (cfg.scanInterval != null) {
+      systemd.services.ncc-discover = mkIf (cfg.scanInterval != "") {
         serviceConfig.Type = "oneshot";
         script = ''
-          ${pkgs.writeShellScriptBin "ncc-discover" ''
-            #!${pkgs.bash}/bin/bash
-            set -euo pipefail
+          #!${pkgs.bash}/bin/bash
+          set -euo pipefail
+          
+          SNAPSHOT_DIR="${cfg.snapshotDir}"
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          SNAPSHOT_FILE="$SNAPSHOT_DIR/system-snapshot_$TIMESTAMP.json"
+          
+          ${ui.messages.info "Starting system discovery..."}
+          
+          # Run all enabled scanners
+          ${snapshotGenerator}/bin/generate-snapshot \
+            --output "$SNAPSHOT_FILE" \
+            ${optionalString cfg.scanners.desktop "--desktop"} \
+            ${optionalString cfg.scanners.steam "--steam"} \
+            ${optionalString cfg.scanners.credentials.enable "--credentials"} \
+            ${optionalString cfg.scanners.packages "--packages"} \
+            ${optionalString cfg.scanners.browser "--browser"} \
+            ${optionalString cfg.scanners.ide "--ide"}
+          
+          ${ui.messages.success "Snapshot created: $SNAPSHOT_FILE"}
+          
+          # Encrypt if enabled
+          if [ "${if cfg.encryption.enable then "true" else "false"}" = "true" ]; then
+            ${ui.messages.info "Encrypting snapshot..."}
+            ${encryptionHandler}/bin/encrypt-snapshot \
+              --input "$SNAPSHOT_FILE" \
+              --method "${cfg.encryption.method}" \
+              ${optionalString (cfg.encryption.sops.keysFile != "") "--sops-keys ${cfg.encryption.sops.keysFile}"} \
+              ${optionalString (cfg.encryption.sops.ageKeyFile != "") "--age-key ${cfg.encryption.sops.ageKeyFile}"} \
+              ${optionalString (cfg.encryption.fido2.device != "") "--fido2-device ${cfg.encryption.fido2.device}"}
             
-            SNAPSHOT_DIR="${cfg.snapshotDir}"
-            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-            SNAPSHOT_FILE="$SNAPSHOT_DIR/system-snapshot_$TIMESTAMP.json"
+            ENCRYPTED_FILE="$SNAPSHOT_FILE.encrypted"
+            ${ui.messages.success "Encrypted snapshot: $ENCRYPTED_FILE"}
+            rm -f "$SNAPSHOT_FILE"  # Remove unencrypted version
+          fi
+          
+          # Upload to GitHub if enabled
+          if [ "${if cfg.github.enable then "true" else "false"}" = "true" ] && [ -n "${cfg.github.repository}" ]; then
+            ${ui.messages.info "Uploading to GitHub..."}
+            ${githubHandler}/bin/upload-to-github \
+              --repository "${cfg.github.repository}" \
+              --branch "${cfg.github.branch}" \
+              ${optionalString (cfg.github.tokenFile != "") "--token-file ${cfg.github.tokenFile}"} \
+              --snapshot "$SNAPSHOT_FILE${optionalString cfg.encryption.enable ".encrypted"}"
             
-            ${ui.messages.info "Starting system discovery..."}
-            
-            # Run all enabled scanners
-            ${snapshotGenerator}/bin/generate-snapshot \
-              --output "$SNAPSHOT_FILE" \
-              ${optionalString cfg.scanners.desktop "--desktop"} \
-              ${optionalString cfg.scanners.steam "--steam"} \
-              ${optionalString cfg.scanners.credentials.enable "--credentials"} \
-              ${optionalString cfg.scanners.packages "--packages"} \
-              ${optionalString cfg.scanners.browser "--browser"} \
-              ${optionalString cfg.scanners.ide "--ide"}
-            
-            ${ui.messages.success "Snapshot created: $SNAPSHOT_FILE"}
-            
-            # Encrypt if enabled
-            if [ "${toString cfg.encryption.enable}" = "true" ]; then
-              ${ui.messages.info "Encrypting snapshot..."}
-              ${encryptionHandler}/bin/encrypt-snapshot \
-                --input "$SNAPSHOT_FILE" \
-                --method "${cfg.encryption.method}" \
-                ${optionalString (cfg.encryption.sops.keysFile != null) "--sops-keys ${cfg.encryption.sops.keysFile}"} \
-                ${optionalString (cfg.encryption.sops.ageKeyFile != null) "--age-key ${cfg.encryption.sops.ageKeyFile}"} \
-                ${optionalString (cfg.encryption.fido2.device != null) "--fido2-device ${cfg.encryption.fido2.device}"}
-              
-              ENCRYPTED_FILE="$SNAPSHOT_FILE.encrypted"
-              ${ui.messages.success "Encrypted snapshot: $ENCRYPTED_FILE"}
-              rm -f "$SNAPSHOT_FILE"  # Remove unencrypted version
-            fi
-            
-            # Upload to GitHub if enabled
-            if [ "${toString cfg.github.enable}" = "true" ] && [ -n "${cfg.github.repository}" ]; then
-              ${ui.messages.info "Uploading to GitHub..."}
-              ${githubHandler}/bin/upload-to-github \
-                --repository "${cfg.github.repository}" \
-                --branch "${cfg.github.branch}" \
-                ${optionalString (cfg.github.tokenFile != null) "--token-file ${cfg.github.tokenFile}"} \
-                --snapshot "$SNAPSHOT_FILE${optionalString cfg.encryption.enable ".encrypted"}"
-              
-              ${ui.messages.success "Uploaded to GitHub"}
-            fi
-            
-            ${ui.messages.success "System discovery complete!"}
-          ''}/bin/ncc-discover
+            ${ui.messages.success "Uploaded to GitHub"}
+          fi
+          
+          ${ui.messages.success "System discovery complete!"}
         '';
       };
-    })
+    }))
   ];
 }
 

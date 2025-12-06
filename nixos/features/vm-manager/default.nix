@@ -1,25 +1,21 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
 with lib;
 
 let
-  stateDir = "/var/lib/virt";
+  cfg = config.features.vm-manager;
+  stateDir = cfg.stateDir;
 in {
   imports = [
+    ./options.nix
     (import ./testing { inherit config lib pkgs; })
   ];
 
-  options.features.vm-manager = {
-    enable = mkEnableOption "VM Manager";
-    storage.enable = mkEnableOption "Storage Management for VMs";
-    stateDir = mkOption {
-      type = types.path;
-      default = stateDir;
-      description = "Base directory for virtualization state";
-    };
-  };
-
-  config = {
+  config = mkMerge [
+    {
+      features.vm-manager.enable = mkDefault (systemConfig.features.vm-manager or false);
+    }
+    (mkIf cfg.enable {
     # Base requirements
     virtualisation = {
       libvirtd.enable = true;
@@ -54,6 +50,6 @@ in {
     features.vm-manager.storage.enable = true;
 
     # Register VM category
-    
-  };
+    })
+  ];
 }

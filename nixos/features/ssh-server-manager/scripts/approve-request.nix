@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = config.features.ssh-server-manager.approve-request;
-  ui = config.features.terminal-ui.api;
+  ui = config.core.cli-formatter.api;
   notifications = config.features.ssh-server-manager.notifications;
 
   approveRequestScript = pkgs.writeScriptBin "ssh-approve-request" ''
@@ -247,7 +247,7 @@ in {
   config = {
     environment.systemPackages = [ approveRequestScript denyRequestScript ];
 
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "ssh-approve-request";
         description = "Approve SSH access request";

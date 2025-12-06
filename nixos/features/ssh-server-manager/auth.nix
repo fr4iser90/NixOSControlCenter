@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = config.features.ssh-server-manager;
-  ui = config.features.terminal-ui.api;
+  ui = config.core.cli-formatter.api;
 
   sshTempOpenScript = pkgs.writeScriptBin "ssh-temp-open" ''
     #!${pkgs.bash}/bin/bash
@@ -79,7 +79,7 @@ in {
       sshForceOpenScript
     ];
 
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "ssh-temp-open";
         description = "Temporarily enable SSH password authentication";

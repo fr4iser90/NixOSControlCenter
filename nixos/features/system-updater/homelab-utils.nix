@@ -3,8 +3,8 @@
 with lib;
 
 let
-  ui = config.features.terminal-ui.api;
-  commandCenter = config.features.command-center;
+  ui = config.core.cli-formatter.api;
+  commandCenter = config.core.command-center;
   hostname = systemConfig.hostName;
 
   # Homelab Minimization Script
@@ -55,7 +55,7 @@ in {
       minimizeScript
     ];
 
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "homelab-minimize";
         description = "Minimize system configuration for homelab use";

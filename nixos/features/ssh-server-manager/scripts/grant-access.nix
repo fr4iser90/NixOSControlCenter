@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = config.features.ssh-server-manager.grant-access;
-  ui = config.features.terminal-ui.api;
+  ui = config.core.cli-formatter.api;
 
   grantAccessScript = pkgs.writeScriptBin "ssh-grant-access" ''
     #!${pkgs.bash}/bin/bash
@@ -90,7 +90,7 @@ in {
   config = {
     environment.systemPackages = [ grantAccessScript ];
 
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "ssh-grant-access";
         description = "Grant temporary SSH password authentication";

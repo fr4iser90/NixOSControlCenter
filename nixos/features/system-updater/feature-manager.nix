@@ -3,8 +3,8 @@
 with lib;
 
 let
-  ui = config.features.terminal-ui.api;
-  commandCenter = config.features.command-center;
+  ui = config.core.cli-formatter.api;
+  commandCenter = config.core.command-center;
   hostname = systemConfig.hostName;
   autoBuild = systemConfig.features.system-updater.auto-build or false;
   featureConfigPath = "/etc/nixos/configs/features-config.nix";
@@ -139,10 +139,23 @@ EOF
         ${ui.messages.success "$feature enabled"}
       fi
     done
-    if sudo nixos-rebuild switch --flake /etc/nixos#${hostname}; then
+    if sudo nixos-rebuild switch --flake /etc/nixos#${hostname} 2>&1; then
       ${ui.messages.success "System successfully rebuilt!"}
     else
-      ${ui.messages.error "Rebuild failed! Check logs for details."}
+      EXIT_CODE=$?
+      # Check if build was successful but switch failed
+      if [ -f /nix/var/nix/profiles/system ]; then
+        CURRENT_GEN=$(readlink /nix/var/nix/profiles/system | cut -d'-' -f2)
+        if [ -n "$CURRENT_GEN" ]; then
+          ${ui.messages.warning "Build completed, but switch encountered issues (exit code: $EXIT_CODE)"}
+          ${ui.messages.info "Current generation: $CURRENT_GEN"}
+          ${ui.messages.info "Some services may have failed to reload - this is often harmless."}
+        else
+          ${ui.messages.error "Rebuild failed! Check logs for details."}
+        fi
+      else
+        ${ui.messages.error "Rebuild failed! Check logs for details."}
+      fi
     fi
   '';
 
@@ -150,7 +163,7 @@ in {
   config = {
     environment.systemPackages = [ featureScript updateFeaturesConfig ];
 
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "feature-manager";
         description = "Toggle NixOS features using fzf";

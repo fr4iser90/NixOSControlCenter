@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = config.features.ssh-server-manager.notifications;
-  ui = config.features.terminal-ui.api;
+  ui = config.core.cli-formatter.api;
 
   notificationTypes = {
     email = {
@@ -78,7 +78,7 @@ in {
       curl
     ];
 
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "ssh-notify-test";
         description = "Test SSH notification system";

@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
 
 let
-  ui = config.features.terminal-ui.api;
+  ui = config.core.cli-formatter.api;
 
   prebuildCheckScript = pkgs.writeScriptBin "build" ''
     #!${pkgs.bash}/bin/bash
@@ -91,10 +91,10 @@ in {
 
   config = {
     # Enable terminal-ui dependency
-    features.terminal-ui.enable = true;
+    # features.terminal-ui.enable removed (cli-formatter is Core) = true;
     
     # Command Center Registration
-    features.command-center.commands = [
+    core.command-center.commands = [
     {
       name = "build";
       category = "system";

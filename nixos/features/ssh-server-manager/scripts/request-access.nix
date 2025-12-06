@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = config.features.ssh-server-manager.request-access;
-  ui = config.features.terminal-ui.api;
+  ui = config.core.cli-formatter.api;
   notifications = config.features.ssh-server-manager.notifications;
 
   requestAccessScript = pkgs.writeScriptBin "ssh-request-access" ''
@@ -118,7 +118,7 @@ in {
   config = {
     environment.systemPackages = [ requestAccessScript ];
 
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "ssh-request-access";
         description = "Request temporary SSH password access";

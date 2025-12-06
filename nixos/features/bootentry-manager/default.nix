@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
 with lib;
 
@@ -6,7 +6,6 @@ let
   cfg = config.features.bootentry-manager;
   
   # Importiere die benötigten Module
-  types = import ./lib/types.nix { inherit lib; };
   common = import ./lib/common.nix { inherit lib; };
   
   # Wähle Provider basierend auf dem Bootloader
@@ -19,16 +18,15 @@ let
   selectedProvider = providers.${config.boot.loader.systemd-boot.enable} or providers."systemd-boot";
 
 in {
-  options.features.bootentry-manager = {
-    enable = mkEnableOption "boot entry manager";
-    description = mkOption {
-      type = types.str;
-      default = "Boot entry management for various bootloaders";
-      description = "Feature description";
-    };
-  };
+  imports = [
+    ./options.nix
+  ];
 
-  config = mkIf cfg.enable {
+  config = mkMerge [
+    {
+      features.bootentry-manager.enable = mkDefault (systemConfig.features.bootentry-manager or false);
+    }
+    (mkIf cfg.enable {
     # Activation scripts
     system.activationScripts = {
       bootEntryInit = lib.mkForce selectedProvider.activation.initializeJson;

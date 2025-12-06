@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = config.features.ssh-server-manager.list-requests;
-  ui = config.features.terminal-ui.api;
+  ui = config.core.cli-formatter.api;
 
   listRequestsScript = pkgs.writeScriptBin "ssh-list-requests" ''
     #!${pkgs.bash}/bin/bash
@@ -203,7 +203,7 @@ in {
   config = {
     environment.systemPackages = [ listRequestsScript cleanupRequestsScript ];
 
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "ssh-list-requests";
         description = "List SSH access requests";

@@ -87,7 +87,6 @@
     systemModules = [
       ./hardware-configuration.nix
       ./core
-      ./desktop
       ./packages
       ./features
       ./custom

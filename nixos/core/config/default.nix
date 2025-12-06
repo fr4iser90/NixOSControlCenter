@@ -1,13 +1,13 @@
 { pkgs, lib, ... }:
 
 let
-  # Import terminal-ui directly (same as terminal-ui/default.nix does)
-  colors = import ../../features/terminal-ui/colors.nix;
-  core = import ../../features/terminal-ui/core { inherit lib colors; config = {}; };
-  status = import ../../features/terminal-ui/status { inherit lib colors; config = {}; };
+  # Import cli-formatter directly (config/ is a library, not a NixOS module, so it can't access config.core.cli-formatter.api)
+  colors = import ../cli-formatter/colors.nix;
+  core = import ../cli-formatter/core { inherit lib colors; config = {}; };
+  status = import ../cli-formatter/status { inherit lib colors; config = {}; };
   
-  # Build UI API (same structure as terminal-ui/default.nix apiValue)
-  ui = {
+  # Build formatter API (same structure as cli-formatter/default.nix apiValue)
+  formatter = {
     inherit colors;
     inherit (core) text layout;
     inherit (status) messages badges;
@@ -16,9 +16,9 @@ let
   # Import once to avoid circular dependencies
   schemaModule = import ./config-schema.nix { inherit lib; };
   detectionModule = import ./config-detection.nix { inherit pkgs lib; };
-  migrationModule = import ./config-migration.nix { inherit pkgs lib ui; };
-  validatorModule = import ./config-validator.nix { inherit pkgs lib ui; };
-  checkModule = import ./config-check.nix { inherit pkgs lib ui; };
+  migrationModule = import ./config-migration.nix { inherit pkgs lib formatter; };
+  validatorModule = import ./config-validator.nix { inherit pkgs lib formatter; };
+  checkModule = import ./config-check.nix { inherit pkgs lib formatter; };
 in
 
 {

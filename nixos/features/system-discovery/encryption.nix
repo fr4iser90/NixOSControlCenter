@@ -1,4 +1,6 @@
-{ pkgs, cfg }:
+{ pkgs, lib, cfg }:
+
+with lib;
 
 pkgs.writeShellScriptBin "encrypt-snapshot" ''
   #!${pkgs.bash}/bin/bash
@@ -84,16 +86,19 @@ pkgs.writeShellScriptBin "encrypt-snapshot" ''
 creation_rules:
   - path_regex: .*\.encrypted$
     age: >-
-      ${if cfg.encryption.sops.ageKeyFile != null then "AGE_KEY_FILE=${cfg.encryption.sops.ageKeyFile}" else ""}
+      ${optionalString (cfg.encryption.sops.ageKeyFile != "") "AGE_KEY_FILE=${cfg.encryption.sops.ageKeyFile}"}
 EOF
       fi
       
       # Set age key if provided
       if [ -n "$AGE_KEY" ] && [ -f "$AGE_KEY" ]; then
         export SOPS_AGE_KEY_FILE="$AGE_KEY"
-      elif [ -n "${cfg.encryption.sops.ageKeyFile}" ] && [ -f "${cfg.encryption.sops.ageKeyFile}" ]; then
+      fi
+      ${optionalString (cfg.encryption.sops.ageKeyFile != "") ''
+      if [ -z "$SOPS_AGE_KEY_FILE" ] && [ -n "${cfg.encryption.sops.ageKeyFile}" ] && [ -f "${cfg.encryption.sops.ageKeyFile}" ]; then
         export SOPS_AGE_KEY_FILE="${cfg.encryption.sops.ageKeyFile}"
       fi
+      ''}
       
       # Encrypt with sops
       if sops -e "$INPUT_FILE" > "$OUTPUT_FILE" 2>/dev/null; then

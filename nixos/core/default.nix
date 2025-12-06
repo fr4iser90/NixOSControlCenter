@@ -8,5 +8,9 @@
     ./network
     ./system
     ./user
+    ./desktop
+    # Infrastructure
+    ./cli-formatter 
+    ./command-center
   ];
 }

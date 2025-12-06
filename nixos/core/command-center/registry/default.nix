@@ -4,14 +4,14 @@ with lib;
 
 let
   types = import ./types.nix { inherit lib; };
-  cfg = config.features.command-center;
+  cfg = config.core.command-center;
 
   # Automatisch alle verwendeten Kategorien sammeln
   usedCategories = lib.unique (
     lib.map (command: command.category) cfg.commands
   );
 in {
-  options.features.command-center = {
+  options.core.command-center = {
     commands = mkOption {
       type = lib.types.listOf types.commandType;
       default = [];

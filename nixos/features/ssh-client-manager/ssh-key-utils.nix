@@ -1,8 +1,8 @@
 { config, lib, pkgs, ... }:
 
 let
-  ui = config.features.terminal-ui.api;
-  cfg = config.services.ssh-client-manager;
+  ui = config.core.cli-formatter.api;
+  cfg = config.features.ssh-client-manager;
 
   # SSH Key Utilities
   # This module provides functions for managing SSH keys (NOT connections)
@@ -114,7 +114,7 @@ let
   '';
 in {
   config = {
-    services.ssh-client-manager = {
+    features.ssh-client-manager = {
       sshClientManagerKeyUtils = sshClientManagerKeyUtils;
     };
   };

@@ -1,8 +1,8 @@
 { config, lib, pkgs, ... }:
 
 let
-  ui = config.features.terminal-ui.api;
-  cfg = config.services.ssh-client-manager;
+  ui = config.core.cli-formatter.api;
+  cfg = config.features.ssh-client-manager;
   
   # Main SSH Client Manager Script
   # This script provides the interactive interface for managing SSH connections
@@ -178,7 +178,7 @@ let
 in {
   config = {
     # Enable terminal-ui dependency
-    features.terminal-ui.enable = true;
+    # features.terminal-ui.enable removed (cli-formatter is Core) = true;
     
     # Add the SSH client manager script to system packages
     environment.systemPackages = [
@@ -186,7 +186,7 @@ in {
     ];
     
     # Register the command in the command center
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "ssh-client-manager";
         description = "Manage SSH client connections";
@@ -207,7 +207,7 @@ in {
     ];
 
     # Store the script reference in the service configuration
-    services.ssh-client-manager = {
+    features.ssh-client-manager = {
       sshClientManagerScript = sshClientManagerScript;
     };
   };

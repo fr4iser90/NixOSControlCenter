@@ -1,8 +1,8 @@
 { config, lib, pkgs, ... }:
 
 let
-  ui = config.features.terminal-ui.api;
-  cfg = config.services.ssh-client-manager;
+  ui = config.core.cli-formatter.api;
+  cfg = config.features.ssh-client-manager;
 
   # Centralized SSH Connection Handler
   # This module contains all SSH connection logic in one place
@@ -121,7 +121,7 @@ let
   '';
 in {
   config = {
-    services.ssh-client-manager = {
+    features.ssh-client-manager = {
       sshConnectionHandler = sshConnectionHandler;
     };
   };

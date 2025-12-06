@@ -1,7 +1,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  ui = config.features.terminal-ui.api;
+  ui = config.core.cli-formatter.api;
   hardwareConfigPath = "/etc/nixos/configs/hardware-config.nix";
   
   # Use the shared update-hardware-config script from utils.nix
@@ -79,7 +79,7 @@ let
 in {
   config = {
     environment.systemPackages = [ prebuildScript ];
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "check-memory";
         category = "system-checks";

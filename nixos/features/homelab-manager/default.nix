@@ -1,6 +1,10 @@
 { config, lib, pkgs, systemConfig, ... }:
 
+with lib;
+
 let
+  cfg = config.features.homelab-manager;
+  
   # Check if Swarm is active
   isSwarmMode = (systemConfig.homelab.swarm or null) != null;
   
@@ -31,11 +35,22 @@ let
   else null;
 
 in {
-  imports = if hasDockerUser then [
+  imports = [
+    ./options.nix
+  ] ++ (if hasDockerUser then [
     ./homelab-create.nix
     ./homelab-fetch.nix
     # ./homelab-update.nix
     # ./homelab-delete.nix
     # ./homelab-status.nix
-  ] else [];
+  ] else []);
+
+  config = mkMerge [
+    {
+      features.homelab-manager.enable = mkDefault (systemConfig.features.homelab-manager or false);
+    }
+    (mkIf cfg.enable {
+      # Feature-specific config here
+    })
+  ];
 }

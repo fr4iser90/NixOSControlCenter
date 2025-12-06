@@ -1,4 +1,6 @@
-{ pkgs, cfg }:
+{ pkgs, lib, cfg }:
+
+with lib;
 
 pkgs.writeShellScriptBin "download-from-github" ''
   #!${pkgs.bash}/bin/bash
@@ -46,7 +48,7 @@ pkgs.writeShellScriptBin "download-from-github" ''
   done
   
   if [ -z "$REPOSITORY" ]; then
-    REPOSITORY="${cfg.github.repository or ""}"
+    REPOSITORY="${cfg.github.repository}"
   fi
   
   if [ -z "$REPOSITORY" ]; then
@@ -133,7 +135,7 @@ pkgs.writeShellScriptBin "download-from-github" ''
       fi
       
       echo "  📦 $filename"
-      echo "     Size: ${SIZE_MB} MB | Updated: $DATE"
+      echo "     Size: $SIZE_MB MB | Updated: $DATE"
       echo ""
       
       SNAPSHOT_LIST+=("$filename")

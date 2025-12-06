@@ -6,8 +6,8 @@ let
   
   # Map feature names to module paths
   featureModuleMap = {
-    "terminal-ui" = ./terminal-ui;
-    "command-center" = ./command-center;
+    # "terminal-ui" removed (now core/cli-formatter)
+    # "command-center" removed (now core/command-center)
     "system-checks" = ./system-checks;
     "system-updater" = ./system-updater;
     "system-logger" = ./system-logger;
@@ -120,18 +120,11 @@ let
   # Convert feature names to module paths
   featureModules = map (feature: featureModuleMap.${feature}) sortedFeatures;
   
-  # CRITICAL: terminal-ui MUST be imported first if any feature is active
-  # This ensures options.features.terminal-ui is defined before other modules' let blocks evaluate
-  hasAnyFeature = activeFeatureNames != [];
-  terminalUIFirst = if hasAnyFeature && lib.elem "terminal-ui" allFeatures then [ ./terminal-ui ] else [];
-  otherModules = lib.filter (m: toString m != toString ./terminal-ui) featureModules;
-  
 in {
-  imports = terminalUIFirst ++ otherModules;
+  imports = featureModules;
   
   config = {
-    # Auto-enable terminal-ui when any feature is active
-    features.terminal-ui.enable = lib.mkIf (lib.elem "terminal-ui" allFeatures) true;
+    # CLI formatter and command-center are Core modules, no enable needed
     
     # Nix experimental features
     nix.settings.experimental-features = [ "nix-command" "flakes" ];

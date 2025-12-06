@@ -3,8 +3,8 @@
 with lib;
 
 let
-  ui = config.features.terminal-ui.api;
-  commandCenter = config.features.command-center;
+  ui = config.core.cli-formatter.api;
+  commandCenter = config.core.command-center;
   hostname = systemConfig.hostName;
   desktopConfigPath = "/etc/nixos/configs/desktop-config.nix";
 
@@ -90,7 +90,7 @@ in {
   config = {
     environment.systemPackages = [ enableDesktopScript updateDesktopConfig ];
 
-    features.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "desktop-manager";
         description = "Enable or disable desktop environment";
