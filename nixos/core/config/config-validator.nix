@@ -1,4 +1,4 @@
-{ pkgs, lib, ... }:
+{ pkgs, lib, ui, ... }:
 
 let
   schema = import ./config-schema.nix { inherit lib; };
@@ -27,6 +27,16 @@ let
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
     
+    # Parse arguments for verbose mode
+    VERBOSE=false
+    for arg in "$@"; do
+      case "$arg" in
+        --verbose|--debug|-v)
+          VERBOSE=true
+          ;;
+      esac
+    done
+    
     SYSTEM_CONFIG="/etc/nixos/system-config.nix"
     CONFIGS_DIR="/etc/nixos/configs"
     
@@ -35,18 +45,22 @@ let
     
     # Check if system-config.nix exists
     if [ ! -f "$SYSTEM_CONFIG" ]; then
-      echo "ERROR: system-config.nix not found at $SYSTEM_CONFIG"
+      ${ui.messages.error "system-config.nix not found at $SYSTEM_CONFIG"}
       exit 1
     fi
     
-    echo "Validating system-config.nix..."
+    if [ "$VERBOSE" = "true" ]; then
+      ${ui.messages.info "Validating system-config.nix..."}
+    fi
     
     # Validate Nix syntax
     if ! ${pkgs.nix}/bin/nix-instantiate --parse "$SYSTEM_CONFIG" >/dev/null 2>&1; then
-      echo "ERROR: system-config.nix has invalid Nix syntax"
+      ${ui.messages.error "system-config.nix has invalid Nix syntax"}
       ERRORS=$((ERRORS + 1))
     else
-      echo "✓ Nix syntax is valid"
+      if [ "$VERBOSE" = "true" ]; then
+        ${ui.messages.success "Nix syntax is valid"}
+      fi
     fi
     
     # MODERN VERSION DETECTION: Use detectionPatterns from schemas via detection module
@@ -57,9 +71,11 @@ let
     STRUCTURE_INFO_MAP='${structureInfoJson}'
     EXPECTED_CONFIG_FILES_MAP='${expectedConfigFilesJson}'
     
-    echo "✓ Detected config version: $CONFIG_VERSION"
-    echo "✓ Current supported version: $CURRENT_VERSION"
-    echo "✓ Supported versions: $SUPPORTED_VERSIONS"
+    if [ "$VERBOSE" = "true" ]; then
+      ${ui.messages.success "Detected config version: $CONFIG_VERSION"}
+      ${ui.messages.success "Current supported version: $CURRENT_VERSION"}
+      ${ui.messages.info "Supported versions: $SUPPORTED_VERSIONS"}
+    fi
     
     # Check if version is supported
     VERSION_SUPPORTED=false
@@ -71,14 +87,18 @@ let
     done
     
     if [ "$VERSION_SUPPORTED" = "false" ]; then
-      echo "WARNING: Config version $CONFIG_VERSION not recognized (assuming v1.0)"
+      if [ "$VERBOSE" = "true" ]; then
+        ${ui.messages.warning "Config version $CONFIG_VERSION not recognized (assuming v1.0)"}
+      fi
       CONFIG_VERSION="1.0"
     fi
     
     # Check if migration is needed (version mismatch)
     if [ "$CONFIG_VERSION" != "$CURRENT_VERSION" ]; then
-      echo "ERROR: Config version $CONFIG_VERSION does not match current version $CURRENT_VERSION"
-      echo "       Migration needed - this will be handled automatically"
+      if [ "$VERBOSE" = "true" ]; then
+        ${ui.messages.warning "Config version $CONFIG_VERSION does not match current version $CURRENT_VERSION"}
+        ${ui.messages.info "Migration needed - this will be handled automatically"}
+      fi
       # Count as error to trigger migration in config-check
       ERRORS=$((ERRORS + 1))
     fi
@@ -90,10 +110,14 @@ let
     for field in $REQUIRED_FIELDS; do
       if ! ${pkgs.nix}/bin/nix-instantiate --eval --strict -E \
         "(import $SYSTEM_CONFIG).$field or null" >/dev/null 2>&1; then
-        echo "WARNING: Required field '$field' not found in system-config.nix (v$CONFIG_VERSION)"
+        if [ "$VERBOSE" = "true" ]; then
+          ${ui.messages.warning "Required field '$field' not found in system-config.nix (v$CONFIG_VERSION)"}
+        fi
         WARNINGS=$((WARNINGS + 1))
       else
-        echo "✓ $field found"
+        if [ "$VERBOSE" = "true" ]; then
+          ${ui.messages.success "$field found"}
+        fi
       fi
     done
     
@@ -106,8 +130,10 @@ let
     if [ "$MAX_LINES" -lt 9999 ]; then
       LINE_COUNT=$(wc -l < "$SYSTEM_CONFIG" 2>/dev/null || echo "0")
       if [ "$LINE_COUNT" -gt "$MAX_LINES" ]; then
-        echo "WARNING: system-config.nix has more than $MAX_LINES lines (should be minimal for v$CONFIG_VERSION)"
-        echo "         Consider running 'ncc-migrate-config' to migrate to modular structure"
+        if [ "$VERBOSE" = "true" ]; then
+          ${ui.messages.warning "system-config.nix has more than $MAX_LINES lines (should be minimal for v$CONFIG_VERSION)"}
+          ${ui.messages.info "Consider running 'ncc-migrate-config' to migrate to modular structure"}
+        fi
         WARNINGS=$((WARNINGS + 1))
       fi
     fi
@@ -116,9 +142,11 @@ let
     for field in $FORBIDDEN_FIELDS; do
       if grep -q "$field = {" "$SYSTEM_CONFIG" 2>/dev/null || \
          grep -q "$field = " "$SYSTEM_CONFIG" 2>/dev/null; then
-        echo "WARNING: Non-critical field '$field' found in system-config.nix (v$CONFIG_VERSION)"
-        echo "         This should be in separate configs/ files"
-        echo "         Consider running 'ncc-migrate-config' to migrate to modular structure"
+        if [ "$VERBOSE" = "true" ]; then
+          ${ui.messages.warning "Non-critical field '$field' found in system-config.nix (v$CONFIG_VERSION)"}
+          ${ui.messages.info "This should be in separate configs/ files"}
+          ${ui.messages.info "Consider running 'ncc-migrate-config' to migrate to modular structure"}
+        fi
         WARNINGS=$((WARNINGS + 1))
       fi
     done
@@ -128,9 +156,13 @@ let
     if [ "$CONFIG_VERSION" != "1.0" ]; then
       # v2.0+ expects configs dir
       if [ ! -d "$CONFIGS_DIR" ]; then
-        echo "INFO: configs/ directory does not exist (recommended for modular config v$CONFIG_VERSION)"
+        if [ "$VERBOSE" = "true" ]; then
+          ${ui.messages.info "configs/ directory does not exist (recommended for modular config v$CONFIG_VERSION)"}
+        fi
       else
-        echo "✓ configs/ directory exists"
+        if [ "$VERBOSE" = "true" ]; then
+          ${ui.messages.success "configs/ directory exists"}
+        fi
         
         # Get expected config files for this version
         EXPECTED_FILES=$(echo "$EXPECTED_CONFIG_FILES_MAP" | ${pkgs.jq}/bin/jq -r ".\"$CONFIG_VERSION\" // [] | .[]")
@@ -138,10 +170,13 @@ let
         # Validate each config file
         for config_file in "$CONFIGS_DIR"/*.nix; do
           if [ -f "$config_file" ]; then
+            CONFIG_BASENAME=$(basename "$config_file")
             if ${pkgs.nix}/bin/nix-instantiate --parse "$config_file" >/dev/null 2>&1; then
-              echo "  ✓ $(basename "$config_file") syntax is valid"
+              if [ "$VERBOSE" = "true" ]; then
+                ${ui.messages.success "  $CONFIG_BASENAME syntax is valid"}
+              fi
             else
-              echo "  ERROR: $(basename "$config_file") has invalid Nix syntax"
+              ${ui.messages.error "  $CONFIG_BASENAME has invalid Nix syntax"}
               ERRORS=$((ERRORS + 1))
             fi
           fi
@@ -151,22 +186,33 @@ let
     
     # If v1.0, suggest migration
     if [ "$CONFIG_VERSION" = "1.0" ] && [ "$CONFIG_VERSION" != "$CURRENT_VERSION" ]; then
-      echo "INFO: v1.0 structure detected (monolithic)"
-      echo "      Consider running 'ncc-migrate-config' to migrate to v$CURRENT_VERSION (modular structure)"
+      if [ "$VERBOSE" = "true" ]; then
+        ${ui.messages.info "v1.0 structure detected (monolithic)"}
+        ${ui.messages.info "Consider running 'ncc-migrate-config' to migrate to v$CURRENT_VERSION (modular structure)"}
+      fi
     fi
     
     # Summary
-    echo ""
-    echo "Validation Summary:"
+    if [ "$VERBOSE" = "true" ]; then
+      ${ui.text.newline}
+      ${ui.text.section "Validation Summary"}
+    fi
     if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
-      echo "✓ All checks passed!"
+      if [ "$VERBOSE" = "true" ]; then
+        ${ui.messages.success "All checks passed!"}
+      fi
       exit 0
     else
       if [ $ERRORS -gt 0 ]; then
-        echo "✗ Found $ERRORS error(s)"
+        ${ui.messages.error "Found $ERRORS error(s)"}
+        if [ "$VERBOSE" = "false" ]; then
+          ${ui.messages.info "Run with --verbose to see details"}
+        fi
       fi
       if [ $WARNINGS -gt 0 ]; then
-        echo "⚠ Found $WARNINGS warning(s)"
+        if [ "$VERBOSE" = "true" ]; then
+          ${ui.messages.warning "Found $WARNINGS warning(s)"}
+        fi
       fi
       exit 1
     fi

@@ -31,6 +31,10 @@
       dependencies = [];
       conflicts = [];
     };
+    "system-discovery" = {
+      dependencies = [ "terminal-ui" "command-center" ];
+      conflicts = [];
+    };
     "bootentry-manager" = {
       dependencies = [];
       conflicts = [];

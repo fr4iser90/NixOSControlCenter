@@ -57,11 +57,22 @@ let
   '';
   
   # Import config management (single import, clean API)
+  # Terminal-UI is imported directly in core/config, no need to pass it
   configModule = import ../../core/config { inherit pkgs lib; };
   
   systemUpdateMainScript = pkgs.writeScriptBin "ncc-system-update-main" ''
     #!${pkgs.bash}/bin/bash
     set -e
+
+    # Parse arguments for verbose mode
+    VERBOSE=false
+    for arg in "$@"; do
+      case "$arg" in
+        --verbose|--debug|-v)
+          VERBOSE=true
+          ;;
+      esac
+    done
 
     # Sudo-Check
     if [ "$EUID" -ne 0 ]; then
@@ -77,10 +88,8 @@ let
     ${ui.text.header "NixOS System Update"}
     
     # Step 1: Check system configuration (validates + migrates if needed)
-    ${ui.messages.loading "Checking system configuration..."}
-    if ${configModule.configCheck}/bin/ncc-config-check 2>&1; then
-      ${ui.messages.success "Configuration is valid"}
-    else
+    # ncc-config-check already outputs status messages, so we just check the exit code
+    if ! ${configModule.configCheck}/bin/ncc-config-check $([ "$VERBOSE" = "true" ] && echo "--verbose") 2>&1; then
       ${ui.messages.warning "Configuration has issues (migration may have been attempted)"}
       ${ui.messages.info "You may want to review the configuration before proceeding"}
     fi

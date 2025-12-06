@@ -12,6 +12,7 @@ let
     "system-updater" = ./system-updater;
     "system-logger" = ./system-logger;
     "system-config-manager" = ./system-config-manager;
+    "system-discovery" = ./system-discovery;
     "homelab-manager" = ./homelab-manager;
     "bootentry-manager" = ./bootentry-manager;
     "ssh-client-manager" = ./ssh-client-manager;
@@ -40,6 +41,7 @@ let
     "system-updater" = cfg.system-updater or false;
     "system-logger" = cfg.system-logger or false;
     "system-config-manager" = cfg.system-config-manager or false;
+    "system-discovery" = cfg.system-discovery or false;
     "homelab-manager" = shouldActivateHomelabManager;
     "bootentry-manager" = cfg.bootentry-manager or false;
     "ssh-client-manager" = cfg.ssh-client-manager or false;

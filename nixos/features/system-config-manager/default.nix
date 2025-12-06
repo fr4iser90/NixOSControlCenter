@@ -86,7 +86,7 @@ EOF
     
     # Read existing feature states
     declare -A features
-    feature_list="system-logger system-checks system-updater system-config-manager ssh-client-manager ssh-server-manager bootentry-manager homelab-manager vm-manager ai-workspace"
+    feature_list="system-logger system-checks system-updater system-config-manager system-discovery ssh-client-manager ssh-server-manager bootentry-manager homelab-manager vm-manager ai-workspace"
     for f in $feature_list; do
       if [ -f "$config_file" ]; then
         status=$(${pkgs.nix}/bin/nix-instantiate --eval --strict -E \
@@ -108,6 +108,7 @@ EOF
     system-checks = ''${features["system-checks"]};
     system-updater = ''${features["system-updater"]};
     system-config-manager = ''${features["system-config-manager"]};
+    system-discovery = ''${features["system-discovery"]};
     ssh-client-manager = ''${features["ssh-client-manager"]};
     ssh-server-manager = ''${features["ssh-server-manager"]};
     bootentry-manager = ''${features["bootentry-manager"]};

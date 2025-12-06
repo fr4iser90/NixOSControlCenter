@@ -14,6 +14,7 @@ let
     "system-checks" 
     "system-updater"
     "system-config-manager"
+    "system-discovery"
     "ssh-client-manager"
     "ssh-server-manager"
     "bootentry-manager"
@@ -67,6 +68,7 @@ let
     system-checks = ''${features["system-checks"]};
     system-updater = ''${features["system-updater"]};
     system-config-manager = ''${features["system-config-manager"]};
+    system-discovery = ''${features["system-discovery"]};
     ssh-client-manager = ''${features["ssh-client-manager"]};
     ssh-server-manager = ''${features["ssh-server-manager"]};
     bootentry-manager = ''${features["bootentry-manager"]};
