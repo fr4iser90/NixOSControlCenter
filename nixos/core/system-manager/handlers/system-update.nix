@@ -28,7 +28,7 @@ let
   # Extract configuration values
   username = head (attrNames systemConfig.users);
   hostname = systemConfig.hostName;
-  autoBuild = systemConfig.features.system-updater.auto-build or false;
+  autoBuild = config.core.system-manager.auto-build or false;
   systemChecks = systemConfig.features.system-checks or false;
   # Function to prompt for build - with conditional build command and better error handling
   prompt_build = ''
@@ -76,7 +76,7 @@ let
   
   # Import config management (single import, clean API)
   # Terminal-UI is imported directly in core/config, no need to pass it
-  configModule = import ../../core/config { inherit pkgs lib; };
+  configModule = import ../../config { inherit pkgs lib; };
   
   systemUpdateMainScript = pkgs.writeScriptBin "ncc-system-update-main" ''
     #!${pkgs.bash}/bin/bash
@@ -386,6 +386,7 @@ in {
       chown root:root ${backupSettings.directory}
     '';
 
+    # Commands are registered in commands.nix
     core.command-center.commands = [
       {
         name = "system-update";

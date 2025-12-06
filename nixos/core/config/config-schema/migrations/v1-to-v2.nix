@@ -58,7 +58,7 @@
         features = {
           "system-logger" = "features.system-logger";
           "system-checks" = "features.system-checks";
-          "system-updater" = "features.system-updater";
+          # "system-updater" removed (now core/system-updater)
           "ssh-client-manager" = "features.ssh-client-manager";
           "ssh-server-manager" = "features.ssh-server-manager";
           "bootentry-manager" = "features.bootentry-manager";

@@ -34,6 +34,9 @@ let
     (lib.head (lib.attrNames adminUsers))  # Only if NOT Swarm
   else null;
 
+  # Import homelab utilities
+  homelabUtils = import ./lib/homelab-utils.nix { inherit config lib pkgs systemConfig; };
+
 in {
   imports = [
     ./options.nix
@@ -50,7 +53,9 @@ in {
       features.homelab-manager.enable = mkDefault (systemConfig.features.homelab-manager or false);
     }
     (mkIf cfg.enable {
-      # Feature-specific config here
+      # Import homelab utilities config
+      environment.systemPackages = (homelabUtils.config.environment.systemPackages or []);
+      core.command-center.commands = (homelabUtils.config.core.command-center.commands or []);
     })
   ];
 }

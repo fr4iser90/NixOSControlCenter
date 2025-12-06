@@ -184,7 +184,7 @@ HWEOF
     if ${pkgs.jq}/bin/jq -e '.features // empty | length > 0' <<< "$OLD_CONFIG_JSON" >/dev/null 2>&1; then
       SYSTEM_LOGGER=$(${pkgs.jq}/bin/jq -r '.features."system-logger" // false' <<< "$OLD_CONFIG_JSON")
       SYSTEM_CHECKS=$(${pkgs.jq}/bin/jq -r '.features."system-checks" // false' <<< "$OLD_CONFIG_JSON")
-      SYSTEM_UPDATER=$(${pkgs.jq}/bin/jq -r '.features."system-updater" // false' <<< "$OLD_CONFIG_JSON")
+      # system-updater is now in core/, not features/ - skip it
       SSH_CLIENT=$(${pkgs.jq}/bin/jq -r '.features."ssh-client-manager" // false' <<< "$OLD_CONFIG_JSON")
       SSH_SERVER=$(${pkgs.jq}/bin/jq -r '.features."ssh-server-manager" // false' <<< "$OLD_CONFIG_JSON")
       BOOTENTRY=$(${pkgs.jq}/bin/jq -r '.features."bootentry-manager" // false' <<< "$OLD_CONFIG_JSON")
@@ -197,7 +197,7 @@ HWEOF
   features = {
     system-logger = $SYSTEM_LOGGER;
     system-checks = $SYSTEM_CHECKS;
-    system-updater = $SYSTEM_UPDATER;
+    # system-updater is now in core/, not features/ - always loaded
     ssh-client-manager = $SSH_CLIENT;
     ssh-server-manager = $SSH_SERVER;
     bootentry-manager = $BOOTENTRY;

@@ -6,13 +6,12 @@ let
   ui = config.core.cli-formatter.api;
   commandCenter = config.core.command-center;
   hostname = systemConfig.hostName;
-  autoBuild = systemConfig.features.system-updater.auto-build or false;
+  autoBuild = config.core.system-manager.auto-build or false;
   featureConfigPath = "/etc/nixos/configs/features-config.nix";
   
   featureList = [
     "system-logger"
     "system-checks" 
-    "system-updater"
     "system-config-manager"
     "system-discovery"
     "ssh-client-manager"
@@ -66,7 +65,6 @@ let
   features = {
     system-logger = ''${features["system-logger"]};
     system-checks = ''${features["system-checks"]};
-    system-updater = ''${features["system-updater"]};
     system-config-manager = ''${features["system-config-manager"]};
     system-discovery = ''${features["system-discovery"]};
     ssh-client-manager = ''${features["ssh-client-manager"]};

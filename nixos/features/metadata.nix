@@ -3,10 +3,7 @@
 
 {
   features = {
-    "system-updater" = {
-      dependencies = [];  # cli-formatter and command-center are Core, no dependencies needed
-      conflicts = [];
-    };
+    # "system-updater" removed (now core/system-updater)
     "system-checks" = {
       dependencies = [];  # cli-formatter is Core, no dependency needed
       conflicts = [];
@@ -45,6 +42,10 @@
       conflicts = [];
     };
     "ai-workspace" = {
+      dependencies = [];
+      conflicts = [];
+    };
+    "hackathon-manager" = {
       dependencies = [];
       conflicts = [];
     };

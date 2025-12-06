@@ -1,25 +1,18 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  cfg = systemConfig.features;
+  cfg = systemConfig.features or {};
   metadata = import ./metadata.nix;
   
-  # Map feature names to module paths
-  featureModuleMap = {
-    # "terminal-ui" removed (now core/cli-formatter)
-    # "command-center" removed (now core/command-center)
-    "system-checks" = ./system-checks;
-    "system-updater" = ./system-updater;
-    "system-logger" = ./system-logger;
-    "system-config-manager" = ./system-config-manager;
-    "system-discovery" = ./system-discovery;
-    "homelab-manager" = ./homelab-manager;
-    "bootentry-manager" = ./bootentry-manager;
-    "ssh-client-manager" = ./ssh-client-manager;
-    "ssh-server-manager" = ./ssh-server-manager;
-    "vm-manager" = ./vm-manager;
-    "ai-workspace" = ./ai-workspace;
-  };
+  # ⭐ AUTO-DISCOVERY: Automatically read all features from directory
+  # Excludes: .TEMPLATE (template directory, not a feature)
+  # Note: system-updater is now in core/, not features/
+  allFeatureDirs = builtins.readDir ./.;
+  featureModuleMap = lib.mapAttrs' (name: type:
+    lib.nameValuePair name (./. + "/${name}")
+  ) (lib.filterAttrs (name: type: 
+    type == "directory" && name != ".TEMPLATE"
+  ) allFeatureDirs);
   
   # Check if homelab-manager should be auto-activated
   # Auto-activate if:
@@ -35,20 +28,18 @@ let
     || (isSingleServer && (systemConfig.homelab or null) != null)  # Single-Server homelab
     || isSwarmManager;  # Swarm Manager
   
-  # Get active features from systemConfig
-  activeFeatures = lib.filterAttrs (name: enabled: enabled) {
-    "system-checks" = cfg.system-checks or false;
-    "system-updater" = cfg.system-updater or false;
-    "system-logger" = cfg.system-logger or false;
-    "system-config-manager" = cfg.system-config-manager or false;
-    "system-discovery" = cfg.system-discovery or false;
+  # AUTO-REGISTRATION: Automatically read active features from systemConfig.features
+  # Special handling for homelab-manager (auto-activation logic)
+  # Filter out system-updater (now in core/, not features/)
+  baseActiveFeatures = lib.filterAttrs (name: enabled: 
+    enabled && name != "system-updater"  # system-updater is now core, not a feature
+  ) cfg;
+  activeFeaturesWithHomelab = baseActiveFeatures // {
+    # Override homelab-manager with special auto-activation logic
     "homelab-manager" = shouldActivateHomelabManager;
-    "bootentry-manager" = cfg.bootentry-manager or false;
-    "ssh-client-manager" = cfg.ssh-client-manager or false;
-    "ssh-server-manager" = cfg.ssh-server-manager or false;
-    "vm-manager" = cfg.vm-manager or false;
-    "ai-workspace" = cfg.ai-workspace or false;
   };
+  # Filter to only enabled features
+  activeFeatures = lib.filterAttrs (name: enabled: enabled) activeFeaturesWithHomelab;
   
   activeFeatureNames = lib.attrNames activeFeatures;
   

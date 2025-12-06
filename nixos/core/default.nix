@@ -12,5 +12,6 @@
     # Infrastructure
     ./cli-formatter 
     ./command-center
+    ./system-manager
   ];
 }
