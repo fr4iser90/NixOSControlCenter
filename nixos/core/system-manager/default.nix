@@ -4,6 +4,11 @@ with lib;
 
 let
   cfg = config.core.system-manager;
+  # API definition - always available
+  configHelpers = import ./lib/config-helpers.nix { inherit pkgs lib; };
+  apiValue = {
+    configHelpers = configHelpers;
+  };
 in {
   imports = [
     ./options.nix
@@ -21,5 +26,7 @@ in {
     # System-Manager ist Core - immer geladen
     # Version-Info und Deprecation-Warnungen sind immer verfügbar
     # Updates sind optional (enableUpdates = false by default)
+    
+    core.system-manager.api = apiValue;
   };
 }

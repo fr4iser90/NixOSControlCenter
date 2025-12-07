@@ -21,13 +21,38 @@
     
     # Helper function to load config if it exists
     loadConfig = configName:
-      if builtins.pathExists ./configs/${configName}-config.nix
-      then import ./configs/${configName}-config.nix
-      else {};
+      let
+        # Config-Datei-Name: ${configName}-config.nix
+        configFileName = "${configName}-config.nix";
+        
+        # 1. Prüfe Modul user-configs (echte Datei) - PRIORITÄT
+        # Durchsuche alle Module in core/ und features/
+        # System-Manager ist ein Modul wie jedes andere - features-config.nix liegt dort
+        modulePaths = [
+          # Standard: Modul-Name = Config-Name (z.B. desktop-config.nix in desktop/)
+          ./core/${configName}/user-configs/${configFileName}
+          ./features/${configName}/user-configs/${configFileName}
+          # Sonderfall: features-config.nix liegt in system-manager (weil System-Manager Features verwaltet)
+          ./core/system-manager/user-configs/${configFileName}
+        ];
+        
+        # 2. Fallback: Legacy Config in /configs/ (für Migration)
+        legacyPath = ./configs/${configFileName};
+        
+        # 3. Finde erste existierende (Modul → Legacy)
+        # Verwende builtins.filter + builtins.head statt lib.findFirst (lib ist noch nicht verfügbar)
+        allPaths = modulePaths ++ [legacyPath];
+        existingPaths = builtins.filter (p: builtins.pathExists p) allPaths;
+        configPath = if builtins.length existingPaths > 0 then builtins.head existingPaths else null;
+      in
+        if configPath != null
+        then import configPath
+        else {};
     
     # List of optional config files (in merge order)
     optionalConfigs = [
       "desktop"
+      "audio"
       "localization"
       "hardware"
       "features"

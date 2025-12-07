@@ -1,5 +1,14 @@
-{ lib, ... }:
+{ lib, pkgs, ... }:
 
+let
+  # Import config helpers
+  configHelpersValue = import ./lib/config-helpers.nix { inherit pkgs lib; };
+  
+  # API definition - always available (like cli-formatter.api)
+  apiValue = {
+    configHelpers = configHelpersValue;
+  };
+in
 {
   options.core.system-manager = {
     # Version-Info ist immer verfügbar (Core)
@@ -28,6 +37,13 @@
       type = lib.types.bool;
       default = false;
       description = "Automatically build after updates";
+    };
+    
+    # API for other modules
+    api = lib.mkOption {
+      type = lib.types.attrs;
+      default = apiValue;
+      description = "System manager API for other modules (config helpers, etc.)";
     };
   };
 }

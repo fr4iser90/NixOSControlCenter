@@ -30,7 +30,7 @@
           theme = {
             dark = "desktop.theme.dark";
           };
-          audio = "desktop.audio";
+          # audio wurde aus Desktop entfernt → eigenes Modul
         };
       };
     };

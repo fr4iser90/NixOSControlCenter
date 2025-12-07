@@ -114,7 +114,8 @@ EOF
       SERVER=$(${pkgs.jq}/bin/jq -r '.desktop.display.server // "wayland"' <<< "$OLD_CONFIG_JSON")
       SESSION=$(${pkgs.jq}/bin/jq -r '.desktop.display.session // "plasma"' <<< "$OLD_CONFIG_JSON")
       DARK=$(${pkgs.jq}/bin/jq -r '.desktop.theme.dark // true' <<< "$OLD_CONFIG_JSON")
-      AUDIO=$(${pkgs.jq}/bin/jq -r '.desktop.audio // "pipewire"' <<< "$OLD_CONFIG_JSON")
+      # Audio wurde aus Desktop-Modul entfernt (eigenes Modul)
+      # Migration: desktop.audio → audio.system (wird separat migriert)
       
       cat > "$CONFIGS_DIR/desktop-config.nix" <<DESKTOPEOF
 {
@@ -130,11 +131,23 @@ EOF
     theme = {
       dark = $DARK;
     };
-    audio = "$AUDIO";
   };
 }
 DESKTOPEOF
       echo "INFO: Created desktop-config.nix"
+      
+      # Migriere desktop.audio → audio.system (eigenes Modul)
+      if [ -n "$AUDIO" ] && [ "$AUDIO" != "none" ]; then
+        cat > "$CONFIGS_DIR/audio-config.nix" <<AUDIOEOF
+{
+  audio = {
+    enable = true;
+    system = "$AUDIO";
+  };
+}
+AUDIOEOF
+        echo "INFO: Created audio-config.nix (migrated from desktop.audio)"
+      fi
     fi
     
     # Create localization-config.nix if locales/keyboard exists

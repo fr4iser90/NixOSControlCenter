@@ -21,12 +21,7 @@ When enabled, the following components are configured:
    - Plasma (KDE)
    - XFCE
 
-4. **Audio**
-   - ALSA
-   - Pipewire
-   - Pulseaudio
-
-5. **Themes**
+4. **Themes**
    - Color Schemes
    - Cursors
    - Fonts

@@ -9,6 +9,7 @@
     ./system
     ./user
     ./desktop
+    ./audio
     # Infrastructure
     ./cli-formatter 
     ./command-center
