@@ -53,7 +53,7 @@ This document tracks all changes needed to refactor `hackathon-manager` to match
 - No versioning implemented
 
 **Target State:**
-- Add `featureVersion = "1.0"` in `options.nix`
+- Add `moduleVersion = "1.0"` in `options.nix`
 - Add `_version` option (internal)
 
 **Files to create/update:**
@@ -84,7 +84,7 @@ This document tracks all changes needed to refactor `hackathon-manager` to match
 ### Step 2: Create Core Files
 - [ ] Create `README.md` with feature documentation
 - [ ] Create `options.nix` - Extract all options from `default.nix`
-- [ ] Add `featureVersion = "1.0"` to `options.nix`
+- [ ] Add `moduleVersion = "1.0"` to `options.nix`
 - [ ] Add `_version` option to `options.nix`
 - [ ] Create `commands.nix` - Move command registration from `default.nix`
 - [ ] Create `scripts/` or `handlers/` directory

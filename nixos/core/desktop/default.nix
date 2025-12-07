@@ -2,14 +2,15 @@
 let
   cfg = systemConfig.desktop or {};
 in {
-  # imports must be at top level
-  imports = if (cfg.enable or false) then [ 
+  imports = [
+    ./options.nix
+  ] ++ (if (cfg.enable or false) then [ 
     ./display-managers
     ./display-servers
     ./environments
     ./themes
-    ./config.nix  # Implementation logic (symlink management + desktop config)
+    ./config.nix
   ] else [
-    ./config.nix  # Import even if disabled (for symlink management)
-  ];
+    ./config.nix
+  ]);
 }

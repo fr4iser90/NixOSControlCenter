@@ -54,7 +54,7 @@ This document tracks all changes needed to refactor `ssh-client-manager` to matc
 - No versioning implemented
 
 **Target State:**
-- Add `featureVersion = "1.0"` in `options.nix`
+- Add `moduleVersion = "1.0"` in `options.nix`
 - Add `_version` option (internal)
 
 **Files to update:**
@@ -90,7 +90,7 @@ This document tracks all changes needed to refactor `ssh-client-manager` to matc
 - [ ] Update all file references in moved files
 
 ### Step 4: Add Versioning
-- [ ] Add `featureVersion = "1.0"` to `options.nix`
+- [ ] Add `moduleVersion = "1.0"` to `options.nix`
 - [ ] Add `_version` option to `options.nix`
 
 ### Step 5: Command Registration

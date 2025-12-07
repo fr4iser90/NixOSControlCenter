@@ -1,7 +1,7 @@
 { lib, ... }:
 
 let
-  featureVersion = "1.0";
+  moduleVersion = "1.0";
   
   # Report Level Definition
   reportLevels = {
@@ -44,7 +44,7 @@ in {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;
-      default = featureVersion;
+      default = moduleVersion;
       internal = true;
       description = "Feature version";
     };

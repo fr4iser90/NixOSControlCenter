@@ -150,13 +150,15 @@ module-name/              # Module name
   let
     cfg = systemConfig.module-name or {};
   in {
-    imports = if (cfg.enable or false) then [
+    imports = [
+      ./options.nix  # Always import options first
+    ] ++ (if (cfg.enable or false) then [
       ./sub-module-1
       ./sub-module-2
       ./config.nix  # Implementation logic goes here
     ] else [
       ./config.nix  # Import even if disabled (for symlink management)
-    ];
+    ]);
   }
   ```
 - **Why**: Keeps `default.nix` clean and forces separation of concerns
@@ -165,10 +167,28 @@ module-name/              # Module name
 - **Purpose**: Define all configuration options
 - **Responsibilities**:
   - For **features**: All `options.features.<module-name>` definitions
-  - For **core modules**: All `options.<module-name>` or `options.systemConfig.<module-name>` definitions
+  - For **core modules**: All `options.systemConfig.<module-name>` definitions
   - Default values and descriptions
   - Type definitions for options
+  - **Versioning**: Define `_version` option for all modules (core and features)
 - **Rule**: NO implementation logic, only option definitions
+- **Required**: **ALL modules** (core and features) must have `options.nix` with versioning
+- **Pattern**:
+  ```nix
+  # For core modules
+  options.systemConfig.module-name = {
+    _version = lib.mkOption { ... };
+    enable = lib.mkOption { ... };
+    # ... other options
+  };
+  
+  # For feature modules
+  options.features.module-name = {
+    _version = lib.mkOption { ... };
+    enable = lib.mkOption { ... };
+    # ... other options
+  };
+  ```
 
 ### `types.nix`
 - **Purpose**: Custom NixOS types for the feature
@@ -529,8 +549,7 @@ in {
 - `config.nix` - Feature-specific configuration
 
 ### Additional Files (as needed):
-- `ARCHITECTURE.md` - Detailed architecture documentation
-- `CHANGELOG.md` - Feature change history
+- `CHANGELOG.md` - Module change history (recommended)
 - `.env.example` - Example environment configuration
 - `schema.json` - JSON schema for configuration validation
 
@@ -584,40 +603,72 @@ options.features.my-feature.timeout = mkOption { type = types.int; default = 30;
 
 #### **Patch Version (0.0.X)** - Bug Fixes
 Version when:
-- ✅ Bug fixes that don't change behavior
-- ✅ Documentation updates
-- ✅ Internal refactoring
-- ✅ Performance improvements
+- ✅ Bug fixes that don't change behavior (SHOULD increase: 1.0.0 → 1.0.1)
+- ✅ Critical security fixes (MUST increase: 1.0.0 → 1.0.1)
 
 **Note**: Patch versions typically don't require migration.
+
+**When NOT to increase version**:
+- ❌ Code refactorings (no user-visible changes)
+- ❌ Documentation-only updates (unless breaking)
+- ❌ Internal improvements (unless they fix bugs)
+- ❌ Comments or formatting changes
 
 ### Versioning Implementation
 
 #### **1. Define Version in `options.nix`**
 
+**For Feature Modules**:
 ```nix
 # options.nix
 let
-  moduleVersion = "1.0";  # Current feature version
+  moduleVersion = "1.0";  # Current module version
 in {
   options.features.my-feature = {
-    # Version metadata (optional but recommended)
-    _version = mkOption {
-      type = types.str;
+    # Version metadata (REQUIRED)
+    _version = lib.mkOption {
+      type = lib.types.str;
       default = moduleVersion;
       internal = true;  # Hidden from users
-      description = "Feature version";
+      description = "Module version";
     };
     
     # Actual options
-    enable = mkOption {
-      type = types.bool;
+    enable = lib.mkOption {
+      type = lib.types.bool;
       default = false;
       description = "Enable my feature";
     };
   };
 }
 ```
+
+**For Core Modules**:
+```nix
+# options.nix
+let
+  moduleVersion = "1.0";  # Current module version
+in {
+  options.systemConfig.my-module = {
+    # Version metadata (REQUIRED)
+    _version = lib.mkOption {
+      type = lib.types.str;
+      default = moduleVersion;
+      internal = true;  # Hidden from users
+      description = "Module version";
+    };
+    
+    # Actual options
+    enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Enable my module";
+    };
+  };
+}
+```
+
+**Important**: **ALL modules** (core and features) must define `_version` in `options.nix`.
 
 #### **2. Create Migration Directory Structure**
 
@@ -845,12 +896,85 @@ When releasing a new version:
 
 - [ ] **Determine version type** (major/minor/patch)
 - [ ] **Update version** in `options.nix`
-- [ ] **Create migration plan** in `migrations/vX-to-vY.nix`
-- [ ] **Test migration** with old configs
-- [ ] **Update documentation** (README.md, CHANGELOG.md)
+- [ ] **Create migration plan** in `migrations/vX-to-vY.nix` (if breaking changes)
+- [ ] **Test migration** with old configs (if breaking changes)
+- [ ] **Update CHANGELOG.md** with changes
+- [ ] **Update documentation** (README.md)
 - [ ] **Add migration script** if needed
 - [ ] **Test backward compatibility** (if minor version)
 - [ ] **Update examples** in documentation
+
+### CHANGELOG.md
+
+**Purpose**: Track all changes to the module (required for version tracking)
+
+**Location**: `module-name/CHANGELOG.md`
+
+**Format**: Follow [Keep a Changelog](https://keepachangelog.com/) format
+
+**When to Update**:
+- ✅ **Always** when version is increased
+- ✅ **Always** when breaking changes are made
+- ✅ **Always** when new features are added
+- ✅ **Recommended** for bugfixes and improvements
+
+**Example**:
+```markdown
+# Changelog
+
+All notable changes to this module will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [2.0.0] - 2025-12-15
+### Breaking Changes
+- Renamed `enable` → `enabled` option
+- Changed `theme.dark` from `bool` to `enum ["light" "dark" "auto"]`
+- Removed deprecated `oldOption` (use `newOption` instead)
+
+### Migration Required
+- Run migration: `v1.0-to-v2.0.nix`
+- Update config: `enabled = true;` (was `enable = true;`)
+
+## [1.1.0] - 2025-12-10
+### Added
+- New `keyboard.layout` option for keyboard configuration
+- Support for additional display managers
+
+### Changed
+- Default theme changed from light to dark
+- Improved error messages
+
+## [1.0.1] - 2025-12-08
+### Fixed
+- Fixed symlink creation issue on first activation
+- Fixed assertion error for invalid display server values
+
+## [1.0.0] - 2025-12-07
+### Added
+- Initial release
+- Desktop environment support (plasma, gnome, xfce)
+- Display server configuration (wayland, x11, hybrid)
+- Theme configuration
+- Keyboard layout support
+```
+
+**Important Notes**:
+- **Version MUST be increased** when:
+  - Breaking changes (Major: 1.0 → 2.0)
+  - New features/options (Minor: 1.0 → 1.1)
+  - Bugfixes (Patch: 1.0.0 → 1.0.1)
+- **Version does NOT need to increase** for:
+  - Code refactorings (no user-visible changes)
+  - Documentation-only updates
+  - Internal improvements (unless they fix bugs)
+- **Client Update Detection**:
+  - `ncc system-update` copies all files regardless of version (simple file copy)
+  - `ncc check-module-versions` compares `_version` in config vs. code
+  - Smart Update (coming soon) will use version comparison for selective updates
 
 ### Integration with System Config Migration
 
@@ -873,17 +997,23 @@ sudo nixos-rebuild switch  # Each feature migrates its own options
 
 ### Core Modules (`nixos/core/`)
 - **Purpose**: System-level functionality (always available)
-- **Examples**: `desktop/`, `hardware/`, `network/`, `user/`
-- **Config Location**: `nixos/core/<module-name>/configs/<module-name>-config.nix`
+- **Examples**: `desktop/`, `hardware/`, `network/`, `user/`, `audio/`
+- **Config Location**: `nixos/core/<module-name>/user-configs/<module-name>-config.nix`
 - **Config Access**: Via `systemConfig.<module-name>` in flake.nix
 - **Enable Pattern**: Usually always enabled, but can be conditionally configured
+- **Options**: Must define `options.systemConfig.<module-name>` in `options.nix`
+- **Versioning**: Must include `_version` option in `options.nix`
+- **Required Files**: `default.nix`, `options.nix`, `config.nix` (if has implementation)
 
 ### Feature Modules (`nixos/features/`)
 - **Purpose**: Optional features that can be enabled/disabled
 - **Examples**: `system-logger/`, `vm-manager/`, `ssh-client-manager/`
-- **Config Location**: `nixos/features/<module-name>/configs/<module-name>-config.nix`
+- **Config Location**: `nixos/features/<module-name>/user-configs/<module-name>-config.nix`
 - **Config Access**: Via `systemConfig.features.<module-name>` in flake.nix
 - **Enable Pattern**: Must check `cfg.enable` before implementation
+- **Options**: Must define `options.features.<module-name>` in `options.nix`
+- **Versioning**: Must include `_version` option in `options.nix`
+- **Required Files**: `default.nix`, `options.nix`, `config.nix` (if has implementation)
 
 ## Config File Management Strategy
 

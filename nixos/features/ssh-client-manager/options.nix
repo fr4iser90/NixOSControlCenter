@@ -1,7 +1,7 @@
 { lib, ... }:
 
 let
-  featureVersion = "1.0";
+  moduleVersion = "1.0";
 in {
   # SSH Client Manager Options
   # This module defines all configuration options for the SSH client manager
@@ -9,7 +9,7 @@ in {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;
-      default = featureVersion;
+      default = moduleVersion;
       internal = true;
       description = "Feature version";
     };

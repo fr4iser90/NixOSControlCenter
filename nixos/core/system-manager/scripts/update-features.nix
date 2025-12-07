@@ -4,7 +4,7 @@ with lib;
 
 let
   ui = config.core.cli-formatter.api;
-  versionChecker = import ../handlers/feature-version-check.nix { inherit config lib; };
+  versionChecker = import ../handlers/module-version-check.nix { inherit config lib; };
   
   # Create the update-features script
   updateFeaturesScript = pkgs.writeShellScriptBin "ncc-update-features" ''
@@ -83,7 +83,7 @@ let
       # Get available version from options.nix
       OPTIONS_FILE="$feature_dir/options.nix"
       if [ -f "$OPTIONS_FILE" ]; then
-        AVAILABLE=$(${pkgs.gnugrep}/bin/grep -m 1 'featureVersion =' "$OPTIONS_FILE" 2>/dev/null | ${pkgs.gnused}/bin/sed 's/.*featureVersion = "\([^"]*\)".*/\1/' || echo "unknown")
+        AVAILABLE=$(${pkgs.gnugrep}/bin/grep -m 1 'moduleVersion =' "$OPTIONS_FILE" 2>/dev/null | ${pkgs.gnused}/bin/sed 's/.*moduleVersion = "\([^"]*\)".*/\1/' || echo "unknown")
       else
         AVAILABLE="unknown"
       fi

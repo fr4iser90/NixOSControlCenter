@@ -1,14 +1,14 @@
 { lib, ... }:
 
 let
-  featureVersion = "1.0";
+  moduleVersion = "1.0";
   stateDir = "/var/lib/virt";
 in {
   options.features.vm-manager = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;
-      default = featureVersion;
+      default = moduleVersion;
       internal = true;
       description = "Feature version";
     };

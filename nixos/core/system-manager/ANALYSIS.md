@@ -68,15 +68,16 @@ Der `system-manager` ist ein **Multi-Purpose Core-Modul**, das viele verschieden
 
 ---
 
-### 5. **Feature Version Checking** (`handlers/feature-version-check.nix`)
+### 5. **Module Version Checking** (`handlers/module-version-check.nix`)
 **Commands**: 
-- `ncc check-feature-versions` (via `scripts/check-versions.nix`)
-- `ncc update-features` (via `scripts/smart-update.nix`)
+- `ncc check-module-versions` (via `scripts/check-versions.nix`)
+- `ncc update-modules` (via `scripts/smart-update.nix` - coming soon)
 
 **Was macht es:**
-- ✅ **Auto-Discovery**: Liest Feature-Versionen aus `options.nix`
-- ✅ Vergleicht installierte vs. verfügbare Versionen
+- ✅ **Auto-Discovery**: Liest Module-Versionen aus `options.nix` (Core + Features)
+- ✅ Vergleicht installierte vs. verfügbare Versionen (Core + Features)
 - ✅ Findet Migration-Pfade (upgrade & downgrade)
+- ✅ Unterstützt Core-Module (`systemConfig.*`) und Feature-Module (`features.*`)
 - ✅ Zeigt Update-Status (current/auto/manual/unknown)
 - ✅ Unterstützt Migration-Chains (z.B. 1.0 → 1.1 → 2.0)
 - ✅ Smart Update mit automatischer Migration
@@ -210,10 +211,10 @@ system-manager/ (oder system-updater/)
 │   ├── feature-manager.nix     # Feature Toggling
 │   ├── channel-manager.nix     # Flake Update
 │   ├── desktop-manager.nix     # Desktop Toggle
-│   ├── feature-version-check.nix # Version Checking
+│   ├── module-version-check.nix # Version Checking (Core + Features)
 │   └── feature-migration.nix   # Feature Migration
 ├── scripts/
-│   ├── check-versions.nix      # CLI: check-feature-versions
+│   ├── check-versions.nix      # CLI: check-module-versions
 │   └── smart-update.nix        # CLI: update-features
 ├── validators/
 │   └── config-validator.nix    # Config Validation
@@ -230,7 +231,7 @@ system-manager/ (oder system-updater/)
 | Feature Management | `ncc feature-manager` | ✅ Ja | - |
 | Channel Update | `ncc update-channels` | ✅ Ja | - |
 | Desktop Toggle | `ncc desktop-manager` | ⚠️ Vielleicht | `core/desktop` |
-| Version Check | `ncc check-feature-versions` | ✅ Ja | - |
+| Version Check | `ncc check-module-versions` | ✅ Ja | Core + Features |
 | Feature Update | `ncc update-features` | ✅ Ja | - |
 | System Config Migration | `ncc migrate-system-config` | ✅ Ja | - |
 | System Config Validation | `ncc validate-system-config` | ✅ Ja | - |
@@ -244,7 +245,7 @@ system-manager/ (oder system-updater/)
 1. ✅ Updated komplette NixOS Config (außer Custom)
 2. ✅ Managed Features (enable/disable)
 3. ✅ Updated Channels/Flake Inputs
-4. ✅ Managed Feature-Versionen (check & update)
+4. ✅ Managed Module-Versionen (Core + Features, check & update)
 5. ✅ Migriert System-Config & Feature-Configs
 6. ✅ Validiert Config-Struktur
 7. ❌ **Homelab-spezifische Utilities** (sollte raus!)

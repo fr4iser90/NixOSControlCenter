@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = config.core.system-manager;
-  versionChecker = import ./handlers/feature-version-check.nix { inherit config lib; };
+  versionChecker = import ./handlers/module-version-check.nix { inherit config lib; };
   checkVersions = import ./scripts/check-versions.nix { inherit config lib pkgs; };
   updateFeatures = import ./scripts/update-features.nix { inherit config lib pkgs; };
   
@@ -37,19 +37,21 @@ in {
       (desktopManagerHandler.config.core.command-center.commands or []) ++
       [
         {
-          name = "check-feature-versions";
-          description = "Check feature versions and update status";
+          name = "check-module-versions";
+          description = "Check module versions (Core + Features) and update status";
           category = "system";
-          script = "${checkVersions.checkVersionsScript}/bin/ncc-check-feature-versions";
+          script = "${checkVersions.checkVersionsScript}/bin/ncc-check-module-versions";
           arguments = [];
           dependencies = [ "nix" ];
-          shortHelp = "check-feature-versions - Check feature versions";
+          shortHelp = "check-module-versions - Check module versions (Core + Features)";
           longHelp = ''
-            Check the version status of all features:
+            Check the version status of all modules (Core + Features):
             - Installed: Current version on the system
             - Available: Latest version in code (Git)
             - Stable: Stable version (if different from available)
             - Status: Update availability and migration support
+            
+            Shows both Core modules (systemConfig.*) and Feature modules (features.*).
           '';
         }
         {
