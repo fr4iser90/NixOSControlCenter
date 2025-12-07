@@ -1,18 +1,22 @@
-# Feature Module Template
+# Module Template
 
-This template defines the recommended structure for all NixOS Control Center feature modules.
+This template defines the recommended structure for **all** NixOS Control Center modules, including:
+- **Core modules** (`nixos/core/`) - System-level modules (desktop, hardware, network, etc.)
+- **Feature modules** (`nixos/features/`) - Optional feature modules (system-logger, vm-manager, etc.)
 
 ## Directory Structure
 
 ```
-feature-name/
-├── README.md              # Feature documentation and usage guide
+module-name/              # Module name
+├── README.md              # Module documentation and usage guide
 ├── default.nix            # Main module (imports all sub-modules)
 ├── options.nix            # All configuration options
 ├── types.nix              # Custom NixOS types (optional)
-├── commands.nix          # Command-Center registration
+├── commands.nix          # Command-Center registration (optional, for features)
 ├── systemd.nix            # Systemd services/timers (optional)
-├── config.nix             # Feature-specific configuration (optional)
+├── config.nix             # Module implementation (optional, split from default.nix if too large)
+├── user-configs/          # User-editable config files (optional)
+│   └── module-name-config.nix  # User config (symlinked to /etc/nixos/configs/)
 ├── lib/                   # Shared utility functions
 │   ├── default.nix        # Library exports
 │   ├── utils.nix          # General utilities
@@ -136,14 +140,16 @@ feature-name/
 - **Purpose**: Main module entry point
 - **Responsibilities**:
   - Imports all sub-modules (options, types, commands, systemd, etc.)
-  - Maps `systemConfig.features.<feature-name>` to `config.features.<feature-name>.enable`
-  - Defines `mkIf cfg.enable` block for feature implementation
+  - For **features**: Maps `systemConfig.features.<module-name>` to `config.features.<module-name>.enable`
+  - For **core modules**: Maps `systemConfig.<module-name>` to module configuration
+  - Defines `mkIf cfg.enable` block (for features) or conditional blocks (for core modules)
 - **Pattern**: Always use `mkMerge` to combine default config with enabled config
 
 ### `options.nix`
 - **Purpose**: Define all configuration options
 - **Responsibilities**:
-  - All `options.features.<feature-name>` definitions
+  - For **features**: All `options.features.<module-name>` definitions
+  - For **core modules**: All `options.<module-name>` or `options.systemConfig.<module-name>` definitions
   - Default values and descriptions
   - Type definitions for options
 - **Rule**: NO implementation logic, only option definitions
@@ -162,7 +168,8 @@ feature-name/
   - Create all executable scripts using `pkgs.writeShellScriptBin`
   - Register commands in `core.command-center.commands`
   - Define command metadata (name, description, category, help text)
-- **Critical**: Must be inside `mkIf cfg.enable` block!
+- **Critical**: Must be inside `mkIf cfg.enable` block (for features)!
+- **Note**: Usually only needed for feature modules that provide CLI commands
 
 ### `systemd.nix`
 - **Purpose**: Systemd service and timer definitions
@@ -174,12 +181,32 @@ feature-name/
 - **Optional**: Only needed if systemd integration is required
 
 ### `config.nix`
-- **Purpose**: Feature-specific configuration logic
+- **Purpose**: Module implementation code (NixOS module configuration logic)
 - **Responsibilities**:
   - Complex configuration transformations
-  - Feature-specific system configuration
+  - Module-specific system configuration
   - Integration with other NixOS modules
-- **Optional**: Use when default.nix would become too large
+- **Optional**: Use when `default.nix` would become too large
+- **Important**: This is **system configuration code** (NOT user-editable)
+- **Contains**: Implementation logic, system settings, NixOS module config
+- **NOT for**: User options/choices - those go in `user-configs/`
+
+### `user-configs/`
+- **Purpose**: User-editable configuration files (what users edit in `/etc/nixos/configs/`)
+- **Structure**:
+  - `module-name-config.nix`: Main config file for this module
+  - Additional config files as needed
+- **Symlink Strategy**: Config files are symlinked to `/etc/nixos/configs/` for easy editing
+- **Best Practice**: Each module manages its own user configs, keeping them co-located with the module code
+- **Key Difference**: These are **user-editable config files**, not implementation code
+- **Contains**: User options, choices, preferences (e.g., `desktop.environment = "plasma"`)
+- **Flow**:
+  1. User edits `/etc/nixos/configs/module-name-config.nix` (symlink)
+  2. Changes are written to `nixos/core|features/<module>/user-configs/module-name-config.nix` (actual file)
+  3. Module reads from `systemConfig` (loaded from user-configs in flake.nix)
+- **Example**:
+  - `nixos/core/desktop/user-configs/desktop-config.nix` → symlink → `/etc/nixos/configs/desktop-config.nix`
+  - `nixos/features/system-logger/user-configs/system-logger-config.nix` → symlink → `/etc/nixos/configs/system-logger-config.nix`
 
 ### `lib/`
 - **Purpose**: Shared utility functions
@@ -306,13 +333,27 @@ feature-name/
 - Register all aliases
 
 ### 3. **Enable Check Pattern**
+
+**For Feature Modules**:
 ```nix
 config = mkMerge [
   {
-    features.feature-name.enable = mkDefault (systemConfig.features.feature-name or false);
+    features.module-name.enable = mkDefault (systemConfig.features.module-name or false);
   }
   (mkIf cfg.enable {
     # All feature implementation here
+  })
+];
+```
+
+**For Core Modules**:
+```nix
+config = mkMerge [
+  {
+    # Core modules are always enabled, but can be conditionally configured
+  }
+  (mkIf (systemConfig.module-name.enable or false) {
+    # Module implementation here
   })
 ];
 ```
@@ -780,7 +821,112 @@ sudo ncc-migrate-config  # Migrates system-config.nix structure
 sudo nixos-rebuild switch  # Each feature migrates its own options
 ```
 
+## Module Types
+
+### Core Modules (`nixos/core/`)
+- **Purpose**: System-level functionality (always available)
+- **Examples**: `desktop/`, `hardware/`, `network/`, `user/`
+- **Config Location**: `nixos/core/<module-name>/configs/<module-name>-config.nix`
+- **Config Access**: Via `systemConfig.<module-name>` in flake.nix
+- **Enable Pattern**: Usually always enabled, but can be conditionally configured
+
+### Feature Modules (`nixos/features/`)
+- **Purpose**: Optional features that can be enabled/disabled
+- **Examples**: `system-logger/`, `vm-manager/`, `ssh-client-manager/`
+- **Config Location**: `nixos/features/<module-name>/configs/<module-name>-config.nix`
+- **Config Access**: Via `systemConfig.features.<module-name>` in flake.nix
+- **Enable Pattern**: Must check `cfg.enable` before implementation
+
+## Config File Management Strategy
+
+### Overview
+Each module manages its own config files, keeping them co-located with the module code. Config files are symlinked to `/etc/nixos/configs/` for centralized editing.
+
+### Key Distinction
+
+**Two Types of Configuration:**
+
+1. **`config.nix`** (System Config - NOT user-editable)
+   - Implementation code
+   - System-level configuration
+   - NixOS module logic
+   - **Location**: `module-name/config.nix`
+   - **Purpose**: How the module works internally
+
+2. **`user-configs/module-name-config.nix`** (User Config - user-editable)
+   - User options and choices
+   - Preferences and settings
+   - **Location**: `module-name/user-configs/module-name-config.nix`
+   - **Symlink**: `/etc/nixos/configs/module-name-config.nix` → points to user-configs file
+   - **Purpose**: What the user wants to configure
+
+### Structure
+```
+nixos/
+├── core/
+│   ├── desktop/
+│   │   ├── user-configs/
+│   │   │   └── desktop-config.nix  # User-editable config
+│   │   └── default.nix
+│   └── hardware/
+│       ├── user-configs/
+│       │   └── hardware-config.nix
+│       └── default.nix
+├── features/
+│   ├── system-logger/
+│   │   ├── user-configs/
+│   │   │   └── system-logger-config.nix
+│   │   └── default.nix
+│   └── vm-manager/
+│       ├── user-configs/
+│       │   └── vm-manager-config.nix
+│       └── default.nix
+└── configs/  # Symlinks to module user-configs (for easy editing)
+    ├── desktop-config.nix -> ../core/desktop/user-configs/desktop-config.nix
+    ├── hardware-config.nix -> ../core/hardware/user-configs/hardware-config.nix
+    ├── system-logger-config.nix -> ../features/system-logger/user-configs/system-logger-config.nix
+    └── vm-manager-config.nix -> ../features/vm-manager/user-configs/vm-manager-config.nix
+```
+
+### Benefits
+1. **Modularity**: Each module is self-contained with its own configs
+2. **Maintainability**: Config changes are co-located with module code
+3. **Easy Editing**: Symlinks provide centralized access in `/etc/nixos/configs/`
+4. **Version Control**: Configs are versioned with their modules
+5. **Migration**: Module migrations can update their own configs
+
+### Symlink Management
+Symlinks are created automatically during module activation:
+- On `nixos-rebuild switch`, modules create symlinks to their configs
+- Symlinks point from `/etc/nixos/configs/` to module config directories
+- If config file doesn't exist, module creates a default one
+
+### Implementation Pattern
+```nix
+# default.nix
+let
+  cfg = config.features.module-name;  # or systemConfig.module-name for core
+  userConfigFile = ./user-configs/module-name-config.nix;
+  symlinkPath = "/etc/nixos/configs/module-name-config.nix";
+in {
+  config = mkIf cfg.enable {
+    # Create symlink on activation
+    system.activationScripts.module-name-config-symlink = ''
+      mkdir -p "$(dirname "${symlinkPath}")"
+      ln -sfn "${toString userConfigFile}" "${symlinkPath}"
+    '';
+    
+    # Module implementation
+    # ...
+  };
+}
+```
+
 ## Example Usage
 
-See existing features like `system-discovery/` or `ssh-client-manager/` for complete examples.
+### Core Module Example
+See `nixos/core/desktop/` for a complete core module example.
+
+### Feature Module Example
+See existing features like `system-discovery/` or `ssh-client-manager/` for complete feature module examples.
 
