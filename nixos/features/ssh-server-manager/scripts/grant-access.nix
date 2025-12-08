@@ -5,6 +5,7 @@ with lib;
 let
   cfg = config.features.ssh-server-manager.grant-access;
   ui = config.core.cli-formatter.api;
+  backupHelpers = config.core.system-manager.api.backupHelpers;
 
   grantAccessScript = pkgs.writeScriptBin "ssh-grant-access" ''
     #!${pkgs.bash}/bin/bash
@@ -33,8 +34,9 @@ let
     ${ui.messages.info "Duration: $DURATION seconds"}
     ${ui.messages.info "Reason: $REASON"}
 
-    # Backup current SSH config
-    sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.$(date +%s)
+    # Backup current SSH config using centralized backup helper
+    ${backupHelpers.backupSSHConfig "/etc/ssh/sshd_config"} >/dev/null 2>&1 || true
+    ls -t "$BACKUP_ROOT"/sshd_config.backup.* 2>/dev/null | tail -n +6 | xargs -r sudo rm -f
 
     # Enable password authentication
     if ! grep -q "^PasswordAuthentication yes" /etc/ssh/sshd_config; then

@@ -1,10 +1,10 @@
 { lib, ... }:
 
 {
-  description = "Monolithic structure - all config in system-config.nix";
+  description = "Modular structure - system-config.nix + configs/*.nix";
   
-  # Required fields (MUSS vorhanden sein)
   requiredFields = [
+    "configVersion"         # MUSS vorhanden sein in v1.0
     "systemType"
     "hostName"
     "system"
@@ -13,31 +13,43 @@
     "timeZone"
   ];
   
-  # Optional fields (können vorhanden sein)
-  optionalFields = [
-    "desktop"
-    "hardware"
-    "features"
-    "packageModules"      # v1.0 hatte packageModules als Attrset (nicht Array!)
-    "locales"
-    "keyboardLayout"
-    "keyboardOptions"
-    "overrides"
-    "email"
-    "domain"
-    "buildLogLevel"
-    "system.version"       # v1.0 hatte system.version (optional)
+  optionalFields = [];  # Alles andere ist in configs/
+  
+  hasConfigsDir = true;
+  hasConfigVersion = true;
+  
+  # Erwartete Config-Dateien in configs/ (optional, können fehlen)
+  expectedConfigFiles = [
+    "desktop-config.nix"
+    "hardware-config.nix"
+    "features-config.nix"
+    "packages-config.nix"
+    "localization-config.nix"
+    "network-config.nix"
+    "hosting-config.nix"
+    "overrides-config.nix"
+    "logging-config.nix"
   ];
   
-  # Struktur-Merkmale
-  hasConfigsDir = false;
-  hasConfigVersion = false;  # Kein configVersion Feld
-  
-  # Typische Erkennungsmerkmale für v1.0
-  detectionPatterns = [
-    "packageModules = {"     # v1.0 hatte packageModules als Attrset
-    "system.version"         # v1.0 hatte system.version
-    "hardware.memory"        # v1.0 hatte hardware.memory (nicht ram!)
-  ];
+  # Struktur-Anforderungen
+  structure = {
+    # system-config.nix sollte minimal sein (~20-30 Zeilen)
+    maxSystemConfigLines = 30;
+    
+    # system-config.nix sollte KEINE dieser Felder haben
+    forbiddenInSystemConfig = [
+      "desktop"
+      "hardware"
+      "features"
+      "packageModules"
+      "locales"
+      "keyboardLayout"
+      "keyboardOptions"
+      "overrides"
+      "email"
+      "domain"
+      "buildLogLevel"
+    ];
+  };
 }
 

@@ -19,7 +19,25 @@ collect_system_data() {
     [[ -f "$SYSTEM_CONFIG_FILE" ]] && backup_file "$SYSTEM_CONFIG_FILE"
     [[ -d "$(dirname "$SYSTEM_CONFIG_FILE")/configs" ]] && {
         log_info "Backing up existing configs directory..."
-        cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/configs" "$(dirname "$SYSTEM_CONFIG_FILE")/configs.backup.$(date +%s)" 2>/dev/null || true
+        BACKUP_ROOT="/var/backup/nixos/directories"
+        BACKUP_DIR="$BACKUP_ROOT/configs.$(date +%Y%m%d_%H%M%S)"
+        # Create directory if it doesn't exist (ActivationScript should have created it)
+        if [ ! -d "$BACKUP_ROOT" ]; then
+            mkdir -p "$BACKUP_ROOT"
+            chmod 700 "$BACKUP_ROOT" 2>/dev/null || sudo chmod 700 "$BACKUP_ROOT" 2>/dev/null || true
+            chown root:root "$BACKUP_ROOT" 2>/dev/null || sudo chown root:root "$BACKUP_ROOT" 2>/dev/null || true
+        else
+            mkdir -p "$BACKUP_ROOT"  # Ensure it exists
+        fi
+        # Create backup directory and set permissions (700 for dirs, 600 for files)
+        if cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/configs" "$BACKUP_DIR" 2>/dev/null || sudo cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/configs" "$BACKUP_DIR" 2>/dev/null; then
+            chmod -R 700 "$BACKUP_DIR" 2>/dev/null || sudo chmod -R 700 "$BACKUP_DIR" 2>/dev/null || true
+            find "$BACKUP_DIR" -type f -exec chmod 600 {} \; 2>/dev/null || sudo find "$BACKUP_DIR" -type f -exec chmod 600 {} \; 2>/dev/null || true
+            chown -R root:root "$BACKUP_DIR" 2>/dev/null || sudo chown -R root:root "$BACKUP_DIR" 2>/dev/null || true
+            # Cleanup old backups (keep last 5)
+            ls -dt "$BACKUP_ROOT"/configs.* 2>/dev/null | tail -n +6 | xargs -r rm -rf 2>/dev/null || sudo xargs -r rm -rf 2>/dev/null || true
+            log_info "Backup created: $BACKUP_DIR"
+        fi
     }
 
     # Ensure configs directory exists
@@ -301,17 +319,21 @@ init_overrides_config() {
 }
 
 restore_backup() {
-    if [[ -f "${SYSTEM_CONFIG_FILE}.backup" ]]; then
-        mv "${SYSTEM_CONFIG_FILE}.backup" "$SYSTEM_CONFIG_FILE"
-        log_info "Restored backup configuration"
+    # Restore system-config.nix backup (from /var/backup/nixos/configs/)
+    local backup_root="/var/backup/nixos/configs"
+    local latest_backup=$(ls -t "$backup_root"/system-config.nix.backup.* 2>/dev/null | head -1)
+    if [[ -n "$latest_backup" && -f "$latest_backup" ]]; then
+        cp "$latest_backup" "$SYSTEM_CONFIG_FILE"
+        log_info "Restored backup configuration from $latest_backup"
     fi
-    if [[ -d "$(dirname "$SYSTEM_CONFIG_FILE")/configs.backup."* ]]; then
-        local backup_dir=$(ls -td "$(dirname "$SYSTEM_CONFIG_FILE")/configs.backup."* 2>/dev/null | head -1)
-        if [[ -n "$backup_dir" ]]; then
-            rm -rf "$(dirname "$SYSTEM_CONFIG_FILE")/configs"
-            mv "$backup_dir" "$(dirname "$SYSTEM_CONFIG_FILE")/configs"
-            log_info "Restored backup configs directory"
-        fi
+    
+    # Restore configs directory backup (from /var/backup/nixos/directories/)
+    backup_root="/var/backup/nixos/directories"
+    local latest_dir_backup=$(ls -td "$backup_root"/configs.* 2>/dev/null | head -1)
+    if [[ -n "$latest_dir_backup" && -d "$latest_dir_backup" ]]; then
+        rm -rf "$(dirname "$SYSTEM_CONFIG_FILE")/configs"
+        cp -r "$latest_dir_backup" "$(dirname "$SYSTEM_CONFIG_FILE")/configs"
+        log_info "Restored backup configs directory from $latest_dir_backup"
     fi
 }
 

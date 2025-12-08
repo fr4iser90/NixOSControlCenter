@@ -57,12 +57,77 @@ ensure_dir() {
 backup_file() {
     local file="$1"
     if [ -f "$file" ]; then
-        local backup="${file}.backup.$(date +%Y%m%d_%H%M%S)"
-        cp "$file" "$backup" || {
-            log_error "Failed to create backup of $file"
-            return 1
-        }
-        log_info "Created backup: $backup"
+        # Determine backup location based on file path
+        local backup_root
+        local backup_file
+        
+        if echo "$file" | grep -q "^/etc/ssh/"; then
+            # SSH config → use SSH backup
+            backup_root="/var/backup/nixos/ssh"
+            backup_file="$backup_root/$(basename "$file").backup.$(date +%Y%m%d_%H%M%S)"
+            # Create directory if it doesn't exist (ActivationScript should have created it)
+            if [ ! -d "$backup_root" ]; then
+                mkdir -p "$backup_root"
+                chmod 700 "$backup_root" 2>/dev/null || sudo chmod 700 "$backup_root" 2>/dev/null || true
+                chown root:root "$backup_root" 2>/dev/null || sudo chown root:root "$backup_root" 2>/dev/null || true
+            else
+                mkdir -p "$backup_root"  # Ensure it exists
+            fi
+            # Create backup file and set permissions (600 = read/write for owner only)
+            if cp "$file" "$backup_file" 2>/dev/null || sudo cp "$file" "$backup_file" 2>/dev/null; then
+                chmod 600 "$backup_file" 2>/dev/null || sudo chmod 600 "$backup_file" 2>/dev/null || true
+                chown root:root "$backup_file" 2>/dev/null || sudo chown root:root "$backup_file" 2>/dev/null || true
+                # Cleanup old backups (keep last 5)
+                ls -t "$backup_root"/$(basename "$file").backup.* 2>/dev/null | tail -n +6 | xargs -r rm -f 2>/dev/null || sudo xargs -r rm -f 2>/dev/null || true
+                log_info "Created backup: $backup_file"
+                return 0
+            fi
+        elif echo "$file" | grep -q "^/etc/nixos/"; then
+            # NixOS config → use config backup
+            backup_root="/var/backup/nixos/configs"
+            backup_file="$backup_root/$(basename "$file").backup.$(date +%Y%m%d_%H%M%S)"
+            # Create directory if it doesn't exist (ActivationScript should have created it)
+            if [ ! -d "$backup_root" ]; then
+                mkdir -p "$backup_root"
+                chmod 700 "$backup_root" 2>/dev/null || sudo chmod 700 "$backup_root" 2>/dev/null || true
+                chown root:root "$backup_root" 2>/dev/null || sudo chown root:root "$backup_root" 2>/dev/null || true
+            else
+                mkdir -p "$backup_root"  # Ensure it exists
+            fi
+            # Create backup file and set permissions (600 = read/write for owner only)
+            if cp "$file" "$backup_file" 2>/dev/null || sudo cp "$file" "$backup_file" 2>/dev/null; then
+                chmod 600 "$backup_file" 2>/dev/null || sudo chmod 600 "$backup_file" 2>/dev/null || true
+                chown root:root "$backup_file" 2>/dev/null || sudo chown root:root "$backup_file" 2>/dev/null || true
+                # Cleanup old backups (keep last 10)
+                ls -t "$backup_root"/$(basename "$file").backup.* 2>/dev/null | tail -n +11 | xargs -r rm -f 2>/dev/null || sudo xargs -r rm -f 2>/dev/null || true
+                log_info "Created backup: $backup_file"
+                return 0
+            fi
+        else
+            # Generic file → use config backup location
+            backup_root="/var/backup/nixos/configs"
+            backup_file="$backup_root/$(basename "$file").backup.$(date +%Y%m%d_%H%M%S)"
+            # Create directory if it doesn't exist (ActivationScript should have created it)
+            if [ ! -d "$backup_root" ]; then
+                mkdir -p "$backup_root"
+                chmod 700 "$backup_root" 2>/dev/null || sudo chmod 700 "$backup_root" 2>/dev/null || true
+                chown root:root "$backup_root" 2>/dev/null || sudo chown root:root "$backup_root" 2>/dev/null || true
+            else
+                mkdir -p "$backup_root"  # Ensure it exists
+            fi
+            # Create backup file and set permissions (600 = read/write for owner only)
+            if cp "$file" "$backup_file" 2>/dev/null || sudo cp "$file" "$backup_file" 2>/dev/null; then
+                chmod 600 "$backup_file" 2>/dev/null || sudo chmod 600 "$backup_file" 2>/dev/null || true
+                chown root:root "$backup_file" 2>/dev/null || sudo chown root:root "$backup_file" 2>/dev/null || true
+                # Cleanup old backups (keep last 10)
+                ls -t "$backup_root"/$(basename "$file").backup.* 2>/dev/null | tail -n +11 | xargs -r rm -f 2>/dev/null || sudo xargs -r rm -f 2>/dev/null || true
+                log_info "Created backup: $backup_file"
+                return 0
+            fi
+        fi
+        
+        log_error "Failed to create backup of $file"
+        return 1
     fi
 }
 

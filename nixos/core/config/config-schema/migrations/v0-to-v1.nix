@@ -1,10 +1,10 @@
 { lib, ... }:
 
 {
-  # Migrations-Plan von v1.0 zu v2.0
+  # Migrations-Plan von v0 zu v1.0
   # Definiert WIE migriert wird - komplett Schema-basiert!
   
-  # Felder die in system-config.nix bleiben (required fields für v2.0)
+  # Felder die in system-config.nix bleiben (required fields für v1.0)
   fieldsToKeep = [
     "systemType"
     "hostName"
@@ -46,7 +46,7 @@
           };
         };
       };
-      # Feld-Mappings (v1.0 -> v2.0)
+      # Feld-Mappings (v0 -> v1.0)
       fieldMappings = {
         "hardware.memory.sizeGB" = "hardware.ram.sizeGB";
       };

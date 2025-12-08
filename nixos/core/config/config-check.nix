@@ -1,7 +1,7 @@
-{ pkgs, lib, formatter, ... }:
+{ pkgs, lib, formatter, backupHelpers, ... }:
 
 let
-  migration = import ./config-migration.nix { inherit pkgs lib formatter; };
+  migration = import ./config-migration.nix { inherit pkgs lib formatter backupHelpers; };
   validator = import ./config-validator.nix { inherit pkgs lib formatter; };
 in
 

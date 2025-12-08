@@ -8,8 +8,8 @@ This system enables:
 - **Automatic Migration** of old configurations to new versions
 - **Schema-based Validation** of configuration structure
 - **Automatic Version Detection** through pattern matching
-- **Modular Configuration** (v2.0+): `system-config.nix` + `configs/*.nix`
-- **Chain Migration**: Automatic migration across multiple versions (e.g., v1.0 → v1.5 → v2.0)
+- **Modular Configuration** (v1.0+): `system-config.nix` + `configs/*.nix`
+- **Chain Migration**: Automatic migration across multiple versions (e.g., v0 → v1.0 → v1.5)
 
 ## Architecture
 
@@ -24,10 +24,10 @@ config/
 ├── types.nix                   # Type Definitions
 ├── default.nix                 # Public API
 └── config-schema/
-    ├── v1.nix                  # Schema v1.0 (monolithic)
-    ├── v2.nix                  # Schema v2.0 (modular)
+    ├── v0.nix                  # Schema v0 (monolithic, ohne configVersion)
+    ├── v1.nix                  # Schema v1.0 (modular, mit configVersion = "1.0")
     └── migrations/
-        └── v1-to-v2.nix        # Migration Plan v1.0 → v2.0
+        └── v0-to-v1.nix        # Migration Plan v0 → v1.0
 ```
 
 ## File Explanations
@@ -48,7 +48,7 @@ config/
   schemas = { "1.0" = {...}; "2.0" = {...}; };
   migrationPlans = { "1.0" = { "2.0" = {...}; }; };
   migrationPaths = { "1.0" = "2.0"; };
-  currentVersion = "2.0";
+  currentVersion = "1.0";
   minSupportedVersion = "1.0";
 }
 ```
@@ -62,7 +62,7 @@ config/
   - Reads `system-config.nix` as text
   - Checks `detectionPatterns` from all schemas
   - Selects version with most matches
-- Fallback: Checks for `configs/` directory (v2.0+) or uses `minSupportedVersion`
+- Fallback: Checks for `configs/` directory (v1.0+) or uses `minSupportedVersion`
 
 **Example**:
 ```bash
@@ -70,12 +70,12 @@ ncc-detect-version
 # Output: "1.0" or "2.0"
 ```
 
-**Pattern Example** (v1.0):
+**Pattern Example** (v0):
 ```nix
 detectionPatterns = [
-  "packageModules = {"     # v1.0 had packageModules as Attrset
-  "system.version"         # v1.0 had system.version
-  "hardware.memory"        # v1.0 had hardware.memory (not ram!)
+  "packageModules = {"     # v0 had packageModules as Attrset
+  "system.version"         # v0 had system.version
+  "hardware.memory"        # v0 had hardware.memory (not ram!)
 ];
 ```
 
@@ -83,8 +83,8 @@ detectionPatterns = [
 **Purpose**: Migration engine for automatic configuration migration
 
 **Functions**:
-- **Direct Migration**: v1.0 → v2.0 (single step)
-- **Chain Migration**: v1.0 → v1.5 → v2.0 (multiple steps)
+- **Direct Migration**: v0 → v1.0 (single step)
+- **Chain Migration**: v0 → v1.0 → v1.5 (multiple steps)
 - **Schema-based**: Uses `fieldsToKeep` and `fieldsToMigrate` from migration plans
 - **Recursive Formatting**: Converts JSON → Nix syntax with arbitrary nesting depth
 - **Atomic Operations**: Uses temporary files, only overwrites on success
@@ -101,7 +101,7 @@ detectionPatterns = [
 **Example**:
 ```bash
 sudo ncc-migrate-config
-# Automatically migrates from v1.0 to v2.0
+# Automatically migrates from v0 to v1.0
 ```
 
 **Recursive Formatting** (jq-based):
@@ -117,7 +117,7 @@ sudo ncc-migrate-config
 - Detects version via `ncc-detect-version`
 - Validates `requiredFields` for detected version
 - Checks structure requirements (`maxSystemConfigLines`, `forbiddenInSystemConfig`)
-- Validates `configs/*.nix` files (for v2.0+)
+- Validates `configs/*.nix` files (for v1.0+)
 - Outputs detailed error and warning messages
 
 **Example**:
@@ -130,7 +130,7 @@ ncc-validate-config
 - ✓ Nix syntax is valid
 - ✓ Version detected
 - ✓ All `requiredFields` present
-- ✓ Structure requirements met (for v2.0: max 30 lines in `system-config.nix`)
+- ✓ Structure requirements met (for v1.0: max 30 lines in `system-config.nix`)
 - ✓ No `forbiddenInSystemConfig` fields in `system-config.nix`
 - ✓ All `configs/*.nix` files have valid syntax
 
@@ -156,19 +156,19 @@ ncc-config-check
 **Purpose**: Helper functions for schema discovery and migration chain finding
 
 **Functions**:
-- `extractVersion`: Extracts version from filename (`v1.nix` → `"1.0"`)
-- `parseMigrationFilename`: Parses migration filenames (`v1-to-v2.nix` → `{ from = "1.0"; to = "2.0"; }`)
+- `extractVersion`: Extracts version from filename (`v0.nix` → `"0"`, `v1.nix` → `"1.0"`)
+- `parseMigrationFilename`: Parses migration filenames (`v0-to-v1.nix` → `{ from = "0"; to = "1.0"; }`)
 - `discoverSchemas`: Automatically discovers all schema files
 - `discoverMigrations`: Automatically discovers all migration plans
 - `generateMigrationPaths`: Generates direct migration paths
-- `findMigrationChain`: Finds migration chain via BFS (e.g., v1.0 → v1.5 → v2.0)
+- `findMigrationChain`: Finds migration chain via BFS (e.g., v0 → v1.0 → v1.5)
 - `canMigrateChain`: Checks if migration chain exists
 
 **Example** (Chain-Finding):
 ```nix
 findMigrationChain migrationPlans "1.0" "2.0"
-# If v1.0 → v1.5 → v2.0 exists: ["1.0", "1.5", "2.0"]
-# If only v1.0 → v2.0 exists: ["1.0", "2.0"]
+# If v0 → v1.0 → v1.5 exists: ["0", "1.0", "1.5"]
+# If only v0 → v1.0 exists: ["0", "1.0"]
 # If no path: null
 ```
 
@@ -251,21 +251,21 @@ Each migration plan defines:
 
 ## Version Differences
 
-### v1.0 (Monolithic)
+### v0 (Monolithic)
 - **Structure**: Everything in `system-config.nix`
 - **No** `configVersion` field
 - **No** `configs/` directory
 - **Detection**: Pattern matching (`packageModules = {`, `system.version`, `hardware.memory`)
 
-### v2.0 (Modular)
+### v1.0 (Modular)
 - **Structure**: Minimal `system-config.nix` + `configs/*.nix` files
-- **Must** have `configVersion = "2.0";`
+- **Must** have `configVersion = "1.0";`
 - **Must** have `configs/` directory
 - **Detection**: Explicit `configVersion` field or `configs/` directory
 
 ## Migration Example
 
-### Before (v1.0):
+### Before (v0):
 ```nix
 {
   systemType = "desktop";
@@ -279,12 +279,12 @@ Each migration plan defines:
 }
 ```
 
-### After (v2.0):
+### After (v1.0):
 
 **`system-config.nix`**:
 ```nix
 {
-  configVersion = "2.0";
+  configVersion = "1.0";
   systemType = "desktop";
   hostName = "Gaming";
   system = { channel = "stable"; bootloader = "systemd-boot"; };
@@ -397,8 +397,8 @@ currentVersion = "3.0";
 - Automatic backups before each migration
 
 ### Chain Migration
-- If direct migration doesn't exist (e.g., v1.0 → v2.0 missing)
-- Automatically finds chain (e.g., v1.0 → v1.5 → v2.0)
+- If direct migration doesn't exist (e.g., v0 → v1.0 missing)
+- Automatically finds chain (e.g., v0 → v1.0 → v1.5)
 - Performs migration step-by-step
 - Each step creates backup
 
@@ -407,7 +407,7 @@ currentVersion = "3.0";
 1. **Always check backups**: Backup is automatically created before migration
 2. **Schema-based**: Add new versions only through schema files
 3. **Pattern-based**: `detectionPatterns` should be unique
-4. **Modular**: v2.0+ should have minimal `system-config.nix`
+4. **Modular**: v1.0+ should have minimal `system-config.nix`
 5. **Validation**: Always run `ncc-config-check` before `nixos-rebuild`
 
 ## Troubleshooting
@@ -426,7 +426,7 @@ currentVersion = "3.0";
 
 ### Chain migration finds no path
 - **Cause**: No migration plans for all steps available
-- **Solution**: Create missing migration plans (e.g., `v1-to-v1.5.nix`, `v1.5-to-v2.nix`)
+- **Solution**: Create missing migration plans (e.g., `v1.0-to-v1.5.nix`, `v1.5-to-v2.0.nix`)
 
 ## Summary
 
@@ -434,7 +434,7 @@ This system enables:
 - ✅ **Automatic Migration** of old configs to new versions
 - ✅ **Schema-based Validation** of structure
 - ✅ **Automatic Version Detection** via patterns
-- ✅ **Modular Configuration** (v2.0+)
+- ✅ **Modular Configuration** (v1.0+)
 - ✅ **Chain Migration** across multiple versions
 - ✅ **Atomic Operations** (no data loss)
 - ✅ **Recursive Formatting** (arbitrary nesting depth)

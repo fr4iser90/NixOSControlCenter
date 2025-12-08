@@ -1,7 +1,8 @@
 { config, lib, pkgs, systemConfig, ... }:
 let
   cfg = systemConfig.desktop or {};
-  userConfigFile = ./user-configs/desktop-config.nix;
+  # CRITICAL: Use absolute path to deployed location, not relative (which resolves to store)
+  userConfigFile = "/etc/nixos/core/desktop/user-configs/desktop-config.nix";
   symlinkPath = "/etc/nixos/configs/desktop-config.nix";
   # Use API (like cli-formatter.api)
   configHelpers = config.core.system-manager.api.configHelpers;

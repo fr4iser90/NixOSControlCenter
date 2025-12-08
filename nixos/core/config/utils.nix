@@ -16,7 +16,7 @@ rec {
       else
         versionStr;
 
-  # Parse migration filename (e.g., "v1-to-v2.nix" -> { from = "1.0"; to = "2.0"; })
+  # Parse migration filename (e.g., "v0-to-v1.nix" -> { from = "0"; to = "1.0"; })
   parseMigrationFilename = filename:
     let
       base = lib.removeSuffix ".nix" filename;

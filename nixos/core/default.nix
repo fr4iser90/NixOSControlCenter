@@ -6,7 +6,7 @@
     ./boot
     ./hardware
     ./network
-    ./system
+    ./localization
     ./user
     ./desktop
     ./audio

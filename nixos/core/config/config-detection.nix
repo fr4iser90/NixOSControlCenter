@@ -97,9 +97,9 @@ in
       exit 0
     fi
     
-    # Fallback: Check if configs/ directory exists (indicates v2.0+)
+    # Fallback: Check if configs/ directory exists (indicates v1.0+)
     if [ -d "$CONFIGS_DIR" ]; then
-      echo "2.0"
+      echo "1.0"
       exit 0
     fi
     

@@ -24,7 +24,7 @@ let
   # Dynamische Inhalte vorbereiten
   caseBlock = lib.concatMapStringsSep "\n  " generateExecCase cfg.commands;
   commandLongHelp = lib.concatMapStringsSep "\n  " generateLongHelpCase cfg.commands;
-  commandList = lib.concatMapStringsSep "\n" (cmd: '' "  ${cmd.name} - ${cmd.description}"'') cfg.commands;
+  commandList = lib.concatMapStringsSep "\n" (cmd: ''  ${cmd.name} - ${cmd.description}'') cfg.commands;
   validCommands = lib.concatStringsSep " " (map (cmd: cmd.name) cfg.commands);
 
   # Hauptskript für ncc

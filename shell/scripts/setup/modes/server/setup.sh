@@ -138,8 +138,25 @@ backup_config() {
     fi
     # Also backup configs directory if it exists
     if [[ -d "$(dirname "$SYSTEM_CONFIG_FILE")/configs" ]]; then
-        local backup_dir="$(dirname "$SYSTEM_CONFIG_FILE")/configs.backup.$(date +%s)"
-        cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/configs" "$backup_dir" 2>/dev/null || true
+        local backup_root="/var/backup/nixos/directories"
+        local backup_dir="$backup_root/configs.$(date +%Y%m%d_%H%M%S)"
+        # Create directory if it doesn't exist (ActivationScript should have created it)
+        if [[ ! -d "$backup_root" ]]; then
+            mkdir -p "$backup_root"
+            chmod 700 "$backup_root" 2>/dev/null || sudo chmod 700 "$backup_root" 2>/dev/null || true
+            chown root:root "$backup_root" 2>/dev/null || sudo chown root:root "$backup_root" 2>/dev/null || true
+        else
+            mkdir -p "$backup_root"  # Ensure it exists
+        fi
+        # Create backup directory and set permissions (700 for dirs, 600 for files)
+        if cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/configs" "$backup_dir" 2>/dev/null || sudo cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/configs" "$backup_dir" 2>/dev/null; then
+            chmod -R 700 "$backup_dir" 2>/dev/null || sudo chmod -R 700 "$backup_dir" 2>/dev/null || true
+            find "$backup_dir" -type f -exec chmod 600 {} \; 2>/dev/null || sudo find "$backup_dir" -type f -exec chmod 600 {} \; 2>/dev/null || true
+            chown -R root:root "$backup_dir" 2>/dev/null || sudo chown -R root:root "$backup_dir" 2>/dev/null || true
+            # Cleanup old backups (keep last 5)
+            ls -dt "$backup_root"/configs.* 2>/dev/null | tail -n +6 | xargs -r rm -rf 2>/dev/null || sudo xargs -r rm -rf 2>/dev/null || true
+            log_info "Backup created: $backup_dir"
+        fi
     fi
     return 0
 }

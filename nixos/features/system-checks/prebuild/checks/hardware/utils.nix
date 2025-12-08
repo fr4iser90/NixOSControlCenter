@@ -19,7 +19,16 @@
       update_type="$2"  # "cpu", "gpu", or "memory"
       new_value="$3"
       
-      # Create configs directory if it doesn't exist
+      # CRITICAL: If config_file is a symlink, resolve to real file
+      # Symlinks point to user-configs/ which are writable
+      if [ -L "$config_file" ]; then
+        REAL_FILE=$(readlink -f "$config_file" 2>/dev/null || echo "$config_file")
+        if [ -n "$REAL_FILE" ] && [ "$REAL_FILE" != "$config_file" ]; then
+          config_file="$REAL_FILE"
+        fi
+      fi
+      
+      # Create directory if it doesn't exist
       mkdir -p "$(dirname "$config_file")"
       
       # Read existing values from config file

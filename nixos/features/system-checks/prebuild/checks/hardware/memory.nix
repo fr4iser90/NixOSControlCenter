@@ -21,8 +21,11 @@ let
     ${ui.messages.info "System Memory:"}
     ${ui.tables.keyValue "Total RAM" "$DETECTED_GB GB"}
     
+    # CRITICAL: Resolve symlink to actual config file
+    REAL_CONFIG_FILE=$(readlink -f "${hardwareConfigPath}" 2>/dev/null || echo "${hardwareConfigPath}")
+    
     # Check if hardware-config.nix exists
-    if [ ! -f "${hardwareConfigPath}" ]; then
+    if [ ! -f "$REAL_CONFIG_FILE" ]; then
       ${ui.messages.info "hardware-config.nix not found, creating it..."}
       
       # Ask for confirmation before creating
@@ -36,8 +39,9 @@ let
       exit 0
     fi
     
-    # Get configured memory size
-    if ! CONFIGURED_GB=$(grep -A2 'ram = {' "${hardwareConfigPath}" | grep 'sizeGB' | grep -o '[0-9]\+' | head -1); then
+    # Get configured memory size (use real file, not symlink)
+    # Flexibleres Pattern: Suche nach sizeGB = NUMBER (mit oder ohne Leerzeichen)
+    if ! CONFIGURED_GB=$(grep -E 'sizeGB\s*=' "$REAL_CONFIG_FILE" 2>/dev/null | grep -oE '[0-9]+' | head -1); then
       ${ui.messages.info "Memory size not configured in hardware-config.nix"}
       
       # Ask for confirmation before adding

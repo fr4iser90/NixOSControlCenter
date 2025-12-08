@@ -323,7 +323,7 @@ create_minimal_system_config() {
     cat > "$config_file" <<EOF
 {
   # Configuration Schema Version
-  configVersion = "2.0";
+  configVersion = "1.0";
   
   # System Identity
   systemType = "$system_type";

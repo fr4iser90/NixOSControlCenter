@@ -1,6 +1,8 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
+  # Import options first (REQUIRED)
+  _ = import ./options.nix { inherit lib; };
   # Load metadata
   metadata = import ./metadata.nix;
   
@@ -195,8 +197,10 @@ let
 
 in {
   imports = 
+    # Config file management (symlink creation)
+    [ ./config.nix ]
     # Base for systemType
-    [ (basePackages.${systemConfig.systemType} or (throw "Unknown system type: ${systemConfig.systemType}")) ]
+    ++ [ (basePackages.${systemConfig.systemType} or (throw "Unknown system type: ${systemConfig.systemType}")) ]
     # Feature modules (without Docker, as it's handled separately)
     ++ (lib.filter (m: !lib.hasSuffix "/docker.nix" (toString m) && !lib.hasSuffix "/docker-rootless.nix" (toString m)) featureModules)
     # Docker modules added separately

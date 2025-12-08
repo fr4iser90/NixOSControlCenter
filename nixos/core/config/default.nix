@@ -1,4 +1,4 @@
-{ pkgs, lib, ... }:
+{ pkgs, lib, config ? null, ... }:
 
 let
   # Import cli-formatter directly (config/ is a library, not a NixOS module, so it can't access config.core.cli-formatter.api)
@@ -13,12 +13,17 @@ let
     inherit (status) messages badges;
   };
   
+  # Use API if available (when called from NixOS module), otherwise import directly
+  backupHelpers = if config != null && config ? core && config.core ? system-manager && config.core.system-manager ? api
+    then config.core.system-manager.api.backupHelpers
+    else import ../system-manager/lib/backup-helpers.nix { inherit pkgs lib; };
+  
   # Import once to avoid circular dependencies
   schemaModule = import ./config-schema.nix { inherit lib; };
   detectionModule = import ./config-detection.nix { inherit pkgs lib; };
-  migrationModule = import ./config-migration.nix { inherit pkgs lib formatter; };
+  migrationModule = import ./config-migration.nix { inherit pkgs lib formatter backupHelpers; };
   validatorModule = import ./config-validator.nix { inherit pkgs lib formatter; };
-  checkModule = import ./config-check.nix { inherit pkgs lib formatter; };
+  checkModule = import ./config-check.nix { inherit pkgs lib formatter backupHelpers; };
 in
 
 {

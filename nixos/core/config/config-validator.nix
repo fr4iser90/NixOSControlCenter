@@ -88,7 +88,7 @@ let
     
     if [ "$VERSION_SUPPORTED" = "false" ]; then
       if [ "$VERBOSE" = "true" ]; then
-        ${formatter.messages.warning "Config version $CONFIG_VERSION not recognized (assuming v1.0)"}
+        ${formatter.messages.warning "Config version $CONFIG_VERSION not recognized (assuming v0)"}
       fi
       CONFIG_VERSION="1.0"
     fi
@@ -154,7 +154,7 @@ let
     # Check if configs directory exists (for modular versions)
     # Note: hasConfigsDir is not in JSON, we check directory directly
     if [ "$CONFIG_VERSION" != "1.0" ]; then
-      # v2.0+ expects configs dir
+      # v1.0+ expects configs dir
       if [ ! -d "$CONFIGS_DIR" ]; then
         if [ "$VERBOSE" = "true" ]; then
           ${formatter.messages.info "configs/ directory does not exist (recommended for modular config v$CONFIG_VERSION)"}
@@ -184,10 +184,10 @@ let
       fi
     fi
     
-    # If v1.0, suggest migration
+    # If v0, suggest migration
     if [ "$CONFIG_VERSION" = "1.0" ] && [ "$CONFIG_VERSION" != "$CURRENT_VERSION" ]; then
       if [ "$VERBOSE" = "true" ]; then
-        ${formatter.messages.info "v1.0 structure detected (monolithic)"}
+        ${formatter.messages.info "v0 structure detected (monolithic)"}
         ${formatter.messages.info "Consider running 'ncc-migrate-config' to migrate to v$CURRENT_VERSION (modular structure)"}
       fi
     fi

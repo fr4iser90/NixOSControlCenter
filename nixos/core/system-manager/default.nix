@@ -4,15 +4,20 @@ with lib;
 
 let
   cfg = config.core.system-manager;
+  # Import helpers
+  backupHelpers = import ./lib/backup-helpers.nix { inherit pkgs lib; };
   # API definition - always available
-  configHelpers = import ./lib/config-helpers.nix { inherit pkgs lib; };
+  # Pass backupHelpers to configHelpers so it can use it
+  configHelpers = import ./lib/config-helpers.nix { inherit pkgs lib; backupHelpers = backupHelpers; };
   apiValue = {
     configHelpers = configHelpers;
+    backupHelpers = backupHelpers;
   };
 in {
   imports = [
     ./options.nix
     ./commands.nix
+    ./config.nix
     # Handlers
     ./handlers/system-update.nix
     ./handlers/feature-manager.nix

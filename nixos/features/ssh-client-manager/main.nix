@@ -1,12 +1,17 @@
 { config, lib, pkgs, ... }:
 
+with lib;
+
 let
   ui = config.core.cli-formatter.api;
   cfg = config.features.ssh-client-manager;
   
-  # Main SSH Client Manager Script
-  # This script provides the interactive interface for managing SSH connections
-  sshClientManagerScript = pkgs.writeScriptBin "ncc-ssh-client-manager-main" ''
+  # Note: Scripts that use cfg must be created in mkIf cfg.enable block
+in {
+  config = mkIf cfg.enable (let
+    # Main SSH Client Manager Script
+    # This script provides the interactive interface for managing SSH connections
+    sshClientManagerScript = pkgs.writeScriptBin "ncc-ssh-client-manager-main" ''
     #!${pkgs.bash}/bin/bash
         
     # Include server utilities, key utilities, and connection handler
@@ -175,8 +180,7 @@ let
     # Start the main function
     main
   '';
-in {
-  config = {
+  in {
     # Enable terminal-ui dependency
     # features.terminal-ui.enable removed (cli-formatter is Core) = true;
     
@@ -210,5 +214,5 @@ in {
     features.ssh-client-manager = {
       sshClientManagerScript = sshClientManagerScript;
     };
-  };
+  });
 }

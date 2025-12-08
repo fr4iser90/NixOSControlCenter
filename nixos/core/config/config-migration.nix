@@ -1,4 +1,4 @@
-{ pkgs, lib, formatter, ... }:
+{ pkgs, lib, formatter, backupHelpers, ... }:
 
 let
   schema = import ./config-schema.nix { inherit lib; };
@@ -146,7 +146,12 @@ let
     MIGRATION_TARGET=''$(echo "$MIGRATION_PATHS" | "$JQ_BIN" -r ".\"$CONFIG_VERSION\" // empty")
     
     # Prepare backup file name (before problematic if block)
-    BACKUP_FILE_CHAIN="$SYSTEM_CONFIG.backup.''$(date +%Y%m%d_%H%M%S)"
+    # Use centralized backup helper
+    BACKUP_FILE_CHAIN=$(${backupHelpers.backupConfigFile "$SYSTEM_CONFIG" "chain-migration"})
+    if [ -z "$BACKUP_FILE_CHAIN" ]; then
+      ${formatter.messages.error "Failed to create backup"}
+      exit 1
+    fi
     
     # If no direct migration, try to find chain migration
     if [ -z "$MIGRATION_TARGET" ] || [ "$MIGRATION_TARGET" = "null" ]; then
@@ -184,9 +189,8 @@ let
       fi
       CURRENT_STEP="$CONFIG_VERSION"
       
-      # Create backup before chain migration
+      # Backup already created above
       mkdir -p "$CONFIGS_DIR"
-      cp "$SYSTEM_CONFIG" "$BACKUP_FILE_CHAIN"
       if [ "$VERBOSE" = "true" ]; then
         ${formatter.messages.info "Backup created: $BACKUP_FILE_CHAIN"}
       fi
@@ -368,9 +372,9 @@ let
     # Create configs directory
     mkdir -p "$CONFIGS_DIR"
     
-    # Create backup
-    BACKUP_FILE="$SYSTEM_CONFIG.backup.''$(date +%Y%m%d_%H%M%S)"
-    if ! cp "$SYSTEM_CONFIG" "$BACKUP_FILE"; then
+    # Create backup using centralized backup helper
+    BACKUP_FILE=$(${backupHelpers.backupConfigFile "$SYSTEM_CONFIG" "migration"})
+    if [ -z "$BACKUP_FILE" ]; then
       ${formatter.messages.error "Failed to create backup"}
       exit 1
     fi
@@ -608,12 +612,19 @@ let
       ')
       
       # Write config file
+      # CRITICAL: Only create if file doesn't exist (NEVER overwrite!)
       if [ -n "$NEW_CONFIG_NIX" ]; then
-        echo "{" > "$CONFIGS_DIR/$TARGET_FILE"
-        echo "$NEW_CONFIG_NIX" >> "$CONFIGS_DIR/$TARGET_FILE"
-        echo "}" >> "$CONFIGS_DIR/$TARGET_FILE"
-        if [ "$VERBOSE" = "true" ]; then
-          ${formatter.messages.info "Created $TARGET_FILE"}
+        if [ ! -f "$CONFIGS_DIR/$TARGET_FILE" ]; then
+          echo "{" > "$CONFIGS_DIR/$TARGET_FILE"
+          echo "$NEW_CONFIG_NIX" >> "$CONFIGS_DIR/$TARGET_FILE"
+          echo "}" >> "$CONFIGS_DIR/$TARGET_FILE"
+          if [ "$VERBOSE" = "true" ]; then
+            ${formatter.messages.info "Created $TARGET_FILE"}
+          fi
+        else
+          if [ "$VERBOSE" = "true" ]; then
+            ${formatter.messages.info "$TARGET_FILE already exists, skipping (preserving user config)"}
+          fi
         fi
       fi
     done

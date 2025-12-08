@@ -1,6 +1,6 @@
 {
   # Configuration Schema Version
-  configVersion = "2.0";
+  configVersion = "1.0";
   
   # System-Identität
   systemType = "@SYSTEM_TYPE@";

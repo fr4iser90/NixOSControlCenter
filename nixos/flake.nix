@@ -19,73 +19,13 @@
   }: let
     system = "x86_64-linux";
     
-    # Helper function to load config if it exists
-    loadConfig = configName:
-      let
-        # Config-Datei-Name: ${configName}-config.nix
-        configFileName = "${configName}-config.nix";
-        
-        # 1. Prüfe Modul user-configs (echte Datei) - PRIORITÄT
-        # Durchsuche alle Module in core/ und features/
-        # System-Manager ist ein Modul wie jedes andere - features-config.nix liegt dort
-        modulePaths = [
-          # Standard: Modul-Name = Config-Name (z.B. desktop-config.nix in desktop/)
-          ./core/${configName}/user-configs/${configFileName}
-          ./features/${configName}/user-configs/${configFileName}
-          # Sonderfall: features-config.nix liegt in system-manager (weil System-Manager Features verwaltet)
-          ./core/system-manager/user-configs/${configFileName}
-        ];
-        
-        # 2. Fallback: Legacy Config in /configs/ (für Migration)
-        legacyPath = ./configs/${configFileName};
-        
-        # 3. Finde erste existierende (Modul → Legacy)
-        # Verwende builtins.filter + builtins.head statt lib.findFirst (lib ist noch nicht verfügbar)
-        allPaths = modulePaths ++ [legacyPath];
-        existingPaths = builtins.filter (p: builtins.pathExists p) allPaths;
-        configPath = if builtins.length existingPaths > 0 then builtins.head existingPaths else null;
-      in
-        if configPath != null
-        then import configPath
-        else {};
+    # Import config loader from system-manager
+    # This centralizes config loading logic - can be used by both flake.nix and system-manager module
+    configLoader = import ./core/system-manager/lib/config-loader.nix {};
     
-    # List of optional config files (in merge order)
-    optionalConfigs = [
-      "desktop"
-      "audio"
-      "localization"
-      "hardware"
-      "features"
-      "packages"
-      "network"
-      "security"
-      "performance"
-      "storage"
-      "monitoring"
-      "backup"
-      "logging"
-      "update"
-      "services"
-      "virtualization"
-      "hosting"
-      "environment"
-      "identity"
-      "certificates"
-      "compliance"
-      "ha"
-      "disaster-recovery"
-      "secrets"
-      "multi-tenant"
-      "overrides"
-    ];
-    
-    # 1. Load minimal system-config (MUST exist)
-    # If old structure: contains all values, will be overridden by optional configs
-    baseConfig = import ./system-config.nix;
-    
-    # 2. Load and merge all optional configs
-    # Order is important: later configs override earlier ones
-    systemConfig = baseConfig // builtins.foldl' (acc: configName: acc // loadConfig configName) {} optionalConfigs;
+    # Load and merge all configs using centralized loader
+    # Pass flake root directory (as path) and system-config path
+    systemConfig = configLoader.loadSystemConfig ./. ./system-config.nix;
     
     # Wähle das richtige nixpkgs und home-manager basierend auf der Konfiguration
     nixpkgs = if systemConfig.system.channel == "stable"

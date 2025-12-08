@@ -78,16 +78,28 @@ let
   # Terminal-UI is imported directly in core/config, no need to pass it
   configModule = import ../../config { inherit pkgs lib; };
   
-  systemUpdateMainScript = pkgs.writeScriptBin "ncc-system-update-main" ''
+  # Create script with runtime dependencies (only available for this script, not system-wide)
+  systemUpdateMainScript = pkgs.symlinkJoin {
+    name = "ncc-system-update-main";
+    paths = [
+      (pkgs.writeScriptBin "ncc-system-update-main" ''
     #!${pkgs.bash}/bin/bash
     set -e
 
-    # Parse arguments for verbose mode
+    # Parse arguments for verbose mode, force-migration, and force-update
     VERBOSE=false
+    FORCE_MIGRATION=false
+    FORCE_UPDATE=false
     for arg in "$@"; do
       case "$arg" in
         --verbose|--debug|-v)
           VERBOSE=true
+          ;;
+        --force-migration)
+          FORCE_MIGRATION=true
+          ;;
+        --force-update)
+          FORCE_UPDATE=true
           ;;
       esac
     done
@@ -208,6 +220,315 @@ let
       esac
     done
 
+    # Helper functions for selective module copying
+    # Extract version from options.nix (SOURCE)
+    get_source_version() {
+      local module_path="$1"
+      local options_file="$module_path/options.nix"
+      if [ -f "$options_file" ]; then
+        grep -m 1 'moduleVersion =' "$options_file" 2>/dev/null | sed 's/.*moduleVersion = "\([^"]*\)".*/\1/' || echo "unknown"
+      else
+        echo "unknown"
+      fi
+    }
+    
+    # Extract version from user-configs/*-config.nix (TARGET)
+    get_target_version() {
+      local module_path="$1"
+      local config_name="$2"
+      local config_file="$module_path/user-configs/''${config_name}-config.nix"
+      if [ -f "$config_file" ]; then
+        grep -m 1 '_version =' "$config_file" 2>/dev/null | sed 's/.*_version = "\([^"]*\)".*/\1/' || echo "unknown"
+      else
+        echo "unknown"
+      fi
+    }
+    
+    # Check if user-configs file exists (handles special case system-manager)
+    check_user_config_exists() {
+      local target_module="$1"
+      local module_name="$2"
+      
+      # Special case: system-manager uses features-config.nix
+      if [ "$module_name" = "system-manager" ]; then
+        if [ -f "$target_module/user-configs/features-config.nix" ]; then
+          echo "features-config.nix"
+          return 0
+        fi
+      else
+        if [ -f "$target_module/user-configs/$module_name-config.nix" ]; then
+          echo "$module_name-config.nix"
+          return 0
+        fi
+      fi
+      return 1
+    }
+    
+    # Update module code (without user-configs/)
+    update_module_code() {
+      local source_module="$1"
+      local target_module="$2"
+      
+      # Create target_module if it doesn't exist
+      mkdir -p "$target_module"
+      
+      # Copy everything EXCEPT user-configs/
+      if [ -d "$target_module/user-configs" ]; then
+        # user-configs/ exists → protect
+        if [ "$VERBOSE" = "true" ]; then
+          rsync -av --exclude='user-configs' "$source_module/" "$target_module/" || {
+            # Fallback: recursively copy (without user-configs/)
+            (cd "$source_module" && find . -type f ! -path "./user-configs/*" -exec install -D {} "$target_module/{}" \;)
+            (cd "$source_module" && find . -type d ! -path "./user-configs/*" ! -path "." -exec mkdir -p "$target_module/{}" \;)
+          }
+        else
+          rsync -aq --exclude='user-configs' "$source_module/" "$target_module/" >/dev/null 2>&1 || {
+            # Fallback: recursively copy (without user-configs/)
+            (cd "$source_module" && find . -type f ! -path "./user-configs/*" -exec install -D {} "$target_module/{}" \;)
+            (cd "$source_module" && find . -type d ! -path "./user-configs/*" ! -path "." -exec mkdir -p "$target_module/{}" \;)
+          }
+        fi
+      else
+        # user-configs/ doesn't exist → copy completely
+        cp -r "$source_module"/* "$target_module/" 2>/dev/null || true
+      fi
+    }
+    
+    # Handle versioned module (Stage 1+)
+    handle_versioned_module() {
+      local source_module="$1"
+      local target_module="$2"
+      local module_name="$3"
+      local item_type="$4"  # "core" or "features"
+      
+      # Check versions
+      SOURCE_VERSION=$(get_source_version "$source_module")
+      
+      # Special case: system-manager uses features-config.nix instead of system-manager-config.nix
+      if [ "$module_name" = "system-manager" ]; then
+        CONFIG_FILE="$target_module/user-configs/features-config.nix"
+        CONFIG_NAME="features"
+      else
+        # GENERIC: All modules (including packages) use the same pattern
+        CONFIG_FILE="$target_module/user-configs/$module_name-config.nix"
+        CONFIG_NAME="$module_name"
+      fi
+      
+      if [ -f "$CONFIG_FILE" ]; then
+        # TARGET has user-configs/ file
+        TARGET_VERSION=$(get_target_version "$target_module" "$CONFIG_NAME")
+        
+        if [ "$SOURCE_VERSION" != "$TARGET_VERSION" ] || [ "$FORCE_MIGRATION" = "true" ]; then
+          # Migration needed (version different OR forced)
+          if [ "$VERBOSE" = "true" ]; then
+            ${ui.messages.info "Module $module_name: Migration needed (v$TARGET_VERSION → v$SOURCE_VERSION)"}
+          fi
+          # TODO: Migration would be executed here (Phase 2)
+          # For now: Only update code, user-configs/ remains untouched
+          update_module_code "$source_module" "$target_module"
+        elif [ "$FORCE_UPDATE" = "true" ]; then
+          # Force update even if versions are the same
+          if [ "$VERBOSE" = "true" ]; then
+            ${ui.messages.info "Module $module_name: Force update requested (v$SOURCE_VERSION), updating code"}
+          fi
+          update_module_code "$source_module" "$target_module"
+        else
+          # No update needed → versions are the same and no force flag
+          if [ "$VERBOSE" = "true" ]; then
+            ${ui.messages.info "Module $module_name: No update needed (v$SOURCE_VERSION), skipping"}
+          fi
+        fi
+      else
+        # TARGET has no user-configs/ file
+        if [ "$VERBOSE" = "true" ]; then
+          ${ui.messages.info "Module $module_name: No user-configs/ file found, copying from source (including user-configs/)"}
+        fi
+        # Copy completely (including user-configs/ from repository)
+        # This copies the default config from the repository
+        cp -r "$source_module" "$target_module" 2>/dev/null || true
+      fi
+    }
+    
+    # Extract module config from system-config.nix (for Stage 0 → 1 migration)
+    extract_module_config() {
+      local system_config_file="$1"
+      local module_name="$2"
+      
+      # Load system-config.nix as JSON
+      if ! command -v nix-instantiate >/dev/null 2>&1 && ! command -v nix >/dev/null 2>&1; then
+        ${ui.messages.error "nix-instantiate or nix required for Stage 0 → 1 migration"}
+        return 1
+      fi
+      
+      # Try with nix-instantiate (older Nix versions)
+      if command -v nix-instantiate >/dev/null 2>&1; then
+        OLD_CONFIG_JSON=$(nix-instantiate --eval --strict --json -E "import $system_config_file" 2>/dev/null || echo "{}")
+      elif command -v nix >/dev/null 2>&1; then
+        OLD_CONFIG_JSON=$(nix eval --json --file "$system_config_file" 2>/dev/null || echo "{}")
+      else
+        OLD_CONFIG_JSON="{}"
+      fi
+      
+      if [ "$OLD_CONFIG_JSON" = "{}" ] || [ -z "$OLD_CONFIG_JSON" ]; then
+        # No config found → return empty
+        echo "{}"
+        return 0
+      fi
+      
+      # Extract module config with jq (if available)
+      if command -v jq >/dev/null 2>&1; then
+        MODULE_CONFIG=$(echo "$OLD_CONFIG_JSON" | jq -c ".''${module_name} // {}" 2>/dev/null || echo "{}")
+        echo "$MODULE_CONFIG"
+      else
+        # Fallback: Try with grep (not ideal, but works for simple cases)
+        # jq is required for complex configs
+        ${ui.messages.warning "jq not available, using fallback extraction (may be incomplete)"}
+        echo "{}"
+      fi
+    }
+    
+    # Migrate module from Stage 0 → Stage 1
+    migrate_stage0_to_stage1() {
+      local source_module="$1"
+      local target_module="$2"
+      local module_name="$3"
+      local item_type="$4"  # "core" or "features"
+      local system_config_file="$NIXOS_DIR/system-config.nix"
+      
+      ${ui.messages.loading "Migrating module $module_name from Stage 0 → 1..."}
+      
+      # 1. Check if system-config.nix exists
+      if [ ! -f "$system_config_file" ]; then
+        ${ui.messages.warning "system-config.nix not found, cannot extract config"}
+        ${ui.messages.info "Copying module code only (user-configs/ will be created from defaults)"}
+        update_module_code "$source_module" "$target_module"
+        return 0
+      fi
+      
+      # 2. Extract module config from system-config.nix
+      MODULE_CONFIG_JSON=$(extract_module_config "$system_config_file" "$module_name")
+      
+      # 3. Create target_module if it doesn't exist
+      mkdir -p "$target_module"
+      
+      # 4. Copy module code (including options.nix)
+      update_module_code "$source_module" "$target_module"
+      
+      # 5. Create user-configs/ directory
+      USER_CONFIGS_DIR="$target_module/user-configs"
+      mkdir -p "$USER_CONFIGS_DIR"
+      
+      # 6. Create user-configs/*-config.nix from extracted config
+      # Extract config directly as Nix code (not JSON)
+      if command -v nix-instantiate >/dev/null 2>&1; then
+        # Try to extract config directly as Nix attrset
+        MODULE_CONFIG_NIX=$(nix-instantiate --eval --strict -E "
+          let config = import $system_config_file;
+          in if config ? ''${module_name} then
+            builtins.toJSON config.''${module_name}
+          else
+            \"{}\"
+        " 2>/dev/null || echo "{}")
+        
+        # Convert JSON back to Nix (simple approach: use builtins.fromJSON in Nix)
+        # Create temporary Nix file for conversion
+        TEMP_NIX=$(mktemp)
+        cat > "$TEMP_NIX" <<'TEMPEOF'
+{ moduleConfigJson, moduleName, moduleVersion }:
+let
+  config = builtins.fromJSON moduleConfigJson;
+  hasVersion = moduleVersion != "unknown";
+in
+  if config == {} then
+    "{}"
+  else if hasVersion then
+    builtins.toJSON (
+      builtins.listToAttrs [{
+        name = moduleName;
+        value = config // { _version = moduleVersion; };
+      }]
+    )
+  else
+    builtins.toJSON (
+      builtins.listToAttrs [{
+        name = moduleName;
+        value = config;
+      }]
+    )
+TEMPEOF
+        
+        SOURCE_VERSION=$(get_source_version "$source_module")
+        FINAL_CONFIG_JSON=$(nix-instantiate --eval --strict --json "$TEMP_NIX" \
+          --argstr moduleConfigJson "$MODULE_CONFIG_JSON" \
+          --argstr moduleName "$module_name" \
+          --argstr moduleVersion "$SOURCE_VERSION" 2>/dev/null || echo "{}")
+        rm -f "$TEMP_NIX"
+        
+        # Convert JSON to Nix format (simple: use jq for formatting)
+        if command -v jq >/dev/null 2>&1 && [ "$FINAL_CONFIG_JSON" != "{}" ]; then
+          # jq can convert JSON to Nix-like format (not perfect, but works)
+          CONFIG_NIX=$(echo "$FINAL_CONFIG_JSON" | jq -r '
+            def to_nix(v):
+              if v == null then "null"
+              elif (v | type) == "boolean" then (if v then "true" else "false" end)
+              elif (v | type) == "number" then (v | tostring)
+              elif (v | type) == "string" then ("\"" + v + "\"")
+              elif (v | type) == "array" then ("[ " + (v | map(to_nix) | join(", ")) + " ]")
+              elif (v | type) == "object" then
+                ("{ " + (v | to_entries | map(.key + " = " + to_nix(.value)) | join("; ")) + "; }")
+              else "null" end;
+            to_entries | map(.key + " = " + to_nix(.value)) | join("; ")
+          ' 2>/dev/null || echo "")
+          
+          if [ -n "$CONFIG_NIX" ]; then
+            cat > "$USER_CONFIGS_DIR/$module_name-config.nix" <<EOF
+{
+  $CONFIG_NIX
+}
+EOF
+            ${ui.messages.success "Created user-configs/$module_name-config.nix from system-config.nix"}
+          else
+            ${ui.messages.warning "Could not convert JSON to Nix format"}
+            touch "$USER_CONFIGS_DIR/$module_name-config.nix"
+          fi
+        else
+          # Fallback: Create empty config (will be filled by activationScripts)
+          ${ui.messages.warning "jq not available or config empty, creating empty config"}
+          ${ui.messages.info "Config will be filled with defaults by activationScripts"}
+          touch "$USER_CONFIGS_DIR/$module_name-config.nix"
+        fi
+      else
+        # nix-instantiate not available → create empty config
+        ${ui.messages.warning "nix-instantiate not available, cannot extract config"}
+        ${ui.messages.info "Creating empty config (will be filled with defaults by activationScripts)"}
+        touch "$USER_CONFIGS_DIR/$module_name-config.nix"
+      fi
+      
+      ${ui.messages.success "Module $module_name migrated from Stage 0 → 1"}
+    }
+    
+    # Handle non-versioned module (Stage 0)
+    handle_stage0_module() {
+      local source_module="$1"
+      local target_module="$2"
+      local module_name="$3"
+      local item_type="$4"  # "core" or "features"
+      
+      if [ -d "$target_module" ]; then
+        # Module exists in TARGET → Stage 0 → 1 migration
+        if [ "$VERBOSE" = "true" ]; then
+          ${ui.messages.info "Module $module_name: Stage 0 → 1 migration needed"}
+        fi
+        migrate_stage0_to_stage1 "$source_module" "$target_module" "$module_name" "$item_type"
+      else
+        # New module → copy completely
+        if [ "$VERBOSE" = "true" ]; then
+          ${ui.messages.info "Module $module_name: New module, copying completely"}
+        fi
+        cp -r "$source_module" "$target_module" 2>/dev/null || true
+      fi
+    }
+
     # Directories and files to copy
     COPY_ITEMS=(
         "core"            # Base system configuration
@@ -249,9 +570,7 @@ let
     # Update files
     ${ui.messages.loading "Updating NixOS configuration..."}
     
-    # Remove old directories (legacy, not in COPY_ITEMS)
-    sudo rm -rf "$NIXOS_DIR/modules" "$NIXOS_DIR/lib" "$NIXOS_DIR/packages"
-    # Note: flake.nix is handled separately below
+
     
     # Copy defined directories and files
     # IMPORTANT: configs/ and custom/ are NEVER overwritten - only copied during migration or if missing
@@ -271,13 +590,54 @@ let
               ${ui.messages.info "$item exists, skipping (preserving existing $item)..."}
             fi
           elif [ "$item" = "core" ] || [ "$item" = "features" ]; then
-            # For core/ and features/: Replace completely, but clean up old subdirectories first
-            ${ui.messages.loading "Replacing $item/ completely..."}
-            # Remove old directory completely
-            sudo rm -rf "$NIXOS_DIR/$item"
-            # Copy new directory
-            sudo cp -r "$SOURCE_DIR/$item" "$NIXOS_DIR/"
-            ${ui.messages.success "$item/ replaced (old subdirectories removed)"}
+            # CRITICAL: Selective copying module-by-module (NEVER rm -rf!)
+            ${ui.messages.loading "Updating $item/ modules (preserving user-configs/)..."}
+            
+            # Create target_dir if it doesn't exist
+            mkdir -p "$NIXOS_DIR/$item"
+            
+            # For each module in SOURCE
+            for source_module in "$SOURCE_DIR/$item"/*; do
+              if [ ! -d "$source_module" ]; then
+                continue
+              fi
+              
+              MODULE_NAME=$(basename "$source_module")
+              TARGET_MODULE="$NIXOS_DIR/$item/$MODULE_NAME"
+              
+              # Check if module is versioned (has options.nix in SOURCE)
+              if [ -f "$source_module/options.nix" ]; then
+                # Module has version (Stage 1+)
+                handle_versioned_module "$source_module" "$TARGET_MODULE" "$MODULE_NAME" "$item"
+              else
+                # Module has no version (Stage 0)
+                handle_stage0_module "$source_module" "$TARGET_MODULE" "$MODULE_NAME" "$item"
+              fi
+            done
+            
+            ${ui.messages.success "$item/ updated (user-configs/ preserved)"}
+          elif [ "$item" = "packages" ]; then
+            # CRITICAL: packages/ is a single module - use SAME GENERIC LOGIC as core/features
+            ${ui.messages.loading "Updating packages/ (preserving user-configs/)..."}
+            
+            # Create target_dir if it doesn't exist
+            mkdir -p "$NIXOS_DIR/$item"
+            
+            # Treat packages as a versioned module (has options.nix) - use handle_versioned_module
+            SOURCE_MODULE="$SOURCE_DIR/$item"
+            TARGET_MODULE="$NIXOS_DIR/$item"
+            MODULE_NAME="packages"
+            
+            # Check if module is versioned (has options.nix in SOURCE)
+            if [ -f "$SOURCE_MODULE/options.nix" ]; then
+              # Module has version (Stage 1+) - use handle_versioned_module
+              handle_versioned_module "$SOURCE_MODULE" "$TARGET_MODULE" "$MODULE_NAME" "$item"
+            else
+              # Module has no version (Stage 0) - use handle_stage0_module
+              handle_stage0_module "$SOURCE_MODULE" "$TARGET_MODULE" "$MODULE_NAME" "$item"
+            fi
+            
+            ${ui.messages.success "packages/ updated (user-configs/ preserved)"}
           else
             # Other directories: Overwrite completely
             sudo rm -rf "$NIXOS_DIR/$item"
@@ -367,7 +727,12 @@ let
     else
       ${prompt_build}
     fi
-  '';
+  '')
+      pkgs.git
+      pkgs.rsync
+      pkgs.jq
+    ];
+  };
 
 in {
   config = {
@@ -377,13 +742,33 @@ in {
     environment.systemPackages = [ 
       systemUpdateMainScript
       configModule.configCheck
-      pkgs.git 
     ];
 
     system.activationScripts.nixosBackupDir = ''
+      # Create main backup directory
       mkdir -p ${backupSettings.directory}
       chmod 700 ${backupSettings.directory}
       chown root:root ${backupSettings.directory}
+      
+      # Create subdirectories for organized backups
+      mkdir -p ${backupSettings.directory}/configs
+      mkdir -p ${backupSettings.directory}/directories
+      mkdir -p ${backupSettings.directory}/migrations
+      mkdir -p ${backupSettings.directory}/ssh
+      mkdir -p ${backupSettings.directory}/system-updates
+      
+      # Set permissions for all subdirectories
+      chmod 700 ${backupSettings.directory}/configs
+      chmod 700 ${backupSettings.directory}/directories
+      chmod 700 ${backupSettings.directory}/migrations
+      chmod 700 ${backupSettings.directory}/ssh
+      chmod 700 ${backupSettings.directory}/system-updates
+      
+      chown root:root ${backupSettings.directory}/configs
+      chown root:root ${backupSettings.directory}/directories
+      chown root:root ${backupSettings.directory}/migrations
+      chown root:root ${backupSettings.directory}/ssh
+      chown root:root ${backupSettings.directory}/system-updates
     '';
 
     # Commands are registered in commands.nix

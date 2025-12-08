@@ -1,14 +1,16 @@
 # Central helper functions for config file management
 # Used by all modules to create default configs and manage symlinks
 
-{ pkgs, lib, ... }:
+{ pkgs, lib, backupHelpers, ... }:
 
 rec {
   # Create default config file if it doesn't exist
-  # Usage: createDefaultConfig userConfigFile defaultContent
-  createDefaultConfig = userConfigFile: defaultContent: ''
-    # Create default config if it doesn't exist
+  # Usage: createDefaultConfig userConfigFile defaultContent symlinkPath
+  # CRITICAL: Prüft auch Symlink, um User-Configs zu schützen
+  createDefaultConfig = userConfigFile: defaultContent: symlinkPath: ''
+    # CRITICAL: Nur erstellen wenn Datei NICHT existiert
     if [ ! -f "${toString userConfigFile}" ]; then
+      # Datei existiert nicht → erstelle Default
       mkdir -p "$(dirname "${toString userConfigFile}")"
       cat > "${toString userConfigFile}" <<'EOF'
 ${defaultContent}
@@ -28,7 +30,8 @@ EOF
       if [ "$CURRENT_TARGET" != "$EXPECTED_TARGET" ]; then
         # Backup old config if it was a real file
         if [ -f "${symlinkPath}" ] && [ ! -L "${symlinkPath}" ]; then
-          cp "${symlinkPath}" "${symlinkPath}.backup.$(date +%s)"
+          # Use centralized backup helper
+          ${backupHelpers.backupConfigFile "${symlinkPath}" "symlink-update"} >/dev/null 2>&1 || true
         fi
         # Create new symlink
         ln -sfn "${toString userConfigFile}" "${symlinkPath}"
@@ -41,10 +44,14 @@ EOF
 
   # Combined: Create default config + symlink
   # Usage: setupConfigFile symlinkPath userConfigFile defaultContent
+  # CRITICAL: Prüft Symlink vor Erstellung, um User-Configs zu schützen
   setupConfigFile = symlinkPath: userConfigFile: defaultContent: ''
     mkdir -p "$(dirname "${symlinkPath}")"
     
-    ${createDefaultConfig userConfigFile defaultContent}
+    # Prüfe ob User-Config existiert (via Symlink oder direkt)
+    ${createDefaultConfig userConfigFile defaultContent symlinkPath}
+    
+    # Erstelle/Update Symlink (auch wenn Default nicht erstellt wurde)
     ${createSymlink symlinkPath userConfigFile}
   '';
 }

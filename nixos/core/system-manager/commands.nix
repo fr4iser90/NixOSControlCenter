@@ -15,7 +15,19 @@ let
   desktopManagerHandler = import ./handlers/desktop-manager.nix { inherit config lib pkgs systemConfig; };
   
   # Import config migration and validation
-  configMigration = import ./config-migration.nix { inherit pkgs lib; };
+  # Import formatter (like in core/config/default.nix)
+  colors = import ../cli-formatter/colors.nix;
+  coreFormatter = import ../cli-formatter/core { inherit lib colors; config = {}; };
+  statusFormatter = import ../cli-formatter/status { inherit lib colors; config = {}; };
+  formatter = {
+    inherit colors;
+    inherit (coreFormatter) text layout;
+    inherit (statusFormatter) messages badges;
+  };
+  # Get backup helpers from API (will be passed to config-migration)
+  # Fallback to direct import if API not yet available
+  backupHelpersForMigration = config.core.system-manager.api.backupHelpers or (import ./lib/backup-helpers.nix { inherit pkgs lib; });
+  configMigration = import ../config/config-migration.nix { inherit pkgs lib formatter; backupHelpers = backupHelpersForMigration; };
   configValidator = import ./validators/config-validator.nix { inherit pkgs lib; };
 in {
   config = {
@@ -38,14 +50,14 @@ in {
       [
         {
           name = "check-module-versions";
-          description = "Check module versions (Core + Features) and update status";
+          description = "Check module versions for Core and Features and update status";
           category = "system";
           script = "${checkVersions.checkVersionsScript}/bin/ncc-check-module-versions";
           arguments = [];
           dependencies = [ "nix" ];
-          shortHelp = "check-module-versions - Check module versions (Core + Features)";
+          shortHelp = "check-module-versions - Check module versions for Core and Features";
           longHelp = ''
-            Check the version status of all modules (Core + Features):
+            Check the version status of all modules (Core and Features):
             - Installed: Current version on the system
             - Available: Latest version in code (Git)
             - Stable: Stable version (if different from available)

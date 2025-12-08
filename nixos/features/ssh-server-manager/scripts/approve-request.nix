@@ -6,6 +6,7 @@ let
   cfg = config.features.ssh-server-manager.approve-request;
   ui = config.core.cli-formatter.api;
   notifications = config.features.ssh-server-manager.notifications;
+  backupHelpers = config.core.system-manager.api.backupHelpers;
 
   approveRequestScript = pkgs.writeScriptBin "ssh-approve-request" ''
     #!${pkgs.bash}/bin/bash
@@ -67,8 +68,8 @@ let
     # Enable password authentication temporarily
     ${ui.messages.info "Enabling SSH password authentication for $DURATION seconds..."}
     
-    # Backup current SSH config
-    sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.$(date +%s)
+    # Backup current SSH config using centralized backup helper
+    ${backupHelpers.backupSSHConfig "/etc/ssh/sshd_config"} >/dev/null 2>&1 || true
     
     # Enable password authentication
     if ! grep -q "^PasswordAuthentication yes" /etc/ssh/sshd_config; then

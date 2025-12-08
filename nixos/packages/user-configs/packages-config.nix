@@ -1,0 +1,4 @@
+{
+  # Package modules directly
+  packageModules = [];
+}
