@@ -14,7 +14,7 @@ mkdir -p nixos/core/system
 mkdir -p nixos/core/infrastructure
 mkdir -p nixos/core/module-management
 mkdir -p nixos/core/management
-# Note: desktop/ and audio/ remain directly under core/ (no domain grouping)
+# Note: ALL modules are domain-grouped, including desktop/ and audio/ → system/
 ```
 
 ### Step 1.2: Create Feature Domain Directories
@@ -27,6 +27,153 @@ mkdir -p nixos/features/security
 mkdir -p nixos/features/specialized
 ```
 
+## Phase 1.5: Naming Conventions
+
+### Module Naming
+
+**Module Directory Names:**
+- Use **kebab-case** (lowercase with hyphens)
+- Examples: `system-lock`, `vm-manager`, `ssh-client`, `boot-entry`
+- No underscores, no camelCase, no PascalCase
+
+**Module Path Structure:**
+- Core: `nixos/core/<domain>/<module-name>/`
+- Features: `nixos/features/<domain>/<module-name>/`
+
+### Option Path Conventions
+
+**Core Modules:**
+```nix
+# Pattern: options.systemConfig.<domain>.<module>
+options.systemConfig.system.boot = { ... }
+options.systemConfig.system.hardware = { ... }
+options.systemConfig.system.desktop = { ... }
+options.systemConfig.infrastructure.cli-formatter = { ... }
+options.systemConfig.management.system-manager = { ... }
+```
+
+**Feature Modules:**
+```nix
+# Pattern: options.features.<domain>.<module>
+options.features.system.lock = { ... }
+options.features.infrastructure.vm = { ... }
+options.features.security.ssh-client = { ... }
+options.features.specialized.ai-workspace = { ... }
+```
+
+**Important:** After domain migration, ALL option paths must include the domain!
+
+### Config Access Conventions
+
+**In `default.nix` and `config.nix`:**
+```nix
+# Core modules
+let
+  cfg = systemConfig.system.boot or {};  # With domain
+  # NOT: systemConfig.boot
+in { ... }
+
+# Feature modules
+let
+  cfg = systemConfig.features.system.lock or {};  # With domain
+  # NOT: systemConfig.features.lock
+in { ... }
+```
+
+### Config File Naming
+
+**User Config Files:**
+- Pattern: `<module-name>-config.nix`
+- Location: `user-configs/<module-name>-config.nix`
+- Symlink: `/etc/nixos/configs/<module-name>-config.nix`
+- Examples:
+  - `desktop-config.nix`
+  - `vm-config.nix`
+  - `ssh-client-config.nix`
+  - `lock-config.nix` (not `system-lock-config.nix` - use module name without domain)
+
+**Note:** Config file names use the module name (without domain prefix).
+
+### Directory Naming
+
+**Module Directories:**
+- Use **kebab-case**: `system-lock`, `vm-manager`, `ssh-client`
+- No underscores: ❌ `system_lock`, ✅ `system-lock`
+- No camelCase: ❌ `vmManager`, ✅ `vm-manager`
+
+**Sub-Directories (Generic vs Semantic):**
+- Prefer **generic names**: `handlers/`, `collectors/`, `processors/`, `validators/`
+- Use **semantic names** only when concept is central: `scanners/`, `providers/`, `drivers/`
+- See `MODULE_TEMPLATE.md` Section 8 for details
+
+### File Naming
+
+**Standard Files:**
+- `default.nix` - Module entry point
+- `options.nix` - Option definitions
+- `config.nix` - Implementation
+- `commands.nix` - Command registration
+- `types.nix` - Custom types
+- `systemd.nix` - Systemd services
+
+**Sub-Module Files:**
+- Use **kebab-case**: `feature-manager.nix`, `system-update.nix`
+- Descriptive names: `config-loader.nix`, `backup-helpers.nix`
+
+### Import Path Conventions
+
+**After Domain Migration:**
+```nix
+# Core modules
+imports = [
+  ./core/system/boot
+  ./core/system/hardware
+  ./core/infrastructure/cli-formatter
+  ./core/management/system-manager
+];
+
+# Feature modules (auto-discovery handles paths)
+# But manual imports would be:
+imports = [
+  ./features/system/lock
+  ./features/infrastructure/vm
+  ./features/security/ssh-client
+];
+```
+
+### Version Naming
+
+**Module Version:**
+- Pattern: `"X.Y"` (semantic versioning, major.minor)
+- Example: `"1.0"`, `"1.1"`, `"2.0"`
+- Defined in `options.nix`:
+  ```nix
+  _version = lib.mkOption {
+    type = lib.types.str;
+    default = "1.0";
+    internal = true;
+  };
+  ```
+
+**Migration Files:**
+- Pattern: `v<from>-to-v<to>.nix`
+- Examples: `v1.0-to-v1.1.nix`, `v1.0-to-v2.0.nix`
+
+### Summary Table
+
+| Element | Convention | Example |
+|---------|------------|---------|
+| Module directory | kebab-case | `system-lock`, `vm-manager` |
+| Core option path | `systemConfig.<domain>.<module>` | `systemConfig.system.boot` |
+| Feature option path | `features.<domain>.<module>` | `features.system.lock` |
+| Config file | `<module-name>-config.nix` | `desktop-config.nix` |
+| Config access (Core) | `systemConfig.<domain>.<module>` | `systemConfig.system.desktop` |
+| Config access (Feature) | `systemConfig.features.<domain>.<module>` | `systemConfig.features.system.lock` |
+| Import path (Core) | `./core/<domain>/<module>` | `./core/system/boot` |
+| Import path (Feature) | `./features/<domain>/<module>` | `./features/system/lock` |
+| Version | `"X.Y"` | `"1.0"` |
+| Migration file | `v<from>-to-v<to>.nix` | `v1.0-to-v2.0.nix` |
+
 ## Phase 2: Module Migration (Mapping)
 
 ### Core Module Mapping (Current → New)
@@ -38,8 +185,8 @@ mkdir -p nixos/features/specialized
 | `core/network/` | `core/system/network/` | system | Move | High |
 | `core/user/` | `core/system/user/` | system | Move | High |
 | `core/localization/` | `core/system/localization/` | system | Move | High |
-| `core/desktop/` | `core/desktop/` | - | Keep (no domain) | High |
-| `core/audio/` | `core/audio/` | - | Keep (no domain) | High |
+| `core/desktop/` | `core/system/desktop/` | system | Move | High |
+| `core/audio/` | `core/system/audio/` | system | Move | High |
 | `core/cli-formatter/` | `core/infrastructure/cli-formatter/` | infrastructure | Move | High |
 | `core/command-center/` | `core/infrastructure/command-center/` | infrastructure | Move | High |
 | `core/config/` | `core/infrastructure/config/` | infrastructure | Move | High |
@@ -228,13 +375,13 @@ system.activationScripts.<module>-config-symlink = ''
    - [ ] Has `config.nix` with symlink management
    - [ ] Has `user-configs/localization-config.nix`
 
-6. **`core/desktop/`** (stays)
+6. **`core/system/desktop/`** (after move)
    - [ ] Has `default.nix` (only imports)
    - [ ] Has `options.nix` with `_version`
    - [ ] Has `config.nix` with symlink management
    - [ ] Has `user-configs/desktop-config.nix`
 
-7. **`core/audio/`** (stays)
+7. **`core/system/audio/`** (after move)
    - [ ] Has `default.nix` (only imports)
    - [ ] Has `options.nix` with `_version`
    - [ ] Has `config.nix` with symlink management
@@ -356,56 +503,26 @@ system.activationScripts.<module>-config-symlink = ''
    - [ ] Has `commands.nix` (CLI commands)
    - [ ] Has `user-configs/hackathon-config.nix`
 
-## Phase 5: Implementation Order
+## Phase 5: Implementation Order (Single Run)
 
 ### Step 5.1: Preparation
 1. Create backup branch: `git checkout -b backup-before-domain-migration`
 2. Commit current state
 3. Create new branch: `git checkout -b domain-structure-migration`
 
-### Step 5.2: Core Modules (Priority: High)
-**Order:**
-1. Create domain directories (Step 1.1)
-2. Move system domain modules (boot, hardware, network, user, localization)
-3. Move infrastructure domain modules (cli-formatter, command-center, config)
-4. Move management domain modules (system-checks → checks, system-logger → logging)
-5. Update `core/default.nix` imports
-6. Test: `nixos-rebuild dry-run`
+### Step 5.2: Execute All Steps in One Run
 
-### Step 5.3: System-Manager Split (Priority: Critical)
-**Order:**
-1. Create new module structures (Step 3.1)
-2. Create `module-manager/` module files (default.nix, options.nix, config.nix, commands.nix)
-3. Move handlers to module-manager
-4. Move rest of system-manager to management/system-manager
-5. Update all import paths
-6. Test: `nixos-rebuild dry-run`
+**ALL steps below are executed in sequence WITHOUT testing between steps. Final test at the end.**
 
-### Step 5.4: Feature Modules (Priority: Medium)
-**Order:**
-1. Create domain directories (Step 1.2)
-2. Move system domain features (system-discovery → system/lock)
-3. Move infrastructure domain features (homelab, vm, bootentry)
-4. Move security domain features (ssh-client, ssh-server)
-5. Move specialized domain features (ai-workspace, hackathon)
-6. Update `features/default.nix` (if needed for auto-discovery)
-7. Update `features/metadata.nix` (if feature names changed)
-8. Test: `nixos-rebuild dry-run`
+1. **Create all domain directories** (Phase 1.1 + 1.2)
+2. **Move all Core modules** (Phase 2 - all at once)
+3. **Move all Feature modules** (Phase 2 - all at once)
+4. **System-Manager Split** (Phase 3 - complete)
+5. **Update all import paths globally** (Phase 5.6 - all files)
+6. **Template Compliance Check** (Phase 4 - create TODO.md for non-compliant)
+7. **Final test**: `nixos-rebuild dry-run` (ONCE at the end)
 
-### Step 5.5: Template Compliance Check
-**For each module:**
-1. Check `default.nix` (only imports)
-2. Check `options.nix` (has `_version`)
-3. Check `config.nix` (has symlink management)
-4. Check `user-configs/` (exists and has config file)
-5. If non-compliant: Create `TODO.md` in module directory
-
-### Step 5.6: Update Import Paths Globally
-**Files to update:**
-1. `nixos/flake.nix` - Update all module import paths
-2. `nixos/core/default.nix` - Update core module imports
-3. `nixos/features/default.nix` - Update if needed (auto-discovery should handle it)
-4. All files that reference old paths (use grep to find)
+**Important:** No intermediate testing. All changes are made, then tested once at the end.
 
 ## Phase 6: TODO.md Template for Non-Compliant Modules
 

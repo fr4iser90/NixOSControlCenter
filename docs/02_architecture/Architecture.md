@@ -16,12 +16,10 @@
 - **Examples**: `core/system/boot/`, `core/system/hardware/`, `core/infrastructure/cli-formatter/`, `core/management/logging/`
 
 **Core Domains:**
-- **`system/`** - OS-Level System Components (boot, hardware, network, user, localization)
+- **`system/`** - OS-Level System Components (boot, hardware, network, user, localization, desktop, audio)
 - **`infrastructure/`** - NCC Framework Components (cli-formatter, command-center, config)
 - **`module-management/`** - Module Management (module-manager for feature enable/disable, version checking)
 - **`management/`** - System Management (system-manager, checks, logging, updates)
-- **`desktop/`** - Desktop Environment (display managers, environments, themes)
-- **`audio/`** - Audio System (PulseAudio, ALSA, etc.)
 
 ### Feature Modules (`nixos/features/`)
 
@@ -123,23 +121,23 @@ nixos/
 │   │       └── user-configs/
 │   │           └── localization-config.nix
 │   │
-│   ├── desktop/             ✅📦
-│   │   ├── default.nix      (ONLY imports)
-│   │   ├── options.nix      (_version: "1.0")
-│   │   ├── config.nix       (ALL implementation)
-│   │   ├── user-configs/
-│   │   │   └── desktop-config.nix
-│   │   ├── display-managers/
-│   │   ├── display-servers/
-│   │   ├── environments/
-│   │   └── themes/
-│   │
-│   ├── audio/               ✅📦
-│   │   ├── default.nix      (ONLY imports)
-│   │   ├── options.nix      (_version: "1.0")
-│   │   ├── config.nix       (ALL implementation)
-│   │   └── user-configs/
-│   │       └── audio-config.nix
+│   │   ├── desktop/         ✅📦
+│   │   │   ├── default.nix  (ONLY imports)
+│   │   │   ├── options.nix  (_version: "1.0")
+│   │   │   ├── config.nix   (ALL implementation)
+│   │   │   ├── user-configs/
+│   │   │   │   └── desktop-config.nix
+│   │   │   ├── display-managers/
+│   │   │   ├── display-servers/
+│   │   │   ├── environments/
+│   │   │   └── themes/
+│   │   │
+│   │   └── audio/           ✅📦
+│   │       ├── default.nix  (ONLY imports)
+│   │       ├── options.nix  (_version: "1.0")
+│   │       ├── config.nix   (ALL implementation)
+│   │       └── user-configs/
+│   │           └── audio-config.nix
 │   │
 │   ├── infrastructure/      # Infrastructure modules
 │   │   ├── cli-formatter/   ✅📦
@@ -356,8 +354,8 @@ nixos/
 | `core/system/network` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | `core/system/user` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | `core/system/localization` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| `core/desktop` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| `core/audio` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| `core/system/desktop` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| `core/system/audio` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | `core/infrastructure/cli-formatter` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | `core/infrastructure/command-center` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | `core/infrastructure/config` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -395,8 +393,8 @@ nixos/
 | `core/network/` | `core/system/network/` |
 | `core/user/` | `core/system/user/` |
 | `core/localization/` | `core/system/localization/` |
-| `core/desktop/` | `core/desktop/` (unchanged) |
-| `core/audio/` | `core/audio/` (unchanged) |
+| `core/desktop/` | `core/system/desktop/` |
+| `core/audio/` | `core/system/audio/` |
 | `core/cli-formatter/` | `core/infrastructure/cli-formatter/` |
 | `core/command-center/` | `core/infrastructure/command-center/` |
 | `core/config/` | `core/infrastructure/config/` |
@@ -499,12 +497,10 @@ let moduleVersion = "1.0"; in {
 
 | Domain | Purpose | Examples |
 |--------|---------|----------|
-| **`system/`** | **OS-Level System Components** - Fundamental system configuration that the OS needs to boot and run | `boot/`, `hardware/`, `network/`, `user/`, `localization/` |
+| **`system/`** | **OS-Level System Components** - Fundamental system configuration that the OS needs to boot and run | `boot/`, `hardware/`, `network/`, `user/`, `localization/`, `desktop/`, `audio/` |
 | **`infrastructure/`** | **NCC Framework Components** - Core infrastructure/tooling that NCC itself needs to function | `cli-formatter/`, `command-center/`, `config/` |
 | **`module-management/`** | **Module Management** - Manages module lifecycle, registration, and versioning | `module-manager/` (Feature Enable/Disable, Version Checking) |
 | **`management/`** | **System Management** - Tools for managing the system (updates, logging, system operations) | `system-manager/`, `checks/`, `logging/`, `updates/` |
-| **`desktop/`** | **Desktop Environment** - GUI/Desktop configuration | `desktop/` (display managers, environments, themes) |
-| **`audio/`** | **Audio System** - Audio configuration | `audio/` (PulseAudio, ALSA, etc.) |
 
 **Features Domains:**
 
@@ -532,7 +528,9 @@ core/
 │   ├── hardware/        ✅ (flat within domain)
 │   ├── network/         ✅ (flat within domain)
 │   ├── user/            ✅ (flat within domain)
-│   └── localization/    ✅ (flat within domain)
+│   ├── localization/    ✅ (flat within domain)
+│   ├── desktop/         ✅ (flat within domain)
+│   └── audio/           ✅ (flat within domain)
 ├── infrastructure/      # Domain: Infrastructure
 │   ├── cli-formatter/   ✅ (flat within domain)
 │   ├── command-center/ ✅ (flat within domain)

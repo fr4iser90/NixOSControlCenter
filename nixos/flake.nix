@@ -21,7 +21,7 @@
     
     # Import config loader from system-manager
     # This centralizes config loading logic - can be used by both flake.nix and system-manager module
-    configLoader = import ./core/system-manager/lib/config-loader.nix {};
+    configLoader = import ./core/management/system-manager/lib/config-loader.nix {};
     
     # Load and merge all configs using centralized loader
     # Pass flake root directory (as path) and system-config path
@@ -86,7 +86,7 @@
               users = lib.mapAttrs (username: userConfig: 
                 { config, ... }: {
                   imports = [ 
-                    (import ./core/user/home-manager/roles/${userConfig.role}.nix {
+                    (import ./core/system/user/home-manager/roles/${userConfig.role}.nix {
                       inherit pkgs lib config systemConfig;
                       user = username;
                     })
