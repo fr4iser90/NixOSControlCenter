@@ -7,9 +7,9 @@ let
 
   # Get system information
   systemInfo = {
-    hasDesktop = systemConfig.desktop != null && systemConfig.desktop != "";
+    hasDesktop = systemConfig.desktop.enable or false;
     systemType = systemConfig.systemType;
-    desktop = systemConfig.desktop or "none";
+    desktop = systemConfig.desktop.environment or "none";
   };
 
   # Determine profile module path

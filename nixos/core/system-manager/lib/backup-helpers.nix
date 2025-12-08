@@ -30,10 +30,8 @@ rec {
       # Cleanup old backups (keep last 10)
       ls -t "$BACKUP_ROOT"/$(basename "$originalPath").backup.* 2>/dev/null | tail -n +11 | xargs -r rm -f 2>/dev/null || sudo xargs -r rm -f 2>/dev/null || true
       echo "$BACKUP_FILE"
-      return 0
     else
       echo "" >&2
-      return 1
     fi
   '';
   
@@ -61,10 +59,8 @@ rec {
       # Cleanup old backups (keep last 5)
       ls -dt "$BACKUP_ROOT"/$(basename "$originalPath").* 2>/dev/null | tail -n +6 | xargs -r rm -rf 2>/dev/null || sudo xargs -r rm -rf 2>/dev/null || true
       echo "$BACKUP_DIR"
-      return 0
     else
       echo "" >&2
-      return 1
     fi
   '';
   
@@ -91,10 +87,8 @@ rec {
       # Cleanup old backups (keep last 5)
       ls -t "$BACKUP_ROOT"/$(basename "$originalPath").backup.* 2>/dev/null | tail -n +6 | xargs -r rm -f 2>/dev/null || sudo xargs -r rm -f 2>/dev/null || true
       echo "$BACKUP_FILE"
-      return 0
     else
       echo "" >&2
-      return 1
     fi
   '';
   

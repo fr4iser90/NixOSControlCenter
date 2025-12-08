@@ -232,13 +232,13 @@ let
       fi
     }
     
-    # Extract version from user-configs/*-config.nix (TARGET)
+    # Extract version from options.nix (TARGET - deployed system)
+    # Version kommt aus dem deployed Code, nicht aus user-configs
     get_target_version() {
       local module_path="$1"
-      local config_name="$2"
-      local config_file="$module_path/user-configs/''${config_name}-config.nix"
-      if [ -f "$config_file" ]; then
-        grep -m 1 '_version =' "$config_file" 2>/dev/null | sed 's/.*_version = "\([^"]*\)".*/\1/' || echo "unknown"
+      local options_file="$module_path/options.nix"
+      if [ -f "$options_file" ]; then
+        grep -m 1 'moduleVersion =' "$options_file" 2>/dev/null | sed 's/.*moduleVersion = "\([^"]*\)".*/\1/' || echo "unknown"
       else
         echo "unknown"
       fi
@@ -533,15 +533,9 @@ EOF
     COPY_ITEMS=(
         "core"            # Base system configuration
         "custom"          # User-defined modules
-        "desktop"         # Desktop environments
         "features"        # Feature modules
         "packages"        # Packages directory
         "flake.nix"       # Flake configuration
-        "modules"         # Legacy modules (if still needed)
-        "overlays"        # Overlays if present
-        "hosts"           # Host-specific configurations
-        "lib"             # Libraries
-        "config"          # Additional configurations
     )
     
     # Create backup directory and perform backup

@@ -1,6 +1,8 @@
 { lib, pkgs, ... }:
 
 let
+  moduleVersion = "1.0";
+  
   # Import helpers
   backupHelpersValue = import ./lib/backup-helpers.nix { inherit pkgs lib; };
   # Pass backupHelpers to configHelpers so it can use it
@@ -14,6 +16,12 @@ let
 in
 {
   options.core.system-manager = {
+    _version = lib.mkOption {
+      type = lib.types.str;
+      default = moduleVersion;
+      internal = true;
+      description = "System manager module version";
+    };
     # Version-Info ist immer verfügbar (Core)
     enableVersionChecker = lib.mkOption {
       type = lib.types.bool;

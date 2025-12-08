@@ -65,11 +65,6 @@ let
       
       feature=$(basename "$feature_dir")
       
-      # Skip .TEMPLATE
-      if [ "$feature" = ".TEMPLATE" ]; then
-        continue
-      fi
-      
       # Filter by --feature if specified
       if [ -n "$FEATURE_FILTER" ] && [ "$feature" != "$FEATURE_FILTER" ]; then
         continue

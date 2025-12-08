@@ -50,20 +50,6 @@ in {
         description = "Use dark theme";
       };
     };
-
-    keyboard = {
-      layout = lib.mkOption {
-        type = lib.types.str;
-        default = "us";
-        description = "Keyboard layout";
-      };
-
-      options = lib.mkOption {
-        type = lib.types.str;
-        default = "";
-        description = "Keyboard options";
-      };
-    };
   };
 }
 

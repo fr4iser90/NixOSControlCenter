@@ -12,6 +12,7 @@ Welcome to the complete documentation for NixOSControlCenter. This documentation
 ### 🏗️ [02. Architecture](./02_architecture/)
 - [System Overview](./02_architecture/overview.md)
 - [Component Architecture](./02_architecture/components.md)
+- [Module Architecture](./02_architecture/Architecture.md) - Core vs Features, Domain-Grouping, Module Tree
 - [Diagrams](./02_architecture/diagrams/)
 
 ### ⚡ [03. Features](./03_features/)

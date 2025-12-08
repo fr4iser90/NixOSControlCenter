@@ -69,8 +69,11 @@ in
       console.keyMap = if keyboardLayout != "" && keyboardLayout != "(unset)" 
                       then keyboardLayout 
                       else "us";
-      services.xserver = lib.mkIf (keyboardOptions != "") {
-        xkb.options = keyboardOptions;
+      services.xserver = {
+        xkb = {
+          layout = keyboardLayout;
+          options = keyboardOptions;
+        };
       };
     }
   ];

@@ -5,13 +5,12 @@ let
   metadata = import ./metadata.nix;
   
   # ⭐ AUTO-DISCOVERY: Automatically read all features from directory
-  # Excludes: .TEMPLATE (template directory, not a feature)
   # Note: system-updater is now in core/, not features/
   allFeatureDirs = builtins.readDir ./.;
   featureModuleMap = lib.mapAttrs' (name: type:
     lib.nameValuePair name (./. + "/${name}")
   ) (lib.filterAttrs (name: type: 
-    type == "directory" && name != ".TEMPLATE"
+    type == "directory"
   ) allFeatureDirs);
   
   # Check if homelab-manager should be auto-activated

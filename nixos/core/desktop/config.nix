@@ -1,6 +1,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 let
   cfg = systemConfig.desktop or {};
+  locCfg = systemConfig.localization or {};
   # CRITICAL: Use absolute path to deployed location, not relative (which resolves to store)
   userConfigFile = "/etc/nixos/core/desktop/user-configs/desktop-config.nix";
   symlinkPath = "/etc/nixos/configs/desktop-config.nix";
@@ -19,13 +20,13 @@ let
     theme = {
       dark = true;
     };
-    keyboard = {
-      layout = "us";
-      options = "";
-    };
   };
 }
 '';
+  
+  # Use keyboard settings from localization module
+  keyboardLayout = locCfg.keyboardLayout or "us";
+  keyboardOptions = locCfg.keyboardOptions or "";
 in
 {
   config = lib.mkMerge [
@@ -38,19 +39,12 @@ in
     (lib.mkIf (cfg.enable or false) {
       environment = {
         variables = {
-          XKB_DEFAULT_LAYOUT = cfg.keyboard.layout or "us";
-          XKB_DEFAULT_OPTIONS = cfg.keyboard.options or "";
+          XKB_DEFAULT_LAYOUT = keyboardLayout;
+          XKB_DEFAULT_OPTIONS = keyboardOptions;
         };
         sessionVariables = {
-          XKB_DEFAULT_LAYOUT = cfg.keyboard.layout or "us";
-          XKB_DEFAULT_OPTIONS = cfg.keyboard.options or "";
-        };
-      };
-
-      services.xserver = {
-        xkb = {
-          layout = cfg.keyboard.layout or "us";
-          options = cfg.keyboard.options or "";
+          XKB_DEFAULT_LAYOUT = keyboardLayout;
+          XKB_DEFAULT_OPTIONS = keyboardOptions;
         };
       };
 

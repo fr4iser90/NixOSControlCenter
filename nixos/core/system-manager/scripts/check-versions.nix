@@ -106,11 +106,6 @@ let
       
       feature=$(basename "$feature_dir")
       
-      # Skip .TEMPLATE
-      if [ "$feature" = ".TEMPLATE" ]; then
-        continue
-      fi
-      
       # Get installed version from config
       INSTALLED=$(${pkgs.nix}/bin/nix-instantiate --eval --strict -E "
         (import <nixpkgs/nixos> { configuration = {}; }).config.features.$feature._version or \"unknown\"

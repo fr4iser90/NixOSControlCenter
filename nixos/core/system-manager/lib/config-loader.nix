@@ -5,59 +5,43 @@
 let
   # Helper function to load config if it exists and is valid
   # configsDir must be a path (not a string)
+  # Loads directly from module user-configs/ (real files), not from /configs/ (symlinks)
   loadConfig = configName: configsDir:
     let
-      # Config file name: ${configName}-config.nix
       configFileName = "${configName}-config.nix";
       
-      # Check if configsDir is absolute - if so, skip central /configs/ path in pure mode
-      # The central path points to /etc/nixos/configs/ which contains symlinks to /etc
-      # In pure mode, we can only access files in the flake source (module paths)
-      isAbsolutePath = 
-        let
-          checkResult = builtins.tryEval (
-            let
-              configsDirStr = toString configsDir;
-            in
-              builtins.substring 0 1 configsDirStr == "/"
-          );
-        in
-          if checkResult.success then checkResult.value else true; # Assume absolute if check fails
+      # Search paths in order of priority - load directly from module user-configs/
+      # Special cases: features-config.nix is in system-manager, packages-config.nix is in packages/
+      modulePaths = [
+        # Standard: Modul-Name = Config-Name (z.B. hardware-config.nix in hardware/)
+        (configsDir + "/core/${configName}/user-configs/${configFileName}")
+        # Features can also be in features/ modules
+        (configsDir + "/features/${configName}/user-configs/${configFileName}")
+        # Sonderfall: features-config.nix liegt in system-manager
+        (configsDir + "/core/system-manager/user-configs/${configFileName}")
+        # Sonderfall: packages-config.nix liegt in packages/
+        (configsDir + "/packages/user-configs/${configFileName}")
+      ];
       
-      # Build paths lazily - wrap each path creation in tryEval to handle pure mode
-      # This avoids path realization errors when configsDir is absolute
-      buildPath = subpath:
-        let
-          result = builtins.tryEval (configsDir + subpath);
-        in
-          if result.success then result.value else null;
-    
-      deployedConfigPath = builtins.tryEval (/etc/nixos/configs/${configFileName});
-      
-      # Check if deployed config exists and is valid
+      # Check if config file is valid (not empty, starts with '{')
       isValidConfig = path:
         let
-          # Check path existence - this can fail in pure mode for absolute paths
           pathExistsResult = builtins.tryEval (builtins.pathExists path);
           pathExists = if pathExistsResult.success then pathExistsResult.value else false;
-          
-          # If path exists, try to read and validate it
-          checkResult = if !pathExists
-            then { success = true; value = false; }
-            else builtins.tryEval (
-              let
-                content = builtins.readFile path;
-                trimmed = builtins.replaceStrings [" " "\n" "\t" "\r"] ["" "" "" ""] content;
-              in
-                builtins.stringLength trimmed >= 2 && builtins.substring 0 1 trimmed == "{"
-            );
         in
-          if checkResult.success then checkResult.value else false;
+          if !pathExists
+          then false
+          else
+            let
+              contentResult = builtins.tryEval (builtins.readFile path);
+              content = if contentResult.success then contentResult.value else "";
+              trimmed = builtins.replaceStrings [" " "\n" "\t" "\r"] ["" "" "" ""] content;
+            in
+              builtins.stringLength trimmed >= 2 && builtins.substring 0 1 trimmed == "{";
       
-      # ONLY use deployed config if it exists and is valid
-      configPath = if deployedConfigPath.success && isValidConfig deployedConfigPath.value
-                   then deployedConfigPath.value
-                   else null;
+      # Find first existing and valid config file
+      validPaths = builtins.filter isValidConfig modulePaths;
+      configPath = if builtins.length validPaths > 0 then builtins.head validPaths else null;
     in
       if configPath != null
       then
@@ -102,29 +86,14 @@ in
   # Usage: loadSystemConfig configsDir systemConfigPath
   loadSystemConfig = configsDir: systemConfigPath:
     let
-      # Wrap entire function in tryEval to handle pure mode restrictions
-      # If configsDir is absolute (like /etc/nixos), path operations will fail in pure mode
-      result = builtins.tryEval (
-        let
-          # 1. Load minimal system-config (MUST exist)
-          # If old structure: contains all values, will be overridden by optional configs
-          baseConfig = import systemConfigPath;
-          
-          # 2. Load and merge all optional configs
-          # Order is important: later configs override earlier ones
-          # Wrap loadConfig in tryEval to handle pure mode restrictions
-          safeLoadConfig = configName: 
-            let
-              configResult = builtins.tryEval (loadConfig configName configsDir);
-            in
-              if configResult.success then configResult.value else {};
-          mergedConfig = baseConfig // builtins.foldl' (acc: configName: acc // safeLoadConfig configName) {} optionalConfigs;
-        in
-          mergedConfig
-      );
+      # 1. Load minimal system-config (MUST exist)
+      baseConfig = import systemConfigPath;
+      
+      # 2. Load and merge all optional configs
+      # Order is important: later configs override earlier ones
+      mergedConfig = baseConfig // builtins.foldl' (acc: configName: acc // loadConfig configName configsDir) {} optionalConfigs;
     in
-      # If loading fails (pure mode with absolute paths), return only base config
-      if result.success then result.value else (import systemConfigPath);
+      mergedConfig;
   
   # Get list of optional configs (for reference)
   inherit optionalConfigs;
