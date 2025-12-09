@@ -18,11 +18,11 @@ rec {
     fi
   '';
   
-  # Extrahiere Version aus user-configs/*-config.nix (TARGET)
+  # Extrahiere Version aus *-config.nix (TARGET)
   # Gibt Bash-Script zurück, das Version ausgibt
   getTargetVersionScript = modulePath: configName: ''
-    # Extrahiere Version aus user-configs/*-config.nix
-    CONFIG_FILE="${toString modulePath}/user-configs/${configName}-config.nix"
+    # Extrahiere Version aus *-config.nix
+    CONFIG_FILE="${toString modulePath}/${configName}-config.nix"
     if [ -f "$CONFIG_FILE" ]; then
       # Grep: _version = "X.Y"
       VERSION=$(grep -m 1 '_version =' "$CONFIG_FILE" 2>/dev/null | sed 's/.*_version = "\([^"]*\)".*/\1/' || echo "unknown")
@@ -57,9 +57,9 @@ rec {
       exit 0
     fi
     
-    # Prüfe ob TARGET user-configs/ hat
-    if [ ! -f "${toString targetModule}/user-configs/${moduleName}-config.nix" ]; then
-      # TARGET hat keine user-configs/ → Migration nötig (erstelle Default)
+    # Prüfe ob TARGET config file hat
+    if [ ! -f "${toString targetModule}/${moduleName}-config.nix" ]; then
+      # TARGET hat keine config file → Migration nötig (erstelle Default)
       exit 0
     fi
     

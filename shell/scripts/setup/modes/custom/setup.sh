@@ -232,10 +232,10 @@ detect_and_setup_docker_users() {
         return 0
     fi
     
-    # Check if Swarm is configured (check for homelab-manager feature or homelab block)
+    # Check if Swarm is configured (check for homelab feature in individual config)
     local swarm_role="none"
-    local features_config="$(dirname "$SYSTEM_CONFIG_FILE")/configs/features-config.nix"
-    if [[ -f "$features_config" ]] && grep -q "homelab-manager.*=.*true" "$features_config" 2>/dev/null; then
+    local homelab_config="$(dirname "$SYSTEM_CONFIG_FILE")/configs/homelab-config.nix"
+    if [[ -f "$homelab_config" ]] && grep -q "homelab.*=.*true" "$homelab_config" 2>/dev/null; then
         # Check if homelab block exists with swarm
         if [[ -f "$SYSTEM_CONFIG_FILE" ]] && grep -q "homelab" "$SYSTEM_CONFIG_FILE" 2>/dev/null; then
             if grep -q 'role = "manager"' "$SYSTEM_CONFIG_FILE" 2>/dev/null; then

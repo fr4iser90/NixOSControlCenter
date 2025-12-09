@@ -5,7 +5,7 @@ with lib;
 let
   cfg = systemConfig.system.localization or {};
   # CRITICAL: Use absolute path to deployed location, not relative (which resolves to store)
-  userConfigFile = "/etc/nixos/core/localization/user-configs/localization-config.nix";
+  userConfigFile = "/etc/nixos/core/system/localization/localization-config.nix";
   symlinkPath = "/etc/nixos/configs/localization-config.nix";
   configHelpers = config.core.management.system-manager.api.configHelpers;
   defaultConfig = ''

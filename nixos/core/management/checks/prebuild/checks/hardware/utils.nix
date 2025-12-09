@@ -20,7 +20,7 @@
       new_value="$3"
       
       # CRITICAL: If config_file is a symlink, resolve to real file
-      # Symlinks point to user-configs/ which are writable
+      # Symlinks point to module directories which are writable
       if [ -L "$config_file" ]; then
         REAL_FILE=$(readlink -f "$config_file" 2>/dev/null || echo "$config_file")
         if [ -n "$REAL_FILE" ] && [ "$REAL_FILE" != "$config_file" ]; then

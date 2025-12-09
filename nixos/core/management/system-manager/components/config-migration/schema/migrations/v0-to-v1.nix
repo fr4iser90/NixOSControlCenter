@@ -1,0 +1,121 @@
+{ lib, ... }:
+
+{
+  # Migrations-Plan von v0 zu v1.0
+  # Definiert WIE migriert wird - komplett Schema-basiert!
+  
+  # Felder die in system-config.nix bleiben (required fields für v1.0)
+  fieldsToKeep = [
+    "systemType"
+    "hostName"
+    "system"
+    "allowUnfree"
+    "users"
+    "timeZone"
+  ];
+  
+  # Felder die in separate Config-Dateien migriert werden
+  fieldsToMigrate = {
+    "desktop" = {
+      targetFile = "configs/desktop-config.nix";
+      structure = {
+        desktop = {
+          enable = "desktop.enable";
+          environment = "desktop.environment";
+          display = {
+            manager = "desktop.display.manager";
+            server = "desktop.display.server";
+            session = "desktop.display.session";
+          };
+          theme = {
+            dark = "desktop.theme.dark";
+          };
+          # audio wurde aus Desktop entfernt → eigenes Modul
+        };
+      };
+    };
+    
+    "hardware" = {
+      targetFile = "configs/hardware-config.nix";
+      structure = {
+        hardware = {
+          cpu = "hardware.cpu";
+          gpu = "hardware.gpu";
+          ram = {
+            sizeGB = "hardware.ram.sizeGB";  # Falls vorhanden
+          };
+        };
+      };
+      # Feld-Mappings (v0 -> v1.0)
+      fieldMappings = {
+        "hardware.memory.sizeGB" = "hardware.ram.sizeGB";
+      };
+    };
+    
+    # Features are now in individual config files (no more features-config.nix)
+    # Each feature creates its own config file in configs/
+    "features" = {
+      # Removed - features are now handled individually in their own config files
+      # This migration is kept for backwards compatibility but doesn't create files
+      skipMigration = true;
+    };
+    
+    "packageModules" = {
+      targetFile = "configs/packages-config.nix";
+      structure = {
+        packageModules = "packageModules";
+        preset = "preset";
+        additionalPackageModules = "additionalPackageModules";
+      };
+      # Spezielle Konvertierung: Attrset -> Array (wird in Migration behandelt)
+      conversion = "attrset-to-array";
+    };
+    
+    "locales" = {
+      targetFile = "configs/localization-config.nix";
+      structure = {
+        locales = "locales";
+        keyboardLayout = "keyboardLayout";
+        keyboardOptions = "keyboardOptions";
+      };
+    };
+    
+    "email" = {
+      targetFile = "configs/hosting-config.nix";
+      structure = {
+        email = "email";
+        domain = "domain";
+        certEmail = "certEmail";
+      };
+    };
+    
+    "overrides" = {
+      targetFile = "configs/overrides-config.nix";
+      structure = {
+        overrides = {
+          enableSSH = "overrides.enableSSH";
+          # enableSteam removed: Steam is now enabled via the "gaming" package feature
+        };
+      };
+    };
+    
+    "buildLogLevel" = {
+      targetFile = "configs/logging-config.nix";
+      structure = {
+        buildLogLevel = "buildLogLevel";
+      };
+    };
+    
+    "enableFirewall" = {
+      targetFile = "configs/network-config.nix";
+      structure = {
+        enableFirewall = "enableFirewall";
+        enablePowersave = "enablePowersave";
+        networkManager = {
+          dns = "networkManager.dns";
+        };
+      };
+    };
+  };
+}
+

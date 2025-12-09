@@ -15,11 +15,14 @@ let
     "systemd-boot" = import ./providers/systemd-boot.nix { inherit config lib pkgs; };
   };
   
-  selectedProvider = providers.${config.boot.loader.systemd-boot.enable} or providers."systemd-boot";
+  selectedProvider = if config.boot.loader.systemd-boot.enable then providers."systemd-boot"
+                     else if config.boot.loader.grub.enable then providers.grub
+                     else providers."systemd-boot";  # Default fallback
 
 in {
   imports = [
     ./options.nix
+    ./config.nix
   ];
 
   config = mkMerge [
@@ -39,5 +42,6 @@ in {
       selectedProvider.scripts.renameEntry
       selectedProvider.scripts.resetEntry
     ];
-  };
+    })
+  ];
 }

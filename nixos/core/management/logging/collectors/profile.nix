@@ -24,23 +24,23 @@ let
       throw "Unknown system type: ${systemConfig.systemType}";
 
   # Standard report shows basic system info
-  standardReport = ''
+  infoReport = ''
     ${ui.text.header "Profile Configuration"}
     ${ui.tables.keyValue "System Type" systemInfo.systemType}
     ${ui.tables.keyValue "Desktop" systemInfo.desktop}
   '';
 
   # Detailed report adds desktop status and module path
-  detailedReport = ''
-    ${standardReport}
+  debugReport = ''
+    ${infoReport}
     ${ui.tables.keyValue "Has Desktop" (toString systemInfo.hasDesktop)}
     ${ui.tables.keyValue "Profile Module" (baseNameOf profileModule)}
   '';
 
 in {
   # Minimal level shows nothing
-  collect = 
-    if currentLevel >= reportLevels.detailed then detailedReport
-    else if currentLevel >= reportLevels.standard then standardReport
+  collect =
+    if currentLevel >= reportLevels.debug then debugReport
+    else if currentLevel >= reportLevels.info then infoReport
     else "";
 }

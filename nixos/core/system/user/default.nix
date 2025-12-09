@@ -74,7 +74,11 @@ let
   };
 
 in {
-  imports = [ ./password-manager.nix ];
+  imports = [
+    ./options.nix
+    ./config.nix
+    ./password-manager.nix
+  ];
   
   # Aktiviere Passwort-Management
   security.passwordManagement.enable = true;

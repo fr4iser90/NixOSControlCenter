@@ -12,8 +12,8 @@ deploy_config() {
         # Check if homelab block exists or homelab-manager feature is enabled
         if grep -q "homelab" "$SYSTEM_CONFIG_FILE" || \
            grep -q "homelab-manager.*=.*true" "$SYSTEM_CONFIG_FILE" 2>/dev/null || \
-           [[ -f "$(dirname "$SYSTEM_CONFIG_FILE")/configs/features-config.nix" ]] && \
-           grep -q "homelab-manager.*=.*true" "$(dirname "$SYSTEM_CONFIG_FILE")/configs/features-config.nix" 2>/dev/null; then
+           [[ -f "$(dirname "$SYSTEM_CONFIG_FILE")/configs/homelab-config.nix" ]] && \
+           grep -q "homelab.*=.*true" "$(dirname "$SYSTEM_CONFIG_FILE")/configs/homelab-config.nix" 2>/dev/null; then
             has_homelab=true
         fi
     fi

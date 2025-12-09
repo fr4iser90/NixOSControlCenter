@@ -3,7 +3,7 @@ let
   cfg = systemConfig.system.desktop or {};
   locCfg = systemConfig.system.localization or {};
   # CRITICAL: Use absolute path to deployed location, not relative (which resolves to store)
-  userConfigFile = "/etc/nixos/core/desktop/user-configs/desktop-config.nix";
+  userConfigFile = "/etc/nixos/core/system/desktop/desktop-config.nix";
   symlinkPath = "/etc/nixos/configs/desktop-config.nix";
   # Use API (like cli-formatter.api)
   configHelpers = config.core.management.system-manager.api.configHelpers;

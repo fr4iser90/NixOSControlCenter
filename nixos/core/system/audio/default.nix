@@ -5,7 +5,7 @@ in {
   imports = [
     ./options.nix
   ] ++ (if (cfg.enable or false) && (cfg.system or "none") != "none" then [
-    (./. + "/${cfg.system}.nix")
+    (./providers + "/${cfg.system}.nix")
     ./config.nix
   ] else [
     ./config.nix

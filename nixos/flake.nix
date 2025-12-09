@@ -21,6 +21,7 @@
     
     # Import config loader from system-manager
     # This centralizes config loading logic - can be used by both flake.nix and system-manager module
+    # Note: lib is not available yet at this point, so config-loader must work without it
     configLoader = import ./core/management/system-manager/lib/config-loader.nix {};
     
     # Load and merge all configs using centralized loader
@@ -52,7 +53,6 @@
     systemModules = [
       ./hardware-configuration.nix
       ./core
-      ./packages
       ./features
       ./custom
     ];

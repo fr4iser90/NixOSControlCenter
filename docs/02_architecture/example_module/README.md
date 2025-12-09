@@ -59,7 +59,7 @@ cp -r docs/02_architecture/example_module nixos/core/audio/my-new-module
    - Change command names and scripts
    - Update command metadata
 
-6. **Update `user-configs/example-module-config.nix`:**
+6. **Update `example-module-config.nix`:**
    - Rename file to match your module name
    - Update config structure
 
@@ -73,7 +73,7 @@ example-module/
 ├── commands.nix         # Command registration (features only)
 ├── types.nix            # Custom types (optional)
 ├── systemd.nix          # Systemd services (optional)
-├── user-configs/        # User-editable configs
+├── example-module-config.nix  # User-editable config
 ├── scripts/             # CLI entry points
 ├── handlers/            # Orchestration layer
 ├── collectors/          # Data gathering

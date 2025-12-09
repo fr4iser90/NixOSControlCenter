@@ -9,7 +9,11 @@ let
   };
 
 in {
-  imports = [ bootloaders.${systemConfig.system.bootloader} or bootloaders.systemd-boot ];
+  imports = [
+    ./options.nix
+    ./config.nix
+    (bootloaders.${systemConfig.system.bootloader} or bootloaders.systemd-boot)
+  ];
 
   # Common boot configuration
   boot = {

@@ -9,10 +9,7 @@ let
   # API definition - always available
   # Pass backupHelpers to configHelpers so it can use it
   configHelpers = import ./lib/config-helpers.nix { inherit pkgs lib; backupHelpers = backupHelpers; };
-  apiValue = {
-    configHelpers = configHelpers;
-    backupHelpers = backupHelpers;
-  };
+  apiValue = configHelpers // backupHelpers;
 in {
   imports = [
     ./options.nix

@@ -10,7 +10,7 @@ let
   
   # Import handlers to get their scripts and commands
   systemUpdateHandler = import ./handlers/system-update.nix { inherit config lib pkgs systemConfig; };
-  featureManagerHandler = import ./handlers/feature-manager.nix { inherit config lib pkgs systemConfig; };
+  # Module-manager commands werden automatisch über das module-manager Modul registriert
   channelManagerHandler = import ./handlers/channel-manager.nix { inherit config lib pkgs systemConfig; };
   desktopManagerHandler = import ./handlers/desktop-manager.nix { inherit config lib pkgs systemConfig; };
   
@@ -38,13 +38,13 @@ in {
         configValidator.validateSystemConfig
       ] ++
       (systemUpdateHandler.config.environment.systemPackages or []) ++
-      (featureManagerHandler.config.environment.systemPackages or []) ++
+      # Module-manager packages werden automatisch registriert
       (channelManagerHandler.config.environment.systemPackages or []) ++
       (desktopManagerHandler.config.environment.systemPackages or []);
     
     core.command-center.commands = 
       (systemUpdateHandler.config.core.command-center.commands or []) ++
-      (featureManagerHandler.config.core.command-center.commands or []) ++
+      # Module-manager commands werden automatisch registriert
       (channelManagerHandler.config.core.command-center.commands or []) ++
       (desktopManagerHandler.config.core.command-center.commands or []) ++
       [
@@ -102,7 +102,7 @@ in {
             Migration Process:
             - Creates backup of current system-config.nix
             - Extracts config sections to separate files in configs/:
-              * features → configs/features-config.nix
+              * features → configs/module-manager-config.nix
               * desktop → configs/desktop-config.nix
               * hardware → configs/hardware-config.nix
               * network → configs/network-config.nix

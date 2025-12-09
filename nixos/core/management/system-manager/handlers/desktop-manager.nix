@@ -4,7 +4,7 @@ with lib;
 
 let
   ui = config.core.cli-formatter.api;
-  commandCenter = config.core.command-center;
+  commandCenter = systemConfig.command-center;
   hostname = systemConfig.hostName;
   desktopConfigPath = "/etc/nixos/configs/desktop-config.nix";
 
@@ -86,6 +86,7 @@ EOF
     echo "Desktop configuration updated successfully!"
   '';
 
+in {
 in {
   config = {
     environment.systemPackages = [ enableDesktopScript updateDesktopConfig ];

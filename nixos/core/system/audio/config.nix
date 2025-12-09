@@ -2,7 +2,7 @@
 let
   cfg = systemConfig.system.audio or {};
   # CRITICAL: Use absolute path to deployed location, not relative (which resolves to store)
-  userConfigFile = "/etc/nixos/core/audio/user-configs/audio-config.nix";
+  userConfigFile = "/etc/nixos/core/system/audio/audio-config.nix";
   symlinkPath = "/etc/nixos/configs/audio-config.nix";
   # Use API (like cli-formatter.api)
   configHelpers = config.core.management.system-manager.api.configHelpers;

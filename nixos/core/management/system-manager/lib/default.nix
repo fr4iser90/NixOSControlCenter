@@ -12,3 +12,4 @@ rec {
   backup-helpers = import ./backup-helpers.nix;
 }
 
+config-migration = import ./config-migration/default.nix;

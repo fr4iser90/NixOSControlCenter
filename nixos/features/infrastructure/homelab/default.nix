@@ -40,6 +40,7 @@ let
 in {
   imports = [
     ./options.nix
+    ./config.nix
   ] ++ (if hasDockerUser then [
     ./homelab-create.nix
     ./homelab-fetch.nix

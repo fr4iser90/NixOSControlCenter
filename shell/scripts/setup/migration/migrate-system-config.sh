@@ -488,62 +488,32 @@ EOF
     log_success "hardware-config.nix created"
 }
 
-# Create features-config.nix
+# Create features-config.nix - DEPRECATED
+# Features now have individual config files (bootentry-config.nix, homelab-config.nix, etc.)
+# This function is kept for backwards compatibility but should not be used
 create_features_config() {
     local configs_dir="$1"
     local json="$2"
-    
-    local system_logger="false"
-    local system_checks="false"
-    local system_updater="false"
-    local ssh_client="false"
-    local ssh_server="false"
-    local bootentry="false"
-    local homelab="false"
-    local vm="false"
-    local ai="false"
-    
-    if command -v jq >/dev/null 2>&1; then
-        system_logger=$(echo "$json" | jq -r '.features."system-logger" // false')
-        system_checks=$(echo "$json" | jq -r '.features."system-checks" // false')
-        system_updater=$(echo "$json" | jq -r '.features."system-updater" // false')
-        ssh_client=$(echo "$json" | jq -r '.features."ssh-client-manager" // false')
-        ssh_server=$(echo "$json" | jq -r '.features."ssh-server-manager" // false')
-        bootentry=$(echo "$json" | jq -r '.features."bootentry-manager" // false')
-        homelab=$(echo "$json" | jq -r '.features."homelab-manager" // false')
-        vm=$(echo "$json" | jq -r '.features."vm-manager" // false')
-        ai=$(echo "$json" | jq -r '.features."ai-workspace" // false')
-    else
-        # Fallback: Extract from Nix file directly
-        local config_file="${SYSTEM_CONFIG_FILE:-/etc/nixos/system-config.nix}"
-        system_logger=$(grep -o 'system-logger.*=.*[^;]*' "$config_file" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo "false")
-        system_checks=$(grep -o 'system-checks.*=.*[^;]*' "$config_file" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo "false")
-        system_updater=$(grep -o 'system-updater.*=.*[^;]*' "$config_file" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo "false")
-        ssh_client=$(grep -o 'ssh-client-manager.*=.*[^;]*' "$config_file" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo "false")
-        ssh_server=$(grep -o 'ssh-server-manager.*=.*[^;]*' "$config_file" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo "false")
-        bootentry=$(grep -o 'bootentry-manager.*=.*[^;]*' "$config_file" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo "false")
-        homelab=$(grep -o 'homelab-manager.*=.*[^;]*' "$config_file" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo "false")
-        vm=$(grep -o 'vm-manager.*=.*[^;]*' "$config_file" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo "false")
-        ai=$(grep -o 'ai-workspace.*=.*[^;]*' "$config_file" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo "false")
-    fi
-    
+
+    log_warning "create_features_config() is deprecated. Features now use individual config files."
+    log_warning "Use create_feature_config() for specific features instead."
+
+    # Create empty deprecated file for backwards compatibility
     cat > "$configs_dir/features-config.nix" <<EOF
+# DEPRECATED: This file is no longer used.
+# Features now have individual config files:
+# - bootentry-config.nix
+# - homelab-config.nix
+# - lock-config.nix
+# etc.
 {
   features = {
-    system-logger = $system_logger;
-    system-checks = $system_checks;
-    system-updater = $system_updater;
-    ssh-client-manager = $ssh_client;
-    ssh-server-manager = $ssh_server;
-    bootentry-manager = $bootentry;
-    homelab-manager = $homelab;
-    vm-manager = $vm;
-    ai-workspace = $ai;
+    # This file is deprecated - use individual feature config files instead
   };
 }
 EOF
-    
-    log_success "features-config.nix created"
+
+    log_warning "Created deprecated features-config.nix - migrate to individual feature configs"
 }
 
 # Create packages-config.nix

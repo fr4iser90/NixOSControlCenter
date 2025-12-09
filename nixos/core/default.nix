@@ -10,14 +10,14 @@
     ./system/user
     ./system/desktop
     ./system/audio
+    ./system/packages
     # Infrastructure
     ./infrastructure/cli-formatter 
     ./infrastructure/command-center
     ./infrastructure/config
-    # Module Management
-    ./module-management/module-manager
     # Management
     ./management/system-manager
+    ./management/module-manager
     ./management/checks
     ./management/logging
   ];

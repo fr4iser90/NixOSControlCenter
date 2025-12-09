@@ -1,26 +1,14 @@
 { config, lib, pkgs, systemConfig, ... }:
-
-with lib;
-
 let
   cfg = systemConfig.management.checks or {};
 in {
+  # imports must be at top level
   imports = [
-    ./options.nix
-    ./prebuild
-    ./postbuild
-  ];
-
-  config = mkMerge [
-    {
-      systemConfig.management.checks.enable = mkDefault (systemConfig.management.checks.enable or false);
-    }
-    (mkIf cfg.enable {
-      environment.systemPackages = with pkgs; [
-        pciutils
-        usbutils
-        lshw
-      ];
-    })
-  ];
+    ./options.nix  # Always import options first
+    ./commands.nix # Command registration (always needed)
+  ] ++ (if (cfg.enable or true) then [
+    ./config.nix  # Implementation logic goes here
+  ] else [
+    ./config.nix  # Import even if disabled (for symlink management)
+  ]);
 }

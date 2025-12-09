@@ -50,7 +50,7 @@ let
     
     # Get features directory
     FEATURES_DIR="${toString ../../../../features}"
-    FEATURES_CONFIG="/etc/nixos/configs/features-config.nix"
+    FEATURES_CONFIG="/etc/nixos/configs/module-manager-config.nix"
     
     # Collect features that need updates
     FEATURES_TO_UPDATE=()
@@ -193,7 +193,7 @@ let
             fi
           fi
           
-          # Update version in features-config.nix
+          # Update version in module-manager-config.nix
           ${ui.messages.info "  Updating version to $to..."}
           # TODO: Implement proper config file update
           ${ui.messages.success "  Migration completed: $feature $from → $to"}

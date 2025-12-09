@@ -28,22 +28,22 @@ let
   '';
 
   # Standard report shows current boot entries
-  standardReport = ''
+  infoReport = ''
     ${ui.text.header "Boot Entries"}
     ${ui.text.subHeader "Current Entries:"}
     ${getBootEntries}
   '';
 
   # Detailed shows same as standard
-  detailedReport = standardReport;
+  debugReport = infoReport;
 
   # Full report shows just standard info
-  fullReport = standardReport;
+  traceReport = infoReport;
 
 in {
-  collect = 
-    if currentLevel >= reportLevels.full then fullReport
-    else if currentLevel >= reportLevels.detailed then detailedReport
-    else if currentLevel >= reportLevels.standard then standardReport
+  collect =
+    if currentLevel >= reportLevels.trace then traceReport
+    else if currentLevel >= reportLevels.debug then debugReport
+    else if currentLevel >= reportLevels.info then infoReport
     else "";  # Minimal level: show nothing
 }

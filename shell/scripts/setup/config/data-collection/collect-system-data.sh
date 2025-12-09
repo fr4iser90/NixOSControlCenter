@@ -227,30 +227,21 @@ init_hardware_config() {
     write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/hardware-config.nix" "$content"
 }
 
-# Create features-config.nix
+# Create features-config.nix - DEPRECATED
 init_features_config() {
-    log_debug "Creating features-config.nix..."
-    local system_logger="${SYSTEM_LOGGER:-true}"
-    local system_checks="${SYSTEM_CHECKS:-true}"
-    local system_updater="${SYSTEM_UPDATER:-true}"
-    local ssh_client="${SSH_CLIENT_MANAGER:-false}"
-    local ssh_server="${SSH_SERVER_MANAGER:-false}"
-    local bootentry="${BOOTENTRY_MANAGER:-false}"
-    local homelab="${HOMELAB_MANAGER:-false}"
-    local vm="${VM_MANAGER:-false}"
-    local ai="${AI_WORKSPACE:-false}"
-    
+    log_warning "init_features_config() is deprecated. Features now use individual config files."
+    log_warning "Use individual feature config functions instead."
+
+    # Create deprecated marker file
     write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/features-config.nix" "{
+  # DEPRECATED: This file is no longer used.
+  # Features now have individual config files:
+  # - bootentry-config.nix
+  # - homelab-config.nix
+  # - lock-config.nix
+  # etc.
   features = {
-    system-logger = $system_logger;
-    system-checks = $system_checks;
-    system-updater = $system_updater;
-    ssh-client-manager = $ssh_client;
-    ssh-server-manager = $ssh_server;
-    bootentry-manager = $bootentry;
-    homelab-manager = $homelab;
-    vm-manager = $vm;
-    ai-workspace = $ai;
+    # This file is deprecated - use individual feature config files instead
   };
 }
 "

@@ -63,10 +63,10 @@ The System Update functionality manages the deployment and update process of the
    **`core/` and `features/` directories** (in COPY_ITEMS):
    - Module-by-module update (NEVER `rm -rf` entire directory)
    - For each module individually:
-     - Preserves `user-configs/` directories (NEVER overwritten)
-     - Updates module code (everything except `user-configs/`)
+     - Preserves config files (NEVER overwritten)
+     - Updates module code (everything except config files)
      - Handles version migrations if needed
-     - Uses `rsync --exclude='user-configs'` or `find` to exclude `user-configs/`
+     - Config files are now directly in module directories
    
    **Other directories** (`packages/`, `desktop/`, etc.):
    - Completely overwritten (`rm -rf` then copy)
@@ -94,11 +94,11 @@ The System Update functionality manages the deployment and update process of the
 - `flake.lock` - Generated lock file
 - `configs/` directory - User-editable configs (protected by safety check, but NOT copied)
 - `custom/` directory - User custom modules (if exists in target)
-- `user-configs/` in modules - User configs within modules (NEVER touched)
+- Config files in modules - User configs within modules (NEVER touched)
 
 **ALWAYS Overwritten**:
 - `flake.nix` - Updated with repository version
-- Module code files (everything except `user-configs/`)
+- Module code files (everything except config files)
 - Other directories (`packages/`, `desktop/`, etc.)
 
 **Conditionally Copied**:
@@ -122,10 +122,10 @@ The System Update functionality manages the deployment and update process of the
 3. `flake.nix` calls: `configLoader.loadSystemConfig ./. ./system-config.nix`
    - `./` = `/etc/nixos/` (current working directory during build)
 4. Config loader searches in this order (ONLY deployed files in `/etc/nixos/`, NEVER repository files):
-   - **First**: `/etc/nixos/configs/features-config.nix` (central config - HIGHEST PRIORITY)
-     - This is a symlink pointing to the actual file in module user-configs/
-     - User edits this file for easy access to all configs in one place
-   - **Second**: `/etc/nixos/core/system-manager/user-configs/features-config.nix` (module config - FALLBACK)
+   - **First**: `/etc/nixos/configs/module-manager-config.nix` (central config - HIGHEST PRIORITY)
+    - This is a symlink pointing to the actual file in module directory
+    - User edits this file for easy access to all configs in one place
+   - **Second**: `/etc/nixos/core/module-management/module-manager/module-manager-config.nix` (module config - FALLBACK)
      - Actual file location (target of symlink)
      - Used if central symlink doesn't exist or is broken
    - **If nothing found**: Returns `{}` (empty attribute set)
@@ -136,19 +136,19 @@ The System Update functionality manages the deployment and update process of the
 
 ### After Build (Activation Scripts)
 
-- **Symlinks are created**: `/etc/nixos/configs/<config-name>.nix` → `/etc/nixos/core/<module>/user-configs/<config-name>.nix`
+- **Symlinks are created**: `/etc/nixos/configs/<config-name>.nix` → `/etc/nixos/core/<module>/<config-name>.nix`
 - **When**: During system activation (AFTER build, via `system.activationScripts`)
 - **Who**: Each module creates its own symlink via `configHelpers.setupConfigFile`
 - **Purpose**: Central location for ALL user-editable configs
 - **Why**: End users can quickly find and edit ALL configurable options in ONE place (`/etc/nixos/configs/`)
 - User edits files in `/etc/nixos/configs/` (central location)
-- Changes are written to actual files in `user-configs/` directories (via symlink)
+- Changes are written to actual files in module directories (via symlink)
 - **Available configs in `/etc/nixos/configs/`**:
   - `desktop-config.nix` - Desktop environment settings
   - `audio-config.nix` - Audio configuration
   - `localization-config.nix` - Locale, keyboard, timezone
   - `hardware-config.nix` - CPU, GPU, RAM settings
-  - `features-config.nix` - Enable/disable features (system-logger, ssh-client-manager, etc.)
+  - `module-manager-config.nix` - Enable/disable features (system-logger, ssh-client-manager, etc.)
   - `packages-config.nix` - Package management
   - `network-config.nix` - Network settings
   - `security-config.nix` - Security settings
@@ -163,15 +163,15 @@ The System Update functionality manages the deployment and update process of the
    - **If versioned**:
      - Compare versions (source vs target)
      - If versions differ: Run migration (if implemented)
-     - Update module code (everything except `user-configs/`)
-     - `user-configs/` remains untouched
+     - Update module code (everything except config files)
+     - Config files remain untouched
    - **If not versioned**:
      - Check if target module exists
      - If exists: Run Stage 0 → 1 migration (extract config from `system-config.nix`)
      - If not: Copy completely
 
-2. **`user-configs/` Protection**:
-   - `user-configs/` directories are **NEVER overwritten**
+2. **Config File Protection**:
+   - Config files are **NEVER overwritten**
    - Only module code is updated
    - User configs remain untouched
 
@@ -188,11 +188,11 @@ The System Update functionality manages the deployment and update process of the
 3. **Build Location**: 
    - When `nixos-rebuild` runs, it evaluates from `/etc/nixos/`
    - Config loader searches in `/etc/nixos/configs/` **FIRST**
-   - Then searches in `/etc/nixos/core/<module>/user-configs/` and `/etc/nixos/features/<module>/user-configs/`
+   - Then searches in `/etc/nixos/core/<module>/` and `/etc/nixos/features/<module>/`
    - **Repository files are NEVER loaded, not even as fallback**
 
 4. **Repository Files**: 
-   - Repository `user-configs/` files are **DEFAULT templates**
+   - Repository config files are **DEFAULT templates**
    - They are copied during initial deployment to `/etc/nixos/`
    - After deployment, **ONLY** deployed files in `/etc/nixos/` are used
    - Repository files are **NEVER** accessed during build

@@ -1,22 +1,26 @@
 # Module Template
 
-This template defines the recommended structure for **all** NixOS Control Center modules, including:
-- **Core modules** (`nixos/core/`) - System-level modules (desktop, hardware, network, etc.)
-- **Feature modules** (`nixos/features/`) - Optional feature modules (system-lock, vm-manager, etc.)
+This template defines the recommended structure for **all** NixOS Control Center modules in our unified architecture:
+
+- **Core System modules** (`systemConfig.core.system.*`) - Core OS functionality (enable = true default)
+- **Core Management modules** (`systemConfig.core.management.*`) - System management tools (enable = true default)
+- **Core Infrastructure modules** (`systemConfig.core.infrastructure.*`) - Core infrastructure (enable = true default)
+- **Feature Infrastructure modules** (`systemConfig.features.infrastructure.*`) - Infrastructure features (enable = false default)
+- **Feature Security modules** (`systemConfig.features.security.*`) - Security features (enable = false default)
+- **Feature Specialized modules** (`systemConfig.features.specialized.*`) - Specialized features (enable = false default)
 
 ## Directory Structure
 
 ```
-module-name/              # Module name
+module-name/               # Module name
 ├── README.md              # Module documentation and usage guide
 ├── default.nix            # Main module (imports all sub-modules)
 ├── options.nix            # All configuration options
 ├── types.nix              # Custom NixOS types (optional)
-├── commands.nix          # Command-Center registration (optional, for features)
+├── commands.nix           # Command-Center registration (optional)
 ├── systemd.nix            # Systemd services/timers (optional)
 ├── config.nix             # Module implementation (optional, split from default.nix if too large)
-├── user-configs/          # User-editable config files (optional)
-│   └── module-name-config.nix  # User config (symlinked to /etc/nixos/configs/)
+├── module-name-config.nix # User config (symlinked to /etc/nixos/configs/)
 ├── lib/                   # Shared utility functions
 │   ├── default.nix        # Library exports
 │   ├── utils.nix          # General utilities
@@ -30,36 +34,36 @@ module-name/              # Module name
 │   ├── handler-1.nix      # Handler implementation 1
 │   └── handler-2.nix      # Handler implementation 2
 ├── collectors/            # Data collection modules (optional)
-│   ├── collector-1.nix   # Collector implementation 1
-│   └── collector-2.nix   # Collector implementation 2
+│   ├── collector-1.nix    # Collector implementation 1
+│   └── collector-2.nix    # Collector implementation 2
 ├── processors/            # Data processing/transformation (optional)
-│   ├── processor-1.nix   # Processor implementation 1
-│   └── processor-2.nix   # Processor implementation 2
+│   ├── processor-1.nix    # Processor implementation 1
+│   └── processor-2.nix    # Processor implementation 2
 ├── validators/            # Input validation (optional)
-│   └── validator-1.nix   # Validator implementation
+│   └── validator-1.nix    # Validator implementation
 ├── formatters/            # Output formatting (optional)
-│   └── formatter-1.nix   # Formatter implementation
+│   └── formatter-1.nix    # Formatter implementation
 ├── adapters/              # Interface translation (optional)
-│   └── adapter-1.nix     # Adapter implementation
+│   └── adapter-1.nix      # Adapter implementation
 ├── parsers/               # Parsing logic (optional)
-│   └── parser-1.nix      # Parser implementation
+│   └── parser-1.nix       # Parser implementation
 ├── serializers/           # Serialization logic (optional)
-│   └── serializer-1.nix  # Serializer implementation
+│   └── serializer-1.nix   # Serializer implementation
 ├── migrations/            # Feature option migrations (optional)
-│   ├── v1.0-to-v1.1.nix  # Minor version migration
-│   ├── v1.0-to-v2.0.nix  # Major version migration
-│   └── v1.1-to-v2.0.nix  # Chain migration
+│   ├── v1.0-to-v1.1.nix   # Minor version migration
+│   ├── v1.0-to-v2.0.nix   # Major version migration
+│   └── v1.1-to-v2.0.nix   # Chain migration
 ├── builders/              # Build/construction logic (optional)
-│   └── builder-1.nix     # Builder implementation
+│   └── builder-1.nix      # Builder implementation
 ├── monitors/              # Monitoring logic (optional)
-│   └── monitor-1.nix     # Monitor implementation
+│   └── monitor-1.nix      # Monitor implementation
 ├── notifiers/             # Notification logic (optional)
-│   └── notifier-1.nix    # Notifier implementation
+│   └── notifier-1.nix     # Notifier implementation
 ├── providers/             # Provider implementations (semantic, optional)
 │   ├── provider-a.nix     # Provider A implementation
 │   └── provider-b.nix     # Provider B implementation
 └── tests/                 # Module tests (optional)
-    └── default.nix         # Test suite
+    └── default.nix        # Test suite
 ```
 
 ## Category Differences Explained
@@ -175,19 +179,18 @@ module-name/              # Module name
 - **Required**: **ALL modules** (core and features) must have `options.nix` with versioning
 - **Pattern**:
   ```nix
-  # For core modules
-  options.systemConfig.module-name = {
+  # ALL modules use the SAME namespace pattern
+  options.systemConfig.{top-level}.{domain}.module-name = {
     _version = lib.mkOption { ... };
     enable = lib.mkOption { ... };
     # ... other options
   };
-  
-  # For feature modules
-  options.features.module-name = {
-    _version = lib.mkOption { ... };
-    enable = lib.mkOption { ... };
-    # ... other options
-  };
+
+  # Examples:
+  # Core system module: options.systemConfig.core.system.audio
+  # Core management module: options.systemConfig.core.management.logging
+  # Core infrastructure module: options.systemConfig.core.infrastructure.cli-formatter
+  # Feature module: options.systemConfig.features.infrastructure.homelab
   ```
 
 ### `types.nix`
@@ -204,8 +207,8 @@ module-name/              # Module name
   - Create all executable scripts using `pkgs.writeShellScriptBin`
   - Register commands in `core.command-center.commands`
   - Define command metadata (name, description, category, help text)
-- **Critical**: Must be inside `mkIf cfg.enable` block (for features)!
-- **Note**: Usually only needed for feature modules that provide CLI commands
+- **Critical**: Should be inside `mkIf cfg.enable` block when module has enable option
+- **Note**: Needed for any module that provides CLI commands
 
 ### `systemd.nix`
 - **Purpose**: Systemd service and timer definitions
@@ -216,31 +219,51 @@ module-name/              # Module name
   - Activation scripts
 - **Optional**: Only needed if systemd integration is required
 
+### `module-name-config.nix`
+- **Purpose**: User-editable configuration file
+- **Responsibilities**:
+  - User options and choices (preferences, settings)
+  - Configuration values that users can edit
+  - Module-specific settings (not system-level logic)
+- **Important**: This is **user configuration** - what users want to configure
+- **Pattern**:
+  ```nix
+  {
+    module-name = {
+      enable = true;        # User choice: enable/disable this module
+      theme = "dark";       # User preference: visual theme
+      timeout = 30;         # User setting: operation timeout
+    };
+  }
+  ```
+- **Access**: Via `systemConfig.module-name` (or `systemConfig.features.module-name` for features)
+- **Symlink**: Automatically symlinked to `/etc/nixos/configs/module-name-config.nix` for easy editing
+
 ### `config.nix`
 - **Purpose**: Module implementation code (NixOS module configuration logic)
 - **Responsibilities**:
-  - **Symlink management**: Create/update symlinks to `user-configs/` files
+  - **Symlink management**: Create/update symlinks to `module-name-config.nix` file
   - **Default config creation**: Create default user config if missing
   - **System configuration**: NixOS module config (services, environment, etc.)
   - **Assertions**: Validation of configuration values
   - **Integration**: Integration with other NixOS modules
-- **When to use**: 
-  - **Always**: If module has `user-configs/` → symlink management goes here
+- **When to use**:
+  - **Always**: If module has `module-name-config.nix` → symlink management goes here
   - **Always**: If module has any system configuration → implementation goes here
   - **Rule**: If `default.nix` would contain `config = { ... }` → move it to `config.nix`
 - **Important**: This is **system configuration code** (NOT user-editable)
-- **Contains**: 
+- **Contains**:
   - Symlink management (`system.activationScripts`)
   - Default config creation
   - Implementation logic, system settings, NixOS module config
   - Assertions and validations
-- **NOT for**: User options/choices - those go in `user-configs/`
+- **NOT for**: User options/choices - those go in `module-name-config.nix`
 - **Pattern**:
   ```nix
   { config, lib, pkgs, systemConfig, ... }:
   let
     cfg = systemConfig.module-name or {};
-    userConfigFile = ./user-configs/module-name-config.nix;
+    userConfigFile = ./module-name-config.nix;
     symlinkPath = "/etc/nixos/configs/module-name-config.nix";
   in
     lib.mkMerge [
@@ -259,23 +282,14 @@ module-name/              # Module name
     ];
   ```
 
-### `user-configs/`
-- **Purpose**: User-editable configuration files (what users edit in `/etc/nixos/configs/`)
+### `lib/`
+- **Purpose**: Shared utility functions
 - **Structure**:
-  - `module-name-config.nix`: Main config file for this module
-  - Additional config files as needed
-- **Symlink Strategy**: Config files are symlinked to `/etc/nixos/configs/` for easy editing
-- **Best Practice**: Each module manages its own user configs, keeping them co-located with the module code
-- **Key Difference**: These are **user-editable config files**, not implementation code
-- **Contains**: User options, choices, preferences (e.g., `desktop.environment = "plasma"`)
-- **Flow**:
-  1. User edits `/etc/nixos/configs/module-name-config.nix` (symlink)
-  2. Changes are written to `nixos/core|features/<module>/user-configs/module-name-config.nix` (actual file)
-  3. Module reads from `systemConfig` (loaded from user-configs in flake.nix)
-- **Example**:
-  - `nixos/core/desktop/user-configs/desktop-config.nix` → symlink → `/etc/nixos/configs/desktop-config.nix`
-  - `nixos/core/management/logging/user-configs/logging-config.nix` → symlink → `/etc/nixos/configs/logging-config.nix`
-  - `nixos/features/system/lock/user-configs/lock-config.nix` → symlink → `/etc/nixos/configs/lock-config.nix`
+  - `default.nix`: Exports all library functions
+  - `utils.nix`: General utility functions
+  - `validators.nix`: Input validation functions
+  - `types.nix`: Internal type helpers (if needed)
+- **Best Practice**: Keep functions pure and reusable
 
 ### `lib/`
 - **Purpose**: Shared utility functions
@@ -393,6 +407,8 @@ module-name/              # Module name
 - Handlers in `handlers/` (orchestration logic)
 - Collectors in `collectors/` (data gathering)
 - Processors in `processors/` (data transformation)
+- User Configs: `module-name-config.nix` (user settings)
+- System Config: `config.nix` (implementation logic)
 - Systemd in `systemd.nix` (service definitions)
 
 ### 2. **Command Registration**
@@ -403,28 +419,65 @@ module-name/              # Module name
 
 ### 3. **Enable Check Pattern**
 
-**For Feature Modules**:
-```nix
-config = mkMerge [
-  {
-    features.module-name.enable = mkDefault (systemConfig.features.module-name or false);
-  }
-  (mkIf cfg.enable {
-    # All feature implementation here
-  })
-];
-```
+**All modules use the same pattern** (just different namespaces):
 
-**For Core Modules**:
 ```nix
-config = mkMerge [
-  {
-    # Core modules are always enabled, but can be conditionally configured
-  }
-  (mkIf (systemConfig.module-name.enable or false) {
-    # Module implementation here
-  })
-];
+# System module example
+{ config, lib, pkgs, systemConfig, ... }:
+let
+  cfg = systemConfig.system.module-name or {};
+in
+  lib.mkMerge [
+    {
+      # Symlink management (always runs)
+      system.activationScripts.module-name-config-symlink = ''
+        # Create symlink and default config
+      '';
+    }
+    (lib.mkIf (cfg.enable or true) {  # Default true for system
+      # Only module implementation here
+      # System configuration
+      # Assertions
+    })
+  ];
+
+# Management module example
+{ config, lib, pkgs, systemConfig, ... }:
+let
+  cfg = systemConfig.management.module-name or {};
+in
+  lib.mkMerge [
+    {
+      # Symlink management (always runs)
+      system.activationScripts.module-name-config-symlink = ''
+        # Create symlink and default config
+      '';
+    }
+    (lib.mkIf (cfg.enable or true) {  # Default true for management
+      # Only module implementation here
+      # System configuration
+      # Assertions
+    })
+  ];
+
+# Feature module example
+{ config, lib, pkgs, systemConfig, ... }:
+let
+  cfg = systemConfig.features.module-name or {};
+in
+  lib.mkMerge [
+    {
+      # Symlink management (always runs)
+      system.activationScripts.module-name-config-symlink = ''
+        # Create symlink and default config
+      '';
+    }
+    (lib.mkIf (cfg.enable or false) {  # Default false for features
+      # Only module implementation here
+      # System configuration
+      # Assertions
+    })
+  ];
 ```
 
 ### 4. **Script Creation Pattern**
@@ -996,25 +1049,33 @@ sudo nixos-rebuild switch  # Each feature migrates its own options
 
 ## Module Types
 
-### Core Modules (`nixos/core/`)
+### Core Modules (`nixos/core/{domain}/{module-name}/`)
 - **Purpose**: System-level functionality (always available)
-- **Examples**: `desktop/`, `hardware/`, `network/`, `user/`, `audio/`
-- **Config Location**: `nixos/core/<module-name>/user-configs/<module-name>-config.nix`
-- **Config Access**: Via `systemConfig.<module-name>` in flake.nix
+- **Domains**:
+  - `system/` - Core OS functionality (`systemConfig.core.system.*`)
+  - `management/` - System management tools (`systemConfig.core.management.*`)
+  - `infrastructure/` - Core infrastructure (`systemConfig.core.infrastructure.*`)
+- **Examples**: `desktop/`, `hardware/`, `network/`, `user/`, `audio/`, `logging/`, `checks/`, `cli-formatter/`
+- **Config Location**: `nixos/core/{domain}/{module-name}/{module-name}-config.nix`
+- **Config Access**: Via `systemConfig.core.{domain}.{module-name}` in flake.nix
 - **Enable Pattern**: Usually always enabled, but can be conditionally configured
-- **Options**: Must define `options.systemConfig.<module-name>` in `options.nix`
+- **Options**: Must define `options.systemConfig.core.{domain}.{module-name}` in `options.nix`
 - **Versioning**: Must include `_version` option in `options.nix`
-- **Required Files**: `default.nix`, `options.nix`, `config.nix` (if has implementation)
+- **Required Files**: `default.nix`, `options.nix`, `config.nix` (if has implementation), `{module-name}-config.nix`
 
-### Feature Modules (`nixos/features/`)
+### Feature Modules (`nixos/features/{domain}/{module-name}/`)
 - **Purpose**: Optional features that can be enabled/disabled
-- **Examples**: `system/lock/`, `infrastructure/vm/`, `security/ssh-client/`
-- **Config Location**: `nixos/features/<module-name>/user-configs/<module-name>-config.nix`
-- **Config Access**: Via `systemConfig.features.<module-name>` in flake.nix
+- **Domains**:
+  - `infrastructure/` - Infrastructure features (`systemConfig.features.infrastructure.*`)
+  - `security/` - Security features (`systemConfig.features.security.*`)
+  - `specialized/` - Specialized features (`systemConfig.features.specialized.*`)
+- **Examples**: `homelab/`, `vm/`, `ssh-client/`, `lock/`, `ai-workspace/`
+- **Config Location**: `nixos/features/{domain}/{module-name}/{module-name}-config.nix`
+- **Config Access**: Via `systemConfig.features.{domain}.{module-name}` in flake.nix
 - **Enable Pattern**: Must check `cfg.enable` before implementation
-- **Options**: Must define `options.features.<module-name>` in `options.nix`
+- **Options**: Must define `options.systemConfig.features.{domain}.{module-name}` in `options.nix`
 - **Versioning**: Must include `_version` option in `options.nix`
-- **Required Files**: `default.nix`, `options.nix`, `config.nix` (if has implementation)
+- **Required Files**: `default.nix`, `options.nix`, `config.nix` (if has implementation), `{module-name}-config.nix`
 
 ## Config File Management Strategy
 
@@ -1032,53 +1093,76 @@ Each module manages its own config files, keeping them co-located with the modul
    - **Location**: `module-name/config.nix`
    - **Purpose**: How the module works internally
 
-2. **`user-configs/module-name-config.nix`** (User Config - user-editable)
+2. **`module-name-config.nix`** (User Config - user-editable)
    - User options and choices
    - Preferences and settings
-   - **Location**: `module-name/user-configs/module-name-config.nix`
-   - **Symlink**: `/etc/nixos/configs/module-name-config.nix` → points to user-configs file
+   - **Location**: `module-name/module-name-config.nix`
+   - **Symlink**: `/etc/nixos/configs/module-name-config.nix` → points to module config file
    - **Purpose**: What the user wants to configure
 
 ### Structure
 ```
 nixos/
 ├── core/
-│   ├── desktop/
-│   │   ├── user-configs/
-│   │   │   └── desktop-config.nix  # User-editable config
-│   │   └── default.nix
-│   └── hardware/
-│       ├── user-configs/
-│       │   └── hardware-config.nix
-│       └── default.nix
-├── features/
-│   ├── management/
-│   │   └── logging/
-│   │       ├── user-configs/
-│   │       │   └── logging-config.nix
+│   ├── system/
+│   │   ├── desktop/
+│   │   │   ├── desktop-config.nix  # User-editable config
+│   │   │   └── default.nix
+│   │   └── hardware/
+│   │       ├── hardware-config.nix
 │   │       └── default.nix
-│   └── module-management/
-│       └── module-manager/
-│           ├── user-configs/
-│           │   └── module-manager-config.nix
+│   ├── management/
+│   │   ├── logging/
+│   │   │   ├── logging-config.nix
+│   │   │   └── default.nix
+│   │   ├── checks/
+│   │   │   ├── checks-config.nix
+│   │   │   └── default.nix
+│   │   └── module-manager/
+│   │       ├── module-manager-config.nix
+│   │       └── default.nix
+│   └── infrastructure/
+│       ├── cli-formatter/
+│       │   ├── cli-formatter-config.nix
+│       │   └── default.nix
+│       └── command-center/
+│           ├── command-center-config.nix
 │           └── default.nix
-└── features/
-    ├── system/
-    │   └── lock/
-    │       ├── user-configs/
-    │       │   └── lock-config.nix
-    │       └── default.nix
-    └── infrastructure/
-        └── vm/
-            ├── user-configs/
-            │   └── vm-config.nix
-            └── default.nix
-└── configs/  # Symlinks to module user-configs (for easy editing)
-    ├── desktop-config.nix -> ../core/desktop/user-configs/desktop-config.nix
-    ├── hardware-config.nix -> ../core/hardware/user-configs/hardware-config.nix
-    ├── logging-config.nix -> ../core/management/logging/user-configs/logging-config.nix
-    ├── lock-config.nix -> ../features/system/lock/user-configs/lock-config.nix
-    └── vm-config.nix -> ../features/infrastructure/vm/user-configs/vm-config.nix
+├── features/
+│   ├── infrastructure/
+│   │   ├── homelab/
+│   │   │   ├── homelab-config.nix
+│   │   │   └── default.nix
+│   │   └── vm/
+│   │       ├── vm-config.nix
+│   │       └── default.nix
+│   ├── security/
+│   │   ├── ssh-client/
+│   │   │   ├── ssh-client-config.nix
+│   │   │   └── default.nix
+│   │   └── lock/
+│   │       ├── lock-config.nix
+│   │       └── default.nix
+│   └── specialized/
+│       ├── ai-workspace/
+│       │   ├── ai-workspace-config.nix
+│       │   └── default.nix
+│       └── hackathon/
+│           ├── hackathon-config.nix
+│           └── default.nix
+└── configs/  # Symlinks to module configs (for easy editing)
+    ├── desktop-config.nix -> ../core/system/desktop/desktop-config.nix
+    ├── hardware-config.nix -> ../core/system/hardware/hardware-config.nix
+    ├── logging-config.nix -> ../core/management/logging/logging-config.nix
+    ├── checks-config.nix -> ../core/management/checks/checks-config.nix
+    ├── cli-formatter-config.nix -> ../core/infrastructure/cli-formatter/cli-formatter-config.nix
+    ├── command-center-config.nix -> ../core/management/command-center/command-center-config.nix
+    ├── homelab-config.nix -> ../features/infrastructure/homelab/homelab-config.nix
+    ├── vm-config.nix -> ../features/infrastructure/vm/vm-config.nix
+    ├── ssh-client-config.nix -> ../features/security/ssh-client/ssh-client-config.nix
+    ├── lock-config.nix -> ../features/security/lock/lock-config.nix
+    ├── ai-workspace-config.nix -> ../features/specialized/ai-workspace/ai-workspace-config.nix
+    └── hackathon-config.nix -> ../features/specialized/hackathon/hackathon-config.nix
 ```
 
 ### Benefits
@@ -1100,7 +1184,11 @@ Symlinks are created automatically during module activation:
 ```nix
 { config, lib, pkgs, systemConfig, ... }:
 let
-  cfg = systemConfig.module-name or {};  # or systemConfig.features.module-name for features
+  # For core modules: systemConfig.core.{domain}.{module-name}
+  cfg = systemConfig.core.infrastructure.cli-formatter or {};
+
+  # For feature modules: systemConfig.features.{domain}.{module-name}
+  # cfg = systemConfig.features.infrastructure.homelab or {};
 in {
   # imports must be at top level
   imports = if (cfg.enable or false) then [
@@ -1117,8 +1205,13 @@ in {
 ```nix
 { config, lib, pkgs, systemConfig, ... }:
 let
-  cfg = systemConfig.module-name or {};
-  userConfigFile = ./user-configs/module-name-config.nix;
+  # For core modules: systemConfig.core.{domain}.{module-name}
+  cfg = systemConfig.core.infrastructure.cli-formatter or {};
+
+  # For feature modules: systemConfig.features.{domain}.{module-name}
+  # cfg = systemConfig.features.infrastructure.homelab or {};
+
+  userConfigFile = ./module-name-config.nix;
   symlinkPath = "/etc/nixos/configs/module-name-config.nix";
 in
   lib.mkMerge [
@@ -1126,7 +1219,7 @@ in
       # Symlink management (always runs, even if disabled)
       system.activationScripts.module-name-config-symlink = ''
         mkdir -p "$(dirname "${symlinkPath}")"
-        
+
         # Create default config if it doesn't exist
         if [ ! -f "${toString userConfigFile}" ]; then
           mkdir -p "$(dirname "${toString userConfigFile}")"
@@ -1173,9 +1266,14 @@ EOF
 
 ## Example Usage
 
-### Core Module Example
-See `nixos/core/desktop/` for a complete core module example.
+### Core System Module Example
+See `nixos/core/system/desktop/` for a complete core system module example.
+
+### Core Management Module Example
+See `nixos/core/management/logging/` for a complete core management module example.
+
+### Core Infrastructure Module Example
+See `nixos/core/infrastructure/cli-formatter/` for a complete core infrastructure module example.
 
 ### Feature Module Example
-See existing features like `features/system/lock/` or `features/security/ssh-client/` for complete feature module examples.
-
+See existing features like `features/security/ssh-client/` or `features/infrastructure/homelab/` for complete feature module examples.

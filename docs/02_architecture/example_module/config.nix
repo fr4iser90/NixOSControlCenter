@@ -4,7 +4,7 @@ let
   cfg = systemConfig.features.example-module or {};
   # Use API from system-manager for config helpers
   configHelpers = config.core.system-manager.api.configHelpers or null;
-  userConfigFile = "/etc/nixos/features/example-module/user-configs/example-module-config.nix";
+  userConfigFile = "/etc/nixos/features/example-module/example-module-config.nix";
   symlinkPath = "/etc/nixos/configs/example-module-config.nix";
   defaultConfig = ''
 {

@@ -5,10 +5,10 @@ let
   
   # Report Level Definition
   reportLevels = {
-    minimal = 1;
-    standard = 2;
-    detailed = 3;
-    full = 4;
+    basic = 1;
+    info = 2;
+    debug = 3;
+    trace = 4;
   };
 
   # Collector-spezifische Optionen
@@ -53,7 +53,7 @@ in {
     
     defaultDetailLevel = lib.mkOption {
       type = lib.types.enum (lib.attrNames reportLevels);
-      default = "standard";
+      default = "info";
       description = "Default detail level for all reports";
     };
 
@@ -74,5 +74,22 @@ in {
       description = "Collector-specific configurations";
     };
   };
-}
 
+  # NixOS Module Options (for config.core namespace)
+  options.core.management.logging = {
+    # System Logger - Core module always available
+    system-logger = {
+      defaultDetailLevel = lib.mkOption {
+        type = lib.types.enum (lib.attrNames reportLevels);
+        default = "info";
+        description = "Default detail level for system logging";
+      };
+
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable system logging";
+      };
+    };
+  };
+}

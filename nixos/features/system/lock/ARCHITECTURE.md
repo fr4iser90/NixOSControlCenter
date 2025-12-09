@@ -4,7 +4,7 @@
 
 ### Module Loading
 
-1. **Module Import**: When a feature is enabled in `features-config.nix`, the module is imported via `features/default.nix`
+1. **Module Import**: When a feature is enabled in `module-manager-config.nix`, the module is imported via `features/default.nix`
 2. **Module Structure**: Every NixOS module has:
    - `options`: Define configuration options (with defaults)
    - `config`: Apply configuration (only evaluated if feature is enabled)

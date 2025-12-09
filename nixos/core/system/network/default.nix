@@ -1,9 +1,11 @@
 # modules/networking/default.nix
 { config, lib, pkgs, systemConfig, ... }:
 
-let  
+let
   # Import sub-modules based on configuration
   networkingModules = [
+    ./options.nix
+    ./config.nix
 #    ./networkmanager.nix
 #    ./firewall.nix
   ];

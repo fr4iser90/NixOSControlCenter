@@ -23,7 +23,7 @@ let
   ];
 
   ui = config.core.cli-formatter.api;
-  commandCenter = config.core.command-center;
+  commandCenter = systemConfig.command-center;
 
   # Extract configuration values
   username = head (attrNames systemConfig.users);
@@ -237,7 +237,7 @@ let
     }
     
     # Extract version from options.nix (TARGET - deployed system)
-    # Version kommt aus dem deployed Code, nicht aus user-configs
+    # Version comes from deployed code, not config files
     get_target_version() {
       local module_path="$1"
       local options_file="$module_path/options.nix"
@@ -248,53 +248,38 @@ let
       fi
     }
     
-    # Check if user-configs file exists (handles special case system-manager)
+    # Check if config file exists (now directly in module directory)
     check_user_config_exists() {
       local target_module="$1"
       local module_name="$2"
-      
-      # Special case: system-manager uses features-config.nix
-      if [ "$module_name" = "system-manager" ]; then
-        if [ -f "$target_module/user-configs/features-config.nix" ]; then
-          echo "features-config.nix"
-          return 0
-        fi
-      else
-        if [ -f "$target_module/user-configs/$module_name-config.nix" ]; then
-          echo "$module_name-config.nix"
-          return 0
-        fi
+
+      # Standard pattern: check for module-name-config.nix directly in module
+      if [ -f "$target_module/$module_name-config.nix" ]; then
+        echo "$module_name-config.nix"
+        return 0
       fi
       return 1
     }
     
-    # Update module code (without user-configs/)
+    # Update module code (config files are now directly in module directory)
     update_module_code() {
       local source_module="$1"
       local target_module="$2"
-      
+
       # Create target_module if it doesn't exist
       mkdir -p "$target_module"
-      
-      # Copy everything EXCEPT user-configs/
-      if [ -d "$target_module/user-configs" ]; then
-        # user-configs/ exists → protect
-        if [ "$VERBOSE" = "true" ]; then
-          rsync -av --exclude='user-configs' "$source_module/" "$target_module/" || {
-            # Fallback: recursively copy (without user-configs/)
-            (cd "$source_module" && find . -type f ! -path "./user-configs/*" -exec install -D {} "$target_module/{}" \;)
-            (cd "$source_module" && find . -type d ! -path "./user-configs/*" ! -path "." -exec mkdir -p "$target_module/{}" \;)
-          }
-        else
-          rsync -aq --exclude='user-configs' "$source_module/" "$target_module/" >/dev/null 2>&1 || {
-            # Fallback: recursively copy (without user-configs/)
-            (cd "$source_module" && find . -type f ! -path "./user-configs/*" -exec install -D {} "$target_module/{}" \;)
-            (cd "$source_module" && find . -type d ! -path "./user-configs/*" ! -path "." -exec mkdir -p "$target_module/{}" \;)
-          }
-        fi
+
+      # Copy everything (no user-configs/ to exclude anymore)
+      if [ "$VERBOSE" = "true" ]; then
+        rsync -av "$source_module/" "$target_module/" || {
+          # Fallback: recursively copy
+          cp -r "$source_module"/* "$target_module/" 2>/dev/null || true
+        }
       else
-        # user-configs/ doesn't exist → copy completely
-        cp -r "$source_module"/* "$target_module/" 2>/dev/null || true
+        rsync -aq "$source_module/" "$target_module/" >/dev/null 2>&1 || {
+          # Fallback: recursively copy
+          cp -r "$source_module"/* "$target_module/" 2>/dev/null || true
+        }
       fi
     }
     
@@ -308,18 +293,12 @@ let
       # Check versions
       SOURCE_VERSION=$(get_source_version "$source_module")
       
-      # Special case: system-manager uses features-config.nix instead of system-manager-config.nix
-      if [ "$module_name" = "system-manager" ]; then
-        CONFIG_FILE="$target_module/user-configs/features-config.nix"
-        CONFIG_NAME="features"
-      else
-        # GENERIC: All modules (including packages) use the same pattern
-        CONFIG_FILE="$target_module/user-configs/$module_name-config.nix"
-        CONFIG_NAME="$module_name"
-      fi
+      # GENERIC: All modules use the same pattern
+      CONFIG_FILE="$target_module/$module_name-config.nix"
+      CONFIG_NAME="$module_name"
       
       if [ -f "$CONFIG_FILE" ]; then
-        # TARGET has user-configs/ file
+        # TARGET has config file
         TARGET_VERSION=$(get_target_version "$target_module" "$CONFIG_NAME")
         
         if [ "$SOURCE_VERSION" != "$TARGET_VERSION" ] || [ "$FORCE_MIGRATION" = "true" ]; then
@@ -328,7 +307,7 @@ let
             ${ui.messages.info "Module $module_name: Migration needed (v$TARGET_VERSION → v$SOURCE_VERSION)"}
           fi
           # TODO: Migration would be executed here (Phase 2)
-          # For now: Only update code, user-configs/ remains untouched
+          # For now: Only update code, config files remain untouched
           update_module_code "$source_module" "$target_module"
         elif [ "$FORCE_UPDATE" = "true" ]; then
           # Force update even if versions are the same
@@ -343,11 +322,11 @@ let
           fi
         fi
       else
-        # TARGET has no user-configs/ file
+        # TARGET has no config file
         if [ "$VERBOSE" = "true" ]; then
-          ${ui.messages.info "Module $module_name: No user-configs/ file found, copying from source (including user-configs/)"}
+          ${ui.messages.info "Module $module_name: No config file found, copying from source (including config)"}
         fi
-        # Copy completely (including user-configs/ from repository)
+        # Copy completely (including config from repository)
         # This copies the default config from the repository
         cp -r "$source_module" "$target_module" 2>/dev/null || true
       fi
@@ -404,7 +383,7 @@ let
       # 1. Check if system-config.nix exists
       if [ ! -f "$system_config_file" ]; then
         ${ui.messages.warning "system-config.nix not found, cannot extract config"}
-        ${ui.messages.info "Copying module code only (user-configs/ will be created from defaults)"}
+        ${ui.messages.info "Copying module code only (config files will be created from defaults)"}
         update_module_code "$source_module" "$target_module"
         return 0
       fi
@@ -418,11 +397,7 @@ let
       # 4. Copy module code (including options.nix)
       update_module_code "$source_module" "$target_module"
       
-      # 5. Create user-configs/ directory
-      USER_CONFIGS_DIR="$target_module/user-configs"
-      mkdir -p "$USER_CONFIGS_DIR"
-      
-      # 6. Create user-configs/*-config.nix from extracted config
+      # 5. Create config file directly in module directory
       # Extract config directly as Nix code (not JSON)
       if command -v nix-instantiate >/dev/null 2>&1; then
         # Try to extract config directly as Nix attrset
@@ -485,15 +460,15 @@ TEMPEOF
           ' 2>/dev/null || echo "")
           
           if [ -n "$CONFIG_NIX" ]; then
-            cat > "$USER_CONFIGS_DIR/$module_name-config.nix" <<EOF
+            cat > "$target_module/$module_name-config.nix" <<EOF
 {
   $CONFIG_NIX
 }
 EOF
-            ${ui.messages.success "Created user-configs/$module_name-config.nix from system-config.nix"}
+            ${ui.messages.success "Created $module_name-config.nix from system-config.nix"}
           else
             ${ui.messages.warning "Could not convert JSON to Nix format"}
-            touch "$USER_CONFIGS_DIR/$module_name-config.nix"
+            touch "$target_module/$module_name-config.nix"
           fi
         else
           # Fallback: Create empty config (will be filled by activationScripts)
@@ -628,7 +603,7 @@ EOF
             fi
           elif [ "$item" = "core" ] || [ "$item" = "features" ]; then
             # CRITICAL: Selective copying module-by-module (NEVER rm -rf!)
-            ${ui.messages.loading "Updating $item/ modules (preserving user-configs/)..."}
+            ${ui.messages.loading "Updating $item/ modules (preserving configs)..."}
             
             # Create target_dir if it doesn't exist
             mkdir -p "$NIXOS_DIR/$item"
@@ -652,13 +627,13 @@ EOF
               fi
             done
             
-            ${ui.messages.success "$item/ updated (user-configs/ preserved)"}
+            ${ui.messages.success "$item/ updated (configs preserved)"}
             
             # Cleanup removed modules (only if --cleanup flag is set)
             cleanup_removed_modules "$item"
           elif [ "$item" = "packages" ]; then
             # CRITICAL: packages/ is a single module - use SAME GENERIC LOGIC as core/features
-            ${ui.messages.loading "Updating packages/ (preserving user-configs/)..."}
+            ${ui.messages.loading "Updating packages/ (preserving configs)..."}
             
             # Create target_dir if it doesn't exist
             mkdir -p "$NIXOS_DIR/$item"
@@ -677,7 +652,7 @@ EOF
               handle_stage0_module "$SOURCE_MODULE" "$TARGET_MODULE" "$MODULE_NAME" "$item"
             fi
             
-            ${ui.messages.success "packages/ updated (user-configs/ preserved)"}
+            ${ui.messages.success "packages/ updated (configs preserved)"}
           else
             # Other directories: Overwrite completely
             sudo rm -rf "$NIXOS_DIR/$item"
@@ -812,7 +787,7 @@ in {
     '';
 
     # Commands are registered in commands.nix
-    core.command-center.commands = [
+    systemConfig.command-center.commands = [
       {
         name = "system-update";
         description = "Update NixOS system configuration";

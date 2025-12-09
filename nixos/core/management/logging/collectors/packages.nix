@@ -31,7 +31,7 @@ let
   };
 
   # Standard report shows package statistics
-  standardReport = ''
+  infoReport = ''
     ${ui.text.header "Package Analysis"}
     ${ui.tables.keyValue "Total Packages" (toString packageAnalysis.total)}
     ${ui.tables.keyValue "Free Packages" (toString (length packageAnalysis.free))}
@@ -40,5 +40,5 @@ let
 
 in {
   # Minimal level shows nothing
-  collect = if currentLevel >= reportLevels.standard then standardReport else "";
+  collect = if currentLevel >= reportLevels.info then infoReport else "";
 }

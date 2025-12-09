@@ -1,7 +1,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 let
   # CRITICAL: Use absolute path to deployed location, not relative (which resolves to store)
-  userConfigFile = "/etc/nixos/core/management/system-manager/user-configs/system-manager-config.nix";
+  userConfigFile = "/etc/nixos/core/management/system-manager/system-manager-config.nix";
   symlinkPath = "/etc/nixos/configs/system-manager-config.nix";
   configHelpers = config.core.management.system-manager.api.configHelpers;
   defaultConfig = ''
@@ -22,9 +22,14 @@ let
 '';
 in
 {
-  config = {
+  config = lib.mkMerge [
+    # Always import component commands (they'll be conditionally enabled)
+    # (import ./components/config-migration/commands.nix)
+
+    # Main config
+    {
     system.activationScripts.system-manager-config-symlink =
       configHelpers.setupConfigFile symlinkPath userConfigFile defaultConfig;
-  };
+    }
+  ];
 }
-

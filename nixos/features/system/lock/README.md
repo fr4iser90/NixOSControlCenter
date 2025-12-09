@@ -102,7 +102,7 @@ sops secrets.encrypted.yaml
 
 The feature can be activated/deactivated like all other features:
 
-**Option 1: Via `features-config.nix`** (recommended):
+**Option 1: Via `module-manager-config.nix`** (recommended):
 ```nix
 {
   features = {

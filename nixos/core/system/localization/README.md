@@ -12,7 +12,7 @@ This module configures:
 
 ## Configuration
 
-Edit `/etc/nixos/configs/localization-config.nix` (symlink to `core/localization/user-configs/localization-config.nix`):
+Edit `/etc/nixos/configs/localization-config.nix` (symlink to `core/localization/localization-config.nix`):
 
 ```nix
 {

@@ -11,15 +11,15 @@ let
     else "unknown";
 
   # Standard report shows basic boot info
-  standardReport = ''
+  infoReport = ''
     ${ui.text.header "Boot Configuration"}
     ${ui.tables.keyValue "Boot Loader" bootloader}
     ${ui.tables.keyValue "Kernel" config.boot.kernelPackages.kernel.version}
   '';
 
   # Detailed report adds bootloader configuration
-  detailedReport = ''
-    ${standardReport}
+  debugReport = ''
+    ${infoReport}
     ${optionalString config.boot.loader.systemd-boot.enable ''
       ${ui.text.subHeader "systemd-boot"}
       ${ui.tables.keyValue "Editor" (if config.boot.loader.systemd-boot.editor then "enabled" else "disabled")}
@@ -28,8 +28,8 @@ let
   '';
 
   # Full report adds EFI information
-  fullReport = ''
-    ${detailedReport}
+  traceReport = ''
+    ${debugReport}
     ${optionalString config.boot.loader.efi.canTouchEfiVariables ''
       ${ui.text.subHeader "EFI Configuration"}
       ${ui.tables.keyValue "System Mount" config.boot.loader.efi.efiSysMountPoint}
@@ -39,8 +39,8 @@ let
 in {
   # Minimal level shows nothing
   collect = 
-    if currentLevel >= reportLevels.full then fullReport
-    else if currentLevel >= reportLevels.detailed then detailedReport
-    else if currentLevel >= reportLevels.standard then standardReport
+    if currentLevel >= reportLevels.full then traceReport
+    else if currentLevel >= reportLevels.detailed then debugReport
+    else if currentLevel >= reportLevels.standard then infoReport
     else "";
 }
