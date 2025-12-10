@@ -1,6 +1,6 @@
 { config, lib, pkgs, systemConfig, ... }:
 let
-  cfg = systemConfig.management.logging or {};
+  cfg = systemConfig.core.management.logging or {};
   ui = config.core.cli-formatter.api;
 
   # Report Level Definition
@@ -19,16 +19,29 @@ let
     "packages"
   ];
 
+  # Default collector configurations
+  defaultCollectors = lib.listToAttrs (map (name: {
+    inherit name;
+    value = {
+      enable = true;
+      detailLevel = null;
+      priority = 100;
+    };
+  }) availableCollectors);
+
+  # Effective collectors (merge defaults with systemConfig)
+  effectiveCollectors = defaultCollectors // (cfg.collectors or {});
+
   # Importiere aktive Collector-Module
-  collectors = lib.filterAttrs (name: _: cfg.collectors.${name}.enable) (
+  collectors = lib.filterAttrs (name: _: effectiveCollectors.${name}.enable) (
     lib.listToAttrs (lib.map (name: {
       inherit name;
       value = import ./collectors/${name}.nix {
         inherit config lib pkgs systemConfig ui reportLevels;
         currentLevel = reportLevels.${
-          if cfg.collectors.${name}.detailLevel != null
-          then cfg.collectors.${name}.detailLevel
-          else cfg.defaultDetailLevel
+          if effectiveCollectors.${name}.detailLevel != null
+          then effectiveCollectors.${name}.detailLevel
+          else config.systemConfig.core.management.logging.defaultDetailLevel or "info"
         };
       };
     }) availableCollectors)
@@ -59,24 +72,32 @@ in
       # Collector-specific configurations
       collectors = {
         # System profile collector
-        profile.enable = true;
-        profile.detailLevel = null;  # Use default
-        profile.priority = 100;
+        profile = {
+          enable = true;
+          detailLevel = null;  # Use default
+          priority = 100;
+        };
 
         # Bootloader information collector
-        bootloader.enable = true;
-        bootloader.detailLevel = null;
-        bootloader.priority = 50;
+        bootloader = {
+          enable = true;
+          detailLevel = null;
+          priority = 50;
+        };
 
         # Boot entry collector
-        bootentries.enable = true;
-        bootentries.detailLevel = null;
-        bootentries.priority = 60;
+        bootentries = {
+          enable = true;
+          detailLevel = null;
+          priority = 60;
+        };
 
         # Installed packages collector
-        packages.enable = true;
-        packages.detailLevel = null;
-        packages.priority = 200;
+        packages = {
+          enable = true;
+          detailLevel = null;
+          priority = 200;
+        };
       };
     };
   };
@@ -118,8 +139,8 @@ EOF
         text = let
           # Sortiere Collectors nach Priorität
           sortedCollectors = lib.sort (a: b:
-            cfg.collectors.${a}.priority < cfg.collectors.${b}.priority
-          ) (lib.filter (name: cfg.collectors.${name}.enable) availableCollectors);
+            effectiveCollectors.${a}.priority < effectiveCollectors.${b}.priority
+          ) (lib.filter (name: effectiveCollectors.${name}.enable) availableCollectors);
 
           # Generiere Reports
           reports = lib.map (name:
@@ -132,7 +153,7 @@ EOF
           ${ui.text.header "NixOS System Report"}
           ${ui.tables.keyValue "Hostname" config.networking.hostName}
           ${ui.tables.keyValue "Generation" "$(readlink /nix/var/nix/profiles/system | cut -d'-' -f2)"}
-          ${ui.tables.keyValue "Detail Level" cfg.defaultDetailLevel}
+          ${ui.tables.keyValue "Detail Level" config.systemConfig.core.management.logging.defaultDetailLevel}
           ${ui.layout.separator "-" 50}
 
           ${lib.concatStringsSep "\n" reports}
@@ -144,7 +165,7 @@ EOF
     {
       _module.args.reportingConfig = {
         inherit ui reportLevels;
-        currentLevel = reportLevels.${cfg.defaultDetailLevel};
+        currentLevel = reportLevels.${config.systemConfig.core.management.logging.defaultDetailLevel};
       };
     }
   ]

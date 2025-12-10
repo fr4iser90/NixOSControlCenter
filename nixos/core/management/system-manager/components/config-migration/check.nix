@@ -2,7 +2,7 @@
 
 let
   cfg = systemConfig.management.system-manager or {};
-  backupHelpers = config.core.management.system-manager.api.backupHelpers;
+  backupHelpers = import ../../lib/backup-helpers.nix { inherit pkgs lib; };
   migration = import ./migration.nix { inherit pkgs lib formatter backupHelpers; };
   validator = import ./validator.nix { inherit pkgs lib formatter; };
 in

@@ -1,7 +1,7 @@
 { config, lib, pkgs, systemConfig, collectors, ui, reportLevels, ... }:
 
 let
-  cfg = systemConfig.management.logging or {};
+  cfg = systemConfig.core.management.logging or {};
   libUtils = import ../lib/utils.nix { inherit lib; };
 
   # Generate system report by orchestrating collectors

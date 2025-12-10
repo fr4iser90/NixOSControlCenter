@@ -2,7 +2,7 @@
 
 let
   schema = import ./schema.nix { inherit lib; };
-  detection = import ./config-detection.nix { inherit pkgs lib; };
+  detection = import ./detection.nix { inherit pkgs lib; };
   currentVersion = schema.currentVersion;
   supportedVersions = lib.attrNames schema.schemas;
   

@@ -1,6 +1,7 @@
 {
   # System Logging Configuration
-  management = {
+  core = {
+    management = {
     logging = {
       enable = true;  # Enable system logging
 
@@ -10,50 +11,71 @@
       # Collector-specific configurations
       collectors = {
         # System profile collector
-        profile.enable = true;
-        profile.detailLevel = null;  # Use default
-        profile.priority = 100;
+        profile = {
+          enable = true;
+          detailLevel = null;  # Use default
+          priority = 100;
+        };
 
         # Bootloader information collector
-        bootloader.enable = true;
-        bootloader.detailLevel = null;
-        bootloader.priority = 50;
+        bootloader = {
+          enable = true;
+          detailLevel = null;
+          priority = 50;
+        };
 
         # Boot entry collector
-        bootentries.enable = true;
-        bootentries.detailLevel = null;
-        bootentries.priority = 60;
+        bootentries = {
+          enable = true;
+          detailLevel = null;
+          priority = 60;
+        };
 
         # Installed packages collector
-        packages.enable = true;
-        packages.detailLevel = null;
-        packages.priority = 200;
+        packages = {
+          enable = true;
+          detailLevel = null;
+          priority = 200;
+        };
 
         # Additional collectors (disabled by default)
-        desktop.enable = false;
-        desktop.detailLevel = null;
-        desktop.priority = 300;
+        desktop = {
+          enable = false;
+          detailLevel = null;
+          priority = 300;
+        };
 
-        network.enable = false;
-        network.detailLevel = null;
-        network.priority = 400;
+        network = {
+          enable = false;
+          detailLevel = null;
+          priority = 400;
+        };
 
-        services.enable = false;
-        services.detailLevel = null;
-        services.priority = 500;
+        services = {
+          enable = false;
+          detailLevel = null;
+          priority = 500;
+        };
 
-        sound.enable = false;
-        sound.detailLevel = null;
-        sound.priority = 600;
+        sound = {
+          enable = false;
+          detailLevel = null;
+          priority = 600;
+        };
 
-        system-config.enable = false;
-        system-config.detailLevel = null;
-        system-config.priority = 700;
+        system-config = {
+          enable = false;
+          detailLevel = null;
+          priority = 700;
+        };
 
-        virtualization.enable = false;
-        virtualization.detailLevel = null;
-        virtualization.priority = 800;
+        virtualization = {
+          enable = false;
+          detailLevel = null;
+          priority = 800;
+        };
       };
+    };
     };
   };
 }

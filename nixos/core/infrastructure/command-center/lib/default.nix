@@ -1,4 +1,5 @@
 # Command Center Library Exports
+{ lib, ... }:
 {
   # Import types
   types = import ./types.nix { inherit lib; };

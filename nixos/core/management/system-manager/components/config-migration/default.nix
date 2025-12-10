@@ -1,10 +1,10 @@
-{ pkgs, lib, config ? null, ... }:
+{ pkgs, lib, config ? null, systemConfig ? null, ... }:
 
 let
   # Import cli-formatter directly (config/ is a library, not a NixOS module, so it can't access config.core.cli-formatter.api)
-  colors = import ../cli-formatter/colors.nix;
-  core = import ../cli-formatter/core { inherit lib colors; config = {}; };
-  status = import ../cli-formatter/status { inherit lib colors; config = {}; };
+  colors = import ../../../../infrastructure/cli-formatter/colors.nix;
+  core = import ../../../../infrastructure/cli-formatter/core { inherit lib colors; config = {}; };
+  status = import ../../../../infrastructure/cli-formatter/status { inherit lib colors; config = {}; };
   
   # Build formatter API (same structure as cli-formatter/default.nix apiValue)
   formatter = {
@@ -20,10 +20,10 @@ let
   
   # Import once to avoid circular dependencies
   schemaModule = import ./schema.nix { inherit lib; };
-  detectionModule = import ./config-detection.nix { inherit pkgs lib; };
-  migrationModule = import ./config-migration.nix { inherit pkgs lib formatter backupHelpers; };
-  validatorModule = import ./config-validator.nix { inherit pkgs lib formatter; };
-  checkModule = import ./config-check.nix { inherit pkgs lib formatter backupHelpers; };
+  detectionModule = import ./detection.nix { inherit pkgs lib; };
+  migrationModule = import ./migration.nix { inherit pkgs lib formatter backupHelpers; };
+  validatorModule = import ./validator.nix { inherit pkgs lib formatter; };
+  checkModule = import ./check.nix { inherit config pkgs lib formatter backupHelpers systemConfig; };
 in
 
 {

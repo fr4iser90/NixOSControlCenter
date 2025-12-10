@@ -1,6 +1,6 @@
 { config, lib, pkgs, systemConfig, ... }:
 let
-  cfg = systemConfig.management.logging or {};
+  cfg = systemConfig.core.management.logging or {};
 
   # Import the system report script
   systemReportScript = import ./scripts/system-report.nix {

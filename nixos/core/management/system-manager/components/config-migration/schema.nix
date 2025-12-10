@@ -2,8 +2,8 @@
 
 let
   utils = import ./utils.nix { inherit lib; };
-  schemaDir = ./config-schema;
-  migrationsDir = ./config-schema/migrations;
+  schemaDir = ./schema;
+  migrationsDir = ./schema/migrations;
 in
 
 {

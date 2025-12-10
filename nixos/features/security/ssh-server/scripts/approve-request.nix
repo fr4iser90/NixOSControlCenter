@@ -6,7 +6,7 @@ let
   cfg = systemConfig.features.security.ssh-server.approve-request;
   ui = config.core.cli-formatter.api;
   notifications = systemConfig.features.security.ssh-server.notifications;
-  backupHelpers = config.core.management.system-manager.api.backupHelpers;
+  backupHelpers = import ../../lib/backup-helpers.nix { inherit pkgs lib; };
 
   approveRequestScript = pkgs.writeScriptBin "ssh-approve-request" ''
     #!${pkgs.bash}/bin/bash

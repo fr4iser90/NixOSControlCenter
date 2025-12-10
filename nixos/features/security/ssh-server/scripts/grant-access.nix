@@ -5,7 +5,7 @@ with lib;
 let
   cfg = systemConfig.features.security.ssh-server.grant-access;
   ui = config.core.cli-formatter.api;
-  backupHelpers = config.core.management.system-manager.api.backupHelpers;
+  backupHelpers = import ../../lib/backup-helpers.nix { inherit pkgs lib; };
 
   grantAccessScript = pkgs.writeScriptBin "ssh-grant-access" ''
     #!${pkgs.bash}/bin/bash

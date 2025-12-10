@@ -1,7 +1,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  cfg = systemConfig.management.logging or {};
+  cfg = systemConfig.core.management.logging or {};
   ui = config.core.cli-formatter.api;
 
   # System Report Script

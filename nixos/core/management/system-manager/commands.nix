@@ -34,7 +34,7 @@ in {
     environment.systemPackages =
       [ checkVersions.checkVersionsScript
         updateFeatures.updateFeaturesScript
-        configMigration.migrateSystemConfig
+        configMigration.migration.migrateSystemConfig
         configValidator.validateSystemConfig
         enableDesktopScript
         updateDesktopConfig

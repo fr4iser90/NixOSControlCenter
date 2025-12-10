@@ -2,7 +2,7 @@
 {
   imports = [
     ./options.nix
-  ] ++ (lib.optionals (systemConfig.management.logging.enable or true) [
+  ] ++ (lib.optionals (systemConfig.core.management.logging.enable or true) [
     ./config.nix  # Import implementation logic
   ]);
 }

@@ -38,9 +38,9 @@ let
 
 in {
   # Minimal level shows nothing
-  collect = 
-    if currentLevel >= reportLevels.full then traceReport
-    else if currentLevel >= reportLevels.detailed then debugReport
-    else if currentLevel >= reportLevels.standard then infoReport
+  collect =
+    if currentLevel >= reportLevels.trace then traceReport
+    else if currentLevel >= reportLevels.debug then debugReport
+    else if currentLevel >= reportLevels.info then infoReport
     else "";
 }

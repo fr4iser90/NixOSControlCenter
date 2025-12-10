@@ -6,10 +6,11 @@ let
   ccLib = import ../lib { inherit lib; };
 
   # Dynamische Inhalte vorbereiten
-  caseBlock = lib.concatMapStringsSep "\n  " ccLib.utils.generateExecCase cfg.commands;
-  commandLongHelp = lib.concatMapStringsSep "\n  " ccLib.utils.generateLongHelpCase cfg.commands;
-  commandList = ccLib.utils.generateCommandList cfg.commands;
-  validCommands = ccLib.utils.getValidCommands cfg.commands;
+  commands = cfg.commands or [];
+  caseBlock = lib.concatMapStringsSep "\n  " ccLib.utils.generateExecCase commands;
+  commandLongHelp = lib.concatMapStringsSep "\n  " ccLib.utils.generateLongHelpCase commands;
+  commandList = ccLib.utils.generateCommandList commands;
+  validCommands = ccLib.utils.getValidCommands commands;
 
 in
   pkgs.writeScriptBin "ncc" ''
