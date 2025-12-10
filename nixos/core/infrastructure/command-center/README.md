@@ -48,11 +48,11 @@ The Command Center is configured via `systemConfig.command-center` in your `flak
 
 ## Command Registration
 
-Modules register commands by adding to `systemConfig.command-center.commands`:
+Modules register commands by adding to `core.command-center.commands`:
 
 ```nix
 {
-  systemConfig.command-center.commands = [
+  core.command-center.commands = [
     {
       name = "my-command";
       script = "${myScript}/bin/my-command";
@@ -109,7 +109,7 @@ command-center/
        echo "Hello from my command!"
      '';
    in {
-     systemConfig.command-center.commands = [
+     core.command-center.commands = [
        {
          name = "my-command";
          script = "${myScript}/bin/my-command";

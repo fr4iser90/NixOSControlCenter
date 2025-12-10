@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **BREAKING**: Moved options from `system.postbuild` to `systemConfig.management.checks.postbuild`
-- **BREAKING**: Changed command registration from `core.command-center.commands` to `systemConfig.command-center.commands`
+- **BREAKING**: Changed command registration from `core.command-center.commands` to `core.command-center.commands`
 - **BREAKING**: Moved implementation from multiple files to single `config.nix`
 - Restructured module to follow unified architecture pattern
 - Consolidated prebuild and postbuild logic into config.nix

@@ -65,7 +65,7 @@ in {
       updateChannelsScript
     ];
 
-    systemConfig.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "update-channels";
         description = "Update Nix flake inputs / channels and rebuild the system";

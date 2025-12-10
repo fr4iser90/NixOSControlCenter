@@ -1,9 +1,10 @@
 { config, lib, pkgs, systemConfig, ... }:
 let
+  cfg = systemConfig.core.management.system-manager or {};
   # CRITICAL: Use absolute path to deployed location, not relative (which resolves to store)
   userConfigFile = "/etc/nixos/core/management/system-manager/system-manager-config.nix";
   symlinkPath = "/etc/nixos/configs/system-manager-config.nix";
-  configHelpers = import ../../management/system-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
+  configHelpers = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
   defaultConfig = ''
 {
   features = {
@@ -27,9 +28,9 @@ in
     # (import ./components/config-migration/commands.nix)
 
     # Main config
-    {
+    (lib.mkIf (cfg.enable or true) {
     system.activationScripts.system-manager-config-symlink =
       configHelpers.setupConfigFile symlinkPath userConfigFile defaultConfig;
-    }
+    })
   ];
 }

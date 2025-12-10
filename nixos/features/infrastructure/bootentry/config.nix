@@ -4,7 +4,7 @@ let
   cfg = systemConfig.features.infrastructure.bootentry;
   userConfigFile = ./bootentry-config.nix;
   symlinkPath = "/etc/nixos/configs/bootentry-config.nix";
-  configHelpers = import ../../management/system-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
+  configHelpers = import ../../management/module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
   defaultConfig = ''
 {
   # Boot Entry Manager Configuration
@@ -23,8 +23,8 @@ let
 '';
 in
   lib.mkMerge [
-    {
-      # Symlink management for user config (always runs)
+    (lib.mkIf (cfg.enable or false) {
+      # Symlink management for user config (only when enabled)
       system.activationScripts.bootentry-config-symlink = ''
         mkdir -p "$(dirname "${symlinkPath}")"
 
@@ -64,6 +64,6 @@ EOF
           ln -sfn "${toString userConfigFile}" "${symlinkPath}"
         fi
       '';
-    }
+    })
     # Boot entry module implementation is handled in default.nix
   ]

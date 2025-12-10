@@ -12,6 +12,22 @@ in {
       description = "Feature version";
     };
 
+    # Dependencies this module has (modular approach)
+    _dependencies = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ "system-checks" "command-center" ];  # Needs these core modules
+      internal = true;
+      description = "Modules this feature depends on";
+    };
+
+    # Conflicts this module has (modular approach)
+    _conflicts = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [];  # Modules that conflict with this one
+      internal = true;
+      description = "Modules that conflict with this feature";
+    };
+
     enable = lib.mkEnableOption "homelab manager";
 
     # Basic configuration options

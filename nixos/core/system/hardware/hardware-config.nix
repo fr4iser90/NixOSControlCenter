@@ -3,7 +3,7 @@
     cpu = "intel";
     gpu = "amd";
     ram = {
-      sizeGB = null;  # null = auto-detect or disabled, set to number to enable memory management
+      sizeGB = 8;  # Default 8GB, will be corrected by system-checks
     };
   };
 }

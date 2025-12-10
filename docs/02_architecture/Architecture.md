@@ -15,30 +15,52 @@ All modules are organized under `systemConfig.*` with three logical categories:
 | **Core Infrastructure** | `systemConfig.core.infrastructure.*` | Core infrastructure | `true` | `cli-formatter/`, `command-center/` |
 | **Features** | `systemConfig.features.*` | Optional user features | `false` | `homelab/`, `vm/`, `ssh-client/`, `lock/` |
 
+### User-Settings vs. APIs
+
+**Two distinct namespaces for different purposes:**
+
+1. **`systemConfig.*`** = User-Settings (what users configure)
+   - `systemConfig.core.system.audio.enable`
+   - `systemConfig.features.infrastructure.homelab.enable`
+   - **Purpose**: User preferences, module activation
+
+2. **`core.*`** = Cross-Module APIs (what modules share)
+   - `core.command-center.commands` (collected from all modules)
+   - `core.logging.collectors` (if logging provides APIs)
+   - **Purpose**: Module-to-module communication
+
 ### Configuration Pattern
 
 **All modules use the same pattern**:
 
 ```nix
 # options.nix - ALL modules follow this structure
-options.systemConfig.system.module-name = {
+options.systemConfig.{category}.{module} = {
   _version = lib.mkOption { /* versioning */ };
   enable = lib.mkOption {
     type = lib.types.bool;
-    default = /* true for system/management, false for features */;
+    default = /* true for core, false for features */;
     description = "...";
   };
-  # ... module-specific options
+  # ... user-configurable options
+};
+
+# For FEATURE modules: Add modular dependencies
+_dependencies = lib.mkOption {
+  type = lib.types.listOf lib.types.str;
+  default = [ "system-checks" "command-center" ];  # What this module needs
+  internal = true;
+  description = "Modules this feature depends on";
 };
 
 # default.nix - ALL modules follow this structure
 { config, lib, pkgs, systemConfig, ... }:
 let
-  cfg = systemConfig.system.module-name or {};  # or management.* or features.*
+  cfg = systemConfig.{category}.{module} or {};
 in {
   imports = [
     ./options.nix
-  ] ++ (if (cfg.enable or false) then [
+  ] ++ (if (cfg.enable or /* category default */) then [
     ./config.nix  # Implementation logic
   ] else [
     ./config.nix  # Symlink management (always)
@@ -48,33 +70,38 @@ in {
 # config.nix - ALL modules follow this structure
 { config, lib, pkgs, systemConfig, ... }:
 let
-  cfg = systemConfig.system.module-name or {};
+  cfg = systemConfig.{category}.{module} or {};
+  apiData = config.core.{category}.{module} or {};  # Optional API data
   userConfigFile = ./module-name-config.nix;
   symlinkPath = "/etc/nixos/configs/module-name-config.nix";
 in
   lib.mkMerge [
     {
       # Symlink management (ALWAYS RUNS)
-      system.activationScripts.module-name-config-symlink = ''
-        # Create symlink and default config
-      '';
+      system.activationScripts.module-name-config-symlink = ''...'';
     }
-    (lib.mkIf (cfg.enable or false) {
+      (lib.mkIf (cfg.enable or /* category default */) {
       # Module implementation (ONLY WHEN ENABLED)
-      # System configuration
-      # Assertions
+        # Use cfg for user settings, apiData for collected data
+
+        # If module provides APIs: Define them here
+        options.core.{category}.{module} = {
+          # API options available when module is loaded
+          commands = lib.mkOption { /* example */ };
+        };
     })
   ];
 ```
 
 ### Key Architecture Principles
 
-1. **Unified API**: All modules use `systemConfig.*` namespace
-2. **Equal Treatment**: Every module has `enable` option with category-specific defaults
-3. **Separation of Concerns**: `default.nix` only imports, `config.nix` does everything else
-4. **Versioning**: Each module manages its own version via `_version`
-5. **User Configs**: Each module has user-editable config
-6. **Symlink Management**: Automatic symlinking to `/etc/nixos/configs/`
+1. **Unified Namespace**: `systemConfig.*` for all user-settings
+2. **Cross-Module APIs**: `core.*` for module-to-module communication
+3. **Modular Dependencies**: Features define dependencies via `_dependencies`
+4. **Unified Structure**: All modules follow same patterns regardless of category
+5. **Separation of Concerns**: `default.nix` imports, `config.nix` implements
+6. **Versioning**: Each module manages its own version via `_version`
+7. **User Configs**: Each module has user-editable config with automatic symlinking
 
 ## Complete Module Tree (All Template-Compliant & Versioned)
 
@@ -204,29 +231,45 @@ sudo ncc feature-manager  # Select any module, toggle enable/disable
 
 ## Migration from Old System
 
+### Major Changes
+
+1. **Unified Namespace System**: `systemConfig.*` for all user-settings
+2. **Cross-Module APIs**: `core.*` for module-to-module communication
+3. **Modular Dependencies**: Dependencies defined in each module's `options.nix`
+4. **Removed metadata.nix**: Centralized dependencies were not modular
+
 ### What Changed
 
-**Before**: Inconsistent namespaces (`systemConfig.*` vs `features.*`)
+**Before**: Centralized, inconsistent
 ```nix
-# OLD - Inconsistent
-options.systemConfig.management.logging = { ... };
-options.features.infrastructure.homelab = { ... };
+# OLD - Centralized dependencies
+metadata.nix = {
+  features.homelab.dependencies = [ ... ];
+};
+
+# OLD - Inconsistent API patterns
+options.features.homelab = { ... };
+core.command-center.commands = { ... };  # Always available
 ```
 
-**After**: Unified namespace with categories
+**After**: Modular, consistent, conditional
 ```nix
-# NEW - Unified & consistent
-options.systemConfig.management.logging = { ... };
-options.systemConfig.features.infrastructure.homelab = { ... };
+# NEW - Each module defines its dependencies
+options.systemConfig.features.infrastructure.homelab = {
+  _dependencies = [ "system-checks" "command-center" ];
+  # ...
+};
+
+# NEW - APIs are always defined, conditionally populated
+options.core.command-center = {
+  commands = { ... };  # Always available, filled when enabled
+};
 ```
-
-### Automatic Migration
-
-Modules can migrate with backward compatibility:
-- Old `options.systemConfig.*` paths still work
-- `options.features.*` redirects to `options.systemConfig.features.*`
-- Migration scripts handle option renaming
 
 ### Template Compliance
 
-**All modules now follow the same template** (as defined in this architecture). No more special cases or exceptions.
+**All modules now follow the unified template** with:
+- Same namespace patterns
+- Modular dependency management
+- Conditional API loading
+- Consistent file structure

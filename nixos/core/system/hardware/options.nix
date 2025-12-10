@@ -53,7 +53,7 @@ in {
       sizeGB = lib.mkOption {
         type = lib.types.nullOr lib.types.int;
         default = null;
-        description = "RAM size in GB (null = auto-detect via system-checks or disabled)";
+        description = "RAM size in GB (null = auto-detect via system-checks, will be set before module loads)";
       };
     };
   };

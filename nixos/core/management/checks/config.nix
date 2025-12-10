@@ -26,8 +26,8 @@ in
           ++ lib.optional (prebuildCfg.enable or true) ./prebuild/checks/system/users.nix;
 
   config = lib.mkMerge [
-    {
-      # Symlink management (always runs, even if disabled)
+    (lib.mkIf (cfg.enable or true) {
+      # Symlink management (only when enabled)
       system.activationScripts.checks-config-symlink = ''
         mkdir -p "$(dirname "${symlinkPath}")"
 
@@ -77,7 +77,7 @@ EOF
           ln -sfn "${toString userConfigFile}" "${symlinkPath}"
         fi
       '';
-    }
+    })
     (lib.mkIf (cfg.enable or true) {
       # Module implementation (only when enabled)
       environment.systemPackages = with pkgs; [

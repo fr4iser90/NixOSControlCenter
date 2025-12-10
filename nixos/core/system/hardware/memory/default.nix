@@ -1,13 +1,12 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  # Memory configuration: only enable if hardware.ram.sizeGB is explicitly set
-  # If not set, memory management features are DISABLED
-  # Set hardware.ram.sizeGB in configs/hardware-config.nix or enable system-checks to auto-detect
-  memoryInGB = systemConfig.system.hardware.ram.sizeGB or null;
+  # Memory configuration: use configured value, fallback to 8GB if null
+  # The activation script will update the config file for future rebuilds
+  memoryInGB = systemConfig.system.hardware.ram.sizeGB or 8;
 
-  # Only enable memory management if RAM size is configured
-  enableMemoryManagement = memoryInGB != null;
+  # Always enable memory management (we always have a fallback)
+  enableMemoryManagement = true;
 
   # Automatic configuration based on available RAM (only if enabled)
   memoryConfig = 

@@ -80,7 +80,10 @@ let
     in
       # Pattern: <top-level>/<domain>/.../<module>/<config>
       # Result: [<domain>, ..., <module>] (skip top-level)
-      if builtins.length relevantParts >= 2
+      # Special case: Configs in /etc/nixos/configs/ merge at top level
+      if builtins.length relevantParts == 1 && builtins.head relevantParts == "configs"
+      then []  # Configs in /etc/nixos/configs/ → merge at top level
+      else if builtins.length relevantParts >= 2
       then builtins.tail relevantParts  # Remove top-level, keep domain(s) + module
       else if builtins.length relevantParts == 1
       then relevantParts  # Just module name, no domain (legacy)

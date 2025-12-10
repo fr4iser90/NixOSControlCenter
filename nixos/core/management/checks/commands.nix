@@ -7,7 +7,7 @@ let
 in {
   config = {
     # Command-Center registration for checks module
-    systemConfig.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "build";
         description = "Build and activate NixOS configuration with safety checks";

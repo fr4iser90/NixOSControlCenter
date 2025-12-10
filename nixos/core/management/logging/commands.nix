@@ -8,7 +8,7 @@ let
   };
 
 in {
-  systemConfig.command-center.commands = lib.mkIf (cfg.enable or true) [
+  core.command-center.commands = lib.mkIf (cfg.enable or true) [
     {
       name = "log-system-report";
       script = "${systemReportScript.script}/bin/ncc-log-system-report";

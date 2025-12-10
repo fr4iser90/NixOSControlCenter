@@ -4,7 +4,7 @@ let
   cfg = systemConfig.features.infrastructure.homelab;
   userConfigFile = ./homelab-config.nix;
   symlinkPath = "/etc/nixos/configs/homelab-config.nix";
-  configHelpers = import ../../management/system-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
+  configHelpers = import ../../management/module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
   defaultConfig = ''
 {
   # Homelab Manager Configuration
@@ -37,8 +37,8 @@ let
 '';
 in
   lib.mkMerge [
-    {
-      # Symlink management for user config (always runs)
+    (lib.mkIf (cfg.enable or false) {
+      # Symlink management for user config (only when enabled)
       system.activationScripts.homelab-config-symlink = ''
         mkdir -p "$(dirname "${symlinkPath}")"
 
@@ -95,6 +95,6 @@ EOF
 
       # Enable feature by default if system config has it
       features.infrastructure.homelab.enable = lib.mkDefault (systemConfig.features.infrastructure.homelab.enable or false);
-    }
+    })
     # Implementation is handled in default.nix
   ]

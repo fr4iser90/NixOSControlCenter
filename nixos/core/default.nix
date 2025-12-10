@@ -14,7 +14,6 @@
     # Infrastructure
     ./infrastructure/cli-formatter 
     ./infrastructure/command-center
-    ./infrastructure/config
     # Management
     ./management/system-manager
     ./management/module-manager

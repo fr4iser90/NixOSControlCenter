@@ -1,16 +1,17 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  cfg = systemConfig.command-center or {};
+  cfg = config.core.command-center or {};
   ui = config.core.cli-formatter.api;
   ccLib = import ../lib { inherit lib; };
 
   # Dynamische Inhalte vorbereiten
-  commands = cfg.commands or [];
-  caseBlock = lib.concatMapStringsSep "\n  " ccLib.utils.generateExecCase commands;
-  commandLongHelp = lib.concatMapStringsSep "\n  " ccLib.utils.generateLongHelpCase commands;
-  commandList = ccLib.utils.generateCommandList commands;
-  validCommands = ccLib.utils.getValidCommands commands;
+  # Get commands from systemConfig
+  resolvedCommands = cfg.commands or [];
+  caseBlock = lib.concatMapStringsSep "\n  " ccLib.utils.generateExecCase resolvedCommands;
+  commandLongHelp = lib.concatMapStringsSep "\n  " ccLib.utils.generateLongHelpCase resolvedCommands;
+  commandList = ccLib.utils.generateCommandList resolvedCommands;
+  validCommands = ccLib.utils.getValidCommands resolvedCommands;
 
 in
   pkgs.writeScriptBin "ncc" ''

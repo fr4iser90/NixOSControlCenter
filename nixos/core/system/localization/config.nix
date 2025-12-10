@@ -7,7 +7,7 @@ let
   # CRITICAL: Use absolute path to deployed location, not relative (which resolves to store)
   userConfigFile = "/etc/nixos/core/system/localization/localization-config.nix";
   symlinkPath = "/etc/nixos/configs/localization-config.nix";
-  configHelpers = import ../../management/system-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
+  configHelpers = import ../../management/module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
   defaultConfig = ''
 {
   localization = {
@@ -52,11 +52,11 @@ let
 in
 {
   config = lib.mkMerge [
-    {
-      # Create symlink on activation (always)
+    (lib.mkIf (cfg.enable or true) {
+      # Create symlink on activation (only when enabled)
       system.activationScripts.localization-config-symlink =
         configHelpers.setupConfigFile symlinkPath userConfigFile defaultConfig;
-    }
+    })
     {
       # Localization configuration (always active, no enable check needed)
       i18n = {

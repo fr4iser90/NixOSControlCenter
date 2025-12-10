@@ -1,11 +1,13 @@
 { config, lib, pkgs, systemConfig, ... }:
+
 let
-  cfg = systemConfig.system.hardware or {};
-  # CRITICAL: Use absolute path to deployed location, not relative (which resolves to store)
-  userConfigFile = "/etc/nixos/core/system/hardware/hardware-config.nix";
-  symlinkPath = "/etc/nixos/configs/hardware-config.nix";
-  configHelpers = import ../../management/system-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
-  defaultConfig = ''
+  configHelpers = import ../../management/module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
+in
+{
+  config = lib.mkIf ((systemConfig.system.hardware.enable or false) || true)
+    (configHelpers.createModuleConfig {
+      moduleName = "hardware";
+      defaultConfig = ''
 {
   hardware = {
     cpu = "intel";
@@ -16,11 +18,6 @@ let
   };
 }
 '';
-in
-{
-  config = {
-    system.activationScripts.hardware-config-symlink =
-      configHelpers.setupConfigFile symlinkPath userConfigFile defaultConfig;
-  };
+    });
 }
 

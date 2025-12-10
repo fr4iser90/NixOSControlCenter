@@ -5,7 +5,7 @@ let
   # CRITICAL: Use absolute path to deployed location, not relative (which resolves to store)
   userConfigFile = "/etc/nixos/core/system/desktop/desktop-config.nix";
   symlinkPath = "/etc/nixos/configs/desktop-config.nix";
-  configHelpers = import ../../management/system-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
+  configHelpers = import ../../management/module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
   defaultConfig = ''
 {
   desktop = {
@@ -29,12 +29,12 @@ let
 in
 {
   config = lib.mkMerge [
-    {
-      # Create symlink on activation (always, not only when enabled)
+    (lib.mkIf (cfg.enable or true) {
+      # Create symlink on activation (only when enabled)
       # Uses central API from system-manager (professional pattern)
-      system.activationScripts.desktop-config-symlink = 
+      system.activationScripts.desktop-config-symlink =
         configHelpers.setupConfigFile symlinkPath userConfigFile defaultConfig;
-    }
+    })
     (lib.mkIf (cfg.enable or false) {
       environment = {
         variables = {

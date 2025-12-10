@@ -91,7 +91,7 @@ let
 
 in {
   # 🎯 COMMAND REGISTRATION: In commands.nix per MODULE_TEMPLATE!
-  systemConfig.command-center.commands = [
+  core.command-center.commands = [
     {
       name = "module-manager";
       description = "Toggle all NixOS modules using fzf (dynamic discovery)";

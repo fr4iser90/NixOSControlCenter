@@ -23,7 +23,7 @@ let
   ];
 
   ui = config.core.cli-formatter.api;
-  commandCenter = systemConfig.command-center;
+  commandCenter = systemConfig.core.infrastructure.command-center;
 
   # Extract configuration values
   username = head (attrNames systemConfig.users);
@@ -787,7 +787,7 @@ in {
     '';
 
     # Commands are registered in commands.nix
-    systemConfig.command-center.commands = [
+    core.command-center.commands = [
       {
         name = "system-update";
         description = "Update NixOS system configuration";

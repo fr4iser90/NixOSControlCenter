@@ -1,6 +1,6 @@
 { config, lib, pkgs, systemConfig, ... }:
 let
-  cfg = systemConfig.command-center or {};
+  cfg = systemConfig.core.infrastructure.command-center or {};
   userConfigFile = ./command-center-config.nix;
   symlinkPath = "/etc/nixos/configs/command-center-config.nix";
 
@@ -12,13 +12,15 @@ let
   aliases = import ./scripts/aliases.nix { inherit config lib pkgs systemConfig; };
 
   # Automatisch alle verwendeten Kategorien sammeln
-  usedCategories = ccLib.utils.getUniqueCategories cfg.commands;
+  # CRITICAL: Use the final resolved commands from systemConfig, not the initial cfg.commands
+  finalCommands = config.core.command-center.commands or [];
+  usedCategories = ccLib.utils.getUniqueCategories finalCommands;
 
 in
 {
   config = lib.mkMerge [
-    {
-      # Symlink management (always runs, even if disabled)
+    (lib.mkIf (cfg.enable or true) {
+      # Symlink management (only when enabled)
       system.activationScripts.command-center-config-symlink = ''
         mkdir -p "$(dirname "${symlinkPath}")"
 
@@ -51,8 +53,8 @@ EOF
       '';
 
       # Compute categories from commands
-      systemConfig.command-center.categories = usedCategories;
-    }
+      systemConfig.core.infrastructure.command-center.categories = usedCategories;
+    })
     (lib.mkIf (cfg.enable or true) {
       # Module implementation (only when enabled)
       environment.systemPackages = [

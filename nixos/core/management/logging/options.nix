@@ -7,11 +7,8 @@ let
   reportLevels = {
     basic = 1;
     info = 2;
-    standard = 2;  # Alias for info
     debug = 3;
-    detailed = 3;  # Alias for debug
     trace = 4;
-    full = 4;  # Alias for trace
   };
 
   # Collector-spezifische Optionen

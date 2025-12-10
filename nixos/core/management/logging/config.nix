@@ -51,8 +51,8 @@ let
   symlinkPath = "/etc/nixos/configs/logging-config.nix";
 in
   lib.mkMerge [
-    {
-      # Symlink management (always runs)
+    (lib.mkIf (cfg.enable or true) {
+      # Symlink management (only when enabled)
       system.activationScripts.logging-config-symlink = ''
         mkdir -p "$(dirname "${symlinkPath}")"
 
@@ -120,7 +120,7 @@ EOF
           ln -sfn "${toString userConfigFile}" "${symlinkPath}"
         fi
       '';
-    }
+    })
 
     # Core API - always available
     {

@@ -5,7 +5,7 @@ let
   configMigrationModule = import ./. { inherit pkgs lib config; };
   checkScript = configMigrationModule.check.configCheck;
 in {
-  systemConfig.command-center.commands = lib.mkIf (cfg.components.configMigration.enable or false) [
+  core.command-center.commands = lib.mkIf (cfg.components.configMigration.enable or false) [
     {
       name = "config-check";
       script = "${checkScript}";

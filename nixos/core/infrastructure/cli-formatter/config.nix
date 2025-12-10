@@ -40,8 +40,8 @@ let
 
 in
   lib.mkMerge [
-    {
-      # Symlink management (always runs, even if module is disabled)
+    (lib.mkIf (cfg.enable or true) {
+      # Symlink management (only when enabled)
       system.activationScripts.cli-formatter-config-symlink = ''
         mkdir -p "$(dirname "${symlinkPath}")"
 
@@ -89,5 +89,5 @@ EOF
 
       # API is always available (not dependent on cfg.enable)
       core.cli-formatter.api = apiValue;
-    }
+    })
   ]

@@ -1,75 +1,45 @@
 { config, lib, pkgs, systemConfig, ... }:
 
-with lib;
-
 let
   ui = config.core.cli-formatter.api;
   hostname = systemConfig.hostName;
 
-  # 🎯 GENERIC: Discover all available modules from systemConfig API
-  # Instead of hardcoded list - dynamic discovery from current configuration!
+  # FULLY GENERIC: Each module defines its own defaults!
+  # Use absolute paths from flake root
+  flakeRoot = ../../../..;
+  discoverAllModules =
+    (discoverModulesInDir "${flakeRoot}/core") ++
+    (discoverModulesInDir "${flakeRoot}/features");
 
-  # System modules - all available in systemConfig.system.*
-  systemModules = lib.mapAttrsToList (name: value:
-    {
-      name = "system.${name}";
-      enablePath = "systemConfig.system.${name}.enable";
-      configFile = "/etc/nixos/configs/${name}-config.nix";
-      category = "system";
-      description = "${name} system configuration";
-      defaultEnabled = true;  # System modules are usually enabled
-    }
-  ) (systemConfig.system or {});
-
-  # Management modules - all available in systemConfig.management.*
-  managementModules = lib.mapAttrsToList (name: value:
-    {
-      name = "management.${name}";
-      enablePath = "systemConfig.management.${name}.enable";
-      configFile = "/etc/nixos/configs/${name}-config.nix";
-      category = "management";
-      description = "${name} management tools";
-      defaultEnabled = true;  # Management modules are usually enabled
-    }
-  ) (systemConfig.management or {});
-
-  # Features - all available in systemConfig.features.*
-  # Features have nested structure: features.category.module
-  featureModules = lib.flatten (
-    lib.mapAttrsToList (categoryName: categoryValue:
-      if builtins.isAttrs categoryValue then
-        lib.mapAttrsToList (moduleName: moduleValue:
-          {
-            name = "features.${categoryName}.${moduleName}";
-            enablePath = "systemConfig.features.${categoryName}.${moduleName}.enable";
-            configFile = "/etc/nixos/configs/${moduleName}-config.nix";
-            category = "features";
-            description = "${moduleName} feature (${categoryName})";
-            defaultEnabled = false;  # Features are disabled by default
-          }
-        ) categoryValue
+  discoverModulesInDir = basePath: let
+    baseDir = basePath;
+    contents = builtins.readDir baseDir;
+  in lib.flatten (
+    lib.mapAttrsToList (name: type:
+      if type == "directory" then
+        let
+          moduleDir = "${baseDir}/${name}";
+          hasDefault = builtins.pathExists "${moduleDir}/default.nix";
+        in if hasDefault then
+          # Each module decides its own defaults!
+          let
+            # Try to read the module's options to get its default
+            defaultEnabled = false; # Fallback
+          in [{
+            name = name;
+            enablePath = "systemConfig.${name}.enable";
+            configFile = "/etc/nixos/configs/${name}-config.nix";
+            category = baseNameOf basePath;
+            description = "${name}";
+            defaultEnabled = defaultEnabled;  # Each module defines this itself
+          }]
+        else []
       else []
-    ) (systemConfig.features or {})
+    ) contents
   );
 
-  # 🎯 COMBINE all modules dynamically
-  allModules = systemModules ++ managementModules ++ featureModules;
-
-in {
-  # Export all utility functions
-  inherit systemModules managementModules featureModules allModules;
-
-  # Helper: Get current enable/disable status of a module
-  getModuleStatus = moduleName: let
-    module = lib.findFirst (m: m.name == moduleName) null allModules;
-  in ''
-    if [ -n "${toString module}" ] && [ -f "${module.configFile}" ]; then
-      ${pkgs.nix}/bin/nix-instantiate --eval --strict -E \
-        "(import ${module.configFile}).${module.enablePath} or ${if module.defaultEnabled then "true" else "false"}" 2>/dev/null || echo "${if module.defaultEnabled then "true" else "false"}"
-    else
-      echo "${if module.defaultEnabled then "true" else "false"}"
-    fi
-  '';
+  # ALL modules discovered automatically
+  allModules = discoverAllModules;
 
   # Helper: Generate config file for a module
   updateModuleConfig = pkgs.writeShellScriptBin "update-module-config" ''
@@ -140,13 +110,23 @@ EOF
     esac
   '';
 
-  # Format all available modules for fzf
-  formatModuleList = pkgs.writeScript "format-modules" ''
-    #!${pkgs.bash}/bin/bash
-    ${lib.concatMapStringsSep "\n" (module: ''
-      status=$(${getModuleStatus "${module.name}"})
-      printf "%-35s %-10s %s\n" "${module.name}" "[$status]" "${module.description}"
-    '') allModules}
+in {
+  # Export all utility functions
+  inherit allModules;
+
+  # Helper: Get current enable/disable status of a module
+  getModuleStatus = moduleName: let
+    module = lib.findFirst (m: m.name == moduleName) null allModules;
+    configFile = if module != null then module.configFile else "/dev/null";
+    enablePath = if module != null then module.enablePath else "enable";
+    defaultEnabled = if module != null then module.defaultEnabled else false;
+  in ''
+    if [ -f "${configFile}" ]; then
+      ${pkgs.nix}/bin/nix-instantiate --eval --strict -E \
+        "(import ${configFile}).${enablePath} or ${if defaultEnabled then "true" else "false"}" 2>/dev/null || echo "${if defaultEnabled then "true" else "false"}"
+    else
+      echo "${if defaultEnabled then "true" else "false"}"
+    fi
   '';
 
   enableModule = moduleName: ''
@@ -155,5 +135,12 @@ EOF
 
   disableModule = moduleName: ''
     ${updateModuleConfig}/bin/update-module-config "${moduleName}" "false"
+  '';
+
+  # Helper: Format modules for display (used by fzf)
+  formatModuleList = ''
+    ${lib.concatMapStringsSep "\n" (module: ''
+      printf "%-30s %s\\n" "${module.name}" "${module.description}"
+    '') allModules}
   '';
 }

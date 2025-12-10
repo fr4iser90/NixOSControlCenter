@@ -6,8 +6,8 @@ let
   symlinkPath = "/etc/nixos/configs/module-manager-config.nix";
 in
   lib.mkMerge [
-    {
-      # Symlink management for user config (always runs)
+    (lib.mkIf (cfg.enable or true) {
+      # Symlink management for user config (only when enabled)
       system.activationScripts.module-manager-config-symlink = ''
         mkdir -p "$(dirname "${symlinkPath}")"
 
@@ -47,7 +47,7 @@ EOF
           ln -sfn "${toString userConfigFile}" "${symlinkPath}"
         fi
       '';
-    }
+    })
     # Module-manager is a core module that dynamically discovers all available modules
     # No additional system configuration needed - works dynamically
   ]

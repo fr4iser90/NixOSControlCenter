@@ -15,7 +15,6 @@ let
   updateDesktopConfig = import ./scripts/update-desktop-config.nix { inherit config lib pkgs systemConfig; };
   
   # Import config migration and validation
-  # Import formatter (like in core/infrastructure/config/default.nix)
   colors = import ../cli-formatter/colors.nix;
   coreFormatter = import ../cli-formatter/core { inherit lib colors; config = {}; };
   statusFormatter = import ../cli-formatter/status { inherit lib colors; config = {}; };
@@ -38,9 +37,12 @@ in {
         configValidator.validateSystemConfig
         enableDesktopScript
         updateDesktopConfig
+      ] ++ lib.optionals (cfg.components.configMigration.enable or false) [
+        configMigration.check.configCheck
+        configMigration.validator.validateSystemConfig
       ];
     
-    systemConfig.command-center.commands =
+    core.command-center.commands =
       [
         {
           name = "check-module-versions";
@@ -86,13 +88,13 @@ in {
           name = "migrate-system-config";
           description = "Migrate system-config.nix from monolithic to modular structure";
           category = "system";
-          script = "${configMigration.migrateSystemConfig}/bin/ncc-migrate-config";
+          script = "${configMigration.migration.migrateSystemConfig}/bin/ncc-migrate-config";
           arguments = [];
           dependencies = [ "nix" ];
           shortHelp = "migrate-system-config - Migrate system-config.nix to modular structure";
           longHelp = ''
             Migrates the system configuration from monolithic to modular structure:
-            
+
             Migration Process:
             - Creates backup of current system-config.nix
             - Extracts config sections to separate files in configs/:
@@ -103,7 +105,7 @@ in {
               * logging → configs/logging-config.nix
             - Keeps only critical values in system-config.nix
             - Preserves all existing configuration values
-            
+
             This migration is safe and creates backups automatically.
             Run 'ncc validate-system-config' to check if migration is needed.
           '';
@@ -118,7 +120,7 @@ in {
           shortHelp = "validate-system-config - Validate system-config.nix structure";
           longHelp = ''
             Validates the system configuration structure and checks:
-            
+
             Validation Checks:
             - Nix syntax validity
             - Required critical values presence:
@@ -126,12 +128,12 @@ in {
               * system.bootloader, allowUnfree, users, timeZone
             - Modular structure check (configs/ directory)
             - Detects old monolithic structure
-            
+
             Recommendations:
             - If old structure detected, run 'ncc migrate-system-config'
             - Ensures configuration follows best practices
             - Helps identify configuration issues before rebuild
-            
+
             Exit codes:
             - 0: All checks passed
             - 1: Errors or warnings found

@@ -170,13 +170,13 @@ module-name/               # Module name
 ### `options.nix`
 - **Purpose**: Define all configuration options
 - **Responsibilities**:
-  - For **features**: All `options.features.<module-name>` definitions
-  - For **core modules**: All `options.systemConfig.<module-name>` definitions
+  - **ALL modules**: `options.systemConfig.{category}.{module-name}` definitions
   - Default values and descriptions
   - Type definitions for options
   - **Versioning**: Define `_version` option for all modules (core and features)
 - **Rule**: NO implementation logic, only option definitions
 - **Required**: **ALL modules** (core and features) must have `options.nix` with versioning
+- **Dependencies**: **Feature modules** must define `_dependencies` for modular dependency management
 - **Pattern**:
   ```nix
   # ALL modules use the SAME namespace pattern
@@ -184,6 +184,14 @@ module-name/               # Module name
     _version = lib.mkOption { ... };
     enable = lib.mkOption { ... };
     # ... other options
+  };
+
+  # FEATURE MODULES: Add modular dependencies
+  _dependencies = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    default = [ "system-checks" "command-center" ];  # What this module needs
+    internal = true;
+    description = "Modules this feature depends on";
   };
 
   # Examples:
@@ -236,7 +244,7 @@ module-name/               # Module name
     };
   }
   ```
-- **Access**: Via `systemConfig.module-name` (or `systemConfig.features.module-name` for features)
+- **Access**: Via `systemConfig.{category}.{module-name}`
 - **Symlink**: Automatically symlinked to `/etc/nixos/configs/module-name-config.nix` for easy editing
 
 ### `config.nix`
@@ -262,22 +270,23 @@ module-name/               # Module name
   ```nix
   { config, lib, pkgs, systemConfig, ... }:
   let
-    cfg = systemConfig.module-name or {};
+    cfg = systemConfig.{category}.{module} or {};
+    apiData = config.core.{category}.{module} or {};  # Optional API data
     userConfigFile = ./module-name-config.nix;
     symlinkPath = "/etc/nixos/configs/module-name-config.nix";
   in
     lib.mkMerge [
       {
         # Symlink management (always runs)
-        system.activationScripts.module-name-config-symlink = ''
-          # Create default config if missing
-          # Create/update symlink
-        '';
+        system.activationScripts.module-name-config-symlink = ''...'';
       }
-      (lib.mkIf (cfg.enable or false) {
+      (lib.mkIf (cfg.enable or /* category-specific default */) {
         # Module implementation (only when enabled)
-        # System configuration
-        # Assertions
+        # Use cfg for user settings, apiData for collected data (if available)
+        # Define APIs here if module provides them
+        options.core.{category}.{module} = {
+          # API options available when module is loaded
+        };
       })
     ];
   ```
