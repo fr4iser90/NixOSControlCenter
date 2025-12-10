@@ -199,11 +199,8 @@ let
     else [ ./features/docker-rootless.nix ];
 
   # --- API: Load packageModules automatisch ---
-  apiPackageModules = packagesCfg.packageModules or [];
-  loadedPackageModules = map (mod:
-    import ./packages/${mod}/default.nix { inherit pkgs lib; }
-  ) apiPackageModules;
-  packageList = lib.concatMap (m: m.packages or []) loadedPackageModules;
+  # Note: packageModules are loaded as features from ./features/
+  # No separate package loading needed - features handle their own packages
 
 in {
   imports = 
@@ -216,6 +213,6 @@ in {
     # Docker modules added separately
     ++ dockerModule;
 
-  # Add all packages from packageModules via API
-  environment.systemPackages = packageList;
+  # Packages are added by the feature modules themselves
+  # No need to collect them here
 }
