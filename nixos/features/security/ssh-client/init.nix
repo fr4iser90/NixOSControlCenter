@@ -2,7 +2,7 @@
 
 let
   ui = config.core.cli-formatter.api;
-  cfg = config.features.security.ssh-client;
+  cfg = systemConfig.features.security.ssh-client;
 
   # Setup user credentials file for each configured user
   # This function creates the necessary directory structure and credentials file

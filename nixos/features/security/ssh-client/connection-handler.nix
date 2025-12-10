@@ -2,7 +2,7 @@
 
 let
   ui = config.core.cli-formatter.api;
-  cfg = config.features.security.ssh-client;
+  cfg = systemConfig.features.security.ssh-client;
 
   # Centralized SSH Connection Handler
   # This module contains all SSH connection logic in one place

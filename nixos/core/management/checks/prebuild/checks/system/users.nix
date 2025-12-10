@@ -67,7 +67,7 @@ let
 in {
   config = {
     environment.systemPackages = [ prebuildScript ];
-    core.command-center.commands = [
+    systemConfig.command-center.commands = [
       {
         name = "check-users";
         category = "system-checks";

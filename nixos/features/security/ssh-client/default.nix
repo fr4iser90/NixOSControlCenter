@@ -6,7 +6,7 @@ with lib;
 # This is the main entry point that imports all SSH client manager components
 
 let
-  cfg = config.features.ssh-client-manager;
+  cfg = systemConfig.features.security.ssh-client;
 in {
   # Import all SSH client manager modules
   imports = [

@@ -5,8 +5,7 @@ let
   # CRITICAL: Use absolute path to deployed location, not relative (which resolves to store)
   userConfigFile = "/etc/nixos/core/system/desktop/desktop-config.nix";
   symlinkPath = "/etc/nixos/configs/desktop-config.nix";
-  # Use API (like cli-formatter.api)
-  configHelpers = config.core.management.system-manager.api.configHelpers;
+  configHelpers = import ../../management/system-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
   defaultConfig = ''
 {
   desktop = {

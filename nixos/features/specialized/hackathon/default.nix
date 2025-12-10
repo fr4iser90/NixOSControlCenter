@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = config.features.specialized.hackathon;
+  cfg = systemConfig.features.specialized.hackathon;
   
   # Finde alle Benutzer mit hackathon-admin Rolle
   hackathonUsers = lib.filterAttrs 

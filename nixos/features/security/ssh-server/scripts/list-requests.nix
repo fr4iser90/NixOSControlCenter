@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = config.features.security.ssh-server.list-requests;
+  cfg = systemConfig.features.security.ssh-server.list-requests;
   ui = config.core.cli-formatter.api;
 
   listRequestsScript = pkgs.writeScriptBin "ssh-list-requests" ''

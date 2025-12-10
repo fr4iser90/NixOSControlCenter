@@ -4,7 +4,7 @@ with lib;
 
 let
   ui = config.core.cli-formatter.api;
-  cfg = config.features.security.ssh-client;
+  cfg = systemConfig.features.security.ssh-client;
   
   # Note: Scripts that use cfg must be created in mkIf cfg.enable block
 in {

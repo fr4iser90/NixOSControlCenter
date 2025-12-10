@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = config.features.security.ssh-server.monitoring;
+  cfg = systemConfig.features.security.ssh-server.monitoring;
   
   monitorScript = pkgs.writeScriptBin "ssh-monitor" ''
     #!${pkgs.bash}/bin/bash

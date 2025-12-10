@@ -18,10 +18,6 @@ in {
     # Handlers
     ./handlers/system-update.nix
     ./handlers/channel-manager.nix
-    ./handlers/desktop-manager.nix
-    # Note: feature-manager and module-version-check moved to module-management/module-manager
-    # Note: config-validator.nix and config-migration.nix are not modules,
-    # they're imported in commands.nix to get their scripts
   ];
 
   config = {

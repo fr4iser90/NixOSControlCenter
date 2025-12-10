@@ -139,7 +139,7 @@ let
 in {
   config = {
     environment.systemPackages = [ prebuildScript ];
-    core.command-center.commands = [
+    systemConfig.command-center.commands = [
       {
         name = "check-gpu";
         category = "system-checks";

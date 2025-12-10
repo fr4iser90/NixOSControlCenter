@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = config.features.security.ssh-server.grant-access;
+  cfg = systemConfig.features.security.ssh-server.grant-access;
   ui = config.core.cli-formatter.api;
   backupHelpers = config.core.management.system-manager.api.backupHelpers;
 

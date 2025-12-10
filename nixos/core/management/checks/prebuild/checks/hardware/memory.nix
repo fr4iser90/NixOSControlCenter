@@ -83,7 +83,7 @@ let
 in {
   config = {
     environment.systemPackages = [ prebuildScript ];
-    core.command-center.commands = [
+    systemConfig.command-center.commands = [
       {
         name = "check-memory";
         category = "system-checks";

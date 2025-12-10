@@ -4,7 +4,7 @@
 with lib;
 
 let
-  cfg = config.features.vm-manager;
+  cfg = systemConfig.features.infrastructure.vm;
   libVM = import ../lib { inherit lib pkgs; };
 
   mkTestVM = distro: {
@@ -13,7 +13,7 @@ let
     pkgs,
     ...
   }: let
-    vmCfg = config.features.vm-manager.testing.${distro}.vm;
+    vmCfg = systemConfig.features.infrastructure.vm.testing.${distro}.vm;
     vmName = "${distro}-test";
   in {
     options.features.vm-manager.testing.${distro}.vm = {

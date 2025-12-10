@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = config.features.security.ssh-server;
+  cfg = systemConfig.features.security.ssh-server;
   ui = config.core.cli-formatter.api;
 
   sshTempOpenScript = pkgs.writeScriptBin "ssh-temp-open" ''

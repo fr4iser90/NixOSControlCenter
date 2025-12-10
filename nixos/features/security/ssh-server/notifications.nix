@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = config.features.security.ssh-server.notifications;
+  cfg = systemConfig.features.security.ssh-server.notifications;
   ui = config.core.cli-formatter.api;
 
   notificationTypes = {

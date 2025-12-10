@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.features.security.ssh-client;
+  cfg = systemConfig.features.security.ssh-client;
 
   # Connection Preview Script
   # This script provides detailed information about SSH servers in the FZF preview window

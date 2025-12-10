@@ -1,4 +1,5 @@
 { config, lib, pkgs, systemConfig, ... }:
+
 let
   cfg = systemConfig.management.checks or {};
   userConfigFile = ./checks-config.nix;
@@ -18,6 +19,12 @@ let
   prebuildCfg = cfg.prebuild or {};
 in
 {
+  imports = lib.optional (prebuildCfg.enable or true) ./prebuild/checks/hardware/utils.nix
+          ++ lib.optional (prebuildCfg.enable or true) ./prebuild/checks/hardware/gpu.nix
+          ++ lib.optional (prebuildCfg.enable or true) ./prebuild/checks/hardware/cpu.nix
+          ++ lib.optional (prebuildCfg.enable or true) ./prebuild/checks/hardware/memory.nix
+          ++ lib.optional (prebuildCfg.enable or true) ./prebuild/checks/system/users.nix;
+
   config = lib.mkMerge [
     {
       # Symlink management (always runs, even if disabled)
@@ -88,13 +95,6 @@ EOF
           ${postbuildScript}/bin/nixos-postbuild
         '';
       };
-
-      # Import prebuild check modules
-      imports = lib.optional (prebuildCfg.enable or true) ./prebuild/checks/hardware/utils.nix
-              ++ lib.optional (prebuildCfg.enable or true) ./prebuild/checks/hardware/gpu.nix
-              ++ lib.optional (prebuildCfg.enable or true) ./prebuild/checks/hardware/cpu.nix
-              ++ lib.optional (prebuildCfg.enable or true) ./prebuild/checks/hardware/memory.nix
-              ++ lib.optional (prebuildCfg.enable or true) ./prebuild/checks/system/users.nix;
     })
   ];
 }

@@ -8,11 +8,11 @@ let
   checkVersions = import ./scripts/check-versions.nix { inherit config lib pkgs; };
   updateFeatures = import ./scripts/update-features.nix { inherit config lib pkgs; };
   
-  # Import handlers to get their scripts and commands
-  systemUpdateHandler = import ./handlers/system-update.nix { inherit config lib pkgs systemConfig; };
-  # Module-manager commands werden automatisch über das module-manager Modul registriert
-  channelManagerHandler = import ./handlers/channel-manager.nix { inherit config lib pkgs systemConfig; };
-  desktopManagerHandler = import ./handlers/desktop-manager.nix { inherit config lib pkgs systemConfig; };
+  # Scripts are imported below (template-compliant)
+
+  # Import scripts (template-compliant)
+  enableDesktopScript = import ./scripts/enable-desktop.nix { inherit config lib pkgs systemConfig; };
+  updateDesktopConfig = import ./scripts/update-desktop-config.nix { inherit config lib pkgs systemConfig; };
   
   # Import config migration and validation
   # Import formatter (like in core/infrastructure/config/default.nix)
@@ -27,26 +27,20 @@ let
   # Get backup helpers from API (will be passed to config-migration)
   # Fallback to direct import if API not yet available
   backupHelpersForMigration = config.core.management.system-manager.api.backupHelpers or (import ./lib/backup-helpers.nix { inherit pkgs lib; });
-  configMigration = import ../config/config-migration.nix { inherit pkgs lib formatter; backupHelpers = backupHelpersForMigration; };
+  configMigration = import ./components/config-migration/default.nix { inherit pkgs lib formatter; backupHelpers = backupHelpersForMigration; };
   configValidator = import ./validators/config-validator.nix { inherit pkgs lib; };
 in {
   config = {
-    environment.systemPackages = 
+    environment.systemPackages =
       [ checkVersions.checkVersionsScript
         updateFeatures.updateFeaturesScript
         configMigration.migrateSystemConfig
         configValidator.validateSystemConfig
-      ] ++
-      (systemUpdateHandler.config.environment.systemPackages or []) ++
-      # Module-manager packages werden automatisch registriert
-      (channelManagerHandler.config.environment.systemPackages or []) ++
-      (desktopManagerHandler.config.environment.systemPackages or []);
+        enableDesktopScript
+        updateDesktopConfig
+      ];
     
-    core.command-center.commands = 
-      (systemUpdateHandler.config.core.command-center.commands or []) ++
-      # Module-manager commands werden automatisch registriert
-      (channelManagerHandler.config.core.command-center.commands or []) ++
-      (desktopManagerHandler.config.core.command-center.commands or []) ++
+    systemConfig.command-center.commands =
       [
         {
           name = "check-module-versions";
@@ -141,6 +135,21 @@ in {
             Exit codes:
             - 0: All checks passed
             - 1: Errors or warnings found
+          '';
+        }
+        {
+          name = "desktop-manager";
+          description = "Enable or disable desktop environment";
+          category = "system";
+          script = "${enableDesktopScript}/bin/enable-desktop";
+          arguments = [ "enable|disable" ];
+          dependencies = [ "nix" ];
+          shortHelp = "Enable or disable the desktop environment";
+          longHelp = ''
+            Allows enabling or disabling the desktop environment:
+            - "enable" to activate the desktop
+            - "disable" to deactivate the desktop
+            Requires sudo privileges and triggers system rebuild.
           '';
         }
       ];

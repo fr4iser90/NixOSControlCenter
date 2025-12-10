@@ -4,7 +4,7 @@ let
   cfg = systemConfig.system.network or {};
   userConfigFile = ./network-config.nix;
   symlinkPath = "/etc/nixos/configs/network-config.nix";
-  configHelpers = config.core.management.system-manager.api.configHelpers;
+  configHelpers = import ../../management/system-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
   defaultConfig = ''
 {
   # Network System Configuration

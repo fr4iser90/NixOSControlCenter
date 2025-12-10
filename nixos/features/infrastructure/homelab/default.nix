@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = config.features.infrastructure.homelab;
+  cfg = systemConfig.features.infrastructure.homelab;
   
   # Check if Swarm is active
   isSwarmMode = (systemConfig.homelab.swarm or null) != null;

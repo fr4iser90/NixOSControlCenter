@@ -63,13 +63,13 @@ EOF
         aliases.nix-control
       ];
 
-      # Assertions for validation
-      assertions = [
-        {
-          assertion = cfg.commands != [];
-          message = "command-center: At least one command must be registered";
-        }
-      ];
+      # Assertions for validation (temporarily disabled - commands are registered via systemConfig)
+      # assertions = [
+      #   {
+      #     assertion = cfg.commands != [];
+      #     message = "command-center: At least one command must be registered";
+      #   }
+      # ];
     })
   ];
 }

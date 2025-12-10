@@ -3,9 +3,9 @@
 with lib;
 
 let
-  cfg = config.features.security.ssh-server.request-access;
+  cfg = systemConfig.features.security.ssh-server.request-access;
   ui = config.core.cli-formatter.api;
-  notifications = config.features.security.ssh-server.notifications;
+  notifications = systemConfig.features.security.ssh-server.notifications;
 
   requestAccessScript = pkgs.writeScriptBin "ssh-request-access" ''
     #!${pkgs.bash}/bin/bash

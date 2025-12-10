@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = config.features.ai-workspace;
+  cfg = systemConfig.features.specialized.ai-workspace or {};
 in {
   imports = [
     ./options.nix

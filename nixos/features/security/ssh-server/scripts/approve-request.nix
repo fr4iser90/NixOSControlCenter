@@ -3,9 +3,9 @@
 with lib;
 
 let
-  cfg = config.features.security.ssh-server.approve-request;
+  cfg = systemConfig.features.security.ssh-server.approve-request;
   ui = config.core.cli-formatter.api;
-  notifications = config.features.security.ssh-server.notifications;
+  notifications = systemConfig.features.security.ssh-server.notifications;
   backupHelpers = config.core.management.system-manager.api.backupHelpers;
 
   approveRequestScript = pkgs.writeScriptBin "ssh-approve-request" ''

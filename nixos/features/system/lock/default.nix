@@ -7,7 +7,7 @@ let
   ui = config.core.cli-formatter.api;
   
   # Feature configuration
-  cfg = config.features.system.lock;
+  cfg = systemConfig.features.system.lock;
   
   # Import scanner modules (only those that don't use cfg can be in outer let)
   desktopScanner = import ./scanners/desktop.nix { inherit pkgs; };

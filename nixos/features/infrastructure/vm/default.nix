@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = config.features.infrastructure.vm;
+  cfg = systemConfig.features.infrastructure.vm;
   stateDir = cfg.stateDir;
 in {
   imports = [

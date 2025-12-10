@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = config.features.infrastructure.bootentry;
+  cfg = systemConfig.features.infrastructure.bootentry;
   
   # Importiere die benötigten Module
   common = import ./lib/common.nix { inherit lib; };

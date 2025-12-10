@@ -3,7 +3,7 @@
 let
   moduleVersion = "1.0";
 in {
-  options.core.management.module-manager = {
+  options.systemConfig.core.management.module-manager = {
     _version = lib.mkOption {
       type = lib.types.str;
       default = moduleVersion;

@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = config.features.security.ssh-server.monitor;
+  cfg = systemConfig.features.security.ssh-server.monitor;
   ui = config.core.cli-formatter.api;
 
   monitorScript = pkgs.writeScriptBin "ssh-monitor" ''
