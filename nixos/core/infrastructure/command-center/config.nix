@@ -1,8 +1,9 @@
 { config, lib, pkgs, systemConfig, ... }:
 let
   cfg = systemConfig.core.infrastructure.command-center or {};
-  userConfigFile = ./command-center-config.nix;
-  symlinkPath = "/etc/nixos/configs/command-center-config.nix";
+  configHelpers = import ../../management/module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
+  # Use the template file as default config
+  defaultConfig = builtins.readFile ./command-center-config.nix;
 
   # Import utilities
   ccLib = import ./lib { inherit lib; };
@@ -20,37 +21,12 @@ in
 {
   config = lib.mkMerge [
     (lib.mkIf (cfg.enable or true) {
-      # Symlink management (only when enabled)
-      system.activationScripts.command-center-config-symlink = ''
-        mkdir -p "$(dirname "${symlinkPath}")"
-
-        # Create default config if it doesn't exist
-        if [ ! -f "${toString userConfigFile}" ]; then
-          mkdir -p "$(dirname "${toString userConfigFile}")"
-          cat > "${toString userConfigFile}" <<'EOF'
-{
-  command-center = {
-    enable = true;
-  };
-}
-EOF
-        fi
-
-        # Create/Update symlink
-        if [ -L "${symlinkPath}" ] || [ -f "${symlinkPath}" ]; then
-          CURRENT_TARGET=$(readlink -f "${symlinkPath}" 2>/dev/null || echo "")
-          EXPECTED_TARGET=$(readlink -f "${toString userConfigFile}" 2>/dev/null || echo "")
-
-          if [ "$CURRENT_TARGET" != "$EXPECTED_TARGET" ]; then
-            if [ -f "${symlinkPath}" ] && [ ! -L "${symlinkPath}" ]; then
-              cp "${symlinkPath}" "${symlinkPath}.backup.$(date +%s)"
-            fi
-            ln -sfn "${toString userConfigFile}" "${symlinkPath}"
-          fi
-        else
-          ln -sfn "${toString userConfigFile}" "${symlinkPath}"
-        fi
-      '';
+      # Create config on activation (always runs)
+      # Uses new external config system
+      (configHelpers.createModuleConfig {
+        moduleName = "command-center";
+        defaultConfig = defaultConfig;
+      });
 
       # Compute categories from commands
       systemConfig.core.infrastructure.command-center.categories = usedCategories;

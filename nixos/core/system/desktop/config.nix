@@ -2,26 +2,9 @@
 let
   cfg = systemConfig.system.desktop or {};
   locCfg = systemConfig.system.localization or {};
-  # CRITICAL: Use absolute path to deployed location, not relative (which resolves to store)
-  userConfigFile = "/etc/nixos/core/system/desktop/desktop-config.nix";
-  symlinkPath = "/etc/nixos/configs/desktop-config.nix";
-  configHelpers = import ../../management/module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
-  defaultConfig = ''
-{
-  desktop = {
-    enable = false;
-    environment = "plasma";
-    display = {
-      manager = "sddm";
-      server = "wayland";
-      session = "plasma";
-    };
-    theme = {
-      dark = true;
-    };
-  };
-}
-'';
+  configHelpers = import ../../management/module-manager/lib/config-helpers.nix { inherit pkgs lib; };
+  # Use the template file as default config
+  defaultConfig = builtins.readFile ./desktop-config.nix;
   
   # Use keyboard settings from localization module
   keyboardLayout = locCfg.keyboardLayout or "us";
@@ -29,11 +12,11 @@ let
 in
 {
   config = lib.mkMerge [
-    (lib.mkIf (cfg.enable or true) {
-      # Create symlink on activation (only when enabled)
-      # Uses central API from system-manager (professional pattern)
-      system.activationScripts.desktop-config-symlink =
-        configHelpers.setupConfigFile symlinkPath userConfigFile defaultConfig;
+    # Create config on activation (always runs)
+    # Uses new external config system
+    (configHelpers.createModuleConfig {
+      moduleName = "desktop";
+      defaultConfig = defaultConfig;
     })
     (lib.mkIf (cfg.enable or false) {
       environment = {

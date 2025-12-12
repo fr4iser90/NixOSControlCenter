@@ -2,8 +2,9 @@
 
 let
   cfg = systemConfig.management.checks or {};
-  userConfigFile = ./checks-config.nix;
-  symlinkPath = "/etc/nixos/configs/checks-config.nix";
+  configHelpers = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
+  # Use the template file as default config
+  defaultConfig = builtins.readFile ./checks-config.nix;
 
   # CLI formatter API
   ui = config.core.cli-formatter.api;
@@ -27,56 +28,12 @@ in
 
   config = lib.mkMerge [
     (lib.mkIf (cfg.enable or true) {
-      # Symlink management (only when enabled)
-      system.activationScripts.checks-config-symlink = ''
-        mkdir -p "$(dirname "${symlinkPath}")"
-
-        # Create default config if it doesn't exist
-        if [ ! -f "${toString userConfigFile}" ]; then
-          mkdir -p "$(dirname "${toString userConfigFile}")"
-          cat > "${toString userConfigFile}" <<'EOF'
-{
-  management = {
-    checks = {
-      enable = true;
-      postbuild = {
-        enable = true;
-        checks = {
-          passwords.enable = true;
-          filesystem.enable = true;
-          services.enable = true;
-        };
-      };
-      prebuild = {
-        enable = true;
-        checks = {
-          cpu.enable = true;
-          gpu.enable = true;
-          memory.enable = true;
-          users.enable = true;
-        };
-      };
-    };
-  };
-}
-EOF
-        fi
-
-        # Create/Update symlink
-        if [ -L "${symlinkPath}" ] || [ -f "${symlinkPath}" ]; then
-          CURRENT_TARGET=$(readlink -f "${symlinkPath}" 2>/dev/null || echo "")
-          EXPECTED_TARGET=$(readlink -f "${toString userConfigFile}" 2>/dev/null || echo "")
-
-          if [ "$CURRENT_TARGET" != "$EXPECTED_TARGET" ]; then
-            if [ -f "${symlinkPath}" ] && [ ! -L "${symlinkPath}" ]; then
-              cp "${symlinkPath}" "${symlinkPath}.backup.$(date +%s)"
-            fi
-            ln -sfn "${toString userConfigFile}" "${symlinkPath}"
-          fi
-        else
-          ln -sfn "${toString userConfigFile}" "${symlinkPath}"
-        fi
-      '';
+      # Create config on activation (always runs)
+      # Uses new external config system
+      (configHelpers.createModuleConfig {
+        moduleName = "checks";
+        defaultConfig = defaultConfig;
+      });
     })
     (lib.mkIf (cfg.enable or true) {
       # Module implementation (only when enabled)

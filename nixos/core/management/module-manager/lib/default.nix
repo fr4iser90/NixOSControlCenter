@@ -41,13 +41,13 @@ let
   # ALL modules discovered automatically
   allModules = discoverAllModules;
 
-  # Helper: Generate config file for a module
+  # Helper: Generate config file for a module (PRESERVES EXISTING CONFIG!)
   updateModuleConfig = pkgs.writeShellScriptBin "update-module-config" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
 
     module_name="$1"
-    value="$2"
+    enable_value="$2"
 
     # Finde Modul-Info dynamisch
     ${lib.concatMapStringsSep "\n" (module: ''
@@ -66,48 +66,69 @@ let
     # Create configs directory if needed
     mkdir -p "$(dirname "$config_file")"
 
-    # Generate config based on category
-    case "$category" in
-      "system")
-        module_short=$(basename "$config_file" "-config.nix")
-        cat > "$config_file" <<EOF
+    # If config doesn't exist, create minimal version
+    if [ ! -f "$config_file" ]; then
+      case "$category" in
+        "system")
+          module_short=$(basename "$config_file" "-config.nix")
+          cat > "$config_file" <<EOF
 {
   $module_short = {
-    enable = $value;
+    enable = $enable_value;
   };
 }
 EOF
-        ;;
-      "management")
-        module_short=$(basename "$config_file" "-config.nix")
-        cat > "$config_file" <<EOF
+          ;;
+        "management")
+          module_short=$(basename "$config_file" "-config.nix")
+          cat > "$config_file" <<EOF
 {
   $module_short = {
-    enable = $value;
+    enable = $enable_value;
   };
 }
 EOF
-        ;;
-      "features")
-        # Features: features.category.module.enable
-        IFS='.' read -r _ category_name module_name_short <<< "$module_name"
-        cat > "$config_file" <<EOF
+          ;;
+        "features")
+          # Features: features.category.module.enable
+          IFS='.' read -r _ category_name module_name_short <<< "$module_name"
+          cat > "$config_file" <<EOF
 {
   features = {
     $category_name = {
       $module_name_short = {
-        enable = $value;
+        enable = $enable_value;
       };
     };
   };
 }
 EOF
-        ;;
-      *)
-        echo "Error: Unknown category '$category'"
-        exit 1
-        ;;
-    esac
+          ;;
+        *)
+          echo "Error: Unknown category '$category'"
+          exit 1
+          ;;
+      esac
+      echo "Created new config for $module_name: $enable_path = $enable_value"
+      exit 0
+    fi
+
+    # Config exists - modify only the enable flag while preserving everything else
+    # This is a simple sed-based approach that looks for the enable line and replaces it
+
+    # Convert enable_path to sed pattern (e.g., "system.audio.enable" -> "enable =")
+    enable_line_pattern="enable ="
+
+    # Backup original file
+    cp "$config_file" "$config_file.backup.$(date +%s)"
+
+    # Replace the enable line (handles both true/false and preserves formatting)
+    if [ "$enable_value" = "true" ] || [ "$enable_value" = "false" ]; then
+      # Use sed to replace "enable = true;" or "enable = false;" with new value
+      sed -i "s/enable = true;/enable = $enable_value;/g; s/enable = false;/enable = $enable_value;/g" "$config_file"
+    fi
+
+    echo "Updated $module_name config: $enable_path = $enable_value"
   '';
 
 in {

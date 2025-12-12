@@ -4,19 +4,9 @@ with lib;
 
 let
   cfg = systemConfig.system.localization or {};
-  # CRITICAL: Use absolute path to deployed location, not relative (which resolves to store)
-  userConfigFile = "/etc/nixos/core/system/localization/localization-config.nix";
-  symlinkPath = "/etc/nixos/configs/localization-config.nix";
-  configHelpers = import ../../management/module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
-  defaultConfig = ''
-{
-  localization = {
-    locales = [ "en_US.UTF-8" ];
-    keyboardLayout = "us";
-    keyboardOptions = "";
-  };
-}
-'';
+  configHelpers = import ../../management/module-manager/lib/config-helpers.nix { inherit pkgs lib; };
+  # Use the template file as default config
+  defaultConfig = builtins.readFile ./localization-config.nix;
   
   locales = cfg.locales or [ "en_US.UTF-8" ];
   defaultLocale = if builtins.length locales > 0 then builtins.head locales else "en_US.UTF-8";
@@ -52,10 +42,11 @@ let
 in
 {
   config = lib.mkMerge [
-    (lib.mkIf (cfg.enable or true) {
-      # Create symlink on activation (only when enabled)
-      system.activationScripts.localization-config-symlink =
-        configHelpers.setupConfigFile symlinkPath userConfigFile defaultConfig;
+    # Create config on activation (always runs)
+    # Uses new external config system
+    (configHelpers.createModuleConfig {
+      moduleName = "localization";
+      defaultConfig = defaultConfig;
     })
     {
       # Localization configuration (always active, no enable check needed)

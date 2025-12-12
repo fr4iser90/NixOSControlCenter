@@ -47,79 +47,18 @@ let
     }) availableCollectors)
   );
 
-  userConfigFile = ./logging-config.nix;
-  symlinkPath = "/etc/nixos/configs/logging-config.nix";
+  configHelpers = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
+  # Use the template file as default config
+  defaultConfig = builtins.readFile ./logging-config.nix;
 in
   lib.mkMerge [
     (lib.mkIf (cfg.enable or true) {
-      # Symlink management (only when enabled)
-      system.activationScripts.logging-config-symlink = ''
-        mkdir -p "$(dirname "${symlinkPath}")"
-
-        # Create default config if it doesn't exist
-        if [ ! -f "${toString userConfigFile}" ]; then
-          mkdir -p "$(dirname "${toString userConfigFile}")"
-          cat > "${toString userConfigFile}" <<'EOF'
-{
-  # System Logging Configuration
-  management = {
-    logging = {
-      enable = true;  # Enable system logging
-
-      # Default detail level for all reports
-      defaultDetailLevel = "info";
-
-      # Collector-specific configurations
-      collectors = {
-        # System profile collector
-        profile = {
-          enable = true;
-          detailLevel = null;  # Use default
-          priority = 100;
-        };
-
-        # Bootloader information collector
-        bootloader = {
-          enable = true;
-          detailLevel = null;
-          priority = 50;
-        };
-
-        # Boot entry collector
-        bootentries = {
-          enable = true;
-          detailLevel = null;
-          priority = 60;
-        };
-
-        # Installed packages collector
-        packages = {
-          enable = true;
-          detailLevel = null;
-          priority = 200;
-        };
-      };
-    };
-  };
-}
-EOF
-        fi
-
-        # Create/Update symlink
-        if [ -L "${symlinkPath}" ] || [ -f "${symlinkPath}" ]; then
-          CURRENT_TARGET=$(readlink -f "${symlinkPath}" 2>/dev/null || echo "")
-          EXPECTED_TARGET=$(readlink -f "${toString userConfigFile}" 2>/dev/null || echo "")
-
-          if [ "$CURRENT_TARGET" != "$EXPECTED_TARGET" ]; then
-            if [ -f "${symlinkPath}" ] && [ ! -L "${symlinkPath}" ]; then
-              cp "${symlinkPath}" "${symlinkPath}.backup.$(date +%s)"
-            fi
-            ln -sfn "${toString userConfigFile}" "${symlinkPath}"
-          fi
-        else
-          ln -sfn "${toString userConfigFile}" "${symlinkPath}"
-        fi
-      '';
+      # Create config on activation (always runs)
+      # Uses new external config system
+      (configHelpers.createModuleConfig {
+        moduleName = "logging";
+        defaultConfig = defaultConfig;
+      });
     })
 
     # Core API - always available

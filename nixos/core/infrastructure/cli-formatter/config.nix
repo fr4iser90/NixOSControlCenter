@@ -34,58 +34,19 @@ let
     inherit (status) messages badges;
   };
 
-  # User config file path
-  userConfigFile = ./cli-formatter-config.nix;
-  symlinkPath = "/etc/nixos/configs/cli-formatter-config.nix";
+  configHelpers = import ../../management/module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
+  # Use the template file as default config
+  defaultConfig = builtins.readFile ./cli-formatter-config.nix;
 
 in
   lib.mkMerge [
     (lib.mkIf (cfg.enable or true) {
-      # Symlink management (only when enabled)
-      system.activationScripts.cli-formatter-config-symlink = ''
-        mkdir -p "$(dirname "${symlinkPath}")"
-
-        # Create default config if it doesn't exist
-        if [ ! -f "${toString userConfigFile}" ]; then
-          mkdir -p "$(dirname "${toString userConfigFile}")"
-          cat > "${toString userConfigFile}" <<'EOF'
-{
-  core = {
-    cli-formatter = {
-      enable = true;  # CLI formatter is always enabled as infrastructure
-      config = {
-        # User customizations here
-        # colors.theme = "dark";
-        # formatting.enableUnicode = true;
-      };
-      components = {
-        # example = {
-        #   enable = false;
-        #   refreshInterval = 10;
-        #   template = "Custom component template";
-        # };
-      };
-    };
-  };
-}
-EOF
-        fi
-
-        # Create/Update symlink
-        if [ -L "${symlinkPath}" ] || [ -f "${symlinkPath}" ]; then
-          CURRENT_TARGET=$(readlink -f "${symlinkPath}" 2>/dev/null || echo "")
-          EXPECTED_TARGET=$(readlink -f "${toString userConfigFile}" 2>/dev/null || echo "")
-
-          if [ "$CURRENT_TARGET" != "$EXPECTED_TARGET" ]; then
-            if [ -f "${symlinkPath}" ] && [ ! -L "${symlinkPath}" ]; then
-              cp "${symlinkPath}" "${symlinkPath}.backup.$(date +%s)"
-            fi
-            ln -sfn "${toString userConfigFile}" "${symlinkPath}"
-          fi
-        else
-          ln -sfn "${toString userConfigFile}" "${symlinkPath}"
-        fi
-      '';
+      # Create config on activation (always runs)
+      # Uses new external config system
+      (configHelpers.createModuleConfig {
+        moduleName = "cli-formatter";
+        defaultConfig = defaultConfig;
+      });
 
       # API is always available (not dependent on cfg.enable)
       core.cli-formatter.api = apiValue;
