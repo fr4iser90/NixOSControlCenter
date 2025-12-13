@@ -6,7 +6,7 @@ let
   # Import helpers
   backupHelpersValue = import ./lib/backup-helpers.nix { inherit pkgs lib; };
   # Pass backupHelpers to configHelpers so it can use it
-  configHelpersValue = import ./lib/config-helpers.nix { inherit pkgs lib; backupHelpers = backupHelpersValue; };
+  configHelpersValue = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   
   # API definition - always available (like cli-formatter.api)
   apiValue = {

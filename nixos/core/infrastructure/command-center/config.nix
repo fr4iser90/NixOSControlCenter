@@ -1,7 +1,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 let
   cfg = systemConfig.core.infrastructure.command-center or {};
-  configHelpers = import ../../management/module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../../management/system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
+  configHelpers = import ../../management/module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   # Use the template file as default config
   defaultConfig = builtins.readFile ./command-center-config.nix;
 
@@ -20,17 +20,15 @@ let
 in
 {
   config = lib.mkMerge [
-    (lib.mkIf (cfg.enable or true) {
-      # Create config on activation (always runs)
-      # Uses new external config system
+    (lib.mkIf (cfg.enable or true) (
       (configHelpers.createModuleConfig {
         moduleName = "command-center";
         defaultConfig = defaultConfig;
-      });
-
-      # Compute categories from commands
-      systemConfig.core.infrastructure.command-center.categories = usedCategories;
-    })
+      }) // {
+        # Compute categories from commands
+        systemConfig.core.infrastructure.command-center.categories = usedCategories;
+      }
+    ))
     (lib.mkIf (cfg.enable or true) {
       # Module implementation (only when enabled)
       environment.systemPackages = [

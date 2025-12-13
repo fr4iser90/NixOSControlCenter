@@ -47,19 +47,17 @@ let
     }) availableCollectors)
   );
 
-  configHelpers = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
+  configHelpers = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   # Use the template file as default config
   defaultConfig = builtins.readFile ./logging-config.nix;
 in
   lib.mkMerge [
-    (lib.mkIf (cfg.enable or true) {
-      # Create config on activation (always runs)
-      # Uses new external config system
+    (lib.mkIf (cfg.enable or true)
       (configHelpers.createModuleConfig {
         moduleName = "logging";
         defaultConfig = defaultConfig;
-      });
-    })
+      })
+    )
 
     # Core API - always available
     {

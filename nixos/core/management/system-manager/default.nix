@@ -8,7 +8,7 @@ let
   backupHelpers = import ./lib/backup-helpers.nix { inherit pkgs lib; };
   # API definition - always available
   # Pass backupHelpers to configHelpers so it can use it
-  configHelpers = import ./lib/config-helpers.nix { inherit pkgs lib; backupHelpers = backupHelpers; };
+  configHelpers = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   apiValue = configHelpers // backupHelpers;
 in {
   imports = [

@@ -23,5 +23,22 @@ in {
       default = {};
       description = "Module configuration map";
     };
+
+    configHelpers = lib.mkOption {
+      type = lib.types.attrs;
+      default = {};
+      description = "Configuration helpers provided by the module manager";
+      internal = true;
+    };
+  };
+
+  # Config namespace for module manager API
+  options.core.management.module-manager = {
+    configHelpers = lib.mkOption {
+      type = lib.types.attrs;
+      default = {};
+      description = "Configuration helpers provided by the module manager";
+      internal = true;
+    };
   };
 }

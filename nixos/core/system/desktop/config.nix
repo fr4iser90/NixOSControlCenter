@@ -14,10 +14,12 @@ in
   config = lib.mkMerge [
     # Create config on activation (always runs)
     # Uses new external config system
-    (configHelpers.createModuleConfig {
-      moduleName = "desktop";
-      defaultConfig = defaultConfig;
-    })
+    (lib.mkIf (cfg.enable or false)
+      (configHelpers.createModuleConfig {
+        moduleName = "desktop";
+        defaultConfig = defaultConfig;
+      })
+    )
     (lib.mkIf (cfg.enable or false) {
       environment = {
         variables = {

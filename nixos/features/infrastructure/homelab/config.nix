@@ -7,16 +7,14 @@ let
   defaultConfig = builtins.readFile ./homelab-config.nix;
 in
   lib.mkMerge [
-    (lib.mkIf (cfg.enable or false) {
-      # Create config on activation (always runs)
-      # Uses new external config system
+    (lib.mkIf (cfg.enable or false) (
       (configHelpers.createModuleConfig {
         moduleName = "homelab";
         defaultConfig = defaultConfig;
-      });
-
-      # Enable feature by default if system config has it
-      features.infrastructure.homelab.enable = lib.mkDefault (systemConfig.features.infrastructure.homelab.enable or false);
-    })
+      }) // {
+        # Enable feature by default if system config has it
+        features.infrastructure.homelab.enable = lib.mkDefault (systemConfig.features.infrastructure.homelab.enable or false);
+      }
+    ))
     # Implementation is handled in default.nix
   ]

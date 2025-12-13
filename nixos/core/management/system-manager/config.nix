@@ -12,9 +12,11 @@ in
 
     # Create config on activation (always runs)
     # Uses new external config system
-    (configHelpers.createModuleConfig {
-      moduleName = "system-manager";
-      defaultConfig = defaultConfig;
-    })
+    (lib.mkIf (cfg.enable or true)
+      (configHelpers.createModuleConfig {
+        moduleName = "system-manager";
+        defaultConfig = defaultConfig;
+      })
+    )
   ];
 }

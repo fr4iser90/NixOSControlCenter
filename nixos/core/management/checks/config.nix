@@ -2,7 +2,7 @@
 
 let
   cfg = systemConfig.management.checks or {};
-  configHelpers = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; backupHelpers = import ../system-manager/lib/backup-helpers.nix { inherit pkgs lib; }; };
+  configHelpers = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   # Use the template file as default config
   defaultConfig = builtins.readFile ./checks-config.nix;
 
@@ -27,14 +27,12 @@ in
           ++ lib.optional (prebuildCfg.enable or true) ./prebuild/checks/system/users.nix;
 
   config = lib.mkMerge [
-    (lib.mkIf (cfg.enable or true) {
-      # Create config on activation (always runs)
-      # Uses new external config system
+    (lib.mkIf (cfg.enable or true)
       (configHelpers.createModuleConfig {
         moduleName = "checks";
         defaultConfig = defaultConfig;
-      });
-    })
+      })
+    )
     (lib.mkIf (cfg.enable or true) {
       # Module implementation (only when enabled)
       environment.systemPackages = with pkgs; [

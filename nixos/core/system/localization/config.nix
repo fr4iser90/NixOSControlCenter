@@ -44,10 +44,12 @@ in
   config = lib.mkMerge [
     # Create config on activation (always runs)
     # Uses new external config system
-    (configHelpers.createModuleConfig {
-      moduleName = "localization";
-      defaultConfig = defaultConfig;
-    })
+    (lib.mkIf (cfg.enable or true)
+      (configHelpers.createModuleConfig {
+        moduleName = "localization";
+        defaultConfig = defaultConfig;
+      })
+    )
     {
       # Localization configuration (always active, no enable check needed)
       i18n = {
