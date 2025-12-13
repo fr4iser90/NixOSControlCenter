@@ -1,137 +1,143 @@
-[2 tools called]
+# KOMPLETTER IMPLEMENTATIONSPLAN: Zentrales Module-Management
 
-**OKAY, ICH VERSTEHE!** Dein Template ist das Ziel - lass mich einen **NEUEN PLAN** erstellen, der das Template als **RICHTIG** annimmt und ALLES dahin migriert:
+## 🎯 ZIEL: Zentrale Kontrolle über ALLE Module (Template wird angepasst)
 
-## 🎯 **NEUER PLAN: Migration zu Template-konformer Architektur**
+## 📋 ALLE BETROFFENEN DATEIEN:
 
-Das Template definiert die **einheitliche Architektur** mit `systemConfig.core.*` und `systemConfig.features.*`. Alles andere ist falsch!
-
-### **Template-konforme Ziel-Architektur:**
-
+### 1. `core/management/module-manager/lib/discovery.nix` - ERSTELLEN
+**AUFGABE:** Discovery-Funktion implementieren
+**INHALT:**
 ```nix
-# Wie im Template definiert:
-options.systemConfig = {
-  core.system.audio = { ... };           # Core System
-  core.management.logging = { ... };     # Core Management  
-  core.infrastructure.cli-formatter = { ... }; # Core Infrastructure
-  features.infrastructure.homelab = { ... };    # Features
-  features.security.ssh-server = { ... };
-};
+# Module Discovery Logic
+discoverAllModules = basePath: let
+  # Rekursiv alle Module in core/ und features/ finden
+  # Rückgabe: Liste von { name, category, path }
+in discoverAllModules;
+```
 
-# Alle Module verwenden systemConfig.* (wie Template sagt)
-{ systemConfig, ... }:
-let
-  audioCfg = systemConfig.core.system.audio;
-  homelabCfg = systemConfig.features.infrastructure.homelab;
-in {
-  # Implementation
+### 1b. `core/management/module-manager/lib/default.nix` - ERWEITERN
+**AUFGABE:** Discovery-Funktion exportieren
+**INHALT:**
+```nix
+{
+  # Bestehende Exports...
+  inherit (import ./discovery.nix) discoverAllModules;
 }
 ```
 
----
-
-## 📋 **Template-konforme Migrations-Phasen:**
-
-### **Phase 1: Command-Center korrigieren (Template-konform)**
-**Problem:** Verwendet falsche `core.command-center.commands` statt `systemConfig.command-center.commands`
-
-| Datei | FALSCH | RICHTIG (nach Template) |
-|-------|--------|------------------------|
-| `handlers/desktop-manager.nix` | `core.command-center.commands = [` | `systemConfig.command-center.commands = [` |
-| `handlers/system-update.nix` | `core.command-center.commands = [` | `systemConfig.command-center.commands = [` |
-| `commands.nix` (system-manager) | `core.command-center.commands = [` | `systemConfig.command-center.commands = [` |
-| `commands.nix` (logging) | `core.command-center.commands = [` | `systemConfig.command-center.commands = [` |
-| `commands.nix` (checks) | `core.command-center.commands = [` | `systemConfig.command-center.commands = [` |
-| `homelab/default.nix` | `core.command-center.commands = [` | `systemConfig.command-center.commands = [` |
-
-### **Phase 2: Config-Zugriffe korrigieren (Template-konform)**
-**Problem:** Module lesen von falschen Quellen statt `systemConfig.*`
-
-| Datei | FALSCH | RICHTIG (nach Template) |
-|-------|--------|------------------------|
-| `module-manager/config.nix` | `config.core.management.module-manager` | `systemConfig.core.management.module-manager` |
-| `checks/config.nix` | `config.management.checks` | `systemConfig.management.checks` |
-| `checks/default.nix` | `config.management.checks` | `systemConfig.management.checks` |
-
-### **Phase 3: Features korrigieren (Template-konform)**
-**Problem:** Features verwenden gemischte `config.*` und `systemConfig.*` APIs
-
-| Datei | FALSCH | RICHTIG (nach Template) |
-|-------|--------|------------------------|
-| `homelab/config.nix` | `config.features.infrastructure.homelab.enable` | `systemConfig.features.infrastructure.homelab.enable` |
-| `homelab/default.nix` | `config.features.infrastructure.homelab` | `systemConfig.features.infrastructure.homelab` |
-| `packages/default.nix` | `config.features.ai-workspace` | `systemConfig.features.ai-workspace` |
-| `ssh-server/default.nix` | `config.features.security.ssh-server` | `systemConfig.features.security.ssh-server` |
-| `ssh-client/default.nix` | `config.features.security.ssh-client` | `systemConfig.features.security.ssh-client` |
-| `bootentry/default.nix` | `config.features.infrastructure.bootentry` | `systemConfig.features.infrastructure.bootentry` |
-| `vm/default.nix` | `config.features.infrastructure.vm` | `systemConfig.features.infrastructure.vm` |
-| `hackathon/default.nix` | `config.features.specialized.hackathon` | `systemConfig.features.specialized.hackathon` |
-| `lock/default.nix` | `config.features.system.lock` | `systemConfig.features.system.lock` |
-| `ai-workspace/default.nix` | `config.features.ai-workspace` | `systemConfig.features.ai-workspace` |
-
-### **Phase 4: Options korrigieren (Template-konform)**
-**Problem:** Options sind falsch definiert
-
-| Datei | FALSCH | RICHTIG (nach Template) |
-|-------|--------|------------------------|
-| `command-center/options.nix` | `options.config.core.command-center` | `options.systemConfig.command-center` |
-| `module-manager/options.nix` | `options.config.core.management.module-manager` | `options.systemConfig.core.management.module-manager` |
-
----
-
-## 🚀 **SICHERE, MANUELLE AUSFÜHRUNG (Template-konform):**
-
-**❌ KEINE sed-Befehle!** Zu gefährlich - könnten Kommentare/Strings/Teilstrings zerstören!
-
-### **Sicherer Plan: Datei für Datei manuell korrigieren**
-
-#### **1. Command-Center API korrigieren**
-**❌ AUSNAHME:** Command-center verwendet `core.command-center.commands` (zentraler Service)
-
-**Problem:** Einige neue Module verwenden fälschlicherweise `systemConfig.command-center.commands`
-
-| Datei | Status | Problem |
-|-------|--------|---------|
-| `checks/commands.nix` | ✅ BEREITS KORRIGIERT | Verwendet `systemConfig.command-center.commands` |
-| Alle anderen | ✅ KORREKT | Verwenden `core.command-center.commands` |
-
-#### **2. Feature API korrigieren** ✅ **ABGESCHLOSSEN**
-**Problem:** Features verwenden `config.features.*` statt `systemConfig.features.*`
-
-**Alle korrigiert:** homelab, hackathon, ai-workspace, ssh-server (+ alle Submodule), ssh-client (+ alle Submodule), bootentry, vm (+ testing), lock
-
-#### **3. Options korrigieren** ✅ **ABGESCHLOSSEN**
-- `module-manager/options.nix`: `options.core.*` → `options.systemConfig.core.*`
-
-#### **4. Script-API Zugriffe korrigieren** ⚠️ **BEKANNTES PROBLEM**
-- Scripts `update-features.nix` & `check-versions.nix` verwenden `config.features.*` für Versionsprüfung
-- **Grund:** Diese Scripts importieren separate NixOS-Konfigurationen zum Testen
-- **Status:** Bekanntes Problem, funktioniert noch mit alter API (nicht kritisch)
-
----
-
-## ✅ **Validierung (Template-konform):** **ABGESCHLOSSEN**
-
-```bash
-# Finale Validierung:
-cd /home/fr4iser/Documents/Git/NixOSControlCenter
-
-# ✅ cfg = config.features.* in .nix Dateien: 0
-# ✅ config.features.* in .nix Dateien (außer Scripts): 0
-# ✅ systemConfig.* Zugriffe: 294
-
-# Build-Test
-sudo nixos-rebuild build --flake /etc/nixos
+### 2. `core/management/module-manager/config.nix` - ERWEITERN
+**AUFGABE:** Zentrale Import- und Enable-Logik
+**INHALT:**
+```nix
+# 1. discoverAllModules aufrufen
+# 2. module-manager-config.nix lesen
+# 3. Aktivierte Module filtern
+# 4. Module importieren
+# 5. enable-Optionen für alle Module setzen
 ```
 
-**GESAMT:** ✅ **ABGESCHLOSSEN!** Alle 25+ Dateien manuell korrigiert!
+### 3. `core/management/module-manager/module-manager-config.nix` - ERSTELLEN
+**AUFGABE:** Zentrale Konfiguration für ALLE Module
+**INHALT:**
+```nix
+{
+  core = {
+    system.audio.enable = true;
+    management.logging.enable = true;
+    infrastructure.cli-formatter.enable = true;
+  };
+  features = {
+    security."ssh-client-manager".enable = true;
+    infrastructure.homelab-manager.enable = false;
+    infrastructure.vm-manager.enable = false;
+  };
+}
+```
 
-**❌ KEINE sed-Befehle verwendet!** Sicher manuell Datei für Datei korrigiert!
+### 4. `core/management/module-manager/commands.nix` - ERWEITERN
+**AUFGABE:** GUI für Module-Management
+**INHALT:**
+```bash
+ncc module-manager:
+- Zeigt alle discovered Module mit Status
+- Erlaubt toggeln von enable/disable
+- Aktualisiert module-manager-config.nix
+- Fzf-basierte interaktive Auswahl
+```
 
-**ERGEBNIS:**
-- ✅ 0 verbleibende `cfg = config.features.*` in .nix Dateien
-- ✅ 0 verbleibende `config.features.*` in .nix Dateien (außer Scripts)
-- ✅ 294 `systemConfig.*` Zugriffe
-- ⚠️ Bekanntes Problem: Scripts verwenden noch `config.features.*` für Versionsprüfung
+### 5. `features/default.nix` - LEER LASSEN
+**AUFGABE:** Nichts tun - Module-Manager macht alles
+**INHALT:**
+```nix
+# LEER - Module-Manager macht ALLE Imports zentral
+{ ... }: {}
+```
 
-**Die API ist jetzt vollständig template-konform!** 🎉🔧
+### 6. ALLE MODULE ANPASSEN (für zentrale Kontrolle):
+
+#### `features/security/ssh-client-manager/options.nix`:
+- `enable` Option hinzufügen (wird von module-manager gesetzt)
+- `_version` hinzufügen
+
+#### `features/security/ssh-client-manager/commands.nix`:
+- `mkIf cfg.enable` hinzufügen
+
+#### `features/security/ssh-client-manager/config.nix`:
+- `mkIf cfg.enable` hinzufügen
+
+#### ALLE anderen Module auch anpassen!
+
+## 🔄 ARBEITSABLAUF:
+
+1. **flake.nix** importiert `./core` (module-manager wird geladen)
+2. **module-manager/config.nix** läuft:
+   - Discovered alle Module aus `core/` und `features/`
+   - Liest `module-manager-config.nix`
+   - Importiert nur aktivierte Module
+   - Setzt `enable = true` für aktivierte Module
+3. **Aktivierte Module** laufen mit voller Funktionalität
+4. **`ncc module-manager`** erlaubt GUI-basierte Verwaltung
+
+## ✅ ARCHITEKTUR:
+
+- ✅ **Zentrale Kontrolle** über module-manager
+- ✅ **Auto-Discovery** aller Module
+- ✅ **GUI-Verwaltung** mit `ncc module-manager`
+- ✅ **Zero-maintenance:** Neue Module automatisch gefunden
+- ✅ **Template angepasst:** Für unser Use-Case optimiert
+
+## 🎮 NCC MODULE-MANAGER GUI:
+
+```
+=== Module Manager ===
+Discovered Modules (auto-discovery):
+
+Core Modules:
+✓ system.audio                    (enabled)
+✓ management.logging              (enabled)
+✓ infrastructure.cli-formatter    (enabled)
+
+Feature Modules:
+✓ security.ssh-client-manager     (enabled)
+○ infrastructure.homelab-manager  (disabled)
+○ infrastructure.vm-manager       (disabled)
+
+Actions: (t)oggle [number] (q)uit
+>
+```
+
+## 📋 IMPLEMENTATIONSSCHRITTE:
+
+1. **Discovery-Funktion** in `lib/default.nix` implementieren
+2. **config.nix** erweitern um Import- und Enable-Logik
+3. **module-manager-config.nix** erstellen mit allen Modulen
+4. **commands.nix** für GUI implementieren
+5. **Alle Module** für zentrale Kontrolle anpassen
+6. **Testen** mit ssh-client-manager
+
+## ⚠️ WICHTIG:
+
+- **Template wird angepasst** für zentrale Kontrolle
+- **features/default.nix** bleibt LEER
+- **Module-Manager** macht ALLES zentral
+- **Neue Module** werden automatisch discovered

@@ -12,7 +12,7 @@
     ./system/audio
     ./system/packages
     # Infrastructure
-    ./infrastructure/cli-formatter 
+    ./infrastructure/cli-formatter
     ./infrastructure/command-center
     # Management
     ./management/system-manager

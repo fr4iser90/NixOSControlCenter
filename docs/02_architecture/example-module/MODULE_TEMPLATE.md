@@ -20,7 +20,7 @@ module-name/               # Module name
 ├── commands.nix           # Command-Center registration (optional)
 ├── systemd.nix            # Systemd services/timers (optional)
 ├── config.nix             # Module implementation (optional, split from default.nix if too large)
-├── module-name-config.nix # User config (symlinked to /etc/nixos/configs/)
+├── module-name-config.nix # User config
 ├── lib/                   # Shared utility functions
 │   ├── default.nix        # Library exports
 │   ├── utils.nix          # General utilities
@@ -62,6 +62,9 @@ module-name/               # Module name
 ├── providers/             # Provider implementations (semantic, optional)
 │   ├── provider-a.nix     # Provider A implementation
 │   └── provider-b.nix     # Provider B implementation
+├── submodules/            # Submodules implementations (semantic, optional)
+│   ├── submodule-a/       # Submodule A implementation
+│   └── submodule-b/       # Submodule B implementation
 └── tests/                 # Module tests (optional)
     └── default.nix        # Test suite
 ```
@@ -146,7 +149,7 @@ module-name/               # Module name
   - **ONLY**: Imports all sub-modules (options, types, commands, systemd, config.nix, etc.)
   - **ONLY**: Conditional imports based on `cfg.enable` or module state
   - **MUST NOT**: Contain any `config = { ... }` blocks with implementation logic
-  - **MUST NOT**: Contain symlink management, assertions, or system configuration
+  - **MUST NOT**: Contain assertions, or system configuration
   - **Rule**: If you need to write implementation logic → create `config.nix` and import it
 - **Pattern**: 
   ```nix
@@ -160,8 +163,6 @@ module-name/               # Module name
       ./sub-module-1
       ./sub-module-2
       ./config.nix  # Implementation logic goes here
-    ] else [
-      ./config.nix  # Import even if disabled (for symlink management)
     ]);
   }
   ```
@@ -228,66 +229,68 @@ module-name/               # Module name
 - **Optional**: Only needed if systemd integration is required
 
 ### `module-name-config.nix`
-- **Purpose**: User-editable configuration file
+- **Purpose**: User-editable configuration file (Template/Default)
 - **Responsibilities**:
-  - User options and choices (preferences, settings)
-  - Configuration values that users can edit
-  - Module-specific settings (not system-level logic)
-- **Important**: This is **user configuration** - what users want to configure
+  - Default configuration values
+  - Example settings for users
+  - Template that gets copied to `/etc/nixos/configs/`
+- **Important**: This is the **default config template** - users edit the copy in `/etc/nixos/configs/`
 - **Pattern**:
   ```nix
   {
-    module-name = {
+    systemConfig.{category}.{module-name} = {
       enable = true;        # User choice: enable/disable this module
       theme = "dark";       # User preference: visual theme
       timeout = 30;         # User setting: operation timeout
     };
   }
   ```
-- **Access**: Via `systemConfig.{category}.{module-name}`
-- **Symlink**: Automatically symlinked to `/etc/nixos/configs/module-name-config.nix` for easy editing
+- **Access**: Via `systemConfig.{category}.{module-name}` (in `/etc/nixos/configs/module-name-config.nix`)
+- **Auto-Creation**: Automatically created in `/etc/nixos/configs/` on first activation
 
 ### `config.nix`
 - **Purpose**: Module implementation code (NixOS module configuration logic)
 - **Responsibilities**:
-  - **Symlink management**: Create/update symlinks to `module-name-config.nix` file
-  - **Default config creation**: Create default user config if missing
+  - **Config Management**: Use framework for automatic config file creation
   - **System configuration**: NixOS module config (services, environment, etc.)
   - **Assertions**: Validation of configuration values
   - **Integration**: Integration with other NixOS modules
 - **When to use**:
-  - **Always**: If module has `module-name-config.nix` → symlink management goes here
   - **Always**: If module has any system configuration → implementation goes here
   - **Rule**: If `default.nix` would contain `config = { ... }` → move it to `config.nix`
 - **Important**: This is **system configuration code** (NOT user-editable)
 - **Contains**:
-  - Symlink management (`system.activationScripts`)
-  - Default config creation
+  - Framework-based config management (`configHelpers.createModuleConfig`)
   - Implementation logic, system settings, NixOS module config
   - Assertions and validations
 - **NOT for**: User options/choices - those go in `module-name-config.nix`
 - **Pattern**:
   ```nix
-  { config, lib, pkgs, systemConfig, ... }:
+  { config, lib, pkgs, systemConfig, moduleConfig, ... }:
   let
-    cfg = systemConfig.{category}.{module} or {};
-    apiData = config.core.{category}.{module} or {};  # Optional API data
-    userConfigFile = ./module-name-config.nix;
-    symlinkPath = "/etc/nixos/configs/module-name-config.nix";
+    cfg = systemConfig.${moduleConfig.configPath};
+    configHelpers = import ../../core/management/module-manager/lib/config-helpers.nix {
+      inherit pkgs lib;
+    };
+    defaultConfig = builtins.readFile ./module-name-config.nix;
   in
     lib.mkMerge [
-      {
-        # Symlink management (always runs)
-        system.activationScripts.module-name-config-symlink = ''...'';
-      }
-      (lib.mkIf (cfg.enable or /* category-specific default */) {
-        # Module implementation (only when enabled)
-        # Use cfg for user settings, apiData for collected data (if available)
-        # Define APIs here if module provides them
-        options.core.{category}.{module} = {
-          # API options available when module is loaded
-        };
-      })
+      (lib.mkIf (cfg.enable or /* category-specific default */)
+        (configHelpers.createModuleConfig {
+          moduleName = "module-name";
+          defaultConfig = defaultConfig;
+        }) // {
+          # Module implementation (only when enabled)
+          # Use cfg for user settings
+          # Define APIs here if module provides them
+          options.core.{category}.{module} = {
+            # API options available when module is loaded
+          };
+
+          # System configuration goes here
+          # environment.systemPackages, services, etc.
+        }
+      )
     ];
   ```
 
@@ -432,61 +435,61 @@ module-name/               # Module name
 
 ```nix
 # System module example
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, moduleConfig, ... }:
 let
-  cfg = systemConfig.system.module-name or {};
+  cfg = systemConfig.${moduleConfig.configPath};
+  configHelpers = import ../../core/management/module-manager/lib/config-helpers.nix {
+    inherit pkgs lib;
+  };
+  defaultConfig = builtins.readFile ./module-name-config.nix;
 in
-  lib.mkMerge [
-    {
-      # Symlink management (always runs)
-      system.activationScripts.module-name-config-symlink = ''
-        # Create symlink and default config
-      '';
-    }
-    (lib.mkIf (cfg.enable or true) {  # Default true for system
+  lib.mkIf (cfg.enable or true)  # Default true for system
+    (configHelpers.createModuleConfig {
+      moduleName = "module-name";
+      defaultConfig = defaultConfig;
+    }) // {
       # Only module implementation here
       # System configuration
       # Assertions
-    })
-  ];
+    };
 
 # Management module example
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, moduleConfig, ... }:
 let
-  cfg = systemConfig.management.module-name or {};
+  cfg = systemConfig.${moduleConfig.configPath};
+  configHelpers = import ../../core/management/module-manager/lib/config-helpers.nix {
+    inherit pkgs lib;
+  };
+  defaultConfig = builtins.readFile ./module-name-config.nix;
 in
-  lib.mkMerge [
-    {
-      # Symlink management (always runs)
-      system.activationScripts.module-name-config-symlink = ''
-        # Create symlink and default config
-      '';
-    }
-    (lib.mkIf (cfg.enable or true) {  # Default true for management
+  lib.mkIf (cfg.enable or true)  # Default true for management
+    (configHelpers.createModuleConfig {
+      moduleName = "module-name";
+      defaultConfig = defaultConfig;
+    }) // {
       # Only module implementation here
       # System configuration
       # Assertions
-    })
-  ];
+    };
 
 # Feature module example
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, moduleConfig, ... }:
 let
-  cfg = systemConfig.features.module-name or {};
+  cfg = systemConfig.${moduleConfig.configPath};
+  configHelpers = import ../../core/management/module-manager/lib/config-helpers.nix {
+    inherit pkgs lib;
+  };
+  defaultConfig = builtins.readFile ./module-name-config.nix;
 in
-  lib.mkMerge [
-    {
-      # Symlink management (always runs)
-      system.activationScripts.module-name-config-symlink = ''
-        # Create symlink and default config
-      '';
-    }
-    (lib.mkIf (cfg.enable or false) {  # Default false for features
+  lib.mkIf (cfg.enable or false)  # Default false for features
+    (configHelpers.createModuleConfig {
+      moduleName = "module-name";
+      defaultConfig = defaultConfig;
+    }) // {
       # Only module implementation here
       # System configuration
       # Assertions
-    })
-  ];
+    };
 ```
 
 ### 4. **Script Creation Pattern**
@@ -610,6 +613,189 @@ in {
 - `commands.nix` - Command registration
 - `systemd.nix` - Systemd services/timers
 - `config.nix` - Feature-specific configuration
+
+### Submodules (for complex modules)
+**Purpose**: Break down complex modules into logical sub-components
+
+**Scalable Architecture with submodules/ Container:**
+
+```
+module-name/
+├── submodules/           # SUBMODULE CONTAINER (scales to 100+ submodules)
+│   ├── submodule-a/      # SUBMODULE: Full module structure inside
+│   │   ├── default.nix   # Submodule imports
+│   │   ├── options.nix   # Submodule options
+│   │   ├── config.nix    # Submodule implementation
+│   │   ├── handlers/     # Submodule handlers
+│   │   └── submodule-a-config.nix  # Submodule config template
+│   ├── submodule-b/      # SUBMODULE: Another full module
+│   │   ├── default.nix   # Submodule imports
+│   │   ├── options.nix   # Submodule options
+│   │   └── config.nix    # Submodule implementation
+│   └── complex-feature/  # SUBMODULE: Complex submodule example
+│       ├── default.nix   # Submodule imports
+│       ├── options.nix   # Submodule options
+│       ├── config.nix    # Submodule implementation
+│       ├── lib/          # Submodule utilities
+│       ├── scripts/      # Submodule scripts
+│       └── complex-feature-config.nix  # Submodule config template
+├── components/           # Small utilities (separate from submodules)
+│   ├── ui-helpers.nix    # Small utility functions
+│   └── validation.nix    # Helper functions
+├── handlers/             # Main module orchestration
+│   ├── main-handler.nix  # Coordinates submodules
+└── config.nix            # Main module implementation
+```
+
+**Why submodules/ container:**
+- ✅ **Scalability**: Handles 100+ submodules without chaos
+- ✅ **Clear Separation**: Submodules vs Components vs Handlers
+- ✅ **Future-Proof**: Easy to add new submodules
+- ✅ **Maintainability**: Clear hierarchy and organization
+
+**When to use submodules:**
+- ✅ Module has multiple distinct responsibilities
+- ✅ Submodule needs full module structure (options, config, handlers)
+- ✅ Submodule needs independent configuration
+- ✅ Complex features that warrant their own architecture
+
+**Example**: `system-manager/` uses submodules/ with cli-formatter/, cli-registry/, system-update/, etc.
+
+### Components Directory (optional)
+**Purpose**: Small, reusable utility components within a module
+
+```
+module-name/
+├── components/           # Small reusable components
+│   ├── ui-helpers.nix    # UI utility functions
+│   ├── validation.nix    # Validation helpers
+│   └── formatters.nix    # Formatting utilities
+└── main-module-files...
+```
+
+**When to use components:**
+- ✅ Small utility functions used across the module
+- ✅ Not complex enough for full submodule
+- ✅ Pure functions or simple helpers
+- ✅ No independent configuration needed
+
+### Module Discovery & Registration
+
+**Purpose**: Automatic module discovery and registration system for dynamic module loading.
+
+#### **Discovery Mechanism**
+The Module Manager automatically discovers modules by scanning the filesystem:
+
+```nix
+# Automatic discovery (no hardcoding needed)
+discoveredModules = lib.mapAttrsToList (name: type:
+  if type == "directory" && lib.pathExists "${modulesPath}/${name}/default.nix"
+  then {
+    name = name;
+    path = "${modulesPath}/${name}";
+    category = "auto";  # Determined by parent directory
+    configPath = "systemConfig.${category}.${name}";
+  }
+  else null
+) (builtins.readDir modulesPath);
+```
+
+#### **Module Metadata**
+Each module provides metadata for automatic registration:
+
+```nix
+# metadata.nix (optional, for advanced modules)
+{
+  # Basic info
+  name = "my-module";
+  description = "My awesome module";
+  category = "features";  # or "core", "infrastructure", etc.
+
+  # Dependencies (for automatic resolution)
+  dependencies = [
+    "cli-formatter"  # Will be resolved to full path
+    "command-center"
+  ];
+
+  # Version info
+  version = "1.0.0";
+
+  # API exports (for other modules to use)
+  exports = {
+    api = "config.core.my-module.api";
+    utils = "config.core.my-module.utils";
+  };
+
+  # Config template location
+  configTemplate = ./my-module-config.nix;
+}
+```
+
+#### **Automatic API Generation**
+The Module Manager generates APIs automatically:
+
+```nix
+# Generated automatically (no hardcoding!)
+options.systemConfig.${category}.${name} = {
+  # Standard options (always present)
+  enable = lib.mkOption { type = lib.types.bool; default = defaultEnable; };
+  _version = lib.mkOption { type = lib.types.str; internal = true; };
+
+  # Module-specific options (from options.nix)
+  # ... merged automatically
+};
+
+# API exports (if defined in metadata.nix)
+config.${apiPath} = {
+  # Module's exported functions/objects
+};
+```
+
+#### **Dependency Resolution**
+Automatic dependency management:
+
+```nix
+# Dependencies resolved automatically
+imports = lib.concatMap (dep: [
+  (discoveredModules.${dep}.path)
+]) (moduleMetadata.dependencies or []);
+```
+
+#### **Dynamic Loading**
+Modules are loaded based on filesystem structure:
+
+```
+modules/
+├── module-manager/     # Discovered automatically
+├── cli-formatter/      # Dependencies resolved
+├── my-feature/         # User config applied
+└── default.nix         # Generated dynamically
+```
+
+#### **Benefits**
+- ✅ **Zero Configuration**: Drop module in folder → automatically available
+- ✅ **Dependency Management**: Automatic resolution and loading order
+- ✅ **Generic APIs**: No hardcoded paths, everything generated
+- ✅ **Extensible**: New modules without touching core code
+- ✅ **Type Safety**: Options generated from module metadata
+
+#### **Implementation Pattern**
+```nix
+# modules/default.nix (generated)
+{ config, lib, pkgs, systemConfig, ... }:
+let
+  # Discover all modules
+  allModules = discovery.discoverModules ./modules;
+
+  # Filter enabled modules
+  enabledModules = lib.filter (m: systemConfig.${m.configPath}.enable or false) allModules;
+
+  # Resolve dependencies
+  resolvedModules = dependencyResolver.resolve enabledModules;
+in {
+  imports = map (m: m.path) resolvedModules;
+}
+```
 
 ### Additional Files (as needed):
 - `CHANGELOG.md` - Module change history (recommended)
@@ -1013,7 +1199,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.1] - 2025-12-08
 ### Fixed
-- Fixed symlink creation issue on first activation
+- Fixed config file creation issue on first activation
 - Fixed assertion error for invalid display server values
 
 ## [1.0.0] - 2025-12-07
@@ -1089,7 +1275,7 @@ sudo nixos-rebuild switch  # Each feature migrates its own options
 ## Config File Management Strategy
 
 ### Overview
-Each module manages its own config files, keeping them co-located with the module code. Config files are symlinked to `/etc/nixos/configs/` for centralized editing.
+Each module manages its own config files, keeping them co-located with the module code.
 
 ### Key Distinction
 
@@ -1102,12 +1288,12 @@ Each module manages its own config files, keeping them co-located with the modul
    - **Location**: `module-name/config.nix`
    - **Purpose**: How the module works internally
 
-2. **`module-name-config.nix`** (User Config - user-editable)
-   - User options and choices
-   - Preferences and settings
+2. **`module-name-config.nix`** (User Config Template - module-provided)
+   - Default configuration template
+   - Example settings
    - **Location**: `module-name/module-name-config.nix`
-   - **Symlink**: `/etc/nixos/configs/module-name-config.nix` → points to module config file
-   - **Purpose**: What the user wants to configure
+   - **Auto-Copy**: Gets copied to `/etc/nixos/configs/module-name-config.nix` on first activation
+   - **Purpose**: Template for user configuration
 
 ### Structure
 ```
@@ -1159,33 +1345,21 @@ nixos/
 │       └── hackathon/
 │           ├── hackathon-config.nix
 │           └── default.nix
-└── configs/  # Symlinks to module configs (for easy editing)
-    ├── desktop-config.nix -> ../core/system/desktop/desktop-config.nix
-    ├── hardware-config.nix -> ../core/system/hardware/hardware-config.nix
-    ├── logging-config.nix -> ../core/management/logging/logging-config.nix
-    ├── checks-config.nix -> ../core/management/checks/checks-config.nix
-    ├── cli-formatter-config.nix -> ../core/infrastructure/cli-formatter/cli-formatter-config.nix
-    ├── command-center-config.nix -> ../core/management/command-center/command-center-config.nix
-    ├── homelab-config.nix -> ../features/infrastructure/homelab/homelab-config.nix
-    ├── vm-config.nix -> ../features/infrastructure/vm/vm-config.nix
-    ├── ssh-client-config.nix -> ../features/security/ssh-client/ssh-client-config.nix
-    ├── lock-config.nix -> ../features/security/lock/lock-config.nix
-    ├── ai-workspace-config.nix -> ../features/specialized/ai-workspace/ai-workspace-config.nix
-    └── hackathon-config.nix -> ../features/specialized/hackathon/hackathon-config.nix
+└── configs/
+
 ```
 
 ### Benefits
 1. **Modularity**: Each module is self-contained with its own configs
 2. **Maintainability**: Config changes are co-located with module code
-3. **Easy Editing**: Symlinks provide centralized access in `/etc/nixos/configs/`
 4. **Version Control**: Configs are versioned with their modules
 5. **Migration**: Module migrations can update their own configs
 
-### Symlink Management
-Symlinks are created automatically during module activation:
-- On `nixos-rebuild switch`, modules create symlinks to their configs
-- Symlinks point from `/etc/nixos/configs/` to module config directories
-- If config file doesn't exist, module creates a default one
+### Config File Management
+Config files are managed through the Module Manager framework:
+- On `nixos-rebuild switch`, the framework creates config files in `/etc/nixos/configs/`
+- Config templates from modules are copied as defaults if files don't exist
+- Users edit files in `/etc/nixos/configs/` directly
 
 ### Implementation Pattern
 
@@ -1204,72 +1378,38 @@ in {
     ./sub-module-1
     ./sub-module-2
     ./config.nix  # Implementation logic
-  ] else [
-    ./config.nix  # Import even if disabled (for symlink management)
   ];
 }
 ```
 
 #### `config.nix` (ALL implementation)
 ```nix
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, moduleConfig, ... }:
 let
-  # For core modules: systemConfig.core.{domain}.{module-name}
-  cfg = systemConfig.core.infrastructure.cli-formatter or {};
-
-  # For feature modules: systemConfig.features.{domain}.{module-name}
-  # cfg = systemConfig.features.infrastructure.homelab or {};
-
-  userConfigFile = ./module-name-config.nix;
-  symlinkPath = "/etc/nixos/configs/module-name-config.nix";
+  cfg = systemConfig.${moduleConfig.configPath};
+  configHelpers = import ../../core/management/module-manager/lib/config-helpers.nix {
+    inherit pkgs lib;
+  };
+  defaultConfig = builtins.readFile ./module-name-config.nix;
 in
   lib.mkMerge [
-    {
-      # Symlink management (always runs, even if disabled)
-      system.activationScripts.module-name-config-symlink = ''
-        mkdir -p "$(dirname "${symlinkPath}")"
-
-        # Create default config if it doesn't exist
-        if [ ! -f "${toString userConfigFile}" ]; then
-          mkdir -p "$(dirname "${toString userConfigFile}")"
-          cat > "${toString userConfigFile}" <<'EOF'
-{
-  module-name = {
-    enable = false;
-    # ... default values
-  };
-}
-EOF
-        fi
-        
-        # Create/Update symlink
-        if [ -L "${symlinkPath}" ] || [ -f "${symlinkPath}" ]; then
-          CURRENT_TARGET=$(readlink -f "${symlinkPath}" 2>/dev/null || echo "")
-          EXPECTED_TARGET=$(readlink -f "${toString userConfigFile}" 2>/dev/null || echo "")
-          
-          if [ "$CURRENT_TARGET" != "$EXPECTED_TARGET" ]; then
-            if [ -f "${symlinkPath}" ] && [ ! -L "${symlinkPath}" ]; then
-              cp "${symlinkPath}" "${symlinkPath}.backup.$(date +%s)"
-            fi
-            ln -sfn "${toString userConfigFile}" "${symlinkPath}"
-          fi
-        else
-          ln -sfn "${toString userConfigFile}" "${symlinkPath}"
-        fi
-      '';
-    }
-    (lib.mkIf (cfg.enable or false) {
-      # Module implementation (only when enabled)
-      # System configuration
-      # Assertions
-      # ...
-    })
+    (lib.mkIf (cfg.enable or false)
+      (configHelpers.createModuleConfig {
+        moduleName = "module-name";
+        defaultConfig = defaultConfig;
+      }) // {
+        # Module implementation (only when enabled)
+        # System configuration
+        # Assertions
+        # ...
+      }
+    )
   ];
 ```
 
 #### Key Rules:
 1. **`default.nix`**: ONLY imports, NO `config = { ... }` blocks
-2. **`config.nix`**: ALL implementation logic, symlink management, system config
+2. **`config.nix`**: ALL implementation logic,  system config
 3. **Automatic**: If you need to write `config = { ... }` → create `config.nix` and import it
 4. **Separation**: Clear separation between structure (default.nix) and implementation (config.nix)
 

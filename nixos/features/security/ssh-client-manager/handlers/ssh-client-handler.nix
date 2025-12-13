@@ -1,8 +1,8 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, moduleConfig, ... }:
 
 let
   ui = config.core.cli-formatter.api;
-  cfg = systemConfig.features.security.ssh-client;
+  cfg = systemConfig.${moduleConfig.configPath};
 
   # Centralized SSH Connection Handler
   # This module contains all SSH connection logic in one place

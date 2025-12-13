@@ -1,11 +1,11 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, moduleConfig, ... }:
 
 with lib;
 
 let
   ui = config.core.cli-formatter.api;
-  cfg = systemConfig.features.security.ssh-client;
-  
+  cfg = systemConfig.${moduleConfig.configPath};
+
   # Note: Scripts that use cfg must be created in mkIf cfg.enable block
 in {
   config = mkIf cfg.enable (let
@@ -195,15 +195,15 @@ in {
         name = "ssh-client-manager";
         description = "Manage SSH client connections";
         category = "network";
-        script = "${sshClientManagerScript}/bin/ncc-ssh-client-manager-main";  # Setze den Pfad zum SSH Client Manager Skript
+        script = "${sshClientManagerScript}/bin/ncc-ssh-client-manager-main";
         arguments = [
-          "--test"  # Beispielargument, passe es nach Bedarf an
+          "--test"
         ];
-        dependencies = [ pkgs.openssh ];  # Füge hier Pakete hinzu, die für den SSH-Client Manager benötigt werden
+        dependencies = [ pkgs.openssh ];
         shortHelp = "Manage and configure SSH clients and connections";
         longHelp = ''
           Manage SSH client connections, configure settings, and perform various actions related to SSH.
-          
+
           Options:
             --test       Run a test connection
         '';
@@ -211,7 +211,7 @@ in {
     ];
 
     # Store the script reference in the service configuration
-    features.ssh-client-manager = {
+    ${moduleConfig.configPath} = {
       sshClientManagerScript = sshClientManagerScript;
     };
   });

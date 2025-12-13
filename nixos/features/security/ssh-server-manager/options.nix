@@ -3,7 +3,7 @@
 let
   moduleVersion = "1.0";
 in {
-  options.features.security.ssh-server = {
+  options.features.security.ssh-server-manager = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;

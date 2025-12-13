@@ -3,6 +3,38 @@
 { pkgs, lib }:
 
 let
+  # 🏗️ AUTOMATIC MODULE FRAMEWORK
+  # Automatically generates module paths from filesystem structure
+
+  # Get module info from current directory
+  getModuleInfo = modulePath: rec {
+    # Extract name from directory name
+    name = lib.last (lib.splitString "/" (toString modulePath));
+
+    # Extract category from parent directory
+    category = lib.last (lib.splitString "/" (toString (dirOf modulePath)));
+
+    # Extract parent category (features/core/etc)
+    parentCategory = lib.last (lib.splitString "/" (toString (dirOf (dirOf modulePath))));
+
+    # Auto-generated paths
+    fullPath = "${parentCategory}.${category}.${name}";
+    optionsPath = fullPath;
+    configPath = fullPath;
+  };
+
+  # Module configuration factory
+  mkModuleConfig = modulePath: let
+    info = getModuleInfo modulePath;
+  in {
+    # Module metadata
+    inherit (info) name category parentCategory fullPath optionsPath configPath;
+
+    # Utility functions
+    mkOptionsPath = "options.${info.optionsPath}";
+    mkConfigPath = "config.${info.configPath}";
+  };
+
   createModuleConfig = { moduleName, defaultConfig }: {
     system.activationScripts."${moduleName}-config-setup" = ''
       mkdir -p "/etc/nixos/configs"
@@ -18,5 +50,5 @@ EOF
   };
 in
 {
-  inherit createModuleConfig;
+  inherit createModuleConfig mkModuleConfig getModuleInfo;
 }

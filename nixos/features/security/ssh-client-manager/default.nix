@@ -6,22 +6,37 @@ with lib;
 # This is the main entry point that imports all SSH client manager components
 
 let
-  cfg = systemConfig.features.security.ssh-client;
+  # 🏗️ AUTOMATIC MODULE CONFIGURATION
+  # Get config helpers with automatic module framework
+  configHelpersLib = import ../../core/management/module-manager/lib/config-helpers.nix {
+    inherit pkgs lib;
+  };
+
+  # Automatically generate module configuration from filesystem
+  moduleConfig = configHelpersLib.mkModuleConfig ./.;
+
+  # Use auto-generated paths (no more hardcoded!)
+  cfg = systemConfig.${moduleConfig.configPath};
 in {
   # Import all SSH client manager modules
   imports = [
     ./options.nix        # Configuration options and defaults
+    ./commands.nix       # Command registration for ncc
+    ./config.nix         # Configuration and activation scripts
     ./init.nix          # Initialization and setup scripts
-    ./main.nix          # Main interactive script and command registration
+    ./main.nix          # Main interactive script
     ./connection-preview.nix  # FZF preview functionality
     ./ssh-key-utils.nix      # SSH key management utilities
     ./ssh-server-utils.nix   # Server connection utilities
     ./connection-handler.nix # Centralized connection handler
   ];
 
+  # Provide module config to all submodules
+  _module.args.moduleConfig = moduleConfig;
+
   config = mkMerge [
     {
-      features.security.ssh-client.enable = mkDefault (systemConfig.features.security.ssh-client or false);
+      ${moduleConfig.configPath}.enable = mkDefault (systemConfig.${moduleConfig.configPath} or false);
     }
     (mkIf cfg.enable {
       # Add required packages to system packages

@@ -1,11 +1,11 @@
-{ lib, ... }:
+{ lib, moduleConfig, ... }:
 
 let
   moduleVersion = "1.0";
 in {
   # SSH Client Manager Options
   # This module defines all configuration options for the SSH client manager
-  options.features.security.ssh-client = {
+  options.${moduleConfig.optionsPath} = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;

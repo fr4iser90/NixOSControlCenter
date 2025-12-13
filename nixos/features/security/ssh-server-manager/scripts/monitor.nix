@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = systemConfig.features.security.ssh-server.monitor;
+  cfg = systemConfig.features.security.ssh-server-manager.monitor;
   ui = config.core.cli-formatter.api;
 
   monitorScript = pkgs.writeScriptBin "ssh-monitor" ''
@@ -77,7 +77,7 @@ let
     done
   '';
 in {
-  options.features.security.ssh-server.monitor = {
+  options.features.security.ssh-server-manager.monitor = {
     enable = mkEnableOption "SSH connection monitoring";
     
     logLevel = mkOption {

@@ -4,6 +4,10 @@ let
   configHelpers = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   # Use the template file as default config
   defaultConfig = builtins.readFile ./system-manager-config.nix;
+
+  # Parse the default config to extract features
+  parsedConfig = import ./system-manager-config.nix;
+  enabledFeatures = parsedConfig.features or {};
 in
 {
   config = lib.mkMerge [

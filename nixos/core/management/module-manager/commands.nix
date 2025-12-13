@@ -11,6 +11,51 @@ let
 
   # 🎯 COMMAND REGISTRATION: Per MODULE_TEMPLATE in commands.nix!
 
+  # Script to update module-manager-config.nix
+  updateModuleConfig = pkgs.writeShellScriptBin "update-module-config" ''
+    #!${pkgs.bash}/bin/bash
+    set -euo pipefail
+
+    module_name="$1"
+    enable_value="$2"
+    config_file="/etc/nixos/configs/module-manager-config.nix"
+
+    # Create directory if needed
+    mkdir -p "$(dirname "$config_file")"
+
+    # If config doesn't exist, create from template
+    if [ ! -f "$config_file" ]; then
+      cp ${../../../core/management/module-manager/module-manager-config.nix} "$config_file"
+    fi
+
+    # Read current config
+    current_config=$(cat "$config_file")
+
+    # Parse module name (features.ssh-client-manager → features / ssh-client-manager)
+    if [[ "$module_name" == *"."* ]]; then
+      category="features"
+      module_short="$module_name"
+    else
+      category="core"
+      module_short="$module_name"
+    fi
+
+    # Update the config using nix
+    ${pkgs.nix}/bin/nix-instantiate --eval --strict -E "
+      let
+        config = $current_config;
+        updated = config // {
+          $category = (config.$category or {}) // {
+            $module_short = $enable_value;
+          };
+        };
+      in builtins.toJSON updated
+    " | ${pkgs.jq}/bin/jq . > "$config_file.tmp"
+
+    mv "$config_file.tmp" "$config_file"
+    echo "Updated $module_name: $enable_value"
+  '';
+
   moduleManagerScript = pkgs.writeScriptBin "ncc-module-manager" ''
     #!${pkgs.bash}/bin/bash
     set -e
@@ -26,10 +71,53 @@ let
     ${ui.text.normal "Available modules from your current configuration:"}
     ${ui.text.newline}
 
+    # Show current config status
+    echo "Current module status:"
+    echo "======================"
+
+    # Read current config
+    config_file="/etc/nixos/configs/module-manager-config.nix"
+    if [ -f "$config_file" ]; then
+      echo "Core modules:"
+      ${pkgs.nix}/bin/nix-instantiate --eval --strict -E "
+        let config = import $config_file;
+        in builtins.concatStringsSep \"\\n\" (
+          builtins.attrNames (config.core or {})
+        )
+      " 2>/dev/null | while read module; do
+        status=$(${pkgs.nix}/bin/nix-instantiate --eval --strict -E "
+          let config = import $config_file;
+          in config.core.\"$module\" or false
+        " 2>/dev/null)
+        printf "  %-25s [%s]\\n" "$module" "$(if [ "$status" = "true" ]; then echo "✓"; else echo "○"; fi)"
+      done
+
+      echo ""
+      echo "Feature modules:"
+      ${pkgs.nix}/bin/nix-instantiate --eval --strict -E "
+        let config = import $config_file;
+        in builtins.concatStringsSep \"\\n\" (
+          builtins.attrNames (config.features or {})
+        )
+      " 2>/dev/null | while read module; do
+        status=$(${pkgs.nix}/bin/nix-instantiate --eval --strict -E "
+          let config = import $config_file;
+          in config.features.\"$module\" or false
+        " 2>/dev/null)
+        printf "  %-25s [%s]\\n" "$module" "$(if [ "$status" = "true" ]; then echo "✓"; else echo "○"; fi)"
+      done
+    else
+      echo "No config file found - using defaults"
+    fi
+
+    echo ""
+    echo "Module selection:"
+    echo "================="
+
     # Module selection with fzf
     selected_modules=$(
       ${handler.formatModuleList} | \
-      ${pkgs.fzf}/bin/fzf --multi --prompt="Select modules (TAB or SPACE to multi-select): " --bind='space:toggle' | \
+      ${pkgs.fzf}/bin/fzf --multi --prompt="Select modules (TAB to multi-select): " | \
       awk '{print $1}'
     )
 
@@ -48,21 +136,14 @@ let
         exit 1
       fi
 
-      # Find description
-      ${lib.concatMapStringsSep "\n" (module: ''
-        if [ "$module_name" = "${module.name}" ]; then
-          module_desc="${module.description}"
-        fi
-      '') handler.allModules}
-
       # Toggle module
       if [ "$current_status" = "true" ]; then
         ${ui.messages.loading "Disabling $module_name..."}
-        ${handler.disableModule "$module_name"}
+        ${updateModuleConfig}/bin/update-module-config "$module_name" false
         ${ui.messages.success "$module_name disabled"}
       else
         ${ui.messages.loading "Enabling $module_name..."}
-        ${handler.enableModule "$module_name"}
+        ${updateModuleConfig}/bin/update-module-config "$module_name" true
         ${ui.messages.success "$module_name enabled"}
       fi
     done
