@@ -20,9 +20,9 @@ in {
     # Import all submodules (full-featured modules within system-manager)
     ./submodules/cli-formatter    # CLI formatting submodule
     ./submodules/cli-registry     # CLI command registration submodule
-    # ./submodules/system-update    # System update submodule - DISABLED: needs moduleConfig
-    # ./submodules/system-checks    # System validation submodule - DISABLED: recursion issue
-    # ./submodules/system-logging   # System logging submodule - DISABLED: recursion issue
+    ./submodules/system-update    # System update submodule - DISABLED: needs moduleConfig
+    ./submodules/system-checks    # System validation submodule - DISABLED: recursion issue
+    ./submodules/system-logging   # System logging submodule - DISABLED: recursion issue
     # Keep other handlers
     ./handlers/channel-manager.nix
     # NOTE: system-update.nix removed - now in submodules/system-update/
