@@ -18,6 +18,30 @@ let
   resolvedModules = discovery.resolveDependencies discoveredModules;
   generatedAPIs = discovery.generateAPIs resolvedModules;
 
+  # DEBUG: Show discovered modules
+  debugDiscovered = builtins.trace "DEBUG: discoveredModules count = ${toString (builtins.length discoveredModules)}" (
+    builtins.trace "DEBUG: discoveredModules names = ${builtins.toJSON (map (m: m.name) discoveredModules)}" discoveredModules
+  );
+
+  # Generate automatic moduleConfig for all discovered modules
+  automaticModuleConfigs = lib.listToAttrs (
+    map (module: {
+      name = module.name;
+      value = {
+        # Pfade: configPath ist der systemConfig Pfad ohne "systemConfig." prefix
+        configPath = module.configPath;
+        enablePath = module.enablePath;
+        apiPath = module.apiPath;
+        name = module.name;
+        category = module.category;
+        path = module.path;
+      };
+    }) debugDiscovered
+  );
+
+  # DEBUG: Show generated configs
+  debugModuleConfigs = builtins.trace "DEBUG: automaticModuleConfigs keys = ${builtins.toJSON (builtins.attrNames automaticModuleConfigs)}" automaticModuleConfigs;
+
   # Read central module configuration
   moduleManagerConfigPath = "/etc/nixos/configs/module-manager-config.nix";
   moduleManagerConfig = if builtins.pathExists moduleManagerConfigPath
@@ -46,21 +70,24 @@ in {
     # 🎯 CENTRAL REGISTRY: Module-Manager provides paths and APIs for other modules
     # This must be defined early so all modules can use it
     {
-      _module.args.modulePaths = {
-        configHelpers = ./lib/config-helpers.nix;
-        backupHelpers = ../system-manager/lib/backup-helpers.nix;
-        # CLI formatter API from submodules
-        cliApi = ../system-manager/submodules/cli-formatter/lib;
-        cliFormatterApi = config.core.management.system-manager.submodules.cli-formatter.api or {};
+      _module.args = {
+        modulePaths = {
+          configHelpers = ./lib/config-helpers.nix;
+          backupHelpers = ../system-manager/lib/backup-helpers.nix;
+          # CLI formatter API from submodules
+          cliApi = ../system-manager/submodules/cli-formatter/lib;
+          cliFormatterApi = config.core.management.system-manager.submodules.cli-formatter.api or {};
+        };
+        # Automatic module configs for all discovered modules
+        moduleConfig = debugModuleConfigs;
       };
 
-      # Export generated APIs automatically
-      core = generatedAPIs.core // {
-        management.module-manager = {
-          inherit configHelpers;
-          discoveredModules = resolvedModules;
-          generatedAPIs = generatedAPIs;
-        };
+      # Only set the module-manager API, keep generatedAPIs internal
+      core.management.module-manager = {
+        inherit configHelpers;
+        discoveredModules = resolvedModules;
+        generatedAPIs = generatedAPIs;
+        api = generatedAPIs.core.management.module-manager.api;
       };
     }
 
@@ -73,7 +100,5 @@ in {
         defaultConfig = defaultConfig;
       })
     )
-    # Module-manager is a core module that dynamically discovers all available modules
-    # No additional system configuration needed - works dynamically
   ];
 }

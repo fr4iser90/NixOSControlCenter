@@ -8,6 +8,21 @@ let
   # Parse the default config to extract features
   parsedConfig = import ./system-manager-config.nix;
   enabledFeatures = parsedConfig.features or {};
+
+  # Import module discovery to get moduleConfig
+  discovery = import ../module-manager/lib/discovery.nix { inherit lib; };
+  discoveredModules = discovery.discoverAllModules;
+  automaticModuleConfigs = lib.listToAttrs (
+    map (module: {
+      name = module.name;
+      value = {
+        inherit (module) configPath enablePath apiPath;
+        name = module.name;
+        category = module.category;
+        path = module.path;
+      };
+    }) discoveredModules
+  );
 in
 {
   config = lib.mkMerge [

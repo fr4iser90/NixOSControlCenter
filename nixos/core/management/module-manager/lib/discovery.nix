@@ -5,95 +5,54 @@ let
   # Use absolute paths from flake root
   flakeRoot = ../../../..;
 
-  # Discover all domains in modules/ directory
-  discoverDomains = let
-    modulesDir = "${flakeRoot}/modules";
-  in if builtins.pathExists modulesDir then
-    # All subdirectories are potential domains
-    lib.filterAttrs (name: type: type == "directory") (builtins.readDir modulesDir)
-  else {};
-
-  # Discover all modules within a domain
-  discoverModulesInDomain = domainName: let
-    domainDir = "${flakeRoot}/modules/${domainName}";
-    contents = builtins.readDir domainDir;
-  in lib.flatten (
-    lib.mapAttrsToList (name: type:
-      if type == "directory" then
-        let
-          moduleDir = "${domainDir}/${name}";
-          hasDefault = builtins.pathExists "${moduleDir}/default.nix";
-          hasOptions = builtins.pathExists "${moduleDir}/options.nix";
-        in if hasDefault && hasOptions then
+  # Discover modules in modules/ directory (recursive)
+  discoverModulesModules = discoverModulesRecursively "${flakeRoot}/modules" "modules";
+  # Strucuture 
+  # flakeRoot/core/moduledomain/module-name/submodules/submodule-a
+  # flakeRoot/modules/moduledomain/module-name/submodules/submodule-a
+  # Discover modules recursively in a directory
+  discoverModulesRecursively = rootDir: rootCategory: let
+    scanDir = dir: relativeCategory: let
+      contents = builtins.readDir dir;
+    in lib.flatten (
+      lib.mapAttrsToList (name: type:
+        if type == "directory" then
           let
-            # Read module metadata if available
-            metadata = if builtins.pathExists "${moduleDir}/metadata.nix"
-              then import "${moduleDir}/metadata.nix"
-              else {};
-
-            # Determine category based on domain
-            category = domainName;
-
-            # Generate API paths automatically
-            configPath = "systemConfig.${category}.${name}";
-            enablePath = "${configPath}.enable";
-            apiPath = "config.core.${category}.${name}";
-          in [{
-            name = name;
-            domain = domainName;
-            category = category;
-            path = moduleDir;
-            configPath = configPath;
-            enablePath = enablePath;
-            apiPath = apiPath;
-            configFile = "/etc/nixos/configs/${name}-config.nix";
-            description = metadata.description or "${name} module";
-            dependencies = metadata.dependencies or [];
-            version = metadata.version or "1.0";
-            defaultEnabled = false; # Features are disabled by default
-          }]
+            subDir = "${dir}/${name}";
+            hasDefault = builtins.pathExists "${subDir}/default.nix";
+            hasOptions = builtins.pathExists "${subDir}/options.nix";
+            currentCategory = if relativeCategory == "" then name else "${relativeCategory}.${name}";
+          in if hasDefault && hasOptions then
+            # Found a module!
+            [{
+              name = name;
+              domain = rootCategory;
+              category = "${rootCategory}.${currentCategory}";
+              path = subDir;
+              configPath = "${rootCategory}.${currentCategory}";
+              enablePath = "${rootCategory}.${currentCategory}.enable";
+              apiPath = "${rootCategory}.${currentCategory}";
+              configFile = "/etc/nixos/configs/${name}-config.nix";
+              description = "${rootCategory} ${currentCategory} module";
+              dependencies = [];
+              version = "1.0";
+              defaultEnabled = rootCategory == "core"; # Core modules enabled by default
+            }]
+            # Continue scanning deeper
+            ++ scanDir subDir currentCategory
+          else
+            # Not a module, but continue scanning
+            scanDir subDir currentCategory
         else []
-      else []
-    ) contents
-  );
-
-  # Discover core modules (always active)
-  discoverCoreModules = let
-    coreDir = "${flakeRoot}/core";
-    contents = builtins.readDir coreDir;
-  in lib.flatten (
-    lib.mapAttrsToList (name: type:
-      if type == "directory" && name != "modules" then
-        let
-          moduleDir = "${coreDir}/${name}";
-          hasDefault = builtins.pathExists "${moduleDir}/default.nix";
-        in if hasDefault then [{
-          name = name;
-          domain = "core";
-          category = "core";
-          path = moduleDir;
-          configPath = "systemConfig.core.${name}";
-          enablePath = "systemConfig.core.${name}.enable";
-          apiPath = "config.core.${name}";
-          configFile = "/etc/nixos/configs/${name}-config.nix";
-          description = "Core ${name} module";
-          dependencies = [];
-          version = "1.0";
-          defaultEnabled = true; # Core modules enabled by default
-        }] else []
-      else []
-    ) contents
-  );
-
-  # Discover all modules (core + features)
-  discoverAllModules = let
-    domainModules = lib.flatten (
-      lib.mapAttrsToList (domainName: _:
-        discoverModulesInDomain domainName
-      ) discoverDomains
+      ) contents
     );
-    coreModules = discoverCoreModules;
-  in coreModules ++ domainModules;
+  in scanDir rootDir "";
+
+  # Discover core modules (always active) - now recursive!
+  discoverCoreModules = discoverModulesRecursively "${flakeRoot}/core" "core";
+
+  # Discover all modules (core + modules) - both recursive now!
+  discoverAllModules = discoverCoreModules ++ discoverModulesModules;
 
   # Generate automatic APIs for all discovered modules
   generateAPIs = modules: let
@@ -114,6 +73,7 @@ let
       # Conditional exports based on what the module provides
       lib = if hasLib then import "${modulePath}/lib/default.nix" else {};
       commands = if hasCommands then import "${modulePath}/commands.nix" else {};
+      api = {}; # Module API - can be extended by the module itself
 
       # Module status
       isEnabled = module.defaultEnabled;
@@ -121,16 +81,18 @@ let
     };
 
     # Generate API for a domain (collection of modules)
-    generateDomainAPI = domainName: modulesInDomain: {
-      modules = lib.listToAttrs (
+    generateDomainAPI = domainName: modulesInDomain: let
+      moduleAPIs = lib.listToAttrs (
         map (module: {
           name = module.name;
           value = generateModuleAPI module;
         }) modulesInDomain
       );
+    in {
+      modules = moduleAPIs;
 
       # Domain-level utilities
-      enabledModules = lib.filter (m: m.isEnabled) modulesInDomain;
+      enabledModules = lib.mapAttrsToList (name: api: api) (lib.filterAttrs (name: api: api.isEnabled) moduleAPIs);
       allModules = modulesInDomain;
     };
 
@@ -163,7 +125,7 @@ let
   in validModules;
 
 in {
-  inherit discoverAllModules discoverDomains discoverModulesInDomain discoverCoreModules generateAPIs resolveDependencies;
+  inherit discoverAllModules discoverCoreModules discoverModulesModules discoverModulesRecursively generateAPIs resolveDependencies;
 
   # Convenience function: Discover modules and generate APIs
   discoverAndGenerateAPIs = let

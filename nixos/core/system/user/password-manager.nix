@@ -41,7 +41,8 @@ in {
     # Erlaube mutable Users nur wenn keine Passwortdatei existiert
     users.mutableUsers = lib.mkIf (builtins.length (builtins.attrNames realUsers) == 0) true;
     
-    config.system.activationScripts.passwordSetup = ''
+    system.activationScripts.passwordSetup = {
+      text = ''
       # Hauptverzeichnis
       mkdir -p /etc/nixos/secrets/passwords
       chmod 700 /etc/nixos/secrets/passwords
@@ -66,6 +67,8 @@ in {
           chown ${username}:${username} /etc/nixos/secrets/passwords/${username}/.hashedPassword
         fi
       '') realUsers)}
-    '';
+      '';
+      deps = [];
+    };
   };
 }

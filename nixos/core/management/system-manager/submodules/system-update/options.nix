@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, systemConfig, ... }:
 
 let
   moduleVersion = "1.0";
@@ -70,7 +70,7 @@ in {
         }
         {
           name = "local";
-          url = "/home/${config.systemConfig.users.users.${builtins.head (builtins.attrNames config.systemConfig.users.users or {})}.name or "user"}/Documents/Git/NixOSControlCenter/nixos";
+          url = "/home/${systemConfig.users.${builtins.head (builtins.attrNames systemConfig.users or {})}.name or "user"}/Documents/Git/NixOSControlCenter/nixos";
           branches = [];
         }
       ];

@@ -1,16 +1,18 @@
 { config, lib, pkgs, systemConfig, moduleConfig, ... }:
 
 let
-  cfg = systemConfig.${moduleConfig.configPath};
   configHelpers = import ../../../module-manager/lib/config-helpers.nix {
     inherit pkgs lib;
   };
+  # Module name: explizit definieren
+  moduleName = "system-update";
+  cfg = config.systemConfig.${moduleConfig.${moduleName}.configPath} or {};
   defaultConfig = builtins.readFile ./system-update-config.nix;
 in
   lib.mkMerge [
     (lib.mkIf (cfg.enable or true)
       (configHelpers.createModuleConfig {
-        moduleName = "system-update";
+        moduleName = moduleName;
         defaultConfig = defaultConfig;
       }) // {
         # System update implementation
