@@ -3,7 +3,7 @@
 with lib;
 
 let
-  ui = config.core.cli-formatter.api;
+  ui = config.core.management.system-manager.submodules.cli-formatter.api;
   
   # Execute feature migration
   # featureName: Name of the feature

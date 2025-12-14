@@ -22,14 +22,14 @@ let
     }
   ];
 
-  ui = config.core.cli-formatter.api;
-  commandCenter = systemConfig.core.infrastructure.command-center;
+  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  commandCenter = systemConfig.core.management.system-manager.submodules.cli-registry;
 
   # Extract configuration values
   username = head (attrNames systemConfig.users);
   hostname = systemConfig.hostName;
   autoBuild = systemConfig.management.system-manager.auto-build or false;
-  systemChecks = systemConfig.management.checks.enable or false;
+  systemChecks = systemConfig.core.management.system-manager.submodules.system-checks.enable or false;
   # Function to prompt for build - with conditional build command and better error handling
   prompt_build = ''
     while true; do
@@ -759,7 +759,7 @@ in {
       configModule.configCheck
     ];
 
-    system.activationScripts.nixosBackupDir = ''
+    config.system.activationScripts.nixosBackupDir = ''
       # Create main backup directory
       mkdir -p ${backupSettings.directory}
       chmod 700 ${backupSettings.directory}
@@ -787,7 +787,7 @@ in {
     '';
 
     # Commands are registered in commands.nix
-    core.command-center.commands = [
+    core.management.system-manager.submodules.cli-registry.commands = [
       {
         name = "system-update";
         description = "Update NixOS system configuration";

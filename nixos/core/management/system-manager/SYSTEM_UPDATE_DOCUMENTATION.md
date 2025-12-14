@@ -137,7 +137,7 @@ The System Update functionality manages the deployment and update process of the
 ### After Build (Activation Scripts)
 
 - **Symlinks are created**: `/etc/nixos/configs/<config-name>.nix` → `/etc/nixos/core/<module>/<config-name>.nix`
-- **When**: During system activation (AFTER build, via `system.activationScripts`)
+- **When**: During system activation (AFTER build, via `config.system.activationScripts`)
 - **Who**: Each module creates its own symlink via `configHelpers.setupConfigFile`
 - **Purpose**: Central location for ALL user-editable configs
 - **Why**: End users can quickly find and edit ALL configurable options in ONE place (`/etc/nixos/configs/`)

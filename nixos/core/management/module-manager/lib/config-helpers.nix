@@ -36,7 +36,7 @@ let
   };
 
   createModuleConfig = { moduleName, defaultConfig }: {
-    system.activationScripts."${moduleName}-config-setup" = ''
+    config.system.activationScripts."${moduleName}-config-setup" = ''
       mkdir -p "/etc/nixos/configs"
 
       # Create default config if it doesn't exist

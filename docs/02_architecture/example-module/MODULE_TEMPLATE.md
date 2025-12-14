@@ -197,8 +197,8 @@ module-name/               # Module name
 
   # Examples:
   # Core system module: options.systemConfig.core.system.audio
-  # Core management module: options.systemConfig.core.management.logging
-  # Core infrastructure module: options.systemConfig.core.infrastructure.cli-formatter
+  # Core management module: options.systemConfig.core.management.system-manager.submodules.system-logging
+  # Core infrastructure module: options.systemConfig.core.management.system-manager.submodules.cli-formatter
   # Feature module: options.systemConfig.features.infrastructure.homelab
   ```
 
@@ -214,7 +214,7 @@ module-name/               # Module name
 - **Purpose**: Command-Center command registration
 - **Responsibilities**:
   - Create all executable scripts using `pkgs.writeShellScriptBin`
-  - Register commands in `core.command-center.commands`
+  - Register commands in `core.management.system-manager.submodules.cli-registry.commands`
   - Define command metadata (name, description, category, help text)
 - **Critical**: Should be inside `mkIf cfg.enable` block when module has enable option
 - **Note**: Needed for any module that provides CLI commands
@@ -502,7 +502,7 @@ let
     # Script content
   '';
 in {
-  core.command-center.commands = [
+  core.management.system-manager.submodules.cli-registry.commands = [
     {
       name = "my-command";
       script = "${myScript}/bin/ncc-my-command";
@@ -998,7 +998,7 @@ let
 in {
   config = mkIf cfg.enable {
     # Auto-migration on activation
-    system.activationScripts.my-feature-migration = mkIf needsMigration {
+    config.system.activationScripts.my-feature-migration = mkIf needsMigration {
       text = ''
         ${pkgs.writeShellScript "migrate-my-feature" ''
           # Migration logic here
@@ -1368,7 +1368,7 @@ Config files are managed through the Module Manager framework:
 { config, lib, pkgs, systemConfig, ... }:
 let
   # For core modules: systemConfig.core.{domain}.{module-name}
-  cfg = systemConfig.core.infrastructure.cli-formatter or {};
+  cfg = systemConfig.core.management.system-manager.submodules.cli-formatter or {};
 
   # For feature modules: systemConfig.features.{domain}.{module-name}
   # cfg = systemConfig.features.infrastructure.homelab or {};

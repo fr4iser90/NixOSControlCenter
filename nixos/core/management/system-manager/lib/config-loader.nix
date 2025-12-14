@@ -122,72 +122,50 @@ let
   
   # Load a single config file
   # Returns: { value = <config-value>; path = <found-path>; domainPath = [<domain>, ...]; } or null
-  loadConfig = configName: configsDir:
+  loadConfig = configName: configsDir: configsPath:
     let
-      configFileName = "${configName}-config.nix";
-      topLevelDirs = builtins.attrNames (filterAttrs (name: type: type == "directory") (safeReadDir configsDir));
-      
-      # Discover all possible paths
-      allPaths = builtins.concatMap (topLevel: 
-        discoverConfigPaths configName configsDir topLevel topLevel 0
-      ) topLevelDirs;
-      
-      # Find first valid config file
-      validPaths = builtins.filter isValidConfig allPaths;
-      configPath = if builtins.length validPaths > 0 then builtins.head validPaths else null;
+      # Use configurable configsPath instead of hardcoded /etc/nixos/configs
+      configPath = configsPath + "/" + configName + "-config.nix";
     in
-      if configPath != null then
+      if builtins.pathExists configPath && isValidConfig configPath then
         let
           loadedConfig = safeImport configPath;
-          configValue = if builtins.hasAttr configName loadedConfig
-            then loadedConfig.${configName}
-            else loadedConfig;
+          # Take the whole loaded config file
+          configValue = loadedConfig;
           domainPath = extractDomainPath configsDir configPath;
         in
           { value = configValue; path = configPath; domainPath = domainPath; }
       else null;
   
   # Discover all config files in the filesystem
-  # Finds all *-config.nix files directly in module directories
-  discoverConfigs = configsDir:
+  # Finds all *-config.nix files in the configs/ directory
+  discoverConfigs = configsDir: configsPath:
     let
-      # Recursively find all *-config.nix files in module directories
-      findConfigFiles = currentPath: depth:
+      # Check if configs directory exists first
+      configsExist = safePathExists configsPath;
+    in
+      if !configsExist then
+        []
+      else
         let
-          currentDir = configsDir + "/${currentPath}";
-          dir = safeReadDir currentDir;
-          entries = dir;
+          dir = builtins.readDir configsPath;
 
-          # Check if this directory contains *-config.nix files directly
+          # Find all *-config.nix files directly in configs/
           configFiles = builtins.filter (name:
             hasSuffix "-config.nix" name && dir.${name} == "regular"
           ) (builtins.attrNames dir);
 
-          # Extract config names from config files
+          # Extract config names
           configNames = builtins.map (file:
             builtins.head (builtins.split "-config.nix" file)
           ) configFiles;
 
-          # Recursively search subdirectories (limit depth)
-          subDirs = builtins.attrNames (filterAttrs (name: type: type == "directory") entries);
-          subConfigs = if depth < 5 then
-            builtins.concatMap (subDir:
-              findConfigFiles "${currentPath}/${subDir}" (depth + 1)
-            ) subDirs
-          else [];
+          # Remove duplicates (shouldn't be any, but safe)
+          uniqueConfigs = builtins.foldl' (acc: name:
+            if builtins.elem name acc then acc else acc ++ [name]
+          ) [] configNames;
         in
-          configNames ++ subConfigs;
-      
-      # Start discovery from all top-level directories
-      topLevelDirs = builtins.attrNames (filterAttrs (name: type: type == "directory") (safeReadDir configsDir));
-      
-      # Find all configs and remove duplicates
-      allConfigs = builtins.concatMap (topLevel: findConfigFiles topLevel 0) topLevelDirs;
-      uniqueConfigs = builtins.foldl' (acc: name: 
-        if builtins.elem name acc then acc else acc ++ [name]
-      ) [] allConfigs;
-    in
-      uniqueConfigs;
+          uniqueConfigs;
   
   # Merge config into correct structure based on discovered domain path
   # Example: ["system", "audio"] → { system = { audio = configValue; }; }
@@ -202,20 +180,22 @@ let
 in
 {
   # Load and merge all configs
-  # Usage: loadSystemConfig configsDir systemConfigPath
-  loadSystemConfig = configsDir: systemConfigPath:
+  # Usage: loadSystemConfig configsDir systemConfigPath configsPath
+  loadSystemConfig = configsDir: systemConfigPath: configsPath:
     let
-      # 1. Load minimal system-config (MUST exist)
-      baseConfig = import systemConfigPath;
-      
+      # 1. Load system-config if exists (for compatibility), otherwise empty set
+      baseConfig = if builtins.pathExists systemConfigPath
+        then import systemConfigPath
+        else {};
+
       # 2. Dynamically discover all config files
-      optionalConfigs = discoverConfigs configsDir;
-      
+      optionalConfigs = discoverConfigs configsDir configsPath;
+
       # 3. Load and merge all discovered configs
       # Order is important: later configs override earlier ones
-      mergedConfig = builtins.foldl' (acc: configName: 
+      mergedConfig = builtins.foldl' (acc: configName:
         let
-          loaded = loadConfig configName configsDir;
+          loaded = loadConfig configName configsDir configsPath;
         in
           if loaded != null && loaded.value != {} then
             mergeConfigIntoStructure loaded.domainPath loaded.value acc
@@ -223,7 +203,15 @@ in
       ) baseConfig optionalConfigs;
     in
       mergedConfig;
-  
+
   # Get list of discovered configs (for reference/debugging)
   getDiscoveredConfigs = configsDir: discoverConfigs configsDir;
+
+  # Export for debugging
+  extractDomainPath = extractDomainPath;
+  loadConfig = loadConfig;
+  safeImport = safeImport;
+  isValidConfig = isValidConfig;
+  safePathExists = safePathExists;
+  safeReadFile = safeReadFile;
 }

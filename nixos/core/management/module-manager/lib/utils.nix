@@ -2,7 +2,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  ui = config.core.cli-formatter.api;
+  ui = config.core.management.system-manager.submodules.cli-formatter.api;
   hostname = systemConfig.hostName;
 
   # Import discovery functions
@@ -10,6 +10,9 @@ let
 
   # ALL modules discovered automatically
   allModules = discovery.discoverAllModules;
+
+  # Debug: Show discovered modules
+  debugModules = builtins.trace "DEBUG: Discovered modules: ${toString (map (m: m.name) allModules)}" allModules;
 
   # Helper: Generate config file for a module (PRESERVES EXISTING CONFIG!)
   updateModuleConfig = pkgs.writeShellScriptBin "update-module-config" ''

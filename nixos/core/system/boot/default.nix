@@ -12,7 +12,7 @@ in {
   imports = [
     ./options.nix
     ./config.nix
-    (bootloaders.${systemConfig.system.bootloader} or bootloaders.systemd-boot)
+    (bootloaders.${systemConfig.system.bootloader or systemConfig.bootloader or "systemd-boot"})
   ];
 
   # Common boot configuration

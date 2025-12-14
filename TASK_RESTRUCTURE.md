@@ -160,7 +160,7 @@ in {
 
 **Critical Breaking Changes:**
 - `config.core.cli-formatter.*` → `config.modules.system-manager.cli-formatter.*`
-- `config.core.command-center.*` → `config.modules.system-manager.cli-registry.*`
+- `config.core.management.system-manager.submodules.cli-registry.*` → `config.modules.system-manager.cli-registry.*`
 
 **Find affected files:**
 ```bash

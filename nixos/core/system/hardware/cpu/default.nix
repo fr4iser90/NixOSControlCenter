@@ -20,14 +20,14 @@ let
 
 in {
   imports = [
-    (cpuConfigs.${systemConfig.system.hardware.cpu} or cpuConfigs.none)  # Default auf 'none'
+    (cpuConfigs.${systemConfig.hardware.cpu or "none"})
   ];
 
   assertions = [
     {
-      assertion = builtins.hasAttr systemConfig.system.hardware.cpu cpuConfigs;
+      assertion = builtins.hasAttr (systemConfig.hardware.cpu or "none") cpuConfigs;
       message = ''
-        Invalid CPU configuration: ${systemConfig.system.hardware.cpu}
+        Invalid CPU configuration: ${systemConfig.hardware.cpu or "none"}
         Available options are: ${toString (builtins.attrNames cpuConfigs)}
       '';
     }

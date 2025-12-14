@@ -3,7 +3,7 @@
 with lib;
 
 let
-  ui = config.core.cli-formatter.api;
+  ui = config.core.management.system-manager.submodules.cli-formatter.api;
   versionChecker = import ../handlers/module-version-check.nix { inherit config lib; };
   
   # Create the update-features script

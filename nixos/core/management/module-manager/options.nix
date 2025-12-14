@@ -2,6 +2,7 @@
 
 let
   moduleVersion = "1.0";
+  name="NCC Module Manager";
 in {
   options.systemConfig.core.management.module-manager = {
     _version = lib.mkOption {

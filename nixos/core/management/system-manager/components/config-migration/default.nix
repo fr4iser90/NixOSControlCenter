@@ -1,10 +1,10 @@
 { pkgs, lib, config ? null, systemConfig ? null, ... }:
 
 let
-  # Import cli-formatter directly (config/ is a library, not a NixOS module, so it can't access config.core.cli-formatter.api)
-  colors = import ../../../../infrastructure/cli-formatter/colors.nix;
-  core = import ../../../../infrastructure/cli-formatter/core { inherit lib colors; config = {}; };
-  status = import ../../../../infrastructure/cli-formatter/status { inherit lib colors; config = {}; };
+  # Import cli-formatter from submodules
+  colors = import ../../submodules/cli-formatter/colors.nix;
+  core = import ../../submodules/cli-formatter/core { inherit lib colors; config = {}; };
+  status = import ../../submodules/cli-formatter/status { inherit lib colors; config = {}; };
   
   # Build formatter API (same structure as cli-formatter/default.nix apiValue)
   formatter = {

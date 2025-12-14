@@ -3,10 +3,10 @@
 with lib;
 
 let
-  ui = config.core.cli-formatter.api;
-  commandCenter = config.core.command-center;
+  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  commandCenter = config.core.management.system-manager.submodules.cli-registry;
   hostname = systemConfig.hostName;
-  systemChecks = systemConfig.management.checks.enable or false;
+  systemChecks = systemConfig.core.management.system-manager.submodules.system-checks.enable or false;
 
   # Script to update flake inputs (channels) and rebuild
   updateChannelsScript = pkgs.writeScriptBin "ncc-update-channels" ''
@@ -65,7 +65,7 @@ in {
       updateChannelsScript
     ];
 
-    core.command-center.commands = [
+    core.management.system-manager.submodules.cli-registry.commands = [
       {
         name = "update-channels";
         description = "Update Nix flake inputs / channels and rebuild the system";

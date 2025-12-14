@@ -25,7 +25,7 @@ All modules are organized under `systemConfig.*` with three logical categories:
    - **Purpose**: User preferences, module activation
 
 2. **`core.*`** = Cross-Module APIs (what modules share)
-   - `core.command-center.commands` (collected from all modules)
+   - `core.management.system-manager.submodules.cli-registry.commands` (collected from all modules)
    - `core.logging.collectors` (if logging provides APIs)
    - **Purpose**: Module-to-module communication
 
@@ -78,7 +78,7 @@ in
   lib.mkMerge [
     {
       # Symlink management (ALWAYS RUNS)
-      system.activationScripts.module-name-config-symlink = ''...'';
+      config.system.activationScripts.module-name-config-symlink = ''...'';
     }
       (lib.mkIf (cfg.enable or /* category default */) {
       # Module implementation (ONLY WHEN ENABLED)
@@ -249,7 +249,7 @@ metadata.nix = {
 
 # OLD - Inconsistent API patterns
 options.features.homelab = { ... };
-core.command-center.commands = { ... };  # Always available
+core.management.system-manager.submodules.cli-registry.commands = { ... };  # Always available
 ```
 
 **After**: Modular, consistent, conditional

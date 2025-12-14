@@ -5,12 +5,6 @@
   
   requiredFields = [
     "configVersion"         # MUSS vorhanden sein in v1.0
-    "systemType"
-    "hostName"
-    "system"
-    "allowUnfree"
-    "users"
-    "timeZone"
   ];
   
   optionalFields = [];  # Alles andere ist in configs/

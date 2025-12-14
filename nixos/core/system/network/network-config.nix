@@ -3,6 +3,9 @@
   # This is a core module that configures basic networking
   # Advanced network configuration should be done in system-config.nix
 
+  # Hostname - will be auto-detected if not set
+  # hostName = "auto-detected";
+
   network = {
     # NetworkManager DNS configuration
     networkManager = {

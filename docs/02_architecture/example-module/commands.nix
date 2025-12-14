@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = config.features.example-module;
-  ui = config.core.cli-formatter.api;
+  ui = config.core.management.system-manager.submodules.cli-formatter.api;
 in
   mkIf cfg.enable {
     # Create scripts using pkgs.writeShellScriptBin
@@ -38,7 +38,7 @@ in
       '';
     in {
       # Register commands in command-center
-      core.command-center.commands = [
+      core.management.system-manager.submodules.cli-registry.commands = [
         {
           name = "example-module";
           description = "Example module command";

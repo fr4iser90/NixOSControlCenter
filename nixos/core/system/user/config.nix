@@ -6,9 +6,22 @@ let
 in
 {
   config = lib.mkIf ((systemConfig.system.user.enable or false) || true)
-    (configHelpers.createModuleConfig {
-      moduleName = "user";
-      defaultConfig = defaultConfig;
-    });
+    (lib.recursiveUpdate
+      (configHelpers.createModuleConfig {
+        moduleName = "user";
+        defaultConfig = defaultConfig;
+      })
+      {
+        # Replace placeholder with actual username
+        system.activationScripts."user-config-personalize" = ''
+          if [ -f "/etc/nixos/configs/user-config.nix" ]; then
+            # Replace yourusername with actual user from whoami
+            REAL_USER=$(whoami)
+            sed -i "s/yourusername/$REAL_USER/g" "/etc/nixos/configs/user-config.nix"
+          fi
+        '';
+      }
+    );
+
   # User module implementation is handled in default.nix
 }

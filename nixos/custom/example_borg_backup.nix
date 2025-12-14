@@ -147,7 +147,7 @@ in
   ######################################################################
   # 🔧 System Activation: Initialize repository on system startup
   ######################################################################
-  system.activationScripts.borg-init = ''
+  config.system.activationScripts.borg-init = ''
     # Initialize Borg repository if it doesn't exist
     if [ ! -d /var/backups/borg-backup ] || [ ! -f /var/backups/borg-backup/config ]; then
       echo "🔧 Initializing Borg repository..."

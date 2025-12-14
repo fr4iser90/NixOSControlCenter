@@ -6,7 +6,7 @@ let
   # Import the handler for business logic
   handler = import ./handlers/module-manager.nix { inherit config lib pkgs systemConfig; };
 
-  ui = config.core.cli-formatter.api;
+  ui = config.core.management.system-manager.submodules.cli-formatter.api;
   hostname = systemConfig.hostName;
 
   # 🎯 COMMAND REGISTRATION: Per MODULE_TEMPLATE in commands.nix!
@@ -172,7 +172,7 @@ let
 
 in {
   # 🎯 COMMAND REGISTRATION: In commands.nix per MODULE_TEMPLATE!
-  core.command-center.commands = [
+  core.management.system-manager.submodules.cli-registry.commands = [
     {
       name = "module-manager";
       description = "Toggle all NixOS modules using fzf (dynamic discovery)";

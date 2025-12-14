@@ -9,8 +9,14 @@ let
   # Use the template file as default config
   defaultConfig = builtins.readFile ./module-manager-config.nix;
 
-  # Import module discovery
+  # Import module discovery and API generation
+  discovery = import ./lib/discovery.nix { inherit lib; };
   moduleLib = import ./lib/default.nix { inherit config lib pkgs systemConfig; };
+
+  # Auto-discover modules and generate APIs
+  discoveredModules = discovery.discoverAllModules;
+  resolvedModules = discovery.resolveDependencies discoveredModules;
+  generatedAPIs = discovery.generateAPIs resolvedModules;
 
   # Read central module configuration
   moduleManagerConfigPath = "/etc/nixos/configs/module-manager-config.nix";
@@ -43,15 +49,19 @@ in {
       _module.args.modulePaths = {
         configHelpers = ./lib/config-helpers.nix;
         backupHelpers = ../system-manager/lib/backup-helpers.nix;
-        cliApi = ../../infrastructure/cli-formatter/lib;
-        # CLI formatter API for modules that need it early
-        cliFormatterApi = (import ../../infrastructure/cli-formatter/config.nix {
-          inherit config lib pkgs systemConfig;
-        }).apiValue;
+        # CLI formatter API from submodules
+        cliApi = ../system-manager/submodules/cli-formatter/lib;
+        cliFormatterApi = config.core.management.system-manager.submodules.cli-formatter.api or {};
       };
 
-      # Also export via config for modules that load later
-      core.management.module-manager.configHelpers = configHelpers;
+      # Export generated APIs automatically
+      core = generatedAPIs.core // {
+        management.module-manager = {
+          inherit configHelpers;
+          discoveredModules = resolvedModules;
+          generatedAPIs = generatedAPIs;
+        };
+      };
     }
 
     # Set enable options for all modules based on central config

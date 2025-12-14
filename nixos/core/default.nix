@@ -11,13 +11,8 @@
     ./system/desktop
     ./system/audio
     ./system/packages
-    # Infrastructure
-    ./infrastructure/cli-formatter
-    ./infrastructure/command-center
-    # Management
+    # Management (includes infrastructure as submodules)
     ./management/system-manager
     ./management/module-manager
-    ./management/checks
-    ./management/logging
   ];
 }

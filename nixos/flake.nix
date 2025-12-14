@@ -25,8 +25,8 @@
     configLoader = import ./core/management/system-manager/lib/config-loader.nix {};
     
     # Load and merge all configs using centralized loader
-    # Pass flake root directory (as path) and system-config path
-    systemConfig = configLoader.loadSystemConfig ./. ./system-config.nix;
+    # Pass flake root directory (as path), system-config path, and configs directory path
+    systemConfig = configLoader.loadSystemConfig ./. (./. + "/system-config.nix") (./. + "/configs");
     
     # Wähle das richtige nixpkgs und home-manager basierend auf der Konfiguration
     nixpkgs = if systemConfig.system.channel == "stable"
@@ -53,7 +53,8 @@
     systemModules = [
       ./hardware-configuration.nix
       ./core
-      ./features
+      # Safe import: only import modules/ if it exists
+      (if builtins.pathExists ./modules/default.nix then ./modules else {})
       ./custom
     ];
 

@@ -15,9 +15,9 @@ let
   updateDesktopConfig = import ./scripts/update-desktop-config.nix { inherit config lib pkgs systemConfig; };
   
   # Import config migration and validation
-  colors = import ../cli-formatter/colors.nix;
-  coreFormatter = import ../cli-formatter/core { inherit lib colors; config = {}; };
-  statusFormatter = import ../cli-formatter/status { inherit lib colors; config = {}; };
+  colors = import ./submodules/cli-formatter/colors.nix;
+  coreFormatter = import ./submodules/cli-formatter/core { inherit lib colors; config = {}; };
+  statusFormatter = import ./submodules/cli-formatter/status { inherit lib colors; config = {}; };
   formatter = {
     inherit colors;
     inherit (coreFormatter) text layout;
@@ -42,7 +42,7 @@ in {
         configMigration.validator.validateSystemConfig
       ];
     
-    core.command-center.commands =
+    core.management.system-manager.submodules.cli-registry.commands =
       [
         {
           name = "check-module-versions";

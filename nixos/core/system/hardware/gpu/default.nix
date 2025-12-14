@@ -34,14 +34,14 @@ let
 
 in {
   imports = [
-    (gpuConfigs.${systemConfig.system.hardware.gpu} or gpuConfigs.none)
+    (gpuConfigs.${systemConfig.hardware.gpu or "none"})
   ];
 
   assertions = [
     {
-      assertion = builtins.hasAttr systemConfig.system.hardware.gpu gpuConfigs;
+      assertion = builtins.hasAttr (systemConfig.hardware.gpu or "none") gpuConfigs;
       message = ''
-        Invalid GPU configuration: ${systemConfig.system.hardware.gpu}
+        Invalid GPU configuration: ${systemConfig.hardware.gpu or "none"}
         Available options are: ${toString (builtins.attrNames gpuConfigs)}
       '';
     }

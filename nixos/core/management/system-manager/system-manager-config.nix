@@ -1,4 +1,10 @@
 {
+  # Core system configuration
+  configVersion = "1.0";
+  systemType = "desktop";
+  system = {
+    channel = "stable";
+  };
   features = {
     system-logger = true;
     system-checks = true;

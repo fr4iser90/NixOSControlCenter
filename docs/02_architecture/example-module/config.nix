@@ -26,7 +26,7 @@ in
     }
     {
       # Symlink management (always runs, even if disabled)
-      system.activationScripts.example-module-config-symlink = 
+      config.system.activationScripts.example-module-config-symlink = 
         if configHelpers != null then
           configHelpers.setupConfigFile symlinkPath userConfigFile defaultConfig
         else ''
