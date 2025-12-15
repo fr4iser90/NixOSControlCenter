@@ -3,8 +3,8 @@
 let
   moduleVersion = "1.0";
 in {
-  # User configuration (accessed via systemConfig.core.cli-formatter)
-  options.systemConfig.core.cli-formatter = {
+  # User configuration (accessed via systemConfig.core.management.system-manager.submodules.cli-formatter)
+  options.systemConfig.core.management.system-manager.submodules.cli-formatter = {
     # Version metadata (REQUIRED for all modules)
     _version = lib.mkOption {
       type = lib.types.str;
@@ -43,8 +43,8 @@ in {
     };
   };
 
-  # API definition (accessed via config.core.cli-formatter)
-  options.core.cli-formatter = {
+  # API definition (accessed via config.core.management.system-manager.submodules.cli-formatter)
+  options.core.management.system-manager.submodules.cli-formatter = {
     api = lib.mkOption {
       type = lib.types.attrs;
       readOnly = true;

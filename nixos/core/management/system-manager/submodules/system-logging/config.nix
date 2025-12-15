@@ -3,7 +3,7 @@ let
   configHelpers = import ../../../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   # Module name: explizit definieren
   moduleName = "system-logging";
-  cfg = config.systemConfig.${moduleConfig.${moduleName}.configPath} or {};
+  cfg = systemConfig.${moduleConfig.${moduleName}.configPath} or {};
   # Use the template file as default config
   defaultConfig = builtins.readFile ./logging-config.nix;
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
@@ -42,11 +42,11 @@ let
     lib.listToAttrs (lib.map (name: {
       inherit name;
       value = import ./collectors/${name}.nix {
-        inherit lib pkgs systemConfig ui reportLevels;
+        inherit config lib pkgs systemConfig ui reportLevels;
         currentLevel = reportLevels.${
           if effectiveCollectors.${name}.detailLevel != null
           then effectiveCollectors.${name}.detailLevel
-          else cfg.defaultDetailLevel or "info"
+          else config.core.management.system-manager.submodules.system-logging.defaultDetailLevel or "info"
         };
       };
     }) availableCollectors)
@@ -68,11 +68,11 @@ EOF
 
     # Core API - always available
     {
-      core.management.system-manager.submodules.system-logging.system-logger.enable = lib.mkDefault true;
-      core.management.system-manager.submodules.system-logging.system-logger.defaultDetailLevel = lib.mkDefault (
-        if systemConfig ? buildLogLevel
+      core.management.system-manager.submodules.system-logging.enable = lib.mkDefault true;
+      core.management.system-manager.submodules.system-logging.defaultDetailLevel = lib.mkDefault (
+        if systemConfig ? buildLogLevel && builtins.elem systemConfig.buildLogLevel ["basic" "info" "debug" "trace"]
         then systemConfig.buildLogLevel
-        else "standard"
+        else "info"
       );
     }
 
@@ -97,7 +97,7 @@ EOF
           ${ui.text.header "NixOS System Report"}
           ${ui.tables.keyValue "Hostname" config.networking.hostName}
           ${ui.tables.keyValue "Generation" "$(readlink /nix/var/nix/profiles/system | cut -d'-' -f2)"}
-          ${ui.tables.keyValue "Detail Level" cfg.defaultDetailLevel}
+          ${ui.tables.keyValue "Detail Level" config.core.management.system-manager.submodules.system-logging.defaultDetailLevel}
           ${ui.layout.separator "-" 50}
 
           ${lib.concatStringsSep "\n" reports}
@@ -105,11 +105,11 @@ EOF
       };
     }
 
-    # Exportiere reportingConfig für andere Module
-    {
-      _module.args.reportingConfig = {
-        inherit ui reportLevels;
-        currentLevel = reportLevels.${cfg.defaultDetailLevel or "info"};
-      };
-    }
+        # Exportiere reportingConfig für andere Module
+        {
+          _module.args.reportingConfig = {
+            inherit ui reportLevels;
+        currentLevel = reportLevels.${config.core.management.system-manager.submodules.system-logging.defaultDetailLevel or "info"};
+          };
+        }
   ]

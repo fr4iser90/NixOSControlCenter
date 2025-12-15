@@ -12,7 +12,7 @@ in {
   imports = [
     ./options.nix
     ./config.nix
-    (bootloaders.${systemConfig.system.bootloader or systemConfig.bootloader or "systemd-boot"})
+    (bootloaders.${systemConfig.bootloader or "systemd-boot"})
   ];
 
   # Common boot configuration
@@ -27,8 +27,8 @@ in {
 
   assertions = [
     {
-      assertion = builtins.hasAttr systemConfig.system.bootloader bootloaders;
-      message = "Invalid bootloader selection: ${systemConfig.system.bootloader}";
+      assertion = builtins.hasAttr systemConfig.bootloader bootloaders;
+      message = "Invalid bootloader selection: ${systemConfig.bootloader}";
     }
   ];
 }

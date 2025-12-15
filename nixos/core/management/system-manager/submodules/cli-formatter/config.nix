@@ -1,7 +1,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  cfg = systemConfig.core.cli-formatter or {};
+  cfg = systemConfig.core.management.system-manager.submodules.cli-formatter or {};
 
   colors = import ./colors.nix;
 
@@ -45,8 +45,8 @@ in
         moduleName = "cli-formatter";
         defaultConfig = defaultConfig;
       }) // {
-        # API is always available (not dependent on cfg.enable)
-        core.cli-formatter.api = apiValue;
+        # API unter filesystem Pfad setzen (jeder Ordner = API Segment)
+        core.management.system-manager.submodules.cli-formatter.api = apiValue;
       }
     ))
   ]

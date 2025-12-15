@@ -76,9 +76,9 @@ in {
   };
 
   # NixOS Module Options (for config.core namespace)
+  # API-Struktur: Jeder Ordner = API Pfad Segment
   options.core.management.system-manager.submodules.system-logging = {
-    # System Logger - Core module always available
-    system-logger = {
+    # Direkt unter system-logging, nicht unter system-logger
       defaultDetailLevel = lib.mkOption {
         type = lib.types.enum (lib.attrNames reportLevels);
         default = "info";
@@ -89,7 +89,6 @@ in {
         type = lib.types.bool;
         default = true;
         description = "Enable system logging";
-      };
     };
   };
 }

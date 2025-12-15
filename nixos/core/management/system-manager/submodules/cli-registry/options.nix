@@ -44,7 +44,7 @@ in {
   };
 
   # API definition - always available, conditionally populated
-  options.core.command-center = {
+  options.core.management.system-manager.submodules.cli-registry = {
     commands = lib.mkOption {
       type = lib.types.listOf ccLib.types.commandType;
       default = [];

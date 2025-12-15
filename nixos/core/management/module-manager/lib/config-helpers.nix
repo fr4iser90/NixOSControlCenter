@@ -39,16 +39,16 @@ let
   createModuleConfig = { moduleName, defaultConfig }: {
     system.activationScripts."${moduleName}-config-setup" = {
       text = ''
-        mkdir -p "/etc/nixos/configs"
+      mkdir -p "/etc/nixos/configs"
 
-        # Create default config if it doesn't exist
-        if [ ! -f "/etc/nixos/configs/${moduleName}-config.nix" ]; then
-          cat << 'EOF' > "/etc/nixos/configs/${moduleName}-config.nix"
+      # Create default config if it doesn't exist
+      if [ ! -f "/etc/nixos/configs/${moduleName}-config.nix" ]; then
+        cat << 'EOF' > "/etc/nixos/configs/${moduleName}-config.nix"
 ${defaultConfig}
 EOF
-          chmod 644 "/etc/nixos/configs/${moduleName}-config.nix"
-        fi
-      '';
+        chmod 644 "/etc/nixos/configs/${moduleName}-config.nix"
+      fi
+    '';
     };
   };
 in

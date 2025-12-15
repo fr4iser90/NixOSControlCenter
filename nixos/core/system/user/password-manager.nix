@@ -67,7 +67,7 @@ in {
           chown ${username}:${username} /etc/nixos/secrets/passwords/${username}/.hashedPassword
         fi
       '') realUsers)}
-      '';
+    '';
       deps = [];
     };
   };

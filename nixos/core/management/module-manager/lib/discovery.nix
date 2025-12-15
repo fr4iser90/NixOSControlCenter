@@ -14,38 +14,38 @@ let
   discoverModulesRecursively = rootDir: rootCategory: let
     scanDir = dir: relativeCategory: let
       contents = builtins.readDir dir;
-    in lib.flatten (
-      lib.mapAttrsToList (name: type:
-        if type == "directory" then
-          let
+  in lib.flatten (
+    lib.mapAttrsToList (name: type:
+      if type == "directory" then
+        let
             subDir = "${dir}/${name}";
             hasDefault = builtins.pathExists "${subDir}/default.nix";
             hasOptions = builtins.pathExists "${subDir}/options.nix";
             currentCategory = if relativeCategory == "" then name else "${relativeCategory}.${name}";
-          in if hasDefault && hasOptions then
+        in if hasDefault && hasOptions then
             # Found a module!
             [{
-              name = name;
+            name = name;
               domain = rootCategory;
               category = "${rootCategory}.${currentCategory}";
               path = subDir;
               configPath = "${rootCategory}.${currentCategory}";
               enablePath = "${rootCategory}.${currentCategory}.enable";
               apiPath = "${rootCategory}.${currentCategory}";
-              configFile = "/etc/nixos/configs/${name}-config.nix";
+            configFile = "/etc/nixos/configs/${name}-config.nix";
               description = "${rootCategory} ${currentCategory} module";
               dependencies = [];
               version = "1.0";
               defaultEnabled = rootCategory == "core"; # Core modules enabled by default
-            }]
+          }]
             # Continue scanning deeper
             ++ scanDir subDir currentCategory
           else
             # Not a module, but continue scanning
             scanDir subDir currentCategory
-        else []
-      ) contents
-    );
+      else []
+    ) contents
+  );
   in scanDir rootDir "";
 
   # Discover core modules (always active) - now recursive!

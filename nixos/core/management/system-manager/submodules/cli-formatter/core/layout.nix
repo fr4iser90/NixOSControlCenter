@@ -40,7 +40,9 @@ with lib;
 
   # Abstände
   spacing = {
-    small = newline;
+    small = ''
+      printf '\n'
+    '';
     medium = ''
       printf '\n\n'
     '';

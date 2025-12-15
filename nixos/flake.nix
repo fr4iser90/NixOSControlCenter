@@ -8,6 +8,9 @@
     # Home-Manager Inputs für verschiedene Versionen
     home-manager-stable.url = "github:nix-community/home-manager/release-25.11";
     home-manager-unstable.url = "github:nix-community/home-manager";
+
+    configs.url = "path:/etc/nixos/configs";
+    configs.flake = false;
   };
 
   outputs = { self
@@ -15,6 +18,7 @@
     , nixpkgs-unstable
     , home-manager-stable
     , home-manager-unstable
+    , configs
     , ... 
   }: let
     system = "x86_64-linux";
@@ -26,8 +30,9 @@
     
     # Load and merge all configs using centralized loader
     # Pass flake root directory (as path), system-config path, and configs directory path
-    systemConfig = configLoader.loadSystemConfig ./. (./. + "/system-config.nix") (./. + "/configs");
-    
+    dummyCopy = builtins.readDir ./configs;
+    systemConfig = configLoader.loadSystemConfig ./. (./. + "/configs/system-config.nix") configs;  
+
     # Wähle das richtige nixpkgs und home-manager basierend auf der Konfiguration
     nixpkgs = if systemConfig.system.channel == "stable"
               then nixpkgs-stable

@@ -24,19 +24,19 @@ in
   ];
 
   # Module implementation
-  environment.systemPackages = with pkgs; [
-    pciutils
-    usbutils
-    lshw
-    prebuildCheckScript
-  ] ++ lib.optional (postbuildCfg.enable or true) postbuildScript;
+      environment.systemPackages = with pkgs; [
+        pciutils
+        usbutils
+        lshw
+        prebuildCheckScript
+      ] ++ lib.optional (postbuildCfg.enable or true) postbuildScript;
 
-  # Postbuild activation script
-  system.activationScripts.postbuildChecks = lib.mkIf (postbuildCfg.enable or true) {
-    deps = [ "users" "groups" ];
-    text = ''
-      echo "Running postbuild checks..."
-      ${postbuildScript}/bin/nixos-postbuild
-    '';
-  };
+      # Postbuild activation script
+      system.activationScripts.postbuildChecks = lib.mkIf (postbuildCfg.enable or true) {
+        deps = [ "users" "groups" ];
+        text = ''
+          echo "Running postbuild checks..."
+          ${postbuildScript}/bin/nixos-postbuild
+        '';
+        };
 }

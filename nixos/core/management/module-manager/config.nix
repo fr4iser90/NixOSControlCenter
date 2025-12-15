@@ -48,17 +48,6 @@ let
     then import moduleManagerConfigPath
     else import ./module-manager-config.nix;
 
-  # Set enable options for all modules based on central config
-  setModuleEnables = lib.concatMap (category:
-    let
-      categoryModules = moduleManagerConfig.${category} or {};
-    in lib.mapAttrsToList (moduleName: enabled:
-      {
-        name = "systemConfig.${category}.${moduleName}.enable";
-        value = enabled;
-      }
-    ) categoryModules
-  ) (builtins.attrNames moduleManagerConfig);
 
   # Set enable options for all modules based on central config
   # Note: Modules are imported statically in flake.nix, not dynamically here
@@ -82,17 +71,12 @@ in {
         moduleConfig = debugModuleConfigs;
       };
 
-      # Only set the module-manager API, keep generatedAPIs internal
+      # Module-manager configuration
       core.management.module-manager = {
         inherit configHelpers;
-        discoveredModules = resolvedModules;
-        generatedAPIs = generatedAPIs;
-        api = generatedAPIs.core.management.module-manager.api;
       };
     }
 
-    # Set enable options for all modules based on central config
-    (builtins.listToAttrs setModuleEnables)
 
     (lib.mkIf (cfg.enable or true)
       (configHelpers.createModuleConfig {

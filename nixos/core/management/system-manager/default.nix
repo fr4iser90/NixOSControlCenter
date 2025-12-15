@@ -3,8 +3,8 @@
 with lib;
 
 let
-  # Use final config with defaults applied
-  cfg = config.systemConfig.management.system-manager or {};
+  # Use systemConfig from module-manager (_module.args)
+  cfg = systemConfig.management.system-manager or {};
 
   # Import helpers
   backupHelpers = import ./lib/backup-helpers.nix { inherit pkgs lib; };
@@ -45,9 +45,9 @@ in {
     }) (cfg.users or {});
 
     # Bootloader from loaded config
-    boot.loader.systemd-boot.enable = cfg.system.bootloader == "systemd-boot";
-    boot.loader.grub.enable = cfg.system.bootloader == "grub";
-
+    boot.loader.systemd-boot.enable = systemConfig.bootloader == "systemd-boot";
+    boot.loader.grub.enable = systemConfig.bootloader == "grub";
+    
     core.management.system-manager.api = apiValue;
   };
 }
