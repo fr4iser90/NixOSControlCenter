@@ -61,6 +61,13 @@
         description = "Detailed help text shown with --help";
       };
 
+      # Legacy compatibility - allow 'help' as alias for longHelp
+      help = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = "Legacy alias for longHelp - use longHelp instead";
+      };
+
       aliases = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [];

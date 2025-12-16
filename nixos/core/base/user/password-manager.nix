@@ -34,7 +34,7 @@ in {
     };
   };
 
-  config = lib.mkIf config.security.passwordManagement.enable {
+  config = {
     # Erlaube temporär Logins während des Builds
     users.allowNoPasswordLogin = lib.mkForce true;
     

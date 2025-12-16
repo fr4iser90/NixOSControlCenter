@@ -13,21 +13,22 @@ let
   aliases = import ./scripts/aliases.nix { inherit config lib pkgs systemConfig; };
 
   # API definition - always available
+  # Commands werden von anderen Modulen hinzugefügt
   apiValue = {
-    commands = config.core.management.system-manager.submodules.cli-registry.commands or [];
-    categories = ccLib.utils.getUniqueCategories (config.core.management.system-manager.submodules.cli-registry.commands or []);
+    categories = [];  # Wird später berechnet
   };
 
 in
-  lib.mkMerge [
-    (lib.mkIf (cfg.enable or true) (
-      (configHelpers.createModuleConfig {
-        moduleName = "cli-registry";
-        defaultConfig = defaultConfig;
-      }) // {
-        # API is always available (not dependent on cfg.enable)
-        core.management.system-manager.submodules.cli-registry = apiValue;
-      }
-    ))
-  ]
+{
+  # CLI Registry is Core - always active like desktop
+  # No enable option needed - NCC command always available
+
+  # API is always available
+  core.management.system-manager.submodules.cli-registry = apiValue;
+
+  # Add NCC to system packages (always available)
+  environment.systemPackages = [
+    mainScript
+  ];
+}
 
