@@ -14,7 +14,7 @@ This template defines the recommended structure for **all** NixOS Control Center
 ```
 module-name/               # Module name
 ├── README.md              # Module documentation and usage guide
-├── default.nix            # Main module (imports all sub-modules)
+├── default.nix            # Main module (metadata + imports - REQUIRED pattern)
 ├── options.nix            # All configuration options
 ├── types.nix              # Custom NixOS types (optional)
 ├── commands.nix           # Command-Center registration (optional)
@@ -701,35 +701,42 @@ discoveredModules = lib.mapAttrsToList (name: type:
 ```
 
 #### **Module Metadata**
-Each module provides metadata for automatic registration:
+**REQUIRED for ALL modules**: Metadata must be defined directly in `default.nix`.
 
 ```nix
-# metadata.nix (optional, for advanced modules)
-{
-  # Basic info
-  name = "my-module";
-  description = "My awesome module";
-  category = "features";  # or "core", "infrastructure", etc.
-
-  # Dependencies (for automatic resolution)
-  dependencies = [
-    "cli-formatter"  # Will be resolved to full path
-    "command-center"
-  ];
-
-  # Version info
-  version = "1.0.0";
-
-  # API exports (for other modules to use)
-  exports = {
-    api = "config.core.my-module.api";
-    utils = "config.core.my-module.utils";
+# default.nix - STANDARD PATTERN (use this for ALL modules)
+{ config, lib, pkgs, systemConfig, ... }:
+let
+  # Module metadata (REQUIRED - define directly here)
+  metadata = {
+    # Basic info
+    name = "my-module";
+    scope = "system";          # system | shared | user
+    mutability = "overlay";    # exclusive | overlay
+    dimensions = [];           # [] for system scope, ["user"] for shared
+    description = "My awesome module";
+    version = "1.0.0";
   };
+in {
+  # REQUIRED: Export metadata for discovery system
+  _module.metadata = metadata;
 
-  # Config template location
-  configTemplate = ./my-module-config.nix;
+  # Module imports
+  imports = [ ./options.nix ./config.nix ];
 }
 ```
+
+**CRITICAL RULES:**
+- ✅ **Metadata MUST be in default.nix** (not lib/metadata.nix, not separate file)
+- ✅ **Use _module.metadata = metadata** (NixOS standard convention)
+- ✅ **Metadata must be available at compile-time** (no lazy imports)
+- ✅ **ALL modules follow this exact pattern** (no exceptions)
+
+**Why this pattern?**
+- **Compile-Time Available**: Required for module discovery system
+- **API Consistent**: Other systems access via `(import ./module/default.nix {})._module.metadata`
+- **Self-Contained**: Module complete in one file
+- **Standard Compliant**: Follows NixOS `_module.*` conventions
 
 #### **Automatic API Generation**
 The Module Manager generates APIs automatically:
@@ -745,7 +752,7 @@ options.systemConfig.${category}.${name} = {
   # ... merged automatically
 };
 
-# API exports (if defined in metadata.nix)
+# API exports (if module provides APIs)
 config.${apiPath} = {
   # Module's exported functions/objects
 };
