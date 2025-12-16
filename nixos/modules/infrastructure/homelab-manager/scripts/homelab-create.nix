@@ -7,12 +7,12 @@ let
   # Find virtualization users (preferred)
   virtUsers = lib.filterAttrs 
     (name: user: user.role == "virtualization") 
-    systemConfig.users;
+    systemConfig.core.base.user;
   
   # Fallback: Find admin users if no virtualization user
   adminUsers = lib.filterAttrs 
     (name: user: user.role == "admin") 
-    systemConfig.users;
+    systemConfig.core.base.user;
   
   hasVirtUsers = (lib.length (lib.attrNames virtUsers)) > 0;
   hasAdminUsers = (lib.length (lib.attrNames adminUsers)) > 0;

@@ -4,7 +4,7 @@ with lib;
 
 let
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
-  hostname = systemConfig.hostName;
+  hostname = systemConfig.core.base.network.hostName or "nixos";
   desktopConfigPath = "/etc/nixos/configs/desktop-config.nix";
 
   updateDesktopConfig = import ./update-desktop-config.nix { inherit config lib pkgs systemConfig; };

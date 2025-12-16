@@ -37,19 +37,8 @@ let
 
 
   createModuleConfig = { moduleName, defaultConfig }: {
-    system.activationScripts."${moduleName}-config-setup" = {
-      text = ''
-      mkdir -p "/etc/nixos/configs"
-
-      # Create default config if it doesn't exist
-      if [ ! -f "/etc/nixos/configs/${moduleName}-config.nix" ]; then
-        cat << 'EOF' > "/etc/nixos/configs/${moduleName}-config.nix"
-${defaultConfig}
-EOF
-        chmod 644 "/etc/nixos/configs/${moduleName}-config.nix"
-      fi
-    '';
-    };
+    # Configs are now created manually in nested structure
+    # Templates remain in modules for reference but no activation scripts needed
   };
 in
 {

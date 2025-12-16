@@ -53,8 +53,8 @@ let
     in if result.success then result.value else {};
   
   # Extract domain path from file path
-  # Example: core/system/audio/audio-config.nix → ["system" "audio"]
-  # Example: features/infrastructure/vm/vm-config.nix → ["infrastructure" "vm"]
+  # Example: core/system/audio/config.nix → ["system" "audio"]
+  # Example: features/infrastructure/vm/config.nix → ["infrastructure" "vm"]
   extractDomainPath = configsDir: configPath:
     let
       pathStr = toString configPath;
@@ -73,21 +73,19 @@ let
       pathComponents = builtins.filter (p: builtins.isString p && p != "") 
         (map (s: if builtins.isString s then s else null) splitPath);
       
-      # Filter out config file name (no more user-configs/ directory)
+      # Filter out config file name and current directory (no more user-configs/ directory)
       relevantParts = builtins.filter (p:
-        !hasSuffix "-config.nix" p
+        !hasSuffix ".nix" p && p != "."
       ) pathComponents;
+
+      # Normal case: remove top-level directory (configs/), keep the module path
+      domainPath = if builtins.length relevantParts >= 2
+                   then builtins.tail relevantParts  # Remove "configs", keep module path
+                   else if builtins.length relevantParts == 1 && builtins.head relevantParts == "configs"
+                   then []  # Configs in /etc/nixos/configs/ → merge at top level
+                   else relevantParts;  # Just module name, no domain (legacy)
     in
-      # Pattern: <top-level>/<domain>/.../<module>/<config>
-      # Result: [<domain>, ..., <module>] (skip top-level)
-      # Special case: Configs in flake ./configs/ merge at top level
-      if builtins.length relevantParts == 1 && builtins.head relevantParts == "configs"
-      then []  # Configs in /etc/nixos/configs/ → merge at top level
-      else if builtins.length relevantParts >= 2
-      then builtins.tail relevantParts  # Remove top-level, keep domain(s) + module
-      else if builtins.length relevantParts == 1
-      then relevantParts  # Just module name, no domain (legacy)
-      else [];
+      domainPath;
   
   # Check if config file is valid (exists, not empty, starts with '{')
   isValidConfig = path:
@@ -101,26 +99,6 @@ let
         exists && startsWithBrace
       );
   
-  # Recursively discover all paths to a specific config file
-  # Pattern: <top-level>/<domain>/.../<module>/<config-name>-config.nix
-  discoverConfigPaths = configName: configsDir: topLevel: currentPath: depth:
-    let
-      configFileName = "${configName}-config.nix";
-      currentDir = configsDir + "/${currentPath}";
-      dir = readDir currentDir;
-      subDirs = builtins.attrNames (filterAttrs (name: type: type == "directory") dir);
-      
-      # Try direct module path
-      directPath = currentDir + "/${configName}/${configFileName}";
-      
-      # Recursively search subdirectories (limit depth to prevent infinite recursion)
-      subPaths = if depth < 5 then
-        builtins.concatMap (subDir: 
-          discoverConfigPaths configName configsDir topLevel "${currentPath}/${subDir}" (depth + 1)
-        ) subDirs
-      else [];
-    in
-      [ directPath ] ++ subPaths;
   
   # Load a single config file
   # Returns: { value = <config-value>; path = <found-path>; domainPath = [<domain>, ...]; } or null
@@ -136,7 +114,7 @@ let
         if acc != null then acc  # Already found, keep it
         else
           let
-            configPath = searchPath + "/" + configName + "-config.nix";
+            configPath = searchPath + "/" + configName + "/config.nix";
     in
       if builtins.pathExists configPath && isValidConfig configPath then
         let
@@ -151,7 +129,7 @@ let
       configResult;
   
   # Discover all config files in the filesystem
-  # Finds all *-config.nix files in the configs/ directory
+  # Recursively finds all config.nix files in nested directory structure
   discoverConfigs = configsDir: configsPath:
     let
       # Check if configs directory exists first
@@ -161,19 +139,31 @@ let
         []
       else
         let
-          dir = builtins.readDir configsPath;
+          # Recursively find all config.nix files
+          findConfigs = currentDir:
+            let
+              dir = builtins.readDir currentDir;
+              subDirs = builtins.attrNames (filterAttrs (name: type: type == "directory") dir);
+              configFiles = builtins.filter (name: name == "config.nix" && dir.${name} == "regular") (builtins.attrNames dir);
+              currentConfigs = builtins.map (file: currentDir + "/${file}") configFiles;
+              recursiveConfigs = builtins.concatMap (subDir: findConfigs (currentDir + "/${subDir}")) subDirs;
+            in
+              currentConfigs ++ recursiveConfigs;
 
-          # Find all *-config.nix files directly in configs/
-          configFiles = builtins.filter (name:
-            hasSuffix "-config.nix" name && dir.${name} == "regular"
-          ) (builtins.attrNames dir);
+          allConfigPaths = findConfigs configsPath;
 
-          # Extract config names
-          configNames = builtins.map (file:
-            builtins.head (builtins.split "-config.nix" file)
-          ) configFiles;
+          # Extract config names (relative path without "config.nix")
+          configNames = builtins.map (path:
+            let
+              pathStr = toString path;
+              dirStr = toString configsPath;
+              relativePath = builtins.substring (builtins.stringLength dirStr + 1)
+                             (builtins.stringLength pathStr - builtins.stringLength dirStr - 1 - builtins.stringLength "/config.nix")
+                             pathStr;
+            in
+              relativePath
+          ) allConfigPaths;
 
-          # Remove duplicates (shouldn't be any, but safe)
           uniqueConfigs = builtins.foldl' (acc: name:
             if builtins.elem name acc then acc else acc ++ [name]
           ) [] configNames;
@@ -193,13 +183,11 @@ let
 in
 {
   # Load and merge all configs
-  # Usage: loadSystemConfig configsDir systemConfigPath configsPath
-  loadSystemConfig = configsDir: systemConfigPath: configsPath:
+  # Usage: loadSystemConfig configsDir configsPath
+  loadSystemConfig = configsDir: configsPath:
     let
-      # 1. Load system-config if exists (for compatibility), otherwise empty set
-      baseConfig = if builtins.pathExists systemConfigPath
-        then builtins.trace "CONFIG-LOADER: LOADING system-config from: ${systemConfigPath}" (import systemConfigPath)
-        else builtins.trace "CONFIG-LOADER: system-config NOT FOUND at: ${systemConfigPath}" {};
+      # 1. Start with empty base config (no more system-config.nix)
+      baseConfig = {};
 
       # 2. Dynamically discover all config files
       optionalConfigs = discoverConfigs configsDir configsPath;
@@ -211,14 +199,21 @@ in
           loaded = loadConfig configName configsDir configsPath;
         in
           if loaded != null && loaded.value != {} then
-            builtins.trace "CONFIG-LOADER: MERGING ${configName} from ${loaded.path}" (
-            mergeConfigIntoStructure loaded.domainPath loaded.value acc
-            )
+            let
+              newAcc = mergeConfigIntoStructure loaded.domainPath loaded.value acc;
+            in
+              builtins.trace "CONFIG-LOADER: MERGING ${configName} from ${loaded.path} → ${builtins.toJSON loaded.domainPath}" (
+                if configName == "core/base/network" then
+                  builtins.trace "CONFIG-LOADER: NETWORK CONFIG = ${builtins.toJSON loaded.value}" (
+                    builtins.trace "CONFIG-LOADER: MERGED NETWORK = ${builtins.toJSON (newAcc.core.base.network or "NOT_FOUND")}" newAcc
+                  )
+                else newAcc
+              )
           else
             builtins.trace "CONFIG-LOADER: SKIPPING ${configName} (not found or empty)" acc
       ) baseConfig optionalConfigs;
     in
-      builtins.trace "CONFIG-LOADER: FINAL systemConfig keys = ${builtins.toJSON (builtins.attrNames mergedConfig)}" mergedConfig;
+      mergedConfig;
 
   # Get list of discovered configs (for reference/debugging)
   getDiscoveredConfigs = configsDir: discoverConfigs configsDir;

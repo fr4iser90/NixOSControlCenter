@@ -1,336 +1,313 @@
-# Central Config Path Management - Phase 5: Testing & Documentation
+# Central Config Path Management - Phase 5: Deployment & Documentation
 
 ## 🎯 Phase Overview
 
-**Duration**: 3 days
-**Focus**: Validate the implementation and prepare for production
-**Goal**: Ensure comprehensive testing and complete documentation
+**Duration**: 1 day
+**Focus**: Final validation and production deployment
+**Goal**: Successfully deploy  config management system
 
 ## 📋 Objectives
 
-- [ ] Create comprehensive test suite for all config strategies
-- [ ] Implement CLI tools for config management and debugging
-- [ ] Add performance benchmarks and caching validation
-- [ ] Create migration guides and documentation
-- [ ] Test end-to-end migration scenarios
+- [ ] Full flake build validation
+- [ ] Production deployment test
+- [ ] Documentation finalization
+- [ ] User acceptance validation
+- [ ] Performance monitoring setup
 
 ## 🔧 Implementation Steps
 
-### Day 1: CLI Tools and Debugging
+### 5.1 Final System Validation
 
-#### 5.4 Enhanced CLI Commands
-**File**: `nixos/core/management/module-manager/commands.nix`
+#### Full Flake Build Test
 
-```nix
-# Comprehensive CLI commands for config management
-{
-  config,
-  lib,
-  ...
-}:
+```bash
+# Test complete flake evaluation
+nix flake check
 
-let
-  cfg = config.core.management.module-manager;
+# Test system build
+nixos-rebuild build --flake .#hostname --show-trace
 
-in {
-  # Config inspection commands
-  "config-inspect" = {
-    description = "Inspect configuration for a specific module";
-    script = ''
-      MODULE="$1"
-      if [ -z "$MODULE" ]; then
-        echo "Usage: module-manager config-inspect <module-name> [user]"
-        exit 1
-      fi
-
-      USER="$2"
-      echo "=== Config Inspection: $MODULE ==="
-
-      # Show resolved paths
-      echo "Resolved config paths:"
-      ${lib.concatStringsSep "\n" (map (path: "echo \"  $path\"") [
-        "/etc/nixos/configs/system/$MODULE.nix"
-        "/etc/nixos/configs/shared/$MODULE.nix"
-      ])}
-      ${lib.optionalString (USER != "") "echo \"  /etc/nixos/configs/users/$USER/$MODULE.nix\""}
-
-      # Show effective config
-      echo ""
-      echo "Effective configuration:"
-      nix eval --raw ".#nixosConfigurations.$(hostname).config.core.system.$MODULE" 2>/dev/null || echo "Unable to evaluate config"
-    '';
-  };
-
-  "config-diff" = {
-    description = "Show differences between config sources";
-    script = ''
-      MODULE="$1"
-      USER="$2"
-
-      echo "=== Config Diff: $MODULE ==="
-      echo "Comparing system vs user configuration"
-      echo ""
-
-      # Show diff between system and user configs
-      SYSTEM_CONFIG="/etc/nixos/configs/system/$MODULE.nix"
-      USER_CONFIG="/etc/nixos/configs/users/$USER/$MODULE.nix"
-
-      if [ -f "$SYSTEM_CONFIG" ] && [ -f "$USER_CONFIG" ]; then
-        diff -u "$SYSTEM_CONFIG" "$USER_CONFIG" || true
-      else
-        echo "Both system and user configs must exist for diff"
-      fi
-    '';
-  };
-
-  "config-create-template" = {
-    description = "Create config template for a module";
-    script = ''
-      MODULE="$1"
-      USER="$2"
-
-      if [ -z "$MODULE" ]; then
-        echo "Usage: module-manager config-create-template <module-name> [user]"
-        exit 1
-      fi
-
-      if [ -n "$USER" ]; then
-        TARGET_DIR="/etc/nixos/configs/users/$USER"
-        TARGET_FILE="$TARGET_DIR/$MODULE.nix"
-        mkdir -p "$TARGET_DIR"
-
-        # Create user-specific template
-        cat > "$TARGET_FILE" << 'EOF'
-# User-specific configuration for MODULE
-# This will override system defaults
-
-{
-  # Example: Override audio volume
-  # audio.volume = 75;
-
-  # Add your user-specific settings here
-  # Remember: Some system-level settings cannot be overridden
-}
-EOF
-
-        echo "Created user config template: $TARGET_FILE"
-      else
-        echo "Specify a user with --user to create user-specific config"
-      fi
-    '';
-  };
-
-  "config-validate-all" = {
-    description = "Validate all configurations (Nix evaluation)";
-    script = ''
-      echo "=== Config Validation ==="
-      echo "Validation happens automatically during nixos-rebuild"
-      echo "Use 'nixos-rebuild build' to validate all configurations"
-    '';
-  };
-
-  "config-show-structure" = {
-    description = "Show current config directory structure";
-    script = ''
-      echo "=== Config Directory Structure ==="
-      find /etc/nixos/configs -type f -name "*.nix" | sort | sed 's|/etc/nixos/configs/|  |'
-    '';
-  };
-}
+# Test with different strategies
+export CONFIG_STRATEGY=categorized
+nixos-rebuild build --flake .#hostname
 ```
 
-#### 5.5 Performance Benchmarking
-**Nix performance testing** - Use `time nixos-rebuild build` to measure performance impact.
+#### Production Deployment Test
 
-### Day 3: Documentation and Final Validation
+```bash
+# Dry run first
+sudo nixos-rebuild dry-run --flake .#hostname
 
-#### 5.6 Create User Documentation
-**File**: `docs/02_architecture/config-management.md`
+# If successful, deploy
+sudo nixos-rebuild switch --flake .#hostname
+
+# Monitor logs
+journalctl -f -u nixos-rebuild
+```
+
+#### Rollback Validation
+
+Ensure rollback works if needed:
+
+```bash
+# Test rollback capability
+sudo nixos-rebuild switch --rollback
+```
+
+### 5.2 Documentation Finalization
+
+#### 5.2.1 Complete User Documentation
+
+**File**: `docs/central-config-path-management-user-guide.md`
 
 ```markdown
-# Central Config Path Management
+# Central Config Path Management - User Guide
 
 ## Overview
 
-The NixOS Control Center uses a centralized config path management system that provides flexible, hierarchical configuration management with support for system-wide, shared, and user-specific settings.
+The central config path management system provides flexible,  Nix-compatible configuration loading.
 
-## Config Structure
+## Quick Start
+
+### 1. Enable the System
+
+```nix
+# flake.nix
+{
+  inputs.configs.url = "path:/etc/nixos/configs";
+  inputs.configs.flake = false;
+}
+
+# nixos configuration
+{
+  core.management.module-manager = {
+    configPathStrategy = "categorized";
+    baseConfigPath = inputs.configs;
+    managedUsers = ["yourusername"];
+  };
+}
+```
+
+### 2. Organize Configs
 
 ```
 /etc/nixos/configs/
-├── system/           # System-wide defaults (audio, network, etc.)
-├── shared/           # Shared configs that can be user-specific (packages)
-├── users/            # User-specific overrides
-│   └── fr4iser/
-│       ├── audio.nix
-│       └── packages.nix
-├── hosts/            # Host-specific configs
-└── environments/     # Environment-specific configs (dev/staging/prod)
+├── system/
+│   ├── audio.nix
+│   ├── packages.nix
+│   └── network.nix
+├── shared/
+│   ├── packages.nix
+│   └── desktop.nix
+└── users/
+    └── yourusername/
+        ├── packages.nix
+        └── audio.nix
 ```
 
-## Configuration Precedence
-
-Configurations are loaded in the following order (later sources override earlier ones):
-
-1. **System configs** (`system/`): Base system defaults
-2. **Shared configs** (`shared/`): Optional shared settings
-3. **User configs** (`users/{user}/`): User-specific overrides
-4. **Host configs** (`hosts/{hostname}/`): Host-specific settings
-5. **Environment configs** (`environments/{env}/`): Environment-specific settings
-
-## Module Metadata
-
-Each module defines metadata that controls its behavior:
+### 3. Create User-Specific Config
 
 ```nix
+# /etc/nixos/configs/users/yourusername/packages.nix
 {
-  name = "audio";
-  scope = "system";        # system | shared | user
-  mutability = "overlay";  # exclusive | overlay
-  dimensions = [];         # [] for global, ["user"] for user-specific
-  description = "Audio system configuration";
-  version = "1.0";
+  packages = {
+    additional = [
+      "vscode"
+      "firefox"
+    ];
+  };
 }
 ```
 
-## User-Specific Configuration
+## Advanced Usage
 
-Users can override system settings by creating configs in their user directory:
+### Dimension-Based Configs
 
-```bash
-# Create user-specific audio config
-module-manager config-create-template audio fr4iser
+The system supports automatic config resolution based on dimensions:
 
-# Edit the created file
-vim /etc/nixos/configs/users/fr4iser/audio.nix
-```
+- **User**: `users/{username}/module.nix`
+- **Host**: `hosts/{hostname}/module.nix`
+- **Environment**: `environments/{env}/module.nix`
 
-Example user config:
+### Config Precedence
 
-```nix
-{
-  # Override system volume
-  audio.volume = 75;
-
-  # Set user-specific audio device
-  # audio.device = "alsa_output.pci-0000_00_1f.3.analog-stereo";
-}
-```
-
-## Security Restrictions
-
-Some system-level settings cannot be overridden by users for security reasons:
-
-- Display manager settings (`desktop.displayManager`)
-- GPU configuration (`hardware.gpu`)
-- Network interfaces (`network.interfaces`)
-- Boot settings (`boot.loader`)
-
-## CLI Commands
-
-### Inspect Configurations
-
-```bash
-# Show resolved config for a module
-module-manager config-inspect audio
-
-# Show config diff between system and user
-module-manager config-diff audio fr4iser
-```
-
-### Create Templates
-
-```bash
-# Create user config template
-module-manager config-create-template packages fr4iser
-```
-
-### Validation
-
-```bash
-# Validate all configurations
-module-manager config-validate-all
-
-# Show directory structure
-module-manager config-show-structure
-```
-
-## Migration from Old System
-
-If you have existing `*-config.nix` files in `/etc/nixos/configs/`, run:
-
-```bash
-# Dry run first - shows what would migrate
-sudo module-manager migrate-config-dry-run
-
-# Perform migration - happens automatically during nixos-rebuild
-sudo nixos-rebuild switch
-
-# Configs are automatically moved to categorized structure
-```
-
-## Performance
-
-The system includes caching to improve performance:
-
-```bash
-# Run performance benchmark (when implemented)
-# time nixos-rebuild build
-
-# Show cache statistics (when implemented)
-# module-manager config-cache-stats
-```
+Configs are merged in this order (last wins):
+1. System defaults
+2. Shared configs
+3. Environment configs
+4. Host configs
+5. User configs (highest priority)
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Config not loading**: Check file permissions and syntax
-2. **User config ignored**: Verify user is in `managedUsers` list
-3. **Security restrictions**: Some paths cannot be overridden by users
-4. **Performance issues**: Enable caching in module manager config
+**Pure Evaluation Errors**
+- Ensure no absolute paths in `baseConfigPath`
+- Use `inputs.configs` or relative paths
+
+**Config Not Loading**
+- Check file permissions
+- Verify flake inputs configuration
+- Use `module-manager show-paths modulename` to debug
+
+**Performance Issues**
+- The system is  and should not impact evaluation speed significantly
+- If slow, check for circular dependencies
 
 ### Debug Commands
 
 ```bash
-# Show detailed config resolution
-module-manager config-inspect <module> --debug
+# Show resolved paths for a module
+module-manager show-paths audio
 
-# Test config loading performance
-module-manager config-performance-test
+# Validate config structure
+module-manager validate-configs
+
+# Test  evaluation
+nix-instantiate --eval nixos/core/management/module-manager/lib/config-path-resolver.test.nix
+```
 ```
 
-## Best Practices
+#### 5.2.2 Developer Documentation
 
-1. **Use user configs sparingly**: Only override what you need
-2. **Test configs**: Always test with `nixos-rebuild build` first
-3. **Keep backups**: The migration script creates automatic backups
-4. **Use templates**: Start with `config-create-template` for new configs
-5. **Validate regularly**: Run `config-validate-all` after changes
+**File**: `docs/central-config-path-management-developer-guide.md`
+
+```markdown
+# Central Config Path Management - Developer Guide
+
+## Architecture
+
+The system consists of three main components:
+
+1. **config-path-resolver.nix**:  path resolution logic
+2. **config-merger.nix**:  config merging logic
+3. **Module integration**: Updated modules using the resolver
+
+## API Reference
+
+### resolveConfigPaths(strategy, moduleName, dimensions)
+
+**Parameters:**
+- `strategy`: "flat" | "categorized"
+- `moduleName`: String (e.g., "audio")
+- `dimensions`: { user?, hostname?, environment? }
+
+**Returns:** Array of potential config paths
+
+### loadMergedConfig(moduleName, dimensions)
+
+**Parameters:**
+- `moduleName`: String
+- `dimensions`: Dimension object
+
+**Returns:** Merged configuration attrset
+
+## Adding New Modules
+
+To add a new module to the system:
+
+1. **Choose scope**: system | shared | user
+2. **Add metadata**:
+```nix
+metadata = {
+  name = "mymodule";
+  scope = "system";
+  mutability = "overlay";
+};
 ```
 
-#### 5.7 Final Integration Tests
-**Nix validation** - All validation happens automatically through Nix evaluation. Use `nixos-rebuild build` to validate configurations.
+3. **Use resolver**:
+```nix
+let
+  configResolver = import ../../../../management/module-manager/lib/config-path-resolver.nix {
+    inherit lib config;
+  };
+
+  resolvedConfig = configResolver.loadMergedConfig "mymodule" {
+    user = null;  # For system modules
+  };
+in {
+  config = lib.mkMerge [resolvedConfig { /* defaults */ }];
+}
+```
+
+## Testing
+
+### Unit Tests
+```bash
+# Run resolver tests
+nix-instantiate --eval nixos/core/management/module-manager/lib/config-path-resolver.test.nix
+```
+
+### Integration Tests
+```bash
+# Run NixOS integration test
+nix build .#checks.x86_64-linux.central-config-path-management
+```
+```
+
+### 5.3 Performance Monitoring
+
+#### 5.3.1 Set Up Monitoring
+
+```bash
+# Add to system monitoring
+{
+  # Monitor evaluation time
+  systemd.services."config-evaluation-monitor" = {
+    description = "Monitor config evaluation performance";
+    script = ''
+      start_time=$(date +%s%N)
+      nix-instantiate --eval nixos/flake.nix >/dev/null
+      end_time=$(date +%s%N)
+      duration=$(( (end_time - start_time) / 1000000 ))
+      echo "Config evaluation took: ${duration}ms" | systemd-cat
+    '';
+  };
+}
+```
+
+### 5.4 User Acceptance
+
+#### 5.4.1 Final Validation Checklist
+
+- [ ] System boots successfully
+- [ ] All services start correctly
+- [ ] User-specific configs load
+- [ ] Performance acceptable
+- [ ] Documentation accessible
+
+#### 5.4.2 User Feedback Collection
+
+Set up feedback mechanism for users to report issues.
 
 ## ✅ Success Criteria
 
-- [ ] CLI tools provide debugging and management capabilities
-- [ ] Migration guides are complete and accurate
-- [ ] Manual testing validates core functionality
-- [ ] Documentation covers all new features
-- [ ] System rebuilds work with new config structure
+- [ ] Full system deploys successfully in production
+- [ ] All documentation complete and accurate
+- [ ] Performance meets requirements
+- [ ] User acceptance testing passes
+- [ ] Rollback procedures validated
 
-## 📚 Documentation Updates
+## 🎉 Completion
 
-- [ ] User guide for new config system
-- [ ] Migration documentation
-- [ ] API reference for CLI commands
-- [ ] Troubleshooting guide
+After Phase 5: **Central Config Path Management System is production-ready!**
 
-## 🔗 Final Steps
+### Key Achievements
 
-After completing Phase 5:
-- System is ready for production deployment
-- All functionality has been validated
-- Documentation is complete and accurate
-- Migration path is clear for existing users
+- ✅ **Pure Nix Compatible**: No absolute paths, works in  evaluation
+- ✅ **Flexible Configuration**: Multiple strategies and dimensions
+- ✅ **Centralized Management**: Module Manager controls all config paths
+- ✅ **Backward Compatible**: Existing setups continue to work
+- ✅ **Well Documented**: Comprehensive guides and API docs
+- ✅ **Thoroughly Tested**: Unit, integration, and performance tests
+
+### Next Steps
+
+The system is now ready for:
+- User adoption
+- Further feature development
+- Integration with other NixOS Control Center components
+
+**Congratulations! 🎯**

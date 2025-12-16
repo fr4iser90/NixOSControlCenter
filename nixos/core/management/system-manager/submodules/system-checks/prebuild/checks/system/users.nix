@@ -11,8 +11,7 @@ let
     
     # Get current and configured users (mit Filter für echte User)
     CURRENT_USERS=`getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 && $1 !~ /^nixbld/ {print $1}'`
-    CONFIGURED_USERS="${builtins.concatStringsSep " " (builtins.attrNames systemConfig.users)}"
-
+    CONFIGURED_USERS="${builtins.concatStringsSep " " (builtins.attrNames (lib.filterAttrs (n: v: builtins.isAttrs v) systemConfig.core.base.user))}"
     ${ui.tables.keyValue "Current users" "$CURRENT_USERS"}
     ${ui.tables.keyValue "Configured users" "$CONFIGURED_USERS"}
 

@@ -5,6 +5,8 @@
   system = {
     channel = "stable";
   };
+  # Nix Config
+  allowUnfree = true;
   features = {
     system-logger = true;
     system-checks = true;

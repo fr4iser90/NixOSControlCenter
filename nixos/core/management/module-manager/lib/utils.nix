@@ -3,7 +3,7 @@
 
 let
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
-  hostname = systemConfig.hostName;
+  hostname = systemConfig.core.base.network.hostName or "nixos";
 
   # Import discovery functions
   discovery = import ./discovery.nix { inherit lib; };
@@ -43,7 +43,7 @@ let
     if [ ! -f "$config_file" ]; then
       case "$category" in
         "system")
-          module_short=$(basename "$config_file" "-config.nix")
+          module_short=$(basename "$(dirname "$config_file")")
           cat > "$config_file" <<EOF
 {
   $module_short = {
@@ -53,7 +53,7 @@ let
 EOF
           ;;
         "management")
-          module_short=$(basename "$config_file" "-config.nix")
+          module_short=$(basename "$(dirname "$config_file")")
           cat > "$config_file" <<EOF
 {
   $module_short = {

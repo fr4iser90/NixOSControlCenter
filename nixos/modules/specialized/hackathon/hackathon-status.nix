@@ -4,7 +4,7 @@ let
   # Finde Hackathon-Admin-Benutzer
   hackathonUsers = lib.filterAttrs 
     (name: user: user.role == "hackathon-admin") 
-    systemConfig.users;
+    systemConfig.core.base.user;
   
   hasHackathonUsers = (lib.length (lib.attrNames hackathonUsers)) > 0;
   hackathonUser = if hasHackathonUsers then lib.head (lib.attrNames hackathonUsers) else "";

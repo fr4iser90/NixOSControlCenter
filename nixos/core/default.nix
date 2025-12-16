@@ -3,14 +3,14 @@
 {
   imports = [
     # Core system modules
-    ./system/boot
-    ./system/hardware
-    ./system/network
-    ./system/localization
-    ./system/user
-    ./system/desktop
-    ./system/audio
-    ./system/packages
+    ./base/boot
+    ./base/hardware
+    ./base/network
+    ./base/localization
+    ./base/user
+    ./base/desktop
+    ./base/audio
+    ./base/packages
     # Management (includes infrastructure as submodules)
     ./management/system-manager
     ./management/module-manager

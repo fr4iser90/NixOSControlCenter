@@ -8,7 +8,7 @@ let
   # Finde alle Benutzer mit hackathon-admin Rolle
   hackathonUsers = lib.filterAttrs 
     (name: user: user.role == "hackathon-admin") 
-    systemConfig.users;
+    systemConfig.core.base.user;
 
   # Prüfe ob wir Hackathon-Admin-Benutzer haben
   hasHackathonUsers = (lib.length (lib.attrNames hackathonUsers)) > 0;

@@ -2,7 +2,7 @@
 
 let
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
-  hardwareConfigPath = "/etc/nixos/configs/hardware-config.nix";
+  hardwareConfigPath = "/etc/nixos/configs/core/base/hardware/config.nix";
   
   # Use the shared update-hardware-config script from utils.nix
   # It will be automatically available via systemPackages

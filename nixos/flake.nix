@@ -9,7 +9,7 @@
     home-manager-stable.url = "github:nix-community/home-manager/release-25.11";
     home-manager-unstable.url = "github:nix-community/home-manager";
 
-    configs.url = "path:/etc/nixos/configs";
+    configs.url = "path:./configs";
     configs.flake = false;
   };
 
@@ -19,40 +19,49 @@
     , home-manager-stable
     , home-manager-unstable
     , configs
-    , ... 
+    , ...
   }: let
     system = "x86_64-linux";
-    
+
     # Import config loader from system-manager
     # This centralizes config loading logic - can be used by both flake.nix and system-manager module
     # Note: lib is not available yet at this point, so config-loader must work without it
     configLoader = import ./core/management/system-manager/lib/config-loader.nix {};
-    
+
     # Load and merge all configs using centralized loader
-    # Pass flake root directory (as path), system-config path, and configs directory path
+    # Only loads modular configs from configs directory
     dummyCopy = builtins.readDir ./configs;
-    systemConfig = configLoader.loadSystemConfig ./. (./. + "/configs/system-config.nix") configs;  
+    systemConfig = configLoader.loadSystemConfig ./. configs;
+
+    # Import module discovery for automatic config paths (after systemConfig is loaded)
+    discoveryLib = import ./core/management/module-manager/lib/discovery.nix;
+    moduleConfigLib = import ./core/management/module-manager/lib/module-config.nix;
 
     # Wähle das richtige nixpkgs und home-manager basierend auf der Konfiguration
-    nixpkgs = if systemConfig.system.channel == "stable"
+    nixpkgs = if systemConfig.core.management.system-manager.system.channel == "stable"
               then nixpkgs-stable
               else nixpkgs-unstable;
-              
-    home-manager = if systemConfig.system.channel == "stable"
+
+    home-manager = if systemConfig.core.management.system-manager.system.channel == "stable"
                    then home-manager-stable
                    else home-manager-unstable;
 
     # Set stateVersion once for both system and home-manager
     # NOTE: Version wird oben in inputs definiert - hier nur stateVersion setzen
-    stateVersion = if systemConfig.system.channel == "stable"
+    stateVersion = if systemConfig.core.management.system-manager.system.channel == "stable"
       then "25.11"
       else "25.11"; # Use latest stable for unstable as well, or set to a default
-    
-    pkgs = import nixpkgs { 
+
+    pkgs = import nixpkgs {
       inherit system;
-      config.allowUnfree = systemConfig.allowUnfree or false;
+      config.allowUnfree = systemConfig.core.management.system-manager.allowUnfree or false;
     };
     lib = pkgs.lib;
+
+    # Now that we have lib, we can create the module config and discovery
+    discovery = discoveryLib { inherit lib; };
+    moduleConfig = moduleConfigLib { inherit lib systemConfig; };
+    getModuleConfig = moduleConfig.getModuleConfig;
 
     # Base modules required for all systems
     systemModules = [
@@ -65,9 +74,11 @@
 
   in {
     nixosConfigurations = {
-      "${systemConfig.hostName}" = nixpkgs.lib.nixosSystem {
+      "${systemConfig.core.base.network.hostName}" = nixpkgs.lib.nixosSystem {
         inherit system;
-        specialArgs = { inherit systemConfig; }; 
+        specialArgs = {
+          inherit systemConfig discovery moduleConfig getModuleConfig;
+        }; 
 
         modules = systemModules ++ [      
           {
@@ -78,7 +89,7 @@
 
             # Unfree Konfiguration
             nixpkgs.config = {
-              allowUnfree = systemConfig.allowUnfree or false;
+              allowUnfree = systemConfig.core.management.system-manager.allowUnfree or false;
             };
           }     
           
@@ -89,10 +100,10 @@
               useGlobalPkgs = true;
               useUserPackages = true;
               extraSpecialArgs = { inherit systemConfig; };
-              users = lib.mapAttrs (username: userConfig: 
+              users = lib.mapAttrs (username: userConfig:
                 { config, ... }: {
-                  imports = [ 
-                    (import ./core/system/user/home-manager/roles/${userConfig.role}.nix {
+                  imports = [
+                    (import ./core/base/user/home-manager/roles/${userConfig.role}.nix {
                       inherit pkgs lib config systemConfig;
                       user = username;
                     })
@@ -102,7 +113,7 @@
                     homeDirectory = "/home/${username}";
                     stateVersion = stateVersion;
                   };
-              }) systemConfig.users;
+              }) (systemConfig.core.base.user or {});
             };
           }
         ];

@@ -55,13 +55,17 @@ in
   lib.mkMerge [
     # Config creation (always)
     {
-      system.activationScripts."logging-config-setup" = ''
+      system.activationScripts."logging-config-setup" = let
+        configPath = moduleConfig.${moduleName}.configPath;
+        configFilePath = "/etc/nixos/configs/" + (builtins.replaceStrings ["."] ["/"] configPath) + "/config.nix";
+      in ''
         mkdir -p "/etc/nixos/configs"
-        if [ ! -f "/etc/nixos/configs/logging-config.nix" ]; then
-          cat << 'EOF' > "/etc/nixos/configs/logging-config.nix"
+        if [ ! -f "${configFilePath}" ]; then
+          mkdir -p "$(dirname "${configFilePath}")"
+          cat << 'EOF' > "${configFilePath}"
 ${defaultConfig}
 EOF
-          chmod 644 "/etc/nixos/configs/logging-config.nix"
+          chmod 644 "${configFilePath}"
         fi
       '';
     }

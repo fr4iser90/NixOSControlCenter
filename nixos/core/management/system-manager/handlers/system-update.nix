@@ -26,8 +26,8 @@ let
   commandCenter = systemConfig.core.management.system-manager.submodules.cli-registry;
 
   # Extract configuration values
-  username = head (attrNames systemConfig.users);
-  hostname = systemConfig.hostName;
+  username = head (attrNames systemConfig.core.base.user);
+  hostname = systemConfig.core.base.network.hostName or "nixos";
   autoBuild = systemConfig.management.system-manager.auto-build or false;
   systemChecks = systemConfig.core.management.system-manager.submodules.system-checks.enable or false;
   # Function to prompt for build - with conditional build command and better error handling
@@ -253,9 +253,9 @@ let
       local target_module="$1"
       local module_name="$2"
 
-      # Standard pattern: check for module-name-config.nix directly in module
-      if [ -f "$target_module/$module_name-config.nix" ]; then
-        echo "$module_name-config.nix"
+      # Standard pattern: check for config.nix in module subdirectory
+      if [ -f "$target_module/$module_name/config.nix" ]; then
+        echo "config.nix"
         return 0
       fi
       return 1
@@ -294,7 +294,7 @@ let
       SOURCE_VERSION=$(get_source_version "$source_module")
       
       # GENERIC: All modules use the same pattern
-      CONFIG_FILE="$target_module/$module_name-config.nix"
+      CONFIG_FILE="$target_module/$module_name/config.nix"
       CONFIG_NAME="$module_name"
       
       if [ -f "$CONFIG_FILE" ]; then
@@ -460,27 +460,27 @@ TEMPEOF
           ' 2>/dev/null || echo "")
           
           if [ -n "$CONFIG_NIX" ]; then
-            cat > "$target_module/$module_name-config.nix" <<EOF
+            cat > "$target_module/$module_name/config.nix" <<EOF
 {
   $CONFIG_NIX
 }
 EOF
-            ${ui.messages.success "Created $module_name-config.nix from system-config.nix"}
+            ${ui.messages.success "Created config.nix from system-config.nix"}
           else
             ${ui.messages.warning "Could not convert JSON to Nix format"}
-            touch "$target_module/$module_name-config.nix"
+            touch "$target_module/$module_name/config.nix"
           fi
         else
           # Fallback: Create empty config (will be filled by activationScripts)
           ${ui.messages.warning "jq not available or config empty, creating empty config"}
           ${ui.messages.info "Config will be filled with defaults by activationScripts"}
-          touch "$USER_CONFIGS_DIR/$module_name-config.nix"
+          touch "$USER_CONFIGS_DIR/$module_name/config.nix"
         fi
       else
         # nix-instantiate not available → create empty config
         ${ui.messages.warning "nix-instantiate not available, cannot extract config"}
         ${ui.messages.info "Creating empty config (will be filled with defaults by activationScripts)"}
-        touch "$USER_CONFIGS_DIR/$module_name-config.nix"
+        touch "$USER_CONFIGS_DIR/$module_name/config.nix"
       fi
       
       ${ui.messages.success "Module $module_name migrated from Stage 0 → 1"}

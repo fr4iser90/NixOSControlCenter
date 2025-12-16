@@ -3,10 +3,10 @@
 let
   # Dynamically determine the first admin user
   # If no admin is found, take the first user
-  adminUsers = lib.filterAttrs (_: userConfig: userConfig.role == "admin") systemConfig.users;
+  adminUsers = lib.filterAttrs (_: userConfig: userConfig.role == "admin") systemConfig.core.base.user;
   firstUser = if lib.length (lib.attrNames adminUsers) > 0
     then lib.head (lib.attrNames adminUsers)
-    else lib.head (lib.attrNames systemConfig.users);
+    else lib.head (lib.attrNames systemConfig.core.base.user);
   
   # Get user UID/GID from config.users.users
   userConfig = config.users.users.${firstUser};

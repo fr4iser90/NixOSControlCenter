@@ -70,7 +70,7 @@ in {
         }
         {
           name = "local";
-          url = "/home/${systemConfig.users.${builtins.head (builtins.attrNames systemConfig.users or {})}.name or "user"}/Documents/Git/NixOSControlCenter/nixos";
+          url = "/home/${systemConfig.core.base.user.${builtins.head (builtins.attrNames systemConfig.core.base.user or {})}.name or "user"}/Documents/Git/NixOSControlCenter/nixos";
           branches = [];
         }
       ];

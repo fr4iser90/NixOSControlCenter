@@ -1,10 +1,10 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, moduleConfig, ... }:
 
 with lib;
 
 let
   # Use systemConfig from module-manager (_module.args)
-  cfg = systemConfig.management.system-manager or {};
+  cfg = getModuleConfig "system-manager";
 
   # Import helpers
   backupHelpers = import ./lib/backup-helpers.nix { inherit pkgs lib; };
@@ -13,7 +13,8 @@ let
   configHelpers = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   apiValue = configHelpers // backupHelpers;
 
-  # moduleConfig kommt automatisch vom module-manager (zentral definiert)
+  bootCfg = systemConfig.core.base.boot or {};
+
 in {
   imports = [
     ./options.nix
@@ -45,8 +46,8 @@ in {
     }) (cfg.users or {});
 
     # Bootloader from loaded config
-    boot.loader.systemd-boot.enable = systemConfig.bootloader == "systemd-boot";
-    boot.loader.grub.enable = systemConfig.bootloader == "grub";
+    boot.loader.systemd-boot.enable = bootCfg.bootloader == "systemd-boot";
+    boot.loader.grub.enable = bootCfg.bootloader == "grub";
     
     core.management.system-manager.api = apiValue;
   };

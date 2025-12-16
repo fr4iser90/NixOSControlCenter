@@ -5,7 +5,7 @@ with lib;
 let
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
   commandCenter = config.core.management.system-manager.submodules.cli-registry;
-  hostname = systemConfig.hostName;
+  hostname = systemConfig.core.base.network.hostName or "nixos";
 
   # Homelab Minimization Script
   # Converts a desktop system to a minimal homelab server by:

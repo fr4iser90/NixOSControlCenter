@@ -7,7 +7,7 @@ let
   handler = import ./handlers/module-manager.nix { inherit config lib pkgs systemConfig; };
 
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
-  hostname = systemConfig.hostName;
+  hostname = systemConfig.core.base.network.hostName or "nixos";
 
   # 🎯 COMMAND REGISTRATION: Per MODULE_TEMPLATE in commands.nix!
 

@@ -8,20 +8,20 @@ let
   # Get system information
   systemInfo = {
     hasDesktop = systemConfig.system.desktop.enable or false;
-    systemType = systemConfig.systemType;
+    systemType = systemConfig.core.management.system-manager.systemType or "desktop";
     desktop = systemConfig.system.desktop.environment or "none";
   };
 
   # Determine profile module path
-  profileModule = 
-    if types.systemTypes.hybrid ? ${systemConfig.systemType} then
+  profileModule =
+    if types.systemTypes.hybrid ? ${systemInfo.systemType} then
       "hybrid/gaming-workstation.nix"
-    else if types.systemTypes.desktop ? ${systemConfig.systemType} then
-      "desktop/${systemConfig.systemType}.nix"
-    else if types.systemTypes.server ? ${systemConfig.systemType} then
-      "server/${systemConfig.systemType}.nix"
+    else if types.systemTypes.desktop ? ${systemInfo.systemType} then
+      "desktop/${systemInfo.systemType}.nix"
+    else if types.systemTypes.server ? ${systemInfo.systemType} then
+      "server/${systemInfo.systemType}.nix"
     else
-      throw "Unknown system type: ${systemConfig.systemType}";
+      throw "Unknown system type: ${systemInfo.systemType}";
 
   # Standard report shows basic system info
   infoReport = ''

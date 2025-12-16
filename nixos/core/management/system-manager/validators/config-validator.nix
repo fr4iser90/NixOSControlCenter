@@ -6,7 +6,7 @@ let
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
     
-    SYSTEM_CONFIG="/etc/nixos/system-config.nix"
+    SYSTEM_CONFIG="/etc/nixos/system-config.nix"   # SYSTEMCONFIG EXISTIERT NICHT MEHR!!!!
     CONFIGS_DIR="/etc/nixos/configs"
     
     ERRORS=0
@@ -55,20 +55,22 @@ let
     else
       echo "✓ configs/ directory exists"
       
-      # Check if configs directory has files
-      if [ -z "$(ls -A "$CONFIGS_DIR"/*.nix 2>/dev/null)" ]; then
-        echo "INFO: configs/ directory is empty (optional configs can be added here)"
+      # Find all config.nix files recursively
+      CONFIG_FILES=$(find "$CONFIGS_DIR" -name "config.nix" -type f)
+
+      if [ -z "$CONFIG_FILES" ]; then
+        echo "INFO: No config.nix files found in configs/ directory"
       else
-        CONFIG_FILES=$(ls -1 "$CONFIGS_DIR"/*.nix 2>/dev/null | wc -l)
-        echo "✓ Found $CONFIG_FILES config file(s) in configs/ directory"
-        
+        NUM_CONFIG_FILES=$(echo "$CONFIG_FILES" | wc -l)
+        echo "✓ Found $NUM_CONFIG_FILES config file(s) in configs/ directory"
+
         # Validate each config file
-        for config_file in "$CONFIGS_DIR"/*.nix; do
+        echo "$CONFIG_FILES" | while read -r config_file; do
           if [ -f "$config_file" ]; then
             if ${pkgs.nix}/bin/nix-instantiate --parse "$config_file" >/dev/null 2>&1; then
-              echo "  ✓ $(basename "$config_file") syntax is valid"
+              echo "  ✓ $(basename "$(dirname "$config_file")")/$(basename "$config_file") syntax is valid"
             else
-              echo "  ERROR: $(basename "$config_file") has invalid Nix syntax"
+              echo "  ERROR: $(basename "$(dirname "$config_file")")/$(basename "$config_file") has invalid Nix syntax"
               ERRORS=$((ERRORS + 1))
             fi
           fi
