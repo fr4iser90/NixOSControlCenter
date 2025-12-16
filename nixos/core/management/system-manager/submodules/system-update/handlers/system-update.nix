@@ -76,7 +76,7 @@ let
   
   # Import config management (single import, clean API)
   # Terminal-UI is imported directly in core/infrastructure/config, no need to pass it
-  configModule = import ../components/config-migration { inherit pkgs lib systemConfig; };
+  configModule = import ../../../components/config-migration { inherit pkgs lib systemConfig; };
   
   # Create script with runtime dependencies (only available for this script, not system-wide)
   systemUpdateMainScript = pkgs.symlinkJoin {
@@ -288,7 +288,7 @@ let
       local source_module="$1"
       local target_module="$2"
       local module_name="$3"
-      local item_type="$4"  # "core" or "modules"
+      local item_type="$4"  # "core" or "features"
       
       # Check versions
       SOURCE_VERSION=$(get_source_version "$source_module")
@@ -375,7 +375,7 @@ let
       local source_module="$1"
       local target_module="$2"
       local module_name="$3"
-      local item_type="$4"  # "core" or "modules"
+      local item_type="$4"  # "core" or "features"
       local system_config_file="$NIXOS_DIR/system-config.nix"
       
       ${ui.messages.loading "Migrating module $module_name from Stage 0 → 1..."}
@@ -480,7 +480,7 @@ EOF
         # nix-instantiate not available → create empty config
         ${ui.messages.warning "nix-instantiate not available, cannot extract config"}
         ${ui.messages.info "Creating empty config (will be filled with defaults by activationScripts)"}
-        touch "$USER_CONFIGS_DIR/$module_name-config.nix"
+        touch "$USER_CONFIGS_DIR/$module_name/config.nix"
       fi
       
       ${ui.messages.success "Module $module_name migrated from Stage 0 → 1"}
@@ -491,7 +491,7 @@ EOF
       local source_module="$1"
       local target_module="$2"
       local module_name="$3"
-      local item_type="$4"  # "core" or "modules"
+      local item_type="$4"  # "core" or "features"
       
       if [ -d "$target_module" ]; then
         # Module exists in TARGET → Stage 0 → 1 migration
@@ -551,7 +551,7 @@ EOF
     COPY_ITEMS=(
         "core"            # Base system configuration
         "custom"          # User-defined modules
-        "modules"         # Feature modules
+        "features"        # Feature modules
         "packages"        # Packages directory
         "flake.nix"       # Flake configuration
     )
@@ -601,7 +601,7 @@ EOF
             else
               ${ui.messages.info "$item exists, skipping (preserving existing $item)..."}
             fi
-          elif [ "$item" = "core" ] || [ "$item" = "modules" ]; then
+          elif [ "$item" = "core" ] || [ "$item" = "features" ]; then
             # CRITICAL: Selective copying module-by-module (NEVER rm -rf!)
             ${ui.messages.loading "Updating $item/ modules (preserving configs)..."}
             
@@ -698,7 +698,7 @@ EOF
     
     # Set permissions
     ${ui.messages.loading "Setting permissions..."}
-    for dir in core modules desktop packages lib; do
+    for dir in core features desktop packages modules lib; do
       if [ -d "$NIXOS_DIR/$dir" ]; then
         chown -R root:root "$NIXOS_DIR/$dir"
         chmod -R 644 "$NIXOS_DIR/$dir"
@@ -750,65 +750,63 @@ EOF
   };
 
 in {
-  config = {
-    # Enable terminal-ui dependency
-    # features.terminal-ui.enable removed (cli-formatter is Core) = true;
-    
-    environment.systemPackages = [ 
-      systemUpdateMainScript
-      configModule.configCheck
-    ];
+  # Enable terminal-ui dependency
+  # features.terminal-ui.enable removed (cli-formatter is Core) = true;
 
-    config.system.activationScripts.nixosBackupDir = ''
-      # Create main backup directory
-      mkdir -p ${backupSettings.directory}
-      chmod 700 ${backupSettings.directory}
-      chown root:root ${backupSettings.directory}
-      
-      # Create subdirectories for organized backups
-      mkdir -p ${backupSettings.directory}/configs
-      mkdir -p ${backupSettings.directory}/directories
-      mkdir -p ${backupSettings.directory}/migrations
-      mkdir -p ${backupSettings.directory}/ssh
-      mkdir -p ${backupSettings.directory}/system-updates
-      
-      # Set permissions for all subdirectories
-      chmod 700 ${backupSettings.directory}/configs
-      chmod 700 ${backupSettings.directory}/directories
-      chmod 700 ${backupSettings.directory}/migrations
-      chmod 700 ${backupSettings.directory}/ssh
-      chmod 700 ${backupSettings.directory}/system-updates
-      
-      chown root:root ${backupSettings.directory}/configs
-      chown root:root ${backupSettings.directory}/directories
-      chown root:root ${backupSettings.directory}/migrations
-      chown root:root ${backupSettings.directory}/ssh
-      chown root:root ${backupSettings.directory}/system-updates
-    '';
+  environment.systemPackages = [
+    systemUpdateMainScript
+    configModule.configCheck
+  ];
 
-    # Commands are registered in commands.nix
-    core.management.system-manager.submodules.cli-registry.commands = [
-      {
-        name = "system-update";
-        description = "Update NixOS system configuration";
-        category = "system";
-        script = "${systemUpdateMainScript}/bin/ncc-system-update-main";
-        arguments = [
-          "--auto-build"
-          "--source"
-          "--branch"
-        ];
-        dependencies = [ "git" ];
-        shortHelp = "system-update [--auto-build] [--source=remote|local] [--branch=name] - Update NixOS configuration";
-        longHelp = ''
-          Update the NixOS system configuration from either a remote repository or local directory.
-          
-          Options:
-            --auto-build    Automatically build after update (default: false)
-            --source        Update source (remote or local)
-            --branch        Branch name for remote updates
-        '';
-      }
-    ];
-  };
+  system.activationScripts.nixosBackupDir = ''
+    # Create main backup directory
+    mkdir -p ${backupSettings.directory}
+    chmod 700 ${backupSettings.directory}
+    chown root:root ${backupSettings.directory}
+
+    # Create subdirectories for organized backups
+    mkdir -p ${backupSettings.directory}/configs
+    mkdir -p ${backupSettings.directory}/directories
+    mkdir -p ${backupSettings.directory}/migrations
+    mkdir -p ${backupSettings.directory}/ssh
+    mkdir -p ${backupSettings.directory}/system-updates
+
+    # Set permissions for all subdirectories
+    chmod 700 ${backupSettings.directory}/configs
+    chmod 700 ${backupSettings.directory}/directories
+    chmod 700 ${backupSettings.directory}/migrations
+    chmod 700 ${backupSettings.directory}/ssh
+    chmod 700 ${backupSettings.directory}/system-updates
+
+    chown root:root ${backupSettings.directory}/configs
+    chown root:root ${backupSettings.directory}/directories
+    chown root:root ${backupSettings.directory}/migrations
+    chown root:root ${backupSettings.directory}/ssh
+    chown root:root ${backupSettings.directory}/system-updates
+  '';
+
+  # Commands are registered in commands.nix
+  core.management.system-manager.submodules.cli-registry.commands = [
+    {
+      name = "system-update";
+      description = "Update NixOS system configuration";
+      category = "system";
+      script = "${systemUpdateMainScript}/bin/ncc-system-update-main";
+      arguments = [
+        "--auto-build"
+        "--source"
+        "--branch"
+      ];
+      dependencies = [ "git" ];
+      shortHelp = "system-update [--auto-build] [--source=remote|local] [--branch=name] - Update NixOS configuration";
+      longHelp = ''
+        Update the NixOS system configuration from either a remote repository or local directory.
+
+        Options:
+          --auto-build    Automatically build after update (default: false)
+          --source        Update source (remote or local)
+          --branch        Branch name for remote updates
+      '';
+    }
+  ];
 }
