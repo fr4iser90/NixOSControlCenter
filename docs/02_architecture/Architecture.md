@@ -63,7 +63,7 @@ in {
   ] ++ (if (cfg.enable or /* category default */) then [
     ./config.nix  # Implementation logic
   ] else [
-    ./config.nix  # Symlink management (always)
+    # Module not enabled - no imports needed
   ]);
 };
 
@@ -72,14 +72,16 @@ in {
 let
   cfg = systemConfig.{category}.{module} or {};
   apiData = config.core.{category}.{module} or {};  # Optional API data
-  userConfigFile = ./module-name-config.nix;
-  symlinkPath = "/etc/nixos/configs/module-name-config.nix";
+  defaultConfig = builtins.readFile ./module-name-config.nix;  # Default template
 in
   lib.mkMerge [
-    {
-      # Symlink management (ALWAYS RUNS)
-      config.system.activationScripts.module-name-config-symlink = ''...'';
-    }
+    # Always import configuration helpers (no more symlinks)
+    (lib.mkIf (cfg.enable or /* category default */)
+      (configHelpers.createModuleConfig {
+        moduleName = "module-name";
+        defaultConfig = defaultConfig;
+      })
+    )
       (lib.mkIf (cfg.enable or /* category default */) {
       # Module implementation (ONLY WHEN ENABLED)
         # Use cfg for user settings, apiData for collected data
@@ -101,7 +103,52 @@ in
 4. **Unified Structure**: All modules follow same patterns regardless of category
 5. **Separation of Concerns**: `default.nix` imports, `config.nix` implements
 6. **Versioning**: Each module manages its own version via `_version`
-7. **User Configs**: Each module has user-editable config with automatic symlinking
+7. **Configuration System**: Modular configs loaded from external flake input
+
+## Configuration System (Current: v2.0 - External Configs)
+
+**Evolution:**
+- **v0**: Monolithic `system-config.nix` (deprecated)
+- **v1**: Symlinked `*-config.nix` files (deprecated)
+- **v2**: External flake input configs (current)
+
+### External Configuration Structure
+
+Configurations are loaded from a separate flake input (`configs`) with this structure:
+
+```
+configs/
+├── core/
+│   ├── base/
+│   │   ├── audio/
+│   │   │   └── config.nix       # Audio settings
+│   │   ├── boot/
+│   │   │   └── config.nix       # Boot settings
+│   │   └── ...
+│   └── management/
+│       ├── system-manager/
+│       │   └── config.nix       # System manager settings
+│       └── ...
+└── features/
+    └── homelab/
+        └── config.nix           # Feature-specific settings
+```
+
+### How It Works
+
+1. **Flake Input**: `configs.url = "path:./configs"` (external repo/directory)
+2. **Dynamic Loading**: `configLoader.loadSystemConfig ./. configs` finds all `config.nix` files
+3. **Domain Mapping**: File paths become config namespaces:
+   - `configs/core/base/audio/config.nix` → `systemConfig.core.base.audio`
+   - `configs/features/homelab/config.nix` → `systemConfig.features.homelab`
+4. **Merging**: All configs are merged hierarchically (later configs override earlier ones)
+
+### Benefits
+
+- **Separation**: Configs completely separate from code
+- **Versioning**: Configs can be versioned independently
+- **Flexibility**: Easy to swap config sources (local, remote, etc.)
+- **No Symlinks**: Clean separation without filesystem hacks
 
 ## Complete Module Tree (All Template-Compliant & Versioned)
 
