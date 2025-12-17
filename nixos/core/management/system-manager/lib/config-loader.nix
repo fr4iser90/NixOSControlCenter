@@ -95,9 +95,7 @@ let
       trimmed = builtins.replaceStrings [" " "\n" "\t" "\r"] ["" "" "" ""] content;
       startsWithBrace = builtins.stringLength trimmed >= 2 && builtins.substring 0 1 trimmed == "{";
     in
-      builtins.trace "CONFIG-LOADER: DEBUG isValidConfig path=${path} exists=${toString exists} contentLength=${toString (builtins.stringLength content)} startsWithBrace=${toString startsWithBrace}" (
-        exists && startsWithBrace
-      );
+      exists && startsWithBrace;
   
   
   # Load a single config file
@@ -202,15 +200,9 @@ in
             let
               newAcc = mergeConfigIntoStructure loaded.domainPath loaded.value acc;
             in
-              builtins.trace "CONFIG-LOADER: MERGING ${configName} from ${loaded.path} → ${builtins.toJSON loaded.domainPath}" (
-                if configName == "core/base/network" then
-                  builtins.trace "CONFIG-LOADER: NETWORK CONFIG = ${builtins.toJSON loaded.value}" (
-                    builtins.trace "CONFIG-LOADER: MERGED NETWORK = ${builtins.toJSON (newAcc.core.base.network or "NOT_FOUND")}" newAcc
-                  )
-                else newAcc
-              )
+              newAcc
           else
-            builtins.trace "CONFIG-LOADER: SKIPPING ${configName} (not found or empty)" acc
+            acc
       ) baseConfig optionalConfigs;
     in
       mergedConfig;
