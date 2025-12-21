@@ -2,11 +2,11 @@
 
 ## Auto-Activation Logic
 
-The homelab-manager module has special auto-activation logic in `features/default.nix`:
+The homelab-manager module has special auto-activation logic in `modules/default.nix`:
 
 ```nix
 # Special handling for homelab-manager auto-activation
-cfg = systemConfig.features or {};
+cfg = systemConfig.modules or {};
 homelabSwarm = systemConfig.homelab.swarm or null;
 isSwarmManager = homelabSwarm != null && (homelabSwarm.role or null) == "manager";
 isSingleServer = homelabSwarm == null;
@@ -17,7 +17,7 @@ shouldActivateHomelabManager = (cfg.homelab-manager.enable or false)
 
 # Override homelab-manager enable status
 getModuleEnabledWithHomelab = module:
-  if module.category == "features" && module.name == "homelab-manager"
+  if module.category == "modules" && module.name == "homelab-manager"
   then shouldActivateHomelabManager
   else getModuleEnabled module;
 ```
@@ -25,13 +25,13 @@ getModuleEnabledWithHomelab = module:
 ## Activation Conditions
 
 homelab-manager is automatically activated when:
-1. `features.infrastructure.homelab-manager.enable = true` (manual activation)
+1. `modules.infrastructure.homelab-manager.enable = true` (manual activation)
 2. `systemConfig.homelab` is configured AND `homelab.swarm` is null (Single-Server mode)
 3. `homelab.swarm.role = "manager"` (Swarm Manager mode)
 
 ## Docker Integration
 
-The homelab-manager handles Docker containers and services with the following features:
+The homelab-manager handles Docker containers and services with the following modules:
 
 - Automatic Docker service management
 - Swarm mode support (manager/worker)
@@ -54,6 +54,6 @@ homelab-manager = {
 
 ## Implementation Notes
 
-- Core logic in `features/default.nix`
+- Core logic in `modules/default.nix`
 - Docker-specific code in homelab-manager modules
 - Auto-activation bypasses normal enable/disable rules

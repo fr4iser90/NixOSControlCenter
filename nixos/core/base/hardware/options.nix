@@ -3,7 +3,7 @@
 let
   moduleVersion = "1.0";
 in {
-  options.systemConfig.system.hardware = {
+  options.systemConfig.core.base.hardware = {
     _version = lib.mkOption {
       type = lib.types.str;
       default = moduleVersion;

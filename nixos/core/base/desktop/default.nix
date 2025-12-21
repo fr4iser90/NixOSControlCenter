@@ -4,12 +4,12 @@ let
   cfg = getModuleConfig "desktop";
 in {
   _module.metadata = {
-    role = "internal";
+    role = "core";
     name = "desktop";
     description = "Desktop environment configuration and management";
     category = "base";
     subcategory = "desktop";
-    stability = "stable";
+    version = "1.0.0";
   };
 
   imports = if cfg.enable or false then [

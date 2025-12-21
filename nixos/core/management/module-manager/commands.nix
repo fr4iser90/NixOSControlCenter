@@ -31,9 +31,9 @@ let
     # Read current config
     current_config=$(cat "$config_file")
 
-    # Parse module name (features.ssh-client-manager → features / ssh-client-manager)
+    # Parse module name (modules.ssh-client-manager → modules / ssh-client-manager)
     if [[ "$module_name" == *"."* ]]; then
-      category="features"
+      category="modules"
       module_short="$module_name"
     else
       category="core"
@@ -97,12 +97,12 @@ let
       ${pkgs.nix}/bin/nix-instantiate --eval --strict -E "
         let config = import $config_file;
         in builtins.concatStringsSep \"\\n\" (
-          builtins.attrNames (config.features or {})
+          builtins.attrNames (config.modules or {})
         )
       " 2>/dev/null | while read module; do
         status=$(${pkgs.nix}/bin/nix-instantiate --eval --strict -E "
           let config = import $config_file;
-          in config.features.\"$module\" or false
+          in config.modules.\"$module\" or false
         " 2>/dev/null)
         printf "  %-25s [%s]\\n" "$module" "$(if [ "$status" = "true" ]; then echo "✓"; else echo "○"; fi)"
       done
@@ -184,14 +184,14 @@ in {
       longHelp = ''
         Interactive module toggler using fzf for selection.
         Automatically discovers ALL available modules from your current systemConfig.
-        Shows system, management, and feature modules with current status.
+        Shows system, management, and optional modules with current status.
         Use TAB or SPACE to select multiple modules.
         Requires sudo privileges and triggers system rebuild.
 
         Categories:
         • system.* - Core OS functionality (usually enabled)
         • management.* - System management tools (usually enabled)
-        • features.* - Optional user features (usually disabled)
+        • modules.* - Optional user modules (usually disabled)
 
         This tool dynamically reads your current NixOS configuration and shows all toggleable modules.
       '';

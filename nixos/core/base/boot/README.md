@@ -70,7 +70,7 @@ The boot module itself has no additional user-configurable options - it uses the
 
 The module dynamically loads bootloader implementations:
 
-- **default.nix**: Reads `systemConfig.system.bootloader` and imports appropriate bootloader
+- **default.nix**: Reads `systemConfig.core.base.bootloader` and imports appropriate bootloader
 - **bootloaders/**: Contains specific configurations for each bootloader
 - **Validation**: Ensures only valid bootloaders are selected
 - **Fallback**: Defaults to systemd-boot if invalid selection

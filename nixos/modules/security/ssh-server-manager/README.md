@@ -219,7 +219,7 @@ The system supports multiple notification types:
 ### Enable the SSH Server Manager
 ```nix
 {
-  features.ssh-server-manager = {
+  modules.security.ssh-server-manager = {
     enable = true;
     
     # Configure notifications
@@ -246,7 +246,7 @@ The system supports multiple notification types:
 ### Customize Default Settings
 ```nix
 {
-  features.ssh-server-manager = {
+  modules.security.ssh-server-manager = {
     request-access = {
       defaultDuration = 300;  # 5 minutes
       maxDuration = 3600;     # 1 hour
@@ -350,7 +350,7 @@ webhook.url = "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK";
 ### Email Integration with Multiple Recipients
 ```nix
 {
-  features.ssh-server-manager.notifications.types.email = {
+  modules.security.ssh-server-manager.notifications.types.email = {
     enable = true;
     address = "admin@example.com,security@example.com";
   };

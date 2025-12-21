@@ -3,7 +3,7 @@
 let
   moduleVersion = "1.0";
 in {
-  options.systemConfig.system.packages = {
+  options.systemConfig.core.system.packages = {
     # Version metadata (REQUIRED)
     _version = lib.mkOption {
       type = lib.types.str;
@@ -11,26 +11,31 @@ in {
       internal = true;
       description = "Packages module version";
     };
-    
-    # Package modules list
+
+    # Package modules list (V1 format)
     packageModules = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [];
-      description = "List of package modules to enable";
+      description = "List of package modules to enable (docker, docker-rootless, gaming, etc.)";
     };
-    
-    # Additional package modules
-    additionalPackageModules = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [];
-      description = "Additional package modules to enable (beyond packageModules)";
+
+    # Preset configuration
+    preset = {
+      modules = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [];
+        description = "Modules from preset configuration";
+      };
     };
-    
-    # Preset selection
-    preset = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      description = "Preset to use (e.g., 'gaming-desktop', 'dev-workstation')";
+
+    # Docker configuration
+    docker = {
+      enable = lib.mkEnableOption "Docker support";
+      root = lib.mkOption {
+        type = lib.types.nullOr lib.types.bool;
+        default = null;
+        description = "Force root Docker (auto-detected for Swarm/AI-Workspace)";
+      };
     };
   };
 }

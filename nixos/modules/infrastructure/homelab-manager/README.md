@@ -18,11 +18,11 @@ Feature for managing homelab environments using Docker containers, with support 
 
 ## Usage
 
-Enable the feature in your user config:
+Enable the module in your user config:
 
 ```nix
 {
-  features.infrastructure.homelab = {
+  modules.infrastructure.homelab = {
     enable = true;
     stacks = [
       {

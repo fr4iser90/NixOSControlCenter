@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **rEFInd**: Graphical EFI boot manager with automatic OS detection
 
 ### Configuration
-- Dynamic loading based on `systemConfig.system.bootloader`
+- Dynamic loading based on `systemConfig.core.base.bootloader`
 - User configuration via `boot-config.nix` symlink
 - Validation of bootloader selection
 - Default bootloader: systemd-boot

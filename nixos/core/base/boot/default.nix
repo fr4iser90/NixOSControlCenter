@@ -12,12 +12,12 @@ let
 
 in {
   _module.metadata = {
-    role = "internal";
+    role = "core";
     name = "boot";
     description = "Bootloader and boot configuration management";
     category = "base";
     subcategory = "boot";
-    stability = "stable";
+    version = "1.0.0";
   };
   imports = [
     ./options.nix

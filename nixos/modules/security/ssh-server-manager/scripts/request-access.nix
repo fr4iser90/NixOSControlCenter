@@ -3,9 +3,9 @@
 with lib;
 
 let
-  cfg = systemConfig.features.security.ssh-server.request-access;
+  cfg = systemConfig.modules.security.ssh-server.request-access;
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
-  notifications = systemConfig.features.security.ssh-server.notifications;
+  notifications = systemConfig.modules.security.ssh-server.notifications;
 
   requestAccessScript = pkgs.writeScriptBin "ssh-request-access" ''
     #!${pkgs.bash}/bin/bash
@@ -93,7 +93,7 @@ To view all: ssh-list-requests"
     find "$REQUESTS_DIR" -name "*.json" -mtime +1 -delete 2>/dev/null || true
   '';
 in {
-  options.features.security.ssh-server.request-access = {
+  options.modules.security.ssh-server.request-access = {
     enable = mkEnableOption "SSH access request functionality";
     
     defaultDuration = mkOption {

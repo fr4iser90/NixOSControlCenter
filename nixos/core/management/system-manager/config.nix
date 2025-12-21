@@ -5,9 +5,9 @@ let
   # Use the template file as default config
   defaultConfig = builtins.readFile ./system-manager-config.nix;
 
-  # Parse the default config to extract features
+  # Parse the default config to extract modules
   parsedConfig = import ./system-manager-config.nix;
-  enabledFeatures = parsedConfig.features or {};
+  enabledModules = parsedConfig.modules or {};
 
   # Import module discovery to get moduleConfig
   discovery = import ../module-manager/lib/discovery.nix { inherit lib; };

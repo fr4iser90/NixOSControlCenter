@@ -7,12 +7,12 @@ let
         else systemConfig.core.management.module-manager or {};
 in {
   _module.metadata = {
-    role = "internal";
+    role = "core";
     name = "module-manager";
     description = "Automatic module discovery and configuration management";
     category = "management";
     subcategory = "modules";
-    stability = "stable";
+    version = "1.0.0";
   };
   # Module-manager is always active (Core module, no enable option)
   imports = [

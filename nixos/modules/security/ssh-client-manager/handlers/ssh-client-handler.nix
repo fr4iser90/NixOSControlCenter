@@ -121,7 +121,7 @@ let
   '';
 in {
   config = {
-    features.ssh-client-manager = {
+    modules.security.ssh-client-manager = {
       sshConnectionHandler = sshConnectionHandler;
     };
   };

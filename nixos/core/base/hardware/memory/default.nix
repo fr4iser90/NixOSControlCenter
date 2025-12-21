@@ -3,7 +3,7 @@
 let
   # Memory configuration: use configured value, fallback to 8GB if null
   # The activation script will update the config file for future rebuilds
-  memoryInGB = systemConfig.system.hardware.ram.sizeGB or 8;
+  memoryInGB = systemConfig.core.base.hardware.ram.sizeGB or 8;
 
   # Always enable memory management (we always have a fallback)
   enableMemoryManagement = true;

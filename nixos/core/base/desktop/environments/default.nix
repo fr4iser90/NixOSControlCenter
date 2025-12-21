@@ -2,7 +2,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 {
   # Only import desktop environment if desktop is enabled
-  # Uses the environment specified in systemConfig.system.desktop.environment
+  # Uses the environment specified in systemConfig.core.base.desktop.environment
   imports = [
     (./. + "/${systemConfig.core.base.desktop.environment}")  # Automatically loads the correct desktop environment
   ];

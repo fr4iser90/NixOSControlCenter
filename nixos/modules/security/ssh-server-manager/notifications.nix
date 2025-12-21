@@ -56,7 +56,7 @@ let
     '' else ""}
   '';
 in {
-  options.features.security.ssh-server.notifications = {
+  options.modules.security.ssh-server.notifications = {
     enable = mkEnableOption "SSH notification system";
     
     types = mkOption {

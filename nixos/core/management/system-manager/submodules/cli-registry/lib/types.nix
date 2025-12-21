@@ -44,7 +44,7 @@
       dependencies = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [];
-        description = "Required features or packages";
+        description = "Required modules or packages";
         example = [ "qemu" "libvirt" ];
       };
 

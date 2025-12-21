@@ -6,15 +6,15 @@ let
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
   versionChecker = import ../handlers/module-version-check.nix { inherit config lib; };
   
-  # Create the update-features script
-  updateFeaturesScript = pkgs.writeShellScriptBin "ncc-update-features" ''
+  # Create the update-modules script
+  updateModulesScript = pkgs.writeShellScriptBin "ncc-update-modules" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
     
     # Parse arguments
     DRY_RUN=false
     AUTO_MODE=false
-    FEATURE_FILTER=""
+    MODULE_FILTER=""
     
     while [[ $# -gt 0 ]]; do
       case $1 in
@@ -26,57 +26,57 @@ let
           AUTO_MODE=true
           shift
           ;;
-        --feature=*)
-          FEATURE_FILTER="''${1#*=}"
+        --module=*)
+          MODULE_FILTER="''${1#*=}"
           shift
           ;;
-        --feature)
-          FEATURE_FILTER="$2"
+        --module)
+          MODULE_FILTER="$2"
           shift 2
           ;;
         *)
           ${ui.messages.error "Unknown option: $1"}
-          echo "Usage: ncc-update-features [--feature=name] [--dry-run] [--auto]"
+          echo "Usage: ncc-update-modules [--module=name] [--dry-run] [--auto]"
           exit 1
           ;;
       esac
     done
     
-    ${ui.text.header "Feature Update"}
+    ${ui.text.header "Module Update"}
     
     if [ "$DRY_RUN" = "true" ]; then
       ${ui.messages.info "DRY RUN MODE - No changes will be made"}
     fi
     
-    # Get features directory
-    FEATURES_DIR="${toString ../../../../features}"
-    FEATURES_CONFIG="/etc/nixos/configs/module-manager-config.nix"
+    # Get modules directory
+    MODULES_DIR="${toString ../../../../modules}"
+    MODULES_CONFIG="/etc/nixos/configs/module-manager-config.nix"
     
-    # Collect features that need updates
-    FEATURES_TO_UPDATE=()
-    FEATURES_MANUAL=()
-    FEATURES_AUTO=()
+    # Collect modules that need updates
+    MODULES_TO_UPDATE=()
+    MODULES_MANUAL=()
+    MODULES_AUTO=()
     
-    # Iterate through all features
-    for feature_dir in "$FEATURES_DIR"/*; do
-      if [ ! -d "$feature_dir" ]; then
+    # Iterate through all modules
+    for module_dir in "$MODULES_DIR"/*; do
+      if [ ! -d "$module_dir" ]; then
         continue
       fi
       
-      feature=$(basename "$feature_dir")
+      module=$(basename "$module_dir")
       
-      # Filter by --feature if specified
-      if [ -n "$FEATURE_FILTER" ] && [ "$feature" != "$FEATURE_FILTER" ]; then
+      # Filter by --module if specified
+      if [ -n "$MODULE_FILTER" ] && [ "$module" != "$MODULE_FILTER" ]; then
         continue
       fi
       
       # Get installed version
       INSTALLED=$(${pkgs.nix}/bin/nix-instantiate --eval --strict -E "
-        (import <nixpkgs/nixos> { configuration = {}; }).config.features.$feature._version or \"unknown\"
+        (import <nixpkgs/nixos> { configuration = {}; }).config.modules.$module._version or \"unknown\"
       " 2>/dev/null || echo "unknown")
       
       # Get available version from options.nix
-      OPTIONS_FILE="$feature_dir/options.nix"
+      OPTIONS_FILE="$module_dir/options.nix"
       if [ -f "$OPTIONS_FILE" ]; then
         AVAILABLE=$(${pkgs.gnugrep}/bin/grep -m 1 'moduleVersion =' "$OPTIONS_FILE" 2>/dev/null | ${pkgs.gnused}/bin/sed 's/.*moduleVersion = "\([^"]*\)".*/\1/' || echo "unknown")
       else
@@ -93,7 +93,7 @@ let
       fi
       
       # Check if migration exists
-      MIGRATIONS_DIR="$feature_dir/migrations"
+      MIGRATIONS_DIR="$module_dir/migrations"
       HAS_MIGRATION=false
       if [ -d "$MIGRATIONS_DIR" ]; then
         MIGRATION_FILE=$(find "$MIGRATIONS_DIR" -name "v''${INSTALLED}-to-v''${AVAILABLE}.nix" 2>/dev/null | head -1)
@@ -103,44 +103,44 @@ let
       fi
       
       if [ "$HAS_MIGRATION" = "true" ]; then
-        FEATURES_AUTO+=("$feature:$INSTALLED:$AVAILABLE")
+        MODULES_AUTO+=("$module:$INSTALLED:$AVAILABLE")
       else
-        FEATURES_MANUAL+=("$feature:$INSTALLED:$AVAILABLE")
+        MODULES_MANUAL+=("$module:$INSTALLED:$AVAILABLE")
       fi
     done
     
     # Show update status
     echo ""
-    if [ ''${#FEATURES_AUTO[@]} -eq 0 ] && [ ''${#FEATURES_MANUAL[@]} -eq 0 ]; then
-      ${ui.messages.success "All features are up to date!"}
+    if [ ''${#MODULES_AUTO[@]} -eq 0 ] && [ ''${#MODULES_MANUAL[@]} -eq 0 ]; then
+      ${ui.messages.success "All modules are up to date!"}
       exit 0
     fi
     
-    ${ui.messages.info "Features with automatic migration available:"}
-    if [ ''${#FEATURES_AUTO[@]} -eq 0 ]; then
+    ${ui.messages.info "Modules with automatic migration available:"}
+    if [ ''${#MODULES_AUTO[@]} -eq 0 ]; then
       echo "  (none)"
     else
-      for feature_info in "''${FEATURES_AUTO[@]}"; do
-        IFS=':' read -r feature from to <<< "$feature_info"
-        echo "  - $feature: $from → $to (auto-update)"
+      for module_info in "''${MODULES_AUTO[@]}"; do
+        IFS=':' read -r module from to <<< "$module_info"
+        echo "  - $module: $from → $to (auto-update)"
       done
     fi
     
     echo ""
-    ${ui.messages.warning "Features requiring manual update:"}
-    if [ ''${#FEATURES_MANUAL[@]} -eq 0 ]; then
+    ${ui.messages.warning "Modules requiring manual update:"}
+    if [ ''${#MODULES_MANUAL[@]} -eq 0 ]; then
       echo "  (none)"
     else
-      for feature_info in "''${FEATURES_MANUAL[@]}"; do
-        IFS=':' read -r feature from to <<< "$feature_info"
-        echo "  - $feature: $from → $to (manual update required)"
+      for module_info in "''${MODULES_MANUAL[@]}"; do
+        IFS=':' read -r module from to <<< "$module_info"
+        echo "  - $module: $from → $to (manual update required)"
       done
     fi
     
     # Ask for confirmation (unless --auto)
-    if [ "$AUTO_MODE" = "false" ] && [ ''${#FEATURES_AUTO[@]} -gt 0 ]; then
+    if [ "$AUTO_MODE" = "false" ] && [ ''${#MODULES_AUTO[@]} -gt 0 ]; then
       echo ""
-      printf "Update features with automatic migration? (y/n): "
+      printf "Update modules with automatic migration? (y/n): "
       read -r confirm
       if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
         ${ui.messages.info "Update cancelled"}
@@ -150,25 +150,25 @@ let
     
     # Perform updates
     if [ "$DRY_RUN" = "true" ]; then
-      ${ui.messages.info "DRY RUN: Would update the following features:"}
-      for feature_info in "''${FEATURES_AUTO[@]}"; do
-        IFS=':' read -r feature from to <<< "$feature_info"
-        echo "  - $feature: $from → $to"
+      ${ui.messages.info "DRY RUN: Would update the following modules:"}
+      for module_info in "''${MODULES_AUTO[@]}"; do
+        IFS=':' read -r module from to <<< "$module_info"
+        echo "  - $module: $from → $to"
       done
       exit 0
     fi
     
-    # Update features with automatic migration
-    if [ ''${#FEATURES_AUTO[@]} -gt 0 ]; then
-      ${ui.messages.loading "Updating features..."}
+    # Update modules with automatic migration
+    if [ ''${#MODULES_AUTO[@]} -gt 0 ]; then
+      ${ui.messages.loading "Updating modules..."}
       
-      for feature_info in "''${FEATURES_AUTO[@]}"; do
-        IFS=':' read -r feature from to <<< "$feature_info"
+      for module_info in "''${MODULES_AUTO[@]}"; do
+        IFS=':' read -r module from to <<< "$module_info"
         
-        ${ui.messages.info "Updating $feature: $from → $to"}
+        ${ui.messages.info "Updating $module: $from → $to"}
         
         # Execute migration
-        MIGRATION_FILE="$feature_dir/migrations/v$from-to-v$to.nix"
+        MIGRATION_FILE="$module_dir/migrations/v$from-to-v$to.nix"
         if [ -f "$MIGRATION_FILE" ]; then
           ${ui.messages.info "Executing migration: $MIGRATION_FILE"}
           
@@ -196,29 +196,29 @@ let
           # Update version in module-manager-config.nix
           ${ui.messages.info "  Updating version to $to..."}
           # TODO: Implement proper config file update
-          ${ui.messages.success "  Migration completed: $feature $from → $to"}
+          ${ui.messages.success "  Migration completed: $module $from → $to"}
         else
           ${ui.messages.warning "Migration file not found: $MIGRATION_FILE"}
-          ${ui.messages.info "Skipping migration for $feature"}
+          ${ui.messages.info "Skipping migration for $module"}
         fi
       done
       
-      ${ui.messages.success "Features updated successfully!"}
+      ${ui.messages.success "Modules updated successfully!"}
     fi
     
     # Warn about manual updates
-    if [ ''${#FEATURES_MANUAL[@]} -gt 0 ]; then
+    if [ ''${#MODULES_MANUAL[@]} -gt 0 ]; then
       echo ""
-      ${ui.messages.warning "The following features require manual update:"}
-      for feature_info in "''${FEATURES_MANUAL[@]}"; do
-        IFS=':' read -r feature from to <<< "$feature_info"
-        echo "  - $feature: $from → $to"
+      ${ui.messages.warning "The following modules require manual update:"}
+      for module_info in "''${MODULES_MANUAL[@]}"; do
+        IFS=':' read -r module from to <<< "$module_info"
+        echo "  - $module: $from → $to"
         ${ui.messages.info "  → No migration available. Please update manually or create migration file."}
       done
     fi
   '';
 
 in {
-  inherit updateFeaturesScript;
+  inherit updateModulesScript;
 }
 

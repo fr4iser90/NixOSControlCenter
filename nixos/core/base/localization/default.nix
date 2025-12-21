@@ -4,12 +4,12 @@ let
   cfg = getModuleConfig "localization";
 in {
   _module.metadata = {
-    role = "internal";
+    role = "core";
     name = "localization";
     description = "System localization and internationalization";
     category = "base";
     subcategory = "localization";
-    stability = "stable";
+    version = "1.0.0";
   };
 
   imports = [

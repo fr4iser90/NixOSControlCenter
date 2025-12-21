@@ -1,7 +1,7 @@
 {
   description = "Development Workstation";
   systemTypes = [ "desktop" ];
-  features = [
+  modules = [
     "web-dev"
     "python-dev"
     "game-dev"

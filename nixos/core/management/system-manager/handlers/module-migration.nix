@@ -5,13 +5,13 @@ with lib;
 let
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
   
-  # Execute feature migration
-  # featureName: Name of the feature
+  # Execute module migration
+  # moduleName: Name of the module
   # fromVersion: Current version
   # toVersion: Target version
   # migrationPath: Path to migration file
-  executeMigration = featureName: fromVersion: toVersion: migrationPath:
-    pkgs.writeShellScriptBin "migrate-${featureName}-${fromVersion}-to-${toVersion}" ''
+  executeMigration = moduleName: fromVersion: toVersion: migrationPath:
+    pkgs.writeShellScriptBin "migrate-${moduleName}-${fromVersion}-to-${toVersion}" ''
       #!${pkgs.bash}/bin/bash
       set -euo pipefail
       
@@ -69,10 +69,10 @@ let
         eval "$MIGRATION_SCRIPT"
       fi
       
-      # Update version in feature config file (now individual per feature)
+      # Update version in module config file (now individual per module)
       if [ -f "$FEATURES_CONFIG" ]; then
         ${ui.messages.info "Updating version in $FEATURE_NAME-config.nix..."}
-        # Update _version for the feature
+        # Update _version for the module
         # This is a simplified version - full implementation would parse and modify Nix files properly
         ${ui.messages.warning "Version update in config file will be implemented in full migration handler"}
       fi
@@ -81,9 +81,9 @@ let
     '';
   
   # Execute migration chain
-  # featureName: Name of the feature
+  # moduleName: Name of the module
   # migrationChain: [version1, version2, version3, ...]
-  executeMigrationChain = featureName: migrationChain:
+  executeMigrationChain = moduleName: migrationChain:
     let
       # Create migration steps: [(from1, to1), (from2, to2), ...]
       steps = lib.zipLists migrationChain (lib.tail migrationChain);
@@ -91,11 +91,11 @@ let
         {
           from = lib.elemAt step 0;
           to = lib.elemAt step 1;
-          path = ../../../../features/${featureName}/migrations + "/v${lib.elemAt step 0}-to-v${lib.elemAt step 1}.nix";
+          path = ../../../../modules/${moduleName}/migrations + "/v${lib.elemAt step 0}-to-v${lib.elemAt step 1}.nix";
         }
       ) steps;
     in
-      pkgs.writeShellScriptBin "migrate-chain-${featureName}" ''
+      pkgs.writeShellScriptBin "migrate-chain-${moduleName}" ''
         #!${pkgs.bash}/bin/bash
         set -euo pipefail
         
@@ -105,7 +105,7 @@ let
         
         # Execute each migration step
         ${lib.concatMapStringsSep "\n" (step: ''
-          ${executeMigration featureName step.from step.to step.path}/bin/migrate-${featureName}-${step.from}-to-${step.to} \
+          ${executeMigration moduleName step.from step.to step.path}/bin/migrate-${moduleName}-${step.from}-to-${step.to} \
             "$FEATURE_NAME" "${step.from}" "${step.to}" "${step.path}"
         '') migrationSteps}
         

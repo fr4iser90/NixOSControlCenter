@@ -288,7 +288,7 @@ let
       local source_module="$1"
       local target_module="$2"
       local module_name="$3"
-      local item_type="$4"  # "core" or "features"
+      local item_type="$4"  # "core" or "modules"
       
       # Check versions
       SOURCE_VERSION=$(get_source_version "$source_module")
@@ -375,7 +375,7 @@ let
       local source_module="$1"
       local target_module="$2"
       local module_name="$3"
-      local item_type="$4"  # "core" or "features"
+      local item_type="$4"  # "core" or "modules"
       local system_config_file="$NIXOS_DIR/system-config.nix"
       
       ${ui.messages.loading "Migrating module $module_name from Stage 0 → 1..."}
@@ -491,7 +491,7 @@ EOF
       local source_module="$1"
       local target_module="$2"
       local module_name="$3"
-      local item_type="$4"  # "core" or "features"
+      local item_type="$4"  # "core" or "modules"
       
       if [ -d "$target_module" ]; then
         # Module exists in TARGET → Stage 0 → 1 migration
@@ -510,7 +510,7 @@ EOF
     
     # Cleanup modules that no longer exist in SOURCE (only if --cleanup flag is set)
     cleanup_removed_modules() {
-      local item_type="$1"  # "core" or "features"
+      local item_type="$1"  # "core" or "modules"
       
       if [ "$CLEANUP" != "true" ]; then
         return 0  # Skip cleanup if flag not set
@@ -551,7 +551,7 @@ EOF
     COPY_ITEMS=(
         "core"            # Base system configuration
         "custom"          # User-defined modules
-        "features"        # Feature modules
+        "modules"        # Optional modules
         "packages"        # Packages directory
         "flake.nix"       # Flake configuration
     )
@@ -601,7 +601,7 @@ EOF
             else
               ${ui.messages.info "$item exists, skipping (preserving existing $item)..."}
             fi
-          elif [ "$item" = "core" ] || [ "$item" = "features" ]; then
+          elif [ "$item" = "core" ] || [ "$item" = "modules" ]; then
             # CRITICAL: Selective copying module-by-module (NEVER rm -rf!)
             ${ui.messages.loading "Updating $item/ modules (preserving configs)..."}
             
@@ -632,7 +632,7 @@ EOF
             # Cleanup removed modules (only if --cleanup flag is set)
             cleanup_removed_modules "$item"
           elif [ "$item" = "packages" ]; then
-            # CRITICAL: packages/ is a single module - use SAME GENERIC LOGIC as core/features
+            # CRITICAL: packages/ is a single module - use SAME GENERIC LOGIC as core/modules
             ${ui.messages.loading "Updating packages/ (preserving configs)..."}
             
             # Create target_dir if it doesn't exist
@@ -698,7 +698,7 @@ EOF
     
     # Set permissions
     ${ui.messages.loading "Setting permissions..."}
-    for dir in core features desktop packages modules lib; do
+    for dir in core modules desktop packages modules lib; do
       if [ -d "$NIXOS_DIR/$dir" ]; then
         chown -R root:root "$NIXOS_DIR/$dir"
         chmod -R 644 "$NIXOS_DIR/$dir"
@@ -751,7 +751,7 @@ EOF
 
 in {
   # Enable terminal-ui dependency
-  # features.terminal-ui.enable removed (cli-formatter is Core) = true;
+  # modules.terminal-ui.enable removed (cli-formatter is Core) = true;
 
   environment.systemPackages = [
     systemUpdateMainScript

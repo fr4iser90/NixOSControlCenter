@@ -3,9 +3,9 @@
 with lib;
 
 let
-  cfg = systemConfig.features.security.ssh-server.approve-request;
+  cfg = systemConfig.modules.security.ssh-server.approve-request;
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
-  notifications = systemConfig.features.security.ssh-server.notifications;
+  notifications = systemConfig.modules.security.ssh-server.notifications;
   backupHelpers = import ../../lib/backup-helpers.nix { inherit pkgs lib; };
 
   approveRequestScript = pkgs.writeScriptBin "ssh-approve-request" ''
@@ -229,7 +229,7 @@ Denied at: $(date)"
     ${ui.messages.info "Denial reason: $DENY_REASON"}
   '';
 in {
-  options.features.security.ssh-server.approve-request = {
+  options.modules.security.ssh-server.approve-request = {
     enable = mkEnableOption "SSH request approval functionality";
     
     maxDuration = mkOption {

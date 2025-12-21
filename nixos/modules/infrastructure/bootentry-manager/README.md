@@ -1,10 +1,10 @@
 # Boot Entry Manager
 
-A feature module that provides advanced bootloader entry management for systemd-boot, GRUB, and rEFInd. This module allows dynamic management of boot entries, custom naming, and synchronization across different bootloader implementations.
+A module module that provides advanced bootloader entry management for systemd-boot, GRUB, and rEFInd. This module allows dynamic management of boot entries, custom naming, and synchronization across different bootloader implementations.
 
 ## Overview
 
-The Boot Entry Manager is a **feature module** that provides unified boot entry management across different bootloaders. It supports creating, renaming, and managing boot entries with a consistent interface regardless of the underlying bootloader.
+The Boot Entry Manager is a **module module** that provides unified boot entry management across different bootloaders. It supports creating, renaming, and managing boot entries with a consistent interface regardless of the underlying bootloader.
 
 ## Features
 
@@ -58,7 +58,7 @@ Enable the boot entry manager in your configuration:
 
 ```nix
 {
-  features = {
+  modules = {
     infrastructure = {
       bootentry = {
         enable = true;
@@ -159,7 +159,7 @@ Each provider implements a common interface:
 
 ```nix
 # Enable boot entry management
-features.infrastructure.bootentry.enable = true;
+modules.infrastructure.bootentry.enable = true;
 
 # Create a custom boot entry
 # Place JSON file in /etc/nixos/boot/entries/custom.json
@@ -175,7 +175,7 @@ features.infrastructure.bootentry.enable = true;
 
 ```nix
 # Enable for multi-boot environment
-features.infrastructure.bootentry.enable = true;
+modules.infrastructure.bootentry.enable = true;
 
 # Entries for different OSes
 # /etc/nixos/boot/entries/nixos.json

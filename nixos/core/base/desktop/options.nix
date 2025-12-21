@@ -3,7 +3,7 @@
 let
   moduleVersion = "1.0";
 in {
-  options.systemConfig.system.desktop = {
+  options.systemConfig.core.base.desktop = {
     _version = lib.mkOption {
       type = lib.types.str;
       default = moduleVersion;

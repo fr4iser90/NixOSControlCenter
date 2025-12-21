@@ -1,6 +1,6 @@
 # System Discovery Feature
 
-The System Discovery feature enables automatic scanning, documentation, and secure storage of your entire system state. It captures desktop settings, installed software (including Steam games), credential metadata, and more.
+The System Discovery module enables automatic scanning, documentation, and secure storage of your entire system state. It captures desktop settings, installed software (including Steam games), credential metadata, and more.
 
 ## Features
 
@@ -96,16 +96,16 @@ sops secrets.encrypted.yaml
    - Restore from backups (if you have them separately)
    - Use key metadata to identify which keys need restoration
 
-**However**: The feature supports optional private key scanning if you explicitly enable it (see Enterprise Features below).
+**However**: The module supports optional private key scanning if you explicitly enable it (see Enterprise Modules below).
 
 ## Activation
 
-The feature can be activated/deactivated like all other features:
+The module can be activated/deactivated like all other modules:
 
 **Option 1: Via `module-manager-config.nix`** (recommended):
 ```nix
 {
-  features = {
+  modules = {
     system-discovery = true;  # or false to disable
   };
 }
@@ -114,22 +114,22 @@ The feature can be activated/deactivated like all other features:
 **Option 2: Via `ncc-config` command**:
 ```bash
 # Enable
-sudo ncc-config set feature system-discovery true
+sudo ncc-config set module system-discovery true
 
 # Disable
-sudo ncc-config set feature system-discovery false
+sudo ncc-config set module system-discovery false
 ```
 
-**Option 3: Via `ncc-feature-manager`**:
+**Option 3: Via `ncc-module-manager`**:
 ```bash
 # Enable
-sudo ncc-feature-manager enable system-discovery
+sudo ncc-module-manager enable system-discovery
 
 # Disable
-sudo ncc-feature-manager disable system-discovery
+sudo ncc-module-manager disable system-discovery
 
-# List all features
-sudo ncc-feature-manager list
+# List all modules
+sudo ncc-module-manager list
 ```
 
 ## Configuration
@@ -137,7 +137,7 @@ sudo ncc-feature-manager list
 ### Basic Configuration
 
 ```nix
-systemConfig.features.system-discovery = {
+systemConfig.modules.system-discovery = {
   enable = true;
   snapshotDir = "/var/lib/nixos-control-center/snapshots";
   
@@ -157,7 +157,7 @@ systemConfig.features.system-discovery = {
 #### With sops-nix
 
 ```nix
-systemConfig.features.system-discovery = {
+systemConfig.modules.system-discovery = {
   encryption = {
     enable = true;
     method = "sops";  # or "fido2" or "both"
@@ -198,7 +198,7 @@ creation_rules:
 #### With FIDO2/YubiKey
 
 ```nix
-systemConfig.features.system-discovery = {
+systemConfig.modules.system-discovery = {
   encryption = {
     enable = true;
     method = "fido2";
@@ -233,7 +233,7 @@ age-plugin-yubikey -r
 ### GitHub Upload
 
 ```nix
-systemConfig.features.system-discovery = {
+systemConfig.modules.system-discovery = {
   github = {
     enable = true;
     repository = "your-username/your-repo";
@@ -248,7 +248,7 @@ systemConfig.features.system-discovery = {
 For automatic daily/weekly/monthly scanning:
 
 ```nix
-systemConfig.features.system-discovery = {
+systemConfig.modules.system-discovery = {
   scanInterval = "daily";  # or "weekly", "monthly"
 };
 ```
@@ -260,7 +260,7 @@ systemConfig.features.system-discovery = {
 Track all discovery operations:
 
 ```nix
-systemConfig.features.system-discovery = {
+systemConfig.modules.system-discovery = {
   audit = {
     enable = true;
     logFile = "/var/log/ncc-discovery-audit.log";
@@ -272,7 +272,7 @@ systemConfig.features.system-discovery = {
 ### Compliance & Retention
 
 ```nix
-systemConfig.features.system-discovery = {
+systemConfig.modules.system-discovery = {
   retention = {
     maxSnapshots = 30;  # Keep last 30 snapshots
     maxAge = "90d";     # Delete snapshots older than 90 days
@@ -283,7 +283,7 @@ systemConfig.features.system-discovery = {
     enable = true;
     requireEncryption = true;  # Fail if encryption disabled
     requireGitHubBackup = false;  # Optional: require GitHub backup
-    dataClassification = "internal";  # internal, confidential, restricted
+    dataClassification = "core";  # internal, confidential, restricted
   };
 };
 ```
@@ -291,7 +291,7 @@ systemConfig.features.system-discovery = {
 ### Multi-User Support
 
 ```nix
-systemConfig.features.system-discovery = {
+systemConfig.modules.system-discovery = {
   multiUser = {
     enable = true;
     allowedUsers = [ "admin" "backup-user" ];
@@ -306,7 +306,7 @@ systemConfig.features.system-discovery = {
 **⚠️ WARNING: Only enable if you understand the security implications!**
 
 ```nix
-systemConfig.features.system-discovery = {
+systemConfig.modules.system-discovery = {
   scanners = {
     credentials = {
       enable = true;
@@ -327,7 +327,7 @@ systemConfig.features.system-discovery = {
 ### Notification & Alerting
 
 ```nix
-systemConfig.features.system-discovery = {
+systemConfig.modules.system-discovery = {
   notifications = {
     enable = true;
     onSuccess = true;  # Notify on successful discovery
@@ -352,7 +352,7 @@ systemConfig.features.system-discovery = {
 Only store changes between snapshots:
 
 ```nix
-systemConfig.features.system-discovery = {
+systemConfig.modules.system-discovery = {
   differential = {
     enable = true;
     baseSnapshot = "latest";  # Compare against latest or specific snapshot
@@ -366,7 +366,7 @@ systemConfig.features.system-discovery = {
 Add custom scanners for your specific needs:
 
 ```nix
-systemConfig.features.system-discovery = {
+systemConfig.modules.system-discovery = {
   customScanners = [
     {
       name = "database-config";
@@ -490,7 +490,7 @@ ncc-fetch --list
 
 ### Restoring from Snapshots
 
-The feature includes a restore function that can automatically restore bookmarks, settings, and more:
+The module includes a restore function that can automatically restore bookmarks, settings, and more:
 
 **From local snapshot**:
 ```bash
@@ -619,7 +619,7 @@ age -d -i ~/.config/age/yubikey-identity.txt snapshot.json.encrypted > snapshot.
 
 ## Extension
 
-The feature is modular. New scanners can be easily added:
+The module is modular. New scanners can be easily added:
 
 1. Create a new scanner in `scanners/`
 2. Add it to `default.nix`
@@ -663,7 +663,7 @@ services.sops-nix = {
 
 ### Restoring from Snapshot
 
-While the feature doesn't provide automatic restoration (by design - you should use NixOS configs for that), you can use snapshots to:
+While the module doesn't provide automatic restoration (by design - you should use NixOS configs for that), you can use snapshots to:
 
 1. **Identify missing packages**: Compare current system with snapshot
 2. **Restore desktop settings**: Use desktop scanner output to recreate themes

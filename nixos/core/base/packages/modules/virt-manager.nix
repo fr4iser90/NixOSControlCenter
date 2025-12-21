@@ -1,6 +1,6 @@
 # virt-manager.nix
 # Virtualization Management GUI
-# Requires: qemu-vm feature
+# Requires: qemu-vm module
 
 { config, lib, pkgs, ... }:
 {

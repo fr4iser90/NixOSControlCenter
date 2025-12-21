@@ -1,6 +1,6 @@
 ## Desktop Configuration
 
-The desktop configuration module provides a declarative way to configure various desktop components in NixOS. It is conditionally enabled through `systemConfig.system.desktop.enable`.
+The desktop configuration module provides a declarative way to configure various desktop components in NixOS. It is conditionally enabled through `systemConfig.core.base.desktop.enable`.
 
 ### Components
 

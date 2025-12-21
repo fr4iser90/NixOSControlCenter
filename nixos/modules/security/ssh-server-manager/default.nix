@@ -13,7 +13,7 @@ in {
     description = "SSH server access management and monitoring";
     category = "security";
     subcategory = "ssh";
-    stability = "stable";
+    version = "1.0.0";
   };
 
   imports = if cfg.enable or false then [
@@ -28,13 +28,16 @@ in {
     ./scripts/grant-access.nix
   ] else [];
 
+  # Provide cfg to all submodules
+  _module.args.cfg = cfg;
+
   config = mkMerge [
     {
       modules.security.ssh-server-manager.enable = mkDefault (cfg.enable or false);
     }
     (mkIf cfg.enable {
     # Enable terminal-ui dependency
-    # features.terminal-ui.enable removed (cli-formatter is Core) = true;
+    # modules.terminal-ui.enable removed (cli-formatter is Core) = true;
     
     services.openssh = {
       enable = true;

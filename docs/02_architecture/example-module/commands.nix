@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = config.features.example-module;
+  cfg = config.modules.example-module;
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
 in
   mkIf cfg.enable {

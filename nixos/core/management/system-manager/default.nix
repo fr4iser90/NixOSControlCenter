@@ -52,12 +52,12 @@ in {
     core.management.system-manager.api = apiValue;
 
     _module.metadata = {
-      role = "internal";
+      role = "core";
       name = "system-manager";
       description = "Central system management and configuration";
       category = "management";
       subcategory = "system";
-      stability = "stable";
+      version = "1.0.0";
     };
   };
 }

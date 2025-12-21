@@ -4,12 +4,12 @@ let
   cfg = getModuleConfig "hardware";
 in {
   _module.metadata = {
-    role = "internal";
+    role = "core";
     name = "hardware";
     description = "Hardware detection and configuration";
     category = "base";
     subcategory = "hardware";
-    stability = "stable";
+    version = "1.0.0";
   };
 
   imports = [

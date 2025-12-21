@@ -1,14 +1,9 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  cfg = systemConfig.features.example-module or {};
-  # Use API from system-manager for config helpers
-  configHelpers = config.core.system-manager.api.configHelpers or null;
-  userConfigFile = "/etc/nixos/features/example-module/example-module-config.nix";
-  symlinkPath = "/etc/nixos/configs/example-module-config.nix";
-  defaultConfig = ''
+
 {
-  features.example-module = {
+  example-module = {
     enable = false;
     option1 = "default-value";
     option2 = 42;
@@ -22,7 +17,7 @@ in
   lib.mkMerge [
     {
       # Set default enable value
-      features.example-module.enable = lib.mkDefault (systemConfig.features.example-module or false);
+      example-module.enable = lib.mkDefault (systemConfig.modules.example-module or false);
     }
     {
       # Symlink management (always runs, even if disabled)

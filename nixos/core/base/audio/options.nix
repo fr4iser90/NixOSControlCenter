@@ -3,7 +3,7 @@
 let
   moduleVersion = "1.0";
 in {
-  options.systemConfig.system.audio = {
+  options.systemConfig.core.base.audio = {
     _version = lib.mkOption {
       type = lib.types.str;
       default = moduleVersion;

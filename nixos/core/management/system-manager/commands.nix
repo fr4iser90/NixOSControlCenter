@@ -6,7 +6,7 @@ let
   cfg = systemConfig.management.system-manager or {};
   versionChecker = import ./handlers/module-version-check.nix { inherit config lib; };
   checkVersions = import ./scripts/check-versions.nix { inherit config lib pkgs; };
-  updateFeatures = import ./scripts/update-features.nix { inherit config lib pkgs; };
+  updateModules = import ./scripts/update-modules.nix { inherit config lib pkgs; };
   
   # Scripts are imported below (template-compliant)
 
@@ -32,7 +32,7 @@ in {
   config = {
     environment.systemPackages =
       [ checkVersions.checkVersionsScript
-        updateFeatures.updateFeaturesScript
+        updateModules.updateModulesScript
         configMigration.migration.migrateSystemConfig
         configValidator.validateSystemConfig
         enableDesktopScript
@@ -59,24 +59,24 @@ in {
             - Stable: Stable version (if different from available)
             - Status: Update availability and migration support
             
-            Shows both Core modules (systemConfig.*) and Feature modules (features.*).
+            Shows both Core modules (systemConfig.*) and optional modules (modules.*).
           '';
         }
         {
-          name = "update-features";
-          description = "Update features with automatic migration support";
+          name = "update-modules";
+          description = "Update modules with automatic migration support";
           category = "system";
-          script = "${updateFeatures.updateFeaturesScript}/bin/ncc-update-features";
+          script = "${updateModules.updateModulesScript}/bin/ncc-update-modules";
           arguments = [
-            "--feature"
+            "--module"
             "--dry-run"
             "--auto"
           ];
           dependencies = [ "nix" ];
-          shortHelp = "update-features [--feature=name] [--dry-run] [--auto] - Update features";
+          shortHelp = "update-modules [--module=name] [--dry-run] [--auto] - Update modules";
           longHelp = ''
             Update features to their latest versions:
-            - --feature=name: Update specific feature only
+            - --module=name: Update specific module only
             - --dry-run: Show what would be updated without making changes
             - --auto: Skip confirmation prompts
             
@@ -98,7 +98,7 @@ in {
             Migration Process:
             - Creates backup of current system-config.nix
             - Extracts config sections to separate files in configs/:
-              * features → configs/module-manager-config.nix
+              * modules → configs/module-manager-config.nix
               * desktop → configs/desktop-config.nix
               * hardware → configs/hardware-config.nix
               * network → configs/network-config.nix

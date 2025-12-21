@@ -1,7 +1,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  cfg = systemConfig.features.infrastructure.bootentry;
+  cfg = systemConfig.modules.infrastructure.bootentry;
   configHelpers = import ../../../core/management/module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   # Use the template file as default config
   defaultConfig = builtins.readFile ./bootentry-config.nix;

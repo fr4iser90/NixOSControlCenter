@@ -15,7 +15,7 @@ in {
     description = "SSH client configuration and key management";
     category = "security";
     subcategory = "ssh";
-    stability = "stable";
+    version = "1.0.0";
   };
 
   # Import all SSH client manager modules

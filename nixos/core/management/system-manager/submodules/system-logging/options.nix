@@ -46,7 +46,7 @@ in {
       type = lib.types.str;
       default = moduleVersion;
       internal = true;
-      description = "Feature version";
+      description = "Module version";
     };
 
     enable = lib.mkEnableOption "system logger";

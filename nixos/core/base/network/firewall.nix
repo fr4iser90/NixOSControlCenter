@@ -6,7 +6,7 @@ let
   rules = import ./lib/rules.nix { inherit lib; };
   
   # Service-Konfigurationen aus systemConfig.nix
-  services = systemConfig.system.network.networking.services or {};
+  services = systemConfig.core.base.network.networking.services or {};
 
   # Helper für sicheres Prüfen der Exposure
   isPubliclyExposed = cfg:

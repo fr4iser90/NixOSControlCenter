@@ -25,7 +25,7 @@ in {
     description = "System state discovery, encryption, and backup management";
     category = "system";
     subcategory = "backup";
-    stability = "stable";
+    version = "1.0.0";
   };
 
   imports = if cfg.enable or false then [
@@ -35,7 +35,7 @@ in {
   config = mkMerge [
     # Default configuration - use module config
     {
-      features.system.lock = {
+      modules.system.lock = {
         enable = mkDefault (cfg.enable or false);
       };
     }

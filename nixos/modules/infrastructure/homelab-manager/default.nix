@@ -44,7 +44,7 @@ in {
     description = "Homelab infrastructure management and orchestration";
     category = "infrastructure";
     subcategory = "homelab";
-    stability = "stable";
+    version = "1.0.0";
   };
 
   imports = if cfg.enable or false then [

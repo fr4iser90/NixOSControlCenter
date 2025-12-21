@@ -14,7 +14,7 @@ let
     # Extract category from parent directory
     category = lib.last (lib.splitString "/" (toString (dirOf modulePath)));
 
-    # Extract parent category (features/core/etc)
+    # Extract parent category (modules/core/etc)
     parentCategory = lib.last (lib.splitString "/" (toString (dirOf (dirOf modulePath))));
 
     # Auto-generated paths

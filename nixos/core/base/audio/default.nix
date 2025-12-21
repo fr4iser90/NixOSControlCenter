@@ -4,12 +4,12 @@ let
   cfg = getModuleConfig "audio";
 in {
   _module.metadata = {
-    role = "internal";
+    role = "core";
     name = "audio";
     description = "Audio system configuration and management";
     category = "base";
     subcategory = "audio";
-    stability = "stable";
+    version = "1.0.0";
   };
 
   imports = if cfg.enable or false then [

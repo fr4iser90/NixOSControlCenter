@@ -78,7 +78,7 @@ let
     done
   '';
 in {
-  options.features.security.ssh-server-manager.monitor = {
+  options.modules.security.ssh-server-manager.monitor = {
     enable = mkEnableOption "SSH connection monitoring";
     
     logLevel = mkOption {

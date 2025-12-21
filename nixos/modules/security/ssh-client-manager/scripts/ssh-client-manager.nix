@@ -182,7 +182,7 @@ in {
   '';
 in {
     # Enable terminal-ui dependency
-    # features.terminal-ui.enable removed (cli-formatter is Core) = true;
+    # modules.terminal-ui.enable removed (cli-formatter is Core) = true;
     
     # Add the SSH client manager script to system packages
     environment.systemPackages = [

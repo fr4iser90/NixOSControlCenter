@@ -3,7 +3,7 @@
 let
   moduleVersion = "1.0";
 in {
-  options.features.example-module = {
+  options.modules.example-module = {
     # Version metadata (REQUIRED for all modules)
     _version = lib.mkOption {
       type = lib.types.str;

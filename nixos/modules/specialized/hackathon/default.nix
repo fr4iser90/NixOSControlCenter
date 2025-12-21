@@ -23,7 +23,7 @@ in {
     description = "Hackathon environment management";
     category = "specialized";
     subcategory = "development";
-    stability = "experimental";
+    version = "1.0.0";
   };
 
   imports = if cfg.enable or false then [

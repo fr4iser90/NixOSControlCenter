@@ -62,12 +62,12 @@ EOF
 }
 EOF
           ;;
-        "features")
-          # Features: features.category.module.enable
+        "modules")
+          # Modules: modules.category.module.enable
           IFS='.' read -r _ category_name module_name_short <<< "$module_name"
           cat > "$config_file" <<EOF
 {
-  features = {
+  modules = {
     $category_name = {
       $module_name_short = {
         enable = $enable_value;

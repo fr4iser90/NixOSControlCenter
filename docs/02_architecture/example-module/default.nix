@@ -1,7 +1,7 @@
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  cfg = systemConfig.features.example-module or {};
+  cfg = systemConfig.modules.example-module or {};
 in {
   imports = [
     ./options.nix

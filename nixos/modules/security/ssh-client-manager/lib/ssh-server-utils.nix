@@ -2,7 +2,7 @@
 
 let
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
-  cfg = systemConfig.features.security.ssh-client-manager;
+  cfg = systemConfig.modules.security.ssh-client-manager;
 
   sshClientManagerServerUtils = ''
     # SSH Client Manager Server Utilities
@@ -71,7 +71,7 @@ let
             --header="Available SSH Servers" \
             --header-first \
             ${lib.optionalString cfg.fzf.preview.enable ''
-              --preview "${systemConfig.features.security.ssh-client-manager.connectionPreviewScript}/bin/ssh-connection-preview {}" \
+              --preview "${systemConfig.modules.security.ssh-client-manager.connectionPreviewScript}/bin/ssh-connection-preview {}" \
               --preview-window="${cfg.fzf.preview.position}"
             ''} \
             --expect=ctrl-x,ctrl-e,ctrl-n,enter 2>/dev/null)
@@ -118,7 +118,7 @@ let
   '';
 in {
   config = {
-    features.ssh-client-manager = {
+    modules.security.ssh-client-manager = {
       sshClientManagerServerUtils = sshClientManagerServerUtils;
     };
   };

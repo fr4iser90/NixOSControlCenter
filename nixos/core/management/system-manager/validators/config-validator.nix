@@ -89,7 +89,7 @@ let
     # Check for non-critical values in system-config.nix (should be in configs/)
     if grep -q "desktop = {" "$SYSTEM_CONFIG" 2>/dev/null || \
        grep -q "hardware = {" "$SYSTEM_CONFIG" 2>/dev/null || \
-       grep -q "features = {" "$SYSTEM_CONFIG" 2>/dev/null || \
+       grep -q "modules = {" "$SYSTEM_CONFIG" 2>/dev/null || \
        grep -q "packageModules = " "$SYSTEM_CONFIG" 2>/dev/null; then
       echo "WARNING: Non-critical values found in system-config.nix"
       echo "         These should be in separate configs/ files"

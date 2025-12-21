@@ -26,7 +26,7 @@ in {
     description = "Boot entry management for multiple bootloaders";
     category = "infrastructure";
     subcategory = "boot";
-    stability = "stable";
+    version = "1.0.0";
   };
 
   imports = if cfg.enable or false then [

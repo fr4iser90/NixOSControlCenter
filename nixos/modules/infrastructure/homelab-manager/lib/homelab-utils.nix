@@ -22,21 +22,21 @@ let
     fi
 
     echo "Disabling desktop..."
-    # Use enable-desktop from desktop-manager feature
+    # Use enable-desktop from desktop-manager module
     if command -v enable-desktop >/dev/null 2>&1; then
       enable-desktop disable
     else
-      echo "Error: enable-desktop command not found. Is desktop-manager feature enabled?"
+      echo "Error: enable-desktop command not found. Is desktop-manager module enabled?"
       exit 1
     fi
 
     echo "Enabling SSH Client & Server Manager..."
-    # Use update-features-config from feature-manager or system-config-manager
-    if command -v update-features-config >/dev/null 2>&1; then
-      update-features-config ssh-client-manager true
-      update-features-config ssh-server-manager true
+    # Use update-modules-config from module-manager or system-config-manager
+    if command -v update-modules-config >/dev/null 2>&1; then
+      update-modules-config ssh-client-manager true
+      update-modules-config ssh-server-manager true
     else
-      echo "Error: update-features-config command not found. Is feature-manager or system-config-manager enabled?"
+      echo "Error: update-modules-config command not found. Is module-manager or system-config-manager enabled?"
       exit 1
     fi
 

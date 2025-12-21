@@ -84,7 +84,7 @@ let
     done
   '';
 in {
-  options.features.security.ssh-server.monitoring = {
+  options.modules.security.ssh-server.monitoring = {
     enable = mkEnableOption "SSH connection monitoring";
     
     logLevel = mkOption {

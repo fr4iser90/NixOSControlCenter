@@ -3,7 +3,7 @@
 let
   moduleVersion = "1.0";
 in {
-  options.systemConfig.system.localization = {
+  options.systemConfig.core.base.localization = {
     _version = lib.mkOption {
       type = lib.types.str;
       default = moduleVersion;

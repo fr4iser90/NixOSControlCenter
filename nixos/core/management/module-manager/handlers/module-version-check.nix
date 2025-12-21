@@ -6,7 +6,7 @@ let
   # 1. Collect ALL module types
   moduleTypes = {
     core = config.systemConfig or {};
-    features = config.features or {};
+    modules = config.modules or {};
     # custom = config.custom or {};  # If you have custom modules
   };
 
@@ -32,7 +32,7 @@ let
     let
       basePaths = {
         core = ../../../core;
-        features = ../../../features;
+        modules = ../../../modules;
         # custom = ../../../custom;
       };
       basePath = basePaths.${moduleType} or (throw "Unknown module type: ${moduleType}");
@@ -141,7 +141,7 @@ in {
 
     # For compatibility with existing code
     coreModuleVersions = lib.filterAttrs (n: _: lib.hasPrefix "core." n) moduleStatuses;
-    featureModuleVersions = lib.filterAttrs (n: _: lib.hasPrefix "features." n) moduleStatuses;
+    moduleVersions = lib.filterAttrs (n: _: lib.hasPrefix "modules." n) moduleStatuses;
   };
 
   # NO options defined here!

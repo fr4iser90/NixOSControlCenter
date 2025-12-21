@@ -7,7 +7,7 @@
   };
   # Nix Config
   allowUnfree = true;
-  features = {
+  modules = {
     system-logger = true;
     system-checks = true;
     system-config-manager = false;

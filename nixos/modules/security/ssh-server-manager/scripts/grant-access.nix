@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = systemConfig.features.security.ssh-server.grant-access;
+  cfg = systemConfig.modules.security.ssh-server.grant-access;
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
   backupHelpers = import ../../lib/backup-helpers.nix { inherit pkgs lib; };
 
@@ -73,7 +73,7 @@ let
     ${ui.messages.info "Access will be automatically revoked at: $(date -d \"+$DURATION seconds\")"}
   '';
 in {
-  options.features.security.ssh-server.grant-access = {
+  options.modules.security.ssh-server.grant-access = {
     enable = mkEnableOption "Direct SSH access grant functionality";
     
     defaultDuration = mkOption {

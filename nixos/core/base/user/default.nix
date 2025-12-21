@@ -81,12 +81,12 @@ let
 
 in {
   _module.metadata = {
-    role = "internal";
+    role = "core";
     name = "user";
     description = "User account management and configuration";
     category = "base";
     subcategory = "user";
-    stability = "stable";
+    version = "1.0.0";
   };
 
   imports = [

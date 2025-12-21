@@ -12,7 +12,7 @@ in {
     description = "Virtual machine management and orchestration";
     category = "infrastructure";
     subcategory = "virtualization";
-    stability = "stable";
+    version = "1.0.0";
   };
 
   imports = if cfg.enable or false then [
@@ -56,7 +56,7 @@ in {
     ];
 
     # Enable components
-    features.infrastructure.vm.storage.enable = true;
+    modules.infrastructure.vm.storage.enable = true;
 
     # Register VM category
     })

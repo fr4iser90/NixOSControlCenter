@@ -16,7 +16,7 @@
   expectedConfigFiles = [
     "desktop-config.nix"
     "hardware-config.nix"
-    # Features have individual config files now (no more features-config.nix)
+    # Modules have individual config files now (no more modules-config.nix)
     "bootentry-config.nix"
     "homelab-config.nix"
     "lock-config.nix"
@@ -37,7 +37,7 @@
     forbiddenInSystemConfig = [
       "desktop"
       "hardware"
-      "features"
+      "modules"
       "packageModules"
       "locales"
       "keyboardLayout"

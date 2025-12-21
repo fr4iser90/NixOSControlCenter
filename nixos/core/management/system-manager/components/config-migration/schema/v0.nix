@@ -17,7 +17,7 @@
   optionalFields = [
     "desktop"
     "hardware"
-    "features"
+    "modules"             # v0 hatte features
     "packageModules"      # v0 hatte packageModules als Attrset (nicht Array!)
     "locales"
     "keyboardLayout"

@@ -54,7 +54,7 @@ let
   
   # Extract domain path from file path
   # Example: core/system/audio/config.nix → ["system" "audio"]
-  # Example: features/infrastructure/vm/config.nix → ["infrastructure" "vm"]
+  # Example: modules/infrastructure/vm/config.nix → ["infrastructure" "vm"]
   extractDomainPath = configsDir: configPath:
     let
       pathStr = toString configPath;

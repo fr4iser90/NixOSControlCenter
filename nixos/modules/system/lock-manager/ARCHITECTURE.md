@@ -4,11 +4,11 @@
 
 ### Module Loading
 
-1. **Module Import**: When a feature is enabled in `module-manager-config.nix`, the module is imported via `features/default.nix`
+1. **Module Import**: When a module is enabled in `module-manager-config.nix`, the module is imported via `modules/default.nix`
 2. **Module Structure**: Every NixOS module has:
    - `options`: Define configuration options (with defaults)
-   - `config`: Apply configuration (only evaluated if feature is enabled)
-   - `let` block: Always evaluated, even if feature is disabled
+   - `config`: Apply configuration (only evaluated if module is enabled)
+   - `let` block: Always evaluated, even if module is disabled
 
 3. **Evaluation Order**:
    ```
@@ -22,7 +22,7 @@
 **Example of WRONG approach**:
 ```nix
 let
-  cfg = config.features.system-discovery;
+  cfg = config.modules.system-discovery;
   # This is evaluated even if cfg.enable = false!
   script = pkgs.writeShellScriptBin "my-script" ''
     VALUE="${cfg.snapshotDir}"  # ❌ ERROR: cfg.snapshotDir is null when disabled!
@@ -42,7 +42,7 @@ in {
 **CORRECT approach**:
 ```nix
 let
-  cfg = config.features.system-discovery;
+  cfg = config.modules.system-discovery;
   # Only define things that don't depend on cfg options
 in {
   config = mkIf cfg.enable {
@@ -62,8 +62,8 @@ in {
 
 ### Terminal-UI Architecture
 
-Terminal-UI is a **shared utility feature** that provides:
-- **Colored output**: Consistent color scheme across all features
+Terminal-UI is a **shared utility module** that provides:
+- **Colored output**: Consistent color scheme across all modules
 - **Formatted messages**: Info, success, warning, error messages
 - **Text formatting**: Headers, subheaders, normal text
 - **Badges**: Status badges for operations
@@ -73,11 +73,11 @@ Terminal-UI is a **shared utility feature** that provides:
 ### Terminal-UI Module Structure
 
 ```nix
-# nixos/features/terminal-ui/default.nix
+# nixos/modules/terminal-ui/default.nix
 { config, lib, ... }:
 
 let
-  cfg = config.features.terminal-ui;
+  cfg = config.modules.terminal-ui;
   colors = import ./colors.nix;
   
   # Core components (text, layout)
@@ -114,7 +114,7 @@ let
   };
 
 in {
-  options.features.terminal-ui = {
+  options.modules.terminal-ui = {
     enable = lib.mkEnableOption "terminal UI";
     
     config = lib.mkOption {
@@ -134,7 +134,7 @@ in {
   config = {
     # API is ALWAYS available, not just when enable = true
     # This is evaluated regardless of enable status
-    features.terminal-ui.api = apiValue;
+    modules.terminal-ui.api = apiValue;
   };
 }
 ```
@@ -146,7 +146,7 @@ in {
 1. **API Defined in `let` Block**: The `apiValue` is created in the `let` block, which is **always evaluated**
 2. **API Set in `config` Block**: The `api` option is set in the `config` block, which is **always evaluated** (not wrapped in `mkIf`)
 3. **No Dependency on `enable`**: The API doesn't depend on `cfg.enable`, so it's always available
-4. **Dependency Guarantee**: If a feature depends on `terminal-ui` (in `metadata.nix`), the module is loaded first, ensuring API exists
+4. **Dependency Guarantee**: If a module depends on `terminal-ui` (in `metadata.nix`), the module is loaded first, ensuring API exists
 
 **Evaluation Flow**:
 ```
@@ -154,7 +154,7 @@ in {
 2. let block evaluated → apiValue created
 3. options defined → api option declared
 4. config evaluated → api option set to apiValue (ALWAYS, not in mkIf)
-5. Other features can access config.features.terminal-ui.api
+5. Other modules can access config.modules.terminal-ui.api
 ```
 
 ### Terminal-UI API Structure
@@ -216,11 +216,11 @@ The API provides:
 **Method 1: Direct Access (RECOMMENDED)**
 
 ```nix
-# In feature module
+# In module
 config = mkIf cfg.enable {
   let
     # ✅ Access directly from config
-    ui = config.features.terminal-ui.api;
+    ui = config.modules.terminal-ui.api;
   in {
     # Use ui here
   };
@@ -249,7 +249,7 @@ config = mkIf cfg.enable {
 ```nix
 # ❌ DON'T DO THIS
 let
-  ui = config.features.terminal-ui.api or (
+  ui = config.modules.terminal-ui.api or (
     # Complex fallback
   );
 ```
@@ -268,22 +268,22 @@ let
 };
 ```
 
-**In `features/default.nix`**:
+**In `modules/default.nix`**:
 ```nix
 # Dependency resolution ensures terminal-ui is loaded first
 sortedFeatures = sortFeaturesByDependencies allFeatures;
 
-# terminal-ui MUST be imported first if any feature is active
+# terminal-ui MUST be imported first if any module is active
 terminalUIFirst = if hasAnyFeature && lib.elem "terminal-ui" allFeatures 
   then [ ./terminal-ui ] 
   else [];
-otherModules = lib.filter (m: toString m != toString ./terminal-ui) featureModules;
+otherModules = lib.filter (m: toString m != toString ./terminal-ui) moduleModules;
 
 imports = terminalUIFirst ++ otherModules;
 ```
 
 **Result**:
-- `terminal-ui` module is loaded before any feature that depends on it
+- `terminal-ui` module is loaded before any module that depends on it
 - `terminal-ui` options are defined before other modules evaluate
 - `terminal-ui.api` is available when other modules access it
 
@@ -294,7 +294,7 @@ imports = terminalUIFirst ++ otherModules;
 ```nix
 config = mkIf cfg.enable {
   let
-    ui = config.features.terminal-ui.api;
+    ui = config.modules.terminal-ui.api;
     myScript = pkgs.writeShellScriptBin "my-command" ''
       #!${pkgs.bash}/bin/bash
       ${ui.messages.info "Starting operation..."}
@@ -312,7 +312,7 @@ config = mkIf cfg.enable {
 ```nix
 config = mkIf cfg.enable {
   let
-    ui = config.features.terminal-ui.api;
+    ui = config.modules.terminal-ui.api;
     message = ui.messages.info "Configuration loaded";
   in {
     # Use message in config
@@ -326,14 +326,14 @@ config = mkIf cfg.enable {
 # Feature A
 config = mkIf cfg.enable {
   let
-    ui = config.features.terminal-ui.api;  # ✅ Same API for all
+    ui = config.modules.terminal-ui.api;  # ✅ Same API for all
   in { ... };
 }
 
 # Feature B
 config = mkIf cfg.enable {
   let
-    ui = config.features.terminal-ui.api;  # ✅ Same API for all
+    ui = config.modules.terminal-ui.api;  # ✅ Same API for all
   in { ... };
 }
 ```
@@ -344,7 +344,7 @@ config = mkIf cfg.enable {
 ```nix
 myScript = pkgs.writeShellScriptBin "cmd" ''
   echo "Starting..."           # ❌ No colors, no formatting
-  echo "Success!"              # ❌ Inconsistent with other features
+  echo "Success!"              # ❌ Inconsistent with other modules
   echo "Error occurred"        # ❌ No error styling
 '';
 ```
@@ -352,7 +352,7 @@ myScript = pkgs.writeShellScriptBin "cmd" ''
 **CORRECT - Using terminal-ui**:
 ```nix
 let
-  ui = config.features.terminal-ui.api;
+  ui = config.modules.terminal-ui.api;
 in {
   myScript = pkgs.writeShellScriptBin "cmd" ''
     ${ui.messages.info "Starting..."}      # ✅ Colored, formatted
@@ -363,7 +363,7 @@ in {
 ```
 
 **Benefits**:
-- Consistent output across all features
+- Consistent output across all modules
 - Colored messages for better readability
 - Proper error/warning styling
 - Unified user experience
@@ -373,8 +373,8 @@ in {
 **Terminal-UI can be configured** (even though API is always available):
 
 ```nix
-systemConfig.features.terminal-ui = {
-  enable = true;  # Enable terminal-ui features
+systemConfig.modules.terminal-ui = {
+  enable = true;  # Enable terminal-ui module
   config = {
     # Configuration options
     colors = { ... };
@@ -383,27 +383,27 @@ systemConfig.features.terminal-ui = {
 };
 ```
 
-**Important**: Even if `enable = false`, the `api` is still available! The `enable` option only controls whether terminal-ui's own features are active, not the API availability.
+**Important**: Even if `enable = false`, the `api` is still available! The `enable` option only controls whether terminal-ui's own modules are active, not the API availability.
 
 ### Terminal-UI Module Loading Order
 
 **Critical Order**:
 
-1. **terminal-ui** module loaded first (if any feature depends on it)
+1. **terminal-ui** module loaded first (if any module depends on it)
 2. **terminal-ui** `let` block evaluated → `apiValue` created
 3. **terminal-ui** `options` defined → `api` option declared
 4. **terminal-ui** `config` evaluated → `api` set to `apiValue`
-5. **Other features** loaded
-6. **Other features** can access `config.features.terminal-ui.api`
+5. **Other modules** loaded
+6. **Other modules** can access `config.modules.terminal-ui.api`
 
 **Why Order Matters**:
-- If `terminal-ui` is loaded after a feature that uses it, the API might not exist yet
+- If `terminal-ui` is loaded after a module that uses it, the API might not exist yet
 - Dependency system ensures correct order
 - `terminal-ui` is always loaded first if it's a dependency
 
 ### Terminal-UI Best Practices
 
-1. **Always Access via config**: `ui = config.features.terminal-ui.api;`
+1. **Always Access via config**: `ui = config.modules.terminal-ui.api;`
 2. **No Fallbacks**: Don't use `or` fallback - API is guaranteed
 3. **No Lambda Parameters**: Don't try to pass `ui` as parameter
 4. **Use in mkIf Block**: Access `ui` in `mkIf cfg.enable` block where it's needed
@@ -415,7 +415,7 @@ systemConfig.features.terminal-ui = {
 **Mistake 1: Fallback Code**
 ```nix
 # ❌ WRONG
-ui = config.features.terminal-ui.api or (
+ui = config.modules.terminal-ui.api or (
   let
     colors = import ../../terminal-ui/colors.nix;
     # ... complex fallback
@@ -427,10 +427,10 @@ ui = config.features.terminal-ui.api or (
 
 **Mistake 2: Accessing in let Block**
 ```nix
-# ❌ WRONG (if feature is disabled)
+# ❌ WRONG (if module is disabled)
 let
-  cfg = config.features.system-discovery;
-  ui = config.features.terminal-ui.api;  # OK, but...
+  cfg = config.modules.system-discovery;
+  ui = config.modules.terminal-ui.api;  # OK, but...
   script = pkgs.writeShellScriptBin "..." ''
     ${ui.messages.info "..."}
     VALUE="${cfg.snapshotDir}"  # ❌ cfg is null when disabled!
@@ -456,8 +456,8 @@ script = pkgs.writeShellScriptBin "..." ''
 
 1. **Created in `let` block**: `apiValue` is created from components
 2. **Set as default**: `api` option has `default = apiValue`
-3. **Set in `config`**: `features.terminal-ui.api = apiValue` (always evaluated)
-4. **Available via config**: Other modules access via `config.features.terminal-ui.api`
+3. **Set in `config`**: `modules.terminal-ui.api = apiValue` (always evaluated)
+4. **Available via config**: Other modules access via `config.modules.terminal-ui.api`
 
 **Key Code**:
 ```nix
@@ -469,14 +469,14 @@ let
     # ... more
   };
 in {
-  options.features.terminal-ui = {
+  options.modules.terminal-ui = {
     api = mkOption {
       default = apiValue;  # Default value
     };
   };
   
   config = {
-    features.terminal-ui.api = apiValue;  # Always set, not in mkIf!
+    modules.terminal-ui.api = apiValue;  # Always set, not in mkIf!
   };
 }
 ```
@@ -536,7 +536,7 @@ in {
 **Usage in Scripts**:
 ```nix
 let
-  ui = config.features.terminal-ui.api;
+  ui = config.modules.terminal-ui.api;
   script = pkgs.writeShellScriptBin "cmd" ''
     #!${pkgs.bash}/bin/bash
     ${ui.messages.info "Starting operation"}
@@ -577,7 +577,7 @@ in { ... }
    ```nix
    config = {
      # ALWAYS evaluated, not in mkIf!
-     features.terminal-ui.api = apiValue;
+     modules.terminal-ui.api = apiValue;
    };
    ```
 
@@ -585,7 +585,7 @@ in { ... }
    ```nix
    config = mkIf cfg.enable {
      let
-       ui = config.features.terminal-ui.api;  # ✅ Available here
+       ui = config.modules.terminal-ui.api;  # ✅ Available here
      in { ... };
    };
    ```
@@ -602,17 +602,17 @@ in { ... }
 ### Command-Center Architecture
 
 Command-Center is the central CLI dispatcher for all NixOS Control Center commands. It provides:
-- **Unified CLI**: Single `ncc` command for all features
-- **Command Discovery**: Automatically finds and registers commands from all enabled features
+- **Unified CLI**: Single `ncc` command for all modules
+- **Command Discovery**: Automatically finds and registers commands from all enabled modules
 - **Help System**: Built-in help and documentation for each command
 - **Argument Parsing**: Handles command arguments and options
 
 ### Command-Center Module Structure
 
 ```nix
-# nixos/features/command-center/registry/default.nix
+# nixos/modules/command-center/registry/default.nix
 {
-  options.features.command-center = {
+  options.modules.command-center = {
     commands = mkOption {
       type = lib.types.listOf types.commandType;
       default = [];
@@ -631,7 +631,7 @@ Command-Center is the central CLI dispatcher for all NixOS Control Center comman
 ### Command Type Definition
 
 ```nix
-# nixos/features/command-center/registry/types.nix
+# nixos/modules/command-center/registry/types.nix
 commandType = lib.types.submodule {
   options = {
     name = lib.mkOption {
@@ -670,7 +670,7 @@ commandType = lib.types.submodule {
     dependencies = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [];
-      description = "Required features or packages";
+      description = "Required modules or packages";
     };
     
     shortHelp = lib.mkOption {
@@ -692,7 +692,7 @@ commandType = lib.types.submodule {
 
 1. **User runs**: `ncc discover`
 2. **CLI dispatcher** (`ncc` script):
-   - Loads all registered commands from `config.features.command-center.commands`
+   - Loads all registered commands from `config.modules.command-center.commands`
    - Finds command with `name = "discover"`
    - Executes the `script` path with remaining arguments
 3. **Script execution**:
@@ -705,7 +705,7 @@ commandType = lib.types.submodule {
 **Step 1: Feature Module Registers Command**
 
 ```nix
-# In feature module (e.g., system-discovery/default.nix)
+# In module (e.g., system-discovery/default.nix)
 config = mkIf cfg.enable {
   let
     discoverScript = pkgs.writeShellScriptBin "ncc-discover-main" ''
@@ -713,7 +713,7 @@ config = mkIf cfg.enable {
       # Script content
     '';
   in {
-    features.command-center.commands = [
+    modules.command-center.commands = [
       {
         name = "discover";
         description = "Scan system and create encrypted snapshot";
@@ -731,16 +731,16 @@ config = mkIf cfg.enable {
 
 **Step 2: Command-Center Collects All Commands**
 
-- All features that register commands add them to `features.command-center.commands`
+- All modules that register commands add them to `modules.command-center.commands`
 - Command-Center module merges all commands into a single list
 - Categories are auto-detected from command categories
 
 **Step 3: CLI Dispatcher Uses Commands**
 
 ```nix
-# nixos/features/command-center/cli/default.nix
+# nixos/modules/command-center/cli/default.nix
 let
-  commands = config.features.command-center.commands;
+  commands = config.modules.command-center.commands;
   
   # Create ncc script that:
   # 1. Parses arguments
@@ -768,24 +768,24 @@ in {
 **CRITICAL**: Commands must be registered in `mkIf cfg.enable` block!
 
 **Why?**
-- If registered in `let` block: Commands are registered even when feature is disabled
+- If registered in `let` block: Commands are registered even when module is disabled
 - Scripts might not exist (if created in `mkIf` block)
 - Or scripts exist but use `null` cfg values (if created in `let` block)
 
 **WRONG - Commands in let block**:
 ```nix
 let
-  cfg = config.features.system-discovery;
+  cfg = config.modules.system-discovery;
   discoverScript = pkgs.writeShellScriptBin "..." ''...'';  # ❌ Created even if disabled
   
-  # ❌ Command registered even if feature disabled!
+  # ❌ Command registered even if module disabled!
   commands = [
     { name = "discover"; script = "${discoverScript}/bin/..."; }
   ];
 in {
   config = mkIf cfg.enable {
     # Script might use null cfg values
-    features.command-center.commands = commands;
+    modules.command-center.commands = commands;
   };
 }
 ```
@@ -793,13 +793,13 @@ in {
 **WRONG - Scripts in let, commands in mkIf**:
 ```nix
 let
-  cfg = config.features.system-discovery;
+  cfg = config.modules.system-discovery;
   discoverScript = pkgs.writeShellScriptBin "..." ''
     VALUE="${cfg.snapshotDir}"  # ❌ ERROR: null when disabled!
   '';
 in {
   config = mkIf cfg.enable {
-    features.command-center.commands = [
+    modules.command-center.commands = [
       { script = "${discoverScript}/bin/..."; }  # Script already created with null values
     ];
   };
@@ -809,20 +809,20 @@ in {
 **CORRECT - Everything in mkIf**:
 ```nix
 let
-  cfg = config.features.system-discovery;
+  cfg = config.modules.system-discovery;
   # ✅ Only things that don't depend on cfg
 in {
   config = mkIf cfg.enable {
     let
-      ui = config.features.terminal-ui.api;
+      ui = config.modules.terminal-ui.api;
       discoverScript = pkgs.writeShellScriptBin "ncc-discover-main" ''
         #!${pkgs.bash}/bin/bash
         VALUE="${cfg.snapshotDir}"  # ✅ cfg is complete here
         ${ui.messages.info "Starting..."}
       '';
     in {
-      # ✅ Commands registered only when feature enabled
-      features.command-center.commands = [
+      # ✅ Commands registered only when module enabled
+      modules.command-center.commands = [
         {
           name = "discover";
           description = "Scan system";
@@ -860,13 +860,13 @@ in {
 
 **Command-Center itself**:
 - Depends on `terminal-ui` for output formatting
-- Provides `features.command-center.commands` option
+- Provides `modules.command-center.commands` option
 - Creates `ncc` CLI dispatcher script
 
 **Features using Command-Center**:
 - Must have `command-center` in dependencies (metadata.nix)
-- Register commands in `features.command-center.commands`
-- Scripts must be created when feature is enabled
+- Register commands in `modules.command-center.commands`
+- Scripts must be created when module is enabled
 
 ### Command-Center Best Practices
 
@@ -881,7 +881,7 @@ in {
 
 **Command-Center approach** (RECOMMENDED):
 ```nix
-features.command-center.commands = [
+modules.command-center.commands = [
   { name = "discover"; script = "${script}/bin/..."; }
 ];
 # User runs: ncc discover
@@ -910,10 +910,10 @@ environment.systemPackages = [ discoverScript ];
 with lib;
 
 let
-  cfg = config.features.system-discovery;
+  cfg = config.modules.system-discovery;
   # ✅ Only define things that don't depend on cfg options
 in {
-  options.features.system-discovery = {
+  options.modules.system-discovery = {
     # Define all options with defaults
     enable = mkEnableOption "system discovery";
     snapshotDir = mkOption {
@@ -926,8 +926,8 @@ in {
   config = mkMerge [
     # Map systemConfig to config
     {
-      features.system-discovery = {
-        enable = mkDefault (systemConfig.features.system-discovery or false);
+      modules.system-discovery = {
+        enable = mkDefault (systemConfig.modules.system-discovery or false);
       };
     }
 
@@ -935,7 +935,7 @@ in {
     (mkIf cfg.enable {
       let
         # ✅ Get terminal-ui API (simple, no fallback)
-        ui = config.features.terminal-ui.api;
+        ui = config.modules.terminal-ui.api;
         
         # ✅ Import scanners (only when enabled)
         desktopScanner = import ./scanners/desktop.nix { inherit pkgs; };
@@ -957,7 +957,7 @@ in {
         # ... other scripts
       in {
         # ✅ Register commands
-        features.command-center.commands = [
+        modules.command-center.commands = [
           {
             name = "discover";
             script = "${discoverScript}/bin/ncc-discover-main";
@@ -988,7 +988,7 @@ in {
    };
    ```
 
-2. **Dependency Resolution** (`features/default.nix`):
+2. **Dependency Resolution** (`modules/default.nix`):
    - When `system-discovery` is enabled, dependencies are automatically resolved
    - `terminal-ui` and `command-center` are loaded first
    - This ensures their options are available when `system-discovery` is evaluated
@@ -1002,8 +1002,8 @@ in {
 
 ### Why Dependencies Matter
 
-- **Terminal-UI**: Provides `config.features.terminal-ui.api` which is always available
-- **Command-Center**: Provides `features.command-center.commands` option for command registration
+- **Terminal-UI**: Provides `config.modules.terminal-ui.api` which is always available
+- **Command-Center**: Provides `modules.command-center.commands` option for command registration
 - **No Fallbacks Needed**: Dependencies guarantee that required options exist
 
 ## Why Terminal-UI is Not Passed in Lambda
@@ -1016,7 +1016,7 @@ in {
 
 **Why `ui` is not a parameter**:
 1. **NixOS Module System**: Modules receive standard parameters (`config`, `lib`, `pkgs`, etc.)
-2. **Access via config**: Terminal-UI API is accessed via `config.features.terminal-ui.api`
+2. **Access via config**: Terminal-UI API is accessed via `config.modules.terminal-ui.api`
 3. **Dependency Guarantee**: Since `terminal-ui` is a dependency, the API is always available
 4. **No Need for Lambda Parameter**: We can access it directly from `config`
 
@@ -1026,12 +1026,12 @@ in {
 { config, lib, pkgs, systemConfig, ... }:
 
 let
-  cfg = config.features.system-discovery;
+  cfg = config.modules.system-discovery;
 in {
   config = mkIf cfg.enable {
     let
       # ✅ Access terminal-ui API from config
-      ui = config.features.terminal-ui.api;
+      ui = config.modules.terminal-ui.api;
     in {
       # Use ui here
     };
@@ -1043,7 +1043,7 @@ in {
 
 ### Mistake 1: Scripts in `let` Block
 
-**Problem**: Scripts created even when feature is disabled, accessing `null` cfg values
+**Problem**: Scripts created even when module is disabled, accessing `null` cfg values
 
 **Solution**: Move scripts into `mkIf cfg.enable` block
 
@@ -1051,7 +1051,7 @@ in {
 
 **Problem**: Unnecessary fallback code when terminal-ui is a dependency
 
-**Solution**: Simply use `config.features.terminal-ui.api`
+**Solution**: Simply use `config.modules.terminal-ui.api`
 
 ### Mistake 3: Echo Instead of UI
 
@@ -1061,7 +1061,7 @@ in {
 
 ### Mistake 4: Imports in `let` Block
 
-**Problem**: Importing scanner/handler modules even when feature is disabled
+**Problem**: Importing scanner/handler modules even when module is disabled
 
 **Solution**: Move imports into `mkIf cfg.enable` block
 
@@ -1069,9 +1069,9 @@ in {
 
 1. **`let` Block**: Only for things that don't depend on `cfg` options
 2. **`mkIf cfg.enable` Block**: Everything that depends on `cfg` goes here
-3. **Terminal-UI**: Simple access via `config.features.terminal-ui.api`, no fallback
+3. **Terminal-UI**: Simple access via `config.modules.terminal-ui.api`, no fallback
 4. **Dependencies**: Guarantee that required options exist
-5. **Scripts**: Created only when feature is enabled, inside `mkIf cfg.enable`
+5. **Scripts**: Created only when module is enabled, inside `mkIf cfg.enable`
 6. **UI Output**: Always use `ui.messages.*`, never `echo`
 
 ## Official Sources and References
@@ -1110,7 +1110,7 @@ in {
 
 **Evaluation Order (Inferred from NixOS Behavior)**:
 1. Module is imported
-2. `let` block is evaluated (ALWAYS, even if feature disabled)
+2. `let` block is evaluated (ALWAYS, even if module disabled)
 3. `options` are declared (ALWAYS)
 4. `config` block is evaluated (ONLY if conditions in `mkIf` are met)
 

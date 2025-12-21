@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = systemConfig.features.security.ssh-server.list-requests;
+  cfg = systemConfig.modules.security.ssh-server.list-requests;
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
 
   listRequestsScript = pkgs.writeScriptBin "ssh-list-requests" ''
@@ -184,7 +184,7 @@ let
     ${ui.messages.info "Remaining: $AFTER_COUNT requests"}
   '';
 in {
-  options.features.security.ssh-server.list-requests = {
+  options.modules.security.ssh-server.list-requests = {
     enable = mkEnableOption "SSH request listing functionality";
     
     defaultCleanupDays = mkOption {

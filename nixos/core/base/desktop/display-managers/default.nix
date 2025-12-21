@@ -10,7 +10,7 @@ let
     (builtins.attrNames (systemConfig.core.base.user or {}));
 in {
   # Import selected display manager configuration
-  # Path is determined by systemConfig.system.desktop.display.manager
+  # Path is determined by systemConfig.core.base.desktop.display.manager
   imports = [
     (./. + "/${systemConfig.core.base.desktop.display.manager}")
   ];

@@ -3,7 +3,7 @@
 let
   moduleVersion = "1.0";
 in {
-  options.systemConfig.system.network = {
+  options.systemConfig.core.base.network = {
     _version = lib.mkOption {
       type = lib.types.str;
       default = moduleVersion;

@@ -36,7 +36,7 @@ in
         moduleName = "ssh-client-manager";
         defaultConfig = defaultConfig;
       }) // {
-        # Enable feature by default if system config has it
+        # Enable module by default if system config has it
         ${moduleConfig.configPath}.enable = lib.mkDefault (systemConfig.${moduleConfig.configPath}.enable or false);
       }
     ))

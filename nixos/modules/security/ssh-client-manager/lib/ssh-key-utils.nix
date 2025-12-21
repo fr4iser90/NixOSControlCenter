@@ -2,7 +2,7 @@
 
 let
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
-  cfg = systemConfig.features.security.ssh-client-manager;
+  cfg = systemConfig.modules.security.ssh-client-manager;
 
   # SSH Key Utilities
   # This module provides functions for managing SSH keys (NOT connections)
@@ -114,7 +114,7 @@ let
   '';
 in {
   config = {
-    features.ssh-client-manager = {
+    modules.security.ssh-client-manager = {
       sshClientManagerKeyUtils = sshClientManagerKeyUtils;
     };
   };

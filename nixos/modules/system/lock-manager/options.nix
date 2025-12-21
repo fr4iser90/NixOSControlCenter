@@ -3,13 +3,13 @@
 let
   moduleVersion = "1.0";
 in {
-  options.features.system.lock = {
+  options.modules.system.lock = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;
       default = moduleVersion;
       internal = true;
-      description = "Feature version";
+      description = "Module version";
     };
 
     # Dependencies this module has
@@ -17,7 +17,7 @@ in {
       type = lib.types.listOf lib.types.str;
       default = [ "system-checks" "command-center" ];
       internal = true;
-      description = "Modules this feature depends on";
+      description = "Modules this module depends on";
     };
 
     # Conflicts this module has
@@ -25,7 +25,7 @@ in {
       type = lib.types.listOf lib.types.str;
       default = [];
       internal = true;
-      description = "Modules that conflict with this feature";
+      description = "Modules that conflict with this module";
     };
 
     enable = lib.mkEnableOption "system discovery and snapshot";
@@ -240,8 +240,8 @@ in {
       };
       
       dataClassification = lib.mkOption {
-        type = lib.types.enum [ "public" "internal" "confidential" "restricted" ];
-        default = "internal";
+        type = lib.types.enum [ "public" "core" "confidential" "restricted" ];
+        default = "core";
         description = "Data classification level";
       };
     };

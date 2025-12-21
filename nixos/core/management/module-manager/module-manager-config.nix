@@ -25,7 +25,7 @@
   };
 
   # Feature modules (opt-in, disabled by default)
-  features = {
+  modules = {
     infrastructure = {
       homelab-manager.enable = false;
       vm-manager.enable = false;

@@ -1,5 +1,5 @@
 {
-  features.infrastructure.homelab = {
+  modules.infrastructure.homelab = {
     enable = true;        # Enable homelab manager
     swarm = null;         # Swarm mode: "manager" | "worker" | null (single-server)
 

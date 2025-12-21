@@ -52,10 +52,10 @@
       };
     };
     
-    # Features are now in individual config files (no more features-config.nix)
-    # Each feature creates its own config file in configs/
-    "features" = {
-      # Removed - features are now handled individually in their own config files
+    # Modules are now in individual config files (no more modules-config.nix)
+    # Each module creates its own config file in configs/
+    "modules" = {
+      # Removed - modules are now handled individually in their own config files
       # This migration is kept for backwards compatibility but doesn't create files
       skipMigration = true;
     };
@@ -94,7 +94,7 @@
       structure = {
         overrides = {
           enableSSH = "overrides.enableSSH";
-          # enableSteam removed: Steam is now enabled via the "gaming" package feature
+          # enableSteam removed: Steam is now enabled via the "gaming" package module
         };
       };
     };

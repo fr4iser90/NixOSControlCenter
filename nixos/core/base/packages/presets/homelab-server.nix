@@ -1,7 +1,7 @@
 {
   description = "Homelab Server";
   systemTypes = [ "server" ];
-  features = [
+  modules = [
     "docker"
     "database"
     "web-server"

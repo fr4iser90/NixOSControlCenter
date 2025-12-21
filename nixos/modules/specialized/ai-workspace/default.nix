@@ -11,7 +11,7 @@ in {
     description = "AI workspace with LLM and training capabilities";
     category = "specialized";
     subcategory = "ai";
-    stability = "experimental";
+    version = "1.0.0";
   };
 
   imports = if cfg.enable or false then [

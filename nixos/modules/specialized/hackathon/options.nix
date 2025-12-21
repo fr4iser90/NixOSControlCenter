@@ -3,13 +3,13 @@
 let
   moduleVersion = "1.0";
 in {
-  options.features.specialized.hackathon = {
+  options.modules.specialized.hackathon = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;
       default = moduleVersion;
       internal = true;
-      description = "Feature version";
+      description = "Module version";
     };
 
     # Dependencies this module has
@@ -17,7 +17,7 @@ in {
       type = lib.types.listOf lib.types.str;
       default = [ "system-checks" "command-center" ];
       internal = true;
-      description = "Modules this feature depends on";
+      description = "Modules this module depends on";
     };
 
     # Conflicts this module has
@@ -25,7 +25,7 @@ in {
       type = lib.types.listOf lib.types.str;
       default = [];
       internal = true;
-      description = "Modules that conflict with this feature";
+      description = "Modules that conflict with this module";
     };
 
     enable = lib.mkOption {
@@ -34,7 +34,7 @@ in {
       description = ''
         Enable hackathon manager (WIP - Work in Progress).
         
-        ⚠️ WARNING: This feature is currently under development and may not be fully functional.
+        ⚠️ WARNING: This module is currently under development and may not be fully functional.
         Use at your own risk.
       '';
     };

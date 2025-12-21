@@ -4,14 +4,51 @@ This template defines the recommended structure for **all** NixOS Control Center
 
 - **Core System modules** (`systemConfig.core.system.*`) - Core OS functionality (enable = true default)
 - **Core Management modules** (`systemConfig.core.management.*`) - System management tools (enable = true default)
-- **Core Infrastructure modules** (`systemConfig.core.infrastructure.*`) - Core infrastructure (enable = true default)
-- **Feature Infrastructure modules** (`systemConfig.features.infrastructure.*`) - Infrastructure features (enable = false default)
-- **Feature Security modules** (`systemConfig.features.security.*`) - Security features (enable = false default)
-- **Feature Specialized modules** (`systemConfig.features.specialized.*`) - Specialized features (enable = false default)
+- **Core Infrastructure modules** (`systemConfig.core.management.system-manager.submodules.*`) - Core infrastructure (enable = true default)
+- **Optional Infrastructure modules** (`systemConfig.modules.infrastructure.*`) - Infrastructure modules (enable = false default)
+- **Optional Security modules** (`systemConfig.modules.security.*`) - Security modules (enable = false default)
+- **Optional Specialized modules** (`systemConfig.modules.specialized.*`) - Specialized modules (enable = false default)
 
 ## Directory Structure
 
 ```
+├── core                          # Domain
+│   ├── base                      # Category
+│   │   ├── audio
+│   │   ├── boot
+│   │   ├── desktop
+│   │   ├── hardware
+│   │   ├── localization
+│   │   ├── network
+│   │   ├── packages
+│   │   └── user
+│   ├── default.nix
+│   └── management                # Category
+│       ├── module-manager        # Module
+│       └── system-manager        # Module
+├── custom                        # custom nix import except example_
+│   ├── default.nix
+│   ├── example_borg_backup.nix
+│   ├── example_command_not_found.nix
+│   ├── example_noisetorch.nix
+│   └── README.md
+├── flake.lock
+├── flake.nix
+└── modules                       # Optionals Modules
+    ├── default.nix
+    ├── infrastructure            # Category
+    │   ├── bootentry-manager     # Module name
+    │   ├── homelab-manager       # Module name
+    │   └── vm                    # Module name
+    ├── security
+    │   ├── ssh-client-manager    # Module name
+    │   └── ssh-server-manager    # Module name
+    ├── specialized
+    │   ├── ai-workspace          # Module name
+    │   └── hackathon             # Module name
+    └── system
+        └── lock-manager          # Module name
+
 module-name/               # Module name
 ├── README.md              # Module documentation and usage guide
 ├── default.nix            # Main module (metadata + imports - REQUIRED pattern)
@@ -174,9 +211,9 @@ module-name/               # Module name
   - **ALL modules**: `options.systemConfig.{category}.{module-name}` definitions
   - Default values and descriptions
   - Type definitions for options
-  - **Versioning**: Define `_version` option for all modules (core and features)
+  - **Versioning**: Define `_version` option for all modules (core and optional)
 - **Rule**: NO implementation logic, only option definitions
-- **Required**: **ALL modules** (core and features) must have `options.nix` with versioning
+- **Required**: **ALL modules** (core and optional) must have `options.nix` with versioning
 - **Dependencies**: **Feature modules** must define `_dependencies` for modular dependency management
 - **Pattern**:
   ```nix
@@ -192,14 +229,14 @@ module-name/               # Module name
     type = lib.types.listOf lib.types.str;
     default = [ "system-checks" "command-center" ];  # What this module needs
     internal = true;
-    description = "Modules this feature depends on";
+    description = "Modules this module depends on";
   };
 
   # Examples:
   # Core system module: options.systemConfig.core.system.audio
   # Core management module: options.systemConfig.core.management.system-manager.submodules.system-logging
-  # Core infrastructure module: options.systemConfig.core.management.system-manager.submodules.cli-formatter
-  # Feature module: options.systemConfig.features.infrastructure.homelab
+  # Core infrastructure module: options.systemConfig.core.management.system-manager.submodules.cli-formatter (in system-manager/submodules/)
+  # Feature module: options.systemConfig.modules.infrastructure.homelab
   ```
 
 ### `types.nix`
@@ -387,14 +424,14 @@ module-name/               # Module name
 - **Purpose**: Multiple implementation providers (e.g., different backends)
 - **Usage**: Select provider based on configuration
 - **Pattern**: One provider per implementation variant
-- **Optional**: Only needed for features with multiple backends
+- **Optional**: Only needed for modules with multiple backends
 - **Note**: This is a **semantic** name - use only when provider concept is central to the feature
 
 ### `tests/`
 - **Purpose**: Module tests and validation
 - **Usage**: Test module functionality and edge cases
 - **Pattern**: Use NixOS testing framework
-- **Optional**: Recommended for complex features
+- **Optional**: Recommended for complex modules
 
 ## Best Practices
 
@@ -481,7 +518,7 @@ let
   };
   defaultConfig = builtins.readFile ./module-name-config.nix;
 in
-  lib.mkIf (cfg.enable or false)  # Default false for features
+  lib.mkIf (cfg.enable or false)  # Default false for optional modules
     (configHelpers.createModuleConfig {
       moduleName = "module-name";
       defaultConfig = defaultConfig;
@@ -524,7 +561,7 @@ in {
 - Document dependencies and requirements
 
 ### 7. **Consistency**
-- Use same structure across all features
+- Use same structure across all modules
 - Follow naming conventions
 - Use consistent option patterns
 - Maintain consistent code style
@@ -562,7 +599,7 @@ in {
 | `containers/` | Feature manages containers | Only if container management is the core feature |
 
 **Decision Guide**:
-1. **Ask**: "Could this logic apply to other features?" → If YES → use generic name
+1. **Ask**: "Could this logic apply to other modules?" → If YES → use generic name
 2. **Ask**: "Is this concept central to the feature's identity?" → If NO → use generic name
 3. **Ask**: "Would renaming this to a generic term lose important meaning?" → If NO → use generic name
 
@@ -575,7 +612,7 @@ in {
 - ❌ `ai-workspace/services/` → Consider `handlers/` or `processors/` instead
 
 **Rule of Thumb**: 
-- Generic = reusable across features (handlers, processors, collectors, validators, formatters)
+- Generic = reusable across modules (handlers, processors, collectors, validators, formatters)
 - Semantic = specific to feature domain (scanners, providers, drivers - only when central to identity)
 
 ## Complete Directory Reference
@@ -657,7 +694,7 @@ module-name/
 - ✅ Module has multiple distinct responsibilities
 - ✅ Submodule needs full module structure (options, config, handlers)
 - ✅ Submodule needs independent configuration
-- ✅ Complex features that warrant their own architecture
+- ✅ Complex modules that warrant their own architecture
 
 **Example**: `system-manager/` uses submodules/ with cli-formatter/, cli-registry/, system-update/, etc.
 
@@ -709,13 +746,20 @@ discoveredModules = lib.mapAttrsToList (name: type:
 let
   # Module metadata (REQUIRED - define directly here)
   metadata = {
-    # Basic info
-    name = "my-module";
-    scope = "system";          # system | shared | user
-    mutability = "overlay";    # exclusive | overlay
-    dimensions = [];           # [] for system scope, ["user"] for shared
-    description = "My awesome module";
-    version = "1.0.0";
+    # Module classification (REQUIRED)
+    role = "optional";              # "optional" | "core" | "required"
+    name = "my-module";             # Unique module identifier
+    description = "My awesome module"; # Human-readable description
+
+    # UI categorization (REQUIRED)
+    category = "infrastructure";    # "core" | "base" | "security" | "infrastructure" | "specialized"
+    subcategory = "containers";     # Specific subcategory within category
+
+    # Stability information (RECOMMENDED)
+    stability = "stable";           # "stable" | "experimental" | "deprecated" | "beta" | "alpha"
+
+    # Version management (REQUIRED)
+    version = "1.0.0";             # SemVer: MAJOR.MINOR.PATCH
   };
 in {
   # REQUIRED: Export metadata for discovery system
@@ -737,6 +781,59 @@ in {
 - **API Consistent**: Other systems access via `(import ./module/default.nix {})._module.metadata`
 - **Self-Contained**: Module complete in one file
 - **Standard Compliant**: Follows NixOS `_module.*` conventions
+
+### **Metadata Fields Explained**
+
+Each `_module.metadata` field has a specific purpose:
+
+#### **`role`** (Required)
+- **Purpose**: Controls module loading behavior and availability
+- **Values**:
+  - `"core"`: Always enabled, cannot be disabled (system, hardware, user)
+  - `"required"`: Auto-enabled when needed, cannot be manually disabled
+  - `"optional"`: User can enable/disable freely (default for feature modules)
+- **Example**: `role = "optional";`
+
+#### **`name`** (Required)
+- **Purpose**: Unique identifier for the module
+- **Rules**: Lowercase, hyphens, matches folder name
+- **Used for**: CLI commands, config paths, API access
+- **Example**: `name = "ssh-client-manager";`
+
+#### **`description`** (Required)
+- **Purpose**: Human-readable explanation of module functionality
+- **Used for**: UI displays, documentation, help text
+- **Best practice**: 1-2 sentences, clear and concise
+- **Example**: `description = "SSH client configuration and key management";`
+
+#### **`category`** (Required)
+- **Purpose**: High-level grouping for UI organization
+- **Values**: `"core"`, `"base"`, `"security"`, `"infrastructure"`, `"specialized"`
+- **Used for**: Navigation menus, feature organization
+- **Example**: `category = "security";`
+
+#### **`subcategory`** (Required)
+- **Purpose**: Fine-grained categorization within a category
+- **Values**: Specific to category (e.g., `"ssh"`, `"virtualization"`, `"containers"`)
+- **Used for**: Sub-menus, detailed organization
+- **Example**: `subcategory = "ssh";`
+
+#### **`stability`** (Recommended)
+- **Purpose**: Indicates reliability and production-readiness of the module
+- **Values**:
+  - `"stable"`: Production-ready, recommended for use
+  - `"experimental"`: New features, may have bugs, use with caution
+  - `"deprecated"`: Will be removed in future versions
+  - `"beta"`: Feature-complete but needs testing
+  - `"alpha"`: Early development, breaking changes expected
+- **Used for**: UI warnings, filter options, user guidance
+- **Example**: `stability = "stable";`
+
+#### **`version`** (Required)
+- **Purpose**: Semantic versioning for updates and compatibility
+- **Format**: `MAJOR.MINOR.PATCH` (SemVer)
+- **Used for**: Migration detection, update management
+- **Example**: `version = "1.0.0";`
 
 #### **Automatic API Generation**
 The Module Manager generates APIs automatically:
@@ -833,13 +930,13 @@ Version when:
 **Example**:
 ```nix
 # v1.0
-options.features.my-feature.enable = mkOption { type = types.bool; };
+options.modules.my-feature.enable = mkOption { type = types.bool; };
 
 # v2.0 - BREAKING: Option renamed
-options.features.my-feature.enabled = mkOption { type = types.bool; };
+options.modules.my-feature.enabled = mkOption { type = types.bool; };
 ```
 
-#### **Minor Version (0.X)** - New Features (Backward Compatible)
+#### **Minor Version (0.X)** - New modules (Backward Compatible)
 Version when:
 - ✅ New optional options are added
 - ✅ New functionality is added
@@ -850,11 +947,11 @@ Version when:
 **Example**:
 ```nix
 # v1.0
-options.features.my-feature.enable = mkOption { type = types.bool; };
+options.modules.my-feature.enable = mkOption { type = types.bool; };
 
 # v1.1 - NEW: Optional option added (backward compatible)
-options.features.my-feature.enable = mkOption { type = types.bool; };
-options.features.my-feature.timeout = mkOption { type = types.int; default = 30; };
+options.modules.my-feature.enable = mkOption { type = types.bool; };
+options.modules.my-feature.timeout = mkOption { type = types.int; default = 30; };
 ```
 
 #### **Patch Version (0.0.X)** - Bug Fixes
@@ -880,7 +977,7 @@ Version when:
 let
   moduleVersion = "1.0";  # Current module version
 in {
-  options.features.my-feature = {
+  options.modules.my-feature = {
     # Version metadata (REQUIRED)
     _version = lib.mkOption {
       type = lib.types.str;
@@ -924,7 +1021,7 @@ in {
 }
 ```
 
-**Important**: **ALL modules** (core and features) must define `_version` in `options.nix`.
+**Important**: **ALL modules** (core and optional) must define `_version` in `options.nix`.
 
 #### **2. Create Migration Directory Structure**
 
@@ -949,17 +1046,17 @@ feature-name/
   
   # Option renamings (old → new)
   optionRenamings = {
-    "features.my-feature.enable" = "features.my-feature.enabled";
+    "my-feature.enable" = "my-feature.enabled";
   };
   
   # Option removals (will be removed, user must update manually)
   optionsRemoved = [
-    "features.my-feature.oldOption"
+    "my-feature.oldOption"
   ];
   
   # Option additions (new options with defaults)
   optionsAdded = {
-    "features.my-feature.newOption" = {
+    "my-feature.newOption" = {
       type = "int";
       default = 30;
       description = "New option";
@@ -968,7 +1065,7 @@ feature-name/
   
   # Type conversions (if needed)
   typeConversions = {
-    "features.my-feature.someOption" = {
+    "my-feature.someOption" = {
       from = "bool";
       to = "enum";
       converter = "bool-to-enum";  # Custom converter function
@@ -990,7 +1087,7 @@ feature-name/
 ```nix
 # default.nix
 let
-  cfg = config.features.my-feature;
+  cfg = config.modules.my-feature;
   currentVersion = "2.0";
   detectedVersion = cfg._version or "1.0";
   
@@ -1048,7 +1145,7 @@ in {
 #### **Pattern 1: Explicit Version Field**
 ```nix
 # User's config
-features.my-feature = {
+my-feature = {
   _version = "1.0";  # Explicit version
   enable = true;
 };
@@ -1078,15 +1175,15 @@ detectionPatterns = {
 
 ```nix
 # v1.0
-options.features.backup.enable = mkOption { type = types.bool; };
+options.modules.backup.enable = mkOption { type = types.bool; };
 
 # v2.0 - Renamed
-options.features.backup.enabled = mkOption { type = types.bool; };
+options.modules.backup.enabled = mkOption { type = types.bool; };
 
 # migrations/v1.0-to-v2.0.nix
 {
   optionRenamings = {
-    "features.backup.enable" = "features.backup.enabled";
+    "backup.enable" = "backup.enabled";
   };
 }
 ```
@@ -1095,13 +1192,13 @@ options.features.backup.enabled = mkOption { type = types.bool; };
 
 ```nix
 # v1.0
-options.features.backup.mode = mkOption { 
+options.modules.backup.mode = mkOption { 
   type = types.bool;  # true/false
   default = false;
 };
 
 # v2.0 - Changed to enum
-options.features.backup.mode = mkOption {
+options.modules.backup.mode = mkOption {
   type = types.enum [ "full" "incremental" "disabled" ];
   default = "disabled";
 };
@@ -1109,7 +1206,7 @@ options.features.backup.mode = mkOption {
 # migrations/v1.0-to-v2.0.nix
 {
   typeConversions = {
-    "features.backup.mode" = {
+    "backup.mode" = {
       from = "bool";
       to = "enum";
       converter = ''
@@ -1128,11 +1225,11 @@ options.features.backup.mode = mkOption {
 
 ```nix
 # v1.0 - Flat structure
-options.features.backup.enable = mkOption { type = types.bool; };
-options.features.backup.path = mkOption { type = types.str; };
+options.modules.backup.enable = mkOption { type = types.bool; };
+options.modules.backup.path = mkOption { type = types.str; };
 
 # v2.0 - Nested structure
-options.features.backup.config = {
+options.modules.backup.config = {
   enable = mkOption { type = types.bool; };
   path = mkOption { type = types.str; };
 };
@@ -1140,8 +1237,8 @@ options.features.backup.config = {
 # migrations/v1.0-to-v2.0.nix
 {
   structureMappings = {
-    "features.backup.enable" = "features.backup.config.enable";
-    "features.backup.path" = "features.backup.config.path";
+    "backup.enable" = "backup.config.enable";
+    "backup.path" = "backup.config.path";
   };
 }
 ```
@@ -1171,7 +1268,7 @@ When releasing a new version:
 **When to Update**:
 - ✅ **Always** when version is increased
 - ✅ **Always** when breaking changes are made
-- ✅ **Always** when new features are added
+- ✅ **Always** when new modules are added
 - ✅ **Recommended** for bugfixes and improvements
 
 **Example**:
@@ -1221,7 +1318,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Important Notes**:
 - **Version MUST be increased** when:
   - Breaking changes (Major: 1.0 → 2.0)
-  - New features/options (Minor: 1.0 → 1.1)
+  - New modules/options (Minor: 1.0 → 1.1)
   - Bugfixes (Patch: 1.0.0 → 1.0.1)
 - **Version does NOT need to increase** for:
   - Code refactorings (no user-visible changes)
@@ -1256,7 +1353,7 @@ sudo nixos-rebuild switch  # Each feature migrates its own options
 - **Domains**:
   - `system/` - Core OS functionality (`systemConfig.core.system.*`)
   - `management/` - System management tools (`systemConfig.core.management.*`)
-  - `infrastructure/` - Core infrastructure (`systemConfig.core.infrastructure.*`)
+  - `system-manager/submodules/` - Core infrastructure (`systemConfig.core.management.system-manager.submodules.*`)
 - **Examples**: `desktop/`, `hardware/`, `network/`, `user/`, `audio/`, `logging/`, `checks/`, `cli-formatter/`
 - **Config Location**: `nixos/core/{domain}/{module-name}/{module-name}-config.nix`
 - **Config Access**: Via `systemConfig.core.{domain}.{module-name}` in flake.nix
@@ -1265,17 +1362,17 @@ sudo nixos-rebuild switch  # Each feature migrates its own options
 - **Versioning**: Must include `_version` option in `options.nix`
 - **Required Files**: `default.nix`, `options.nix`, `config.nix` (if has implementation), `{module-name}-config.nix`
 
-### Feature Modules (`nixos/features/{domain}/{module-name}/`)
-- **Purpose**: Optional features that can be enabled/disabled
+### Feature Modules (`nixos/modules/{domain}/{module-name}/`)
+- **Purpose**: Optional modules that can be enabled/disabled
 - **Domains**:
-  - `infrastructure/` - Infrastructure features (`systemConfig.features.infrastructure.*`)
-  - `security/` - Security features (`systemConfig.features.security.*`)
-  - `specialized/` - Specialized features (`systemConfig.features.specialized.*`)
-- **Examples**: `homelab/`, `vm/`, `ssh-client/`, `lock/`, `ai-workspace/`
-- **Config Location**: `nixos/features/{domain}/{module-name}/{module-name}-config.nix`
-- **Config Access**: Via `systemConfig.features.{domain}.{module-name}` in flake.nix
+  - `infrastructure/` - Infrastructure modules (`systemConfig.modules.infrastructure.*`)
+  - `security/` - Security modules (`systemConfig.modules.security.*`)
+  - `specialized/` - Specialized modules (`systemConfig.modules.specialized.*`)
+- **Examples**: `homelab/`, `vm/`, `ssh-client/`, `lock/`, `ai-workspace/`, `hackathon/`
+- **Config Location**: `nixos/modules/{domain}/{module-name}/{module-name}-config.nix`
+- **Config Access**: Via `systemConfig.modules.{domain}.{module-name}` in flake.nix
 - **Enable Pattern**: Must check `cfg.enable` before implementation
-- **Options**: Must define `options.systemConfig.features.{domain}.{module-name}` in `options.nix`
+- **Options**: Must define `options.systemConfig.modules.{domain}.{module-name}` in `options.nix`
 - **Versioning**: Must include `_version` option in `options.nix`
 - **Required Files**: `default.nix`, `options.nix`, `config.nix` (if has implementation), `{module-name}-config.nix`
 
@@ -1330,7 +1427,7 @@ nixos/
 │       └── command-center/
 │           ├── command-center-config.nix
 │           └── default.nix
-├── features/
+├── modules/
 │   ├── infrastructure/
 │   │   ├── homelab/
 │   │   │   ├── homelab-config.nix
@@ -1377,8 +1474,8 @@ let
   # For core modules: systemConfig.core.{domain}.{module-name}
   cfg = systemConfig.core.management.system-manager.submodules.cli-formatter or {};
 
-  # For feature modules: systemConfig.features.{domain}.{module-name}
-  # cfg = systemConfig.features.infrastructure.homelab or {};
+  # For feature modules: systemConfig.modules.{domain}.{module-name}
+  # cfg = systemConfig.modules.infrastructure.homelab or {};
 in {
   # imports must be at top level
   imports = if (cfg.enable or false) then [
@@ -1432,4 +1529,4 @@ See `nixos/core/management/logging/` for a complete core management module examp
 See `nixos/core/infrastructure/cli-formatter/` for a complete core infrastructure module example.
 
 ### Feature Module Example
-See existing features like `features/security/ssh-client/` or `features/infrastructure/homelab/` for complete feature module examples.
+See existing modules like `modules/security/ssh-client/` or `modules/infrastructure/homelab/` for complete feature module examples.

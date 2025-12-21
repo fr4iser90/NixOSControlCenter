@@ -15,12 +15,12 @@ let
 
 in {
   _module.metadata = {
-    role = "internal";
+    role = "core";
     name = "network";
     description = "Network configuration and management";
     category = "base";
     subcategory = "network";
-    stability = "stable";
+    version = "1.0.0";
   };
 
   imports = networkingModules;

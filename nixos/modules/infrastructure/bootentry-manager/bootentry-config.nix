@@ -1,12 +1,12 @@
 {
   # Boot Entry Manager Configuration
-  # This feature manages bootloader entries for systemd-boot, GRUB, and rEFInd
+  # This module manages bootloader entries for systemd-boot, GRUB, and rEFInd
 
-  features = {
+  modules = {
     infrastructure = {
       bootentry = {
         enable = false;
-        # Boot entry management is automatically enabled when this feature is active
+        # Boot entry management is automatically enabled when this module is active
         # No additional configuration needed - uses system bootloader configuration
       };
     };

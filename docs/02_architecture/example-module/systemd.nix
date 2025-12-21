@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = systemConfig.features.example-module or {};
+  cfg = systemConfig.modules.example-module or {};
 in
   mkIf (cfg.enable or false) {
     # Example systemd service

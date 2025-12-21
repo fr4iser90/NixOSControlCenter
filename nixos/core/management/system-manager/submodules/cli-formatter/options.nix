@@ -48,7 +48,7 @@ in {
     api = lib.mkOption {
       type = lib.types.attrs;
       readOnly = true;
-      description = "CLI formatter API for other features (read-only)";
+      description = "CLI formatter API for other modules (read-only)";
     };
   };
 }

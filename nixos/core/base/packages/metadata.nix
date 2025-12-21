@@ -1,9 +1,9 @@
-# Feature Metadata
-# Defines metadata for all features: systemTypes, groups, dependencies, conflicts
-# Legacy migration support: legacyPath maps old packageModules structure to new feature names
+# Module Metadata
+# Defines metadata for all modules: systemTypes, groups, dependencies, conflicts
+# Legacy migration support: legacyPath maps old packageModules structure to new module names
 
 {
-  features = {
+  modules = {
     # Gaming Features
     streaming = {
       systemTypes = [ "desktop" ];
@@ -83,7 +83,7 @@
       dependencies = [];
       conflicts = [];
       legacyPath = "development.virtualization";  # Migration: development.virtualization → qemu-vm (+ virt-manager on desktop)
-      legacyHandler = "multi-feature";  # Generates multiple features: qemu-vm + virt-manager (desktop only)
+      legacyHandler = "multi-module";  # Generates multiple modules: qemu-vm + virt-manager (desktop only)
     };
     
     virt-manager = {
@@ -121,7 +121,7 @@
       legacyPath = "server.mail";  # Migration: server.mail → mail-server
     };
     
-    # Desktop Environments - NICHT als Features in packages/features/!
+    # Desktop Environments - NICHT als Module in packages/modules/!
     # Sie sind bereits in nixos/desktop/environments/ (komplexe Struktur)
     # Metadata nur für Custom Install UI-Auswahl
     # Werden über desktop-config.nix konfiguriert, nicht über packageModules
@@ -131,7 +131,7 @@
       description = "KDE Plasma desktop environment";
       dependencies = [];
       conflicts = [ "gnome" "xfce" ];
-      # WICHTIG: Kein Feature-File in packages/features/!
+      # WICHTIG: Kein Module-File in packages/modules/!
       # Desktop Environment ist in nixos/desktop/environments/plasma/
       # Custom Install schreibt desktop.environment = "plasma" in desktop-config.nix
     };
@@ -152,7 +152,7 @@
       conflicts = [ "plasma" "gnome" ];
     };
     
-    # Podman - EINFACHES Feature → gehört in packages/features/
+    # Podman - EINFACHES Module → gehört in packages/modules/
     podman = {
       systemTypes = [ "server" ];
       group = "virtualization";
