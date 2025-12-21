@@ -1,19 +1,28 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 with lib;
 
 let
-  cfg = systemConfig.features.infrastructure.vm;
+  cfg = getModuleConfig "vm";
   stateDir = cfg.stateDir;
 in {
-  imports = [
+  _module.metadata = {
+    role = "optional";
+    name = "vm";
+    description = "Virtual machine management and orchestration";
+    category = "infrastructure";
+    subcategory = "virtualization";
+    stability = "stable";
+  };
+
+  imports = if cfg.enable or false then [
     ./options.nix
     (import ./testing { inherit config lib pkgs; })
-  ];
+  ] else [];
 
   config = mkMerge [
     {
-      features.infrastructure.vm.enable = mkDefault (systemConfig.features.infrastructure.vm or false);
+      modules.infrastructure.vm.enable = mkDefault (cfg.enable or false);
     }
     (mkIf cfg.enable {
     # Base requirements

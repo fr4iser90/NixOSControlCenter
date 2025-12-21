@@ -14,6 +14,15 @@ let
   localizationCfg = getModuleConfig "localization";
 
 in {
+  _module.metadata = {
+    role = "internal";
+    name = "network";
+    description = "Network configuration and management";
+    category = "base";
+    subcategory = "network";
+    stability = "stable";
+  };
+
   imports = networkingModules;
 
   # Basic networking configuration

@@ -80,7 +80,9 @@
           inherit systemConfig discovery moduleConfig getModuleConfig;
         }; 
 
-        modules = systemModules ++ [      
+        modules = [
+          ./core/management/module-manager
+        ] ++ systemModules ++ [      
           {
             # System Version
             system.stateVersion = stateVersion;

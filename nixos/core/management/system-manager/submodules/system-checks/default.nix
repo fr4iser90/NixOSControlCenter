@@ -1,7 +1,9 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+
 let
-  cfg = systemConfig.core.management.system-manager.submodules.system-checks or {};
-in {
+  cfg = getModuleConfig "system-checks";
+in
+{
   # imports must be at top level
   imports = [
     ./options.nix  # Always import options first
@@ -11,4 +13,5 @@ in {
   ] else [
     ./config.nix  # Import even if disabled (for symlink management)
   ]);
+
 }

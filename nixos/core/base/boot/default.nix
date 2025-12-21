@@ -11,6 +11,14 @@ let
   bootCfg = getModuleConfig "boot";
 
 in {
+  _module.metadata = {
+    role = "internal";
+    name = "boot";
+    description = "Bootloader and boot configuration management";
+    category = "base";
+    subcategory = "boot";
+    stability = "stable";
+  };
   imports = [
     ./options.nix
     ./config.nix

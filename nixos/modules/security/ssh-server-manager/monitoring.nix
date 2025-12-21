@@ -1,9 +1,10 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, cfg, ... }:
 
 with lib;
 
 let
-  cfg = systemConfig.features.security.ssh-server.monitoring;
+  # monitoringCfg.monitoring is passed from parent module
+  monitoringCfg = monitoringCfg.monitoring or {};
   
   monitorScript = pkgs.writeScriptBin "ssh-monitor" ''
     #!${pkgs.bash}/bin/bash
@@ -13,7 +14,7 @@ let
     CONNECTIONS=$(ss -tn state established '( dport = :ssh )' | awk '{print $5}' | sort | uniq -c)
     
     # Enhanced SSH Log Monitor with configurable verbosity
-    LOG_LEVEL="${toString cfg.logLevel}"
+    LOG_LEVEL="${toString monitoringCfg.logLevel}"
     ${pkgs.systemd}/bin/journalctl -f -u sshd | while read -r line; do
       if [ "$LOG_LEVEL" = "verbose" ]; then
         logger -t ssh-monitor "Raw log: $line"
@@ -27,7 +28,7 @@ let
         ACTIVE_CONNECTIONS=$((ACTIVE_CONNECTIONS + 1))
         CONNECTIONS="$CONNECTIONS\n$USER@$IP ($METHOD)"
         
-        if [ "${cfg.notificationLevel}" != "none" ]; then
+        if [ "${monitoringCfg.notificationLevel}" != "none" ]; then
           ${pkgs.libnotify}/bin/notify-send \
             -i ${pkgs.papirus-icon-theme}/share/icons/Papirus/48x48/status/network-transmit-receive.png \
             "SSH Connected" \
@@ -44,7 +45,7 @@ let
           ACTIVE_CONNECTIONS=$((ACTIVE_CONNECTIONS - 1))
           CONNECTIONS=$(echo -e "$CONNECTIONS" | grep -v "$USER@$IP")
           
-          if [ "${cfg.notificationLevel}" != "none" ]; then
+          if [ "${monitoringCfg.notificationLevel}" != "none" ]; then
             ${pkgs.libnotify}/bin/notify-send \
               -i ${pkgs.papirus-icon-theme}/share/icons/Papirus/48x48/status/network-offline.png \
               "SSH Disconnected" \
@@ -69,7 +70,7 @@ let
         IP=$(echo "$line" | grep -oP "from \K[^ ]+")
         
         if [ -n "$USER" ] && [ -n "$IP" ] && [ -n "$REASON" ]; then
-          if [ "${cfg.notificationLevel}" != "none" ]; then
+          if [ "${monitoringCfg.notificationLevel}" != "none" ]; then
             ${pkgs.libnotify}/bin/notify-send -u critical \
               -i ${pkgs.papirus-icon-theme}/share/icons/Papirus/48x48/status/dialog-warning.png \
               "SSH Failed Attempt!" \
@@ -105,7 +106,7 @@ in {
     };
   };
 
-  config = mkIf cfg.enable {
+  config = mkIf monitoringCfg.enable {
     environment.systemPackages = with pkgs; [
       libnotify
       dunst

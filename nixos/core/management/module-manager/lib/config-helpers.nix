@@ -44,3 +44,4 @@ in
 {
   inherit createModuleConfig mkModuleConfig getModuleInfo;
 }
+ 

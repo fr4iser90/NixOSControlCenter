@@ -1,13 +1,23 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+
 let
-  cfg = systemConfig.system.audio or {};
+  cfg = getModuleConfig "audio";
 in {
-  imports = [
+  _module.metadata = {
+    role = "internal";
+    name = "audio";
+    description = "Audio system configuration and management";
+    category = "base";
+    subcategory = "audio";
+    stability = "stable";
+  };
+
+  imports = if cfg.enable or false then [
     ./options.nix
-  ] ++ (if (cfg.enable or false) && (cfg.system or "none") != "none" then [
+  ] ++ (if (cfg.system or "none") != "none" then [
     (./providers + "/${cfg.system}.nix")
     ./config.nix
   ] else [
     ./config.nix
-  ]);
+  ]) else [];
 }

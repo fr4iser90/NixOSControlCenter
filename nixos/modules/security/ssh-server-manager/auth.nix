@@ -1,9 +1,8 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, cfg, ... }:
 
 with lib;
 
 let
-  cfg = systemConfig.features.security.ssh-server;
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
 
   sshTempOpenScript = pkgs.writeScriptBin "ssh-temp-open" ''

@@ -42,4 +42,12 @@ in {
       internal = true;
     };
   };
+
+  # Define _module.metadata as a valid option for all modules
+  options._module.metadata = lib.mkOption {
+    type = lib.types.attrsOf lib.types.anything;
+    default = {};
+    description = "Module metadata for discovery and management";
+    internal = true;
+  };
 }

@@ -1,9 +1,10 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, cfg, ... }:
 
 with lib;
 
 let
-  cfg = systemConfig.features.security.ssh-server.notifications;
+  # notificationsCfg.notifications is passed from parent module
+  notificationsCfg = notificationsCfg.notifications or {};
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
 
   notificationTypes = {
@@ -36,22 +37,22 @@ let
   };
 
   sendNotification = level: message: ''
-    ${if cfg.types.email.enable then ''
-      ${pkgs.mailutils}/bin/mail -s "SSH Notification (${level})" ${cfg.types.email.address} <<< "${message}"
+    ${if notificationsCfg.types.email.enable then ''
+      ${pkgs.mailutils}/bin/mail -s "SSH Notification (${level})" ${notificationsCfg.types.email.address} <<< "${message}"
     '' else ""}
     
-    ${if cfg.types.desktop.enable then ''
+    ${if notificationsCfg.types.desktop.enable then ''
       ${pkgs.libnotify}/bin/notify-send \
-        -u ${cfg.types.desktop.urgency} \
+        -u ${notificationsCfg.types.desktop.urgency} \
         "SSH Notification (${level})" \
         "${message}"
     '' else ""}
     
-    ${if cfg.types.webhook.enable then ''
+    ${if notificationsCfg.types.webhook.enable then ''
       ${pkgs.curl}/bin/curl -X POST \
         -H 'Content-Type: application/json' \
         -d '{"level": "${level}", "message": "${message}"}' \
-        ${cfg.types.webhook.url}
+        ${notificationsCfg.types.webhook.url}
     '' else ""}
   '';
 in {
@@ -71,7 +72,7 @@ in {
     };
   };
 
-  config = mkIf cfg.enable {
+  config = mkIf notificationsCfg.enable {
     environment.systemPackages = with pkgs; [
       mailutils
       libnotify

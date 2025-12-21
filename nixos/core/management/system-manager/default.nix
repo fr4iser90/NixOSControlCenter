@@ -50,5 +50,14 @@ in {
     boot.loader.grub.enable = bootCfg.bootloader == "grub";
     
     core.management.system-manager.api = apiValue;
+
+    _module.metadata = {
+      role = "internal";
+      name = "system-manager";
+      description = "Central system management and configuration";
+      category = "management";
+      subcategory = "system";
+      stability = "stable";
+    };
   };
 }

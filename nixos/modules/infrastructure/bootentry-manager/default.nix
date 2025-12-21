@@ -1,9 +1,9 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 with lib;
 
 let
-  cfg = systemConfig.features.infrastructure.bootentry;
+  cfg = getModuleConfig "bootentry-manager";
   
   # Importiere die benötigten Module
   common = import ./lib/common.nix { inherit lib; };
@@ -20,14 +20,23 @@ let
                      else providers."systemd-boot";  # Default fallback
 
 in {
-  imports = [
+  _module.metadata = {
+    role = "optional";
+    name = "bootentry-manager";
+    description = "Boot entry management for multiple bootloaders";
+    category = "infrastructure";
+    subcategory = "boot";
+    stability = "stable";
+  };
+
+  imports = if cfg.enable or false then [
     ./options.nix
     ./config.nix
-  ];
+  ] else [];
 
   config = mkMerge [
     {
-      features.infrastructure.bootentry.enable = mkDefault (systemConfig.features.infrastructure.bootentry or false);
+      modules.infrastructure.bootentry-manager.enable = mkDefault (cfg.enable or false);
     }
     (mkIf cfg.enable {
     # Activation scripts

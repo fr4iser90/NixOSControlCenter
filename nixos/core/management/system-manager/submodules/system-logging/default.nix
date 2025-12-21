@@ -1,8 +1,13 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+
+let
+  cfg = getModuleConfig "system-logging";
+in
 {
   imports = [
     ./options.nix
-  ] ++ (lib.optionals (systemConfig.core.management.system-manager.submodules.system-logging.enable or true) [
+  ] ++ (lib.optionals (cfg.enable or true) [
     ./config.nix  # Import implementation logic
   ]);
+
 }

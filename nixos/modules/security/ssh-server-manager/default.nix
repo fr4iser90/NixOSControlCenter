@@ -1,27 +1,36 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 with lib;
 
 let
-  cfg = systemConfig.features.security.ssh-server;
+  cfg = getModuleConfig "ssh-server-manager";
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
   commandCenter = config.core.management.system-manager.submodules.cli-registry;
 in {
-  imports = [
+  _module.metadata = {
+    role = "optional";
+    name = "ssh-server-manager";
+    description = "SSH server access management and monitoring";
+    category = "security";
+    subcategory = "ssh";
+    stability = "stable";
+  };
+
+  imports = if cfg.enable or false then [
     ./options.nix
-    ./auth.nix
-    ./monitoring.nix
-    ./notifications.nix
-    ./scripts/monitor.nix
+    (import ./auth.nix { inherit cfg; })
+    (import ./monitoring.nix { inherit cfg; })
+    (import ./notifications.nix { inherit cfg; })
+    (import ./scripts/monitor.nix { inherit cfg; })
     ./scripts/request-access.nix
     ./scripts/approve-request.nix
     ./scripts/list-requests.nix
     ./scripts/grant-access.nix
-  ];
+  ] else [];
 
   config = mkMerge [
     {
-      features.security.ssh-server.enable = mkDefault (systemConfig.features.security.ssh-server or false);
+      modules.security.ssh-server-manager.enable = mkDefault (cfg.enable or false);
     }
     (mkIf cfg.enable {
     # Enable terminal-ui dependency

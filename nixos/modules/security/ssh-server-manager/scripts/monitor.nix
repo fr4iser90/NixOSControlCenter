@@ -1,9 +1,10 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, cfg, ... }:
 
 with lib;
 
 let
-  cfg = systemConfig.features.security.ssh-server-manager.monitor;
+  # monitorCfg.monitor is passed from parent module
+  monitorCfg = monitorCfg.monitor or {};
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
 
   monitorScript = pkgs.writeScriptBin "ssh-monitor" ''
@@ -87,7 +88,7 @@ in {
     };
   };
 
-  config = mkIf cfg.enable {
+  config = mkIf monitorCfg.enable {
     environment.systemPackages = [ monitorScript ];
 
     core.management.system-manager.submodules.cli-registry.commands = [

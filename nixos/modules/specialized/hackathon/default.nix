@@ -1,9 +1,9 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 with lib;
 
 let
-  cfg = systemConfig.features.specialized.hackathon;
+  cfg = getModuleConfig "hackathon";
   
   # Finde alle Benutzer mit hackathon-admin Rolle
   hackathonUsers = lib.filterAttrs 
@@ -17,7 +17,16 @@ let
   hackathonUser = if hasHackathonUsers then lib.head (lib.attrNames hackathonUsers) else "";
 
 in {
-  imports = [
+  _module.metadata = {
+    role = "optional";
+    name = "hackathon";
+    description = "Hackathon environment management";
+    category = "specialized";
+    subcategory = "development";
+    stability = "experimental";
+  };
+
+  imports = if cfg.enable or false then [
     ./options.nix
   ] ++ (if hasHackathonUsers then [
     ./hackathon-fetch.nix
@@ -29,7 +38,7 @@ in {
 
   config = mkMerge [
     {
-      features.specialized.hackathon.enable = mkDefault (systemConfig.features.specialized.hackathon or false);
+      modules.specialized.hackathon.enable = mkDefault (cfg.enable or false);
     }
     (mkIf cfg.enable {
       # Feature-specific config here

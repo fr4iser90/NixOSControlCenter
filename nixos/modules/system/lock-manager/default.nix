@@ -1,13 +1,13 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 with lib;
 
 let
   # CLI formatter API (Core module, always available)
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
-  
+
   # Feature configuration
-  cfg = systemConfig.features.system.lock;
+  cfg = getModuleConfig "lock-manager";
   
   # Import scanner modules (only those that don't use cfg can be in outer let)
   desktopScanner = import ./scanners/desktop.nix { inherit pkgs; };
@@ -19,15 +19,24 @@ let
   # Note: Handlers and scanners that use cfg must be in mkIf cfg.enable block
   
 in {
-  imports = [
+  _module.metadata = {
+    role = "optional";
+    name = "lock-manager";
+    description = "System state discovery, encryption, and backup management";
+    category = "system";
+    subcategory = "backup";
+    stability = "stable";
+  };
+
+  imports = if cfg.enable or false then [
     ./options.nix
-  ];
+  ] else [];
 
   config = mkMerge [
-    # Default configuration - map systemConfig.features.system-discovery to config.features.system-discovery.enable
+    # Default configuration - use module config
     {
       features.system.lock = {
-        enable = mkDefault (systemConfig.features.system.lock or false);
+        enable = mkDefault (cfg.enable or false);
       };
     }
     

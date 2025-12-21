@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
   # Import options first (REQUIRED)
@@ -202,15 +202,26 @@ let
   # Note: packageModules are loaded as features from ./features/
   # No separate package loading needed - features handle their own packages
 
+  cfg = getModuleConfig "packages";
+
 in {
-  imports = 
-    # Config file management (symlink creation)
+  _module.metadata = {
+    role = "internal";
+    name = "packages";
+    description = "Package management and feature loading system";
+    category = "base";
+    subcategory = "packages";
+    stability = "stable";
+  };
+
+  imports =
+    # Config file management (symlink creation) - always needed
     [ ./config.nix ]
-    # Base for systemType
+    # Base for systemType - always needed
     ++ [ (basePackages.${systemConfig.core.management.system-manager.systemType} or (throw "Unknown system type: ${systemConfig.core.management.system-manager.systemType}")) ]
-    # Feature modules (without Docker, as it's handled separately)
+    # Feature modules (without Docker, as it's handled separately) - always needed for package management
     ++ (lib.filter (m: !lib.hasSuffix "/docker.nix" (toString m) && !lib.hasSuffix "/docker-rootless.nix" (toString m)) featureModules)
-    # Docker modules added separately
+    # Docker modules added separately - always needed
     ++ dockerModule;
 
   # Packages are added by the feature modules themselves

@@ -1,9 +1,9 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 with lib;
 
 let
-  cfg = systemConfig.features.infrastructure.homelab;
+  cfg = getModuleConfig "homelab-manager";
   
   # Check if Swarm is active
   isSwarmMode = (systemConfig.homelab.swarm or null) != null;
@@ -38,7 +38,16 @@ let
   homelabUtils = import ./lib/homelab-utils.nix { inherit config lib pkgs systemConfig; };
 
 in {
-  imports = [
+  _module.metadata = {
+    role = "optional";
+    name = "homelab-manager";
+    description = "Homelab infrastructure management and orchestration";
+    category = "infrastructure";
+    subcategory = "homelab";
+    stability = "stable";
+  };
+
+  imports = if cfg.enable or false then [
     ./options.nix
     ./config.nix
   ] ++ (if hasDockerUser then [
@@ -51,7 +60,7 @@ in {
 
   config = mkMerge [
     {
-      features.infrastructure.homelab.enable = mkDefault (systemConfig.features.infrastructure.homelab or false);
+      modules.infrastructure.homelab-manager.enable = mkDefault (cfg.enable or false);
     }
     (mkIf cfg.enable {
       # Import homelab utilities config

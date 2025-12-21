@@ -1,6 +1,8 @@
-{ config, pkgs, lib, systemConfig, ... }:
+{ config, pkgs, lib, systemConfig, getModuleConfig, ... }:
 
 let
+  cfg = getModuleConfig "user";
+
   # Gruppen basierend auf Rolle
   roleGroups = {
     admin = [ "wheel" "networkmanager" "docker" "podman" "video" "audio" "render" "input" "seat" ];
@@ -44,7 +46,7 @@ let
     else [];
 
   # Filter out non-user attributes (like 'enable')
-  userAttrs = lib.filterAttrs (n: v: builtins.isAttrs v) (systemConfig.core.base.user or {});
+  userAttrs = lib.filterAttrs (n: v: builtins.isAttrs v) cfg;
   userNames = builtins.attrNames userAttrs;
 
   # Automatisches Autologin für den ersten restricted-Admin-User
@@ -78,6 +80,15 @@ let
   };
 
 in {
+  _module.metadata = {
+    role = "internal";
+    name = "user";
+    description = "User account management and configuration";
+    category = "base";
+    subcategory = "user";
+    stability = "stable";
+  };
+
   imports = [
     ./options.nix
     ./config.nix
