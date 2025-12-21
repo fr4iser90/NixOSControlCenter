@@ -6,9 +6,10 @@ Based on the fundamental architecture analysis, this implementation plan address
 
 1. **NCC System Module Creation** - Separate CLI ecosystem from system management
 2. **Formatting Migration** - Move CLI formatting to dedicated NCC module
-3. **Validated Module Discovery** - Add validation during module discovery phase
-4. **Enhanced Validation Pipeline** - Coordinate validation between System and Module managers
-5. **Domain Layer Evaluation** - Assess impact of removing rigid domain structure
+3. **Permission System Integration** - Role-based access control for CLI commands
+4. **Validated Module Discovery** - Add validation during module discovery phase
+5. **Enhanced Validation Pipeline** - Coordinate validation between System and Module managers
+6. **Domain Layer Evaluation** - Assess impact of removing rigid domain structure
 
 ## Implementation Phases
 
@@ -278,7 +279,193 @@ core.management.ncc.api = {
 - Use NCC validation APIs for dependency checking
 - Report validation results through NCC formatting
 
-### Phase 5: Domain Layer Assessment (1-2 days)
+### Phase 3: Permission System Integration (2-3 days)
+
+#### 3.1 Extend NCC with Permission APIs
+**Objective:** Add role-based access control to NCC as core CLI infrastructure
+
+**Files to Create/Modify:**
+```
+core/management/nixos-control-center/
+├── submodules/
+│   └── permissions/          # NEW: Permission management
+│       ├── default.nix       # Permission module
+│       ├── roles.nix         # Role definitions
+│       ├── policies.nix      # Permission policies
+│       ├── access-control.nix # Access checking logic
+│       └── user-context.nix  # Current user detection
+```
+
+**Permission Architecture:**
+```nix
+# submodules/permissions/roles.nix
+{
+  # Standard roles (extend existing user roles)
+  roles = {
+    admin = {
+      description = "Full system access";
+      permissions = [ "system.*" "module.*" "security.*" ];
+      inherits = [];
+    };
+
+    virtualization = {
+      description = "Virtualization and container management";
+      permissions = [ "infrastructure.homelab.*" "infrastructure.vm.*" ];
+      inherits = [];
+    };
+
+    user = {
+      description = "Basic user access";
+      permissions = [ "system.status" "module.list" ];
+      inherits = [];
+    };
+  };
+}
+```
+
+#### 3.2 Update CLI Registry with Permissions
+**Objective:** Add permission metadata to command registration
+
+**Files to Modify:**
+- `core/management/nixos-control-center/submodules/cli-registry/commands.nix`
+
+**Enhanced Command Structure:**
+```nix
+# NEW: Commands with permission metadata
+commands = [
+  {
+    name = "homelab-status";
+    script = "${homelabStatus}/bin/ncc-homelab-status";
+    description = "Show homelab status";
+    category = "infrastructure";
+    permissions = {
+      roles = [ "admin" "virtualization" ];  # Required roles
+      users = [];                           # Specific users (optional)
+      groups = [];                          # Group membership (optional)
+    };
+  }
+];
+```
+
+#### 3.3 Create Permission-Aware Command Filter
+**Objective:** Filter commands based on user permissions
+
+**Files to Create:**
+- `core/management/nixos-control-center/submodules/cli-registry/filter.nix`
+
+**Implementation:**
+```nix
+# filter.nix - Permission-aware command filtering
+{ config, lib, ... }:
+let
+  cfg = config.core.management.ncc.submodules.cli-registry;
+  permissions = config.core.management.ncc.submodules.permissions;
+
+  # Get current user context
+  currentUser = permissions.user-context.currentUser;
+
+  # Check if user has permission for command
+  hasPermission = command: user:
+    let
+      cmdPerms = command.permissions or {};
+      userRoles = permissions.getUserRoles user;
+      userGroups = permissions.getUserGroups user;
+    in
+      # Allow if no permissions defined (backward compatibility)
+      if cmdPerms == {} then true
+      else
+        # Check roles
+        (cmdPerms.roles or [] == []) ||
+        (lib.any (role: builtins.elem role userRoles) cmdPerms.roles) ||
+        # Check specific users
+        (builtins.elem user (cmdPerms.users or [])) ||
+        # Check groups
+        (lib.any (group: builtins.elem group userGroups) (cmdPerms.groups or []));
+
+  # Filter commands based on permissions
+  filterCommands = commands: user:
+    builtins.filter (cmd: hasPermission cmd user) commands;
+
+in {
+  # Public API
+  inherit hasPermission filterCommands;
+}
+```
+
+#### 3.4 Update NCC API with Permissions
+**Objective:** Expose permission functionality through NCC API
+
+**Files to Modify:**
+- `core/management/nixos-control-center/api.nix`
+
+**Enhanced NCC API:**
+```nix
+core.management.ncc.api = {
+  inherit formatter registry;
+
+  # NEW: Permission APIs
+  permissions = {
+    checkAccess = user: command: config.core.management.ncc.submodules.permissions.access-control.checkAccess user command;
+    filterCommands = user: commands: config.core.management.ncc.submodules.permissions.cli-filter.filterCommands commands user;
+    getUserRoles = username: config.core.management.ncc.submodules.permissions.user-context.getUserRoles username;
+    getUserGroups = username: config.core.management.ncc.submodules.permissions.user-context.getUserGroups username;
+  };
+
+  # Validation APIs
+  validation = {
+    validateModule = moduleName: { /* validation logic */ };
+    validateSystem = { /* system checks */ };
+    checkDependencies = moduleList: { /* dependency resolution */ };
+    reportIssues = issues: { /* NCC-formatted error reporting */ };
+  };
+};
+```
+
+#### 3.5 Update NCC Commands with Permission Filtering
+**Objective:** Make NCC CLI commands respect permissions
+
+**Files to Modify:**
+- `core/management/nixos-control-center/commands.nix`
+
+**Implementation:**
+```nix
+# commands.nix - Permission-aware command help
+{ config, lib, pkgs, ... }:
+let
+  cfg = config.core.management.ncc;
+  permissions = cfg.submodules.permissions;
+  registry = cfg.submodules.cli-registry;
+
+  # Get current user (from environment or detection)
+  currentUser = permissions.user-context.currentUser;
+
+  # Filter available commands for current user
+  availableCommands = permissions.cli-filter.filterCommands registry.commands currentUser;
+
+  # Permission-aware help command
+  nccHelp = pkgs.writeShellScriptBin "ncc" ''
+    #!${pkgs.bash}/bin/bash
+    echo "NixOS Control Center (NCC) - Available Commands:"
+    echo "User: $(whoami) | Roles: ${permissions.getUserRoles currentUser}"
+    echo ""
+
+    ${lib.concatStringsSep "\n" (map (cmd: ''
+      echo "${cmd.name} - ${cmd.description}"
+    '') availableCommands)}
+
+    echo ""
+    echo "Use 'ncc <command> --help' for detailed help"
+  '';
+
+in {
+  # Register permission-filtered NCC command
+  environment.systemPackages = [ nccHelp ];
+}
+```
+
+### Phase 4: Validated Module Discovery (2-3 days)
+
+#### 4.1 Create Discovery Validation Library
 
 #### 5.1 Analyze Current Domain Usage
 **Objective:** Assess impact of domain removal
@@ -317,6 +504,8 @@ groupByCategory = modules:
 
 ### Functional Requirements
 - [ ] NCC module provides formatting API to all modules
+- [ ] Permission system filters commands by user roles
+- [ ] CLI shows only accessible commands per user
 - [ ] Module discovery validates module structure
 - [ ] Validation coordinator prevents invalid configurations
 - [ ] System and Module managers coordinate properly
@@ -324,12 +513,15 @@ groupByCategory = modules:
 
 ### Quality Requirements
 - [ ] All existing functionality preserved
+- [ ] Permission system is backward compatible
 - [ ] No breaking changes without migration path
 - [ ] Comprehensive test coverage
 - [ ] Updated documentation
+- [ ] Clear permission error messages
 
 ### Performance Requirements
 - [ ] Module discovery time < 2 seconds
+- [ ] Permission checking < 100ms per command
 - [ ] Validation overhead < 10% of build time
 - [ ] CLI responsiveness maintained
 
@@ -339,10 +531,11 @@ groupByCategory = modules:
 |-------|----------|-----------|
 | Phase 1: NCC Foundation | 2-3 days | NCC module created and integrated |
 | Phase 2: Formatting Migration | 1-2 days | All modules use NCC formatting |
-| Phase 3: Validated Discovery | 2-3 days | Module validation during discovery |
-| Phase 4: Validation Pipeline | 2-3 days | Centralized validation coordination |
+| Phase 3: Permission System | 2-3 days | Role-based command access control |
+| Phase 4: Validated Discovery | 2-3 days | Module validation during discovery |
+| Phase 5: Validation Pipeline | 2-3 days | Centralized validation coordination |
 
-**Total Timeline:** 11-17 days
+**Total Timeline:** 13-19 days
 
 ## Dependencies and Prerequisites
 
