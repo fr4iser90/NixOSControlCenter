@@ -1,219 +1,228 @@
-[8 tools called]
+# NixOS Control Center - Implementation Roadmap
 
-## 🎯 **VOLLSTÄNDIGE & KOMPLETTE LISTE ALLER AFFECTED FILES**
+## 🎯 **PHASE 1: Core Architecture Completion**
 
-# 📋 **PHASE 1: HARDCODED systemConfig.* REFERENZEN (98 Dateien)**
+### **1.1 Enhanced Module Metadata** ✅ IN PROGRESS
+**Status**: 70% Complete (Basic metadata exists)
+**Missing**: Dependency declarations in metadata
 
-## 🔴 **KRITISCH (brechen System - features.* → modules.*):**
+**Tasks**:
+- [x] Basic `_module.metadata` structure in all modules
+- [ ] Add `dependencies.requires` to all module metadata
+- [ ] Add `dependencies.conflicts` to all module metadata
+- [ ] Add `dependencies.provides` to all module metadata
+- [ ] Implement dependency resolution logic
+- [ ] Add dependency validation assertions
 
-### **SSH-Server-Manager (features.* falsch):**
-- `nixos/modules/security/ssh-server-manager/scripts/approve-request.nix`
-- `nixos/modules/security/ssh-server-manager/scripts/list-requests.nix`
-- `nixos/modules/security/ssh-server-manager/scripts/request-access.nix`
-- `nixos/modules/security/ssh-server-manager/scripts/grant-access.nix`
+**Files to modify**:
+- `nixos/modules/*/default.nix` - Add dependency declarations
+- `nixos/core/*/default.nix` - Add dependency declarations
+- Create `nixos/core/management/module-manager/lib/dependency-resolver.nix`
 
-### **SSH-Client-Manager (features.* falsch):**
-- `nixos/modules/security/ssh-client-manager/scripts/ssh-client-manager.nix`
-- `nixos/modules/security/ssh-client-manager/lib/ssh-server-utils.nix`
-- `nixos/modules/security/ssh-client-manager/commands.nix`
-- `nixos/modules/security/ssh-client-manager/config.nix`
-- `nixos/modules/security/ssh-client-manager/lib/ssh-key-utils.nix`
-- `nixos/modules/security/ssh-client-manager/handlers/ssh-client-handler.nix`
+### **1.2 Standardized Error Handling System** 🔄 NEXT
+**Status**: 30% Complete (config-validator exists)
+**Missing**: Structured error system with categories/levels
 
-### **Infrastructure Module (features.* falsch):**
-- `nixos/modules/infrastructure/vm/testing/default.nix`
-- `nixos/modules/infrastructure/bootentry-manager/config.nix`
-- `nixos/modules/infrastructure/homelab-manager/config.nix`
+**Tasks**:
+- [x] `config-validator.nix` for basic validation
+- [ ] Create `lib/errors.nix` with error categories/levels
+- [ ] Create `validators/framework.nix` for structured validation
+- [ ] Add error handling patterns to all modules
+- [ ] Implement error aggregation and reporting
 
-### **Options Schema Fehler (system.* → core.base.*):**
-- `nixos/core/base/packages/options.nix`
-- `nixos/core/base/boot/options.nix`
-- `nixos/core/base/hardware/options.nix`
-- `nixos/core/base/localization/options.nix`
-- `nixos/core/base/desktop/options.nix`
-- `nixos/core/base/audio/options.nix`
-- `nixos/core/base/user/options.nix`
-- `nixos/core/base/network/options.nix`
+**Files to create**:
+- `nixos/core/management/module-manager/lib/errors.nix`
+- `nixos/core/management/module-manager/validators/framework.nix`
+- Update all `validators/` directories in modules
 
-## 🟡 **HOCH (funktionale Probleme):**
+### **1.3 Event System for Module Interaktion** ❌ NOT STARTED
+**Status**: 0% Complete
+**Missing**: Complete event bus system
 
-### **Core Module hardcoded:**
-- `nixos/core/base/packages/default.nix`
-- `nixos/core/base/desktop/options.nix`
-- `nixos/core/base/user/options.nix`
-- `nixos/core/base/network/options.nix`
-- `nixos/core/base/hardware/options.nix`
-- `nixos/core/base/audio/options.nix`
-- `nixos/core/base/packages/options.nix`
-- `nixos/core/base/boot/options.nix`
-- `nixos/core/base/localization/options.nix`
+**Tasks**:
+- [ ] Create event bus architecture (`events/default.nix`)
+- [ ] Define standard event types
+- [ ] Implement event publishing/subscription
+- [ ] Add event handlers to existing modules
+- [ ] Create event monitoring commands
 
-### **Module hardcoded:**
-- `nixos/modules/specialized/hackathon/default.nix`
-- `nixos/modules/infrastructure/homelab-manager/default.nix`
+**Files to create**:
+- `nixos/core/management/system-manager/events/default.nix`
+- `nixos/core/management/system-manager/events/types.nix`
+- `nixos/core/management/system-manager/events/bus.nix`
+- Update module metadata with event declarations
 
-### **Management hardcoded:**
-- `nixos/core/management/module-manager/default.nix`
-- `nixos/flake.nix`
-- `nixos/core/management/system-manager/default.nix`
-- `nixos/core/management/module-manager/config.nix`
-- `nixos/core/management/system-manager/handlers/channel-manager.nix`
-- `nixos/core/management/module-manager/options.nix`
-- `nixos/core/management/system-manager/commands.nix`
-- `nixos/core/management/system-manager/components/config-migration/commands.nix`
-- `nixos/core/management/system-manager/submodules/system-checks/commands.nix`
-- `nixos/modules/infrastructure/homelab-manager/lib/homelab-utils.nix`
-- `nixos/core/management/system-manager/submodules/system-logging/commands.nix`
-- `nixos/core/management/system-manager/submodules/system-update/handlers/system-update.nix`
-- `nixos/core/management/module-manager/lib/utils.nix`
-- `nixos/core/management/system-manager/submodules/system-update/options.nix`
+### **1.4 Health Check System** ❌ NOT STARTED
+**Status**: 0% Complete
+**Missing**: Complete health monitoring
 
-### **Hardware/Desktop hardcoded:**
-- `nixos/core/base/hardware/gpu/default.nix`
-- `nixos/core/base/hardware/cpu/default.nix`
-- `nixos/core/base/desktop/environments/default.nix`
-- `nixos/core/base/desktop/themes/color-schemes/default.nix`
-- `nixos/core/base/desktop/display-servers/default.nix`
-- `nixos/core/base/desktop/display-managers/default.nix`
-- `nixos/core/base/desktop/themes/color-schemes/schemes/gnome.nix`
-- `nixos/core/base/desktop/themes/color-schemes/schemes/plasma.nix`
+**Tasks**:
+- [ ] Create health check framework
+- [ ] Implement readiness/liveness checks
+- [ ] Add health endpoints to modules
+- [ ] Create health monitoring commands
+- [ ] Integrate with systemd services
 
-## 🟢 **NORMAL (cleanup):**
+**Files to create**:
+- `nixos/core/management/system-manager/health/default.nix`
+- `nixos/core/management/system-manager/health/types.nix`
+- `nixos/modules/*/health/` directories
+- Health check commands in system-manager
 
-### **System Manager Submodules hardcoded:**
-- `nixos/core/management/system-manager/submodules/cli-registry/default.nix`
-- `nixos/core/management/system-manager/submodules/system-update/default.nix`
-- `nixos/core/management/system-manager/submodules/system-update/commands.nix`
-- `nixos/core/management/system-manager/submodules/system-checks/prebuild/checks/system/users.nix`
-- `nixos/core/management/system-manager/submodules/cli-registry/config.nix`
-- `nixos/core/management/system-manager/submodules/system-logging/config.nix`
-- `nixos/core/management/system-manager/submodules/system-logging/collectors/profile.nix`
-- `nixos/core/management/system-manager/submodules/system-logging/scripts/system-report.nix`
-- `nixos/core/management/system-manager/submodules/system-checks/scripts/prebuild-checks.nix`
-- `nixos/core/management/system-manager/submodules/system-logging/handlers/report-handler.nix`
-- `nixos/core/management/system-manager/submodules/system-checks/options.nix`
-- `nixos/core/management/system-manager/submodules/system-update/system-update-config.nix`
-- `nixos/core/management/system-manager/options.nix`
-- `nixos/core/management/system-manager/components/config-migration/check.nix`
-- `nixos/core/management/system-manager/submodules/system-logging/options.nix`
-- `nixos/core/management/system-manager/submodules/cli-formatter/options.nix`
-- `nixos/core/management/system-manager/submodules/cli-registry/options.nix`
-- `nixos/core/management/system-manager/submodules/system-update/options.nix`
-- `nixos/core/management/system-manager/submodules/cli-formatter/config.nix`
-- `nixos/core/management/system-manager/config.nix`
+## 🎯 **PHASE 2: Advanced Features**
 
-### **Scripts & Utils hardcoded:**
-- `nixos/core/management/module-manager/commands.nix`
-- `nixos/core/management/system-manager/commands.nix`
-- `nixos/core/management/system-manager/scripts/check-versions.nix`
-- `nixos/core/management/system-manager/scripts/enable-desktop.nix`
-- `nixos/core/management/system-manager/submodules/system-checks/scripts/postbuild-checks.nix`
+### **2.1 Documentation Generation** ❌ NOT STARTED
+**Status**: 0% Complete
+**Missing**: Auto-generated documentation
 
-### **Specialized Scripts hardcoded:**
-- `nixos/modules/specialized/hackathon/hackathon-status.nix`
-- `nixos/modules/specialized/hackathon/hackathon-create.nix`
-- `nixos/modules/specialized/hackathon/hackathon-fetch.nix`
-- `nixos/modules/infrastructure/homelab-manager/scripts/homelab-create.nix`
-- `nixos/modules/infrastructure/homelab-manager/scripts/homelab-fetch.nix`
+**Tasks**:
+- [ ] Create documentation generator framework
+- [ ] Auto-generate module READMEs
+- [ ] Generate API documentation
+- [ ] Create dependency graphs
+- [ ] Generate configuration examples
 
-### **Home Manager hardcoded:**
-- `nixos/core/base/user/home-manager/roles/restricted-admin.nix`
-- `nixos/core/base/user/home-manager/shellInit/index.nix`
-- `nixos/core/base/user/home-manager/roles/virtualization.nix`
-- `nixos/core/base/user/home-manager/roles/admin.nix`
+**Files to create**:
+- `nixos/core/management/module-manager/docs/generator.nix`
+- `nixos/core/management/module-manager/docs/templates/`
+- Auto-update scripts for README generation
 
-### **Config Files hardcoded:**
-- `nixos/core/base/network/config.nix`
-- `nixos/core/base/boot/config.nix`
-- `nixos/core/base/packages/config.nix`
-- `nixos/core/management/system-manager/submodules/system-update/config.nix`
-- `nixos/core/management/system-manager/submodules/cli-formatter/config.nix`
-- `nixos/core/management/system-manager/config.nix`
+### **2.2 UI Generation (Optional)** ❌ NOT STARTED
+**Status**: 0% Complete
+**Missing**: Configuration UI generation
 
-### **Network & Hardware hardcoded:**
-- `nixos/core/base/network/networkmanager.nix`
-- `nixos/core/base/network/firewall.nix`
-- `nixos/core/base/hardware/memory/default.nix`
+**Tasks**:
+- [ ] Create UI generation framework
+- [ ] Generate HTML forms from module options
+- [ ] Create configuration wizards
+- [ ] Integrate with web interface
+- [ ] Add validation to UI components
 
-### **Documentation (README/MD) hardcoded:**
-- `nixos/modules/system/lock-manager/README.md`
-- `nixos/modules/system/lock-manager/ARCHITECTURE.md`
-- `nixos/core/management/module-manager/CHANGELOG.md`
-- `nixos/core/management/system-manager/submodules/system-checks/CHANGELOG.md`
-- `nixos/core/management/system-manager/submodules/cli-registry/CHANGELOG.md`
-- `nixos/core/base/network/README.md`
-- `nixos/core/base/user/README.md`
-- `nixos/modules/infrastructure/homelab-manager/docker.md`
-- `nixos/core/base/boot/README.md`
-- `nixos/core/base/boot/CHANGELOG.md`
-- `nixos/core/base/desktop/README.md`
-- `nixos/core/base/hardware/README.md`
+**Files to create**:
+- `nixos/core/management/module-manager/ui/generator.nix`
+- `nixos/core/management/module-manager/ui/templates/`
+- UI generation commands
 
-### **Custom & Examples hardcoded:**
-- `nixos/custom/example_borg_backup.nix`
+### **2.3 Testing Framework Enhancement** 🔄 NEXT
+**Status**: 40% Complete (VM testing exists)
+**Missing**: Comprehensive testing framework
+
+**Tasks**:
+- [x] VM testing exists in `infrastructure/vm/testing/`
+- [ ] Create unit test framework for modules
+- [ ] Add integration tests
+- [ ] Add property-based testing
+- [ ] Create test runner commands
+- [ ] Add CI/CD integration
+
+**Files to create**:
+- `nixos/core/management/module-manager/tests/framework.nix`
+- `nixos/modules/*/tests/` directories
+- Test runner commands
+
+### **2.4 Metrics & Telemetry** ❌ NOT STARTED
+**Status**: 0% Complete
+**Missing**: Monitoring and metrics collection
+
+**Tasks**:
+- [ ] Define metrics schema
+- [ ] Implement metrics collection
+- [ ] Add telemetry events
+- [ ] Create monitoring dashboards
+- [ ] Add alerting system
+
+**Files to create**:
+- `nixos/core/management/system-manager/metrics/default.nix`
+- `nixos/core/management/system-manager/metrics/collectors/`
+- Monitoring commands
+
+### **2.5 Security Policies** ❌ NOT STARTED
+**Status**: 0% Complete
+**Missing**: Security policy framework
+
+**Tasks**:
+- [ ] Define security policy schema
+- [ ] Implement access control
+- [ ] Add security checks
+- [ ] Create audit logging
+- [ ] Add compliance validation
+
+**Files to create**:
+- `nixos/core/management/system-manager/security/policies.nix`
+- `nixos/core/management/system-manager/security/access-control.nix`
+- Security audit commands
+
+### **2.6 Backup/Restore System** ❌ NOT STARTED
+**Status**: 0% Complete
+**Missing**: Backup functionality
+
+**Tasks**:
+- [ ] Create backup framework
+- [ ] Implement backup strategies
+- [ ] Add restore functionality
+- [ ] Create backup scheduling
+- [ ] Add backup validation
+
+**Files to create**:
+- `nixos/core/management/system-manager/backup/default.nix`
+- `nixos/core/management/system-manager/backup/strategies/`
+- Backup commands
+
+## 🎯 **PHASE 3: Integration & Optimization**
+
+### **3.1 Module Discovery Enhancement**
+- [ ] Improve automatic module discovery
+- [ ] Add module health checks to discovery
+- [ ] Implement lazy loading for optional modules
+- [ ] Add module dependency caching
+
+### **3.2 Performance Optimization**
+- [ ] Optimize module loading times
+- [ ] Implement module caching
+- [ ] Add parallel module evaluation
+- [ ] Optimize event system performance
+
+### **3.3 User Experience Improvements**
+- [ ] Enhanced error messages
+- [ ] Better progress indicators
+- [ ] Improved command help system
+- [ ] Add interactive configuration wizards
+
+## 📊 **Implementation Priority**
+
+### **HIGH PRIORITY** (Next Sprint):
+1. **Dependency Management** - Core für Module-Interaktion
+2. **Error Handling System** - Kritisch für Zuverlässigkeit
+3. **Testing Framework** - Wichtig für Qualität
+4. **Event System** - Basis für lose Kopplung
+
+### **MEDIUM PRIORITY**:
+5. **Health Check System** - Für Monitoring
+6. **Documentation Generation** - Für Benutzerfreundlichkeit
+7. **Metrics & Telemetry** - Für Insights
+
+### **LOW PRIORITY** (Optional):
+8. **UI Generation** - Nice-to-have
+9. **Security Policies** - Erweiterte Sicherheit
+10. **Backup/Restore** - Nice-to-have
+
+## ✅ **Completed Features**
+- [x] Basic module structure and metadata system
+- [x] Core/Optional module separation
+- [x] Command registration system
+- [x] Versioning and migration system
+- [x] CHANGELOG system
+- [x] Basic validation (config-validator)
+- [x] VM testing framework (partial)
+
+## 🔍 **Current Status Summary**
+- **Total Features**: 12 Advanced Architecture Features
+- **Completed**: 7 Basic Features
+- **In Progress**: 1 (Dependency Management)
+- **Not Started**: 4 High Priority Features
+- **Overall Progress**: ~35%
 
 ---
 
-# 📋 **PHASE 2: FEHLENDE _module.metadata (60+ Dateien)**
-
-## 🔴 **KRITISCH (Root Module ohne Metadata):**
-
-### **Infrastructure Root Module:**
-- `nixos/modules/infrastructure/bootentry-manager/default.nix` ❌
-- `nixos/modules/infrastructure/homelab-manager/default.nix` ❌
-- `nixos/modules/infrastructure/vm/default.nix` ❌
-
-### **Security Root Module:**
-- `nixos/modules/security/ssh-server-manager/default.nix` ❌ (nur teilweise)
-
-### **Specialized Root Module:**
-- `nixos/modules/specialized/hackathon/default.nix` ❌
-- `nixos/modules/specialized/ai-workspace/default.nix` ❌
-
-### **System Root Module:**
-- `nixos/modules/system/lock-manager/default.nix` ❌
-
-## 🟡 **HOCH (Core Submodule ohne Metadata):**
-
-### **System Manager Submodules:**
-- `nixos/core/management/system-manager/submodules/cli-formatter/default.nix` ❌
-- `nixos/core/management/system-manager/submodules/cli-registry/default.nix` ❌
-- `nixos/core/management/system-manager/submodules/system-checks/default.nix` ❌
-- `nixos/core/management/system-manager/submodules/system-logging/default.nix` ❌
-- `nixos/core/management/system-manager/submodules/system-update/default.nix` ❌
-
-### **Base Submodules:**
-- `nixos/core/base/desktop/default.nix` ❌
-- `nixos/core/base/hardware/default.nix` ❌
-- `nixos/core/base/network/default.nix` ❌
-- `nixos/core/base/audio/default.nix` ❌
-- `nixos/core/base/boot/default.nix` ❌
-- `nixos/core/base/localization/default.nix` ❌
-
-## 🟢 **NORMAL (weitere Module ohne Metadata):**
-
-### **Infrastructure Submodules:**
-- `nixos/modules/infrastructure/vm/core/default.nix` ❌
-- `nixos/modules/infrastructure/vm/containers/default.nix` ❌
-- `nixos/modules/infrastructure/vm/iso-manager/default.nix` ❌
-
-### **Specialized Submodules:**
-- `nixos/modules/specialized/ai-workspace/containers/default.nix` ❌
-- `nixos/modules/specialized/ai-workspace/llm/default.nix` ❌
-- `nixos/modules/specialized/ai-workspace/services/default.nix` ❌
-
-### **System Submodules:**
-- Alle Scanner in `nixos/modules/system/lock-manager/scanners/` ❌
-
----
-
-# 🎯 **GESAMT: 160+ DATEIEN ZU MIGRieren**
-
-**Phase 1:** 98 Dateien mit hardcoded systemConfig.* (198 matches total)
-**Phase 2:** 60+ Dateien ohne _module.metadata
-
-**TOTAL: 160+ AFFECTED FILES**
-
-**JEDE EINZELNE AUFGEFÜHRT!** 🚀
-
-**Welche Datei migrieren wir zuerst?** 🔥
+*Last updated: $(date)*
+*Next focus: Dependency Management completion*
