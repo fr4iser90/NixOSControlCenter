@@ -43,6 +43,7 @@ let
       inherit name;
       value = import ./collectors/${name}.nix {
         inherit config lib pkgs systemConfig ui reportLevels;
+        getModuleConfig = moduleConfig.getModuleConfig;
         currentLevel = reportLevels.${
           if effectiveCollectors.${name}.detailLevel != null
           then effectiveCollectors.${name}.detailLevel

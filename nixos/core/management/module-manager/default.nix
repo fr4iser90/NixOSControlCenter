@@ -2,9 +2,7 @@
 
 let
   # Self-migration: Use getModuleConfig with systemConfig fallback for safety
-  cfg = if (builtins.tryEval (getModuleConfig "module-manager")).success
-        then getModuleConfig "module-manager"
-        else systemConfig.core.management.module-manager or {};
+  cfg = getModuleConfig "module-manager";
 in {
   _module.metadata = {
     role = "core";

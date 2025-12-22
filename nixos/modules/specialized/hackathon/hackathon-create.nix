@@ -1,10 +1,10 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
   # Finde Hackathon-Admin-Benutzer
-  hackathonUsers = lib.filterAttrs 
-    (name: user: user.role == "hackathon-admin") 
-    systemConfig.core.base.user;
+  hackathonUsers = lib.filterAttrs
+    (name: user: user.role == "hackathon-admin")
+    (getModuleConfig "user");
   
   hasHackathonUsers = (lib.length (lib.attrNames hackathonUsers)) > 0;
   hackathonUser = if hasHackathonUsers then lib.head (lib.attrNames hackathonUsers) else "";

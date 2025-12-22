@@ -6,9 +6,9 @@ let
   cfg = getModuleConfig "hackathon";
   
   # Finde alle Benutzer mit hackathon-admin Rolle
-  hackathonUsers = lib.filterAttrs 
-    (name: user: user.role == "hackathon-admin") 
-    systemConfig.core.base.user;
+  hackathonUsers = lib.filterAttrs
+    (name: user: user.role == "hackathon-admin")
+    (getModuleConfig "user");
 
   # Prüfe ob wir Hackathon-Admin-Benutzer haben
   hasHackathonUsers = (lib.length (lib.attrNames hackathonUsers)) > 0;
@@ -26,15 +26,17 @@ in {
     version = "1.0.0";
   };
 
-  imports = if cfg.enable or false then [
-    ./options.nix
-  ] ++ (if hasHackathonUsers then [
-    ./hackathon-fetch.nix
-    ./hackathon-create.nix
-    ./hackathon-update.nix
-    ./hackathon-status.nix
-    ./hackathon-cleanup.nix
-  ] else []);
+  imports = if cfg.enable or false then
+    [
+      ./options.nix
+    ] ++ (if hasHackathonUsers then [
+      ./hackathon-fetch.nix
+      ./hackathon-create.nix
+      ./hackathon-update.nix
+      ./hackathon-status.nix
+      ./hackathon-cleanup.nix
+    ] else [])
+  else [];
 
   config = mkMerge [
     {

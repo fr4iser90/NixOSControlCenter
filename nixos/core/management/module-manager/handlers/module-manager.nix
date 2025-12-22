@@ -1,8 +1,8 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig }:
 
 # Import utility functions from lib/
 let
-  libUtils = import ../lib/default.nix { inherit config lib pkgs systemConfig; };
+  libUtils = import ../lib/default.nix { inherit config lib pkgs systemConfig getModuleConfig; };
 
 in {
   # 🎯 HANDLER: Only Business Logic - NO Commands!

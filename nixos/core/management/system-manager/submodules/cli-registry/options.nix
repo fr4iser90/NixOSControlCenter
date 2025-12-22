@@ -45,6 +45,14 @@ in {
 
   # API definition - always available, conditionally populated
   options.core.management.system-manager.submodules.cli-registry = {
+    # API for other modules - always available
+    api = lib.mkOption {
+      type = lib.types.attrs;
+      default = {};
+      internal = true;
+      description = "CLI registry API for other modules";
+    };
+
     commands = lib.mkOption {
       type = lib.types.listOf ccLib.types.commandType;
       default = [];

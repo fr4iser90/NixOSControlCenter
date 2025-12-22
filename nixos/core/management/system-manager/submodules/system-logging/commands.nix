@@ -1,6 +1,6 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 let
-  cfg = systemConfig.core.management.system-manager.submodules.system-logging or {};
+  cfg = getModuleConfig "system-logging";
 
   # Import the system report script
   systemReportScript = import ./scripts/system-report.nix {

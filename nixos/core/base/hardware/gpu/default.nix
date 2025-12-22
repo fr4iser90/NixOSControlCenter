@@ -1,7 +1,8 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
   # GPU configuration selection based on environment settings
+  hardwareCfg = getModuleConfig "hardware";
   gpuConfigs = {
     # Single GPU configurations
     "nvidia" = ./nvidia.nix;
@@ -34,14 +35,14 @@ let
 
 in {
   imports = [
-    (gpuConfigs.${systemConfig.core.base.hardware.gpu or "none"})
+    (gpuConfigs.${hardwareCfg.gpu or "none"})
   ];
 
   assertions = [
     {
-      assertion = builtins.hasAttr (systemConfig.hardware.gpu or "none") gpuConfigs;
+      assertion = builtins.hasAttr (hardwareCfg.gpu or "none") gpuConfigs;
       message = ''
-        Invalid GPU configuration: ${systemConfig.hardware.gpu or "none"}
+        Invalid GPU configuration: ${hardwareCfg.gpu or "none"}
         Available options are: ${toString (builtins.attrNames gpuConfigs)}
       '';
     }

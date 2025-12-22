@@ -13,7 +13,7 @@ let
   configHelpers = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   apiValue = configHelpers // backupHelpers;
 
-  bootCfg = systemConfig.core.base.boot or {};
+  bootCfg = getModuleConfig "boot";
 
 in {
   imports = [

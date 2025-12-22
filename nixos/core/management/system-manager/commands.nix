@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 with lib;
 
@@ -11,7 +11,7 @@ let
   # Scripts are imported below (template-compliant)
 
   # Import scripts (template-compliant)
-  enableDesktopScript = import ./scripts/enable-desktop.nix { inherit config lib pkgs systemConfig; };
+  enableDesktopScript = import ./scripts/enable-desktop.nix { inherit config lib pkgs systemConfig getModuleConfig; };
   updateDesktopConfig = import ./scripts/update-desktop-config.nix { inherit config lib pkgs systemConfig; };
   
   # Import config migration and validation

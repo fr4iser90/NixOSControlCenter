@@ -1,6 +1,6 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 let
-  cfg = systemConfig.core.management.system-manager.submodules.system-update or {};
+  cfg = getModuleConfig "system-update";
 in {
   imports = [
     ./options.nix

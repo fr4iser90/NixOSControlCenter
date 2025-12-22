@@ -1,9 +1,9 @@
 # Module Manager Utility Functions
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
-  hostname = systemConfig.core.base.network.hostName or "nixos";
+  hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
 
   # Import discovery functions
   discovery = import ./discovery.nix { inherit lib; };

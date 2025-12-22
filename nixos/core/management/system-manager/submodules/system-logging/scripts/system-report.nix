@@ -1,7 +1,7 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
-  cfg = systemConfig.core.management.system-manager.submodules.system-logging or {};
+  cfg = getModuleConfig "system-logging";
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
 
   # System Report Script

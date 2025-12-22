@@ -1,12 +1,12 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 with lib;
 
 let
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
   commandCenter = config.core.management.system-manager.submodules.cli-registry;
-  hostname = systemConfig.core.base.network.hostName or "nixos";
-  systemChecks = systemConfig.core.management.system-manager.submodules.system-checks.enable or false;
+  hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
+  systemChecks = lib.attrByPath ["enable"] false (getModuleConfig "system-checks");
 
   # Script to update flake inputs (channels) and rebuild
   updateChannelsScript = pkgs.writeScriptBin "ncc-update-channels" ''

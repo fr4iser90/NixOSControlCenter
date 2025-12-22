@@ -1,16 +1,19 @@
 # environments/default.nix
-{ config, lib, pkgs, systemConfig, ... }:
-{
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+let
+  desktopCfg = getModuleConfig "desktop";
+  environment = desktopCfg.environment;
+in {
   # Only import desktop environment if desktop is enabled
   # Uses the environment specified in systemConfig.core.base.desktop.environment
   imports = [
-    (./. + "/${systemConfig.core.base.desktop.environment}")  # Automatically loads the correct desktop environment
+    (./. + "/${environment}")  # Automatically loads the correct desktop environment
   ];
 
   # Verify that the specified desktop environment exists
   # This prevents configuration errors before the system build starts
-  assertions = lib.mkIf systemConfig.core.base.desktop.enable [{
-    assertion = builtins.pathExists (./. + "/${systemConfig.core.base.desktop.environment}");
-    message = "Desktop environment ${systemConfig.core.base.desktop.environment} not found in ${toString ./.}";
+  assertions = lib.mkIf desktopCfg.enable [{
+    assertion = builtins.pathExists (./. + "/${environment}");
+    message = "Desktop environment ${environment} not found in ${toString ./.}";
   }];
 }

@@ -1,5 +1,5 @@
 # nixconfig/networking/networkmanager.nix
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 {
   networking = {
     useDHCP = false;
@@ -9,7 +9,7 @@
       enable = true;
       wifi.powersave = systemConfig.enablePowersave or false;
       wifi.scanRandMacAddress = true;
-      dns = systemConfig.core.base.network.networkManager.dns or "default";
+      dns = lib.attrByPath ["networkManager" "dns"] "default" (getModuleConfig "network");
     };
   };
 }

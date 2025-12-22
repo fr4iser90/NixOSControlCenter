@@ -1,6 +1,6 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 let
-  cfg = systemConfig.core.management.system-manager or {};
+  cfg = getModuleConfig "system-manager";
   configHelpers = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   # Use the template file as default config
   defaultConfig = builtins.readFile ./system-manager-config.nix;

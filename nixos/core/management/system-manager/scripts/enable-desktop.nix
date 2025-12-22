@@ -1,10 +1,10 @@
-{ config, lib, pkgs, systemConfig }:
+{ config, lib, pkgs, systemConfig, getModuleConfig }:
 
 with lib;
 
 let
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
-  hostname = systemConfig.core.base.network.hostName or "nixos";
+  ui = config.core.management.system-manager.submodules.cli-formatter.api or {};
+  hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
   desktopConfigPath = "/etc/nixos/configs/desktop-config.nix";
 
   updateDesktopConfig = import ./update-desktop-config.nix { inherit config lib pkgs systemConfig; };

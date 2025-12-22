@@ -9,14 +9,14 @@ let
   isSwarmMode = (systemConfig.homelab.swarm or null) != null;
   
   # Find virtualization users (preferred)
-  virtUsers = lib.filterAttrs 
-    (name: user: user.role == "virtualization") 
-    systemConfig.core.base.user;
+  virtUsers = lib.filterAttrs
+    (name: user: user.role == "virtualization")
+    (getModuleConfig "user");
 
   # Fallback: Find admin users if no virtualization user
-  adminUsers = lib.filterAttrs 
-    (name: user: user.role == "admin") 
-    systemConfig.core.base.user;
+  adminUsers = lib.filterAttrs
+    (name: user: user.role == "admin")
+    (getModuleConfig "user");
   
   hasVirtUsers = (lib.length (lib.attrNames virtUsers)) > 0;
   hasAdminUsers = (lib.length (lib.attrNames adminUsers)) > 0;
@@ -47,16 +47,18 @@ in {
     version = "1.0.0";
   };
 
-  imports = if cfg.enable or false then [
-    ./options.nix
-    ./config.nix
-  ] ++ (if hasDockerUser then [
-    ./homelab-create.nix
-    ./homelab-fetch.nix
-    # ./homelab-update.nix
-    # ./homelab-delete.nix
-    # ./homelab-status.nix
-  ] else []);
+  imports = if cfg.enable or false then
+    [
+      ./options.nix
+      ./config.nix
+    ] ++ (if hasDockerUser then [
+      ./homelab-create.nix
+      ./homelab-fetch.nix
+      # ./homelab-update.nix
+      # ./homelab-delete.nix
+      # ./homelab-status.nix
+    ] else [])
+  else [];
 
   config = mkMerge [
     {

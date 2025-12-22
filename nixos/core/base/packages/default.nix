@@ -2,6 +2,7 @@
 
 let
   cfg = getModuleConfig "packages";
+  systemManagerCfg = getModuleConfig "system-manager";
 
   # Load base packages
   basePackages = {
@@ -42,6 +43,9 @@ in {
 
   imports = [
     ./config.nix
-    (basePackages.${systemConfig.core.management.system-manager.systemType} or (throw "Unknown system type: ${systemConfig.core.management.system-manager.systemType}"))
+    (let
+      systemType = systemManagerCfg.systemType or "desktop";
+    in
+      basePackages.${systemType} or (throw "Unknown system type: ${systemType}"))
   ] ++ moduleModules ++ dockerModules;
 }

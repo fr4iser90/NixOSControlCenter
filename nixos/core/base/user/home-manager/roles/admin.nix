@@ -1,8 +1,9 @@
 # src/nixos/modules/homemanager/roles/admin.nix
-{ config, lib, pkgs, user, systemConfig, ... }:
+{ config, lib, pkgs, user, systemConfig, getModuleConfig, ... }:
 
 let
-  userConfig = systemConfig.core.base.user.${user};
+  userCfg = getModuleConfig "user";
+  userConfig = userCfg.${user};
   shellInit = import ../shellInit/${userConfig.defaultShell}Init.nix { inherit pkgs lib; };
 in {
   imports = [ shellInit ];

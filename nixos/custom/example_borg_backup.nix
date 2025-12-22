@@ -1,12 +1,13 @@
-{ config, pkgs, lib, systemConfig, ... }:
+{ config, pkgs, lib, systemConfig, getModuleConfig, ... }:
 
 let
   # Dynamically determine the first admin user
   # If no admin is found, take the first user
-  adminUsers = lib.filterAttrs (_: userConfig: userConfig.role == "admin") systemConfig.core.base.user;
+  userCfg = getModuleConfig "user";
+  adminUsers = lib.filterAttrs (_: userConfig: userConfig.role == "admin") userCfg;
   firstUser = if lib.length (lib.attrNames adminUsers) > 0
     then lib.head (lib.attrNames adminUsers)
-    else lib.head (lib.attrNames systemConfig.core.base.user);
+    else lib.head (lib.attrNames userCfg);
   
   # Get user UID/GID from config.users.users
   userConfig = config.users.users.${firstUser};

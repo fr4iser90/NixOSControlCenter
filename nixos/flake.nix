@@ -62,6 +62,9 @@
     discovery = discoveryLib { inherit lib; };
     moduleConfig = moduleConfigLib { inherit lib systemConfig; };
     getModuleConfig = moduleConfig.getModuleConfig;
+    getModuleMetadata = moduleConfig.getModuleMetadata;
+    getCurrentModuleMetadata = moduleConfig.getCurrentModuleMetadata;
+    getModuleApi = moduleConfig.getModuleApi;
 
     # Base modules required for all systems
     systemModules = [
@@ -77,7 +80,7 @@
       "${systemConfig.core.base.network.hostName}" = nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = {
-          inherit systemConfig discovery moduleConfig getModuleConfig;
+          inherit systemConfig discovery moduleConfig getModuleConfig getModuleMetadata getCurrentModuleMetadata getModuleApi;
         }; 
 
         modules = [
@@ -101,12 +104,14 @@
             home-manager = {
               useGlobalPkgs = true;
               useUserPackages = true;
-              extraSpecialArgs = { inherit systemConfig; };
+              extraSpecialArgs = {
+                inherit systemConfig discovery moduleConfig getModuleConfig getModuleMetadata getCurrentModuleMetadata;
+              };
               users = lib.mapAttrs (username: userConfig:
                 { config, ... }: {
                   imports = [
                     (import ./core/base/user/home-manager/roles/${userConfig.role}.nix {
-                      inherit pkgs lib config systemConfig;
+                      inherit pkgs lib config systemConfig getModuleConfig;
                       user = username;
                     })
                   ];

@@ -1,6 +1,6 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 let
-  cfg = config.systemConfig.core.system.packages;
+  cfg = getModuleConfig "packages";
 in {
   # Packages configuration is handled in default.nix (core module, always enabled)
   # This file creates symlinks and handles config file management

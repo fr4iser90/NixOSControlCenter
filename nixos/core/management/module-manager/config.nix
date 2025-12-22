@@ -1,10 +1,10 @@
-# Zentrales Module-Management System
-{ config, lib, pkgs, systemConfig, ... }:
+# Central Module Management System
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 with lib;
 
 let
-  cfg = systemConfig.core.management.module-manager or {};
+  cfg = getModuleConfig "module-manager";
   configHelpers = import ./lib/config-helpers.nix { inherit pkgs lib; };
   # Use the template file as default config
   defaultConfig = builtins.readFile ./module-manager-config.nix;

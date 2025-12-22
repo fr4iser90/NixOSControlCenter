@@ -1,10 +1,10 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 let
-  cfg = systemConfig.core.management.system-manager.submodules.system-update or {};
+  cfg = getModuleConfig "system-update";
 
-  # Import the UI from the cli-formatter submodule
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  # Import the UI from the cli-formatter submodule (generic)
+  ui = getModuleApi "system-manager";
 
   # System update main script (extracted from the old handler)
   systemUpdateMainScript = pkgs.writeScriptBin "ncc-system-update-main" ''

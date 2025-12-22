@@ -1,9 +1,9 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
-  cfg = systemConfig.core.management.system-manager.submodules.system-checks or {};
+  cfg = getModuleConfig "system-checks";
   prebuildCfg = cfg.prebuild or {};
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = config.core.management.system-manager.submodules.cli-formatter.api or {};
 in
   pkgs.writeScriptBin "build" ''
     #!${pkgs.bash}/bin/bash

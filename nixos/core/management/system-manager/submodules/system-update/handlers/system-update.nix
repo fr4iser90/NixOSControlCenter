@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 with lib;
 
@@ -23,13 +23,13 @@ let
   ];
 
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
-  commandCenter = systemConfig.core.management.system-manager.submodules.cli-registry;
+  commandCenter = getModuleConfig "cli-registry";
 
   # Extract configuration values
-  username = head (attrNames systemConfig.core.base.user);
-  hostname = systemConfig.core.base.network.hostName or "nixos";
-  autoBuild = systemConfig.management.system-manager.auto-build or false;
-  systemChecks = systemConfig.core.management.system-manager.submodules.system-checks.enable or false;
+  username = head (attrNames (getModuleConfig "user"));
+  hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
+  autoBuild = lib.attrByPath ["autoBuild"] false (getModuleConfig "system-manager");
+  systemChecks = lib.attrByPath ["enable"] false (getModuleConfig "system-checks");
   # Function to prompt for build - with conditional build command and better error handling
   prompt_build = ''
     while true; do

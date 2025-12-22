@@ -1,13 +1,14 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 with lib;
 
 let
   # Import the handler for business logic
-  handler = import ./handlers/module-manager.nix { inherit config lib pkgs systemConfig; };
+  handler = import ./handlers/module-manager.nix { inherit config lib pkgs systemConfig getModuleConfig; };
 
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
-  hostname = systemConfig.core.base.network.hostName or "nixos";
+  ui = let apiPath = getModuleApi "cli-formatter"; in
+       if apiPath == "" then {} else lib.attrByPath (lib.splitString "." apiPath) {} config;  # Generic API access
+  hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");  # Generic config access
 
   # 🎯 COMMAND REGISTRATION: Per MODULE_TEMPLATE in commands.nix!
 

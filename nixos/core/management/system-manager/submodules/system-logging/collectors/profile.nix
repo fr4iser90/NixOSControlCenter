@@ -1,4 +1,4 @@
-{ config, lib, ui, reportLevels, currentLevel, systemConfig, ... }:
+{ config, lib, ui, reportLevels, currentLevel, systemConfig, getModuleConfig, ... }:
 
 with lib;
 
@@ -7,9 +7,9 @@ let
 
   # Get system information
   systemInfo = {
-    hasDesktop = systemConfig.core.base.desktop.enable or false;
-    systemType = systemConfig.core.management.system-manager.systemType or "desktop";
-    desktop = systemConfig.core.base.desktop.environment or "none";
+    hasDesktop = lib.attrByPath ["enable"] false (getModuleConfig "desktop");
+    systemType = lib.attrByPath ["systemType"] "desktop" (getModuleConfig "system-manager");
+    desktop = lib.attrByPath ["environment"] "none" (getModuleConfig "desktop");
   };
 
   # Determine profile module path

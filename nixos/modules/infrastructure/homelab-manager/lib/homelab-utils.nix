@@ -1,11 +1,11 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 with lib;
 
 let
   ui = config.core.management.system-manager.submodules.cli-formatter.api;
   commandCenter = config.core.management.system-manager.submodules.cli-registry;
-  hostname = systemConfig.core.base.network.hostName or "nixos";
+  hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
 
   # Homelab Minimization Script
   # Converts a desktop system to a minimal homelab server by:

@@ -1,7 +1,7 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
-  cfg = systemConfig.core.management.system-manager.submodules.system-checks or {};
+  cfg = getModuleConfig "system-checks";
   postbuildCfg = cfg.postbuild or {};
 
   # Available postbuild checks
