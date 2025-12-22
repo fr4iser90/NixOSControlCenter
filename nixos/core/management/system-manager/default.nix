@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, moduleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, moduleConfig, ... }:
 
 with lib;
 

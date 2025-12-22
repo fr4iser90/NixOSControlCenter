@@ -1,9 +1,9 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, getModuleApi, ... }:
 
 with lib;
 
 let
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
   
   # Execute module migration
   # moduleName: Name of the module

@@ -1,8 +1,8 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleApi, ... }:
 
 let
   cfg = config.core.management.system-manager.submodules.cli-registry or {};
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
   ccLib = import ../lib { inherit lib; };
 
   # Dynamische Inhalte vorbereiten

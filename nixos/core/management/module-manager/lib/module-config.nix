@@ -69,11 +69,27 @@ let
   # getModuleApi "cli-formatter" → "core.management.system-manager.submodules.cli-formatter.api"
   # getModuleApi "system-manager" → "core.management.system-manager.api"
   # Usage: config.${getModuleApi "module"}
+  # Automatische Übersetzung: Runtime = config path, Build-Time = direkter API import
   getModuleApi = moduleName:
     let
       metadata = getModuleMetadata moduleName;
+      apiPath = if metadata == {} then "" else metadata.apiPath;
     in
-      if metadata == {} then "" else metadata.apiPath + ".api";
+    # Magische Übersetzung: Zur Build-Time automatisch resolve
+    if (builtins.tryEval builtins.derivation).success then
+      # Build-Time: Discovery neu laufen und API direkt importieren
+      let
+        modules = discovery.discoverAllModules;
+        targetModule = lib.findFirst (m: m.name == moduleName) null modules;
+      in
+      if targetModule == null then
+        throw "Module ${moduleName} not found"
+      else
+        # Direktes API import zur Build-Time
+        import "${targetModule.path}/api.nix" { inherit lib; }
+    else
+      # Runtime: Normales config access
+      apiPath + ".api";
 
 in
 moduleConfigAttrs // {

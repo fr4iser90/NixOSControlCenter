@@ -1,8 +1,8 @@
 # Module Manager Utility Functions
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 let
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
 
   # Import discovery functions

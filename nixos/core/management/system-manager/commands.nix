@@ -1,17 +1,17 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 with lib;
 
 let
   cfg = systemConfig.management.system-manager or {};
   versionChecker = import ./handlers/module-version-check.nix { inherit config lib; };
-  checkVersions = import ./scripts/check-versions.nix { inherit config lib pkgs; };
-  updateModules = import ./scripts/update-modules.nix { inherit config lib pkgs; };
+  checkVersions = import ./scripts/check-versions.nix { inherit config lib pkgs getModuleApi; };
+  updateModules = import ./scripts/update-modules.nix { inherit config lib pkgs getModuleApi; };
   
   # Scripts are imported below (template-compliant)
 
   # Import scripts (template-compliant)
-  enableDesktopScript = import ./scripts/enable-desktop.nix { inherit config lib pkgs systemConfig getModuleConfig; };
+  enableDesktopScript = import ./scripts/enable-desktop.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   updateDesktopConfig = import ./scripts/update-desktop-config.nix { inherit config lib pkgs systemConfig; };
   
   # Import config migration and validation

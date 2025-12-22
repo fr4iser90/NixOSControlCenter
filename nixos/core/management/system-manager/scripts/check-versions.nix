@@ -1,9 +1,9 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, getModuleApi, ... }:
 
 with lib;
 
 let
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
   versionChecker = import ../handlers/module-version-check.nix { inherit config lib; };
   
   # Create the check-versions script

@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = getModuleConfig "ssh-server-manager";
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
   commandCenter = config.core.management.system-manager.submodules.cli-registry;
 in {
   _module.metadata = {

@@ -4,7 +4,7 @@ with lib;
 
 let
   # CLI formatter API (Core module, always available)
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
 
   # Feature configuration
   cfg = getModuleConfig "lock-manager";

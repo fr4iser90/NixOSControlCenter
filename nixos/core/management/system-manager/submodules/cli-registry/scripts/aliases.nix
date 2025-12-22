@@ -1,8 +1,8 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleApi, ... }:
 
 let
   # Import the main script
-  mainScript = import ./main-script.nix { inherit config lib pkgs systemConfig; };
+  mainScript = import ./main-script.nix { inherit config lib pkgs systemConfig getModuleApi; };
 in
 {
   nixcc = pkgs.writeScriptBin "nixcc" ''

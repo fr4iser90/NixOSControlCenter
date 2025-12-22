@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
 
 let
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
   cfg = systemConfig.modules.security.ssh-client-manager;
 
   # SSH Key Utilities

@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi,... }:
 
 let
   cfg = getModuleConfig "system-checks";

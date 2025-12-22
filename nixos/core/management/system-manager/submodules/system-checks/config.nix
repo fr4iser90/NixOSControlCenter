@@ -1,9 +1,6 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleApi, ... }:
 
 let
-  # CLI formatter API
-  ui = {}; # Temporarily disable UI
-
   # Import scripts from scripts/ directory
 
   # Postbuild checks config
@@ -13,6 +10,11 @@ let
   prebuildCfg = {};
 in
 {
+  # Pass getModuleApi to check modules
+  _module.args = {
+    inherit getModuleApi;
+  };
+
   imports = [
     ./prebuild/checks/hardware/utils.nix
     ./prebuild/checks/hardware/gpu.nix

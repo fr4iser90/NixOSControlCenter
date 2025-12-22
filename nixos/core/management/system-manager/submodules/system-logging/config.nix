@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, moduleConfig, ... }:
+{ config, lib, pkgs, systemConfig, moduleConfig, getModuleApi, ... }:
 let
   configHelpers = import ../../../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   # Module name: explizit definieren
@@ -6,7 +6,7 @@ let
   cfg = systemConfig.${moduleConfig.${moduleName}.configPath} or {};
   # Use the template file as default config
   defaultConfig = builtins.readFile ./logging-config.nix;
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
 
   # Report Level Definition
   reportLevels = {

@@ -5,7 +5,7 @@ with lib;
 let
   # notificationsCfg.notifications is passed from parent module
   notificationsCfg = notificationsCfg.notifications or {};
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
 
   notificationTypes = {
     email = {

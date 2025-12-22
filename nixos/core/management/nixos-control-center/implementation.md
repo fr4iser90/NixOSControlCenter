@@ -155,7 +155,7 @@ statusFormatter = formatter.status;
 **Changes:**
 ```nix
 # BEFORE: Direct system-manager reference
-ui = config.core.management.system-manager.submodules.cli-formatter.api;
+ui = getModuleApi "cli-formatter";
 
 # AFTER: Use NCC API
 ui = config.core.management.ncc.api.formatter;

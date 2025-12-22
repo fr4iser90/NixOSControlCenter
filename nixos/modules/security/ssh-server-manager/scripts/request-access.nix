@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = systemConfig.modules.security.ssh-server.request-access;
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
   notifications = systemConfig.modules.security.ssh-server.notifications;
 
   requestAccessScript = pkgs.writeScriptBin "ssh-request-access" ''

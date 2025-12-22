@@ -1,9 +1,9 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 with lib;
 
 let
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
   commandCenter = config.core.management.system-manager.submodules.cli-registry;
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
   systemChecks = lib.attrByPath ["enable"] false (getModuleConfig "system-checks");

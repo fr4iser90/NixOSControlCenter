@@ -1,9 +1,9 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi }:
 
 with lib;
 
 let
-  ui = config.core.management.system-manager.submodules.cli-formatter.api or {};
+  ui = getModuleApi "cli-formatter";
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
   desktopConfigPath = "/etc/nixos/configs/desktop-config.nix";
 

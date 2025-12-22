@@ -1,10 +1,10 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi,... }:
 
 let
   cfg = getModuleConfig "system-checks";
   prebuildCfg = cfg.prebuild or {};
-  postbuildScript = import ./scripts/postbuild-checks.nix { inherit config lib pkgs systemConfig getModuleConfig; };
-  prebuildCheckScript = import ./scripts/prebuild-checks.nix { inherit config lib pkgs systemConfig getModuleConfig; };
+  postbuildScript = import ./scripts/postbuild-checks.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
+  prebuildCheckScript = import ./scripts/prebuild-checks.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
 in {
   config = {
     # Command-Center registration for checks module

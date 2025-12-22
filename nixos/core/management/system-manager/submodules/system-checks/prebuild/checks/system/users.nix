@@ -1,7 +1,8 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 let
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  # ui = getModuleApi "cli-formatter";
+  ui = config.core.management.system-manager.submodules.cli-formatter.api; 
   
   prebuildScript = pkgs.writeScriptBin "prebuild-check-users" ''
     #!${pkgs.bash}/bin/bash

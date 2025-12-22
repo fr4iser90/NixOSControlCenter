@@ -31,8 +31,8 @@
 
   spinner = phase: let
     frames = ["⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏"];
-    index = phase % (builtins.length frames);
+    index = lib.mod phase (builtins.length frames);
   in ''
-    printf '\r%b' "${frames.[index]} "
+    printf '\r%b' "${builtins.elemAt frames index} "
   '';
 }

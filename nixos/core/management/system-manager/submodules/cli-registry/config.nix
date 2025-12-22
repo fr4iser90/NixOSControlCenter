@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 let
   cfg = getModuleConfig "cli-registry";
   configHelpers = import ../../../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
@@ -9,8 +9,8 @@ let
   ccLib = import ./lib { inherit lib; };
 
   # Import scripts from scripts/ directory
-  mainScript = import ./scripts/main-script.nix { inherit config lib pkgs systemConfig getModuleConfig; };
-  aliases = import ./scripts/aliases.nix { inherit config lib pkgs systemConfig getModuleConfig; };
+  mainScript = import ./scripts/main-script.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
+  aliases = import ./scripts/aliases.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
 
   # API definition - always available
   # Commands werden von anderen Modulen hinzugefügt

@@ -1,5 +1,5 @@
 # Central Module Management System
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 with lib;
 
@@ -11,7 +11,7 @@ let
 
   # Import module discovery and API generation
   discovery = import ./lib/discovery.nix { inherit lib; };
-  moduleLib = import ./lib/default.nix { inherit config lib pkgs systemConfig; };
+  moduleLib = import ./lib/default.nix { inherit config lib pkgs systemConfig getModuleApi; };
 
   # Auto-discover modules and generate APIs
   discoveredModules = discovery.discoverAllModules;

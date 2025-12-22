@@ -1,7 +1,9 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleApi, ... }:
 
 let
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  # ui = getModuleApi "cli-formatter";
+  ui = config.core.management.system-manager.submodules.cli-formatter.api; 
+
   hardwareConfigPath = "/etc/nixos/configs/core/base/hardware/config.nix";
   
   # Use the shared update-hardware-config script from utils.nix

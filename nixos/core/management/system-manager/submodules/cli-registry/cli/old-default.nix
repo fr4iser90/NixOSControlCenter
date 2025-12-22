@@ -2,7 +2,7 @@
 
 let
   # Zugriff auf die CLI-Formatter-API
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
 
   # Befehle aus der Konfiguration
   cfg = config.core.management.system-manager.submodules.cli-registry;

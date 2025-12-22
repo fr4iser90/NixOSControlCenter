@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = systemConfig.modules.security.ssh-server.grant-access;
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
   backupHelpers = import ../../lib/backup-helpers.nix { inherit pkgs lib; };
 
   grantAccessScript = pkgs.writeScriptBin "ssh-grant-access" ''

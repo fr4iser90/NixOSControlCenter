@@ -3,7 +3,7 @@
 with lib;
 
 let
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
   cfg = systemConfig.${moduleConfig.configPath};
 
   # Note: Scripts that use cfg must be created in mkIf cfg.enable block

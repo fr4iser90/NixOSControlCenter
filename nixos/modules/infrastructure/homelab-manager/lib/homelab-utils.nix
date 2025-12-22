@@ -3,7 +3,7 @@
 with lib;
 
 let
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
   commandCenter = config.core.management.system-manager.submodules.cli-registry;
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
 

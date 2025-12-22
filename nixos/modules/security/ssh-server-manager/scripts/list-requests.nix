@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = systemConfig.modules.security.ssh-server.list-requests;
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
 
   listRequestsScript = pkgs.writeScriptBin "ssh-list-requests" ''
     #!${pkgs.bash}/bin/bash

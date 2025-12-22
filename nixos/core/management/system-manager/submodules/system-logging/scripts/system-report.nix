@@ -1,8 +1,8 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 let
   cfg = getModuleConfig "system-logging";
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
 
   # System Report Script
   systemReportScript = pkgs.writeShellScriptBin "ncc-log-system-report" ''

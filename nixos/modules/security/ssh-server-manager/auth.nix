@@ -3,7 +3,7 @@
 with lib;
 
 let
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
 
   sshTempOpenScript = pkgs.writeScriptBin "ssh-temp-open" ''
     #!${pkgs.bash}/bin/bash

@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = config.modules.example-module;
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
 in
   mkIf cfg.enable {
     # Create scripts using pkgs.writeShellScriptBin

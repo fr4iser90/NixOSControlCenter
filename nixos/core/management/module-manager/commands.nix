@@ -4,10 +4,9 @@ with lib;
 
 let
   # Import the handler for business logic
-  handler = import ./handlers/module-manager.nix { inherit config lib pkgs systemConfig getModuleConfig; };
+  handler = import ./handlers/module-manager.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
 
-  ui = let apiPath = getModuleApi "cli-formatter"; in
-       if apiPath == "" then {} else lib.attrByPath (lib.splitString "." apiPath) {} config;  # Generic API access
+  ui = getModuleApi "cli-formatter";  
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");  # Generic config access
 
   # 🎯 COMMAND REGISTRATION: Per MODULE_TEMPLATE in commands.nix!

@@ -5,7 +5,7 @@ with lib;
 let
   # monitorCfg.monitor is passed from parent module
   monitorCfg = monitorCfg.monitor or {};
-  ui = config.core.management.system-manager.submodules.cli-formatter.api;
+  ui = getModuleApi "cli-formatter";
 
   monitorScript = pkgs.writeScriptBin "ssh-monitor" ''
     #!${pkgs.bash}/bin/bash
