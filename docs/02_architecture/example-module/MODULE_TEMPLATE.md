@@ -24,14 +24,25 @@ options.systemConfig.modules.infrastructure.homelab = { ... };
 options.systemConfig.modules.security.ssh-client = { ... };
 ```
 
-### **Automatic API Generation**
-Module APIs are automatically generated based on filesystem structure:
+### **Automatic API Generation & Access**
+Module APIs are automatically discoverable and accessible through the generic API system:
 
 ```nix
 # Filesystem → API Mapping
 core/base/audio/ → systemConfig.core.base.audio
 modules/infrastructure/homelab/ → systemConfig.modules.infrastructure.homelab
+
+# Generic Access (works everywhere)
+ui = config.${getModuleApi "cli-formatter"};        # Runtime access
+ui = getModuleApi "cli-formatter";                  # Direct access (build-time)
+api = config.${getModuleApi "system-manager"};      # Any module API
 ```
+
+#### **API Access Patterns**
+- **Runtime Code**: `config.${getModuleApi "module-name"}` (config available)
+- **Build-Time Code**: `getModuleApi "module-name"` (direct API import)
+- **Automatic Context**: `getModuleApi` detects context and returns appropriate value
+- **Consistent Syntax**: Same pattern works across all modules and contexts
 
 ### **Module Metadata**
 All modules require `_module.metadata` for automatic discovery:
@@ -179,6 +190,7 @@ _module.metadata = {
 module-name/               # Module name
 ├── README.md              # Module documentation and usage guide
 ├── default.nix            # Main module (metadata + imports - REQUIRED pattern)
+├── api.nix                # Module API definition (for getModuleApi access)
 ├── options.nix            # All configuration options
 ├── types.nix              # Custom NixOS types (optional)
 ├── commands.nix           # Command-Center registration (optional)
@@ -253,6 +265,37 @@ module-name/               # Module name
 ```
 
 ## File Descriptions
+
+### `api.nix`
+**Purpose**: Module API definition for `getModuleApi` access
+
+**Responsibilities**:
+- Define the public API that other modules can access
+- Export functions, data structures, and utilities
+- Enable build-time API access (when config is not available)
+- Keep API stable and well-documented
+
+**Pattern**:
+```nix
+# api.nix
+{ lib }:
+
+let
+  # Import internal components
+  colors = import ./colors.nix;
+  core = import ./core { inherit lib colors; config = {}; };
+  components = import ./components { inherit lib colors; config = {}; };
+
+in {
+  # Public API exports
+  inherit colors;
+  inherit (core) text layout;
+  inherit (components) lists tables progress boxes;
+
+  # Utility functions
+  formatMessage = msg: "[${colors.blue}INFO${colors.reset}] ${msg}";
+}
+```
 
 ### `default.nix`
 **Purpose**: Main module entry point - ONLY imports and module structure
@@ -414,10 +457,46 @@ _module.metadata = {
 - Optional modules: `options.systemConfig.modules.{domain}.{name}`
 - Always include `_version` option
 
-### 3. **API Generation**
-- Automatic based on filesystem structure
-- No manual API definitions needed
-- Module discovery finds all modules automatically
+### 3. **API Generation & Access**
+- **Automatic API Discovery**: Based on filesystem structure and `_module.metadata`
+- **Generic API Access**: Use `getModuleApi "module-name"` for consistent API access
+- **Runtime vs Build-Time**: Automatic context detection and API resolution
+
+#### **Generic API Access Pattern**
+```nix
+# Works everywhere - automatically resolves at runtime or build-time
+ui = config.${getModuleApi "cli-formatter"};
+api = config.${getModuleApi "system-manager"};
+
+# Or direct API access (when config not available)
+ui = getModuleApi "cli-formatter";  # Returns API directly
+```
+
+#### **How it Works**
+- **Runtime**: `getModuleApi` returns config path (e.g. `"core.management.system-manager.submodules.cli-formatter.api"`)
+- **Build-Time**: `getModuleApi` returns imported API directly (avoids config dependency)
+- **Automatic**: No manual context detection needed - works in scripts, handlers, etc.
+
+#### **API Definition**
+Create `api.nix` in module root for build-time access:
+```nix
+# cli-formatter/api.nix
+{ lib }:
+let
+  colors = import ./colors.nix;
+  # ... API components
+in {
+  inherit colors;
+  text = core.text;
+  layout = core.layout;
+  # ... exported API
+}
+```
+
+#### **Module Discovery**
+- Automatic based on `_module.metadata` in `default.nix`
+- No manual registration needed
+- APIs available via `getModuleApi "module-name"`
 
 ### 4. **Enable Pattern**
 - Optional modules: Check `cfg.enable`
