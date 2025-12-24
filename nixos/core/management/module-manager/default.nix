@@ -2,7 +2,7 @@
 
 let
   # Single Source: Modulname nur einmal definieren
-  moduleName = "module-manager";
+  moduleName = baseNameOf ./. ;  # ← module-manager aus management/module-manager/
   # Self-migration: Use getModuleConfig with systemConfig fallback for safety
   cfg = getModuleConfig moduleName;
 in {

@@ -5,7 +5,6 @@ with lib;
 
 let
   cfg = getModuleConfig "module-manager";
-  configHelpers = import ./lib/config-helpers.nix { inherit pkgs lib; };
   # Use the template file as default config
   defaultConfig = builtins.readFile ./module-manager-config.nix;
 
@@ -72,17 +71,7 @@ in {
       };
 
       # Module-manager configuration
-      core.management.module-manager = {
-        inherit configHelpers;
-      };
+      core.management.module-manager = { };
     }
-
-
-    (lib.mkIf (cfg.enable or true)
-      (configHelpers.createModuleConfig {
-        moduleName = "module-manager";
-        defaultConfig = defaultConfig;
-      })
-    )
   ];
 }

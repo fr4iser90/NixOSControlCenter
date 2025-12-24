@@ -1,7 +1,6 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, moduleName, ... }:
 let
-  cfg = getModuleConfig "cli-registry";
-  configHelpers = import ../../../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
+  cfg = getModuleConfig moduleName;
   # Use the template file as default config
   defaultConfig = builtins.readFile ./command-center-config.nix;
 

@@ -2,7 +2,7 @@
 
 let
   # Single Source: Modulname nur einmal definieren
-  moduleName = "system-checks";
+  moduleName = baseNameOf ./. ;  # ← system-checks aus submodules/system-checks/
   moduleMeta = getModuleMetadata moduleName;
   cfg = getModuleConfig moduleName;
 in
@@ -25,9 +25,9 @@ in
     ./options.nix  # Always import options first
     ./commands.nix # Command registration (always needed)
   ] ++ (if (cfg.enable or true) then [
-    ./config.nix  # Implementation logic goes here
+    (import ./config.nix { inherit config lib pkgs systemConfig getModuleApi moduleName; })
   ] else [
-    ./config.nix  # Import even if disabled (for symlink management)
+    (import ./config.nix { inherit config lib pkgs systemConfig getModuleApi moduleName; })
   ]);
 
 }

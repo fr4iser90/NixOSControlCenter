@@ -1,7 +1,7 @@
 { config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 let
   # Single Source: Modulname nur einmal definieren
-  moduleName = "system-update";
+  moduleName = baseNameOf ./. ;  # ← system-update aus submodules/system-update/
   cfg = getModuleConfig moduleName;
 in {
   _module.metadata = {
@@ -21,7 +21,7 @@ in {
     ./options.nix
   ] ++ (if (cfg.enable or true) then [
     ./commands.nix  # System update commands
-    ./config.nix    # System update implementation
+    (import ./config.nix { inherit config lib pkgs systemConfig getModuleConfig moduleName; })
     ./handlers/system-update.nix  # System update handler
   ] else []);
 }

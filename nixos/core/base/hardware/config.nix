@@ -1,7 +1,7 @@
-{ config, lib, getModuleConfig, ... }:
+{ config, lib, getModuleConfig, moduleName, ... }:
 
 let
-  cfg = getModuleConfig "hardware";
+  cfg = getModuleConfig moduleName;
 in
 {
   config = lib.mkIf (cfg.enable or false) {

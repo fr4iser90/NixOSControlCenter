@@ -2,7 +2,7 @@
 
 let
   # Single Source: Modulname nur einmal definieren
-  moduleName = "cli-formatter";
+  moduleName = baseNameOf ./. ;  # ← cli-formatter aus submodules/cli-formatter/
 
 in {
   _module.metadata = {

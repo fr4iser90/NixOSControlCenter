@@ -1,9 +1,7 @@
-{ config, lib, pkgs, systemConfig, moduleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getCurrentModuleMetadata, moduleName, ... }:
 let
-  configHelpers = import ../../../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
-  # Module name: explizit definieren
-  moduleName = "system-logging";
-  cfg = systemConfig.${moduleConfig.${moduleName}.configPath} or {};
+  cfg = getModuleConfig moduleName;
+  metadata = getCurrentModuleMetadata ../.;
   # Use the template file as default config
   defaultConfig = builtins.readFile ./logging-config.nix;
   ui = getModuleApi "cli-formatter";
@@ -43,7 +41,7 @@ let
       inherit name;
       value = import ./collectors/${name}.nix {
         inherit config lib pkgs systemConfig ui reportLevels;
-        getModuleConfig = moduleConfig.getModuleConfig;
+        inherit getModuleConfig;
         currentLevel = reportLevels.${
           if effectiveCollectors.${name}.detailLevel != null
           then effectiveCollectors.${name}.detailLevel
@@ -53,11 +51,12 @@ let
     }) availableCollectors)
   );
 in
-  lib.mkMerge [
+{
+  config = lib.mkMerge [
     # Config creation (always)
     {
       system.activationScripts."logging-config-setup" = let
-        configPath = moduleConfig.${moduleName}.configPath;
+        configPath = metadata.configPath;
         configFilePath = "/etc/nixos/configs/" + (builtins.replaceStrings ["."] ["/"] configPath) + "/config.nix";
       in ''
         mkdir -p "/etc/nixos/configs"
@@ -109,4 +108,5 @@ EOF
         currentLevel = reportLevels.${cfg.defaultDetailLevel or "info"};
           };
         }
-  ]
+  ];
+}

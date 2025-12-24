@@ -58,9 +58,6 @@ let
     inherit (cfg) config;
   };
 
-  configHelpers = import ../../../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
-  # Use the template file as default config
-  defaultConfig = builtins.readFile ./cli-formatter-config.nix;
 
 in
 {
@@ -69,7 +66,4 @@ in
   core.management.system-manager.submodules.cli-formatter.api = apiValue;
 
   # Config nur wenn enabled
-} // configHelpers.createModuleConfig {
-  moduleName = "cli-formatter";
-  defaultConfig = defaultConfig;
 }

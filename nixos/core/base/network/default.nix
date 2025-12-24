@@ -3,12 +3,12 @@
 
 let
   # Single Source: Modulname nur einmal definieren
-  moduleName = "network";
+  moduleName = baseNameOf ./. ;  # ← network aus core/base/network/
 
   # Import sub-modules based on configuration
   networkingModules = [
     ./options.nix
-    ./config.nix
+    (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })
 #    ./networkmanager.nix
 #    ./firewall.nix
   ];

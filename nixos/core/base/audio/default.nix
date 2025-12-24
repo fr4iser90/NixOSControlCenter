@@ -2,7 +2,7 @@
 
 let
   # Single Source: Modulname nur einmal definieren
-  moduleName = "audio";
+  moduleName = baseNameOf ./. ;  # ← audio aus core/base/audio/
   cfg = getModuleConfig moduleName;
 in {
   _module.metadata = {
@@ -21,8 +21,8 @@ in {
     ./options.nix
   ] ++ (if (cfg.system or "none") != "none" then [
     (./providers + "/${cfg.system}.nix")
-    ./config.nix
+    (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })
   ] else [
-    ./config.nix
+    (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })
   ]) else [];
 }

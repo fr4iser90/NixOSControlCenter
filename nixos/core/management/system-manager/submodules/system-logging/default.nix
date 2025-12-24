@@ -1,8 +1,8 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getCurrentModuleMetadata, ... }:
 
 let
   # Single Source: Modulname nur einmal definieren
-  moduleName = "system-logging";
+  moduleName = baseNameOf ./. ;  # ← system-logging aus submodules/system-logging/
   cfg = getModuleConfig moduleName;
 in
 {
@@ -22,7 +22,7 @@ in
   imports = [
     ./options.nix
   ] ++ (lib.optionals (cfg.enable or true) [
-    ./config.nix  # Import implementation logic
+    (import ./config.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi getCurrentModuleMetadata moduleName; })
   ]);
 
 }

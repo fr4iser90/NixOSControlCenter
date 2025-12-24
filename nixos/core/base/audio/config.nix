@@ -1,6 +1,6 @@
-{ config, lib, pkgs, getModuleConfig, ... }:
+{ config, lib, pkgs, getModuleConfig, moduleName, ... }:
 let
-  cfg = getModuleConfig "audio";
+  cfg = getModuleConfig moduleName;
 in
 {
   config = {

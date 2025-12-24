@@ -2,7 +2,7 @@
 
 let
   # Single Source: Modulname nur einmal definieren
-  moduleName = "boot";
+  moduleName = baseNameOf ./. ;  # ← boot aus core/base/boot/
 
   # Bootloader configurations
   bootloaders = {
@@ -27,7 +27,7 @@ in {
   _module.args.moduleName = moduleName;
   imports = [
     ./options.nix
-    ./config.nix
+    (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })
     (bootloaders.${bootCfg.bootloader or "systemd-boot"})
   ];
 

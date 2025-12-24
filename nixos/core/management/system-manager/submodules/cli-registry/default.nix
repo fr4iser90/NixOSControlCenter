@@ -1,10 +1,12 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+
 let
-  cfg = systemConfig.command-center or {};
+  moduleName = baseNameOf ./. ;  # ← cli-registry aus submodules/cli-registry/
+  cfg = getModuleConfig moduleName;
 in {
   _module.metadata = {
     role = "core";
-    name = "cli-registry";
+    name = moduleName;
     description = "CLI command registration and management";
     category = "management";
     subcategory = "system-manager.submodules.cli-registry";
@@ -12,12 +14,15 @@ in {
     version = "1.0.0";
   };
 
+  # Modulname einmalig definieren und an Submodule weitergeben
+  _module.args.moduleName = moduleName;
+
   # imports must be at top level
   imports = [
     ./options.nix      # Always import options first
   ] ++ (if (cfg.enable or true) then [
-    ./config.nix      # Implementation logic goes here
+    (import ./config.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi moduleName; })
   ] else [
-    ./config.nix      # Import even if disabled (for symlink management)
+    (import ./config.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi moduleName; })
   ]);
 }

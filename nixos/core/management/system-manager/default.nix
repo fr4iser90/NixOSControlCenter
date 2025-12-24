@@ -4,16 +4,14 @@ with lib;
 
 let
   # Single Source: Modulname nur einmal definieren
-  moduleName = "system-manager";
+  moduleName = baseNameOf ./. ;  # ← system-manager aus management/system-manager/
   # Use systemConfig from module-manager (_module.args)
   cfg = getModuleConfig moduleName;
 
   # Import helpers
   backupHelpers = import ./lib/backup-helpers.nix { inherit pkgs lib; };
   # API definition - always available
-  # Pass backupHelpers to configHelpers so it can use it
-  configHelpers = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
-  apiValue = configHelpers // backupHelpers;
+  apiValue = backupHelpers;
 
   bootCfg = getModuleConfig "boot";
 

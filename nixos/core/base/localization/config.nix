@@ -1,9 +1,9 @@
-{ config, lib, getModuleConfig, ... }:
+{ config, lib, getModuleConfig, moduleName, ... }:
 
 with lib;
 
 let
-  cfg = getModuleConfig "localization";
+  cfg = getModuleConfig moduleName;
   
   locales = cfg.locales or [ "en_US.UTF-8" ];
   defaultLocale = if builtins.length locales > 0 then builtins.head locales else "en_US.UTF-8";

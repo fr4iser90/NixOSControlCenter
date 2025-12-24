@@ -2,7 +2,7 @@
 
 let
   # Single Source: Modulname nur einmal definieren
-  moduleName = "hardware";
+  moduleName = baseNameOf ./. ;  # ← hardware aus core/base/hardware/
   cfg = getModuleConfig moduleName;
 in {
   _module.metadata = {
@@ -19,7 +19,7 @@ in {
 
   imports = [
     ./options.nix
-    ./config.nix
+    (import ./config.nix { inherit config lib getModuleConfig moduleName; })
     ./gpu
     ./cpu
     ./memory

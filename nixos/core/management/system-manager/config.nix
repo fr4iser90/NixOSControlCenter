@@ -1,7 +1,6 @@
 { config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 let
   cfg = getModuleConfig "system-manager";
-  configHelpers = import ../module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   # Use the template file as default config
   defaultConfig = builtins.readFile ./system-manager-config.nix;
 
@@ -29,13 +28,5 @@ in
     # Always import component commands (they'll be conditionally enabled)
     # (import ./components/config-migration/commands.nix)
 
-    # Create config on activation (always runs)
-    # Uses new external config system
-    (lib.mkIf (cfg.enable or true)
-      (configHelpers.createModuleConfig {
-        moduleName = "system-manager";
-        defaultConfig = defaultConfig;
-      })
-    )
   ];
 }

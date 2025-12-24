@@ -2,7 +2,7 @@
 
 let
   # Single Source: Modulname nur einmal definieren
-  moduleName = "user";
+  moduleName = baseNameOf ./. ;  # ← user aus core/base/user/
   cfg = getModuleConfig moduleName;
 
   # Gruppen basierend auf Rolle
@@ -96,7 +96,7 @@ in {
 
   imports = [
     ./options.nix
-    ./config.nix
+    (import ./config.nix { inherit config lib getModuleConfig moduleName; })
     ./password-manager.nix
   ];
   
