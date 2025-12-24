@@ -1,7 +1,9 @@
-{ lib, ... }:
+{ lib, getCurrentModuleMetadata, ... }:
 
 let
-  moduleVersion = "1.0";
+  # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
+  metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
+  configPath = metadata.configPath or "systemConfig.core.management.system-manager.submodules.system-checks";  # Fallback
 
   # Default postbuild checks (moved from postbuild/default.nix)
   defaultPostbuildChecks = {
@@ -45,11 +47,11 @@ let
   };
 
 in {
-  options.systemConfig.core.management.system-manager.submodules.system-checks = {
+  options.${configPath} = {
     # Version metadata (REQUIRED for all modules)
     _version = lib.mkOption {
       type = lib.types.str;
-      default = moduleVersion;
+      default = "1.0.0";
       internal = true;
       description = "Module version";
     };

@@ -1,17 +1,17 @@
 { pkgs, lib, ... }:
 
 rec {
-  # Prüfe ob Modul versioniert ist (hat options.nix)
-  hasVersion = modulePath: builtins.pathExists "${toString modulePath}/options.nix";
+  # Prüfe ob Modul versioniert ist (hat default.nix mit metadata)
+  hasVersion = modulePath: builtins.pathExists "${toString modulePath}/default.nix";
   
-  # Extrahiere Version aus options.nix (SOURCE)
+  # Extrahiere Version aus _module.metadata (SOURCE)
   # Gibt Bash-Script zurück, das Version ausgibt
   getSourceVersionScript = modulePath: ''
-    # Extrahiere Version aus options.nix
-    OPTIONS_FILE="${toString modulePath}/options.nix"
-    if [ -f "$OPTIONS_FILE" ]; then
-      # Grep: moduleVersion = "X.Y"
-      VERSION=$(grep -m 1 'moduleVersion =' "$OPTIONS_FILE" 2>/dev/null | sed 's/.*moduleVersion = "\([^"]*\)".*/\1/' || echo "unknown")
+    # Extrahiere Version aus _module.metadata
+    DEFAULT_FILE="${toString modulePath}/default.nix"
+    if [ -f "$DEFAULT_FILE" ]; then
+      # Verwende nix-instantiate um metadata.version auszulesen
+      VERSION=$(nix-instantiate --eval "$DEFAULT_FILE" 2>/dev/null | ${pkgs.jq}/bin/jq -r '._module.metadata.version // "unknown"' 2>/dev/null || echo "unknown")
       echo -n "$VERSION"
     else
       echo -n "unknown"
@@ -52,7 +52,7 @@ rec {
   # Exit 0 wenn Migration nötig, Exit 1 wenn nicht
   migrationNeededScript = sourceModule: targetModule: moduleName: forceMigration: ''
     # Prüfe ob SOURCE versioniert ist
-    if [ ! -f "${toString sourceModule}/options.nix" ]; then
+    if [ ! -f "${toString sourceModule}/default.nix" ]; then
       # SOURCE hat keine Version → Stufe 0 → 1 Migration
       exit 0
     fi

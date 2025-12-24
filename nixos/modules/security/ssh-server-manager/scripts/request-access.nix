@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, corePathsLib, ... }:
 
 with lib;
 
@@ -115,10 +115,11 @@ in {
     };
   };
 
-  config = {
-    environment.systemPackages = [ requestAccessScript ];
-
-    core.management.system-manager.submodules.cli-registry.commands = [
+  config = lib.mkMerge [
+    {
+      environment.systemPackages = [ requestAccessScript ];
+    }
+    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "ssh-request-access";
         description = "Request temporary SSH password access";
@@ -140,6 +141,6 @@ in {
             ssh-request-access john "Emergency server maintenance" 600
         '';
       }
-    ];
-  };
+      ])
+  ];
 }

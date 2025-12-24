@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleApi, corePathsLib, ... }:
 
 let
   # ui = getModuleApi "cli-formatter";
@@ -138,9 +138,11 @@ let
   '';
 
 in {
-  config = {
-    environment.systemPackages = [ prebuildScript ];
-    core.management.system-manager.submodules.cli-registry.commands = [
+  config = lib.mkMerge [
+    {
+      environment.systemPackages = [ prebuildScript ];
+    }
+    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "check-gpu";
         category = "system-checks";
@@ -165,6 +167,6 @@ in {
         interactive = true;
         dependencies = [ "system-checks" ];
       }
-    ];
-  };
+      ])
+  ];
 }

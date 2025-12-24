@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, corePathsLib, ... }:
 
 with lib;
 
@@ -248,7 +248,8 @@ in {
   config = {
     environment.systemPackages = [ approveRequestScript denyRequestScript ];
 
-    core.management.system-manager.submodules.cli-registry.commands = [
+    config = lib.mkMerge [
+      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "ssh-approve-request";
         description = "Approve SSH access request";
@@ -289,6 +290,7 @@ in {
             ssh-deny-request 20250126_101530_fr4iser "Security policy violation"
         '';
       }
+      ])
     ];
   };
 }

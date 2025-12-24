@@ -2,6 +2,9 @@
 { config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
+  # Single Source: Modulname nur einmal definieren
+  moduleName = "network";
+
   # Import sub-modules based on configuration
   networkingModules = [
     ./options.nix
@@ -10,18 +13,21 @@ let
 #    ./firewall.nix
   ];
 
-  networkCfg = getModuleConfig "network";
-  localizationCfg = getModuleConfig "localization";
+  networkCfg = getModuleConfig moduleName;
+  localizationCfg = getModuleConfig "localization";  # Anderes Modul, bleibt hardcoded
 
 in {
   _module.metadata = {
     role = "core";
-    name = "network";
+    name = moduleName;
     description = "Network configuration and management";
     category = "base";
     subcategory = "network";
     version = "1.0.0";
   };
+
+  # Modulname einmalig definieren und an Submodule weitergeben
+  _module.args.moduleName = moduleName;
 
   imports = networkingModules;
 

@@ -1,11 +1,13 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, corePathsLib, ... }:
 let
   cfg = systemConfig.management.system-manager or {};
   # Import config-migration module to get the commands
   configMigrationModule = import ./. { inherit pkgs lib config; };
   checkScript = configMigrationModule.check.configCheck;
 in {
-  core.management.system-manager.submodules.cli-registry.commands = lib.mkIf (cfg.components.configMigration.enable or false) [
+  config = lib.mkMerge [
+    (lib.mkIf (cfg.components.configMigration.enable or false)
+      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
     {
       name = "config-check";
       script = "${checkScript}";
@@ -34,5 +36,6 @@ in {
       category = "system";
       help = "ncc config-validate: Validates the structure and required fields of the current NixOS configuration.";
     }
+    ]))
   ];
 }

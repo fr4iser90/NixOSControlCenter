@@ -47,7 +47,7 @@ let
         currentLevel = reportLevels.${
           if effectiveCollectors.${name}.detailLevel != null
           then effectiveCollectors.${name}.detailLevel
-          else config.core.management.system-manager.submodules.system-logging.defaultDetailLevel or "info"
+          else cfg.defaultDetailLevel or "info"
         };
       };
     }) availableCollectors)
@@ -71,15 +71,7 @@ EOF
       '';
     }
 
-    # Core API - always available
-    {
-      core.management.system-manager.submodules.system-logging.enable = lib.mkDefault true;
-      core.management.system-manager.submodules.system-logging.defaultDetailLevel = lib.mkDefault (
-        if systemConfig ? buildLogLevel && builtins.elem systemConfig.buildLogLevel ["basic" "info" "debug" "trace"]
-        then systemConfig.buildLogLevel
-        else "info"
-      );
-    }
+    # Values come from cfg (generic config), not hardcoded API paths
 
     # Module implementation (always enabled)
     {
@@ -102,7 +94,7 @@ EOF
           ${ui.text.header "NixOS System Report"}
           ${ui.tables.keyValue "Hostname" config.networking.hostName}
           ${ui.tables.keyValue "Generation" "$(readlink /nix/var/nix/profiles/system | cut -d'-' -f2)"}
-          ${ui.tables.keyValue "Detail Level" config.core.management.system-manager.submodules.system-logging.defaultDetailLevel}
+          ${ui.tables.keyValue "Detail Level" (cfg.defaultDetailLevel or "info")}
           ${ui.layout.separator "-" 50}
 
           ${lib.concatStringsSep "\n" reports}
@@ -114,7 +106,7 @@ EOF
         {
           _module.args.reportingConfig = {
             inherit ui reportLevels;
-        currentLevel = reportLevels.${config.core.management.system-manager.submodules.system-logging.defaultDetailLevel or "info"};
+        currentLevel = reportLevels.${cfg.defaultDetailLevel or "info"};
           };
         }
   ]

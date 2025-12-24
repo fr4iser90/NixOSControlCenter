@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, corePathsLib, ... }:
 
 with lib;
 
@@ -60,12 +60,13 @@ let
   '';
 
 in {
-  config = {
-    environment.systemPackages = [
-      updateChannelsScript
-    ];
-
-    core.management.system-manager.submodules.cli-registry.commands = [
+  config = lib.mkMerge [
+    {
+      environment.systemPackages = [
+        updateChannelsScript
+      ];
+    }
+    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "update-channels";
         description = "Update Nix flake inputs / channels and rebuild the system";
@@ -81,6 +82,6 @@ in {
           Requires sudo privileges.
         '';
       }
-    ];
-  };
+      ])
+  ];
 }

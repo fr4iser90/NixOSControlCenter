@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, corePathsLib, ... }:
 
 with lib;
 
@@ -9,7 +9,7 @@ let
   ui = getModuleApi "cli-formatter";  
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");  # Generic config access
 
-  # 🎯 COMMAND REGISTRATION: Per MODULE_TEMPLATE in commands.nix!
+  # 🎯 COMMAND REGISTRATION: Per MODULE_TEMPLATE in commands.nix! (zentralisiert über corePathsLib)
 
   # Script to update module-manager-config.nix
   updateModuleConfig = pkgs.writeShellScriptBin "update-module-config" ''
@@ -171,8 +171,9 @@ let
   '';
 
 in {
-  # 🎯 COMMAND REGISTRATION: In commands.nix per MODULE_TEMPLATE!
-  core.management.system-manager.submodules.cli-registry.commands = [
+  # 🎯 COMMAND REGISTRATION: In commands.nix per MODULE_TEMPLATE! (zentralisiert)
+  config = lib.mkMerge [
+    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
     {
       name = "module-manager";
       description = "Toggle all NixOS modules using fzf (dynamic discovery)";
@@ -196,5 +197,6 @@ in {
         This tool dynamically reads your current NixOS configuration and shows all toggleable modules.
       '';
     }
+    ])
   ];
 }

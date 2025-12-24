@@ -1,14 +1,17 @@
-{ lib, ... }:
+{ lib, getCurrentModuleMetadata, ... }:
 
 let
-  moduleVersion = "1.0";  # Current module version
+  # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
+  metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
+  configPath = metadata.configPath or "systemConfig.core.management.system-manager.submodules.cli-registry";  # Fallback
+
   ccLib = import ./lib { inherit lib; };
 in {
-  options.systemConfig.core.management.system-manager.submodules.cli-registry = {
+  options.${configPath} = {
     # Version metadata (required for all modules)
     _version = lib.mkOption {
       type = lib.types.str;
-      default = moduleVersion;
+      default = "1.0.0";
       internal = true;  # Hidden from users
       description = "Module version";
     };

@@ -1,12 +1,13 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, corePathsLib, ... }:
 
 with lib;
 
 let
   cfg = systemConfig.modules.security.ssh-client-manager;
 in {
-  config = mkIf cfg.enable {
-    core.management.system-manager.submodules.cli-registry.commands = [
+  config = mkIf cfg.enable
+    (lib.mkMerge [
+      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "ssh-client-manager";
         description = "Manage SSH client connections";
@@ -21,6 +22,6 @@ in {
           managing SSH keys, and configuring connection settings.
         '';
       }
-    ];
-  };
+      ])
+    ]);
 }

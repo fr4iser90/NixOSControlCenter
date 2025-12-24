@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, corePathsLib, ... }:
 let
   cfg = getModuleConfig "system-logging";
 
@@ -8,7 +8,9 @@ let
   };
 
 in {
-  core.management.system-manager.submodules.cli-registry.commands = lib.mkIf (cfg.enable or true) [
+  config = lib.mkMerge [
+    (lib.mkIf (cfg.enable or true)
+      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
     {
       name = "log-system-report";
       script = "${systemReportScript.script}/bin/ncc-log-system-report";
@@ -24,5 +26,6 @@ in {
           ncc-log-system-report --enable profile  # Enable specific collector
       '';
     }
+    ]))
   ];
 }

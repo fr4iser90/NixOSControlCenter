@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleApi, moduleName, ... }:
 
 let
   # Import scripts from scripts/ directory

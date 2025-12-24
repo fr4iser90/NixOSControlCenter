@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, corePathsLib, ... }:
 
 with lib;
 
@@ -89,10 +89,11 @@ in {
     };
   };
 
-  config = {
-    environment.systemPackages = [ grantAccessScript ];
-
-    core.management.system-manager.submodules.cli-registry.commands = [
+  config = lib.mkMerge [
+    {
+      environment.systemPackages = [ grantAccessScript ];
+    }
+    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "ssh-grant-access";
         description = "Grant temporary SSH password authentication";
@@ -116,6 +117,6 @@ in {
             ssh-grant-access john 120 "Quick key setup"
         '';
       }
-    ];
-  };
+      ])
+  ];
 }

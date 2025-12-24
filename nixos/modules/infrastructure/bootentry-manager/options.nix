@@ -1,14 +1,13 @@
-{ lib, ... }:
+{ lib, moduleName }:
 
 let
-  moduleVersion = "1.0";
   types = import ./lib/types.nix { inherit lib; };
 in {
-  options.modules.infrastructure.bootentry = {
+  options.modules.infrastructure.${moduleName} = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;
-      default = moduleVersion;
+      default = "1.0.0";
       internal = true;
       description = "Module version";
     };
@@ -29,7 +28,7 @@ in {
       description = "Modules that conflict with this module";
     };
 
-    enable = lib.mkEnableOption "boot entry manager";
+    enable = lib.mkEnableOption "${moduleName}";
     
     description = lib.mkOption {
       type = types.str;

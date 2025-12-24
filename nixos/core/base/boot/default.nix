@@ -1,6 +1,9 @@
 { config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
+  # Single Source: Modulname nur einmal definieren
+  moduleName = "boot";
+
   # Bootloader configurations
   bootloaders = {
     systemd-boot = ./bootloaders/systemd-boot.nix;
@@ -8,17 +11,20 @@ let
     refind = ./bootloaders/refind.nix;
   };
 
-  bootCfg = getModuleConfig "boot";
+  bootCfg = getModuleConfig moduleName;
 
 in {
   _module.metadata = {
     role = "core";
-    name = "boot";
+    name = moduleName;
     description = "Bootloader and boot configuration management";
     category = "base";
     subcategory = "boot";
     version = "1.0.0";
   };
+
+  # Modulname einmalig definieren und an Submodule weitergeben
+  _module.args.moduleName = moduleName;
   imports = [
     ./options.nix
     ./config.nix

@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, corePathsLib, ... }:
 
 with lib;
 
@@ -55,7 +55,8 @@ in {
       minimizeScript
     ];
 
-    core.management.system-manager.submodules.cli-registry.commands = [
+    config = lib.mkMerge [
+      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "homelab-minimize";
         description = "Minimize system configuration for homelab use";
@@ -71,6 +72,7 @@ in {
           Requires sudo privileges and triggers system rebuild.
         '';
       }
+      ])
     ];
   };
 }

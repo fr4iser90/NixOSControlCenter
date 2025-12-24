@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, corePathsLib, ... }:
 
 let
   cfg = getModuleConfig "system-update";
@@ -15,9 +15,8 @@ let
   '';
 
 in
-  lib.mkIf (cfg.enable or true) {
-    # Register the system-update command
-    core.management.system-manager.submodules.cli-registry.commands = lib.mkAfter [
+  lib.mkIf (cfg.enable or true)
+    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "system-update";
         script = "${systemUpdateMainScript}/bin/ncc-system-update-main";
@@ -25,5 +24,4 @@ in
         description = "Update NixOS configuration from repository";
         help = "system-update [--auto-build] [--source=remote|local] [--branch=name] - Update NixOS configuration";
       }
-    ];
-  }
+    ])

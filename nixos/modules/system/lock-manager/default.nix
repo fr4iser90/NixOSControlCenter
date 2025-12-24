@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, corePathsLib, ... }:
 
 with lib;
 
@@ -7,7 +7,9 @@ let
   ui = getModuleApi "cli-formatter";
 
   # Feature configuration
-  cfg = getModuleConfig "lock-manager";
+  # Single Source: Modulname nur einmal definieren
+  moduleName = "lock-manager";
+  cfg = getModuleConfig moduleName;
   
   # Import scanner modules (only those that don't use cfg can be in outer let)
   desktopScanner = import ./scanners/desktop.nix { inherit pkgs; };
@@ -21,12 +23,15 @@ let
 in {
   _module.metadata = {
     role = "optional";
-    name = "lock-manager";
+    name = moduleName;
     description = "System state discovery, encryption, and backup management";
     category = "system";
     subcategory = "backup";
     version = "1.0.0";
   };
+
+  # Modulname einmalig definieren und an Submodule weitergeben
+  _module.args.moduleName = moduleName;
 
   imports = if cfg.enable or false then [
     ./options.nix
@@ -240,7 +245,8 @@ in {
     fi
   '';
     in {
-      core.management.system-manager.submodules.cli-registry.commands = [
+      config = lib.mkMerge [
+        (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
         {
           name = "discover";
           description = "Scan system and create encrypted snapshot";
@@ -405,6 +411,7 @@ in {
         '';
       };
     }))
+    ])
   ];
 }
 

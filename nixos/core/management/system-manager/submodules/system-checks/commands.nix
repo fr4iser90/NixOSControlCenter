@@ -1,14 +1,15 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi,... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, moduleName, corePathsLib, ... }:
 
 let
-  cfg = getModuleConfig "system-checks";
+  cfg = getModuleConfig moduleName;
   prebuildCfg = cfg.prebuild or {};
   postbuildScript = import ./scripts/postbuild-checks.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   prebuildCheckScript = import ./scripts/prebuild-checks.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
 in {
-  config = {
+  config = lib.mkMerge [
     # Command-Center registration for checks module
-    core.management.system-manager.submodules.cli-registry.commands = [
+    # CLI-Registry Pfad zentralisiert über corePathsLib
+    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "build";
         description = "Build and activate NixOS configuration with safety checks";
@@ -30,6 +31,6 @@ in {
             --force   Skip safety checks
         '';
       }
-    ];
-  };
+    ])
+  ];
 }

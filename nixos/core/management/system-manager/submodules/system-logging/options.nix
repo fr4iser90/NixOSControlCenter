@@ -1,8 +1,14 @@
-{ lib, ... }:
+{ lib, getCurrentModuleMetadata, ... }:
 
 let
-  moduleVersion = "1.0";
-  
+  # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
+  metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
+  configPath = metadata.configPath or "systemConfig.core.management.system-manager.submodules.system-logging";  # Fallback
+  apiPath = metadata.apiPath or "core.management.system-manager.submodules.system-logging";  # Fallback
+
+  # API Definition - outsourced in api.nix
+  apiValue = import ./api.nix { inherit lib; };
+
   # Report Level Definition
   reportLevels = {
     basic = 1;
@@ -40,17 +46,18 @@ let
     "packages"
   ];
 in {
-  options.systemConfig.core.management.system-manager.submodules.system-logging = {
+
+  options.${configPath} = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;
-      default = moduleVersion;
+      default = "1.0.0";
       internal = true;
       description = "Module version";
     };
 
     enable = lib.mkEnableOption "system logger";
-    
+
     defaultDetailLevel = lib.mkOption {
       type = lib.types.enum (lib.attrNames reportLevels);
       default = "info";
@@ -72,23 +79,6 @@ in {
       };
       default = {};
       description = "Collector-specific configurations";
-    };
-  };
-
-  # NixOS Module Options (for config.core namespace)
-  # API-Struktur: Jeder Ordner = API Pfad Segment
-  options.core.management.system-manager.submodules.system-logging = {
-    # Direkt unter system-logging, nicht unter system-logger
-      defaultDetailLevel = lib.mkOption {
-        type = lib.types.enum (lib.attrNames reportLevels);
-        default = "info";
-        description = "Default detail level for system logging";
-      };
-
-      enable = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Enable system logging";
     };
   };
 }

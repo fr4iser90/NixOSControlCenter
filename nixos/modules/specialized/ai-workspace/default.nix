@@ -3,16 +3,21 @@
 with lib;
 
 let
-  cfg = getModuleConfig "ai-workspace";
+  # Single Source: Modulname nur einmal definieren
+  moduleName = "ai-workspace";
+  cfg = getModuleConfig moduleName;
 in {
   _module.metadata = {
     role = "optional";
-    name = "ai-workspace";
+    name = moduleName;
     description = "AI workspace with LLM and training capabilities";
     category = "specialized";
     subcategory = "ai";
     version = "1.0.0";
   };
+
+  # Modulname einmalig definieren und an Submodule weitergeben
+  _module.args.moduleName = moduleName;
 
   imports = if cfg.enable or false then [
     ./options.nix

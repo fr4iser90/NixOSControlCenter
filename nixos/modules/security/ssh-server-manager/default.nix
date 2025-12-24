@@ -3,18 +3,23 @@
 with lib;
 
 let
-  cfg = getModuleConfig "ssh-server-manager";
+  # Single Source: Modulname nur einmal definieren
+  moduleName = "ssh-server-manager";
+  cfg = getModuleConfig moduleName;
   ui = getModuleApi "cli-formatter";
   commandCenter = config.core.management.system-manager.submodules.cli-registry;
 in {
   _module.metadata = {
     role = "optional";
-    name = "ssh-server-manager";
+    name = moduleName;
     description = "SSH server access management and monitoring";
     category = "security";
     subcategory = "ssh";
     version = "1.0.0";
   };
+
+  # Modulname einmalig definieren und an Submodule weitergeben
+  _module.args.moduleName = moduleName;
 
   imports = if cfg.enable or false then [
     ./options.nix

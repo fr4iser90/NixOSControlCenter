@@ -1,4 +1,4 @@
-{ config, lib, pkgs, cfg, ... }:
+{ config, lib, pkgs, cfg, corePathsLib, ... }:
 
 with lib;
 
@@ -78,7 +78,8 @@ in {
       sshForceOpenScript
     ];
 
-    core.management.system-manager.submodules.cli-registry.commands = [
+    config = lib.mkMerge [
+      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "ssh-temp-open";
         description = "Temporarily enable SSH password authentication";
@@ -105,6 +106,7 @@ in {
           then automatically disables it. Useful for one-time access.
         '';
       }
+      ])
     ];
   };
 }

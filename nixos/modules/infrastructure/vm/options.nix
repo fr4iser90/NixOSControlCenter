@@ -1,14 +1,13 @@
 { lib, ... }:
 
 let
-  moduleVersion = "1.0";
   stateDir = "/var/lib/virt";
 in {
   options.modules.infrastructure.vm = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;
-      default = moduleVersion;
+      default = "1.0.0";
       internal = true;
       description = "Module version";
     };

@@ -3,7 +3,9 @@
 with lib;
 
 let
-  cfg = getModuleConfig "hackathon";
+  # Single Source: Modulname nur einmal definieren
+  moduleName = "hackathon";
+  cfg = getModuleConfig moduleName;
   
   # Finde alle Benutzer mit hackathon-admin Rolle
   hackathonUsers = lib.filterAttrs
@@ -19,12 +21,15 @@ let
 in {
   _module.metadata = {
     role = "optional";
-    name = "hackathon";
+    name = moduleName;
     description = "Hackathon environment management";
     category = "specialized";
     subcategory = "development";
     version = "1.0.0";
   };
+
+  # Modulname einmalig definieren und an Submodule weitergeben
+  _module.args.moduleName = moduleName;
 
   imports = if cfg.enable or false then
     [

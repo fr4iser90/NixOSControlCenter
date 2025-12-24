@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, corePathsLib, ... }:
 
 with lib;
 
@@ -200,10 +200,11 @@ in {
     };
   };
 
-  config = {
-    environment.systemPackages = [ listRequestsScript cleanupRequestsScript ];
-
-    core.management.system-manager.submodules.cli-registry.commands = [
+  config = lib.mkMerge [
+    {
+      environment.systemPackages = [ listRequestsScript cleanupRequestsScript ];
+    }
+    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "ssh-list-requests";
         description = "List SSH access requests";
@@ -243,6 +244,6 @@ in {
             ssh-cleanup-requests 30  # Clean up requests older than 30 days
         '';
       }
-    ];
-  };
+      ])
+  ];
 }

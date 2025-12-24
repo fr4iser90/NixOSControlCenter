@@ -3,7 +3,9 @@
 with lib;
 
 let
-  cfg = getModuleConfig "homelab-manager";
+  # Single Source: Modulname nur einmal definieren
+  moduleName = "homelab-manager";
+  cfg = getModuleConfig moduleName;
   
   # Check if Swarm is active
   isSwarmMode = (systemConfig.homelab.swarm or null) != null;
@@ -40,12 +42,15 @@ let
 in {
   _module.metadata = {
     role = "optional";
-    name = "homelab-manager";
+    name = moduleName;
     description = "Homelab infrastructure management and orchestration";
     category = "infrastructure";
     subcategory = "homelab";
     version = "1.0.0";
   };
+
+  # Modulname einmalig definieren und an Submodule weitergeben
+  _module.args.moduleName = moduleName;
 
   imports = if cfg.enable or false then
     [
@@ -67,7 +72,7 @@ in {
     (mkIf cfg.enable {
       # Import homelab utilities config
       environment.systemPackages = (homelabUtils.config.environment.systemPackages or []);
-      core.management.system-manager.submodules.cli-registry.commands = (homelabUtils.config.core.management.system-manager.submodules.cli-registry.commands or []);
+      "${corePathsLib.getCliRegistryCommandsPath}" = (homelabUtils.config."${corePathsLib.getCliRegistryCommandsPath}" or []);
     })
   ];
 }

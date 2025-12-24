@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, corePathsLib, ... }:
 
 with lib;
 
@@ -225,24 +225,24 @@ let
     done
 
     # Helper functions for selective module copying
-    # Extract version from options.nix (SOURCE)
+    # Extract version from _module.metadata (SOURCE)
     get_source_version() {
       local module_path="$1"
-      local options_file="$module_path/options.nix"
-      if [ -f "$options_file" ]; then
-        grep -m 1 'moduleVersion =' "$options_file" 2>/dev/null | sed 's/.*moduleVersion = "\([^"]*\)".*/\1/' || echo "unknown"
+      local default_file="$module_path/default.nix"
+      if [ -f "$default_file" ]; then
+        nix-instantiate --eval "$default_file" 2>/dev/null | jq -r '._module.metadata.version // "unknown"' 2>/dev/null || echo "unknown"
       else
         echo "unknown"
       fi
     }
     
-    # Extract version from options.nix (TARGET - deployed system)
+    # Extract version from _module.metadata (TARGET - deployed system)
     # Version comes from deployed code, not config files
     get_target_version() {
       local module_path="$1"
-      local options_file="$module_path/options.nix"
-      if [ -f "$options_file" ]; then
-        grep -m 1 'moduleVersion =' "$options_file" 2>/dev/null | sed 's/.*moduleVersion = "\([^"]*\)".*/\1/' || echo "unknown"
+      local default_file="$module_path/default.nix"
+      if [ -f "$default_file" ]; then
+        nix-instantiate --eval "$default_file" 2>/dev/null | jq -r '._module.metadata.version // "unknown"' 2>/dev/null || echo "unknown"
       else
         echo "unknown"
       fi
@@ -749,44 +749,46 @@ EOF
     ];
   };
 
-in {
-  # Enable terminal-ui dependency
-  # modules.terminal-ui.enable removed (cli-formatter is Core) = true;
+in lib.mkMerge [
+  {
+    # Enable terminal-ui dependency
+    # modules.terminal-ui.enable removed (cli-formatter is Core) = true;
 
-  environment.systemPackages = [
-    systemUpdateMainScript
-    configModule.configCheck
-  ];
+    environment.systemPackages = [
+      systemUpdateMainScript
+      configModule.configCheck
+    ];
 
-  system.activationScripts.nixosBackupDir = ''
-    # Create main backup directory
-    mkdir -p ${backupSettings.directory}
-    chmod 700 ${backupSettings.directory}
-    chown root:root ${backupSettings.directory}
+    system.activationScripts.nixosBackupDir = ''
+      # Create main backup directory
+      mkdir -p ${backupSettings.directory}
+      chmod 700 ${backupSettings.directory}
+      chown root:root ${backupSettings.directory}
 
-    # Create subdirectories for organized backups
-    mkdir -p ${backupSettings.directory}/configs
-    mkdir -p ${backupSettings.directory}/directories
-    mkdir -p ${backupSettings.directory}/migrations
-    mkdir -p ${backupSettings.directory}/ssh
-    mkdir -p ${backupSettings.directory}/system-updates
+      # Create subdirectories for organized backups
+      mkdir -p ${backupSettings.directory}/configs
+      mkdir -p ${backupSettings.directory}/directories
+      mkdir -p ${backupSettings.directory}/migrations
+      mkdir -p ${backupSettings.directory}/ssh
+      mkdir -p ${backupSettings.directory}/system-updates
 
-    # Set permissions for all subdirectories
-    chmod 700 ${backupSettings.directory}/configs
-    chmod 700 ${backupSettings.directory}/directories
-    chmod 700 ${backupSettings.directory}/migrations
-    chmod 700 ${backupSettings.directory}/ssh
-    chmod 700 ${backupSettings.directory}/system-updates
+      # Set permissions for all subdirectories
+      chmod 700 ${backupSettings.directory}/configs
+      chmod 700 ${backupSettings.directory}/directories
+      chmod 700 ${backupSettings.directory}/migrations
+      chmod 700 ${backupSettings.directory}/ssh
+      chmod 700 ${backupSettings.directory}/system-updates
 
-    chown root:root ${backupSettings.directory}/configs
-    chown root:root ${backupSettings.directory}/directories
-    chown root:root ${backupSettings.directory}/migrations
-    chown root:root ${backupSettings.directory}/ssh
-    chown root:root ${backupSettings.directory}/system-updates
-  '';
+      chown root:root ${backupSettings.directory}/configs
+      chown root:root ${backupSettings.directory}/directories
+      chown root:root ${backupSettings.directory}/migrations
+      chown root:root ${backupSettings.directory}/ssh
+      chown root:root ${backupSettings.directory}/system-updates
+    '';
+  }
 
-  # Commands are registered in commands.nix
-  core.management.system-manager.submodules.cli-registry.commands = [
+  # Commands are registered in commands.nix (zentralisiert)
+  (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
     {
       name = "system-update";
       description = "Update NixOS system configuration";
@@ -808,5 +810,5 @@ in {
           --branch        Branch name for remote updates
       '';
     }
-  ];
-}
+  ])
+]

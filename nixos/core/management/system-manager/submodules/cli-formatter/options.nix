@@ -1,14 +1,25 @@
-{ lib, ... }:
+{ lib, getCurrentModuleMetadata, ... }:
 
 let
-  moduleVersion = "1.0";
+  # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
+  metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
+  configPath = metadata.configPath or "systemConfig.core.management.system-manager.submodules.cli-formatter";  # Fallback
+  apiPath = metadata.apiPath or "core.management.system-manager.submodules.cli-formatter";  # Fallback
 in {
-  # User configuration (accessed via systemConfig.core.management.system-manager.submodules.cli-formatter)
-  options.systemConfig.core.management.system-manager.submodules.cli-formatter = {
+  # Parent option for submodule
+  options.core.management.system-manager.submodules.cli-formatter = lib.mkOption {
+    type = lib.types.attrs;
+    default = {};
+    internal = true;
+    description = "CLI formatter submodule container";
+  };
+
+  # User configuration (accessed via ${configPath})
+  options.${configPath} = {
     # Version metadata (REQUIRED for all modules)
     _version = lib.mkOption {
       type = lib.types.str;
-      default = moduleVersion;
+      default = "1.0.0";
       internal = true;
       description = "CLI formatter module version";
     };
@@ -35,20 +46,19 @@ in {
           template = lib.mkOption {
             type = lib.types.lines;
             description = "Component template using CLI formatter API";
-          };
-        };
-      });
+    };
+  };
+
+  # API option (without default - set in config.nix)
+  options.core.management.system-manager.submodules.cli-formatter.api = lib.mkOption {
+    type = lib.types.attrs;
+    internal = true;
+    description = "CLI formatter API for other modules";
+  };
+});
       default = {};
       description = "Custom CLI formatter components";
     };
   };
 
-  # API definition (accessed via config.core.management.system-manager.submodules.cli-formatter)
-  options.core.management.system-manager.submodules.cli-formatter = {
-    api = lib.mkOption {
-      type = lib.types.attrs;
-      readOnly = true;
-      description = "CLI formatter API for other modules (read-only)";
-    };
-  };
 }

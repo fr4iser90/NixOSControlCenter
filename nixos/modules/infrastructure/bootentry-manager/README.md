@@ -19,13 +19,13 @@ The Boot Entry Manager is a **module module** that provides unified boot entry m
 ### File Structure
 
 ```
-bootentry/
+bootentry-manager/
 ├── README.md                    # This documentation
 ├── CHANGELOG.md                 # Version history
 ├── default.nix                  # Main module entry point
 ├── options.nix                  # Configuration options
 ├── config.nix                   # Implementation logic & symlink management
-├── bootentry-config.nix         # User configuration (symlinked)
+├── bootentry-manager-config.nix         # User configuration (symlinked)
 ├── lib/                         # Shared utility functions
 │   ├── common.nix              # Common utilities
 │   └── types.nix               # Type definitions
@@ -60,7 +60,7 @@ Enable the boot entry manager in your configuration:
 {
   modules = {
     infrastructure = {
-      bootentry = {
+      bootentry-manager = {
         enable = true;
       };
     };
@@ -88,9 +88,9 @@ Boot entries are managed through JSON files in `/etc/nixos/boot/entries/`:
 
 The module provides command-line tools:
 
-- **`ncc bootentry list`**: List all boot entries
-- **`ncc bootentry rename <old> <new>`**: Rename a boot entry
-- **`ncc bootentry reset <name>`**: Reset entry to default
+- **`ncc bootentry-manager list`**: List all boot entries
+- **`ncc bootentry-manager rename <old> <new>`**: Rename a boot entry
+- **`ncc bootentry-manager reset <name>`**: Reset entry to default
 
 ### Entry Synchronization
 
@@ -159,7 +159,7 @@ Each provider implements a common interface:
 
 ```nix
 # Enable boot entry management
-modules.infrastructure.bootentry.enable = true;
+modules.infrastructure.bootentry-manager.enable = true;
 
 # Create a custom boot entry
 # Place JSON file in /etc/nixos/boot/entries/custom.json
@@ -175,7 +175,7 @@ modules.infrastructure.bootentry.enable = true;
 
 ```nix
 # Enable for multi-boot environment
-modules.infrastructure.bootentry.enable = true;
+modules.infrastructure.bootentry-manager.enable = true;
 
 # Entries for different OSes
 # /etc/nixos/boot/entries/nixos.json

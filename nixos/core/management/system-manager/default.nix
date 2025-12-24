@@ -3,8 +3,10 @@
 with lib;
 
 let
+  # Single Source: Modulname nur einmal definieren
+  moduleName = "system-manager";
   # Use systemConfig from module-manager (_module.args)
-  cfg = getModuleConfig "system-manager";
+  cfg = getModuleConfig moduleName;
 
   # Import helpers
   backupHelpers = import ./lib/backup-helpers.nix { inherit pkgs lib; };
@@ -32,6 +34,18 @@ in {
   ];
 
   config = {
+    _module.metadata = {
+      role = "core";
+      name = moduleName;
+      description = "Central system management and configuration";
+      category = "management";
+      subcategory = "system";
+      version = "1.0.0";
+    };
+
+    # Modulname einmalig definieren und an Submodule weitergeben
+    _module.args.moduleName = moduleName;
+
     # moduleConfig kommt automatisch vom module-manager (zentral definiert)
 
     # System-Manager ist Core - immer geladen
@@ -50,14 +64,5 @@ in {
     boot.loader.grub.enable = bootCfg.bootloader == "grub";
     
     core.management.system-manager.api = apiValue;
-
-    _module.metadata = {
-      role = "core";
-      name = "system-manager";
-      description = "Central system management and configuration";
-      category = "management";
-      subcategory = "system";
-      version = "1.0.0";
-    };
   };
 }

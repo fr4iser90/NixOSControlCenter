@@ -1,13 +1,15 @@
-{ config, lib, systemConfig, ... }:
+{ config, lib, systemConfig, getCurrentModuleMetadata, ... }:
 
 let
-  moduleVersion = "1.0";
+  # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
+  metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
+  configPath = metadata.configPath or "systemConfig.core.management.system-manager.submodules.system-update";  # Fallback
 in {
-  options.systemConfig.core.management.system-manager.submodules.system-update = {
+  options.${configPath} = {
     # Version metadata (REQUIRED)
     _version = lib.mkOption {
       type = lib.types.str;
-      default = moduleVersion;
+      default = "1.0.0";
       internal = true;
       description = "Module version";
     };

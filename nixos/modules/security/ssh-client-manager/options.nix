@@ -1,15 +1,13 @@
 { lib, moduleConfig, ... }:
 
-let
-  moduleVersion = "1.0";
-in {
+{
   # SSH Client Manager Options
   # This module defines all configuration options for the SSH client manager
   options.${moduleConfig.optionsPath} = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;
-      default = moduleVersion;
+      default = "1.0.0";
       internal = true;
       description = "Module version";
     };

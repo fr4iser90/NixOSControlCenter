@@ -1,4 +1,4 @@
-{ config, lib, pkgs, moduleConfig, ... }:
+{ config, lib, pkgs, moduleConfig, corePathsLib, ... }:
 
 with lib;
 
@@ -189,8 +189,9 @@ in {
       sshClientManagerScript  # SSH Client Manager Script wird als Systempaket hinzugefügt
     ];
     
-    # Register the command in the command center
-    core.management.system-manager.submodules.cli-registry.commands = [
+    # Register the command in the command center (zentralisiert)
+    config = lib.mkMerge [
+      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "ssh-client-manager";
         description = "Manage SSH client connections";
@@ -208,7 +209,7 @@ in {
             --test       Run a test connection
         '';
       }
-    ];
+      ]);
 
     # Store the script reference in the service configuration
     ${moduleConfig.configPath} = {

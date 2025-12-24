@@ -1,6 +1,8 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, getModuleConfig, moduleName, ... }:
 let
-  cfg = getModuleConfig "packages";
+  # Discovery: Modulname aus Dateisystem ableiten (wie options.nix!)
+  moduleName = baseNameOf (dirOf ./.);  # ← packages aus core/base/packages/
+  cfg = getModuleConfig moduleName;
 in {
   # Packages configuration is handled in default.nix (core module, always enabled)
   # This file creates symlinks and handles config file management

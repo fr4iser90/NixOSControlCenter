@@ -1,8 +1,6 @@
 { lib, pkgs, ... }:
 
 let
-  moduleVersion = "1.0";
-  
   # Import helpers
   backupHelpersValue = import ./lib/backup-helpers.nix { inherit pkgs lib; };
   # Pass backupHelpers to configHelpers so it can use it
@@ -18,7 +16,7 @@ in
   options.systemConfig.management.system-manager = {
     _version = lib.mkOption {
       type = lib.types.str;
-      default = moduleVersion;
+      default = "1.0.0";
       internal = true;
       description = "System manager module version";
     };

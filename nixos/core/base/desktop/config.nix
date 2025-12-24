@@ -1,6 +1,8 @@
-{ config, lib, getModuleConfig, ... }:
+{ config, lib, systemConfig, getModuleConfig, moduleName, ... }:
 let
-  cfg = getModuleConfig "desktop";
+  # Discovery: Modulname aus Dateisystem ableiten (wie options.nix!)
+  moduleName = baseNameOf (dirOf ./.);  # ← desktop aus core/base/desktop/
+  cfg = getModuleConfig moduleName;
   locCfg = getModuleConfig "localization";
 
   # Use keyboard settings from localization module
@@ -45,5 +47,6 @@ in
           message = "Invalid display manager: ${cfg.display.manager or "none"}";
         }
       ];
+
   };
 }

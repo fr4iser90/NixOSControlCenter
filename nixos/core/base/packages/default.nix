@@ -1,8 +1,10 @@
 { config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
-  cfg = getModuleConfig "packages";
-  systemManagerCfg = getModuleConfig "system-manager";
+  # Discovery: Modulname aus Dateisystem ableiten
+  moduleName = baseNameOf ./. ;  # ← packages aus core/base/packages/
+  cfg = getModuleConfig moduleName;
+  systemManagerCfg = getModuleConfig "system-manager";  # Anderes Modul, bleibt hardcoded
 
   # Load base packages
   basePackages = {
@@ -33,16 +35,19 @@ let
 
 in {
   _module.metadata = {
-    role = "core";   
-    name = "packages";
+    role = "core";
+    name = moduleName;
     description = "Package management system";
     category = "base";
     subcategory = "packages";
     version = "1.0.0";
   };
 
+  # Modulname einmalig definieren und an Submodule weitergeben
+  _module.args.moduleName = moduleName;
+
   imports = [
-    ./config.nix
+    (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })
     (let
       systemType = systemManagerCfg.systemType or "desktop";
     in

@@ -1,4 +1,4 @@
-{ config, lib, pkgs, cfg, ... }:
+{ config, lib, pkgs, cfg, corePathsLib, ... }:
 
 with lib;
 
@@ -79,7 +79,8 @@ in {
       curl
     ];
 
-    core.management.system-manager.submodules.cli-registry.commands = [
+    config = lib.mkMerge [
+      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "ssh-notify-test";
         description = "Test SSH notification system";
@@ -95,6 +96,7 @@ in {
           Useful for verifying notification configuration.
         '';
       }
+      ])
     ];
   };
 }

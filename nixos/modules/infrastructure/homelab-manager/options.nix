@@ -1,13 +1,11 @@
 { lib, ... }:
 
-let
-  moduleVersion = "1.0";
-in {
+{
   options.modules.infrastructure.homelab = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;
-      default = moduleVersion;
+      default = "1.0.0";
       internal = true;
       description = "Module version";
     };

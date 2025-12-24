@@ -78,7 +78,8 @@ let
       # Get available version from options.nix
       OPTIONS_FILE="$module_dir/options.nix"
       if [ -f "$OPTIONS_FILE" ]; then
-        AVAILABLE=$(${pkgs.gnugrep}/bin/grep -m 1 'moduleVersion =' "$OPTIONS_FILE" 2>/dev/null | ${pkgs.gnused}/bin/sed 's/.*moduleVersion = "\([^"]*\)".*/\1/' || echo "unknown")
+        DEFAULT_FILE="$module_dir/default.nix"
+        AVAILABLE=$(nix-instantiate --eval "$DEFAULT_FILE" 2>/dev/null | ${pkgs.jq}/bin/jq -r '._module.metadata.version // "unknown"' 2>/dev/null || echo "unknown")
       else
         AVAILABLE="unknown"
       fi

@@ -1,7 +1,9 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleMetadata, moduleName, ... }:
 
 let
-  cfg = systemConfig.modules.infrastructure.bootentry;
+  # Modulname kommt aus default.nix (single source of truth)
+  moduleMeta = getModuleMetadata moduleName;
+  cfg = lib.attrByPath (lib.splitString "." moduleMeta.configPath) {} systemConfig;
   configHelpers = import ../../../core/management/module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   # Use the template file as default config
   defaultConfig = builtins.readFile ./bootentry-config.nix;
@@ -9,7 +11,7 @@ in
   lib.mkMerge [
     (lib.mkIf (cfg.enable or false)
       (configHelpers.createModuleConfig {
-        moduleName = "bootentry";
+        moduleName = moduleMeta.name;
         defaultConfig = defaultConfig;
       })
     )

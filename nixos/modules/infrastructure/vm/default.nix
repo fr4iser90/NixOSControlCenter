@@ -3,17 +3,22 @@
 with lib;
 
 let
-  cfg = getModuleConfig "vm";
+  # Single Source: Modulname nur einmal definieren
+  moduleName = "vm";
+  cfg = getModuleConfig moduleName;
   stateDir = cfg.stateDir;
 in {
   _module.metadata = {
     role = "optional";
-    name = "vm";
+    name = moduleName;
     description = "Virtual machine management and orchestration";
     category = "infrastructure";
     subcategory = "virtualization";
     version = "1.0.0";
   };
+
+  # Modulname einmalig definieren und an Submodule weitergeben
+  _module.args.moduleName = moduleName;
 
   imports = if cfg.enable or false then [
     ./options.nix

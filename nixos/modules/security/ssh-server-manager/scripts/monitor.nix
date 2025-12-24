@@ -1,4 +1,4 @@
-{ config, lib, pkgs, cfg, ... }:
+{ config, lib, pkgs, cfg, corePathsLib, ... }:
 
 with lib;
 
@@ -91,7 +91,8 @@ in {
   config = mkIf monitorCfg.enable {
     environment.systemPackages = [ monitorScript ];
 
-    core.management.system-manager.submodules.cli-registry.commands = [
+    config = lib.mkMerge [
+      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "ssh-monitor";
         description = "Monitor SSH connections in real-time";
@@ -104,6 +105,7 @@ in {
           total connections, and failed attempts. Integrates with the terminal UI.
         '';
       }
+      ])
     ];
   };
 }

@@ -21,28 +21,48 @@ Based on the fundamental architecture analysis, this implementation plan address
 **Files to Create:**
 ```
 core/management/nixos-control-center/
-├── default.nix              # Main NCC module definition
-├── options.nix              # NCC configuration options
-├── config.nix               # NCC implementation
-├── commands.nix             # NCC command registration
-├── api.nix                  # Public NCC APIs for other modules
+├── default.nix                                  # Main NCC module definition
+├── options.nix                                  # NCC configuration options
+├── config.nix                                   # NCC implementation
+├── commands.nix                                 # NCC command registration
+├── api.nix                                      # Public NCC APIs for other modules
 └── submodules/
-    ├── cli-formatter/       # MOVED from system-manager/submodules/cli-formatter/
-    │   ├── default.nix
-    │   ├── colors.nix
-    │   ├── core.nix
-    │   └── status.nix
-    └── cli-registry/         # MOVED from system-manager/submodules/cli-registry/
-        ├── default.nix
-        ├── api.nix
-        └── commands.nix
+    ├── cli-formatter/                           # MOVED from system-manager
+    │   ├── default.nix                          # Module definition with metadata
+    │   ├── api.nix                              # API exports
+    │   ├── options.nix                          # NCC submodule options
+    │   ├── config.nix                           # Implementation
+    │   ├── colors.nix                           # MOVED from system-manager
+    │   ├── core.nix                             # MOVED from system-manager
+    │   ├── status.nix                           # MOVED from system-manager
+    │   └── cli-formatter-config.nix             # User configuration template
+    ├── cli-registry/                            # Command registration system
+    │   ├── default.nix                          # Module definition with metadata
+    │   ├── api.nix                              # API exports
+    │   ├── options.nix                          # NCC submodule options
+    │   ├── config.nix                           # Implementation
+    │   ├── commands.nix                         # Command registration
+    │   ├── filter.nix                           # Permission-aware filtering
+    │   └── cli-registry-config.nix              # User configuration template
+    └── cli-permissions/                         # Role-based access control
+        ├── default.nix                          # Module definition with metadata
+        ├── api.nix                              # API exports
+        ├── options.nix                          # NCC submodule options
+        ├── config.nix                           # Implementation
+        ├── roles.nix                            # Permission roles
+        ├── policies.nix                         # Permission policies
+        ├── access-control.nix                   # Access checking logic
+        ├── user-context.nix                     # Current user detection
+        └── cli-permissions-config.nix           # User configuration template
 ```
 
 **Implementation Steps:**
-1. Create directory structure
-2. Copy cli-formatter from system-manager to ncc/submodules/
-3. Update metadata and module structure following MODULE_TEMPLATE.md
-4. Create basic API exports for formatting and registry
+1. Create directory structure with submodules
+2. Copy cli-formatter components from system-manager to ncc/submodules/cli-formatter/
+3. Create cli-registry submodule with command registration logic
+4. Create cli-permissions submodule with role-based access control
+5. Update metadata in all submodules following MODULE_TEMPLATE.md
+6. Create API exports within NCC module structure
 
 #### 1.2 Update Core Imports
 **Objective:** Add NCC module to core/default.nix
@@ -70,7 +90,7 @@ imports = [
 ```
 
 #### 1.3 NCC Module Definition
-**File:** `nixos/core/management/ncc/default.nix`
+**File:** `nixos/core/management/nixos-control-center/default.nix`
 ```nix
 { config, lib, pkgs, systemConfig, ... }:
 
@@ -78,12 +98,13 @@ let
   # Module metadata (REQUIRED - define directly here)
   metadata = {
     # Basic info
-    name = "ncc";
-    scope = "system";          # system | shared | user
-    mutability = "overlay";    # exclusive | overlay
-    dimensions = [];           # [] for system scope, ["user"] for shared
+    role = "core";                    # "core" | "optional"
+    name = "nixos-control-center";    # Unique module identifier
     description = "NixOS Control Center - CLI ecosystem";
-    version = "1.0.0";
+    category = "core";                # "core" | "base" | "security" | "infrastructure" | "specialized"
+    subcategory = "management";       # Specific subcategory within category
+    stability = "stable";             # "stable" | "experimental" | "deprecated" | "beta" | "alpha"
+    version = "1.0.0";                # SemVer: MAJOR.MINOR.PATCH
   };
 in {
   # REQUIRED: Export metadata for discovery system
@@ -95,27 +116,26 @@ in {
     ./config.nix
     ./commands.nix
     ./api.nix
-    ./submodules/cli-formatter
-    ./submodules/cli-registry
   ];
 }
 ```
 
 #### 1.4 NCC API Definition
-**File:** `nixos/core/management/ncc/api.nix`
+**File:** `nixos/core/management/nixos-control-center/api.nix`
 ```nix
 { config, lib, ... }:
 
 with lib;
 
 let
-  # Import formatting APIs
-  formatter = config.core.management.ncc.submodules.cli-formatter.api;
-  registry = config.core.management.ncc.submodules.cli-registry.api;
+  # Import APIs using generic API system
+  formatter = config.${getModuleApi "cli-formatter"};
+  registry = config.${getModuleApi "cli-registry"};
+  permissions = config.${getModuleApi "cli-permissions"};
 in {
   # Public NCC API - available to all modules
-  core.management.ncc.api = {
-    inherit formatter registry;
+  core.management.nixos-control-center.api = {
+    inherit formatter registry permissions;
 
     # Convenience functions
     format = formatter;
@@ -139,8 +159,8 @@ colors = import ./submodules/cli-formatter/colors.nix;
 coreFormatter = import ./submodules/cli-formatter/core { inherit lib colors; config = {}; };
 statusFormatter = import ./submodules/cli-formatter/status { inherit lib colors; config = {}; };
 
-# AFTER: Use NCC API
-formatter = config.core.management.ncc.api.formatter;
+# AFTER: Use generic API system
+formatter = config.${getModuleApi "cli-formatter"};
 colors = formatter.colors;
 coreFormatter = formatter.core;
 statusFormatter = formatter.status;
@@ -157,8 +177,8 @@ statusFormatter = formatter.status;
 # BEFORE: Direct system-manager reference
 ui = getModuleApi "cli-formatter";
 
-# AFTER: Use NCC API
-ui = config.core.management.ncc.api.formatter;
+# AFTER: Keep build-time access (context-appropriate)
+ui = getModuleApi "cli-formatter";
 ```
 
 #### 2.3 Remove Old CLI Formatter from System Manager
@@ -246,7 +266,7 @@ in {
 
 **New NCC Validation APIs:**
 ```nix
-core.management.ncc.api = {
+core.management.nixos-control-center.api = {
   inherit formatter registry;
 
   # Validation APIs
@@ -266,7 +286,7 @@ core.management.ncc.api = {
 - `nixos/core/management/system-manager/submodules/system-checks/`
 
 **Changes:**
-- Use `config.core.management.ncc.api.validation` instead of local logic
+- Use `config.${getModuleApi "nixos-control-center"}.validation` instead of local logic
 - Format validation reports with NCC formatter
 
 #### 4.3 Module Manager Validation Enhancement
@@ -335,7 +355,7 @@ core/management/nixos-control-center/
 commands = [
   {
     name = "homelab-status";
-    script = "${homelabStatus}/bin/ncc-homelab-status";
+    script = "${homelabStatus}/bin/nixos-control-center-homelab-status";
     description = "Show homelab status";
     category = "infrastructure";
     permissions = {
@@ -358,8 +378,8 @@ commands = [
 # filter.nix - Permission-aware command filtering
 { config, lib, ... }:
 let
-  cfg = config.core.management.ncc.submodules.cli-registry;
-  permissions = config.core.management.ncc.submodules.permissions;
+  cfg = config.${getModuleApi "cli-registry"};
+  permissions = config.${getModuleApi "cli-permissions"};
 
   # Get current user context
   currentUser = permissions.user-context.currentUser;
@@ -400,15 +420,15 @@ in {
 
 **Enhanced NCC API:**
 ```nix
-core.management.ncc.api = {
+core.management.nixos-control-center.api = {
   inherit formatter registry;
 
   # NEW: Permission APIs
   permissions = {
-    checkAccess = user: command: config.core.management.ncc.submodules.permissions.access-control.checkAccess user command;
-    filterCommands = user: commands: config.core.management.ncc.submodules.permissions.cli-filter.filterCommands commands user;
-    getUserRoles = username: config.core.management.ncc.submodules.permissions.user-context.getUserRoles username;
-    getUserGroups = username: config.core.management.ncc.submodules.permissions.user-context.getUserGroups username;
+    checkAccess = user: command: config.${getModuleApi "cli-permissions"}.access-control.checkAccess user command;
+    filterCommands = user: commands: config.${getModuleApi "cli-permissions"}.cli-filter.filterCommands commands user;
+    getUserRoles = username: config.${getModuleApi "cli-permissions"}.user-context.getUserRoles username;
+    getUserGroups = username: config.${getModuleApi "cli-permissions"}.user-context.getUserGroups username;
   };
 
   # Validation APIs
@@ -432,9 +452,9 @@ core.management.ncc.api = {
 # commands.nix - Permission-aware command help
 { config, lib, pkgs, ... }:
 let
-  cfg = config.core.management.ncc;
-  permissions = cfg.submodules.permissions;
-  registry = cfg.submodules.cli-registry;
+  cfg = config.${getModuleApi "nixos-control-center"};
+  permissions = config.${getModuleApi "cli-permissions"};
+  registry = config.${getModuleApi "cli-registry"};
 
   # Get current user (from environment or detection)
   currentUser = permissions.user-context.currentUser;

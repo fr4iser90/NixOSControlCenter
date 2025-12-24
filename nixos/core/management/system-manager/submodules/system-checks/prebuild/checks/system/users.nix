@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, corePathsLib, ... }:
 
 let
   # ui = getModuleApi "cli-formatter";
@@ -65,9 +65,11 @@ let
   '';
 
 in {
-  config = {
-    environment.systemPackages = [ prebuildScript ];
-    core.management.system-manager.submodules.cli-registry.commands = [
+  config = lib.mkMerge [
+    {
+      environment.systemPackages = [ prebuildScript ];
+    }
+    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
       {
         name = "check-users";
         category = "system-checks";
@@ -89,6 +91,6 @@ in {
         dependencies = [ "system-checks" ];
       }
       # Weitere Befehle können hier hinzugefügt werden
-    ];
-  };
+      ])
+  ];
 }

@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, corePathsLib, ... }:
 
 with lib;
 
@@ -29,21 +29,22 @@ let
   configMigration = import ./components/config-migration/default.nix { inherit pkgs lib formatter; backupHelpers = backupHelpersForMigration; };
   configValidator = import ./validators/config-validator.nix { inherit pkgs lib; };
 in {
-  config = {
-    environment.systemPackages =
-      [ checkVersions.checkVersionsScript
-        updateModules.updateModulesScript
-        configMigration.migration.migrateSystemConfig
-        configValidator.validateSystemConfig
-        enableDesktopScript
-        updateDesktopConfig
-      ] ++ lib.optionals (cfg.components.configMigration.enable or false) [
-        configMigration.check.configCheck
-        configMigration.validator.validateSystemConfig
-      ];
-    
-    core.management.system-manager.submodules.cli-registry.commands =
-      [
+  config = lib.mkMerge [
+    {
+      environment.systemPackages =
+        [ checkVersions.checkVersionsScript
+          updateModules.updateModulesScript
+          configMigration.migration.migrateSystemConfig
+          configValidator.validateSystemConfig
+          enableDesktopScript
+          updateDesktopConfig
+        ] ++ lib.optionals (cfg.components.configMigration.enable or false) [
+          configMigration.check.configCheck
+          configMigration.validator.validateSystemConfig
+        ];
+    }
+    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList
+    [
         {
           name = "check-module-versions";
           description = "Check module versions for Core and Features and update status";
@@ -154,7 +155,7 @@ in {
             Requires sudo privileges and triggers system rebuild.
           '';
         }
-      ];
-  };
+      ])
+  ];
 }
 

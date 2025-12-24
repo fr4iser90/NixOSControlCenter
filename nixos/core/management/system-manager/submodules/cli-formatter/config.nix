@@ -30,7 +30,8 @@ let
     inherit (coreForApi) text layout;
     inherit (componentsForApi) lists tables progress boxes;
     inherit (interactiveForApi) prompts spinners;
-    inherit (statusForApi) messages badges;
+    inherit (statusForApi) messages;
+    badges = statusForApi.badges;
   };
 
   # ERST JETZT cfg holen

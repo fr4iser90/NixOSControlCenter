@@ -1,7 +1,9 @@
 { config, pkgs, lib, systemConfig, getModuleConfig, ... }:
 
 let
-  cfg = getModuleConfig "user";
+  # Single Source: Modulname nur einmal definieren
+  moduleName = "user";
+  cfg = getModuleConfig moduleName;
 
   # Gruppen basierend auf Rolle
   roleGroups = {
@@ -82,12 +84,15 @@ let
 in {
   _module.metadata = {
     role = "core";
-    name = "user";
+    name = moduleName;
     description = "User account management and configuration";
     category = "base";
     subcategory = "user";
     version = "1.0.0";
   };
+
+  # Modulname einmalig definieren und an Submodule weitergeben
+  _module.args.moduleName = moduleName;
 
   imports = [
     ./options.nix
