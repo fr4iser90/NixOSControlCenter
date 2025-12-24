@@ -14,5 +14,6 @@
     # Management (includes infrastructure as submodules)
     ./management/system-manager
     ./management/module-manager
+    ./management/nixos-control-center
   ];
 }

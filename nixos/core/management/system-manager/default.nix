@@ -21,8 +21,7 @@ in {
     ./commands.nix
     ./config.nix
     # Import all submodules (full-featured modules within system-manager)
-    ./submodules/cli-formatter    # CLI formatting submodule
-    ./submodules/cli-registry     # CLI command registration submodule
+    # NOTE: cli-formatter and cli-registry moved to nixos-control-center
     ./submodules/system-update    # System update submodule
     ./submodules/system-checks    # System validation submodule
     ./submodules/system-logging   # System logging submodule

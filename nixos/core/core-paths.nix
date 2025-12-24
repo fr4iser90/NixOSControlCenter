@@ -2,8 +2,8 @@
 # Single Source of Truth für alle Core-Pfade
 {
   # CLI Registry Pfade
-  cliRegistryCommands = "core.management.system-manager.submodules.cli-registry.commands";
-  cliRegistryApi = "core.management.system-manager.submodules.cli-registry.api";
+  cliRegistryCommands = "core.management.nixos-control-center.submodules.cli-registry.commands";
+  cliRegistryApi = "core.management.nixos-control-center.submodules.cli-registry.api";
 
   # System Manager Pfade
   systemManagerApi = "core.management.system-manager.api";

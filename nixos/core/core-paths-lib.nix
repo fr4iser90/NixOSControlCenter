@@ -5,8 +5,8 @@
 let
   # Basis-Pfade (Single Source of Truth)
   paths = {
-    cliRegistryCommands = "core.management.system-manager.submodules.cli-registry.commands";
-    cliRegistryApi = "core.management.system-manager.submodules.cli-registry.api";
+    cliRegistryCommands = "core.management.nixos-control-center.submodules.cli-registry.commands";
+    cliRegistryApi = "core.management.nixos-control-center.submodules.cli-registry.api";
     systemManagerApi = "core.management.system-manager.api";
   };
 

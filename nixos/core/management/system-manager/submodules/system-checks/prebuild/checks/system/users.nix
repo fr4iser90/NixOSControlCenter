@@ -1,8 +1,8 @@
 { config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, corePathsLib, ... }:
 
 let
-  # ui = getModuleApi "cli-formatter";
-  ui = config.core.management.system-manager.submodules.cli-formatter.api; 
+  # GENERISCH: CLI Formatter API über getModuleApi beziehen
+  ui = getModuleApi "cli-formatter"; 
   
   prebuildScript = pkgs.writeScriptBin "prebuild-check-users" ''
     #!${pkgs.bash}/bin/bash

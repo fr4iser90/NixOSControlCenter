@@ -1,8 +1,8 @@
 { config, lib, pkgs, systemConfig, getModuleApi, ... }:
 
 let
-  # ui = getModuleApi "cli-formatter";
-  ui = config.core.management.system-manager.submodules.cli-formatter.api; 
+  # GENERISCH: CLI Formatter API über getModuleApi beziehen
+  ui = getModuleApi "cli-formatter"; 
 
   hardwareConfigPath = "/etc/nixos/configs/core/base/hardware/config.nix";
   
