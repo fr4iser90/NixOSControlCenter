@@ -15,18 +15,11 @@ let
   updateDesktopConfig = import ./scripts/update-desktop-config.nix { inherit config lib pkgs systemConfig; };
   
   # Import config migration and validation
-  colors = import ./submodules/cli-formatter/colors.nix;
-  coreFormatter = import ./submodules/cli-formatter/core { inherit lib colors; config = {}; };
-  statusFormatter = import ./submodules/cli-formatter/status { inherit lib colors; config = {}; };
-  formatter = {
-    inherit colors;
-    inherit (coreFormatter) text layout;
-    inherit (statusFormatter) messages badges;
-  };
-  # Get backup helpers from API (will be passed to config-migration)
+  # CLI Formatter ist jetzt in NCC - verwende getModuleApi
+  formatter = getModuleApi "cli-formatter";
   # Fallback to direct import if API not yet available
   backupHelpersForMigration = config.core.management.system-manager.api.backupHelpers or (import ./lib/backup-helpers.nix { inherit pkgs lib; });
-  configMigration = import ./components/config-migration/default.nix { inherit pkgs lib formatter; backupHelpers = backupHelpersForMigration; };
+  configMigration = import ./components/config-migration/default.nix { inherit config pkgs lib systemConfig getModuleApi; backupHelpers = backupHelpersForMigration; };
   configValidator = import ./validators/config-validator.nix { inherit pkgs lib; };
 in {
   config = lib.mkMerge [

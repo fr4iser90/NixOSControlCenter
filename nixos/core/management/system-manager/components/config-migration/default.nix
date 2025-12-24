@@ -1,29 +1,17 @@
-{ pkgs, lib, config ? null, systemConfig ? null, ... }:
+{ pkgs, lib, config, systemConfig, getModuleApi, backupHelpers, ... }:
 
 let
-  # Import cli-formatter from submodules
-  colors = import ../../submodules/cli-formatter/colors.nix;
-  core = import ../../submodules/cli-formatter/core { inherit lib colors; config = {}; };
-  status = import ../../submodules/cli-formatter/status { inherit lib colors; config = {}; };
+  # Formatter wird direkt aus NCC geholt - GENAUSO WIE ALLE ANDEREN MODULE!
+  formatterApi = getModuleApi "cli-formatter";
   
-  # Build formatter API (same structure as cli-formatter/default.nix apiValue)
-  formatter = {
-    inherit colors;
-    inherit (core) text layout;
-    inherit (status) messages badges;
-  };
-  
-  # Use API if available (when called from NixOS module), otherwise import directly
-  backupHelpers = if config != null && config ? core && config.core ? management && config.core.management ? system-manager && config.core.management.system-manager ? api
-    then config.core.management.system-manager.api.backupHelpers
-    else import ../../lib/backup-helpers.nix { inherit pkgs lib; };
+  # backupHelpers wird jetzt als Parameter übergeben
   
   # Import once to avoid circular dependencies
   schemaModule = import ./schema.nix { inherit lib; };
   detectionModule = import ./detection.nix { inherit pkgs lib; };
-  migrationModule = import ./migration.nix { inherit pkgs lib formatter backupHelpers; };
-  validatorModule = import ./validator.nix { inherit pkgs lib formatter; };
-  checkModule = import ./check.nix { inherit config pkgs lib formatter backupHelpers systemConfig; };
+  migrationModule = import ./migration.nix { inherit pkgs lib getModuleApi backupHelpers; };
+  validatorModule = import ./validator.nix { inherit pkgs lib getModuleApi; };
+  checkModule = import ./check.nix { inherit config pkgs lib getModuleApi backupHelpers systemConfig; };
 in
 
 {

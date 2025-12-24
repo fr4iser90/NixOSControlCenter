@@ -1,9 +1,10 @@
-{ pkgs, lib, formatter, backupHelpers, ... }:
+{ pkgs, lib, getModuleApi, backupHelpers, ... }:
 
 let
   schema = import ./schema.nix { inherit lib; };
   utils = import ./utils.nix { inherit lib; };
   detection = import ./detection.nix { inherit pkgs lib; };
+  formatter = getModuleApi "cli-formatter";
   
   currentVersion = schema.currentVersion;
   minSupportedVersion = schema.minSupportedVersion;

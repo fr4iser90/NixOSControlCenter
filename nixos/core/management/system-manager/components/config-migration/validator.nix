@@ -1,8 +1,9 @@
-{ pkgs, lib, formatter, ... }:
+{ pkgs, lib, getModuleApi, ... }:
 
 let
   schema = import ./schema.nix { inherit lib; };
   detection = import ./detection.nix { inherit pkgs lib; };
+  formatter = getModuleApi "cli-formatter";
   currentVersion = schema.currentVersion;
   supportedVersions = lib.attrNames schema.schemas;
   

@@ -75,8 +75,8 @@ let
   '';
   
   # Import config management (single import, clean API)
-  # Terminal-UI is imported directly in core/infrastructure/config, no need to pass it
-  configModule = import ../../../components/config-migration { inherit pkgs lib systemConfig; };
+  # CLI Formatter wird von config-migration selbst geholt
+  configModule = import ../../../components/config-migration { inherit config pkgs lib systemConfig getModuleApi; backupHelpers = import ../../../lib/backup-helpers.nix { inherit pkgs lib; }; };
   
   # Create script with runtime dependencies (only available for this script, not system-wide)
   systemUpdateMainScript = pkgs.symlinkJoin {

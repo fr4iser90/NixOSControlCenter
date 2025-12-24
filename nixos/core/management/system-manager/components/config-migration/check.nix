@@ -1,10 +1,11 @@
-{ config, lib, pkgs, systemConfig, formatter, ... }:
+{ config, lib, pkgs, systemConfig, getModuleApi, ... }:
 
 let
   cfg = systemConfig.management.system-manager or {};
   backupHelpers = import ../../lib/backup-helpers.nix { inherit pkgs lib; };
-  migration = import ./migration.nix { inherit pkgs lib formatter backupHelpers; };
-  validator = import ./validator.nix { inherit pkgs lib formatter; };
+  formatter = getModuleApi "cli-formatter";
+  migration = import ./migration.nix { inherit pkgs lib getModuleApi backupHelpers; };
+  validator = import ./validator.nix { inherit pkgs lib getModuleApi; };
 in
 
 {
