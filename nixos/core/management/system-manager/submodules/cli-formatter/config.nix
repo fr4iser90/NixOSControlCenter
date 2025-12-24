@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, moduleName, ... }:
 
 let
   colors = import ./colors.nix;
@@ -35,7 +35,7 @@ let
   };
 
   # ERST JETZT cfg holen
-  cfg = getModuleConfig "cli-formatter";
+  cfg = getModuleConfig moduleName;
 
   # Für Implementation: Components mit echter config neu importieren
   core = import ./core {

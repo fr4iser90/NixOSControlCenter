@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
   # Single Source: Modulname nur einmal definieren
@@ -20,6 +20,6 @@ in {
 
   imports = [
     ./options.nix
-    ./config.nix
+    (import ./config.nix { inherit config lib pkgs systemConfig getModuleConfig moduleName; })
   ];
 }
