@@ -1,202 +1,209 @@
-# NixOS Control Center - Architecture Implementation Plan
+# NixOS Control Center - GENERISCHE Architecture Implementation Plan
 
 ## Executive Summary
 
-Based on the fundamental architecture analysis, this implementation plan addresses the key issues:
+**REVOLUTIONÄRE GENERISCHE ARCHITEKTUR!** Basierend auf der komplett generischen Core-Architektur implementiert dieser Plan:
 
-1. **NCC System Module Creation** - Separate CLI ecosystem from system management
-2. **Formatting Migration** - Move CLI formatting to dedicated NCC module
-3. **Permission System Integration** - Role-based access control for CLI commands
-4. **Validated Module Discovery** - Add validation during module discovery phase
-5. **Enhanced Validation Pipeline** - Coordinate validation between System and Module managers
-6. **Domain Layer Evaluation** - Assess impact of removing rigid domain structure
+1. **🧬 GENERISCHE NCC-STRUKTUR** - NCC als generisches Discovery-Modul
+2. **🎨 GENERISCHE FORMATTER-MIGRATION** - CLI-Formatting mit generischen APIs
+3. **🔐 GENERISCHE PERMISSION-SYSTEM** - Rollenbasierte Zugriffe generisch
+4. **✅ GENERISCHE VALIDATION** - Modul-Validation während Discovery
+5. **🔗 GENERISCHE VALIDATION-PIPELINE** - Koordinierte Validation zwischen Modulen
+6. **🏗️ GENERISCHE DOMAIN-ARCHITEKTUR** - Flexible Kategorisierung durch Metadata
+
+**SCHLÜSSEL-PRINZIP: ALLES GENERISCH - KEINE HARDCODINGS!**
 
 ## Implementation Phases
 
-### Phase 1: NCC System Module Foundation (2-3 days)
+### Phase 1: GENERISCHE NCC-STRUKTUR (2-3 Tage)
 
-#### 1.1 Create NCC Module Structure
-**Objective:** Establish the new NCC system module with proper metadata and API structure.
+#### 1.1 GENERISCHE NCC-Modul-Struktur Erstellen
+**Ziel:** NCC als vollständig generisches Discovery-Modul etablieren.
 
-**Files to Create:**
-```
+**GENERISCHE Dateien-Struktur:**
+```bash
+# ALLE Module folgen dem EXAKTEN generischen Pattern!
 core/management/nixos-control-center/
-├── default.nix                                  # Main NCC module definition
-├── options.nix                                  # NCC configuration options
-├── config.nix                                   # NCC implementation
-├── commands.nix                                 # NCC command registration
-├── api.nix                                      # Public NCC APIs for other modules
+├── default.nix                    # GENERISCH: moduleName = baseNameOf ./.
+├── options.nix                    # GENERISCH: getCurrentModuleMetadata ./.
+├── config.nix                     # GENERISCH: { ..., moduleName }: cfg = getModuleConfig moduleName
+├── commands.nix                   # NCC-spezifische Commands
+├── api.nix                        # GENERISCHE API-Exports
 └── submodules/
-    ├── cli-formatter/                           # MOVED from system-manager
-    │   ├── default.nix                          # Module definition with metadata
-    │   ├── api.nix                              # API exports
-    │   ├── options.nix                          # NCC submodule options
-    │   ├── config.nix                           # Implementation
-    │   ├── colors.nix                           # MOVED from system-manager
-    │   ├── core.nix                             # MOVED from system-manager
-    │   ├── status.nix                           # MOVED from system-manager
-    │   └── cli-formatter-config.nix             # User configuration template
-    ├── cli-registry/                            # Command registration system
-    │   ├── default.nix                          # Module definition with metadata
-    │   ├── api.nix                              # API exports
-    │   ├── options.nix                          # NCC submodule options
-    │   ├── config.nix                           # Implementation
-    │   ├── commands.nix                         # Command registration
-    │   ├── filter.nix                           # Permission-aware filtering
-    │   └── cli-registry-config.nix              # User configuration template
-    └── cli-permissions/                         # Role-based access control
-        ├── default.nix                          # Module definition with metadata
-        ├── api.nix                              # API exports
-        ├── options.nix                          # NCC submodule options
-        ├── config.nix                           # Implementation
-        ├── roles.nix                            # Permission roles
-        ├── policies.nix                         # Permission policies
-        ├── access-control.nix                   # Access checking logic
-        ├── user-context.nix                     # Current user detection
-        └── cli-permissions-config.nix           # User configuration template
+    ├── cli-formatter/             # VERSCHOBEN von system-manager
+    │   ├── default.nix            # GENERISCH: baseNameOf ./. Pattern
+    │   ├── api.nix                # GENERISCHE API-Definition
+    │   ├── options.nix            # GENERISCH: getCurrentModuleMetadata
+    │   ├── config.nix             # GENERISCH: moduleName Parameter
+    │   ├── colors.nix             # Implementation-Details
+    │   ├── core.nix               # Implementation-Details
+    │   ├── status.nix             # Implementation-Details
+    │   └── cli-formatter-config.nix # User-Template (NICHT generisch)
+    ├── cli-registry/              # NEUES: Command-Registrierung
+    │   ├── default.nix            # GENERISCH: baseNameOf ./. Pattern
+    │   ├── api.nix                # GENERISCHE API-Definition
+    │   ├── options.nix            # GENERISCH: getCurrentModuleMetadata
+    │   ├── config.nix             # GENERISCH: moduleName Parameter
+    │   ├── commands.nix           # Command-Registrierung
+    │   ├── filter.nix             # Permission-Filtering
+    │   └── cli-registry-config.nix # User-Template (NICHT generisch)
+    └── cli-permissions/           # NEUES: Rollenbasierte Zugriffe
+        ├── default.nix            # GENERISCH: baseNameOf ./. Pattern
+        ├── api.nix                # GENERISCHE API-Definition
+        ├── options.nix            # GENERISCH: getCurrentModuleMetadata
+        ├── config.nix             # GENERISCH: moduleName Parameter
+        ├── roles.nix              # Permission-Rollen
+        ├── policies.nix           # Permission-Policies
+        ├── access-control.nix     # Zugriffs-Kontrolle
+        ├── user-context.nix       # User-Erkennung
+        └── cli-permissions-config.nix # User-Template (NICHT generisch)
 ```
 
-**Implementation Steps:**
-1. Create directory structure with submodules
-2. Copy cli-formatter components from system-manager to ncc/submodules/cli-formatter/
-3. Create cli-registry submodule with command registration logic
-4. Create cli-permissions submodule with role-based access control
-5. Update metadata in all submodules following MODULE_TEMPLATE.md
-6. Create API exports within NCC module structure
+**GENERISCHE Implementierungs-Schritte:**
+1. **Directory-Struktur erstellen** mit generischen Submodulen
+2. **cli-formatter von system-manager nach ncc/submodules/cli-formatter/ verschieben**
+3. **cli-registry Submodul mit generischer Command-Registrierung erstellen**
+4. **cli-permissions Submodul mit generischer rollenbasierter Zugriffs-Kontrolle erstellen**
+5. **Metadata in ALLEN Submodulen aktualisieren** mit generischen Patterns
+6. **GENERISCHE API-Exports** mit `getModuleApi` System
 
-#### 1.2 Update Core Imports
-**Objective:** Add NCC module to core/default.nix
+#### 1.2 GENERISCHE Core-Imports Aktualisieren
+**Ziel:** NCC-Modul zu core/default.nix hinzufügen mit generischer Struktur.
 
-**Files to Modify:**
+**Dateien modifizieren:**
 - `nixos/core/default.nix`
 
-**Changes:**
+**GENERISCHE Änderungen:**
 ```nix
 imports = [
-  # Core system modules
-  ./base/boot
-  ./base/hardware
-  ./base/network
-  ./base/localization
-  ./base/user
-  ./base/desktop
-  ./base/audio
-  ./base/packages
-  # Management (includes infrastructure as submodules)
-  ./management/system-manager
-  ./management/module-manager
-  ./management/nixos-control-center             # CLI ecosystem (NEW)
+  # GENERISCHE Core system modules (alle discovery-basiert!)
+  ./base/boot        # moduleName = baseNameOf ./.
+  ./base/hardware    # moduleName = baseNameOf ./.
+  ./base/network     # moduleName = baseNameOf ./.
+  ./base/localization # moduleName = baseNameOf ./.
+  ./base/user        # moduleName = baseNameOf ./.
+  ./base/desktop     # moduleName = baseNameOf ./.
+  ./base/audio       # moduleName = baseNameOf ./.
+  ./base/packages    # moduleName = baseNameOf ./.
+
+  # GENERISCHE Management (alle submodules generisch)
+  ./management/system-manager    # moduleName = baseNameOf ./.
+  ./management/module-manager    # moduleName = baseNameOf ./.
+  ./management/nixos-control-center # GENERISCHES NCC (NEU!) moduleName = baseNameOf ./.
 ];
 ```
 
-#### 1.3 NCC Module Definition
-**File:** `nixos/core/management/nixos-control-center/default.nix`
+#### 1.3 GENERISCHE NCC-Modul-Definition
+**Datei:** `nixos/core/management/nixos-control-center/default.nix`
 ```nix
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
-  # Module metadata (REQUIRED - define directly here)
-  metadata = {
-    # Basic info
-    role = "core";                    # "core" | "optional"
-    name = "nixos-control-center";    # Unique module identifier
-    description = "NixOS Control Center - CLI ecosystem";
-    category = "core";                # "core" | "base" | "security" | "infrastructure" | "specialized"
-    subcategory = "management";       # Specific subcategory within category
-    stability = "stable";             # "stable" | "experimental" | "deprecated" | "beta" | "alpha"
-    version = "1.0.0";                # SemVer: MAJOR.MINOR.PATCH
-  };
-in {
-  # REQUIRED: Export metadata for discovery system
-  _module.metadata = metadata;
+  # GENERISCH: Modulname aus Dateisystem ableiten
+  moduleName = baseNameOf ./. ;  # "nixos-control-center"
 
-  # Module imports
-  imports = [
+  cfg = getModuleConfig moduleName;
+in {
+  # GENERISCH: Metadata aus generischem Pattern
+  _module.metadata = {
+    role = "core";
+    name = moduleName;  # ← GENERISCH!
+    description = "NixOS Control Center - CLI ecosystem";
+    category = "management";
+    subcategory = "control-center";
+    stability = "stable";
+    version = "1.0.0";
+  };
+
+  # GENERISCH: Modulname weitergeben
+  _module.args.moduleName = moduleName;
+
+  # GENERISCHE Imports (alle Submodule generisch!)
+  imports = if cfg.enable or true then [
     ./options.nix
     ./config.nix
     ./commands.nix
     ./api.nix
-  ];
+  ] else [];
 }
 ```
 
-#### 1.4 NCC API Definition
-**File:** `nixos/core/management/nixos-control-center/api.nix`
+#### 1.4 GENERISCHE NCC-API-Definition
+**Datei:** `nixos/core/management/nixos-control-center/api.nix`
 ```nix
-{ config, lib, ... }:
+{ config, lib, getModuleApi, ... }:
 
 with lib;
 
 let
-  # Import APIs using generic API system
+  # GENERISCH: APIs über getModuleApi laden (NICHT hardcoded!)
   formatter = config.${getModuleApi "cli-formatter"};
   registry = config.${getModuleApi "cli-registry"};
   permissions = config.${getModuleApi "cli-permissions"};
 in {
-  # Public NCC API - available to all modules
+  # GENERISCHE Public NCC API - für alle Module verfügbar
   core.management.nixos-control-center.api = {
     inherit formatter registry permissions;
 
-    # Convenience functions
+    # GENERISCHE Convenience functions
     format = formatter;
     registerCommand = registry.register;
   };
 }
 ```
 
-### Phase 2: Formatting Migration (1-2 days)
+### Phase 2: GENERISCHE Formatter-Migration (1-2 Tage)
 
-#### 2.1 Update System Manager Commands
-**Objective:** Change system-manager to use NCC formatting API instead of direct imports
+#### 2.1 GENERISCHE System-Manager Commands Aktualisieren
+**Ziel:** system-manager soll NCC formatting API verwenden statt direkter Imports
 
-**Files to Modify:**
+**Dateien modifizieren:**
 - `nixos/core/management/system-manager/commands.nix`
 
-**Changes:**
+**GENERISCHE Änderungen:**
 ```nix
-# BEFORE: Direct imports
+# VORHER: Direkte hardcoded Imports (NICHT GENERISCH!)
 colors = import ./submodules/cli-formatter/colors.nix;
 coreFormatter = import ./submodules/cli-formatter/core { inherit lib colors; config = {}; };
 statusFormatter = import ./submodules/cli-formatter/status { inherit lib colors; config = {}; };
 
-# AFTER: Use generic API system
-formatter = config.${getModuleApi "cli-formatter"};
+# NACHHER: GENERISCHE API-System verwenden
+formatter = config.${getModuleApi "cli-formatter"};  # ← GENERISCH!
 colors = formatter.colors;
 coreFormatter = formatter.core;
 statusFormatter = formatter.status;
 ```
 
-#### 2.2 Update Module Manager Commands
-**Objective:** Update module-manager to use NCC formatting API
+#### 2.2 GENERISCHE Module-Manager Commands Aktualisieren
+**Ziel:** module-manager soll NCC formatting API verwenden
 
-**Files to Modify:**
+**Dateien modifizieren:**
 - `nixos/core/management/module-manager/commands.nix`
 
-**Changes:**
+**GENERISCHE Änderungen:**
 ```nix
-# BEFORE: Direct system-manager reference
-ui = getModuleApi "cli-formatter";
-
-# AFTER: Keep build-time access (context-appropriate)
-ui = getModuleApi "cli-formatter";
+# VORHER: Direkte system-manager Referenz (hardcoded)
+# NACHER: Build-time Access beibehalten (context-appropriate)
+ui = getModuleApi "cli-formatter";  # ← GLEICH BLEIBEN (bereits generisch)
 ```
 
-#### 2.3 Remove Old CLI Formatter from System Manager
-**Objective:** Remove the old cli-formatter submodule from system-manager
+#### 2.3 GENERISCHE CLI-Formatter von System-Manager Entfernen
+**Ziel:** Alten cli-formatter Submodul aus system-manager entfernen
 
-**Files to Modify:**
-- `nixos/core/management/system-manager/default.nix`
-- Remove cli-formatter references from imports and config
+**Dateien modifizieren:**
+- `nixos/core/management/system-manager/default.nix` (GENERISCH!)
+- cli-formatter Referenzen aus imports und config entfernen
 
-#### 2.4 Update Flake.nix
-**Objective:** Ensure NCC module is properly imported in flake structure
+#### 2.4 GENERISCHE Flake.nix Aktualisieren
+**Ziel:** NCC-Modul korrekt in flake Struktur importieren
 
-**Files to Modify:**
+**Dateien modifizieren:**
 - `nixos/flake.nix`
 
-**Verification:**
-- Test that all NCC commands still work
-- Verify formatting consistency across modules
+**Verifikation:**
+- ✅ Alle NCC-Commands funktionieren noch
+- ✅ Formatting-Konsistenz über alle Module
+- ✅ GENERISCHE APIs werden korrekt verwendet
 
 ### Phase 3: Validated Module Discovery (2-3 days)
 
@@ -299,21 +306,25 @@ core.management.nixos-control-center.api = {
 - Use NCC validation APIs for dependency checking
 - Report validation results through NCC formatting
 
-### Phase 3: Permission System Integration (2-3 days)
+### Phase 3: GENERISCHES Permission-System (2-3 Tage)
 
-#### 3.1 Extend NCC with Permission APIs
-**Objective:** Add role-based access control to NCC as core CLI infrastructure
+#### 3.1 GENERISCHE NCC Permission-APIs Erweitern
+**Ziel:** Rollenbasierte Zugriffs-Kontrolle zu NCC als generische CLI-Infrastruktur hinzufügen
 
-**Files to Create/Modify:**
-```
+**GENERISCHE Dateien erstellen/modifizieren:**
+```bash
+# ALLES GENERISCH - baseNameOf ./. Pattern!
 core/management/nixos-control-center/
 ├── submodules/
-│   └── permissions/          # NEW: Permission management
-│       ├── default.nix       # Permission module
-│       ├── roles.nix         # Role definitions
-│       ├── policies.nix      # Permission policies
-│       ├── access-control.nix # Access checking logic
-│       └── user-context.nix  # Current user detection
+│   └── cli-permissions/      # GENERISCH: Rollen-Management
+│       ├── default.nix       # GENERISCH: moduleName = baseNameOf ./.
+│       ├── api.nix           # GENERISCHE API-Definition
+│       ├── options.nix       # GENERISCH: getCurrentModuleMetadata
+│       ├── config.nix        # GENERISCH: moduleName Parameter
+│       ├── roles.nix         # Permission-Rollen
+│       ├── policies.nix      # Permission-Policies
+│       ├── access-control.nix # Zugriffs-Kontrolle
+│       └── user-context.nix  # User-Erkennung
 ```
 
 **Permission Architecture:**

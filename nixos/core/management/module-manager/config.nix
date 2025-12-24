@@ -60,7 +60,6 @@ in {
     {
       _module.args = {
         modulePaths = {
-          configHelpers = ./lib/config-helpers.nix;
           backupHelpers = ../system-manager/lib/backup-helpers.nix;
           # CLI formatter API from submodules
           cliApi = ../system-manager/submodules/cli-formatter/lib;

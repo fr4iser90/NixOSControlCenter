@@ -2,9 +2,6 @@
 # Note: homelab-utils.nix has been moved to modules/homelab-manager/lib/
 
 rec {
-  # Config management helpers (for all modules)
-  config-helpers = import ../../module-manager/lib/config-helpers.nix;
-  
   # Version management helpers (for module version checking)
   version-helpers = import ./version-helpers.nix;
   
