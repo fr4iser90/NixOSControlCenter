@@ -4,7 +4,14 @@
 with lib;
 
 let
-  cfg = getModuleConfig "module-manager";
+  # CONVENTION OVER CONFIGURATION - same as options.nix
+  moduleName = baseNameOf ./. ;        # "module-manager"
+  parentName = baseNameOf ../.;        # "management"
+  grandparentName = baseNameOf ../../.; # "core"
+  configPath = "${grandparentName}.${parentName}.${moduleName}";
+
+  # Cannot use getModuleConfig for self (chicken-egg problem)
+  cfg = config.${configPath};
   # Use the template file as default config
   defaultConfig = builtins.readFile ./module-manager-config.nix;
 
@@ -69,8 +76,8 @@ in {
         moduleConfig = debugModuleConfigs;
       };
 
-      # Module-manager configuration
-      core.management.module-manager = { };
+      # Module-manager configuration (generic path)
+      ${configPath} = { };
     }
   ];
 }

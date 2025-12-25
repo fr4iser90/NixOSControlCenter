@@ -1,9 +1,15 @@
 { lib, getCurrentModuleMetadata, ... }:
 
 let
-  # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
-  metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
-  configPath = metadata.configPath or "systemConfig.core.management.system-manager.submodules.system-checks";  # Fallback
+  # CONVENTION OVER CONFIGURATION - 100% GENERIC!
+  # Derive path from filesystem location
+  moduleName = baseNameOf ./. ;        # "system-checks"
+  parentName = baseNameOf ../.;        # "submodules"
+  grandparentName = baseNameOf ../../.; # "system-manager"
+  greatGrandparentName = baseNameOf ../../../.; # "management"
+  greatGreatGrandparentName = baseNameOf ../../../../.; # "core"
+
+  configPath = "${greatGreatGrandparentName}.${greatGrandparentName}.${grandparentName}.${parentName}.${moduleName}"; 
 
   # Default postbuild checks (moved from postbuild/default.nix)
   defaultPostbuildChecks = {

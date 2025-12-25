@@ -21,6 +21,7 @@ in {
   getCliRegistryApiPathList = lib.splitString "." paths.cliRegistryApi;
   getSystemManagerApiPathList = lib.splitString "." paths.systemManagerApi;
 
+
   # Direkter Zugriff auf alle Pfade
   inherit paths;
 }

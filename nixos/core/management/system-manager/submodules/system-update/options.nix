@@ -3,7 +3,7 @@
 let
   # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
   metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
-  configPath = metadata.configPath or "systemConfig.core.management.system-manager.submodules.system-update";  # Fallback
+  configPath = metadata.configPath;
 in {
   options.${configPath} = {
     # Version metadata (REQUIRED)

@@ -4,6 +4,7 @@ with lib;
 
 let
   cfg = systemConfig.modules.security.ssh-client-manager;
+  moduleName = baseNameOf ./. ;
 in {
   config = mkIf cfg.enable
     (lib.mkMerge [

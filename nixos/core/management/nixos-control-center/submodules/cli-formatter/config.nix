@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, moduleName, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getCurrentModuleMetadata, moduleName, ... }:
 
 let
   colors = import ./colors.nix;
@@ -34,6 +34,10 @@ let
     badges = statusForApi.badges;
   };
 
+  # Generischen Pfad aus Dateisystem ableiten
+  metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
+  configPath = metadata.configPath;  # NO FALLBACKS!
+
   # ERST JETZT cfg holen
   cfg = getModuleConfig moduleName;
 
@@ -61,9 +65,10 @@ let
 
 in
 {
-  # API immer verfügbar machen (für andere Module)
-  core.management.nixos-control-center.submodules.cli-formatter = {};
-  core.management.nixos-control-center.submodules.cli-formatter.api = apiValue;
+  config = {
+    # API immer verfügbar machen (für andere Module) - GENERISCH!
+    ${configPath}.api = apiValue;
+  };
 
   # Config nur wenn enabled
 }

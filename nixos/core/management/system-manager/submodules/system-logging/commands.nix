@@ -26,6 +26,7 @@ in {
           ncc-log-system-report --enable profile  # Enable specific collector
       '';
     }
-    ]))
+    ];
+    })
   ];
 }

@@ -1,10 +1,16 @@
 { lib, getCurrentModuleMetadata, ... }:
 
 let
-  # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
-  metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
-  configPath = metadata.configPath or "systemConfig.core.management.system-manager.submodules.system-logging";  # Fallback
-  apiPath = metadata.apiPath or "core.management.system-manager.submodules.system-logging";  # Fallback
+  # CONVENTION OVER CONFIGURATION - 100% GENERIC!
+  # Derive path from filesystem location
+  moduleName = baseNameOf ./. ;        # "system-logging"
+  parentName = baseNameOf ../.;        # "submodules"
+  grandparentName = baseNameOf ../../.; # "system-manager"
+  greatGrandparentName = baseNameOf ../../../.; # "management"
+  greatGreatGrandparentName = baseNameOf ../../../../.; # "core"
+
+  configPath = "${greatGreatGrandparentName}.${greatGrandparentName}.${grandparentName}.${parentName}.${moduleName}";
+  apiPath = "${configPath}.api";
 
   # API Definition - outsourced in api.nix
   apiValue = import ./api.nix { inherit lib; };

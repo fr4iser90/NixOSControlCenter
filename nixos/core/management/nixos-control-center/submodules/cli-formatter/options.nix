@@ -3,17 +3,8 @@
 let
   # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
   metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
-  configPath = metadata.configPath or "systemConfig.core.management.nixos-control-center.submodules.cli-formatter";  # Fallback
-  apiPath = metadata.apiPath or "core.management.nixos-control-center.submodules.cli-formatter";  # Fallback
+  configPath = metadata.configPath;
 in {
-  # Parent option for submodule
-  options.core.management.nixos-control-center.submodules.cli-formatter = lib.mkOption {
-    type = lib.types.attrs;
-    default = {};
-    internal = true;
-    description = "CLI formatter submodule container";
-  };
-
   # User configuration (accessed via ${configPath})
   options.${configPath} = {
     # Version metadata (REQUIRED for all modules)
@@ -46,19 +37,18 @@ in {
           template = lib.mkOption {
             type = lib.types.lines;
             description = "Component template using CLI formatter API";
-    };
-  };
-
-  # API option (without default - set in config.nix)
-  options.core.management.nixos-control-center.submodules.cli-formatter.api = lib.mkOption {
-    type = lib.types.attrs;
-    internal = true;
-    description = "CLI formatter API for other modules";
-  };
-});
+          };
+        };
+      });
       default = {};
       description = "Custom CLI formatter components";
     };
-  };
 
+    # API option (without default - set in config.nix)
+    api = lib.mkOption {
+      type = lib.types.attrs;
+      internal = true;
+      description = "CLI formatter API for other modules";
+    };
+  };
 }

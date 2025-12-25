@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getCurrentModuleMetadata, ... }:
 
 let
   moduleName = baseNameOf ./. ;  # ← cli-registry aus submodules/cli-registry/
@@ -21,8 +21,8 @@ in {
   imports = [
     ./options.nix      # Always import options first
   ] ++ (if (cfg.enable or true) then [
-    (import ./config.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi moduleName; })
+    (import ./config.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi getCurrentModuleMetadata moduleName; })
   ] else [
-    (import ./config.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi moduleName; })
+    (import ./config.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi getCurrentModuleMetadata moduleName; })
   ]);
 }

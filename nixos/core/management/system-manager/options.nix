@@ -1,6 +1,14 @@
 { lib, pkgs, ... }:
 
 let
+  # CONVENTION OVER CONFIGURATION - 100% GENERIC!
+  # Derive path from filesystem location
+  moduleName = baseNameOf ./. ;        # "system-manager"
+  parentName = baseNameOf ../.;        # "management"
+  grandparentName = baseNameOf ../../.; # "core"
+
+  configPath = "${grandparentName}.${parentName}.${moduleName}";
+
   # Import helpers
   backupHelpersValue = import ./lib/backup-helpers.nix { inherit pkgs lib; };
 
@@ -8,7 +16,7 @@ let
   apiValue = backupHelpersValue;
 in
 {
-  options.systemConfig.management.system-manager = {
+  options.${configPath} = {
     _version = lib.mkOption {
       type = lib.types.str;
       default = "1.0.0";
@@ -43,6 +51,14 @@ in
       description = "Automatically build after updates";
     };
 
+    # API for other modules - always available
+    api = lib.mkOption {
+      type = lib.types.attrs;
+      default = apiValue;
+      internal = true;
+      description = "System manager API for other modules (config helpers, backup helpers, etc.)";
+    };
+
     # Config Migration Component
     components.configMigration = {
       enable = lib.mkOption {
@@ -53,14 +69,5 @@ in
     };
   };
 
-  # NixOS Module Options (for config.core namespace)
-  options.core.management.system-manager = {
-    # API for other modules - always available
-    api = lib.mkOption {
-      type = lib.types.attrs;
-      default = apiValue;
-      internal = true;
-      description = "System manager API for other modules (config helpers, backup helpers, etc.)";
-    };
-  };
+  # API is now defined generically above via configPath
 }

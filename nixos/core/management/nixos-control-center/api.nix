@@ -5,8 +5,8 @@ let
   formatter = import ./submodules/cli-formatter/api.nix { inherit lib; };
   registry = import ./submodules/cli-registry/api.nix { inherit lib; };
 
-  # GENERISCH: Config Path aus Metadata ableiten
-  metadata = getCurrentModuleMetadata ./.;
+  # Jetzt GENERISCH wie options.nix!
+  metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
   configPath = metadata.configPath;
 in {
   # NCC Public API - GENERISCH unter configPath.api!

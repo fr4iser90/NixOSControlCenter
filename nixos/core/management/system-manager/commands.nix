@@ -18,7 +18,13 @@ let
   # CLI Formatter ist jetzt in NCC - verwende getModuleApi
   formatter = getModuleApi "cli-formatter";
   # Fallback to direct import if API not yet available
-  backupHelpersForMigration = config.core.management.system-manager.api.backupHelpers or (import ./lib/backup-helpers.nix { inherit pkgs lib; });
+  # CONVENTION OVER CONFIGURATION
+  moduleName = baseNameOf ./. ;        # "system-manager"
+  parentName = baseNameOf ../.;        # "management"
+  grandparentName = baseNameOf ../../.; # "core"
+  configPath = "${grandparentName}.${parentName}.${moduleName}";
+
+  backupHelpersForMigration = config.${configPath}.api.backupHelpers or (import ./lib/backup-helpers.nix { inherit pkgs lib; });
   configMigration = import ./components/config-migration/default.nix { inherit config pkgs lib systemConfig getModuleApi; backupHelpers = backupHelpersForMigration; };
   configValidator = import ./validators/config-validator.nix { inherit pkgs lib; };
 in {
@@ -38,8 +44,8 @@ in {
     }
     (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList
     [
-        {
-          name = "check-module-versions";
+      {
+        name = "check-module-versions";
           description = "Check module versions for Core and Features and update status";
           category = "system";
           script = "${checkVersions.checkVersionsScript}/bin/ncc-check-module-versions";
@@ -151,4 +157,3 @@ in {
       ])
   ];
 }
-

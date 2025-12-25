@@ -8,7 +8,7 @@ let
   # Helper function to get boot entries
   getBootEntries = ''
     if [ -d "${entriesDir}" ]; then
-      entries=$(ls ${entriesDir}/nixos-generation-*.conf 2>/dev/null || true)
+      entries=$(ls ${entriesDir}/nixos-generation-*.conf 2>/dev/null | sort -V | tail -3 || true)
       if [ ! -z "$entries" ]; then
         for entry in $entries; do
           gen=$(basename "$entry" | grep -o '[0-9]\+')

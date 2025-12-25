@@ -3,7 +3,7 @@
 let
   # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
   metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
-  configPath = metadata.configPath or "systemConfig.core.management.module-manager";  # Fallback
+  configPath = metadata.configPath;
 in {
   options.${configPath} = {
     _version = lib.mkOption {
@@ -34,15 +34,7 @@ in {
     };
   };
 
-  # Config namespace for module manager API
-  options.core.management.module-manager = {
-    configHelpers = lib.mkOption {
-      type = lib.types.attrs;
-      default = {};
-      description = "Configuration helpers provided by the module manager";
-      internal = true;
-    };
-  };
+  # Config namespace is defined generically above via configPath
 
   # Define _module.metadata as a valid option for all modules
   options._module.metadata = lib.mkOption {

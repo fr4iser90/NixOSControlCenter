@@ -172,8 +172,7 @@ let
 
 in {
   # 🎯 COMMAND REGISTRATION: In commands.nix per MODULE_TEMPLATE! (zentralisiert)
-  config = lib.mkMerge [
-    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+  config = (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
     {
       name = "module-manager";
       description = "Toggle all NixOS modules using fzf (dynamic discovery)";
@@ -197,6 +196,5 @@ in {
         This tool dynamically reads your current NixOS configuration and shows all toggleable modules.
       '';
     }
-    ])
-  ];
+    ]);
 }

@@ -3,10 +3,14 @@
 with lib;
 
 let
-  # Single Source: Modulname nur einmal definieren
-  moduleName = baseNameOf ./. ;  # ← system-manager aus management/system-manager/
-  # Use systemConfig from module-manager (_module.args)
-  cfg = getModuleConfig moduleName;
+  # CONVENTION OVER CONFIGURATION - same as options.nix
+  moduleName = baseNameOf ./. ;        # "system-manager"
+  parentName = baseNameOf ../.;        # "management"
+  grandparentName = baseNameOf ../../.; # "core"
+  configPath = "${grandparentName}.${parentName}.${moduleName}";
+
+  # Cannot use getModuleConfig (chicken-egg problem)
+  cfg = config.${configPath};
 
   # Import helpers
   backupHelpers = import ./lib/backup-helpers.nix { inherit pkgs lib; };
@@ -60,6 +64,6 @@ in {
     boot.loader.systemd-boot.enable = bootCfg.bootloader == "systemd-boot";
     boot.loader.grub.enable = bootCfg.bootloader == "grub";
     
-    core.management.system-manager.api = apiValue;
+    ${configPath}.api = apiValue;
   };
 }

@@ -4,7 +4,7 @@ with lib;
 
 let
   ui = getModuleApi "cli-formatter";
-  commandCenter = config.core.management.system-manager.submodules.cli-registry;
+  commandCenter = getModuleApi "cli-registry";
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
   systemChecks = lib.attrByPath ["enable"] false (getModuleConfig "system-checks");
 
