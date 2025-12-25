@@ -196,7 +196,6 @@ module-name/               # Module name
 ├── commands.nix           # Command-Center registration (optional)
 ├── systemd.nix            # Systemd services/timers (optional)
 ├── config.nix             # Module implementation (optional, split from default.nix if too large)
-├── module-name-config.nix # User config template
 ├── lib/                   # Shared utility functions
 │   ├── default.nix        # Library exports
 │   ├── utils.nix          # General utilities
@@ -244,7 +243,6 @@ module-name/               # Module name
 │   │   ├── options.nix    # Submodule options
 │   │   ├── config.nix     # Submodule implementation
 │   │   ├── handlers/      # Submodule handlers
-│   │   └── submodule-a-config.nix  # Submodule config template
 │   ├── submodule-b/       # Submodule B implementation
 │   │   ├── default.nix    # Submodule imports
 │   │   ├── options.nix    # Submodule options
@@ -255,7 +253,6 @@ module-name/               # Module name
 │       ├── config.nix     # Submodule implementation
 │       ├── lib/           # Submodule utilities
 │       ├── scripts/       # Submodule scripts
-│       └── complex-feature-config.nix  # Submodule config template
 ├── components/            # Small utilities (separate from submodules)
 │   ├── ui-helpers.nix     # Small utility functions
 │   ├── validation.nix     # Helper functions
@@ -408,7 +405,7 @@ let
   configHelpers = import ../../core/management/module-manager/lib/config-helpers.nix {
     inherit pkgs lib;
   };
-  defaultConfig = builtins.readFile ./module-name-config.nix;
+  defaultConfig = builtins.readFile 
 in
   lib.mkMerge [
     (lib.mkIf (cfg.enable or (moduleConfig.role == "core"))  # Core modules always enabled
@@ -424,16 +421,7 @@ in
   ];
 ```
 
-### `module-name-config.nix`
-**Purpose**: User-editable configuration file (Template/Default)
 
-**Pattern**:
-```nix
-{
-  enable = true;        # User choice: enable/disable this module
-  # ... other user settings
-}
-```
 
 ## Best Practices
 
@@ -716,7 +704,7 @@ enablePath = "core.management.system-manager.submodules.cli-formatter.enable"
     configHelpers = import ../../core/management/module-manager/lib/config-helpers.nix {
       inherit pkgs lib;
     };
-    defaultConfig = builtins.readFile ./homelab-config.nix;
+    defaultConfig = 
   in
     lib.mkIf (cfg.enable or false)
       (configHelpers.createModuleConfig {

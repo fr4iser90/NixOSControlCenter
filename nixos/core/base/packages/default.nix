@@ -8,8 +8,8 @@ let
 
   # Load base packages
   basePackages = {
-    desktop = import ./base/desktop.nix;
-    server = import ./base/server.nix;
+    desktop = import ./components/base/desktop.nix;
+    server = import ./components/base/server.nix;
   };
 
 
@@ -26,12 +26,12 @@ let
     else null;
 
   # Smart Docker handling
-  dockerModules = if dockerMode == "root" then [ ./modules/docker.nix ]
-               else if dockerMode == "rootless" then [ ./modules/docker-rootless.nix ]
+  dockerModules = if dockerMode == "root" then [ ./components/sets/docker.nix ]
+               else if dockerMode == "rootless" then [ ./components/sets/docker-rootless.nix ]
                else [];
 
   # Load feature modules
-  moduleModules = map (mod: ./modules/${mod}.nix) allModules;
+  moduleModules = map (mod: ./components/sets/${mod}.nix) allModules;
 
 in {
   _module.metadata = {
@@ -47,7 +47,9 @@ in {
   _module.args.moduleName = moduleName;
 
   imports = [
+    ./options.nix
     (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })
+    (import ./commands.nix { inherit config lib pkgs getModuleConfig moduleName; })
     (let
       systemType = systemManagerCfg.systemType or "desktop";
     in
