@@ -1,8 +1,8 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, sshClientCfg, ... }:
 
 let
   ui = getModuleApi "cli-formatter";
-  cfg = systemConfig.modules.security.ssh-client-manager;
+  cfg = sshClientCfg;
 
   sshClientManagerServerUtils = ''
     # SSH Client Manager Server Utilities
@@ -71,7 +71,7 @@ let
             --header="Available SSH Servers" \
             --header-first \
             ${lib.optionalString cfg.fzf.preview.enable ''
-              --preview "${systemConfig.modules.security.ssh-client-manager.connectionPreviewScript}/bin/ssh-connection-preview {}" \
+              --preview "${cfg.connectionPreviewScript}/bin/ssh-connection-preview {}" \
               --preview-window="${cfg.fzf.preview.position}"
             ''} \
             --expect=ctrl-x,ctrl-e,ctrl-n,enter 2>/dev/null)

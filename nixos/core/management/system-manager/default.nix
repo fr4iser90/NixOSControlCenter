@@ -3,13 +3,12 @@
 with lib;
 
 let
-  # CONVENTION OVER CONFIGURATION - same as options.nix
   moduleName = baseNameOf ./. ;        # "system-manager"
   parentName = baseNameOf ../.;        # "management"
   grandparentName = baseNameOf ../../.; # "core"
   configPath = "${grandparentName}.${parentName}.${moduleName}";
 
-  # Cannot use getModuleConfig (chicken-egg problem)
+  # Cannot use getModuleConfig (chicken-egg problem with core modules)
   cfg = config.${configPath};
 
   # Import helpers

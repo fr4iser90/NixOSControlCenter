@@ -4,7 +4,7 @@
 with lib;
 
 let
-  # CONVENTION OVER CONFIGURATION - same as options.nix
+
   moduleName = baseNameOf ./. ;        # "module-manager"
   parentName = baseNameOf ../.;        # "management"
   grandparentName = baseNameOf ../../.; # "core"

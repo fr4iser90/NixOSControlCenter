@@ -6,7 +6,8 @@ let
   # Import the handler for business logic
   handler = import ./handlers/module-manager.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
 
-  ui = getModuleApi "cli-formatter";  
+  ui = getModuleApi "cli-formatter";
+  cliRegistry = getModuleApi "cli-registry";
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");  # Generic config access
 
   # 🎯 COMMAND REGISTRATION: Per MODULE_TEMPLATE in commands.nix! (zentralisiert über corePathsLib)
@@ -172,7 +173,7 @@ let
 
 in {
   # 🎯 COMMAND REGISTRATION: In commands.nix per MODULE_TEMPLATE! (zentralisiert)
-  config = (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+  config = (cliRegistry.registerCommandsFor "module-manager" [
     {
       name = "module-manager";
       description = "Toggle all NixOS modules using fzf (dynamic discovery)";

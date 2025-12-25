@@ -3,8 +3,8 @@
 with lib;
 
 let
-  # Single Source: Modulname nur einmal definieren
-  moduleName = "hackathon";
+  # CONVENTION OVER CONFIGURATION - Vollständig dynamisch aus Dateisystem
+  moduleName = baseNameOf ./. ;        # "hackathon" - automatisch!
   cfg = getModuleConfig moduleName;
   
   # Finde alle Benutzer mit hackathon-admin Rolle

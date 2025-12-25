@@ -1,125 +1,108 @@
-# NIXOS CONTROL CENTER - CURRENT STATUS ANALYSIS
+# NCC Module Refactoring TODO - MODULE_TEMPLATE Konformität
 
-## 📁 FILES ANALYZED
+## 🚨 **KRITISCHE API-PROBLEME (sofort beheben)**
 
-### **Core Files:**
-- `nixos/core/default.nix` - Main core module imports
-- `nixos/core/management/nixos-control-center/default.nix` - NCC main module
-- `nixos/core/management/nixos-control-center/options.nix` - NCC options definition
-- `nixos/core/management/nixos-control-center/config.nix` - NCC configuration
-- `nixos/core/management/nixos-control-center/api.nix` - NCC API definition
-- `nixos/core/management/nixos-control-center/commands.nix` - NCC commands
+### **Hardcoded moduleName → baseNameOf ./. ändern**
+**Status:** 7 Module müssen geändert werden
+- [x] `homelab-manager`: `moduleName = "homelab-manager"` → `moduleName = baseNameOf ./.` ✅
+- [x] `ssh-client-manager`: `moduleName = "ssh-client-manager"` → `moduleName = baseNameOf ./.` ✅
+- [x] `bootentry-manager`: `moduleName = "bootentry-manager"` → `moduleName = baseNameOf ./.` ✅
+- [x] `vm`: `moduleName = "vm"` → `moduleName = baseNameOf ./.` ✅
+- [x] `ssh-server-manager`: `moduleName = "ssh-server-manager"` → `moduleName = baseNameOf ./.` ✅
+- [x] `hackathon`: `moduleName = "hackathon"` → `moduleName = baseNameOf ./.` ✅
+- [x] `ai-workspace`: `moduleName = "ai-workspace"` → `moduleName = baseNameOf ./.` ✅
 
-### **Submodules:**
-- `nixos/core/management/nixos-control-center/submodules/cli-registry/options.nix` - CLI registry options
-- `nixos/core/management/nixos-control-center/submodules/cli-registry/config.nix` - CLI registry config
-- `nixos/core/management/nixos-control-center/submodules/cli-formatter/options.nix` - CLI formatter options
-- `nixos/core/management/nixos-control-center/submodules/cli-formatter/config.nix` - CLI formatter config
+### **Hardcoded Pfad-Zugriffe → API-basiert ändern**
+**Status:** Mehrere Module greifen hardcoded auf systemConfig zu
+- [x] `homelab-manager`: `systemConfig.homelab.swarm` → `cfg.swarm` und API-Args verwenden ✅
+- [x] `ssh-client-manager`: `systemConfig.modules.security.ssh-client-manager` → `moduleConfig.configPath` und API-Args verwenden ✅
+- [x] `system-manager`: Behält `config.${configPath}` (Chicken-Egg Problem bei Core-Modulen) ✅
+- [x] Alle Module: hardcoded Pfade in commands.nix durch `moduleConfig` ersetzen ✅
 
-### **Module Manager:**
-- `nixos/core/management/module-manager/lib/module-config.nix` - Module config helpers
-- `nixos/core/management/module-manager/lib/discovery.nix` - Module discovery logic
+## 📁 **STRUKTUR-PROBLEME (Template-Konformität)**
 
-### **Problem Files:**
-- `nixos/core/management/system-manager/submodules/system-checks/prebuild/checks/system/users.nix` - Tries to access NCC before it's loaded
+### **Falsche Verzeichnis-Struktur**
+**Status:** Viele Module haben Dateien im Root statt in korrekten Verzeichnissen
 
-## 🔍 CURRENT STATUS OF EACH COMPONENT
+#### **homelab-manager (scripts/ sollte handlers/ sein)**
+- [ ] `scripts/homelab-create.nix` → `handlers/homelab-create.nix`
+- [ ] `scripts/homelab-fetch.nix` → `handlers/homelab-fetch.nix`
+- [ ] Pfad-Updates in default.nix und anderen Dateien
+homelab-manager/
+├── scripts/
+│   └── homelab-main.nix      # ✅ User entry point (parses args)
+├── handlers/
+│   ├── homelab-create.nix    # ✅ Business logic orchestration  
+│   └── homelab-fetch.nix     # ✅ Business logic orchestration
 
-### **✅ WORKING COMPONENTS:**
+#### **ssh-client-manager (bereits teilweise korrekt)**
+- [ ] Prüfen ob alle Handler in `handlers/` sind
+- [ ] Prüfen ob Scripts in `scripts/` sind (falls vorhanden)
 
-#### **Module Discovery System (100% GENERIC)**
-- **Status:** ✅ IMPLEMENTED & WORKING
-- **Files:** `discovery.nix`, `module-config.nix`
-- **Functionality:** Automatically discovers all modules, generates APIs
-- **Genericity:** ✅ No hardcoded paths
+#### **bootentry-manager (bereits teilweise korrekt)**
+- [ ] Prüfen ob providers/ zu handlers/ verschoben werden sollten
+- [ ] lib/ Struktur überprüfen
 
-#### **CLI Registry Submodule (99% GENERIC)**
-- **Status:** ✅ IMPLEMENTED
-- **Files:** `submodules/cli-registry/options.nix`, `config.nix`
-- **Genericity:** ✅ Uses `getCurrentModuleMetadata ./.`
-- **Problem:** ❌ Has fallback hardcoded paths (user didn't want fallbacks)
+#### **vm (prüfen)**
+- [ ] lib/ Struktur überprüfen
+- [ ] Eventuell testing/ zu tests/ umbenennen
 
-#### **CLI Formatter Submodule (99% GENERIC)**
-- **Status:** ✅ IMPLEMENTED
-- **Files:** `submodules/cli-formatter/options.nix`, `config.nix`
-- **Genericity:** ✅ Uses `getCurrentModuleMetadata ./.`
-- **Problem:** ❌ Has fallback hardcoded paths (user didn't want fallbacks)
+#### **ssh-server-manager (prüfen)**
+- [ ] scripts/ zu handlers/ verschieben?
+- [ ] Alle Handler-Dateien in handlers/ konsolidieren
 
-### **❌ BROKEN COMPONENTS:**
+#### **hackathon (prüfen)**
+- [ ] hackathon-*.nix Dateien zu handlers/ verschieben?
 
-#### **NCC Main Module (CAN BE GENERIC - PROBLEM IS FIXABLE)**
-- **Status:** ❌ BROKEN - Cannot load
-- **Files:** `default.nix`, `options.nix`, `config.nix`, `api.nix`
-- **Problem:** ❌ Uses `getModuleConfig` which depends on discovery
-- **Issue:** Chicken-egg problem - NCC loads before discovery runs
-- **Genericity:** ✅ **CAN BE FIXED** - NCC should be generic unlike NixOS core modules!
+#### **ai-workspace (prüfen)**
+- [ ] containers/ und schemas/ Struktur überprüfen
+- [ ] Eventuell zu submodules/ umstrukturieren
 
-#### **System Manager Integration**
-- **Status:** ❌ BROKEN
-- **Files:** `system-manager/submodules/system-checks/prebuild/checks/system/users.nix`
-- **Problem:** ❌ Tries to access NCC APIs before NCC is loaded
-- **Error:** `The option 'core.management.nixos-control-center' does not exist`
+## 🔧 **TECHNISCHE VERBESSERUNGEN**
 
-## 🎯 THE CHICKEN-EGG PROBLEM EXPLAINED
+### **API-Konsistenz**
+**Status:** Einige Module verwenden API, andere hardcoded
+- [ ] Alle Module: `getModuleConfig` statt hardcoded Pfade verwenden
+- [ ] Alle Module: `getModuleApi` statt direkter API-Zugriffe
+- [ ] Alle Module: `moduleConfig` Parameter in options.nix, commands.nix, config.nix verwenden
 
-**The Core Issue:**
-1. NCC needs `discoveredModules` to know its config path
-2. `discoveredModules` is created by discovery process
-3. Discovery process needs to find NCC first
-4. **Result:** Circular dependency - impossible to resolve!
+### **Metadata-Konsistenz**
+**Status:** Einige Module haben unvollständige metadata
+- [ ] Alle Module: `stability` und `version` in _module.metadata hinzufügen
+- [ ] Alle Module: subcategory korrekt setzen
 
-**BUT:** Unlike NixOS core modules (boot, audio, users), NCC is a **self-built module system**. It SHOULD be able to be 100% generic!
+## ✅ **BEREITS KONFORM (Referenz-Module)**
+- [x] `lock-manager`: Vollständig refactored ✅
+- [x] `system-manager`: API-konform ✅
+- [x] `nixos-control-center`: API-konform ✅
+- [x] **ALLE `core/*` Module**: API-konform ✅ (base/, management/, alle verwenden `baseNameOf ./.`)
+  - **Strukturell**: `system-manager` und `module-manager` perfekt TEMPLATE-konform ✅
+  - **Strukturell**: `base/*` Module haben funktionale Struktur ✅ (vereinfacht für core Module)
+    - `audio`: providers/ (funktional, könnte aber collectors/ werden)
+    - `boot`: bootloaders/ (funktional, könnte handlers/ werden)
+    - `desktop`: funktionale Unterteilung (environments/, display-managers/, etc.)
+    - `hardware`: funktionale Unterteilung (cpu/, gpu/, memory/)
+    - `network`: lib/ + recommendations/ (könnte processors/ werden)
+    - `packages`: modules/ + presets/ (könnte submodules/ werden)
+    - `user`: home-manager/ (funktionale rollenbasierte Struktur)
+- [x] Alle `system-manager` Submodules: API-konform ✅
 
-**Why NixOS core modules are hardcoded:**
-- They are PART of the NixOS system itself
-- They provide the foundation that everything else builds on
-- Hardcoding is acceptable for system foundations
+### **Optionale Core-Struktur-Verbesserungen**
+**Status:** Einige schon gemacht!
+- [x] `desktop/`: environments/, display-managers/, themes/ → components/ ✅ **FERTIG!**
+- [ ] `audio/providers/` → `audio/collectors/` (TEMPLATE-konform)
+- [ ] `boot/bootloaders/` → `boot/providers/` (klarere Benennung)
+- [ ] `network/recommendations/` → `network/processors/` (TEMPLATE-konform)
+- [ ] `packages/modules/` + `packages/presets/` → `packages/submodules/` (konsolidieren)
 
-**Why NCC SHOULD be generic:**
-- NCC is a USER-BUILT module system
-- It sits ON TOP of NixOS, not as part of it
-- Users should be able to move/rename NCC without breaking it
+## 🎯 **PRIORITÄT**
+1. **Hardcoded moduleName → baseNameOf ./.** (einfach, großer Impact)
+2. **Hardcoded Pfade → API-basiert** (mittel, großer Impact)
+3. **Struktur-Probleme beheben** (aufwändig, aber wichtig für Wartbarkeit)
 
-## 📋 DETAILED ANALYSIS
-
-### **What CAN be made 100% generic:**
-1. **Submodules** - Use `getCurrentModuleMetadata ./.` (already implemented)
-2. **Module discovery** - Automatically scans filesystem (already working)
-3. **Module config helpers** - Generate APIs from discovered modules (already working)
-
-### **What CANNOT be made generic:**
-1. **Module loading order** - NCC must load before modules that depend on it
-2. **Discovery initialization** - NCC provides functions that discovery depends on
-
-### **Current Hardcoded Elements:**
-```nix
-# In NCC/options.nix
-configPath = "core.management.nixos-control-center";  # HARDCODED - BUT SHOULD BE GENERIC!
-
-# In submodules (with fallbacks - user doesn't want these)
-configPath = metadata.configPath or "fallback.path";  # FALLBACKS EXIST - REMOVE THEM!
-```
-
-## 💡 SOLUTION OPTIONS
-
-### **Option 1: Accept Minimal Hardcoding (RECOMMENDED)**
-- NCC uses hardcoded `"core.management.nixos-control-center"`
-- Submodules use `getCurrentModuleMetadata ./.` (no fallbacks)
-- Remove all fallback paths from submodules
-
-### **Option 2: Convention over Configuration**
-- NCC calculates path from filesystem: `${grandparent}.${parent}.${name}`
-- But `baseNameOf` may not work reliably in all contexts
-
-### **Option 3: Two-Phase Loading**
-- Phase 1: Load NCC with minimal config
-- Phase 2: Reconfigure NCC with full discovery
-- Too complex for NixOS module system
-
-## 🎯 NEXT STEPS
-
-1. **Remove all fallback paths** from submodules (user requirement)
-2. **Implement NCC as normal core module** with hardcoded anchor path
-3. **Fix module loading order** so NCC loads before system-manager
-4. **Test system** with minimal hardcoded NCC
-5. **Document** why 100% genericity is impossible for NCC
+## 📋 **TESTING NACH REFACTORING**
+Nach jeder Änderung:
+- [ ] `nix-instantiate` auf default.nix testen
+- [ ] `ncc help` funktioniert
+- [ ] Commands sind verfügbar
+- [ ] Keine Linter-Fehler

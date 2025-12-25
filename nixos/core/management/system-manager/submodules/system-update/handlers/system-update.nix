@@ -812,3 +812,7 @@ in lib.mkMerge [
     }
   ])
 ]
+// 
+{
+  inherit systemUpdateMainScript;
+}

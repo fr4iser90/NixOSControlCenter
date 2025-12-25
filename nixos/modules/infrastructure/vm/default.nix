@@ -3,8 +3,8 @@
 with lib;
 
 let
-  # Single Source: Modulname nur einmal definieren
-  moduleName = "vm";
+  # CONVENTION OVER CONFIGURATION - Vollständig dynamisch aus Dateisystem
+  moduleName = baseNameOf ./. ;        # "vm" - automatisch!
   cfg = getModuleConfig moduleName;
   stateDir = cfg.stateDir;
 in {

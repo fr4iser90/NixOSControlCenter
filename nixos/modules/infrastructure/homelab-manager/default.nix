@@ -1,14 +1,13 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleMetadata, ... }:
 
 with lib;
 
 let
-  # Single Source: Modulname nur einmal definieren
-  moduleName = "homelab-manager";
+  moduleName = baseNameOf ./. ;        # "homelab-manager" - automatisch!
   cfg = getModuleConfig moduleName;
   
   # Check if Swarm is active
-  isSwarmMode = (systemConfig.homelab.swarm or null) != null;
+  isSwarmMode = (cfg.swarm or null) != null;
   
   # Find virtualization users (preferred)
   virtUsers = lib.filterAttrs
@@ -49,8 +48,11 @@ in {
     version = "1.0.0";
   };
 
-  # Modulname einmalig definieren und an Submodule weitergeben
-  _module.args.moduleName = moduleName;
+  # Modulname und Swarm-Konfiguration an Submodule weitergeben
+  _module.args = {
+    inherit moduleName;
+    isSwarmMode = isSwarmMode;
+  };
 
   imports = if cfg.enable or false then
     [
@@ -66,9 +68,13 @@ in {
   else [];
 
   config = mkMerge [
-    {
-      modules.infrastructure.homelab-manager.enable = mkDefault (cfg.enable or false);
-    }
+    # Generisch: enable-Flag aus Discovery-Pfad setzen
+    (let
+      moduleMeta = getModuleMetadata moduleName;
+      enablePath = lib.splitString "." moduleMeta.enablePath;
+    in
+      lib.setAttrByPath enablePath (mkDefault (cfg.enable or false))
+    )
     (mkIf cfg.enable {
       # Import homelab utilities config
       environment.systemPackages = (homelabUtils.config.environment.systemPackages or []);

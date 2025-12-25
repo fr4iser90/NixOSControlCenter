@@ -1,6 +1,7 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, corePathsLib, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, corePathsLib, getModuleApi, ... }:
 let
   cfg = getModuleConfig "system-logging";
+  cliRegistry = getModuleApi "cli-registry";
 
   # Import the system report script
   systemReportScript = import ./scripts/system-report.nix {
@@ -10,13 +11,14 @@ let
 in {
   config = lib.mkMerge [
     (lib.mkIf (cfg.enable or true)
-      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+      (cliRegistry.registerCommandsFor "system-logging" [
     {
       name = "log-system-report";
       script = "${systemReportScript.script}/bin/ncc-log-system-report";
       category = "system";
       description = "Generate system report with configured collectors";
-      helpText = ''
+      shortHelp = "log-system-report - Generate system report";
+      longHelp = ''
         Generate a comprehensive system report using configured collectors.
 
         Examples:

@@ -6,8 +6,8 @@ with lib;
 # This is the main entry point that imports all SSH client manager components
 
 let
-  # Single Source: Modulname nur einmal definieren
-  moduleName = "ssh-client-manager";
+  # CONVENTION OVER CONFIGURATION - Vollständig dynamisch aus Dateisystem
+  moduleName = baseNameOf ./. ;        # "ssh-client-manager" - automatisch!
   # Use the new generic module system
   cfg = getModuleConfig moduleName;
 in {
@@ -20,8 +20,11 @@ in {
     version = "1.0.0";
   };
 
-  # Modulname einmalig definieren und an Submodule weitergeben
-  _module.args.moduleName = moduleName;
+  # Modulname und Config an Submodule weitergeben
+  _module.args = {
+    inherit moduleName;
+    sshClientCfg = cfg;
+  };
 
   # Import all SSH client manager modules
   imports = if cfg.enable or false then [

@@ -23,10 +23,10 @@ in {
 
   imports = if cfg.enable or false then [
     ./options.nix
-    ./display-managers
-    ./display-servers
-    ./environments
-    ./themes
+    ./components/display-managers
+    ./components/display-servers
+    ./components/environments
+    ./components/themes
     (import ./config.nix { inherit config lib systemConfig getModuleConfig moduleName; })
   ] else [];
 }

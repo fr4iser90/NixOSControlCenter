@@ -1,9 +1,10 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, corePathsLib, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, corePathsLib, getModuleApi, ... }:
 
 with lib;
 
 let
   ui = getModuleApi "cli-formatter";
+  cliRegistry = getModuleApi "cli-registry";
   commandCenter = config.core.management.system-manager.submodules.cli-registry;
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
 
@@ -56,7 +57,7 @@ in {
     ];
 
     config = lib.mkMerge [
-      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+      (cliRegistry.registerCommandsFor "homelab-manager" [
       {
         name = "homelab-minimize";
         description = "Minimize system configuration for homelab use";

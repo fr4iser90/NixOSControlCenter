@@ -1,8 +1,8 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, sshClientCfg, ... }:
 
 let
   ui = getModuleApi "cli-formatter";
-  cfg = systemConfig.modules.security.ssh-client-manager;
+  cfg = sshClientCfg;
 
   # SSH Key Utilities
   # This module provides functions for managing SSH keys (NOT connections)

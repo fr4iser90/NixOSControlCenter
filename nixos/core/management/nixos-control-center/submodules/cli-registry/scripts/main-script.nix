@@ -1,13 +1,13 @@
-{ config, lib, pkgs, systemConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getCurrentModuleMetadata, moduleName, ... }:
 
 let
-  cfg = config.core.management.nixos-control-center.submodules.cli-registry or {};
   ui = getModuleApi "cli-formatter";
+  cliRegistry = getModuleApi "cli-registry";
   ccLib = import ../lib { inherit lib; };
 
   # Dynamische Inhalte vorbereiten
-  # Get commands from systemConfig
-  resolvedCommands = cfg.commands or [];
+  # Get commands from CLI Registry API (collects from all modules)
+  resolvedCommands = cliRegistry.getRegisteredCommands config;
   caseBlock = lib.concatMapStringsSep "\n  " ccLib.utils.generateExecCase resolvedCommands;
   commandLongHelp = lib.concatMapStringsSep "\n  " ccLib.utils.generateLongHelpCase resolvedCommands;
   commandList = ccLib.utils.generateCommandList resolvedCommands;

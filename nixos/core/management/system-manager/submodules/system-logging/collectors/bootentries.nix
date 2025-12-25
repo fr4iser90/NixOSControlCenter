@@ -30,7 +30,6 @@ let
   # Standard report shows current boot entries
   infoReport = ''
     ${ui.text.header "Boot Entries"}
-    ${ui.text.subHeader "Current Entries:"}
     ${getBootEntries}
   '';
 

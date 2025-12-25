@@ -3,8 +3,8 @@
 with lib;
 
 let
-  # Single Source: Modulname nur einmal definieren
-  moduleName = "bootentry-manager";
+  
+  moduleName = baseNameOf ./. ;        # "bootentry-manager" - automatisch!
   cfg = getModuleConfig moduleName;
 
   # Importiere die benötigten Module

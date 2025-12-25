@@ -5,18 +5,17 @@ let
 
   # Import the UI from the cli-formatter submodule (generic)
   ui = getModuleApi "system-manager";
+  cliRegistry = getModuleApi "cli-registry";
 
-  # System update main script (extracted from the old handler)
-  systemUpdateMainScript = pkgs.writeScriptBin "ncc-system-update-main" ''
-    #!/bin/bash
-    # System update script - moved to submodule
-    echo "System update functionality"
-    # TODO: Extract full script from handlers/system-update.nix
-  '';
+  # Import the actual system update script from handlers
+  systemUpdateHandler = import ./handlers/system-update.nix { 
+    inherit config lib pkgs systemConfig getModuleConfig getModuleApi corePathsLib; 
+  };
+  systemUpdateMainScript = systemUpdateHandler.systemUpdateMainScript;
 
 in
   lib.mkIf (cfg.enable or true)
-    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+    (cliRegistry.registerCommandsFor "system-update" [
       {
         name = "system-update";
         script = "${systemUpdateMainScript}/bin/ncc-system-update-main";

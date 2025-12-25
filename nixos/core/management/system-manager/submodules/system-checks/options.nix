@@ -1,7 +1,6 @@
 { lib, getCurrentModuleMetadata, ... }:
 
 let
-  # CONVENTION OVER CONFIGURATION - 100% GENERIC!
   # Derive path from filesystem location
   moduleName = baseNameOf ./. ;        # "system-checks"
   parentName = baseNameOf ../.;        # "submodules"

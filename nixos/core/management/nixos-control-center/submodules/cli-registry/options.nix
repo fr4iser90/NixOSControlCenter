@@ -62,6 +62,13 @@ in {
       description = "Available commands for the NixOS Control Center";
     };
 
+    commandSets = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.listOf ccLib.types.commandType);
+      default = {};
+      description = "Command sets from different modules";
+      internal = true;
+    };
+
     categories = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [];

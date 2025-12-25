@@ -3,8 +3,8 @@
 with lib;
 
 let
-  # Single Source: Modulname nur einmal definieren
-  moduleName = "ssh-server-manager";
+  # CONVENTION OVER CONFIGURATION - Vollständig dynamisch aus Dateisystem
+  moduleName = baseNameOf ./. ;        # "ssh-server-manager" - automatisch!
   cfg = getModuleConfig moduleName;
   ui = getModuleApi "cli-formatter";
   commandCenter = config.core.management.system-manager.submodules.cli-registry;

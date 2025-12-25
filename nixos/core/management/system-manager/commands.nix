@@ -15,10 +15,11 @@ let
   updateDesktopConfig = import ./scripts/update-desktop-config.nix { inherit config lib pkgs systemConfig; };
   
   # Import config migration and validation
-  # CLI Formatter ist jetzt in NCC - verwende getModuleApi
+  # CLI APIs - elegant registration
   formatter = getModuleApi "cli-formatter";
+  cliRegistry = getModuleApi "cli-registry";
+
   # Fallback to direct import if API not yet available
-  # CONVENTION OVER CONFIGURATION
   moduleName = baseNameOf ./. ;        # "system-manager"
   parentName = baseNameOf ../.;        # "management"
   grandparentName = baseNameOf ../../.; # "core"
@@ -42,8 +43,7 @@ in {
           configMigration.validator.validateSystemConfig
         ];
     }
-    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList
-    [
+    (cliRegistry.registerCommandsFor "system-manager" [
       {
         name = "check-module-versions";
           description = "Check module versions for Core and Features and update status";

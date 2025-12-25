@@ -1,6 +1,7 @@
 { config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, corePathsLib, ... }:
 
 let
+  cliRegistry = getModuleApi "cli-registry";
   # GENERISCH: CLI Formatter API über getModuleApi beziehen
   ui = getModuleApi "cli-formatter"; 
   
@@ -69,7 +70,7 @@ in {
     {
       environment.systemPackages = [ prebuildScript ];
     }
-    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+    (cliRegistry.registerCommandsFor "system-checks-users" [
       {
         name = "check-users";
         category = "system-checks";

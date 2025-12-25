@@ -1,8 +1,8 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, isSwarmMode, ... }:
 
 let
   # Check if Swarm is active
-  isSwarmMode = (systemConfig.homelab.swarm or null) != null;
+  isSwarmMode = isSwarmMode;
 
   # Find virtualization users (preferred)
   virtUsers = lib.filterAttrs

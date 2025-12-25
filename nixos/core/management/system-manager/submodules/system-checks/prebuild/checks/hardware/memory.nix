@@ -2,7 +2,8 @@
 
 let
   # GENERISCH: CLI Formatter API über getModuleApi beziehen
-  ui = getModuleApi "cli-formatter"; 
+  ui = getModuleApi "cli-formatter";
+  cliRegistry = getModuleApi "cli-registry"; 
   hardwareConfigPath = "/etc/nixos/configs/core/base/hardware/config.nix";
   
   # Use the shared update-hardware-config script from utils.nix
@@ -86,7 +87,7 @@ in {
     {
       environment.systemPackages = [ prebuildScript ];
     }
-    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+    (cliRegistry.registerCommandsFor "system-checks-memory" [
       {
         name = "check-memory";
         category = "system-checks";

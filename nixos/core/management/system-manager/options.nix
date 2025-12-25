@@ -1,8 +1,6 @@
 { lib, pkgs, ... }:
 
 let
-  # CONVENTION OVER CONFIGURATION - 100% GENERIC!
-  # Derive path from filesystem location
   moduleName = baseNameOf ./. ;        # "system-manager"
   parentName = baseNameOf ../.;        # "management"
   grandparentName = baseNameOf ../../.; # "core"

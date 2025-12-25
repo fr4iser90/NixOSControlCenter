@@ -1,6 +1,7 @@
 { config, lib, pkgs, systemConfig, getModuleApi, corePathsLib, ... }:
 
 let
+  cliRegistry = getModuleApi "cli-registry";
   # GENERISCH: CLI Formatter API über getModuleApi beziehen
   ui = getModuleApi "cli-formatter"; 
   hardwareConfigPath = "/etc/nixos/configs/core/base/hardware/config.nix";
@@ -142,7 +143,7 @@ in {
     {
       environment.systemPackages = [ prebuildScript ];
     }
-    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+    (cliRegistry.registerCommandsFor "system-checks-gpu" [
       {
         name = "check-gpu";
         category = "system-checks";

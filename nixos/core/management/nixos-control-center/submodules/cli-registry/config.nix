@@ -1,5 +1,9 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, moduleName, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getCurrentModuleMetadata, moduleName, ... }:
 let
+  # Generischen Pfad aus Dateisystem ableiten
+  metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
+  configPath = metadata.configPath;  # NO FALLBACKS!
+
   cfg = getModuleConfig moduleName;
   # Use the template file as default config
   defaultConfig = builtins.readFile ./command-center-config.nix;
@@ -8,7 +12,9 @@ let
   ccLib = import ./lib { inherit lib; };
 
   # Import scripts from scripts/ directory
-  mainScript = import ./scripts/main-script.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
+  mainScript = import ./scripts/main-script.nix {
+    inherit config lib pkgs systemConfig getModuleConfig getModuleApi getCurrentModuleMetadata moduleName;
+  };
   aliases = import ./scripts/aliases.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
 
   # API definition - always available
@@ -23,7 +29,6 @@ in
   # No enable option needed - NCC command always available
 
   # API is always available
-  core.management.nixos-control-center.submodules.cli-registry = {};
   core.management.nixos-control-center.submodules.cli-registry.api = apiValue;
 
   # Add NCC to system packages (always available)

@@ -2,14 +2,15 @@
 
 let
   cfg = getModuleConfig moduleName;
+  cliRegistry = getModuleApi "cli-registry";
   prebuildCfg = cfg.prebuild or {};
   postbuildScript = import ./scripts/postbuild-checks.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   prebuildCheckScript = import ./scripts/prebuild-checks.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
 in {
   config = lib.mkMerge [
     # Command-Center registration for checks module
-    # CLI-Registry Pfad zentralisiert über corePathsLib
-    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+    # CLI-Registry API - elegante Registrierung
+    (cliRegistry.registerCommandsFor "system-checks" [
       {
         name = "build";
         description = "Build and activate NixOS configuration with safety checks";

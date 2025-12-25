@@ -13,7 +13,7 @@ in
         defaultConfig = defaultConfig;
       }) // {
         # Enable module by default if system config has it
-        modules.infrastructure.homelab.enable = lib.mkDefault (systemConfig.modules.infrastructure.homelab.enable or false);
+        ${moduleConfig.enablePath} = lib.mkDefault (systemConfig.${moduleConfig.configPath}.enable or false);
       }
     ))
     # Implementation is handled in default.nix

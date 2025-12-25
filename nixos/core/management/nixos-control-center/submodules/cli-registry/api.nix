@@ -1,13 +1,19 @@
 { lib }:
 
+# CLI Registry API - Elegant command registration system
+# Each module registers under a unique key, then we collect all
 {
-  # WORKING CLI Registry API - Direct config access
-  registerCommands = commands: {
-    core.management.nixos-control-center.submodules.cli-registry.commands = commands;
+  # Register commands for a specific module
+  registerCommandsFor = moduleName: commands: {
+    core.management.nixos-control-center.submodules.cli-registry.commandSets.${moduleName} = commands;
   };
 
-  # Commands are read directly from config by main-script.nix
-  getAllCommands = "READ_FROM_CONFIG";
+  # Get all registered commands (flattened)
+  getRegisteredCommands = config:
+    let
+      commandSets = config.core.management.nixos-control-center.submodules.cli-registry.commandSets or {};
+    in
+      builtins.concatLists (builtins.attrValues commandSets);
 
   version = "1.0.0";
 }

@@ -3,8 +3,8 @@
 with lib;
 
 let
-  # Single Source: Modulname nur einmal definieren
-  moduleName = "ai-workspace";
+  # CONVENTION OVER CONFIGURATION - Vollständig dynamisch aus Dateisystem
+  moduleName = baseNameOf ./. ;        # "ai-workspace" - automatisch!
   cfg = getModuleConfig moduleName;
 in {
   _module.metadata = {

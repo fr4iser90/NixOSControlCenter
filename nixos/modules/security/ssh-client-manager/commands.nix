@@ -1,14 +1,15 @@
-{ config, lib, pkgs, systemConfig, corePathsLib, ... }:
+{ config, lib, pkgs, systemConfig, corePathsLib, getModuleApi, ... }:
 
 with lib;
 
 let
-  cfg = systemConfig.modules.security.ssh-client-manager;
+  cfg = systemConfig.${moduleConfig.configPath};
+  cliRegistry = getModuleApi "cli-registry";
   moduleName = baseNameOf ./. ;
 in {
   config = mkIf cfg.enable
     (lib.mkMerge [
-      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+      (cliRegistry.registerCommandsFor "ssh-client-manager" [
       {
         name = "ssh-client-manager";
         description = "Manage SSH client connections";
