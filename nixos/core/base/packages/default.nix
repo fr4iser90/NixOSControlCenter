@@ -6,6 +6,9 @@ let
   cfg = getModuleConfig moduleName;
   systemManagerCfg = getModuleConfig "system-manager";  # Anderes Modul, bleibt hardcoded
 
+  # Import package module metadata for validation
+  packageMetadata = import ./lib/metadata.nix;
+
   # Load base packages
   basePackages = {
     desktop = import ./components/base/desktop.nix;
@@ -55,4 +58,32 @@ in {
     in
       basePackages.${systemType} or (throw "Unknown system type: ${systemType}"))
   ] ++ moduleModules ++ dockerModules;
+
+  # System packages from systemPackages option
+  environment.systemPackages = lib.mkIf ((cfg.systemPackages or []) != []) (
+    map (pkgName:
+      let
+        meta = packageMetadata.modules.${pkgName} or {};
+      in
+        if meta ? package then meta.package
+        else if builtins.hasAttr pkgName pkgs then pkgs.${pkgName}
+        else throw "Package '${pkgName}' not found in package metadata or nixpkgs"
+    ) cfg.systemPackages
+  );
+
+  # Home-manager integration for userPackages (only if home-manager is available)
+  home-manager = lib.mkIf (cfg.userPackages or {} != {}) {
+    users = lib.mapAttrs (userName: packages:
+      { config, ... }: {
+        home.packages = map (pkgName:
+          let
+            meta = packageMetadata.modules.${pkgName} or {};
+          in
+            if meta ? package then meta.package
+            else if builtins.hasAttr pkgName pkgs then pkgs.${pkgName}
+            else throw "Package '${pkgName}' not found in package metadata or nixpkgs"
+        ) packages;
+      }
+    ) cfg.userPackages;
+  };
 }

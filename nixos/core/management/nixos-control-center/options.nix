@@ -21,6 +21,14 @@ in {
       description = "NCC API for other modules";
     };
 
+    # ⚠️ Dangerous Operations - überspringt Bestätigungen
+    dangerousIgnore = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Ignore dangerous command warnings (for automation/scripting)";
+      example = true;
+    };
+
     # NCC-spezifische Optionen können hier hinzugefügt werden
     # theme = lib.mkOption {
     #   type = lib.types.enum [ "dark" "light" ];

@@ -5,7 +5,9 @@ let
   metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
   configPath = metadata.configPath or "systemConfig.core.management.nixos-control-center.submodules.cli-registry";  # Fallback
 
-  ccLib = import ./lib { inherit lib; };
+  ccLib = {
+    types = import ./lib/types.nix { inherit lib; };
+  };
 in {
   options.${configPath} = {
     # Version metadata (required for all modules)

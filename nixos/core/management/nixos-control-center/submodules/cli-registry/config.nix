@@ -9,7 +9,7 @@ let
   defaultConfig = builtins.readFile ./command-center-config.nix;
 
   # Import utilities
-  ccLib = import ./lib { inherit lib; };
+  ccLib = import ./lib { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
 
   # Import scripts from scripts/ directory
   mainScript = import ./scripts/main-script.nix {

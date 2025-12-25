@@ -3,7 +3,7 @@
 let
   ui = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
-  ccLib = import ../lib { inherit lib; };
+  ccLib = import ../lib { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
 
   # Dynamische Inhalte vorbereiten
   # Get commands from CLI Registry API (collects from all modules)

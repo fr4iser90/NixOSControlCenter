@@ -22,5 +22,9 @@ in
         category = "System Management";
         description = "Update NixOS configuration from repository";
         help = "system-update [--auto-build] [--source=remote|local] [--branch=name] - Update NixOS configuration";
+        permission = "system.update";  # ← NCC prüft diese Capability
+        requiresSudo = true;           # ← NCC führt mit sudo aus
+        dangerous = true;              # ← NCC zeigt Warnung: "Dieser Befehl ist gefährlich!"
+        # riskLevel = "high";         # ← Optional: Risiko-Level für Warnings
       }
     ])

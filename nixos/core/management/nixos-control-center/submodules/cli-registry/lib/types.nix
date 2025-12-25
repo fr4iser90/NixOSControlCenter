@@ -86,6 +86,26 @@
         default = 100;
         description = "Sorting priority for fzf results (lower = more important)";
       };
+
+      # Permission system
+      permission = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Required capability for executing this command";
+        example = "system.update";
+      };
+
+      requiresSudo = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Whether this command requires sudo privileges";
+      };
+
+      dangerous = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Whether this is a dangerous command that needs confirmation";
+      };
     };
   };
 }

@@ -25,5 +25,20 @@ in {
         in meta.systemTypes != [] && !(builtins.elem (systemManagerCfg.systemType or "desktop") meta.systemTypes)
       ) cfg.packageModules)}";
     }
-  ];
+  ] ++
+  # Validate systemPackages (only if defined)
+  (let systemPkgs = cfg.systemPackages or []; in
+   if systemPkgs != [] then [
+     {
+       assertion = lib.all (pkg: packageMetadata.modules.${pkg} or null != null) systemPkgs;
+       message = "Unknown system package(s): ${lib.concatStringsSep ", " (lib.filter (pkg: !(packageMetadata.modules.${pkg} or null != null)) systemPkgs)}";
+     }
+   ] else []) ++
+  # Validate userPackages (only if defined)
+  lib.concatLists (lib.mapAttrsToList (user: packages: [
+    {
+      assertion = lib.all (pkg: packageMetadata.modules.${pkg} or null != null) packages;
+      message = "Unknown user package(s) for ${user}: ${lib.concatStringsSep ", " (lib.filter (pkg: !(packageMetadata.modules.${pkg} or null != null)) packages)}";
+    }
+  ]) (cfg.userPackages or {}));
 }
