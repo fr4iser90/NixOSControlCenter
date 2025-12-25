@@ -1,6 +1,6 @@
-{ config, lib, pkgs, systemConfig, corePathsLib, ... }:
+{ config, lib, pkgs, systemConfig, corePathsLib, configPath ? "management.system-manager", ... }:
 let
-  cfg = systemConfig.management.system-manager or {};
+  cfg = systemConfig.${configPath};
   # Import config-migration module to get the commands
   configMigrationModule = import ./. { inherit pkgs lib config; };
   checkScript = configMigrationModule.check.configCheck;

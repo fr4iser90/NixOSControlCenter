@@ -57,7 +57,7 @@ in {
   imports = if cfg.enable or false then
     [
       ./options.nix
-      ./config.nix
+      (import ./config.nix { inherit moduleConfig; })
     ] ++ (if hasDockerUser then [
       ./homelab-create.nix
       ./homelab-fetch.nix

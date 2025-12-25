@@ -1,7 +1,7 @@
-{ config, lib, pkgs, systemConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleApi, configPath ? "management.system-manager", ... }:
 
 let
-  cfg = systemConfig.management.system-manager or {};
+  cfg = systemConfig.${configPath};
   backupHelpers = import ../../lib/backup-helpers.nix { inherit pkgs lib; };
   formatter = getModuleApi "cli-formatter";
   migration = import ./migration.nix { inherit pkgs lib getModuleApi backupHelpers; };

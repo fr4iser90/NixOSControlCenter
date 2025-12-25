@@ -15,7 +15,9 @@ in {
   };
 
   # Modulname einmalig definieren und an Submodule weitergeben
-  _module.args.moduleName = moduleName;
+  _module.args = {
+    inherit moduleName getModuleConfig;
+  };
 
   imports = [
     ./options.nix

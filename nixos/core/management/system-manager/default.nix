@@ -21,7 +21,7 @@ let
 in {
   imports = [
     ./options.nix
-    ./commands.nix
+    (import ./commands.nix { inherit config lib pkgs systemConfig moduleConfig getModuleConfig getModuleApi corePathsLib; })
     ./config.nix
     # Import all submodules (full-featured modules within system-manager)
     # NOTE: cli-formatter and cli-registry moved to nixos-control-center

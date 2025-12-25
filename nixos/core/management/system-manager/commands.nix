@@ -3,7 +3,16 @@
 with lib;
 
 let
-  cfg = systemConfig.management.system-manager or {};
+  moduleName = baseNameOf ./. ;        # "system-manager"
+  parentName = baseNameOf ../.;        # "management"
+  grandparentName = baseNameOf ../../.; # "core"
+  configPath = "${grandparentName}.${parentName}.${moduleName}";
+
+  # Core modules use config.* (chicken-egg problem with systemConfig)
+  cfg = config.${configPath};
+
+  # For components: provide configPath for consistent access
+  # This allows components to use systemConfig.${configPath} instead of hardcoded paths
   versionChecker = import ./handlers/module-version-check.nix { inherit config lib; };
   checkVersions = import ./scripts/check-versions.nix { inherit config lib pkgs getModuleApi; };
   updateModules = import ./scripts/update-modules.nix { inherit config lib pkgs getModuleApi; };
@@ -19,14 +28,8 @@ let
   formatter = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
 
-  # Fallback to direct import if API not yet available
-  moduleName = baseNameOf ./. ;        # "system-manager"
-  parentName = baseNameOf ../.;        # "management"
-  grandparentName = baseNameOf ../../.; # "core"
-  configPath = "${grandparentName}.${parentName}.${moduleName}";
-
   backupHelpersForMigration = config.${configPath}.api.backupHelpers or (import ./lib/backup-helpers.nix { inherit pkgs lib; });
-  configMigration = import ./components/config-migration/default.nix { inherit config pkgs lib systemConfig getModuleApi; backupHelpers = backupHelpersForMigration; };
+  configMigration = import ./components/config-migration/default.nix { inherit config pkgs lib systemConfig getModuleApi configPath; backupHelpers = backupHelpersForMigration; };
   configValidator = import ./validators/config-validator.nix { inherit pkgs lib; };
 in {
   config = lib.mkMerge [

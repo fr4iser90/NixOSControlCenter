@@ -1,5 +1,5 @@
 {
-  systemConfig.core.management.system-manager.submodules.system-update = {
+  system-update = {
     enable = true;
     autoBuild = false;
     backup = {
@@ -15,7 +15,7 @@
       }
       {
         name = "local";
-        url = "/home/user/Documents/Git/NixOSControlCenter/nixos";
+        url = "/home/$user/Documents/Git/NixOSControlCenter/nixos";
         branches = [];
       }
     ];

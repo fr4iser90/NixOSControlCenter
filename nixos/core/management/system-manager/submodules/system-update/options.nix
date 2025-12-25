@@ -72,7 +72,7 @@ in {
         }
         {
           name = "local";
-          url = "/home/${systemConfig.core.base.user.${builtins.head (builtins.attrNames systemConfig.core.base.user or {})}.name or "user"}/Documents/Git/NixOSControlCenter/nixos";
+          url = lib.mkDefault (import ../../lib/user-path-helper.nix { inherit systemConfig; });
           branches = [];
         }
       ];

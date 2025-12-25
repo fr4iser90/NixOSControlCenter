@@ -1,4 +1,4 @@
-{ pkgs, lib, config, systemConfig, getModuleApi, backupHelpers, ... }:
+{ pkgs, lib, config, systemConfig, getModuleApi, backupHelpers, configPath ? "management.system-manager", ... }:
 
 let
   # Formatter wird direkt aus NCC geholt - GENAUSO WIE ALLE ANDEREN MODULE!
@@ -11,7 +11,7 @@ let
   detectionModule = import ./detection.nix { inherit pkgs lib; };
   migrationModule = import ./migration.nix { inherit pkgs lib getModuleApi backupHelpers; };
   validatorModule = import ./validator.nix { inherit pkgs lib getModuleApi; };
-  checkModule = import ./check.nix { inherit config pkgs lib getModuleApi backupHelpers systemConfig; };
+  checkModule = import ./check.nix { inherit config pkgs lib getModuleApi backupHelpers systemConfig configPath; };
 in
 
 {
