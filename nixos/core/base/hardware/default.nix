@@ -20,8 +20,8 @@ in {
   imports = [
     ./options.nix
     (import ./config.nix { inherit config lib getModuleConfig moduleName; })
-    ./gpu
-    ./cpu
-    ./memory
+    ./components/gpu
+    ./components/cpu
+    ./components/memory
   ];
 }

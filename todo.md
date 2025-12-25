@@ -25,23 +25,25 @@
 **Status:** Viele Module haben Dateien im Root statt in korrekten Verzeichnissen
 
 #### **homelab-manager (scripts/ sollte handlers/ sein)**
-- [ ] `scripts/homelab-create.nix` → `handlers/homelab-create.nix`
-- [ ] `scripts/homelab-fetch.nix` → `handlers/homelab-fetch.nix`
-- [ ] Pfad-Updates in default.nix und anderen Dateien
+- [x] `scripts/homelab-create.nix` → `handlers/homelab-create.nix` ✅
+- [x] `scripts/homelab-fetch.nix` → `handlers/homelab-fetch.nix` ✅
+- [x] Pfad-Updates in default.nix und anderen Dateien ✅
 homelab-manager/
-├── scripts/
-│   └── homelab-main.nix      # ✅ User entry point (parses args)
-├── handlers/
-│   ├── homelab-create.nix    # ✅ Business logic orchestration  
-│   └── homelab-fetch.nix     # ✅ Business logic orchestration
+├── handlers/                # ✅ Business logic orchestration
+│   ├── homelab-create.nix    # ✅ Implementiert
+│   └── homelab-fetch.nix     # ✅ Implementiert
+└── scripts/                  # 🗑️ Leere Platzhalter entfernt
 
-#### **ssh-client-manager (bereits teilweise korrekt)**
-- [ ] Prüfen ob alle Handler in `handlers/` sind
-- [ ] Prüfen ob Scripts in `scripts/` sind (falls vorhanden)
+#### **ssh-client-manager (jetzt vollständig korrigiert)**
+- [x] Alle Handler sind bereits in `handlers/` ✅
+- [x] Scripts sind bereits in `scripts/` ✅
+- [x] Imports in default.nix korrigiert - nicht existierende Dateien entfernt ✅
 
-#### **bootentry-manager (bereits teilweise korrekt)**
-- [ ] Prüfen ob providers/ zu handlers/ verschoben werden sollten
-- [ ] lib/ Struktur überprüfen
+#### **bootentry-manager (Analyse abgeschlossen)**
+- [ ] `providers/` → `handlers/` verschieben (Business-Logic für Bootloader)
+- [ ] `commands.nix` erstellen (NCC-Commands für Boot-Management)
+- [ ] `scripts/` Verzeichnis erstellen für Executables
+- [ ] lib/ Struktur ist korrekt ✅
 
 #### **vm (prüfen)**
 - [ ] lib/ Struktur überprüfen

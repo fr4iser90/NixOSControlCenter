@@ -2,11 +2,11 @@
 { config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
-  recommendations = import ./recommendations/services.nix;
+  recommendations = import ./processors/services.nix;
   rules = import ./lib/rules.nix { inherit lib; };
   
   # Service-Konfigurationen aus systemConfig.nix
-  services = lib.attrByPath ["networking" "services"] {} (getModuleConfig "network");
+  services = lib.attrByPath ["services"] {} (getModuleConfig "network");
 
   # Helper für sicheres Prüfen der Exposure
   isPubliclyExposed = cfg:
@@ -38,7 +38,7 @@ in {
       # Zusätzliche vertrauenswürdige Netze
       ${lib.concatMapStrings (net: ''
         iptables -A INPUT -s ${net} -j ACCEPT
-      '') (lib.attrByPath ["networking" "firewall" "trustedNetworks"] [] (getModuleConfig "network"))}
+      '') (lib.attrByPath ["firewall" "trustedNetworks"] [] (getModuleConfig "network"))}
     '';
   };
 

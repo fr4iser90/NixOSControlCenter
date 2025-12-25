@@ -1,3 +1,0 @@
-{
-  bootloader = "systemd-boot";
-}

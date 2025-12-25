@@ -6,9 +6,9 @@ let
 
   # Bootloader configurations
   bootloaders = {
-    systemd-boot = ./bootloaders/systemd-boot.nix;
-    grub = ./bootloaders/grub.nix;
-    refind = ./bootloaders/refind.nix;
+    systemd-boot = ./handlers/systemd-boot.nix;
+    grub = ./handlers/grub.nix;
+    refind = ./handlers/refind.nix;
   };
 
   bootCfg = getModuleConfig moduleName;

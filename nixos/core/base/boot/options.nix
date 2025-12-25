@@ -1,7 +1,6 @@
 { lib, getCurrentModuleMetadata, ... }:
 
 let
-  # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
   metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
   configPath = metadata.configPath;
 in {
@@ -14,5 +13,10 @@ in {
     };
     # Boot module has no user-configurable options - it uses systemConfig.core.base.bootloader
     # to dynamically load the appropriate bootloader implementation
+    bootloader = lib.mkOption {
+      type = lib.types.enum [ "systemd-boot" "grub" "refind" ];
+      default = "systemd-boot";
+      description = "Bootloader to use";
+    };
   };
 }

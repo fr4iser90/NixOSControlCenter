@@ -12,9 +12,9 @@ let
 
   # Wähle Provider basierend auf dem Bootloader
   providers = {
-    grub = import ./providers/grub.nix { inherit config lib pkgs; };
-    refind = import ./providers/refind.nix { inherit config lib pkgs; };
-    "systemd-boot" = import ./providers/systemd-boot.nix { inherit config lib pkgs; };
+    grub = import ./handlers/grub.nix { inherit config lib pkgs; };
+    refind = import ./handlers/refind.nix { inherit config lib pkgs; };
+    "systemd-boot" = import ./handlers/systemd-boot.nix { inherit config lib pkgs; };
   };
 
   selectedProvider = if config.boot.loader.systemd-boot.enable then providers."systemd-boot"

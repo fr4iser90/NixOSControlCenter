@@ -20,7 +20,7 @@ in {
   imports = if cfg.enable or false then [
     ./options.nix
   ] ++ (if (cfg.system or "none") != "none" then [
-    (./providers + "/${cfg.system}.nix")
+    (./handlers + "/${cfg.system}.nix")
     (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })
   ] else [
     (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })

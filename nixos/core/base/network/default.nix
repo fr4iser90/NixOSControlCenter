@@ -9,8 +9,8 @@ let
   networkingModules = [
     ./options.nix
     (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })
-#    ./networkmanager.nix
-#    ./firewall.nix
+    ./networkmanager.nix
+    ./firewall.nix
   ];
 
   networkCfg = getModuleConfig moduleName;
@@ -33,14 +33,14 @@ in {
 
   # Basic networking configuration
   networking = {
-    hostName = networkCfg.hostName or "nixos";
+    hostName = networkCfg.hostName;
 
     # Enable NetworkManager by default
     networkmanager.enable = true;
 
     # Basic firewall settings
     firewall = {
-      enable = networkCfg.firewall.enable or false;
+      enable = networkCfg.firewall.enable;
       allowPing = true;
     };
   };

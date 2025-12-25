@@ -22,21 +22,33 @@ in {
       };
     };
 
-    # Networking services configuration (for firewall rules)
-    networking = {
-      services = lib.mkOption {
-        type = lib.types.attrs;
-        default = {};
-        description = "Service configurations for firewall rules";
+    # Basic networking options
+    hostName = lib.mkOption {
+      type = lib.types.str;
+      default = "nixos";
+      description = "System hostname";
+    };
+
+    # Firewall configuration
+    firewall = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable system firewall";
       };
 
-      firewall = {
-        trustedNetworks = lib.mkOption {
-          type = lib.types.listOf lib.types.str;
-          default = [];
-          description = "List of trusted networks (CIDR notation)";
-        };
+      trustedNetworks = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [];
+        description = "List of trusted networks (CIDR notation)";
       };
+    };
+
+    # Networking services configuration (for firewall rules)
+    services = lib.mkOption {
+      type = lib.types.attrs;
+      default = {};
+      description = "Service configurations for firewall rules";
     };
   };
 }

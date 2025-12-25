@@ -26,17 +26,15 @@ in {
     sshClientCfg = cfg;
   };
 
-  # Import all SSH client manager modules
+  # Import all SSH client manager modules - MODULE_TEMPLATE konform
   imports = if cfg.enable or false then [
-    ./options.nix        # Configuration options and defaults
-    ./commands.nix       # Command registration for ncc
-    ./config.nix         # Configuration and activation scripts
-    ./init.nix          # Initialization and setup scripts
-    ./main.nix          # Main interactive script
-    ./connection-preview.nix  # FZF preview functionality
-    ./ssh-key-utils.nix      # SSH key management utilities
-    ./ssh-server-utils.nix   # Server connection utilities
-    ./connection-handler.nix # Centralized connection handler
+    ./options.nix                    # Configuration options and defaults
+    ./commands.nix                   # Command registration for ncc
+    ./config.nix                     # System configuration
+    ./handlers/ssh-client-handler.nix    # Business logic orchestration
+    ./scripts/ssh-client-manager.nix     # Executable script
+    ./lib/ssh-key-utils.nix             # SSH key utilities
+    ./lib/ssh-server-utils.nix          # Server connection utilities
   ] else [];
 
   config = mkMerge [

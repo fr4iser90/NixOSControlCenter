@@ -59,11 +59,11 @@ in {
       ./options.nix
       (import ./config.nix { inherit moduleConfig; })
     ] ++ (if hasDockerUser then [
-      ./homelab-create.nix
-      ./homelab-fetch.nix
-      # ./homelab-update.nix
-      # ./homelab-delete.nix
-      # ./homelab-status.nix
+      ./handlers/homelab-create.nix
+      ./handlers/homelab-fetch.nix
+      # ./handlers/homelab-update.nix
+      # ./handlers/homelab-delete.nix
+      # ./handlers/homelab-status.nix
     ] else [])
   else [];
 

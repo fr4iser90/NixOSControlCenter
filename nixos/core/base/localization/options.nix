@@ -30,6 +30,12 @@ in {
       default = "";
       description = "Keyboard options (e.g., 'terminate:ctrl_alt_bksp')";
     };
+
+    timeZone = lib.mkOption {
+      type = lib.types.str;
+      default = "Europe/Berlin";
+      description = "System timezone (e.g., 'Europe/Berlin', 'America/New_York', 'UTC')";
+    };
   };
 }
 

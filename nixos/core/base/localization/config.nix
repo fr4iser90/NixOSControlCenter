@@ -4,11 +4,12 @@ with lib;
 
 let
   cfg = getModuleConfig moduleName;
-  
-  locales = cfg.locales or [ "en_US.UTF-8" ];
+
+  locales = cfg.locales;
   defaultLocale = if builtins.length locales > 0 then builtins.head locales else "en_US.UTF-8";
-  keyboardLayout = cfg.keyboardLayout or "us";
-  keyboardOptions = cfg.keyboardOptions or "";
+  keyboardLayout = cfg.keyboardLayout;
+  keyboardOptions = cfg.keyboardOptions;
+  timeZone = cfg.timeZone;
   
   # Extract language code from locale (e.g., "de_DE.UTF-8" -> "de_DE")
   # Format: "LANGUAGE_COUNTRY.ENCODING" -> "LANGUAGE_COUNTRY"
@@ -39,6 +40,9 @@ let
 in
 {
   config = {
+      # Timezone configuration
+      time.timeZone = timeZone;
+
       # Localization configuration (always active, no enable check needed)
       i18n = {
         defaultLocale = defaultLocale;
