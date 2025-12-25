@@ -9,8 +9,8 @@ let
   networkingModules = [
     ./options.nix
     (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })
-    ./networkmanager.nix
-    ./firewall.nix
+    ./handlers/networkmanager.nix
+    ./handlers/firewall.nix
   ];
 
   networkCfg = getModuleConfig moduleName;

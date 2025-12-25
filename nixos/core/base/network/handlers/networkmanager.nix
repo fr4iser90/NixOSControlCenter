@@ -1,4 +1,3 @@
-# nixconfig/networking/networkmanager.nix
 { config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 {
   networking = {

@@ -1,9 +1,8 @@
-# modules/networking/firewall.nix
 { config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
-  recommendations = import ./processors/services.nix;
-  rules = import ./lib/rules.nix { inherit lib; };
+  recommendations = import ../processors/services.nix;
+  rules = import ../lib/rules.nix { inherit lib; };
   
   # Service-Konfigurationen aus systemConfig.nix
   services = lib.attrByPath ["services"] {} (getModuleConfig "network");
