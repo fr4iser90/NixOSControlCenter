@@ -1,12 +1,11 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, moduleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getCurrentModuleMetadata, moduleConfig, ... }:
 
 with lib;
 
 let
-  moduleName = baseNameOf ./. ;        # "system-manager"
-  parentName = baseNameOf ../.;        # "management"
-  grandparentName = baseNameOf ../../.; # "core"
-  configPath = "${grandparentName}.${parentName}.${moduleName}";
+  # ALTE getCurrentModuleMetadata verwenden (repariert)
+  metadata = getCurrentModuleMetadata ./.;  # ← Jetzt korrekt!
+  configPath = metadata.configPath;
 
   # Cannot use getModuleConfig (chicken-egg problem with core modules)
   cfg = config.${configPath};
@@ -21,16 +20,16 @@ let
 in {
   imports = [
     ./options.nix
-    (import ./commands.nix { inherit config lib pkgs systemConfig moduleConfig getModuleConfig getModuleApi corePathsLib; })
+    (import ./commands.nix { inherit config lib pkgs systemConfig moduleConfig getModuleConfig getModuleApi; })
     ./config.nix
-    # Import all submodules (full-featured modules within system-manager)
+    # Import all components (full-featured modules within system-manager)
     # NOTE: cli-formatter and cli-registry moved to nixos-control-center
-    ./submodules/system-update    # System update submodule
-    ./submodules/system-checks    # System validation submodule
-    ./submodules/system-logging   # System logging submodule
+    ./components/system-update    # System update submodule
+    ./components/system-checks    # System validation submodule
+    ./components/system-logging   # System logging submodule
     # Keep other handlers
     ./handlers/channel-manager.nix
-    # NOTE: system-update.nix removed - now in submodules/system-update/
+    # NOTE: system-update.nix removed - now in components/system-update/
   ];
 
   config = {

@@ -66,8 +66,6 @@
     getCurrentModuleMetadata = moduleConfig.getCurrentModuleMetadata;
     getModuleApi = moduleConfig.getModuleApi;
 
-    # Core Paths Library (wie getModuleConfig)
-    corePathsLib = import ./core/core-paths-lib.nix { inherit lib; };
 
     # Base modules required for all systems
     systemModules = [
@@ -83,7 +81,7 @@
       "${systemConfig.core.base.network.hostName}" = nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = {
-          inherit systemConfig discovery moduleConfig getModuleConfig getModuleMetadata getCurrentModuleMetadata getModuleApi corePathsLib;
+          inherit systemConfig discovery moduleConfig getModuleConfig getModuleMetadata getCurrentModuleMetadata getModuleApi;
         }; 
 
         modules = [

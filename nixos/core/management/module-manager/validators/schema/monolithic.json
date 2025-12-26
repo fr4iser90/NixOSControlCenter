@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "type": { "const": "monolithic" },
+      "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+      "structure": {
+        "type": "object",
+        "properties": {
+          "module.nix": { "type": "string" }
+        },
+        "required": ["module.nix"]
+      },
+      "metadata": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "category": { "type": "string" },
+          "version": { "type": "string" }
+        },
+        "required": ["name", "description", "category", "version"]
+      }
+    },
+    "required": ["type", "version", "structure", "metadata"]
+  }

@@ -190,12 +190,20 @@ _module.metadata = {
 module-name/               # Module name
 ├── README.md              # Module documentation and usage guide
 ├── default.nix            # Main module (metadata + imports - REQUIRED pattern)
+├── api/                   # Modulare APIs (für komplexe Module)
+│   ├── feature-a.nix      # API für Feature A
+│   ├── feature-b.nix      # API für Feature B
+│   └── module.nix         # Modul-eigene APIs
 ├── api.nix                # Module API definition (for getModuleApi access)
 ├── options.nix            # All configuration options
 ├── types.nix              # Custom NixOS types (optional)
 ├── commands.nix           # Command-Center registration (optional)
 ├── systemd.nix            # Systemd services/timers (optional)
 ├── config.nix             # Module implementation (optional, split from default.nix if too large)
+├── tui/                   # TUI interface components (optional)
+│   ├── menu.nix           # TUI menu definition and navigation
+│   ├── actions.nix        # TUI action handlers (calls CLI commands)
+│   └── helpers.nix        # TUI-specific utility functions
 ├── lib/                   # Shared utility functions
 │   ├── default.nix        # Library exports
 │   ├── utils.nix          # General utilities
@@ -256,6 +264,10 @@ module-name/               # Module name
 ├── components/            # Small utilities (separate from submodules)
 │   ├── ui-helpers.nix     # Small utility functions
 │   ├── validation.nix     # Helper functions
+├── tui/                   # TUI interface components (optional)
+│   ├── menu.nix           # TUI menu definition and navigation
+│   ├── actions.nix        # TUI action handlers (calls CLI commands)
+│   └── helpers.nix        # TUI-specific utility functions
 ├── tests/                 # Module tests (optional)
 │   └── default.nix        # Test suite
 └── CHANGELOG.md           # Module change history (recommended)

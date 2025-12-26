@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, corePathsLib, configPath ? "management.system-manager", ... }:
+{ config, lib, pkgs, systemConfig, configPath ? "management.system-manager", ... }:
 let
   cfg = systemConfig.${configPath};
   # Import config-migration module to get the commands
@@ -7,7 +7,7 @@ let
 in {
   config = lib.mkMerge [
     (lib.mkIf (cfg.components.configMigration.enable or false)
-      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+      cliRegistry.registerCommandsFor "config-migration" [
     {
       name = "config-check";
       script = "${checkScript}";

@@ -1,4 +1,4 @@
-{ config, lib, pkgs, corePathsLib, ... }:
+{ config, lib, pkgs, ... }:
 
 with lib;
 
@@ -119,7 +119,7 @@ in {
     {
       environment.systemPackages = [ requestAccessScript ];
     }
-    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+    cliRegistry.registerCommandsFor "ssh-server-request-access" [
       {
         name = "ssh-request-access";
         description = "Request temporary SSH password access";

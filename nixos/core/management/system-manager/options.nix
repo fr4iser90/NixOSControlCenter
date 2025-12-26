@@ -1,11 +1,9 @@
-{ lib, pkgs, ... }:
+{ lib, pkgs, getCurrentModuleMetadata, ... }:
 
 let
-  moduleName = baseNameOf ./. ;        # "system-manager"
-  parentName = baseNameOf ../.;        # "management"
-  grandparentName = baseNameOf ../../.; # "core"
-
-  configPath = "${grandparentName}.${parentName}.${moduleName}";
+  # ALTE getCurrentModuleMetadata verwenden (repariert)
+  metadata = getCurrentModuleMetadata ./.;  # ← Jetzt korrekt!
+  configPath = metadata.configPath;
 
   # Import helpers
   backupHelpersValue = import ./lib/backup-helpers.nix { inherit pkgs lib; };

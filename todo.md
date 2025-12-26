@@ -1,110 +1,242 @@
-# NCC Module Refactoring TODO - MODULE_TEMPLATE Konformität
+**Exzellente Fragen!** Du hast absolut recht - wir brauchen eine klare Standardisierung. Lass uns das Schema richtig definieren:
 
-## 🚨 **KRITISCHE API-PROBLEME (sofort beheben)**
+## **1. Minimale Requirements für ALLE Module**
 
-### **Hardcoded moduleName → baseNameOf ./. ändern**
-**Status:** 7 Module müssen geändert werden
-- [x] `homelab-manager`: `moduleName = "homelab-manager"` → `moduleName = baseNameOf ./.` ✅
-- [x] `ssh-client-manager`: `moduleName = "ssh-client-manager"` → `moduleName = baseNameOf ./.` ✅
-- [x] `bootentry-manager`: `moduleName = "bootentry-manager"` → `moduleName = baseNameOf ./.` ✅
-- [x] `vm`: `moduleName = "vm"` → `moduleName = baseNameOf ./.` ✅
-- [x] `ssh-server-manager`: `moduleName = "ssh-server-manager"` → `moduleName = baseNameOf ./.` ✅
-- [x] `hackathon`: `moduleName = "hackathon"` → `moduleName = baseNameOf ./.` ✅
-- [x] `ai-workspace`: `moduleName = "ai-workspace"` → `moduleName = baseNameOf ./.` ✅
+**Jedes NCC Modul MUSS haben:**
+```json
+{
+  "type": "modular|monolithic",
+  "structure": {
+    "default.nix": "string",      // ERFORDERLICH - Entry Point
+    "options.nix": "string",      // ERFORDERLICH - Konfiguration
+    "_module.metadata": "object"  // ERFORDERLICH - Discovery Data
+  },
+  "metadata": {
+    "name": "string",             // ERFORDERLICH - Eindeutiger Name
+    "description": "string",      // ERFORDERLICH - Menschenlesbare Beschreibung
+    "category": "string",         // ERFORDERLICH - core|modules
+    "version": "string"           // ERFORDERLICH - SemVer
+  }
+}
+```
 
-### **Hardcoded Pfad-Zugriffe → API-basiert ändern**
-**Status:** Mehrere Module greifen hardcoded auf systemConfig zu
-- [x] `homelab-manager`: `systemConfig.homelab.swarm` → `cfg.swarm` und API-Args verwenden ✅
-- [x] `ssh-client-manager`: `systemConfig.modules.security.ssh-client-manager` → `moduleConfig.configPath` und API-Args verwenden ✅
-- [x] `system-manager`: Behält `config.${configPath}` (Chicken-Egg Problem bei Core-Modulen) ✅
-- [x] Alle Module: hardcoded Pfade in commands.nix durch `moduleConfig` ersetzen ✅
+**Zusätzliche Requirements:**
+- ✅ **`default.nix`** muss `_module.metadata` exportieren
+- ✅ **`options.nix`** muss `systemConfig.{category}.{name}` definieren
+- ✅ **Filesystem-Struktur** muss konsistent sein
+- ✅ **API-Namenskonventionen** müssen eingehalten werden
 
-## 📁 **STRUKTUR-PROBLEME (Template-Konformität)**
+## **2. Schema mit detaillierten Requirements**
 
-### **Falsche Verzeichnis-Struktur**
-**Status:** Viele Module haben Dateien im Root statt in korrekten Verzeichnissen
+**Aktualisiertes modular.json:**
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "type": { "const": "modular" },
+    "version": { "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    
+    "structure": {
+      "type": "object",
+      "properties": {
+        "default.nix": {
+          "type": "string",
+          "description": "Entry point - MUSS _module.metadata exportieren"
+        },
+        "options.nix": {
+          "type": "string", 
+          "description": "Options - MUSS systemConfig.{category}.{name} definieren"
+        },
+        "config.nix": {
+          "type": "boolean",
+          "description": "Implementation - OPTIONAL aber empfohlen"
+        },
+        "api.nix": {
+          "type": "boolean",
+          "description": "API exports - OPTIONAL für wiederverwendbare Module"
+        },
+        "commands.nix": {
+          "type": "boolean",
+          "description": "CLI commands - OPTIONAL"
+        },
+        
+        "lib/": {
+          "type": "object",
+          "description": "Shared utilities - OPTIONAL"
+        },
+        "validators/": {
+          "type": "object", 
+          "description": "Input validation - OPTIONAL"
+        },
+        "handlers/": {
+          "type": "object",
+          "description": "Business logic - OPTIONAL"
+        },
+        "scripts/": {
+          "type": "object",
+          "description": "CLI executables - OPTIONAL"
+        }
+      },
+      "required": ["default.nix", "options.nix"]
+    },
+    
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Eindeutiger Modulname (keine Leerzeichen)"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "description": "Menschenlesbare Beschreibung"
+        },
+        "category": {
+          "enum": ["core", "modules"],
+          "description": "Namespace: core (always enabled) | modules (opt-in)"
+        },
+        "subcategory": {
+          "type": "string",
+          "description": "Unterkategorie (z.B. 'base', 'infrastructure')"
+        },
+        "version": {
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "SemVer Version"
+        },
+        "stability": {
+          "enum": ["stable", "beta", "alpha", "experimental"],
+          "description": "Stabilitätslevel"
+        }
+      },
+      "required": ["name", "description", "category", "version"]
+    },
+    
+    "requirements": {
+      "type": "object",
+      "properties": {
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Andere Module die benötigt werden"
+        },
+        "conflicts": {
+          "type": "array", 
+          "items": { "type": "string" },
+          "description": "Inkompatible Module"
+        }
+      }
+    }
+  },
+  "required": ["type", "version", "structure", "metadata"]
+}
+```
 
-#### **homelab-manager (scripts/ sollte handlers/ sein)**
-- [x] `scripts/homelab-create.nix` → `handlers/homelab-create.nix` ✅
-- [x] `scripts/homelab-fetch.nix` → `handlers/homelab-fetch.nix` ✅
-- [x] Pfad-Updates in default.nix und anderen Dateien ✅
-homelab-manager/
-├── handlers/                # ✅ Business logic orchestration
-│   ├── homelab-create.nix    # ✅ Implementiert
-│   └── homelab-fetch.nix     # ✅ Implementiert
-└── scripts/                  # 🗑️ Leere Platzhalter entfernt
+## **3. Integration mit MODULE_TEMPLATE.md**
 
-#### **ssh-client-manager (jetzt vollständig korrigiert)**
-- [x] Alle Handler sind bereits in `handlers/` ✅
-- [x] Scripts sind bereits in `scripts/` ✅
-- [x] Imports in default.nix korrigiert - nicht existierende Dateien entfernt ✅
+**Das Schema sollte das Template ERWEITERN:**
 
-#### **bootentry-manager (Analyse abgeschlossen)**
-- [ ] `providers/` → `handlers/` verschieben (Business-Logic für Bootloader)
-- [ ] `commands.nix` erstellen (NCC-Commands für Boot-Management)
-- [ ] `scripts/` Verzeichnis erstellen für Executables
-- [ ] lib/ Struktur ist korrekt ✅
+```markdown
+## Module Requirements (AUTOMATISCH VALIDIERT)
 
-#### **vm (prüfen)**
-- [ ] lib/ Struktur überprüfen
-- [ ] Eventuell testing/ zu tests/ umbenennen
+### Pflicht-Requirements (SCHEMA-VALIDIERT)
+- [x] **`default.nix`** mit `_module.metadata`
+- [x] **`options.nix`** mit korrekten Pfaden
+- [x] **Metadata** vollständig definiert
+- [x] **Filesystem-Struktur** konsistent
 
-#### **ssh-server-manager (prüfen)**
-- [ ] scripts/ zu handlers/ verschieben?
-- [ ] Alle Handler-Dateien in handlers/ konsolidieren
+### Empfohlene Struktur (TEMPLATE-BASED)
+- [ ] `config.nix` für Implementation
+- [ ] `api.nix` für Wiederverwendung
+- [ ] `lib/` für Utilities
+- [ ] `validators/` für Input-Checks
+```
 
-#### **hackathon (prüfen)**
-- [ ] hackathon-*.nix Dateien zu handlers/ verschieben?
+## **4. Assertions & Violations Detection**
 
-#### **ai-workspace (prüfen)**
-- [ ] containers/ und schemas/ Struktur überprüfen
-- [ ] Eventuell zu submodules/ umstrukturieren
+**Drei Ebenen der Validation:**
 
-## 🔧 **TECHNISCHE VERBESSERUNGEN**
+### **A) Schema-Level (JSON Schema)**
+```nix
+# Automatisch beim Discovery
+validateModule = modulePath: 
+  let
+    schema = loadJsonSchema "modular";
+    data = extractModuleData modulePath;
+  in
+  lib.runJsonSchema schema data;
+```
 
-### **API-Konsistenz**
-**Status:** Einige Module verwenden API, andere hardcoded
-- [ ] Alle Module: `getModuleConfig` statt hardcoded Pfade verwenden
-- [ ] Alle Module: `getModuleApi` statt direkter API-Zugriffe
-- [ ] Alle Module: `moduleConfig` Parameter in options.nix, commands.nix, config.nix verwenden
+### **B) Structural Assertions**
+```nix
+# Zusätzliche Checks die Schema nicht abdeckt
+validateModuleStructure = modulePath:
+  let
+    hasRequiredFiles = all (f: pathExists "${modulePath}/${f}") 
+                         ["default.nix" "options.nix"];
+    hasValidMetadata = checkMetadataConsistency modulePath;
+    hasCorrectOptions = validateOptionsStructure modulePath;
+  in {
+    valid = hasRequiredFiles && hasValidMetadata && hasCorrectOptions;
+    violations = collectViolations [hasRequiredFiles hasValidMetadata hasCorrectOptions];
+  };
+```
 
-### **Metadata-Konsistenz**
-**Status:** Einige Module haben unvollständige metadata
-- [ ] Alle Module: `stability` und `version` in _module.metadata hinzufügen
-- [ ] Alle Module: subcategory korrekt setzen
+### **C) Runtime Assertions**
+```nix
+# In config.nix - NixOS Module System
+{
+  assertions = [
+    {
+      assertion = cfg.enable -> (cfg.someRequiredOption != null);
+      message = "someRequiredOption must be set when module is enabled";
+    }
+  ];
+}
+```
 
-## ✅ **BEREITS KONFORM (Referenz-Module)**
-- [x] `lock-manager`: Vollständig refactored ✅
-- [x] `system-manager`: API-konform ✅
-- [x] `nixos-control-center`: API-konform ✅
-- [x] **ALLE `core/*` Module**: API-konform ✅ (base/, management/, alle verwenden `baseNameOf ./.`)
-  - **Strukturell**: `system-manager` und `module-manager` perfekt TEMPLATE-konform ✅
-  - **Strukturell**: `base/*` Module haben funktionale Struktur ✅ (vereinfacht für core Module)
-    - `audio`: providers/ (funktional, könnte aber collectors/ werden)
-    - `boot`: bootloaders/ (funktional, könnte handlers/ werden)
-    - `desktop`: funktionale Unterteilung (environments/, display-managers/, etc.)
-    - `hardware`: funktionale Unterteilung (cpu/, gpu/, memory/)
-    - `network`: lib/ + recommendations/ (könnte processors/ werden)
-    - `packages`: modules/ + presets/ (könnte submodules/ werden)
-    - `user`: home-manager/ (funktionale rollenbasierte Struktur)
-- [x] Alle `system-manager` Submodules: API-konform ✅
+## **5. Ziel: Vollständige Automatisierung**
 
-### **Optionale Core-Struktur-Verbesserungen**
-**Status:** Einige schon gemacht!
-- [x] `desktop/`: environments/, display-managers/, themes/ → components/ ✅ **FERTIG!**
-- [ ] `audio/providers/` → `audio/collectors/` (TEMPLATE-konform)
-- [ ] `boot/bootloaders/` → `boot/providers/` (klarere Benennung)
-- [ ] `network/recommendations/` → `network/processors/` (TEMPLATE-konform)
-- [ ] `packages/modules/` + `packages/presets/` → `packages/submodules/` (konsolidieren)
+**Workflow soll so aussehen:**
+```
+1. Neues Modul erstellen (Template kopieren)
+2. Dateien ausfüllen
+3. nixos-rebuild → Automatische Discovery
+4. Schema-Validation läuft automatisch
+5. Violations werden reported
+6. Bei Erfolg: Modul ist verfügbar
+```
 
-## 🎯 **PRIORITÄT**
-1. **Hardcoded moduleName → baseNameOf ./.** (einfach, großer Impact)
-2. **Hardcoded Pfade → API-basiert** (mittel, großer Impact)
-3. **Struktur-Probleme beheben** (aufwändig, aber wichtig für Wartbarkeit)
+**Detection & Reporting:**
+```bash
+# Bei Violations
+❌ Module 'my-module' invalid:
+   - Missing required file: options.nix
+   - Invalid metadata: missing 'description'
+   - Options path incorrect: expected 'systemConfig.modules.my-module'
 
-## 📋 **TESTING NACH REFACTORING**
-Nach jeder Änderung:
-- [ ] `nix-instantiate` auf default.nix testen
-- [ ] `ncc help` funktioniert
-- [ ] Commands sind verfügbar
-- [ ] Keine Linter-Fehler
+# Bei Success  
+✅ Module 'my-module' validated and registered
+```
+
+## **6. Gleichbehandlung Core vs Modules**
+
+**Alle Module folgen denselben Regeln:**
+- ✅ **Selbe Struktur** (nur Pfad unterschiedlich)
+- ✅ **Selbe Metadata-Requirements**
+- ✅ **Selbe Validation**
+- ✅ **Selbe API-Patterns**
+
+**Unterschied nur in:**
+- **Pfad:** `core.*` vs `modules.*`
+- **Enable:** Core = immer aktiv, Modules = opt-in
+
+## **Fazit**
+
+**JA!** Das Schema sollte:
+- ✅ **Minimale Requirements** definieren
+- ✅ **Dokumentation** im Template integrieren
+- ✅ **Assertions** für automatische Detection
+- ✅ **Gleiche Struktur** für alle Module-Typen
+- ✅ **Automatische Validation** bei Discovery

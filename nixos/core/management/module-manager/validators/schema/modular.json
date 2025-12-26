@@ -1,0 +1,34 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "type": { "const": "modular" },
+      "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+      "structure": {
+        "type": "object",
+        "properties": {
+          "default.nix": { "type": "string" },
+          "options.nix": { "type": "string" },
+          "config.nix": { "type": "boolean" },
+          "api.nix": { "type": "boolean" },
+          "commands.nix": { "type": "boolean" },
+          "lib/": { "type": "object" },
+          "handlers/": { "type": "object" },
+          "validators/": { "type": "object" },
+          "scripts/": { "type": "object" }
+        },
+        "required": ["default.nix", "options.nix"]
+      },
+      "metadata": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "category": { "type": "string" },
+          "version": { "type": "string" }
+        },
+        "required": ["name", "description", "category", "version"]
+      }
+    },
+    "required": ["type", "version", "structure", "metadata"]
+  }

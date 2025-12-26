@@ -1,4 +1,4 @@
-{ config, lib, pkgs, cfg, corePathsLib, ... }:
+{ config, lib, pkgs, cfg, ... }:
 
 with lib;
 
@@ -92,7 +92,7 @@ in {
     environment.systemPackages = [ monitorScript ];
 
     config = lib.mkMerge [
-      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+      cliRegistry.registerCommandsFor "ssh-server-monitor" [
       {
         name = "ssh-monitor";
         description = "Monitor SSH connections in real-time";

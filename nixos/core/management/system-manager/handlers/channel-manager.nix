@@ -1,8 +1,9 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, corePathsLib, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 with lib;
 
 let
+  cliRegistry = getModuleApi "cli-registry";
   ui = getModuleApi "cli-formatter";
   commandCenter = getModuleApi "cli-registry";
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
@@ -66,7 +67,7 @@ in {
         updateChannelsScript
       ];
     }
-    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+    (cliRegistry.registerCommandsFor "channel-manager" [
       {
         name = "update-channels";
         description = "Update Nix flake inputs / channels and rebuild the system";
@@ -82,6 +83,6 @@ in {
           Requires sudo privileges.
         '';
       }
-      ])
+    ])
   ];
 }

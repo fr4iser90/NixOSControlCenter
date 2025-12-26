@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release of the Module Manager core module
 - Dynamic module discovery from `systemConfig.core.base.*`, `systemConfig.management.*`, and `systemConfig.modules.*`
-- Interactive fzf-based interface for module toggling (`ncc module-manager` command)
+- Modern Bubble Tea TUI interface for module management (`ncc module-manager` command)
 - Automatic configuration file generation for different module categories
 - Real-time module status display
 - Automatic system rebuild after module changes
@@ -33,6 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Feature modules**: Optional user features (default disabled)
 
 ### Dependencies
-- `fzf`: Interactive fuzzy finder for module selection
+- `Bubble Tea`: Modern terminal UI framework for interactive module management
 - `nix`: For configuration evaluation and system rebuilds
 - `bash`: Shell environment for script execution

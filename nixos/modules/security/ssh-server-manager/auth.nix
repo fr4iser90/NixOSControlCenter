@@ -1,4 +1,4 @@
-{ config, lib, pkgs, cfg, corePathsLib, ... }:
+{ config, lib, pkgs, cfg, ... }:
 
 with lib;
 
@@ -79,7 +79,7 @@ in {
     ];
 
     config = lib.mkMerge [
-      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+      cliRegistry.registerCommandsFor "ssh-server-auth" [
       {
         name = "ssh-temp-open";
         description = "Temporarily enable SSH password authentication";

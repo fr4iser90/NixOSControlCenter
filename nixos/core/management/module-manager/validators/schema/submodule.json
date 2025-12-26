@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "hierarchy": {
+        "type": "object",
+        "patternProperties": {
+          ".*": { "$ref": "#" }
+        }
+      },
+      "depth": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 10
+      },
+      "relationships": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "parent": { "type": "string" },
+            "child": { "type": "string" },
+            "dependency": { "type": "string", "enum": ["required", "optional"] }
+          },
+          "required": ["parent", "child"]
+        }
+      }
+    },
+    "required": ["hierarchy", "depth"]
+  }

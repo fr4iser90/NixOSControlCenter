@@ -131,7 +131,7 @@ in {
     ${updateModuleConfig}/bin/update-module-config "${moduleName}" "false"
   '';
 
-  # Helper: Format modules for display (used by fzf)
+  # Helper: Format modules for display (used by Bubble Tea TUI)
   formatModuleList = ''
     ${lib.concatMapStringsSep "\n" (module: ''
       printf "%-30s %s\\n" "${module.name}" "${module.description}"

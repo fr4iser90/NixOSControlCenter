@@ -1,4 +1,4 @@
-{ config, lib, pkgs, corePathsLib, ... }:
+{ config, lib, pkgs, ... }:
 
 with lib;
 
@@ -204,7 +204,7 @@ in {
     {
       environment.systemPackages = [ listRequestsScript cleanupRequestsScript ];
     }
-    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+    cliRegistry.registerCommandsFor "ssh-server-list-requests" [
       {
         name = "ssh-list-requests";
         description = "List SSH access requests";

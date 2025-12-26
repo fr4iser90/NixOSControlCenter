@@ -1,4 +1,4 @@
-{ config, lib, pkgs, corePathsLib, ... }:
+{ config, lib, pkgs, ... }:
 
 with lib;
 
@@ -249,7 +249,7 @@ in {
     environment.systemPackages = [ approveRequestScript denyRequestScript ];
 
     config = lib.mkMerge [
-      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+      cliRegistry.registerCommandsFor "ssh-server-approve-request" [
       {
         name = "ssh-approve-request";
         description = "Approve SSH access request";

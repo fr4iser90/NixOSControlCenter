@@ -78,7 +78,7 @@ in {
     (mkIf cfg.enable {
       # Import homelab utilities config
       environment.systemPackages = (homelabUtils.config.environment.systemPackages or []);
-      "${corePathsLib.getCliRegistryCommandsPath}" = (homelabUtils.config."${corePathsLib.getCliRegistryCommandsPath}" or []);
+      # Commands werden direkt über cliRegistry registriert
     })
   ];
 }

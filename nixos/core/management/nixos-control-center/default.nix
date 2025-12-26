@@ -21,8 +21,8 @@ in {
     ./config.nix
     ./commands.nix
     ./api.nix
-    # NCC importiert Submodules - GENAUSO WIE SYSTEM-MANAGER!
-    ./submodules/cli-formatter    # VERSCHOBEN von system-manager
-    ./submodules/cli-registry     # VERSCHOBEN von system-manager
+    # NCC importiert components
+    # ./components/cli-formatter    # VERSCHOBEN von system-manager
+    # ./components/cli-registry     # VERSCHOBEN von system-manager
   ];
 }

@@ -1,4 +1,4 @@
-{ config, lib, pkgs, corePathsLib, ... }:
+{ config, lib, pkgs, ... }:
 
 with lib;
 
@@ -93,7 +93,7 @@ in {
     {
       environment.systemPackages = [ grantAccessScript ];
     }
-    (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+    cliRegistry.registerCommandsFor "ssh-server-grant-access" [
       {
         name = "ssh-grant-access";
         description = "Grant temporary SSH password authentication";

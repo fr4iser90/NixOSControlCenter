@@ -1,4 +1,4 @@
-{ config, lib, pkgs, moduleConfig, corePathsLib, ... }:
+{ config, lib, pkgs, moduleConfig, ... }:
 
 with lib;
 
@@ -191,7 +191,7 @@ in {
     
     # Register the command in the command center (zentralisiert)
     config = lib.mkMerge [
-      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+      cliRegistry.registerCommandsFor "ssh-client-manager" [
       {
         name = "ssh-client-manager";
         description = "Manage SSH client connections";

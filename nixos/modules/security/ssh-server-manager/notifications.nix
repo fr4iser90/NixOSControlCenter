@@ -1,4 +1,4 @@
-{ config, lib, pkgs, cfg, corePathsLib, ... }:
+{ config, lib, pkgs, cfg, ... }:
 
 with lib;
 
@@ -80,7 +80,7 @@ in {
     ];
 
     config = lib.mkMerge [
-      (lib.setAttrByPath corePathsLib.getCliRegistryCommandsPathList [
+      cliRegistry.registerCommandsFor "ssh-server-notifications" [
       {
         name = "ssh-notify-test";
         description = "Test SSH notification system";
