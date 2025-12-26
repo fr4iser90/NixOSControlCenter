@@ -76,7 +76,7 @@ let
   
   # Import config management (single import, clean API)
   # CLI Formatter wird von config-migration selbst geholt
-  configModule = import ../../../components/config-migration { inherit config pkgs lib systemConfig getModuleApi; backupHelpers = import ../../../lib/backup-helpers.nix { inherit pkgs lib; }; };
+  configModule = import ./../components/config-migration { inherit config pkgs lib systemConfig getModuleApi; backupHelpers = import ../../../lib/backup-helpers.nix { inherit pkgs lib; }; };
   
   # Create script with runtime dependencies (only available for this script, not system-wide)
   systemUpdateMainScript = pkgs.symlinkJoin {

@@ -22,14 +22,12 @@ in {
     ./options.nix
     (import ./commands.nix { inherit config lib pkgs systemConfig moduleConfig getModuleConfig getModuleApi; })
     ./config.nix
-    # Import all components (full-featured modules within system-manager)
-    # NOTE: cli-formatter and cli-registry moved to nixos-control-center
-    ./components/system-update    # System update submodule
-    ./components/system-checks    # System validation submodule
-    ./components/system-logging   # System logging submodule
+    # Component Handler (converted from full modules)
+    (import ./handlers/system-checks.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; })
+    (import ./handlers/system-logging.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi getCurrentModuleMetadata; })
     # Keep other handlers
     ./handlers/channel-manager.nix
-    # NOTE: system-update.nix removed - now in components/system-update/
+    # NOTE: system-update and system-logging handlers kommen später
   ];
 
   config = {

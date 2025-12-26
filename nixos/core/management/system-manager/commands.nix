@@ -28,6 +28,19 @@ let
   formatter = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
 
+  # System Checks Scripts (converted from component)
+  postbuildCheckScript = import ./components/system-checks/scripts/postbuild-checks.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
+  prebuildCheckScript = import ./components/system-checks/scripts/prebuild-checks.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
+
+  # System Logging Scripts (converted from component)
+  systemReportScript = import ./components/system-logging/scripts/system-report.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
+
+  # System Update Handler (converted from component)
+  systemUpdateHandler = import ./handlers/system-update.nix {
+    inherit config lib pkgs systemConfig getModuleConfig getModuleApi cliRegistry;
+  };
+  systemUpdateMainScript = systemUpdateHandler.systemUpdateMainScript;
+
   backupHelpersForMigration = config.${configPath}.api.backupHelpers or (import ./lib/backup-helpers.nix { inherit pkgs lib; });
   configMigration = import ./components/config-migration/default.nix { inherit config pkgs lib systemConfig getModuleApi configPath; backupHelpers = backupHelpersForMigration; };
   configValidator = import ./validators/config-validator.nix { inherit pkgs lib; };
@@ -158,5 +171,70 @@ in {
           '';
         }
       ])
+    # System Checks Commands (enabled by default in core, but configurable)
+    (lib.mkIf (cfg.enableChecks or true)
+      (cliRegistry.registerCommandsFor "system-checks" [
+        {
+          name = "build";
+          description = "Build and activate NixOS configuration with safety checks";
+          category = "system";
+          script = "${prebuildCheckScript}/bin/build";
+          arguments = ["switch" "boot" "test" "build"];
+          dependencies = [ "nix" ];
+          shortHelp = "build <command> - Build with preflight checks";
+          longHelp = ''
+            Build and activate NixOS configuration with preflight safety checks
+
+            Commands:
+              switch    Build and activate configuration
+              boot      Build boot configuration
+              test      Test configuration
+              build     Build only
+
+            Options:
+              --force   Skip safety checks
+          '';
+        }
+      ]))
+    # System Logging Commands (converted from component - always enabled in core)
+    (cliRegistry.registerCommandsFor "system-logging" [
+      {
+        name = "log-system-report";
+        script = "${systemReportScript.script}/bin/ncc-log-system-report";
+        category = "system";
+        description = "Generate system report with configured collectors";
+        shortHelp = "log-system-report - Generate system report";
+        longHelp = ''
+          Generate a comprehensive system report using configured collectors.
+
+          Examples:
+            ncc-log-system-report                    # Generate default report
+            ncc-log-system-report --level debug     # Generate debug report
+            ncc-log-system-report --list-collectors # List available collectors
+            ncc-log-system-report --enable profile  # Enable specific collector
+        '';
+      }
+    ])
+    # System Update Commands (converted from component - always enabled in core)
+    (cliRegistry.registerCommandsFor "system-update" [
+      {
+        name = "system-update";
+        script = "${systemUpdateMainScript}/bin/ncc-system-update-main";
+        category = "System Management";
+        description = "Update NixOS configuration from repository";
+        shortHelp = "system-update [--auto-build] [--source=remote|local] [--branch=name] - Update NixOS configuration";
+        longHelp = ''
+          Update NixOS configuration from repository with automatic migration support.
+
+          Options:
+            --auto-build    Automatically build after update (default: false)
+            --source        Update source (remote or local)
+            --branch        Branch name for remote updates
+        '';
+        permission = "system.update";
+        requiresSudo = true;
+        dangerous = true;
+      }
+    ])
   ];
 }

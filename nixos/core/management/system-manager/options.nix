@@ -40,6 +40,13 @@ in
       description = "Enable automatic updates (optional)";
     };
 
+    # System Checks Component (converted from submodule)
+    enableChecks = lib.mkOption {
+      type = lib.types.bool;
+      default = true;  # Standardmäßig aktiviert
+      description = "Enable system health checks component";
+    };
+
     # Auto-build nach Updates
     auto-build = lib.mkOption {
       type = lib.types.bool;
