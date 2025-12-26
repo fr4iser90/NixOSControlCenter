@@ -347,10 +347,76 @@ in
         "fmt"
         "log"
         "os/exec"
+        "regexp"
         "strings"
       )
 
       var discoveryScriptFile = "discoveryScriptFile"
+
+      // Module represents a NixOS module
+      type Module struct {
+        ID          string
+        Name        string
+        Description string
+        Category    string
+        Status      string
+        Path        string
+      }
+
+      // parseModulesJSON parses JSON output into modules
+      func parseModulesJSON(jsonStr string) ([]Module, error) {
+        var modules []Module
+
+        // Simple JSON parsing (in a real implementation, use encoding/json)
+        lines := strings.Split(strings.TrimSpace(jsonStr), "\n")
+
+        for _, line := range lines {
+          line = strings.TrimSpace(line)
+          if line == "[" || line == "]" || line == "" {
+            continue
+          }
+          if strings.HasSuffix(line, ",") {
+            line = line[:len(line)-1]
+          }
+
+          // Simple field extraction (this is a basic implementation)
+          if strings.Contains(line, `"id"`) {
+            var module Module
+
+            // Extract id
+            if idMatch := regexp.MustCompile(`"id":\s*"([^"]*)"`).FindStringSubmatch(line); len(idMatch) > 1 {
+              module.ID = idMatch[1]
+              module.Name = idMatch[1]
+            }
+
+            // Extract description
+            if descMatch := regexp.MustCompile(`"description":\s*"([^"]*)"`).FindStringSubmatch(line); len(descMatch) > 1 {
+              module.Description = descMatch[1]
+            }
+
+            // Extract category
+            if catMatch := regexp.MustCompile(`"category":\s*"([^"]*)"`).FindStringSubmatch(line); len(catMatch) > 1 {
+              module.Category = catMatch[1]
+            }
+
+            // Extract status
+            if statusMatch := regexp.MustCompile(`"status":\s*"([^"]*)"`).FindStringSubmatch(line); len(statusMatch) > 1 {
+              module.Status = statusMatch[1]
+            }
+
+            // Extract path
+            if pathMatch := regexp.MustCompile(`"path":\s*"([^"]*)"`).FindStringSubmatch(line); len(pathMatch) > 1 {
+              module.Path = pathMatch[1]
+            }
+
+            if module.ID != "" {
+              modules = append(modules, module)
+            }
+          }
+        }
+
+        return modules, nil
+      }
 
       func main() {
         log.Println("🔧 Module Manager TUI")
@@ -365,13 +431,24 @@ in
         if err != nil {
           log.Printf("❌ Fehler beim Laden: %v\n", err)
         } else {
-          lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-          log.Printf("✅ %d Module gefunden\n", len(lines))
-          for i, line := range lines[:min(5, len(lines))] {
-            log.Printf("  %d. %s\n", i+1, line)
-          }
-          if len(lines) > 5 {
-            log.Printf("  ... und %d weitere\n", len(lines)-5)
+          // Parse JSON to get actual module count
+          modules, parseErr := parseModulesJSON(string(output))
+          if parseErr != nil {
+            log.Printf("❌ JSON Parse Fehler: %v\n", parseErr)
+            log.Printf("Raw output: %s\n", string(output))
+          } else {
+            log.Printf("✅ %d Module gefunden\n", len(modules))
+            for i, mod := range modules[:min(5, len(modules))] {
+              log.Printf("  %d. {\n", i+1)
+              log.Printf("      \"id\": \"%s\",\n", mod.ID)
+              log.Printf("      \"name\": \"%s\",\n", mod.Name)
+              log.Printf("      \"description\": \"%s\",\n", mod.Description)
+              log.Printf("      \"status\": \"%s\"\n", mod.Status)
+              log.Printf("    }\n")
+            }
+            if len(modules) > 5 {
+              log.Printf("  ... und %d weitere\n", len(modules)-5)
+            }
           }
         }
 
