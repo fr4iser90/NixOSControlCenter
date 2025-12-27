@@ -47,7 +47,7 @@ func main() {
 
 	// Start Bubble Tea program
 	// log.Println("🐛 DEBUG: Starting Bubble Tea program...")
-	p := tea.NewProgram(model)
+	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		// log.Println("🐛 DEBUG: TUI error: %v", err)
 		log.Fatal("TUI error:", err)

@@ -38,9 +38,47 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.WindowSizeMsg:
-		// Handle window resize
+		// Handle window resize - update dimensions and recalculate layout
+		m.width = msg.Width
+		m.height = msg.Height
+
+		// ✅ KEINE Fallbacks - valide Größe oder Error!
+		if m.width < 80 || m.height < 20 {
+			return m, tea.Quit // Exit mit Error - User muss Terminal vergrößern
+		}
+
+		// Update list size based on available space
 		h, v := m.docStyle.GetFrameSize()
 		m.list.SetSize(msg.Width-h, msg.Height-v)
+
+		// Update viewport sizes dynamically
+		headerHeight := 4 // Account for borders and padding
+		viewportHeight := max(10, msg.Height-headerHeight)
+
+		// Calculate panel widths based on available space
+		menuWidth := max(20, msg.Width/6)
+		contentWidth := max(25, msg.Width/4)
+		filterWidth := max(15, msg.Width/8)
+		infoWidth := max(20, msg.Width/6)
+		statsWidth := max(15, msg.Width/8)
+
+		// Update all viewport dimensions
+		m.menuViewport.Width = menuWidth
+		m.menuViewport.Height = viewportHeight
+
+		m.contentViewport.Width = contentWidth
+		m.contentViewport.Height = viewportHeight
+
+		m.filterViewport.Width = filterWidth
+		m.filterViewport.Height = viewportHeight
+
+		m.infoViewport.Width = infoWidth
+		m.infoViewport.Height = viewportHeight
+
+		m.statsViewport.Width = statsWidth
+		m.statsViewport.Height = viewportHeight
+
+		// Force panel recalculation with new dimensions
 		m.updatePanels()
 
 	case spinner.TickMsg:
@@ -69,13 +107,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
 
+	// Update all viewports for scrolling
+	var menuCmd tea.Cmd
+	var contentCmd tea.Cmd
+	var filterCmd tea.Cmd
+	var infoCmd tea.Cmd
+	var statsCmd tea.Cmd
+
+	m.menuViewport, menuCmd = m.menuViewport.Update(msg)
+	m.contentViewport, contentCmd = m.contentViewport.Update(msg)
+	m.filterViewport, filterCmd = m.filterViewport.Update(msg)
+	m.infoViewport, infoCmd = m.infoViewport.Update(msg)
+	m.statsViewport, statsCmd = m.statsViewport.Update(msg)
+
 	// Update selected module and panels
 	if m.list.SelectedItem() != nil {
 		m.selectedModule = m.list.SelectedItem().(ModuleItem)
 	}
 	m.updatePanels()
 
-	return m, cmd
+	// Combine commands
+	cmds := []tea.Cmd{cmd, menuCmd, contentCmd, filterCmd, infoCmd, statsCmd}
+	return m, tea.Batch(cmds...)
 }
 
 // Commands for module operations
