@@ -31,5 +31,4 @@ in {
   inherit (components) lists tables progress boxes;
   inherit (interactive) prompts spinners fzf menus tui;
   inherit (status) messages badges;
-  version = "1.0.0";
 }

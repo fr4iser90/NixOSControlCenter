@@ -14,6 +14,4 @@
       commandSets = config.core.management.nixos-control-center.submodules.cli-registry.commandSets or {};
     in
       builtins.concatLists (builtins.attrValues commandSets);
-
-  version = "1.0.0";
 }
