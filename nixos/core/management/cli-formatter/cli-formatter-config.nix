@@ -20,7 +20,7 @@
         #   enable = true;
         #   refreshInterval = 10;
         #   template = ''
-        #     ${config.systemconfig.core.management.nixos-control-center.submodules.cli-formatter.api.boxes.primary {
+        #     ${config.systemconfig.core.management.cli-formatter.api.boxes.primary {
         #       title = "My Status";
         #       content = "System is running smoothly!";
         #     }}

@@ -20,7 +20,7 @@ let
 
 in
 pkgs.writeShellScriptBin "homelab-tui-actions" ''
-  #!/bin/bash
+  #!${pkgs.bash}/bin/bash
   set -e
 
   # Get the selected action from TUI menu

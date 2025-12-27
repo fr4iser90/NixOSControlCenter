@@ -18,6 +18,7 @@
     ufw         # Uncomplicated Firewall for managing firewall rules
     nmap        # Network scanner for auditing and monitoring networks
     gnupg       # Encryption and signing tool for secure communications
+    jq
   ];
 
   # Enable OpenSSH for remote access to the server

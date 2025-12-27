@@ -9,11 +9,10 @@ let
   # Pass discovery script as string to avoid ncc permission issues
   discoveryScript = (import ./lib/runtime_discovery.nix { inherit lib pkgs; }).runtimeDiscovery;
 
-  bubbleTeaTui = import ./tui/tui.nix {
-    inherit lib pkgs getModuleApi discoveryScript;
-  };
+  # Bubble Tea TUI from tui-engine - use script from config like SSH manager
+  bubbleTeaTui = config.core.management.tui-engine.moduleManagerTuiScript;
 
-  # Bubble Tea Module Manager (SINGLE INTERFACE with subcommands)
+  # Gum Module Manager (SINGLE INTERFACE with subcommands)
   moduleManagerTui = pkgs.writeScriptBin "ncc-module-manager" ''
     # Handle subcommands
     case "$1" in
@@ -23,7 +22,7 @@ let
         ;;
       "")
         # No args = run TUI
-        ${bubbleTeaTui}/bin/module-manager-tui
+        ${bubbleTeaTui}/bin/ncc-module-manager-tui
         ;;
       *)
         echo "Usage: ncc module-manager [get-module-data]"

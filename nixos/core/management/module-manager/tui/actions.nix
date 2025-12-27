@@ -1,99 +1,69 @@
-# Module Manager TUI Actions
-# Handles TUI menu selections by calling appropriate CLI commands
+# Module Manager TUI Actions API
+# Provides actions for the Gum-based TUI
 
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, getModuleApi, ... }:
 
 let
-  # Get UI utilities
+  # Get APIs
   ui = getModuleApi "cli-formatter";
+  runtimeDiscovery = (import ../lib/runtime_discovery.nix { inherit lib pkgs; }).runtimeDiscovery;
 
-in
-pkgs.writeShellScriptBin "module-manager-tui-actions" ''
-  #!/bin/bash
-  set -e
+  # Create toggle module script
+  toggleModuleScript = pkgs.writeScriptBin "toggle-module" ''
+    #!${pkgs.bash}/bin/bash
+    set -euo pipefail
 
-  # Get the selected action from TUI menu
-  SELECTED_ACTION="$1"
-  shift  # Remove action from args, rest are parameters
+    local module_name="$1"
+    local action="$2"
+    local config_file="/etc/nixos/configs/$module_name/config.nix"
 
-  case "$SELECTED_ACTION" in
-    "status")
-      ${ui.badges.info "📋 Module Status"}
-      ${ui.messages.info "Checking current module status..."}
-      # For now, show a placeholder message
-      ${ui.messages.info "Module status check - not implemented yet"}
-      ${ui.messages.info "Use 'ncc module list' for current implementation"}
-      ;;
+    echo "Setting $module_name to $action..."
 
-    "enable")
-      ${ui.badges.info "✅ Enable Modules"}
-      ${ui.messages.info "Module enabling - not implemented yet"}
-      ${ui.messages.info "Use existing 'ncc module-manager' for now"}
-      ;;
+    # Create config directory if needed
+    mkdir -p "$(dirname "$config_file")"
 
-    "disable")
-      ${ui.badges.warning "❌ Disable Modules"}
-      ${ui.prompts.input "Continue? (y/N): "}
-      read -r confirm
-      if [[ "$confirm" =~ ^[Yy]$ ]]; then
-        ${ui.messages.info "Module disabling - not implemented yet"}
-        ${ui.messages.info "Use existing 'ncc module-manager' for now"}
-      else
-        ${ui.messages.info "Module disable cancelled"}
-      fi
-      ;;
+    # Create or update config
+    cat > "$config_file" << EOF
+{ config, lib, ... }:
+{
+  $module_name.enable = $action;
+}
+EOF
 
-    "info")
-      ${ui.badges.info "🔍 Module Information"}
-      ${ui.prompts.input "Module name: "}
-      read -r module_name
-      if [ -n "$module_name" ]; then
-        ${ui.messages.info "Module info for: $module_name - not implemented yet"}
-      fi
-      ;;
+    echo "$module_name $action"
+  '';
 
-    "configure")
-      ${ui.badges.info "⚙️ Configure Module"}
-      ${ui.prompts.input "Module name: "}
-      read -r module_name
-      if [ -n "$module_name" ]; then
-        ${ui.messages.info "Module configuration for: $module_name - not implemented yet"}
-      fi
-      ;;
+in {
+  # Get module list for display
+  getModuleList = ''
+    echo "DEBUG: Starting runtime discovery..." >&2
+    ${runtimeDiscovery}
+    echo "DEBUG: Runtime discovery finished, calling main..." >&2
+    main 2>&1 | head -10 >&2
+    main | jq -r '.[] | "\(.id)|\(.name)|\(.description)|\(.category)|\(.status)|\(.version)|\(.path)"' 2>&1 || echo "ERROR: jq failed" >&2
+  '';
 
-    "update-all")
-      ${ui.badges.warning "🔄 Update All Modules"}
-      ${ui.prompts.input "Continue? (y/N): "}
-      read -r confirm
-      if [[ "$confirm" =~ ^[Yy]$ ]]; then
-        ${ui.messages.info "Module updates - not implemented yet"}
-        ${ui.messages.info "Use 'ncc update-modules' for current implementation"}
-      fi
-      ;;
+  # Get filter panel content
+  getFilterPanel = ''
+    echo "🔍 FILTERS:"
+    echo "Status: All"
+    echo "Category: All"
+    echo "Search: Active"
+  '';
 
-    "check-versions")
-      ${ui.badges.info "🧪 Check Module Versions"}
-      # Call existing command
-      if command -v ncc >/dev/null 2>&1; then
-        ncc check-module-versions
-      else
-        ${ui.badges.error "ncc command not found"}
-      fi
-      ;;
+  # Get details panel content
+  getDetailsPanel = ''
+    echo "ℹ️ DETAILS:"
+    echo "Select module to view details..."
+  '';
 
-    "discover")
-      ${ui.badges.info "📦 Module Discovery"}
-      ${ui.messages.info "Module discovery - not implemented yet"}
-      ;;
+  # Get actions panel content
+  getActionsPanel = ''
+    echo "⚡ ACTIONS:"
+    echo "[e] Enable  [d] Disable"
+    echo "[r] Refresh  [q] Quit"
+  '';
 
-    *)
-      ${ui.badges.error "Unknown action: $SELECTED_ACTION"}
-      exit 1
-      ;;
-  esac
-
-  # Pause before returning to menu
-  ${ui.text.newline}
-  ${ui.messages.info "Press Enter to continue..."}
-  read -r
-''
+  # Reference to toggle script
+  toggle_module_script = toggleModuleScript;
+}

@@ -9,6 +9,9 @@
     home-manager-stable.url = "github:nix-community/home-manager/release-25.11";
     home-manager-unstable.url = "github:nix-community/home-manager";
 
+    # For TUI engine Go building
+    gomod2nix.url = "github:nix-community/gomod2nix";
+
     configs.url = "path:./configs";
     configs.flake = false;
   };
@@ -18,6 +21,7 @@
     , nixpkgs-unstable
     , home-manager-stable
     , home-manager-unstable
+    , gomod2nix
     , configs
     , ...
   }: let
@@ -82,6 +86,9 @@
         inherit system;
         specialArgs = {
           inherit systemConfig discovery moduleConfig getModuleConfig getModuleMetadata getCurrentModuleMetadata getModuleApi;
+          # For TUI engine Go building
+          buildGoApplication = gomod2nix.legacyPackages.${system}.buildGoApplication;
+          gomod2nix = gomod2nix.legacyPackages.${system};
         }; 
 
         modules = [

@@ -1,194 +1,309 @@
-# TUI Engine Implementation Plan
+# TUI Engine Implementation Plan - BUBBLE TEA BASED
 
 ## Overview
 
-The TUI Engine is a generic Bubble Tea TUI builder for all NixOS Control Center modules. It provides templates and utilities to create consistent, professional TUIs across different managers.
+The TUI Engine is a Bubble Tea-based TUI builder for all NixOS Control Center modules. Based on OptiNix's successful implementation, we use Go with Bubble Tea for complex multi-panel TUIs instead of simple Gum-based interfaces.
 
-## Architecture Decision: Template System
+## Architecture Analysis
 
-After analysis of three options, we chose **Template System** as the best long-term solution:
+Based on OptiNix's proven Bubble Tea implementation and existing module patterns (cli-registry, cli-formatter, system-manager), the TUI engine provides a Go-based TUI framework with proper multi-panel layouts.
 
-### Why Template System?
+### Module Structure Pattern
+```nix
+# default.nix (following OptiNix pattern)
+{ config, lib, ... }:
 
-**Advantages:**
-- **Flexibility**: Each module chooses optimal template
-- **Consistency**: Standardized layouts ensure predictable UX
-- **Maintainability**: Centralized template management
-- **Scalability**: Easy to add new templates for future modules
-- **Professional**: Balances implementation simplicity with UX quality
+let
+  moduleName = baseNameOf ./. ;
+in {
+  _module.metadata = {
+    role = "core";
+    name = moduleName;
+    description = "Bubble Tea-based TUI utilities for NixOS Control Center";
+    category = "management";
+    subcategory = "tui-engine";
+    stability = "stable";
+    version = "1.0.0";
+  };
 
-**Template Types:**
-- **2-Panel**: Simple menu + content (basic modules)
-- **3-Panel**: Menu + content + info (standard modules)
-- **4-Panel**: Menu + content + sidebar + stats (complex modules)
-- **5-Panel**: Menu + list + filter + info + actions (advanced modules)
+  _module.args.moduleName = moduleName;
 
-## TUI Engine API
+  imports = [
+    ./options.nix
+    ./config.nix
+    ./builders.nix  # Go application builders
+  ];
+}
+```
+
+### API Pattern
+- **Definition**: API functions defined in `config.nix`
+- **Registration**: API exposed via `${configPath}.api = apiValue`
+- **Access**: `getModuleApi "tui-engine"` returns the API
+
+## Core Problem: Runtime Discovery Integration
+
+**Current Issue:** Runtime discovery needs to be called at runtime, not build time.
+
+**Solution:** Gum-based TUIs call runtime discovery directly in shell scripts.
+
+## TUI Engine API Design
+
+Based on OptiNix's Bubble Tea implementation, we provide Go-based TUI templates with proper Model-Update-View pattern.
 
 ```nix
-# Generic TUI builder
-tuiEngine.buildTUI {
-  name = "module-name";
-  goCode = customBubbleTeaCode;
-  discoveryScript = moduleDiscoveryScript;
-  inherit pkgs;
+# builders.nix - Go application builders (based on OptiNix)
+{ lib, buildGoApplication, gomod2nix }:
+
+let
+  # Build function using gomod2nix (from OptiNix pattern)
+  buildTUIApp = { pname, version, src, go ? null }:
+    buildGoApplication {
+      inherit pname version src go;
+      modules = ./gomod2nix.toml;
+      nativeBuildInputs = with pkgs; [ installShellFiles ];
+      postInstall = ''
+        installShellCompletion --cmd ${pname} \
+          --bash <($out/bin/${pname} completion bash) \
+          --fish <($out/bin/${pname} completion fish) \
+          --zsh <($out/bin/${pname} completion zsh)
+      '';
+    };
+
+in {
+  inherit buildTUIApp;
+}
+```
+
+```go
+// Go TUI templates (inspired by OptiNix)
+package tui
+
+import (
+    "github.com/charmbracelet/bubbles/list"
+    tea "github.com/charmbracelet/bubbletea"
+    "github.com/charmbracelet/lipgloss"
+)
+
+type ModuleItem struct {
+    Name        string
+    Description string
+    Status      string
+    Category    string
 }
 
-# Template system (future extension)
-tuiEngine.templates."4-panel" {
-  menu = menuComponent;
-  content = contentComponent;
-  sidebar = sidebarComponent;
-  stats = statsComponent;
+func (i ModuleItem) Title() string       { return i.Name }
+func (i ModuleItem) Description() string { return i.Description }
+func (i ModuleItem) FilterValue() string { return i.Name }
+
+type Model struct {
+    list     list.Model
+    panels   [5]string  // 5-panel layout
+    selected int
 }
-```
 
-## Module-Specific TUI Designs
-
-### System Manager (4-Panel)
-
-```
-┌─────────────────────────────────────────────────┐
-│ 🔧 System Manager | nixos@nixos-vm | Online     │
-├─────────────┬─────────────────────┬─────────────┤
-│ 📊 MENU    │ 📈 SYSTEM STATUS      │ 🔧 SERVICES │
-│ • 📈 Status│ CPU: ████████░░ 75% │ • nginx    │
-│ • 🔧 Services│ RAM: ████████░░ 68% │ • sshd     │
-│ • 💾 Storage│ DISK: ████░░░░░░ 28% │ • systemd   │
-│ • 🔒 Security│ TEMP: 45°C          │ • NetworkMgr│
-│ • 📊 Monitor│ UPTIME: 2d 4h 12m  │ • docker    │
-│ • ⚙️ Settings│ LOAD: 1.2 0.8 0.5   │ • bluetooth │
-└─────────────┴─────────────────────┴─────────────┘
-```
-
-### Module Manager (5-Panel)
-
-```
-┌─────────────────────────────────────────────────┐
-│ 📦 Module Manager | 18 modules | 15 enabled    │
-├───────┬─────────────────────┬───────┬───────────┤
-│ 📋   │ 📦 MODULE LIST        │ 🔍   │ 📊 STATS  │
-│ MENU │ ✅ audio v1.0.0 core   │ FILTER│ 15/18    │
-│ • 📋│ ✅ boot v1.0.0 core    │ [ ]   │ enabled   │
-│ • ✅│ ✅ desktop v1.0.0 core │ core  │ 3/18      │
-│ • ❌│ ✅ hardware v1.0.0 core│ [x]   │ disabled  │
-│ • 🔄│ ✅ network v1.0.0 core │       │ 0/18      │
-│ • ⚙️│ ✅ packages v1.0.0 core│       │ pending   │
-└───────┴─────────────────────┴───────┴───────────┘
-```
-
-### Network Manager (4-Panel)
-
-```
-┌─────────────────────────────────────────────────┐
-│ 🌐 Network Manager | eth0 | 192.168.122.100    │
-├─────────────┬─────────────────────┬─────────────┤
-│ 🔗 MENU    │ 🌐 INTERFACE STATUS   │ 📊 TRAFFIC │
-│ • 🌐 Status│ eth0: UP 192.168.122.│ ↑ 2.3MB/s │
-│ • ⚙️ Config│ wlan0: DOWN         │ ↓ 1.8MB/s │
-│ • 🛡️ Firewall│ lo: UP 127.0.0.1   │            │
-│ • 📊 Monitor│ Firewall: active     │ 🔥 RULES  │
-└─────────────┴─────────────────────┴─────────────┘
-```
-
-### Package Manager (5-Panel)
-
-```
-┌─────────────────────────────────────────────────┐
-│ 💾 Package Manager | 1245 packages | Updated    │
-├───────┬─────────────────────┬───────┬───────────┤
-│ 📦   │ 📦 INSTALLED PACKAGES │ 🔄   │ 📊 INFO   │
-│ MENU │ nix-2.15.0           │ UPDATES│ nix 2.15.0│
-│ • 📦│ glibc-2.37           │ [12]  │ glibc 2.37│
-│ • 📥│ systemd-253.6        │       │ systemd 253│
-│ • 🔄│ firefox-115.0.2      │       │ firefox 115│
-└───────┴─────────────────────┴───────┴───────────┘
-```
-
-## Implementation Structure
-
-```
-nixos/core/management/tui-engine/
-├── api.nix                 # Public API (buildTUI, templates)
-├── components/
-│   └── tui-engine/
-│       └── default.nix     # Core build functions
-├── options.nix            # Module configuration
-├── config.nix             # API setup
-└── default.nix            # Module metadata
+func (m Model) View() string {
+    // 5-panel layout inspired by design.md
+    return lipgloss.JoinHorizontal(
+        lipgloss.Top,
+        m.panels[0], // Menu
+        m.panels[1], // Content
+        m.panels[2], // Filter
+        m.panels[3], // Info
+        m.panels[4], // Stats
+    )
+}
 ```
 
 ## Module Usage Pattern
 
 ```nix
-# In any module's TUI
-{ lib, pkgs, getModuleApi, discoveryScript }:
+# In any module's TUI (e.g., module-manager/tui/tui.nix)
+{ lib, pkgs, getModuleApi, ... }:
 
 let
   tuiEngine = getModuleApi "tui-engine";
-  myGoCode = ''
-    // Custom Bubble Tea code for this module
-    package main
-    // ... TUI implementation
-  '';
+
+  # Create Bubble Tea-based TUI application
+  moduleManagerTui = tuiEngine.builders.buildTUIApp {
+    pname = "module-manager-tui";
+    version = "1.0.0";
+    src = ./src;  # Go source code
+    go = pkgs.go_1_25;
+  };
 in
-  tuiEngine.buildTUI {
-    name = "my-module";
-    goCode = myGoCode;
-    inherit discoveryScript pkgs;
-  }
+  moduleManagerTui
+```
+
+```go
+// src/main.go - Module Manager TUI (inspired by OptiNix)
+package main
+
+import (
+    "encoding/json"
+    "os/exec"
+    tea "github.com/charmbracelet/bubbletea"
+    "github.com/hmajid2301/nixos-control-center/tui"
+)
+
+func main() {
+    // Get modules from runtime discovery (like OptiNix gets options)
+    modulesJSON, _ := exec.Command("runtime-discovery-script").Output()
+    var modules []tui.ModuleItem
+    json.Unmarshal(modulesJSON, &modules)
+
+    // Create 5-panel TUI model
+    model := tui.NewModuleManagerModel(modules)
+
+    p := tea.NewProgram(model)
+    if _, err := p.Run(); err != nil {
+        panic(err)
+    }
+}
+```
+
+## Implementation Structure
+
+Based on OptiNix's structure but adapted for module management:
+
+```
+nixos/core/management/tui-engine/
+├── default.nix            # Module metadata
+├── options.nix            # Module options (enable, goVersion)
+├── config.nix             # API definition and registration
+├── builders.nix           # Go application builders (gomod2nix)
+├── gomod2nix.toml         # Go dependencies (from OptiNix)
+├── go.mod                 # Go module definition
+├── go.sum                 # Go dependencies
+├── src/                   # Go source code
+│   ├── main.go           # TUI application entry
+│   ├── tui/              # TUI components
+│   │   ├── model.go      # Bubble Tea model
+│   │   ├── update.go     # Update logic
+│   │   ├── view.go       # View rendering
+│   │   ├── keymaps.go    # Key bindings
+│   │   └── styles.go     # Lipgloss styles
+│   └── lib/              # Utility functions
+└── implementation.md     # This documentation
+```
+
+**Kopierbar von OptiNix:**
+- `gomod2nix.toml` (Bubble Tea + Charm dependencies)
+- Go project structure (`src/tui/` with model/update/view)
+- Keymaps and styles pattern
+- Nix build setup (`flake.nix`, `default.nix`)
+
+**Nicht kopierbar:**
+- Nix options domain logic
+- Database/SQL code
+- CLI command structure
+
+## Runtime Discovery Integration
+
+Bubble Tea TUIs integrate with runtime discovery via JSON (like OptiNix integrates with Nix options):
+
+```bash
+# Runtime discovery outputs JSON (like OptiNix's option fetching)
+runtime-discovery-script | jq '.[] | {name, description, status, category}'
+```
+
+```go
+// Go code calls runtime discovery at startup (like OptiNix)
+func getModules() []ModuleItem {
+    cmd := exec.Command("runtime-discovery-script")
+    output, _ := cmd.Output()
+
+    var modules []ModuleItem
+    json.Unmarshal(output, &modules)
+    return modules
+}
+
+// Module enable/disable via shell commands (like OptiNix's nix commands)
+func toggleModule(name, action string) error {
+    return exec.Command("module-toggle-script", name, action).Run()
+}
 ```
 
 ## Navigation Standards
 
+Based on OptiNix's keymaps (j/k navigation, t for toggle, g/G for top/end):
+
 **Global Shortcuts:**
 - `q` / `Ctrl+C` = Quit
-- `Tab` = Switch between panels
-- `↑↓` / `jk` = Navigate within panel
-- `Enter` = Select/Execute
-- `Esc` = Back/Cancel
-- `r` = Refresh
-- `/` = Search
+- `↑↓` / `jk` = Navigate list
+- `Enter` = Select module
+- `t` = Toggle details view
+- `g` = Top of list
+- `G` = End of list
+- `e` = Enable selected module
+- `d` = Disable selected module
+- `r` = Refresh modules
+- `/` = Search/Filter
 
-**Panel-Specific:**
-- **Menu Panel**: `↑↓` navigation, `Enter` select
-- **Content Panel**: `↑↓` scroll, `Enter` action
-- **Filter Panel**: `↑↓` select filters, `Space` toggle
-
-## Future Extensions
-
-1. **Template System Implementation**
-   - Add template definitions to TUI engine
-   - Allow modules to choose templates
-   - Standardized panel layouts
-
-2. **Theme System**
-   - Color schemes (dark/light/custom)
-   - Icon sets
-   - Responsive layouts
-
-3. **Component Library**
-   - Reusable UI components
-   - Standard widgets (lists, tables, forms)
-   - Consistent styling
-
-4. **Accessibility**
-   - Keyboard navigation
-   - Screen reader support
-   - High contrast modes
+**Bubble Tea Specific:**
+- **List**: Fuzzy search with live filtering
+- **Spinner**: Loading indicators during discovery
+- **Help**: Context-sensitive help display
+- **Multi-panel**: Synchronized panel updates
 
 ## Integration Points
 
-- **Module Discovery**: Each module provides its own discovery script
 - **CLI Registry**: TUIs registered as commands via cli-registry
-- **API Access**: TUIs available via `getModuleApi "module-name"`
+- **API Access**: TUI engine available via `getModuleApi "tui-engine"`
+- **Runtime Discovery**: Called at TUI execution time
 - **Configuration**: Module settings via standard options system
 
 ## Testing Strategy
 
-1. **Unit Tests**: Template rendering, component behavior
-2. **Integration Tests**: End-to-end TUI workflows
-3. **Compatibility Tests**: Different terminal sizes, themes
-4. **Performance Tests**: Large data sets, complex layouts
+1. **Unit Tests**: API function correctness
+2. **Integration Tests**: End-to-end Gum TUI workflows
+3. **Compatibility Tests**: Different terminal sizes
+4. **Performance Tests**: Large option lists
 
-This implementation provides a solid foundation for consistent, professional TUIs across all NixOS Control Center modules while maintaining flexibility for future enhancements.
+## TODO: Complete Bubble Tea Implementation
+
+### Phase 1: Infrastructure Setup
+- [ ] Copy `gomod2nix.toml` from OptiNix and adapt dependencies
+- [ ] Create Go project structure (`src/tui/model.go`, etc.)
+- [ ] Set up `builders.nix` with `buildGoApplication`
+- [ ] Configure `flake.nix` with gomod2nix input
+
+### Phase 2: Core TUI Components
+- [ ] Implement `model.go` with 5-panel layout structure
+- [ ] Create `update.go` with navigation and action handling
+- [ ] Build `view.go` with lipgloss styling for panels
+- [ ] Add `keymaps.go` based on OptiNix patterns
+
+### Phase 3: Module Manager Integration
+- [ ] Integrate runtime discovery JSON parsing
+- [ ] Implement module enable/disable via shell commands
+- [ ] Add 5-panel layout: Menu|Content|Filter|Info|Stats
+- [ ] Connect with cli-registry for command registration
+
+### Phase 4: Testing & Polish
+- [ ] Test multi-panel navigation
+- [ ] Add help system and keymap display
+- [ ] Performance optimization for large module lists
+- [ ] Error handling for discovery failures
+
+## Kopierbare Assets von OptiNix
+
+**Voll kopierbar:**
+- `gomod2nix.toml` (Bubble Tea + Charm libraries)
+- Go project structure pattern
+- Keymap implementation (`keymaps.go`)
+- Model-Update-View architecture
+- Lipgloss styling patterns
+- Nix build configuration
+
+**Adaptiervar:**
+- Domain logic (Nix options → NixOS modules)
+- Data fetching (Nix options API → runtime discovery)
+- Database → JSON parsing
+- CLI commands → Module management actions
+
+This corrected implementation provides a proper Bubble Tea-based TUI foundation for complex multi-panel interfaces, following OptiNix's proven patterns.
+
+
+
+

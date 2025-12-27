@@ -7,5 +7,6 @@
     ./nixos-control-center 
     ./cli-registry
     ./cli-formatter   
+    ./tui-engine
   ];
 }

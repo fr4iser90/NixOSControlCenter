@@ -3,7 +3,7 @@
 let
   # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
   metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
-  configPath = metadata.configPath or "systemConfig.core.management.nixos-control-center.submodules.cli-registry";  # Fallback
+  configPath = metadata.configPath or "systemConfig.core.management.cli-registry";  # Fallback
 
   ccLib = {
     types = import ./lib/types.nix { inherit lib; };
@@ -49,7 +49,7 @@ in {
   };
 
   # API definition - always available, conditionally populated
-  options.core.management.nixos-control-center.submodules.cli-registry = {
+  options.core.management.cli-registry = {
     # API for other modules - always available
     api = lib.mkOption {
       type = lib.types.attrs;

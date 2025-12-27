@@ -15,5 +15,6 @@
     libreoffice
     unzip
     appimage-run
+    jq
   ];
 }

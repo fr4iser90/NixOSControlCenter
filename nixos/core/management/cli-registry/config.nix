@@ -29,7 +29,8 @@ in
   # No enable option needed - NCC command always available
 
   # API is always available
-  core.management.nixos-control-center.submodules.cli-registry.api = apiValue;
+  # ${configPath}.api = apiValue;
+  core.management.cli-registry.api = apiValue;
 
   # Add NCC to system packages (always available)
   environment.systemPackages = [
