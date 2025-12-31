@@ -25,12 +25,6 @@
     };
   };
 
-  # NVIDIA Container Toolkit (replaces deprecated virtualisation.docker.enableNvidia)
-  # Only enable if NVIDIA is actually configured (not for AMD/Intel/Radeon)
-  hardware.nvidia-container-toolkit.enable = lib.mkIf (
-    (config.hardware.nvidia.package or null) != null
-  ) true;
-
   # Docker Pakete installieren
   environment.systemPackages = with pkgs; [
     docker

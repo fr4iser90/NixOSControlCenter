@@ -113,12 +113,12 @@ func (m Model) renderViewportPanel(title string, vp viewport.Model, width, heigh
 	vp.Width = width
 	vp.Height = height
 
-	// Create border style
+	// Create border style ohne Width-Constraint
 	style := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("39")).
-		Padding(1, 1).
-		Width(width)
+		Padding(1, 1)
+		// REMOVED: .Width(width) - lässt Panel natürliche Breite verwenden
 
 	// Combine title and viewport content
 	viewportContent := vp.View()
@@ -145,9 +145,15 @@ func NewLayoutManager(width, height int) *LayoutManager {
 }
 
 func (lm *LayoutManager) GetAvailableDimensions() (int, int) {
-    // KORREKT: Alle Borders + Margins + Padding berücksichtigen
-    
-    bodyWidth := lm.width - 4  // Links/Rechts Border + Padding
+
+    // GLOBALE BORDER braucht auch Overhead!
+    globalBorderOverhead := 4  // 2 links + 2 rechts für Border + Margin
+	globalHeightOverhead := 4  // 2 oben + 2 unten
+    // 🎯 PANEL-OVERHEAD BERÜCKSICHTIGEN
+    // Jeder Panel: Border(2) + Padding(2) = 4 Zeichen Overhead
+    // 5 Panels = 20 Zeichen Overhead abziehen
+    panelOverhead := 5 * 4  // 20 Zeichen
+    bodyWidth := lm.width - panelOverhead - globalBorderOverhead // Templates bekommen weniger Breite
 
     fixedOverhead := 34  // Funktioniert für 62 Zeilen
     
@@ -158,7 +164,7 @@ func (lm *LayoutManager) GetAvailableDimensions() (int, int) {
     totalOverhead := max(minOverhead, int(float64(lm.height) * scalingFactor))
     totalOverhead = max(totalOverhead, fixedOverhead)  // Nicht unter funktionierenden Wert
     
-    bodyHeight := lm.height - totalOverhead
+    bodyHeight := lm.height - totalOverhead - globalHeightOverhead
     
     if bodyHeight < 15 {
         bodyHeight = 15  // Nie unter 15 Zeilen
@@ -742,18 +748,18 @@ func (m Model) renderResponsiveLayout() string {
 	innerLayout := template.Render(m)
 	log.Printf("🐛 DEBUG renderResponsiveLayout(): template.Render returned: %d chars\n", len(innerLayout))
 
-	// ✅ Border mit Padding zurück!
+	// 🎯 FIX: Border ohne Width-Constraints
 	border := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("39")).
-		Padding(1, 2)  // Padding zurück - du willst es so!
-
+		Width(m.width - 4).   // Terminal minus Margin links (2) + rechts (2)
+		Height(m.height - 4). // Terminal minus Margin oben (2) + unten (2)
+		Margin(2, 2, 2, 2)  // 2 Zeilen oben/unten, 2 Spalten links/rechts
+		// REMOVED: .Width(m.width).Height(m.height) - lässt Border natürliche Größe verwenden
+		
 	borderedLayout := border.Render(innerLayout)
 
-	// Add top margin (2 lines space above border)
-	topMargin := strings.Repeat("\n", 2)
-
-	return topMargin + borderedLayout
+	return borderedLayout
 }
 
 // OLD LAYOUT FUNCTIONS REMOVED - REPLACED BY TEMPLATE SYSTEM
