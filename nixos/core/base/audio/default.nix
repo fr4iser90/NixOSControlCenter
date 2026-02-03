@@ -14,9 +14,6 @@ in {
     version = "1.0.0";
   };
 
-  # Modulname einmalig definieren und an Submodule weitergeben
-  _module.args.moduleName = moduleName;
-
   imports = if cfg.enable or false then [
     ./options.nix
   ] ++ (if (cfg.system or "none") != "none" then [

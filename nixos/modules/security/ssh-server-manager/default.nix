@@ -1,28 +1,18 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 with lib;
 
 let
-  # CONVENTION OVER CONFIGURATION - Vollständig dynamisch aus Dateisystem
-  moduleName = baseNameOf ./. ;        # "ssh-server-manager" - automatisch!
+  moduleName = baseNameOf ./. ;
   cfg = getModuleConfig moduleName;
-  ui = getModuleApi "cli-formatter";
-  commandCenter = config.core.management.system-manager.submodules.cli-registry;
+  # ui = getModuleApi "cli-formatter";  # Removed: not used
+  # commandCenter = config.core.management.system-manager.submodules.cli-registry;  # Removed: doesn't exist
 in {
-  _module.metadata = {
-    role = "optional";
-    name = moduleName;
-    description = "SSH server access management and monitoring";
-    category = "security";
-    subcategory = "ssh";
-    version = "1.0.0";
-  };
-
-  # Modulname einmalig definieren und an Submodule weitergeben
-  _module.args.moduleName = moduleName;
+  _module.args.cfg = cfg;
 
   imports = if cfg.enable or false then [
     ./options.nix
+    ./commands.nix
     (import ./auth.nix { inherit cfg; })
     (import ./monitoring.nix { inherit cfg; })
     (import ./notifications.nix { inherit cfg; })
@@ -33,54 +23,36 @@ in {
     ./scripts/grant-access.nix
   ] else [];
 
-  # Provide cfg to all submodules
-  _module.args.cfg = cfg;
-
-  config = mkMerge [
-    {
-      modules.security.ssh-server-manager.enable = mkDefault (cfg.enable or false);
-    }
-    (mkIf cfg.enable {
-    # Enable terminal-ui dependency
-    # modules.terminal-ui.enable removed (cli-formatter is Core) = true;
-    
-    services.openssh = {
-      enable = true;
-      settings = {
-        PasswordAuthentication = false;
-        PubkeyAuthentication = true;
-        PermitRootLogin = "no";
-        KbdInteractiveAuthentication = false;
-        UsePAM = true;
-        LogLevel = "VERBOSE";
-        SyslogFacility = "AUTH";
-      };
-      extraConfig = ''
-        ChallengeResponseAuthentication yes
-        LogLevel VERBOSE
-      '';
+  # Removed: Redundant enable setting (already defined in options.nix)
+  
+  services.openssh = mkIf (cfg.enable or false) {
+    enable = true;
+    settings = {
+      PasswordAuthentication = false;
+      PubkeyAuthentication = true;
+      PermitRootLogin = "no";
+      KbdInteractiveAuthentication = false;
+      UsePAM = true;
+      LogLevel = "VERBOSE";
+      SyslogFacility = "AUTH";
     };
-
-    security.pam.services.sshd.text = ''
-      auth required pam_unix.so nullok
-      account required pam_unix.so
-      password required pam_unix.so nullok sha512
-      session required pam_unix.so
+    extraConfig = ''
+      ChallengeResponseAuthentication yes
+      LogLevel VERBOSE
     '';
+  };
 
-    environment.etc."ssh/banner".text = cfg.banner;
+  security.pam.services.sshd.text = mkIf (cfg.enable or false) ''
+    auth required pam_unix.so nullok
+    account required pam_unix.so
+    password required pam_unix.so nullok sha512
+    session required pam_unix.so
+  '';
 
-    core.management.system-manager.submodules.cli-formatter.components.ssh-status = {
-      enable = true;
-      refreshInterval = 5;
-      template = ''
-        ${ui.text.header "SSH Status"}
-        ${ui.tables.keyValue "Password Auth" (if config.services.openssh.settings.PasswordAuthentication then "Enabled" else "Disabled")}
-        ${ui.tables.keyValue "Active Sessions" "$(ss -tn state established '( dport = :ssh )' | wc -l)"}
-        ${ui.tables.keyValue "Client Alive Interval" "${toString config.services.openssh.settings.ClientAliveInterval}"}
-        ${ui.tables.keyValue "Client Alive Count Max" "${toString config.services.openssh.settings.ClientAliveCountMax}"}
-      '';
-    };
-    })
-  ];
+  environment.etc."ssh/banner" = mkIf ((cfg.enable or false) && (cfg.banner or "") != "") {
+    text = cfg.banner;
+  };
+
+  # Removed: core.management.system-manager option doesn't exist
+  # Modules should only set standard NixOS options
 }

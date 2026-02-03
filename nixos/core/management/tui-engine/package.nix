@@ -6,6 +6,7 @@ let
     buildGoApplication {
       inherit pname version src go;
       modules = ./gomod2nix.toml;
+      subPackages = [ "." ];
       nativeBuildInputs = with pkgs; [
         installShellFiles
       ];
@@ -25,7 +26,7 @@ in
     (buildTUIApp {
       pname = "module-manager-tui";
       version = "1.0.0";
-      src = ./src;
+      src = ./.;
     })
   ];
 }

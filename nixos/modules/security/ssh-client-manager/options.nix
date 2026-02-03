@@ -1,9 +1,13 @@
-{ lib, moduleConfig, ... }:
+{ lib, getCurrentModuleMetadata, ... }:
 
-{
+let
+  # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
+  metadata = getCurrentModuleMetadata ./.;
+  configPath = metadata.configPath;
+in {
   # SSH Client Manager Options
   # This module defines all configuration options for the SSH client manager
-  options.${moduleConfig.optionsPath} = {
+  options.${configPath} = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;

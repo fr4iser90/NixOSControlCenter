@@ -1,7 +1,7 @@
 { lib, ... }:
 
 {
-  options.modules.ai-workspace = {
+  options.systemConfig.modules.specialized.ai-workspace = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;

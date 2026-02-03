@@ -46,9 +46,6 @@ in {
     version = "1.0.0";
   };
 
-  # Modulname einmalig definieren und an Submodule weitergeben
-  _module.args.moduleName = moduleName;
-
   imports = [
     ./options.nix
     (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })

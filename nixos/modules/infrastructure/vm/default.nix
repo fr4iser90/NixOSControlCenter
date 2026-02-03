@@ -8,62 +8,32 @@ let
   cfg = getModuleConfig moduleName;
   stateDir = cfg.stateDir;
 in {
-  _module.metadata = {
-    role = "optional";
-    name = moduleName;
-    description = "Virtual machine management and orchestration";
-    category = "infrastructure";
-    subcategory = "virtualization";
-    version = "1.0.0";
+  imports = [
+    ./options.nix
+  ] ++ optional (cfg.enable or false) (import ./testing { inherit config lib pkgs; });
+
+  # Removed: Redundant enable setting (already defined in options.nix)
+
+  virtualisation = mkIf (cfg.enable or false) {
+    libvirtd.enable = true;
+    libvirtd.allowedBridges = [ "virbr0" ];
+    spiceUSBRedirection.enable = true;
   };
 
-  # Modulname einmalig definieren und an Submodule weitergeben
-  _module.args.moduleName = moduleName;
+  programs.virt-manager.enable = mkIf (cfg.enable or false) true;
 
-  imports = if cfg.enable or false then [
-    ./options.nix
-    (import ./testing { inherit config lib pkgs; })
-  ] else [];
+  environment.systemPackages = mkIf (cfg.enable or false) (with pkgs; [
+    qemu
+    virt-manager
+    spice
+    spice-gtk
+    spice-protocol
+    swtpm
+  ]);
 
-  config = mkMerge [
-    {
-      modules.infrastructure.vm.enable = mkDefault (cfg.enable or false);
-    }
-    (mkIf cfg.enable {
-    # Base requirements
-    virtualisation = {
-      libvirtd.enable = true;
-  #    libvirtd.qemu.enable = true;
-  #    libvirtd.qemu.package = pkgs.qemu_kvm;
-      libvirtd.allowedBridges = [ "virbr0" ];
-      spiceUSBRedirection.enable = true;
-    };
-
-
-    programs.virt-manager.enable = true;
-
-    # Base packages
-    environment.systemPackages = with pkgs; [
-      qemu
-      virt-manager
-      spice
-      spice-gtk
-      spice-protocol
- #     OVMF
-      swtpm
-    ];
-
-    # Base directory structure
-    systemd.tmpfiles.rules = [
-      "d ${stateDir} 0755 root root -"
-      "d ${stateDir}/images 0775 root libvirt -"
-      "d ${stateDir}/testing 0775 root libvirt -"
-    ];
-
-    # Enable components
-    modules.infrastructure.vm.storage.enable = true;
-
-    # Register VM category
-    })
+  systemd.tmpfiles.rules = mkIf (cfg.enable or false) [
+    "d ${stateDir} 0755 root root -"
+    "d ${stateDir}/images 0775 root libvirt -"
+    "d ${stateDir}/testing 0775 root libvirt -"
   ];
 }

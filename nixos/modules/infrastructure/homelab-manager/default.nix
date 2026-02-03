@@ -5,6 +5,7 @@ with lib;
 let
   moduleName = baseNameOf ./. ;        # "homelab-manager" - automatisch!
   cfg = getModuleConfig moduleName;
+  moduleConfig = systemConfig.modules.infrastructure.homelab;
   
   # Check if Swarm is active
   isSwarmMode = (cfg.swarm or null) != null;
@@ -39,18 +40,7 @@ let
   homelabUtils = import ./lib/homelab-utils.nix { inherit config lib pkgs systemConfig; };
 
 in {
-  _module.metadata = {
-    role = "optional";
-    name = moduleName;
-    description = "Homelab infrastructure management and orchestration";
-    category = "infrastructure";
-    subcategory = "homelab";
-    version = "1.0.0";
-  };
-
-  # Modulname und Swarm-Konfiguration an Submodule weitergeben
   _module.args = {
-    inherit moduleName;
     isSwarmMode = isSwarmMode;
   };
 
@@ -61,24 +51,9 @@ in {
     ] ++ (if hasDockerUser then [
       ./handlers/homelab-create.nix
       ./handlers/homelab-fetch.nix
-      # ./handlers/homelab-update.nix
-      # ./handlers/homelab-delete.nix
-      # ./handlers/homelab-status.nix
     ] else [])
   else [];
 
-  config = mkMerge [
-    # Generisch: enable-Flag aus Discovery-Pfad setzen
-    (let
-      moduleMeta = getModuleMetadata moduleName;
-      enablePath = lib.splitString "." moduleMeta.enablePath;
-    in
-      lib.setAttrByPath enablePath (mkDefault (cfg.enable or false))
-    )
-    (mkIf cfg.enable {
-      # Import homelab utilities config
-      environment.systemPackages = (homelabUtils.config.environment.systemPackages or []);
-      # Commands werden direkt über cliRegistry registriert
-    })
-  ];
+  # Put config attributes at top level, not in config =
+  environment.systemPackages = mkIf (cfg.enable or false) (homelabUtils.config.environment.systemPackages or []);
 }

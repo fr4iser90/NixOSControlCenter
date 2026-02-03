@@ -3,7 +3,7 @@
 let
   stateDir = "/var/lib/virt";
 in {
-  options.modules.infrastructure.vm = {
+  options.systemConfig.modules.infrastructure.vm = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;

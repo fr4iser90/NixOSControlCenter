@@ -11,32 +11,32 @@ let
   # flakeRoot/core/moduledomain/module-name/submodules/submodule-a
   # flakeRoot/modules/moduledomain/module-name/submodules/submodule-a
   # Discover modules recursively in a directory
-  discoverModulesRecursively = rootDir: rootCategory: let
-    scanDir = dir: relativeCategory: let
+  discoverModulesRecursively = rootDir: domain: let
+    scanDir = dir: category: let
       contents = builtins.readDir dir;
   in lib.flatten (
-    lib.mapAttrsToList (name: type:
+    lib.mapAttrsToList (moduleName: type:
       if type == "directory" then
         let
-            subDir = "${dir}/${name}";
+            subDir = "${dir}/${moduleName}";
             hasDefault = builtins.pathExists "${subDir}/default.nix";
             hasOptions = builtins.pathExists "${subDir}/options.nix";
-            currentCategory = if relativeCategory == "" then name else "${relativeCategory}.${name}";
+            currentCategory = if category == "" then moduleName else "${category}.${moduleName}";
         in if hasDefault && hasOptions then
             # Found a module!
             [{
-            name = name;
-              domain = rootCategory;
-              category = "${rootCategory}.${currentCategory}";
+            name = moduleName;
+              domain = domain;
+              category = "${domain}.${currentCategory}";
               path = subDir;
-              configPath = "${rootCategory}.${currentCategory}";
-              enablePath = "${rootCategory}.${currentCategory}.enable";
-              apiPath = "${rootCategory}.${currentCategory}";
-              configFile = "/etc/nixos/configs/${name}/config.nix";
-              description = "${rootCategory} ${currentCategory} module";
+              configPath = "${domain}.${currentCategory}";
+              enablePath = "${domain}.${currentCategory}.enable";
+              apiPath = "${domain}.${currentCategory}";
+              configFile = "/etc/nixos/configs/${domain}/${category}/${moduleName}/config.nix";
+              description = "${domain} ${currentCategory} module";
               dependencies = [];
               version = "1.0";
-              defaultEnabled = rootCategory == "core"; # Core modules enabled by default
+              defaultEnabled = domain == "core"; # Core modules enabled by default
           }]
             # Continue scanning deeper
             ++ scanDir subDir currentCategory

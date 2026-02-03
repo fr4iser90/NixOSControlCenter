@@ -15,8 +15,6 @@ in {
     version = "1.0.0";
   };
 
-  # Modulname einmalig definieren und an Submodule weitergeben
-  _module.args.moduleName = moduleName;
   # Module-manager is always active (Core module, no enable option)
   imports = [
     ./options.nix

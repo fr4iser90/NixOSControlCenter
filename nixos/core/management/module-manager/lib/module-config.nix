@@ -20,7 +20,7 @@ let
 
   # SEMANTISCH KLAR GETRENNTE FUNKTIONEN:
 
-  # 1. getModuleConfig: Holt CONFIG aus systemConfig
+  # 1. getModuleConfig: Holt CONFIG aus systemConfig (MIT options.nix defaults!)
   # getModuleConfig "network" → systemConfig.core.base.network
   getModuleConfig = moduleName:
     let

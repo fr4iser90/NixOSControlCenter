@@ -21,46 +21,22 @@ let
                      else if config.boot.loader.grub.enable then providers.grub
                      else providers."systemd-boot";  # Default fallback
 
-in {
-  _module.metadata = {
-    role = "optional";
-    name = moduleName;
-    description = "Boot entry management for multiple bootloaders";
-    category = "infrastructure";
-    subcategory = "boot";
-    stability = "experimental";
-    version = "1.0.0";
+in
+{
+  imports = [
+    (import ./options.nix { inherit lib moduleName; })
+  ] ++ optional (cfg.enable or false) ./config.nix;
+
+  # Don't use top-level config = when you have _module!
+  # Put config attributes directly at top level
+  system.activationScripts = mkIf (cfg.enable or false) {
+    bootEntryInit = lib.mkForce selectedProvider.activation.initializeJson;
+    bootEntrySync = lib.mkForce selectedProvider.activation.syncEntries;
   };
 
-  imports = if cfg.enable or true then [
-    (import ./options.nix { inherit moduleName; })
-    ./config.nix
-  ] else [];
-
-  # Modulname einmalig definieren und an Submodule weitergeben
-  _module.args.moduleName = moduleName;
-
-  config = mkMerge [
-    (let
-      # Generisch: enable-Flag aus Discovery-Pfad setzen
-      moduleMeta = getModuleMetadata moduleName;
-      enablePath = lib.splitString "." moduleMeta.enablePath;
-    in
-      lib.setAttrByPath enablePath (mkDefault (cfg.enable or true))
-    )
-    (mkIf cfg.enable {
-    # Activation scripts
-    config.system.activationScripts = {
-      bootEntryInit = lib.mkForce selectedProvider.activation.initializeJson;
-      bootEntrySync = lib.mkForce selectedProvider.activation.syncEntries;
-    };
-
-    # Management tools
-    environment.systemPackages = [
-      selectedProvider.scripts.listEntries
-      selectedProvider.scripts.renameEntry
-      selectedProvider.scripts.resetEntry
-    ];
-    })
+  environment.systemPackages = mkIf (cfg.enable or false) [
+    selectedProvider.scripts.listEntries
+    selectedProvider.scripts.renameEntry
+    selectedProvider.scripts.resetEntry
   ];
 }

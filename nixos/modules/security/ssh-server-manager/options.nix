@@ -1,7 +1,7 @@
 { lib, ... }:
 
 {
-  options.modules.security.ssh-server-manager = {
+  options.systemConfig.modules.security.ssh-server-manager = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;

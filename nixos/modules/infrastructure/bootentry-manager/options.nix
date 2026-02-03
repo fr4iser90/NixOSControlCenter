@@ -3,7 +3,7 @@
 let
   types = import ./lib/types.nix { inherit lib; };
 in {
-  options.modules.infrastructure.${moduleName} = {
+  options.systemConfig.modules.infrastructure.${moduleName} = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;

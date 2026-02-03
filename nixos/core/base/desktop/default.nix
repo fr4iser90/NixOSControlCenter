@@ -18,9 +18,6 @@ in {
   };
 
 
-  # Modulname einmalig definieren und an Submodule weitergeben
-  _module.args.moduleName = moduleName;
-
   imports = if cfg.enable or false then [
     ./options.nix
     ./components/display-managers

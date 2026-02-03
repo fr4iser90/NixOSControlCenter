@@ -66,9 +66,7 @@ let
 in
 {
   config = {
-    # API immer verfügbar machen (für andere Module) - GENERISCH!
+    # API immer verfügbar machen
     ${configPath}.api = apiValue;
   };
-
-  # Config nur wenn enabled
 }

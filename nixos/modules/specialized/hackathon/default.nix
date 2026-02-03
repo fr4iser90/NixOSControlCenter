@@ -3,34 +3,17 @@
 with lib;
 
 let
-  # CONVENTION OVER CONFIGURATION - Vollständig dynamisch aus Dateisystem
-  moduleName = baseNameOf ./. ;        # "hackathon" - automatisch!
+  moduleName = baseNameOf ./. ;
   cfg = getModuleConfig moduleName;
   
-  # Finde alle Benutzer mit hackathon-admin Rolle
   hackathonUsers = lib.filterAttrs
     (name: user: user.role == "hackathon-admin")
     (getModuleConfig "user");
 
-  # Prüfe ob wir Hackathon-Admin-Benutzer haben
   hasHackathonUsers = (lib.length (lib.attrNames hackathonUsers)) > 0;
-
-  # Hole den ersten Hackathon-Admin-Benutzer, falls vorhanden
   hackathonUser = if hasHackathonUsers then lib.head (lib.attrNames hackathonUsers) else "";
 
 in {
-  _module.metadata = {
-    role = "optional";
-    name = moduleName;
-    description = "Hackathon environment management";
-    category = "specialized";
-    subcategory = "development";
-    version = "1.0.0";
-  };
-
-  # Modulname einmalig definieren und an Submodule weitergeben
-  _module.args.moduleName = moduleName;
-
   imports = if cfg.enable or false then
     [
       ./options.nix
@@ -43,12 +26,5 @@ in {
     ] else [])
   else [];
 
-  config = mkMerge [
-    {
-      modules.specialized.hackathon.enable = mkDefault (cfg.enable or false);
-    }
-    (mkIf cfg.enable {
-      # Feature-specific config here
-    })
-  ];
+  # Removed: Redundant enable setting (already defined in options.nix)
 }

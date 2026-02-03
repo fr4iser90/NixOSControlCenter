@@ -739,29 +739,49 @@ enablePath = "core.management.system-manager.submodules.cli-formatter.enable"
 - **Purpose**: Command-Center command registration
 - **Responsibilities**:
   - Create all executable scripts using `pkgs.writeShellScriptBin`
-  - Register commands in `core.management.system-manager.submodules.cli-registry.commands`
+  - Register commands via CLI Registry API: `cliRegistry.registerCommandsFor`
   - Define command metadata (name, description, category, help text)
-- **Critical**: Should be inside `mkIf cfg.enable` block when module has enable option
+- **Critical**: Commands must be wrapped in `lib.mkMerge` and use the API
 - **Pattern**:
 ```nix
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, moduleName, ... }:
+
+with lib;
+
 let
-  cfg = systemConfig.modules.infrastructure.homelab;
-  homelabStatus = pkgs.writeShellScriptBin "ncc-homelab-status" ''
+  cfg = getModuleConfig moduleName;
+  cliRegistry = getModuleApi "cli-registry";
+  
+  # Create script with safe defaults for build-time
+  myScript = pkgs.writeShellScriptBin "ncc-my-command" ''
+    #!/usr/bin/env bash
     # Command implementation
+    echo "Hello from my module!"
   '';
 in
-  lib.mkIf (cfg.enable or false) {
-    core.management.system-manager.submodules.cli-registry.commands = [
+{
+  config = lib.mkMerge [
+    (cliRegistry.registerCommandsFor "my-module" [
       {
-        name = "homelab-status";
-        script = "${homelabStatus}/bin/ncc-homelab-status";
-        description = "Show homelab status";
-        category = "infrastructure";
-        help = "Display current homelab configuration and status";
+        name = "my-command";
+        script = "${myScript}/bin/ncc-my-command";
+        description = "My awesome command";
+        category = "specialized";
+        arguments = ["arg1" "arg2"];
+        shortHelp = "my-command - Short description";
+        longHelp = ''
+          Detailed help text here
+          
+          Usage: ncc my-command [options]
+          
+          Options:
+            arg1    First argument
+            arg2    Second argument
+        '';
       }
-    ];
-  }
+    ])
+  ];
+}
 ```
 
 ## Best Practices

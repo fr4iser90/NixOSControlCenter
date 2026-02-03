@@ -14,8 +14,6 @@ in {
     version = "1.0.0";
   };
 
-  _module.args.moduleName = moduleName;
-
   imports = [
     ./options.nix
     ./config.nix

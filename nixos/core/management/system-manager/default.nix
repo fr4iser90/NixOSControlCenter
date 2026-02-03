@@ -6,6 +6,7 @@ let
   # ALTE getCurrentModuleMetadata verwenden (repariert)
   metadata = getCurrentModuleMetadata ./.;  # ← Jetzt korrekt!
   configPath = metadata.configPath;
+  moduleName = metadata.name;  # ← Ableiten aus metadata!
 
   # Cannot use getModuleConfig (chicken-egg problem with core modules)
   cfg = config.${configPath};
@@ -40,9 +41,7 @@ in {
       version = "1.0.0";
     };
 
-    # Modulname einmalig definieren und an Submodule weitergeben
-    _module.args.moduleName = moduleName;
-
+    # moduleName ist nur lokal im let Block - NICHT in _module.args exportieren!
     # moduleConfig kommt automatisch vom module-manager (zentral definiert)
 
     # System-Manager ist Core - immer geladen

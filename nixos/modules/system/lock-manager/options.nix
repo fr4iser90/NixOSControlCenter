@@ -1,7 +1,7 @@
 { lib, ... }:
 
 {
-  options.modules.system.lock = {
+  options.systemConfig.modules.system.lock = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;

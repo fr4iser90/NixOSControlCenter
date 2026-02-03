@@ -13,8 +13,6 @@ in {
     version = "1.0.0";
   };
 
-  _module.args.moduleName = moduleName;
-
   imports = [
     ./options.nix
     (import ./config.nix { inherit config lib pkgs buildGoApplication gomod2nix; })

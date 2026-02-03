@@ -14,9 +14,6 @@ in {
     version = "1.0.0";
   };
 
-  # Modulname einmalig definieren und an Submodule weitergeben
-  _module.args.moduleName = moduleName;
-
   # imports must be at top level
   imports = [
     ./options.nix      # Always import options first

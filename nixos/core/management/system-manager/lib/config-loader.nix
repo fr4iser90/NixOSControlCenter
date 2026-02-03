@@ -112,7 +112,7 @@ let
         if acc != null then acc  # Already found, keep it
         else
           let
-            configPath = searchPath + "/" + configName + "/config.nix";
+            configPath = "${toString searchPath}/${configName}/config.nix";
     in
       if builtins.pathExists configPath && isValidConfig configPath then
         let

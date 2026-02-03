@@ -1,7 +1,7 @@
 { lib, ... }:
 
 {
-  options.modules.infrastructure.homelab = {
+  options.systemConfig.modules.infrastructure.homelab = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;

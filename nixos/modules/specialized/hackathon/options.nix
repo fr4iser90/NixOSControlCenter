@@ -1,7 +1,7 @@
 { lib, ... }:
 
 {
-  options.modules.specialized.hackathon = {
+  options.systemConfig.modules.specialized.hackathon = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;
