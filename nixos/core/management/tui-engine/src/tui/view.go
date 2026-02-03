@@ -24,29 +24,35 @@ func init() {
 	}
 }
 
-func (m Model) renderHeader() string {
-	log.Printf("🐛 DEBUG renderHeader(): width=%d\n", m.width)
+func (m Model) renderHeader(dims *LayoutDimensions) string {
+	log.Printf("🐛 DEBUG renderHeader(): dims.InnerWidth=%d\n", dims.InnerWidth)
 
-	header := lipgloss.NewStyle().
+	// ✅ Header verwendet EXAKTE Dimensionen aus LayoutDimensions
+	content := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("39")).
 		Align(lipgloss.Center).
-		Width(m.width).
-		Height(1)
-
-	result := header.Render("📦 Module Manager")
-	log.Printf("🐛 DEBUG renderHeader(): result length: %d\n", len(result))
+		Render("📦 Module Manager")
+	
+	// ✅ Garantiere exakte Größe mit ensureSize
+	result := ensureSize(content, dims.InnerWidth, dims.HeaderHeight)
+	
+	log.Printf("🐛 DEBUG renderHeader(): result size: %dx%d\n", 
+		lipgloss.Width(result), lipgloss.Height(result))
 	return result
 }
 
-func (m Model) renderFooter() string {
-	footer := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("241")).
-		Width(m.width).
-		Align(lipgloss.Left)
-
+func (m Model) renderFooter(dims *LayoutDimensions) string {
+	// ✅ Footer verwendet EXAKTE Dimensionen aus LayoutDimensions
 	shortcuts := "↑/↓ Navigate • / Search • e Enable • d Disable • r Refresh • t Details • q Quit"
-	return footer.Render(shortcuts)
+	
+	content := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("241")).
+		Align(lipgloss.Left).
+		Render(shortcuts)
+	
+	// ✅ Garantiere exakte Größe mit ensureSize
+	return ensureSize(content, dims.InnerWidth, dims.FooterHeight)
 }
 
 // =============================================================================
@@ -107,11 +113,28 @@ func (m Model) renderPanel(config PanelConfig) string {
 }
 
 func (m Model) renderViewportPanel(title string, vp viewport.Model, width, height int) string {
-	log.Printf("🐛 DEBUG renderViewportPanel(): %s width=%d height=%d\n", title, width, height)
+	log.Printf("🐛 DEBUG renderViewportPanel(): %s target width=%d height=%d\n", title, width, height)
 
-	// Update viewport dimensions
+	// ✅ CRITICAL FIX: Ziehe Border + Padding Overhead ab!
+	// Border: NormalBorder = 2 top + 2 bottom = 4
+	// Padding: (1,1) = 2 top + 2 bottom = 4
+	// Total vertical overhead = 8 lines
+	borderOverhead := 4  // 2 top + 2 bottom for NormalBorder
+	paddingOverhead := 4 // 2 top + 2 bottom for Padding(1,1)
+	totalVerticalOverhead := borderOverhead + paddingOverhead
+	
+	// Calculate actual content height
+	contentHeight := height - totalVerticalOverhead
+	if contentHeight < 1 {
+		contentHeight = 1 // Safety minimum
+	}
+	
+	log.Printf("🐛 DEBUG renderViewportPanel(): %s contentHeight=%d (after removing %d overhead)\n", 
+		title, contentHeight, totalVerticalOverhead)
+
+	// Update viewport dimensions with corrected height
 	vp.Width = width
-	vp.Height = height
+	vp.Height = contentHeight
 
 	// Create border style ohne Width-Constraint
 	style := lipgloss.NewStyle().
@@ -126,13 +149,86 @@ func (m Model) renderViewportPanel(title string, vp viewport.Model, width, heigh
 
 	content := title + "\n\n" + viewportContent
 	result := style.Render(content)
+	
+	actualHeight := lipgloss.Height(result)
+	log.Printf("🐛 DEBUG renderViewportPanel(): %s final height: target=%d, actual=%d\n", 
+		title, height, actualHeight)
 
-	log.Printf("🐛 DEBUG renderViewportPanel(): %s final result: %d chars\n", title, len(result))
 	return result
 }
 
 // =============================================================================
-// LAYOUT MANAGER
+// LAYOUT DIMENSIONS - SINGLE SOURCE OF TRUTH
+// =============================================================================
+
+type LayoutDimensions struct {
+	// Terminal size (absolute reference)
+	TerminalWidth  int
+	TerminalHeight int
+	
+	// Inner dimensions (after border)
+	InnerWidth  int
+	InnerHeight int
+	
+	// Component dimensions (fixed)
+	HeaderHeight int
+	FooterHeight int
+	
+	// Body dimensions (calculated)
+	BodyWidth  int
+	BodyHeight int
+}
+
+func NewLayoutDimensions(termWidth, termHeight int, borderStyle lipgloss.Style) *LayoutDimensions {
+	// Get border insets (border-agnostic!)
+	borderX, borderY := GetBorderInset(borderStyle)
+	
+	// Calculate inner dimensions
+	innerWidth := termWidth - borderX
+	innerHeight := termHeight - borderY
+	
+	// Fixed component heights
+	headerHeight := 1
+	footerHeight := 1
+	
+	// Body gets remaining space
+	bodyWidth := innerWidth
+	bodyHeight := innerHeight - headerHeight - footerHeight
+	
+	return &LayoutDimensions{
+		TerminalWidth:  termWidth,
+		TerminalHeight: termHeight,
+		InnerWidth:     innerWidth,
+		InnerHeight:    innerHeight,
+		HeaderHeight:   headerHeight,
+		FooterHeight:   footerHeight,
+		BodyWidth:      bodyWidth,
+		BodyHeight:     bodyHeight,
+	}
+}
+
+// GetBorderInset returns horizontal and vertical border size
+func GetBorderInset(style lipgloss.Style) (x, y int) {
+	// ✅ Lipgloss Border: GetHorizontalBorderSize() und GetVerticalBorderSize() verwenden!
+	horizontalBorder := style.GetHorizontalBorderSize()
+	verticalBorder := style.GetVerticalBorderSize()
+	
+	return horizontalBorder, verticalBorder
+}
+
+// ensureSize guarantees exact dimensions with clipping and padding
+func ensureSize(content string, width, height int) string {
+	style := lipgloss.NewStyle().
+		Width(width).      // Padding if too small
+		Height(height).    // Padding if too small
+		MaxWidth(width).   // Clipping if too large
+		MaxHeight(height)  // Clipping if too large
+	
+	return style.Render(content)
+}
+
+// =============================================================================
+// LAYOUT MANAGER (Legacy - kept for compatibility)
 // =============================================================================
 
 type LayoutManager struct {
@@ -145,32 +241,31 @@ func NewLayoutManager(width, height int) *LayoutManager {
 }
 
 func (lm *LayoutManager) GetAvailableDimensions() (int, int) {
-
-    // GLOBALE BORDER braucht auch Overhead!
-    globalBorderOverhead := 4  // 2 links + 2 rechts für Border + Margin
-	globalHeightOverhead := 4  // 2 oben + 2 unten
-    // 🎯 PANEL-OVERHEAD BERÜCKSICHTIGEN
-    // Jeder Panel: Border(2) + Padding(2) = 4 Zeichen Overhead
-    // 5 Panels = 20 Zeichen Overhead abziehen
-    panelOverhead := 5 * 4  // 20 Zeichen
-    bodyWidth := lm.width - panelOverhead - globalBorderOverhead // Templates bekommen weniger Breite
-
-    fixedOverhead := 34  // Funktioniert für 62 Zeilen
+    // ✅ NUR ECHTE OVERHEADS BERÜCKSICHTIGEN
     
-    // RESPONSIVE: Overhead skaliert mit Terminal-Größe
-    scalingFactor := 0.5  // 50% Overhead für große Terminals
-    minOverhead := 25     // Minimum für kleine Terminals
+    // Outer border: 2 links + 2 rechts für die RoundedBorder in renderResponsiveLayout
+    outerBorderWidth := 4
     
-    totalOverhead := max(minOverhead, int(float64(lm.height) * scalingFactor))
-    totalOverhead = max(totalOverhead, fixedOverhead)  // Nicht unter funktionierenden Wert
+    // Header (1 Zeile) + Footer (1 Zeile) + Outer border oben (1) + unten (1)
+    outerBorderHeight := 4
     
-    bodyHeight := lm.height - totalOverhead - globalHeightOverhead
+    // Panel-Overhead: Jeder Panel hat Border(2 links+rechts) + Padding(2 links+rechts) = 4 Zeichen
+    // Bei 5 Panels horizontal = 5 * 4 = 20 Zeichen Overhead
+    panelOverhead := 5 * 4
     
-    if bodyHeight < 15 {
-        bodyHeight = 15  // Nie unter 15 Zeilen
+    // Verfügbare Breite für Template-Body
+    bodyWidth := lm.width - outerBorderWidth - panelOverhead
+    
+    // Verfügbare Höhe für Template-Body
+    // Header(1) + Footer(1) + Outer border(2) + Panel borders oben/unten(2) = 6
+    bodyHeight := lm.height - outerBorderHeight - 2
+    
+    // Sicherheitschecks
+    if bodyWidth < 60 {
+        bodyWidth = 60  // Minimum Breite
     }
-    if bodyHeight > lm.height - 10 {
-        bodyHeight = lm.height - 10  // Nie zu nah an Maximum
+    if bodyHeight < 10 {
+        bodyHeight = 10  // Minimum Höhe
     }
     
     return bodyWidth, bodyHeight
@@ -213,7 +308,7 @@ func (lm *LayoutManager) DistributeWidths(totalWidth int, configs []PanelConfig)
 // =============================================================================
 
 type Template interface {
-	Render(m Model) string
+	Render(m Model, dims *LayoutDimensions) string
 	GetMinWidth() int
 	GetMinHeight() int
 	GetPanels() []PanelConfig
@@ -328,9 +423,10 @@ func (t *FullLayoutTemplate) GetPanels() []PanelConfig {
 	}
 }
 
-func (t *FullLayoutTemplate) Render(m Model) string {
-	header := m.renderHeader()
-	footer := m.renderFooter()
+func (t *FullLayoutTemplate) Render(m Model, dims *LayoutDimensions) string {
+	// ✅ Render header and footer with EXACT dimensions
+	header := m.renderHeader(dims)
+	footer := m.renderFooter(dims)
 
 	// Get dimensions
 	lm := NewLayoutManager(m.width, m.height)
@@ -374,13 +470,14 @@ func (t *MediumLayoutTemplate) GetPanels() []PanelConfig {
 	}
 }
 
-func (t *MediumLayoutTemplate) Render(m Model) string {
+func (t *MediumLayoutTemplate) Render(m Model, dims *LayoutDimensions) string {
     log.Printf("🐛 DEBUG MediumTemplate.Render(): Start\n")
 
-    header := m.renderHeader()
+    // ✅ Render header and footer with EXACT dimensions
+    header := m.renderHeader(dims)
     log.Printf("🐛 DEBUG MediumTemplate.Render(): Header length: %d\n", len(header))
 
-    footer := m.renderFooter()
+    footer := m.renderFooter(dims)
     log.Printf("🐛 DEBUG MediumTemplate.Render(): Footer length: %d\n", len(footer))
 
     // ✅ DIMENSION-BERECHNUNG WIEDER HINZUFÜGEN!
@@ -428,9 +525,10 @@ func (t *CompactLayoutTemplate) GetPanels() []PanelConfig {
 	}
 }
 
-func (t *CompactLayoutTemplate) Render(m Model) string {
-	header := m.renderHeader()
-	footer := m.renderFooter()
+func (t *CompactLayoutTemplate) Render(m Model, dims *LayoutDimensions) string {
+	// ✅ Render header and footer with EXACT dimensions
+	header := m.renderHeader(dims)
+	footer := m.renderFooter(dims)
 
 	lm := NewLayoutManager(m.width, m.height)
 	bodyWidth, bodyHeight := lm.GetAvailableDimensions()
@@ -487,9 +585,10 @@ func (t *UltraCompactLayoutTemplate) GetPanels() []PanelConfig {
 	}
 }
 
-func (t *UltraCompactLayoutTemplate) Render(m Model) string {
-	header := m.renderHeader()
-	footer := m.renderFooter()
+func (t *UltraCompactLayoutTemplate) Render(m Model, dims *LayoutDimensions) string {
+	// ✅ Render header and footer with EXACT dimensions
+	header := m.renderHeader(dims)
+	footer := m.renderFooter(dims)
 
 	lm := NewLayoutManager(m.width, m.height)
 	bodyWidth, bodyHeight := lm.GetAvailableDimensions()
@@ -540,14 +639,15 @@ func (t *EmergencyLayoutTemplate) GetPanels() []PanelConfig {
 	}
 }
 
-func (t *EmergencyLayoutTemplate) Render(m Model) string {
-	header := m.renderHeader()
+func (t *EmergencyLayoutTemplate) Render(m Model, dims *LayoutDimensions) string {
+	// ✅ Render header with EXACT dimensions
+	header := m.renderHeader(dims)
 
 	content := m.renderPanel(PanelConfig{
 		Title:   "📦 MODULES",
 		Content: t.contentProvider.GetContent("menu"),
-		Width:   m.width,
-		Height:  m.height - 1, // Header only
+		Width:   dims.BodyWidth,
+		Height:  dims.BodyHeight,
 		Style:   PanelStyleMinimal,
 	})
 
@@ -723,41 +823,61 @@ func init() {
 func (m Model) renderResponsiveLayout() string {
 	log.Printf("🐛 DEBUG renderResponsiveLayout(): Start\n")
 
-	// Create content provider with current model
+	// ✅ 1. Create border style
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("39"))
+	
+	// ✅ 2. Calculate EXACT dimensions (border-agnostic!)
+	dims := NewLayoutDimensions(m.width, m.height, borderStyle)
+	log.Printf("🐛 DEBUG Dimensions: Terminal=%dx%d, Inner=%dx%d, Body=%dx%d\n",
+		dims.TerminalWidth, dims.TerminalHeight,
+		dims.InnerWidth, dims.InnerHeight,
+		dims.BodyWidth, dims.BodyHeight)
+
+	// ✅ 3. Create content provider with current model
 	cp := NewDefaultContentProvider(&m)
 
-	// Create fresh templates with current content provider
+	// ✅ 4. Create fresh templates with current content provider
 	templateRegistry.Register("emergency", NewEmergencyLayoutTemplate(cp))
 	templateRegistry.Register("ultra-compact", NewUltraCompactLayoutTemplate(cp))
 	templateRegistry.Register("compact", NewCompactLayoutTemplate(cp))
 	templateRegistry.Register("medium", NewMediumLayoutTemplate(cp))
 	templateRegistry.Register("full", NewFullLayoutTemplate(cp))
 
-	// Select appropriate template
+	// ✅ 5. Select appropriate template
 	template := templateRegistry.SelectTemplate(m.width, m.height, "")
 	log.Printf("🐛 DEBUG renderResponsiveLayout(): Template selected: %T\n", template)
 
 	if template == nil {
 		log.Printf("🐛 DEBUG renderResponsiveLayout(): Kein Template gefunden, verwende Emergency!\n")
-		// Fallback to emergency template
 		template = templateRegistry.Get("emergency")
 	}
 
-	// Render inner layout
+	// ✅ 6. Render inner layout with EXACT dimensions (dims explizit übergeben!)
 	log.Printf("🐛 DEBUG renderResponsiveLayout(): Rufe template.Render() auf\n")
-	innerLayout := template.Render(m)
+	innerLayout := template.Render(m, dims)
 	log.Printf("🐛 DEBUG renderResponsiveLayout(): template.Render returned: %d chars\n", len(innerLayout))
 
-	// 🎯 FIX: Border ohne Width-Constraints
-	border := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("39")).
-		Width(m.width - 4).   // Terminal minus Margin links (2) + rechts (2)
-		Height(m.height - 4). // Terminal minus Margin oben (2) + unten (2)
-		Margin(2, 2, 2, 2)  // 2 Zeilen oben/unten, 2 Spalten links/rechts
-		// REMOVED: .Width(m.width).Height(m.height) - lässt Border natürliche Größe verwenden
-		
-	borderedLayout := border.Render(innerLayout)
+	// ✅ 7. VALIDATE: Check if innerLayout has correct size
+	actualWidth := lipgloss.Width(innerLayout)
+	actualHeight := lipgloss.Height(innerLayout)
+	log.Printf("🐛 DEBUG VALIDATION: Expected=%dx%d, Actual=%dx%d\n",
+		dims.InnerWidth, dims.InnerHeight,
+		actualWidth, actualHeight)
+	
+	if actualWidth != dims.InnerWidth || actualHeight != dims.InnerHeight {
+		log.Printf("❌ SIZE MISMATCH! Template rendered wrong size!\n")
+	}
+
+	// ✅ 8. Border wraps content (OHNE Width/Height - passt sich an!)
+	borderedLayout := borderStyle.Render(innerLayout)
+	
+	finalWidth := lipgloss.Width(borderedLayout)
+	finalHeight := lipgloss.Height(borderedLayout)
+	log.Printf("🐛 DEBUG FINAL: Expected=%dx%d, Actual=%dx%d\n",
+		dims.TerminalWidth, dims.TerminalHeight,
+		finalWidth, finalHeight)
 
 	return borderedLayout
 }
