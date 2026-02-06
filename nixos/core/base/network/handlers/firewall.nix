@@ -6,14 +6,18 @@ let
   
   # Service-Konfigurationen aus systemConfig.nix
   services = lib.attrByPath ["services"] {} (getModuleConfig "network");
+  
+  # Firewall-Config lesen
+  networkCfg = getModuleConfig "network";
+  firewallEnabled = lib.attrByPath ["firewall" "enable"] true networkCfg;
 
   # Helper für sicheres Prüfen der Exposure
   isPubliclyExposed = cfg:
     (cfg.exposure or "local") == "public";
 
 in {
-  networking.firewall = {
-    enable = lib.mkDefault true;
+  networking.firewall = lib.mkIf firewallEnabled {
+    enable = true;
     allowPing = true;
 
     extraCommands = ''
@@ -29,6 +33,10 @@ in {
       iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
       iptables -A INPUT -i lo -j ACCEPT
 
+      # ICMP erlauben (für Ping)
+      iptables -A INPUT -p icmp --icmp-type echo-request -j ACCEPT
+      iptables -A INPUT -p icmp --icmp-type echo-reply -j ACCEPT
+
       # Service-spezifische Regeln
       ${lib.concatMapStrings (service: 
         rules.generateServiceRules service recommendations.${service} (services.${service} or {})
@@ -37,7 +45,7 @@ in {
       # Zusätzliche vertrauenswürdige Netze
       ${lib.concatMapStrings (net: ''
         iptables -A INPUT -s ${net} -j ACCEPT
-      '') (lib.attrByPath ["firewall" "trustedNetworks"] [] (getModuleConfig "network"))}
+      '') (lib.attrByPath ["firewall" "trustedNetworks"] [] networkCfg)}
     '';
   };
 

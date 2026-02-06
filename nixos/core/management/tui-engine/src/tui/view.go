@@ -418,7 +418,7 @@ func (t *FullLayoutTemplate) GetPanels() []PanelConfig {
 		{Title: "📋 MENU", MinWidth: 20, Weight: 0.2, Style: PanelStyleBordered},
 		{Title: "📦 CONTENT", MinWidth: 25, Weight: 0.4, Style: PanelStyleBordered},
 		{Title: "🔍 FILTER", MinWidth: 15, Weight: 0.13, Style: PanelStyleBordered},
-		{Title: "ℹ️ INFO", MinWidth: 15, Weight: 0.13, Style: PanelStyleBordered},
+		{Title: "⚙️ ACTIONS", MinWidth: 15, Weight: 0.13, Style: PanelStyleBordered},
 		{Title: "📊 STATS", MinWidth: 15, Weight: 0.13, Style: PanelStyleBordered},
 	}
 }
@@ -440,7 +440,7 @@ func (t *FullLayoutTemplate) Render(m Model, dims *LayoutDimensions) string {
 	menu := m.renderViewportPanel("📋 MENU", m.menuViewport, widths[0], bodyHeight)
 	content := m.renderViewportPanel("📦 CONTENT", m.contentViewport, widths[1], bodyHeight)
 	filter := m.renderViewportPanel("🔍 FILTER", m.filterViewport, widths[2], bodyHeight)
-	info := m.renderViewportPanel("ℹ️ INFO", m.infoViewport, widths[3], bodyHeight)
+	info := m.renderViewportPanel("⚙️ ACTIONS", m.infoViewport, widths[3], bodyHeight)
 	stats := m.renderViewportPanel("📊 STATS", m.statsViewport, widths[4], bodyHeight)
 
 	// Join horizontally
@@ -697,6 +697,8 @@ func (m *Model) updatePanels() {
 // OLD PANEL FUNCTIONS REMOVED - REPLACED BY TEMPLATE SYSTEM
 
 func (m Model) renderModuleListContent() string {
+	// ✅ Remove duplicate header - list already has title
+	// Just return the list view directly
 	return m.list.View()
 }
 
@@ -713,24 +715,47 @@ func (m Model) renderFilterContent() string {
 }
 
 func (m Model) renderInfoContent() string {
+	// ✅ Renamed to ACTIONS - show what user can DO
+	content := "⚙️ ACTIONS\n\n"
+	
 	if m.selectedModule.Name == "" {
-		return "ℹ️ INFO\n\nSelect a module to see details..."
+		content += "Select a module to see\navailable actions.\n\n"
+		content += "Navigation:\n"
+		content += "↑/↓  Navigate list\n"
+		content += "/    Search modules\n"
+		content += "q    Quit\n"
+		return content
 	}
-
-	content := fmt.Sprintf("ℹ️ MODULE INFO\n\n")
-	content += fmt.Sprintf("Name: %s\n", m.selectedModule.Name)
-	content += fmt.Sprintf("Description: %s\n", m.selectedModule.DescriptionText)
-	content += fmt.Sprintf("Status: %s\n", m.selectedModule.Status)
-	content += fmt.Sprintf("Category: %s\n", m.selectedModule.Category)
-	content += fmt.Sprintf("Path: %s\n", m.selectedModule.Path)
+	
+	// Show available actions for selected module
+	content += "Module Actions:\n\n"
+	
+	// Check if module is enabled/disabled
+	if m.selectedModule.Status == "enabled" {
+		content += "[d] Disable Module\n"
+	} else if m.selectedModule.Status == "disabled" {
+		content += "[e] Enable Module\n"
+	}
+	
+	content += "[r] Reload Config\n"
+	content += "[t] Show Details\n"
+	content += "[c] View Config\n"
+	content += "[l] View Logs\n"
+	content += "\n"
+	content += "Navigation:\n"
+	content += "[q] Quit\n"
+	content += "[?] Help\n"
+	
 	return content
 }
 
 func (m Model) renderStatsContent() string {
+	// ✅ Calculate real statistics
 	total := len(m.modules)
 	enabled := 0
 	disabled := 0
 	broken := 0
+	unknown := 0
 
 	for _, mod := range m.modules {
 		switch mod.Status {
@@ -740,15 +765,37 @@ func (m Model) renderStatsContent() string {
 			disabled++
 		case "broken":
 			broken++
+		default:
+			unknown++
 		}
 	}
 
 	content := "📊 STATISTICS\n\n"
-	content += fmt.Sprintf("Total: %d\n", total)
-	content += fmt.Sprintf("Enabled: %d\n", enabled)
-	content += fmt.Sprintf("Disabled: %d\n", disabled)
-	content += fmt.Sprintf("Broken: %d\n", broken)
-	content += fmt.Sprintf("\nTerminal: %dx%d\n", m.width, m.height)
+	content += fmt.Sprintf("Total: %d modules\n", total)
+	content += "━━━━━━━━━━━━━━━━\n"
+	
+	// Show percentages
+	if total > 0 {
+		enabledPct := (enabled * 100) / total
+		disabledPct := (disabled * 100) / total
+		
+		content += fmt.Sprintf("✓ Enabled: %d (%d%%)\n", enabled, enabledPct)
+		content += fmt.Sprintf("✗ Disabled: %d (%d%%)\n", disabled, disabledPct)
+		
+		if broken > 0 {
+			brokenPct := (broken * 100) / total
+			content += fmt.Sprintf("? Broken: %d (%d%%)\n", broken, brokenPct)
+		}
+		
+		if unknown > 0 {
+			content += fmt.Sprintf("? Unknown: %d\n", unknown)
+		}
+	}
+	
+	content += "\nCategories:\n"
+	content += "🔧 Core: (TBD)\n"
+	content += "📦 Custom: (TBD)\n"
+	
 	return content
 }
 

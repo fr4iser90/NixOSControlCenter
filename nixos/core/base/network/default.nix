@@ -35,11 +35,8 @@ in {
     # Enable NetworkManager by default
     networkmanager.enable = true;
 
-    # Basic firewall settings
-    firewall = {
-      enable = networkCfg.firewall.enable;
-      allowPing = true;
-    };
+    # Firewall configuration is handled in handlers/firewall.nix
+    # to avoid conflicts and ensure proper enable/disable handling
   };
 
   # Time zone configuration
