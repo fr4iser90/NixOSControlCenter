@@ -16,9 +16,15 @@ let
     (cfg.exposure or "local") == "public";
 
 in {
-  networking.firewall = lib.mkIf firewallEnabled {
-    enable = true;
-    allowPing = true;
+  # Firewall-Konfiguration mit explizitem enable-Status
+  networking.firewall = lib.mkMerge [
+    # Firewall-Status IMMER explizit setzen (auch wenn false)
+    {
+      enable = firewallEnabled;
+    }
+    # Rest der Firewall-Konfiguration nur wenn aktiviert
+    (lib.mkIf firewallEnabled {
+      allowPing = true;
 
     extraCommands = ''
       # Lösche existierende Regeln
@@ -47,16 +53,17 @@ in {
         iptables -A INPUT -s ${net} -j ACCEPT
       '') (lib.attrByPath ["firewall" "trustedNetworks"] [] networkCfg)}
     '';
-  };
+    })
+  ];
 
   # Warnungen für unsichere Konfigurationen
-  warnings = lib.flatten (map (service:
+  warnings = lib.flatten (lib.filter (w: w != null) (map (service:
     let
       cfg = recommendations.${service};
       userCfg = services.${service} or {};
     in
     if isPubliclyExposed userCfg && (cfg.recommended or "local") == "local"
-    then [ "Warning: ${service} is exposed publicly but recommended to be local only (${cfg.reason or "security risk"})" ]
-    else []
-  ) (builtins.attrNames recommendations));
+    then "Warning: ${service} is exposed publicly but recommended to be local only (${cfg.reason or "security risk"})"
+    else null
+  ) (builtins.attrNames recommendations)));
 }
