@@ -1,35 +1,38 @@
-# Migration Service - Modul-Struktur Analyse
+# Nixify - Modul-Struktur Analyse
 
 ## Vergleich mit MODULE_TEMPLATE
 
 ### ✅ Aktuell vorhanden
 
 ```
-migration-service/
+nixify/
 ├── README.md                    ✅ Vorhanden
+├── CHANGELOG.md                 ✅ Vorhanden
 └── doc/                        ✅ Vorhanden
     ├── DOCUMENTATION_CHECKLIST.md
-    ├── MIGRATION_SERVICE_ARCHITECTURE.md
-    ├── MIGRATION_SERVICE_STRUCTURE.md
-    └── MIGRATION_SERVICE_WORKFLOW.md
+    ├── NIXIFY_ARCHITECTURE.md
+    ├── NIXIFY_WORKFLOW.md
+    └── ARCHITECTURE_CLARIFICATION.md
 ```
 
 ### ❌ Fehlend (gemäß MODULE_TEMPLATE)
 
 ```
-migration-service/
+nixify/
 ├── default.nix                 ❌ FEHLT - Modul-Entry-Point (REQUIRED)
 ├── options.nix                 ❌ FEHLT - Config-Optionen (REQUIRED)
 ├── config.nix                  ❌ FEHLT - System-Integration (REQUIRED wenn enabled)
 ├── commands.nix                ❌ FEHLT - CLI-Commands (OPTIONAL aber empfohlen)
 ├── api.nix                     ⏳ OPTIONAL - API-Definition
-├── CHANGELOG.md                ⏳ EMPFOHLEN - Version-Historie
+├── CHANGELOG.md                ✅ Vorhanden
 │
 ├── snapshot/                   ❌ FEHLT - Snapshot-Scripts
 │   ├── windows/
-│   │   └── migration-snapshot.ps1
-│   └── macos/
-│       └── migration-snapshot.sh
+│   │   └── nixify-scan.ps1
+│   ├── macos/
+│   │   └── nixify-scan.sh
+│   └── linux/                  ❌ FEHLT - Linux-Script (NEU)
+│       └── nixify-scan.sh
 │
 ├── mapping/                    ❌ FEHLT - Programm-Mapping
 │   ├── mapping-database.json
@@ -67,14 +70,14 @@ migration-service/
 with lib;
 
 let
-  moduleName = baseNameOf ./. ;  # "migration-service"
+  moduleName = baseNameOf ./. ;  # "nixify"
   cfg = getModuleConfig moduleName;
   
   # Module metadata (REQUIRED)
   metadata = {
     role = "optional";              # "optional" | "core" | "required"
-    name = "migration-service";     # Unique module identifier
-    description = "Windows/macOS → NixOS Migration Service"; # Human-readable
+    name = "nixify";                # Unique module identifier
+    description = "Windows/macOS/Linux → NixOS System-DNA-Extractor"; # Human-readable
     category = "specialized";        # "core" | "base" | "security" | "infrastructure" | "specialized"
     subcategory = "migration";      # Specific subcategory
     stability = "experimental";     # "stable" | "experimental" | "deprecated" | "beta" | "alpha"
@@ -86,7 +89,7 @@ in
   _module.metadata = metadata;
   
   _module.args = {
-    migrationServiceCfg = cfg;
+    nixifyCfg = cfg;
     moduleName = moduleName;
   };
 
@@ -110,7 +113,7 @@ in
 
 let
   metadata = getCurrentModuleMetadata ./.;
-  configPath = metadata.configPath or "systemConfig.modules.specialized.migration-service";
+  configPath = metadata.configPath or "systemConfig.modules.specialized.nixify";
   moduleVersion = "0.1.0";
 in
 {
@@ -127,7 +130,7 @@ in
     enable = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Enable Windows/macOS → NixOS Migration Service";
+      description = "Enable Windows/macOS/Linux → NixOS System-DNA-Extractor";
     };
 
     # Web-Service configuration
@@ -179,10 +182,10 @@ let
 in
 lib.mkIf (cfg.enable or false) {
   # Web-Service als systemd-Service
-  systemd.services.migration-web-service = lib.mkIf cfg.webService.enable {
+  systemd.services.nixify-service = lib.mkIf cfg.webService.enable {
     enable = true;
     serviceConfig = {
-      ExecStart = "${webService}/bin/migration-web-service";
+      ExecStart = "${webService}/bin/nixify-service";
       Restart = "always";
     };
     environment = {
@@ -195,6 +198,7 @@ lib.mkIf (cfg.enable or false) {
   environment.systemPackages = lib.mkIf cfg.snapshot.enable [
     snapshotScripts.windows
     snapshotScripts.macos
+    snapshotScripts.linux  # NEU
   ];
 }
 ```
@@ -214,29 +218,30 @@ let
   cfg = getModuleConfig moduleName;
   cliRegistry = getModuleApi "cli-registry";
   
-  # Migration Service Manager Script
-  migrationServiceScript = pkgs.writeScriptBin "ncc-migration-service" ''
+  # Nixify Service Manager Script
+  nixifyServiceScript = pkgs.writeScriptBin "ncc-nixify" ''
     #!/usr/bin/env bash
-    # Migration Service Manager
-    echo "Migration Service - Windows/macOS → NixOS"
+    # Nixify Service Manager
+    echo "Nixify - Windows/macOS/Linux → NixOS System-DNA-Extractor"
   '';
 in
 lib.mkMerge [
-  (cliRegistry.registerCommandsFor "migration-service" [
+  (cliRegistry.registerCommandsFor "nixify" [
     {
-      name = "migration-service";
+      name = "nixify";
       scope = "module";
       type = "manager";
-      description = "Windows/macOS → NixOS Migration Service";
-      script = "${migrationServiceScript}/bin/ncc-migration-service";
+      description = "Windows/macOS/Linux → NixOS System-DNA-Extractor";
+      script = "${nixifyServiceScript}/bin/ncc-nixify";
       category = "specialized";
-      shortHelp = "migration-service - Migrate from Windows/macOS to NixOS";
+      shortHelp = "nixify - Extract system DNA and generate NixOS configs";
       longHelp = ''
-        Migration Service helps users migrate from Windows/macOS to NixOS.
+        Nixify helps users migrate from Windows/macOS/Linux to NixOS.
         
         Usage:
-          ncc migration-service snapshot    # Generate system snapshot
-          ncc migration-service status      # Check service status
+          ncc nixify service start    # Start web service
+          ncc nixify service status    # Check service status
+          ncc nixify list              # List sessions
       '';
     }
   ])
@@ -248,26 +253,28 @@ lib.mkMerge [
 ## Vollständige Ziel-Struktur
 
 ```
-nixos/modules/specialized/migration-service/
+nixos/modules/specialized/nixify/
 ├── README.md                    ✅ Vorhanden
+├── CHANGELOG.md                 ✅ Vorhanden
 ├── default.nix                 ❌ FEHLT - Erstellen
 ├── options.nix                 ❌ FEHLT - Erstellen
 ├── config.nix                  ❌ FEHLT - Erstellen
 ├── commands.nix                ❌ FEHLT - Erstellen
-├── CHANGELOG.md                ⏳ EMPFOHLEN - Erstellen
 │
 ├── doc/                        ✅ Vorhanden
 │   ├── DOCUMENTATION_CHECKLIST.md
 │   ├── MODULE_STRUCTURE_ANALYSIS.md  ← Diese Datei
-│   ├── migration-service-architecture.md
-│   ├── migration-service-structure.md
-│   └── migration-service-workflow.md
+│   ├── NIXIFY_ARCHITECTURE.md
+│   ├── NIXIFY_WORKFLOW.md
+│   └── ARCHITECTURE_CLARIFICATION.md
 │
 ├── snapshot/                   ❌ FEHLT - Erstellen
 │   ├── windows/
-│   │   └── migration-snapshot.ps1
-│   └── macos/
-│       └── migration-snapshot.sh
+│   │   └── nixify-scan.ps1
+│   ├── macos/
+│   │   └── nixify-scan.sh
+│   └── linux/                  ❌ FEHLT - Erstellen (NEU)
+│       └── nixify-scan.sh
 │
 ├── mapping/                    ❌ FEHLT - Erstellen
 │   ├── mapping-database.json
@@ -318,14 +325,14 @@ nixos/modules/specialized/migration-service/
 ### Phase 2: Dokumentation
 
 - [x] README.md
-- [x] doc/MIGRATION_SERVICE_ARCHITECTURE.md
-- [x] doc/MIGRATION_SERVICE_STRUCTURE.md
-- [x] doc/MIGRATION_SERVICE_WORKFLOW.md
-- [ ] CHANGELOG.md (empfohlen)
+- [x] CHANGELOG.md
+- [x] doc/NIXIFY_ARCHITECTURE.md
+- [x] doc/NIXIFY_WORKFLOW.md
+- [x] doc/ARCHITECTURE_CLARIFICATION.md
 
 ### Phase 3: Komponenten (später)
 
-- [ ] snapshot/ - Snapshot-Scripts
+- [ ] snapshot/ - Snapshot-Scripts (Windows/macOS/Linux)
 - [ ] mapping/ - Programm-Mapping
 - [ ] web-service/ - Web-Service
 - [ ] iso-builder/ - ISO-Builder
@@ -366,11 +373,12 @@ hackathon/
 └── (Scripts)
 ```
 
-### Migration-Service (aktuell)
+### Nixify (aktuell)
 
 ```
-migration-service/
+nixify/
 ├── README.md                   ✅
+├── CHANGELOG.md                ✅
 └── doc/                        ✅
     └── (Dokumentation)
 ```

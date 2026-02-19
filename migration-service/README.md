@@ -41,20 +41,4 @@ migration-service/
 
 ## Development
 
-### Dokumentation
-
-- **Architektur:** `doc/MIGRATION_SERVICE_ARCHITECTURE.md` - Komplette Architektur-Übersicht
-- **Struktur:** `doc/MIGRATION_SERVICE_STRUCTURE.md` - Repository-Struktur Entscheidung
-- **Workflow:** `doc/MIGRATION_SERVICE_WORKFLOW.md` - Detaillierter Workflow
-- **Struktur-Analyse:** `doc/MODULE_STRUCTURE_ANALYSIS.md` - Vergleich mit MODULE_TEMPLATE
-- **Implementierung:** `doc/IMPLEMENTATION_CHECKLIST.md` - Implementierungs-Checkliste
-- **Dokumentation:** `doc/DOCUMENTATION_CHECKLIST.md` - Dokumentations-Status
-- **Zusammenfassung:** `doc/SUMMARY.md` - Dokumentations-Übersicht
-
-### Status
-
-- **Phase:** Planning & Documentation ✅
-- **Next:** Core module files (default.nix, options.nix, config.nix, commands.nix)
-- **Stability:** Experimental (pre-implementation)
-
-Siehe `CHANGELOG.md` für Versions-Historie.
+Siehe `docs/02_architecture/migration-service-architecture.md` für Details.

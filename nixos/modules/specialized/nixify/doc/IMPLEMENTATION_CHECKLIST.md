@@ -1,8 +1,8 @@
-# Migration Service - Implementierungs-Checkliste
+# Nixify - Implementierungs-Checkliste
 
 ## Übersicht
 
-Diese Checkliste führt durch die komplette Implementierung des Migration-Service-Moduls.
+Diese Checkliste führt durch die komplette Implementierung des Nixify-Moduls.
 
 ---
 
@@ -15,8 +15,8 @@ Diese Checkliste führt durch die komplette Implementierung des Migration-Servic
 **Aufgaben:**
 - [ ] Module-Metadata definieren
   - [ ] role = "optional"
-  - [ ] name = "migration-service"
-  - [ ] description = "Windows/macOS → NixOS Migration Service"
+  - [ ] name = "nixify"
+  - [ ] description = "Windows/macOS/Linux → NixOS System-DNA-Extractor"
   - [ ] category = "specialized"
   - [ ] subcategory = "migration"
   - [ ] stability = "experimental"
@@ -58,6 +58,7 @@ Diese Checkliste führt durch die komplette Implementierung des Migration-Servic
 - [ ] Snapshot-Scripts als Packages
   - [ ] Windows-Script
   - [ ] macOS-Script
+  - [ ] Linux-Script (NEU)
 - [ ] Integration mit bestehenden Modulen
   - [ ] getModuleApi "module-manager"
   - [ ] getModuleApi "system-manager"
@@ -69,8 +70,8 @@ Diese Checkliste führt durch die komplette Implementierung des Migration-Servic
 **Status:** ❌ Fehlt
 
 **Aufgaben:**
-- [ ] Migration-Service-Manager-Command
-  - [ ] name = "migration-service"
+- [ ] Nixify-Service-Manager-Command
+  - [ ] name = "nixify"
   - [ ] scope = "module"
   - [ ] type = "manager"
   - [ ] category = "specialized"
@@ -88,12 +89,12 @@ Diese Checkliste führt durch die komplette Implementierung des Migration-Servic
 ### 2.1 Core-Dokumentation
 
 - [x] README.md
-- [x] doc/MIGRATION_SERVICE_ARCHITECTURE.md
-- [x] doc/MIGRATION_SERVICE_STRUCTURE.md
-- [x] doc/MIGRATION_SERVICE_WORKFLOW.md
+- [x] CHANGELOG.md
+- [x] doc/NIXIFY_ARCHITECTURE.md
+- [x] doc/NIXIFY_WORKFLOW.md
+- [x] doc/ARCHITECTURE_CLARIFICATION.md
 - [x] doc/DOCUMENTATION_CHECKLIST.md
 - [x] doc/MODULE_STRUCTURE_ANALYSIS.md
-- [x] CHANGELOG.md
 
 ### 2.2 Zukünftige Dokumentation
 
@@ -128,7 +129,7 @@ Diese Checkliste führt durch die komplette Implementierung des Migration-Servic
 - [ ] JSON-Report generieren
 - [ ] User-Review-Interface
 
-**Datei:** `snapshot/windows/migration-snapshot.ps1`
+**Datei:** `snapshot/windows/nixify-scan.ps1`
 
 ### 3.2 macOS-Script
 
@@ -150,7 +151,45 @@ Diese Checkliste führt durch die komplette Implementierung des Migration-Servic
 - [ ] JSON-Report generieren
 - [ ] User-Review-Interface
 
-**Datei:** `snapshot/macos/migration-snapshot.sh`
+**Datei:** `snapshot/macos/nixify-scan.sh`
+
+### 3.3 Linux-Script ✅ **NEU**
+
+**Status:** ❌ Fehlt
+
+**Aufgaben:**
+- [ ] Shell-Script erstellen
+- [ ] Distro-Erkennung
+  - [ ] /etc/os-release parsen
+  - [ ] Distro-ID und Version
+- [ ] Package Manager Detection
+  - [ ] apt (Ubuntu/Debian)
+  - [ ] dnf (Fedora/RHEL)
+  - [ ] pacman (Arch)
+  - [ ] zypper (openSUSE)
+- [ ] Programm-Erkennung
+  - [ ] Package Manager Packages
+  - [ ] Flatpak
+  - [ ] Snap
+- [ ] System-Einstellungen erfassen
+  - [ ] Timezone
+  - [ ] Locale
+  - [ ] Desktop Environment
+- [ ] Hardware-Info
+  - [ ] CPU
+  - [ ] RAM
+  - [ ] GPU
+- [ ] JSON-Report generieren
+- [ ] User-Review-Interface
+
+**Datei:** `snapshot/linux/nixify-scan.sh`
+
+**Unterstützte Distros:**
+- Ubuntu/Debian (apt)
+- Fedora/RHEL (dnf)
+- Arch (pacman)
+- openSUSE (zypper)
+- NixOS (Replikation)
 
 ---
 
@@ -191,9 +230,10 @@ Diese Checkliste führt durch die komplette Implementierung des Migration-Servic
 **Aufgaben:**
 - [ ] Go REST API (empfohlen)
 - [ ] Endpoints implementieren
-  - [ ] GET /snapshot/windows
-  - [ ] GET /snapshot/macos
-  - [ ] POST /api/v1/snapshot/upload
+  - [ ] GET /download/windows
+  - [ ] GET /download/macos
+  - [ ] GET /download/linux (NEU)
+  - [ ] POST /api/v1/upload
   - [ ] GET /api/v1/config/{session}
   - [ ] POST /api/v1/config/{session}/review
   - [ ] GET /api/v1/config/{session}/download
@@ -263,6 +303,7 @@ Diese Checkliste führt durch die komplette Implementierung des Migration-Servic
 **Aufgaben:**
 - [ ] Snapshot-Script testen (Windows)
 - [ ] Snapshot-Script testen (macOS)
+- [ ] Snapshot-Script testen (Linux) (NEU)
 - [ ] Web-Service testen
 - [ ] Config-Generator testen
 - [ ] ISO-Builder testen
@@ -298,7 +339,7 @@ Diese Checkliste führt durch die komplette Implementierung des Migration-Servic
 5. ❌ commands.nix
 
 ### P1 (Wichtig - für Basis-Funktionalität)
-6. ❌ Snapshot-Scripts (Windows/macOS)
+6. ❌ Snapshot-Scripts (Windows/macOS/Linux)
 7. ❌ Mapping-Database
 8. ❌ Web-Service (Basis)
 
@@ -325,7 +366,7 @@ Diese Checkliste führt durch die komplette Implementierung des Migration-Servic
 - Core-Modul-Dateien (default.nix, options.nix, config.nix, commands.nix)
 
 ### ⏳ Geplant
-- Snapshot-Scripts
+- Snapshot-Scripts (Windows/macOS/Linux)
 - Mapping-Database
 - Web-Service
 - ISO-Builder

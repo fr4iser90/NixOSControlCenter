@@ -1,12 +1,13 @@
-# Migration Service - Dokumentations-Checkliste
+# Nixify - Dokumentations-Checkliste
 
 ## ✅ Aktuell vorhandene Dokumentation
 
 ### Core-Dokumentation
-- ✅ **README.md** - Quick Start Guide
-- ✅ **MIGRATION_SERVICE_ARCHITECTURE.md** - Komplette Architektur-Übersicht
-- ✅ **MIGRATION_SERVICE_STRUCTURE.md** - Repository-Struktur Entscheidung
-- ✅ **MIGRATION_SERVICE_WORKFLOW.md** - Detaillierter Workflow
+- ✅ **README.md** - Quick Start Guide (mit Linux-Support)
+- ✅ **CHANGELOG.md** - Versions-Historie
+- ✅ **doc/NIXIFY_ARCHITECTURE.md** - Komplette Architektur-Übersicht (konsolidiert, mit Linux)
+- ✅ **doc/NIXIFY_WORKFLOW.md** - Detaillierter Workflow (mit Linux)
+- ✅ **doc/ARCHITECTURE_CLARIFICATION.md** - System-Trennung (kritisch!)
 
 ### Status: **Grundlegende Dokumentation komplett!** ✅
 
@@ -75,11 +76,16 @@ Die 4 vorhandenen Dokumente decken ab:
 - ✅ roadmap
 - ✅ README (vermutlich)
 
-### Migration-Service (aktuell)
+### Nixify (aktuell)
 - ✅ README.md
-- ✅ MIGRATION_SERVICE_ARCHITECTURE.md
-- ✅ MIGRATION_SERVICE_STRUCTURE.md
-- ✅ MIGRATION_SERVICE_WORKFLOW.md
+- ✅ CHANGELOG.md
+- ✅ doc/NIXIFY_ARCHITECTURE.md (konsolidiert)
+- ✅ doc/NIXIFY_WORKFLOW.md
+- ✅ doc/ARCHITECTURE_CLARIFICATION.md
+- ✅ doc/MODULE_STRUCTURE_ANALYSIS.md
+- ✅ doc/IMPLEMENTATION_CHECKLIST.md
+- ✅ doc/DOCUMENTATION_CHECKLIST.md
+- ✅ doc/SUMMARY.md
 
 **→ Für Pre-Implementation ist das ausreichend!**
 
@@ -89,11 +95,13 @@ Die 4 vorhandenen Dokumente decken ab:
 
 **Aktueller Stand: Dokumentation ist vollständig für die Planungs-Phase!**
 
-Die 4 vorhandenen Dokumente decken alle wichtigen Aspekte ab:
-1. ✅ **Architektur** - Wie es funktioniert
-2. ✅ **Struktur** - Wo es hinpasst
-3. ✅ **Workflow** - Wie User es nutzen
-4. ✅ **Quick Start** - Erste Schritte
+Die vorhandenen Dokumente decken alle wichtigen Aspekte ab:
+1. ✅ **Architektur** - Wie es funktioniert (konsolidiert, mit Linux)
+2. ✅ **Workflow** - Wie User es nutzen (Windows/macOS/Linux)
+3. ✅ **System-Trennung** - Kritische Architektur-Erklärung
+4. ✅ **Quick Start** - Erste Schritte (mit Linux)
+5. ✅ **Struktur-Analyse** - Vergleich mit MODULE_TEMPLATE
+6. ✅ **Implementierungs-Checkliste** - Phase-für-Phase
 
 **Für die Implementierung reicht das!** 🚀
 
