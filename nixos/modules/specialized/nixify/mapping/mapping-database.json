@@ -1,0 +1,218 @@
+{
+  "version": "0.1.0",
+  "programs": {
+    "Visual Studio Code": {
+      "nixos_package": "vscode",
+      "module": null,
+      "category": "development",
+      "aliases": ["vscode", "code", "Visual Studio Code", "VS Code"]
+    },
+    "Firefox": {
+      "nixos_package": "firefox",
+      "module": null,
+      "category": "browser",
+      "aliases": ["firefox", "Mozilla Firefox"]
+    },
+    "Google Chrome": {
+      "nixos_package": "google-chrome",
+      "module": null,
+      "category": "browser",
+      "aliases": ["chrome", "Google Chrome", "Chrome"]
+    },
+    "Chromium": {
+      "nixos_package": "chromium",
+      "module": null,
+      "category": "browser",
+      "aliases": ["chromium"]
+    },
+    "Docker Desktop": {
+      "nixos_package": "docker",
+      "module": "modules.infrastructure.homelab-manager",
+      "category": "infrastructure",
+      "aliases": ["docker", "Docker", "Docker Desktop"]
+    },
+    "Steam": {
+      "nixos_package": "steam",
+      "module": null,
+      "category": "gaming",
+      "aliases": ["steam"]
+    },
+    "Discord": {
+      "nixos_package": "discord",
+      "module": null,
+      "category": "communication",
+      "aliases": ["discord"]
+    },
+    "Slack": {
+      "nixos_package": "slack",
+      "module": null,
+      "category": "communication",
+      "aliases": ["slack"]
+    },
+    "Git": {
+      "nixos_package": "git",
+      "module": null,
+      "category": "development",
+      "aliases": ["git", "Git"]
+    },
+    "GitHub Desktop": {
+      "nixos_package": "github-desktop",
+      "module": null,
+      "category": "development",
+      "aliases": ["github-desktop", "GitHub Desktop"]
+    },
+    "Node.js": {
+      "nixos_package": "nodejs",
+      "module": null,
+      "category": "development",
+      "aliases": ["node", "nodejs", "Node.js"]
+    },
+    "Python": {
+      "nixos_package": "python3",
+      "module": null,
+      "category": "development",
+      "aliases": ["python", "python3", "Python"]
+    },
+    "VLC": {
+      "nixos_package": "vlc",
+      "module": null,
+      "category": "multimedia",
+      "aliases": ["vlc", "VLC media player"]
+    },
+    "Spotify": {
+      "nixos_package": "spotify",
+      "module": null,
+      "category": "multimedia",
+      "aliases": ["spotify"]
+    },
+    "7-Zip": {
+      "nixos_package": "p7zip",
+      "module": null,
+      "category": "utilities",
+      "aliases": ["7zip", "7-Zip", "p7zip"]
+    },
+    "WinRAR": {
+      "nixos_package": "unrar",
+      "module": null,
+      "category": "utilities",
+      "aliases": ["winrar", "WinRAR", "unrar"]
+    },
+    "Notepad++": {
+      "nixos_package": "notepadqq",
+      "module": null,
+      "category": "development",
+      "aliases": ["notepad++", "Notepad++", "notepadqq"]
+    },
+    "Adobe Acrobat Reader": {
+      "nixos_package": "okular",
+      "module": null,
+      "category": "utilities",
+      "aliases": ["acrobat", "Adobe Reader", "okular"]
+    },
+    "Microsoft Office": {
+      "nixos_package": "libreoffice",
+      "module": null,
+      "category": "productivity",
+      "aliases": ["office", "Microsoft Office", "libreoffice", "LibreOffice"]
+    },
+    "VirtualBox": {
+      "nixos_package": "virtualbox",
+      "module": null,
+      "category": "virtualization",
+      "aliases": ["virtualbox", "VirtualBox"]
+    },
+    "VMware": {
+      "nixos_package": null,
+      "module": "modules.infrastructure.vm-manager",
+      "category": "virtualization",
+      "aliases": ["vmware", "VMware"]
+    },
+    "iTerm2": {
+      "nixos_package": "alacritty",
+      "module": null,
+      "category": "utilities",
+      "aliases": ["iterm", "iTerm2", "alacritty"]
+    },
+    "Homebrew": {
+      "nixos_package": null,
+      "module": null,
+      "category": "package-manager",
+      "note": "NixOS uses nix package manager instead"
+    },
+    "Chocolatey": {
+      "nixos_package": null,
+      "module": null,
+      "category": "package-manager",
+      "note": "NixOS uses nix package manager instead"
+    }
+  },
+  "desktop_mapping": {
+    "windows": {
+      "preferred_de": "plasma",
+      "reason": "Most similar to Windows UI with taskbar and start menu",
+      "alternatives": ["gnome", "xfce"]
+    },
+    "macos": {
+      "preferred_de": "gnome",
+      "reason": "Most similar to macOS UI with dock and top bar",
+      "alternatives": ["plasma", "pantheon"]
+    },
+    "linux": {
+      "gnome": {
+        "preferred_de": "gnome",
+        "reason": "Same desktop environment",
+        "alternatives": []
+      },
+      "GNOME": {
+        "preferred_de": "gnome",
+        "reason": "Same desktop environment",
+        "alternatives": []
+      },
+      "kde": {
+        "preferred_de": "plasma",
+        "reason": "KDE Plasma is the modern KDE",
+        "alternatives": []
+      },
+      "KDE": {
+        "preferred_de": "plasma",
+        "reason": "KDE Plasma is the modern KDE",
+        "alternatives": []
+      },
+      "xfce": {
+        "preferred_de": "xfce",
+        "reason": "Same desktop environment",
+        "alternatives": []
+      },
+      "XFCE": {
+        "preferred_de": "xfce",
+        "reason": "Same desktop environment",
+        "alternatives": []
+      },
+      "default": {
+        "preferred_de": "plasma",
+        "reason": "Most flexible and customizable",
+        "alternatives": ["gnome", "xfce"]
+      }
+    }
+  },
+  "package_manager_mapping": {
+    "apt": {
+      "note": "Ubuntu/Debian packages can be mapped to nixpkgs equivalents"
+    },
+    "dnf": {
+      "note": "Fedora/RHEL packages can be mapped to nixpkgs equivalents"
+    },
+    "pacman": {
+      "note": "Arch packages can be mapped to nixpkgs equivalents"
+    },
+    "zypper": {
+      "note": "openSUSE packages can be mapped to nixpkgs equivalents"
+    },
+    "homebrew": {
+      "note": "Homebrew formulas can be mapped to nixpkgs equivalents"
+    },
+    "chocolatey": {
+      "note": "Chocolatey packages can be mapped to nixpkgs equivalents"
+    }
+  }
+}
