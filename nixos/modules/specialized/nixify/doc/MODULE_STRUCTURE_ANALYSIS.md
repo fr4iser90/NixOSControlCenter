@@ -90,15 +90,14 @@ in
   
   _module.args = {
     nixifyCfg = cfg;
-    moduleName = moduleName;
   };
 
   # Module imports
   imports = [
     ./options.nix  # Always import options first
+    (import ./commands.nix { inherit moduleName; })  # moduleName als Parameter übergeben
   ] ++ (if (cfg.enable or false) then [
-    ./config.nix
-    ./commands.nix
+    (import ./config.nix { inherit moduleName; })  # moduleName als Parameter übergeben
   ] else []);
 }
 ```
@@ -175,7 +174,7 @@ in
 { config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 let
-  moduleName = baseNameOf ./.;
+  moduleName = moduleName;  # Als Parameter übergeben von default.nix - nur einmal berechnet!
   cfg = getModuleConfig moduleName;
   moduleManager = getModuleApi "module-manager";
   systemManager = getModuleApi "system-manager";
@@ -214,7 +213,7 @@ lib.mkIf (cfg.enable or false) {
 with lib;
 
 let
-  moduleName = baseNameOf ./.;
+  moduleName = moduleName;  # Als Parameter übergeben von default.nix - nur einmal berechnet!
   cfg = getModuleConfig moduleName;
   cliRegistry = getModuleApi "cli-registry";
   
