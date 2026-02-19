@@ -76,6 +76,7 @@ func main() {
 	server := NewServer(port, host, dataDir)
 
 	// Setup routes
+	http.HandleFunc("/", server.handleRoot)
 	http.HandleFunc("/api/v1/health", server.handleHealth)
 	http.HandleFunc("/api/v1/upload", server.handleUpload)
 	http.HandleFunc("/api/v1/sessions", server.handleListSessions)
@@ -97,6 +98,92 @@ func main() {
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	html := `<!DOCTYPE html>
+<html>
+<head>
+    <title>Nixify Web Service</title>
+    <style>
+        body { font-family: monospace; margin: 40px; background: #1e1e1e; color: #d4d4d4; }
+        h1 { color: #4ec9b0; }
+        h2 { color: #569cd6; margin-top: 30px; }
+        code { background: #252526; padding: 2px 6px; border-radius: 3px; }
+        .endpoint { margin: 10px 0; padding: 10px; background: #252526; border-left: 3px solid #4ec9b0; }
+        .method { color: #4ec9b0; font-weight: bold; }
+        .path { color: #ce9178; }
+    </style>
+</head>
+<body>
+    <h1>🚀 Nixify Web Service</h1>
+    <p>Windows/macOS/Linux → NixOS System-DNA-Extractor</p>
+    
+    <h2>API Endpoints</h2>
+    
+    <div class="endpoint">
+        <span class="method">GET</span> <span class="path">/api/v1/health</span>
+        <p>Service health check</p>
+    </div>
+    
+    <div class="endpoint">
+        <span class="method">POST</span> <span class="path">/api/v1/upload</span>
+        <p>Upload snapshot report (JSON)</p>
+    </div>
+    
+    <div class="endpoint">
+        <span class="method">GET</span> <span class="path">/api/v1/sessions</span>
+        <p>List all migration sessions</p>
+    </div>
+    
+    <div class="endpoint">
+        <span class="method">GET</span> <span class="path">/api/v1/session/{id}</span>
+        <p>Get session details</p>
+    </div>
+    
+    <div class="endpoint">
+        <span class="method">GET</span> <span class="path">/api/v1/config/{id}</span>
+        <p>Get generated NixOS configuration</p>
+    </div>
+    
+    <div class="endpoint">
+        <span class="method">POST</span> <span class="path">/api/v1/iso/build</span>
+        <p>Build custom NixOS ISO</p>
+    </div>
+    
+    <div class="endpoint">
+        <span class="method">GET</span> <span class="path">/api/v1/iso/{id}/download</span>
+        <p>Download built ISO</p>
+    </div>
+    
+    <h2>Download Scripts</h2>
+    
+    <div class="endpoint">
+        <span class="method">GET</span> <span class="path">/download/windows</span>
+        <p>Download Windows snapshot script (PowerShell)</p>
+    </div>
+    
+    <div class="endpoint">
+        <span class="method">GET</span> <span class="path">/download/macos</span>
+        <p>Download macOS snapshot script (Bash)</p>
+    </div>
+    
+    <div class="endpoint">
+        <span class="method">GET</span> <span class="path">/download/linux</span>
+        <p>Download Linux snapshot script (Bash)</p>
+    </div>
+    
+    <h2>Quick Test</h2>
+    <p>Test the service: <code>curl http://localhost:8080/api/v1/health</code></p>
+    
+    <p style="margin-top: 40px; color: #858585; font-size: 0.9em;">
+        Service running on: <code>` + fmt.Sprintf("%s:%s", s.host, s.port) + `</code><br>
+        Active sessions: <code>` + fmt.Sprintf("%d", len(s.sessions)) + `</code>
+    </p>
+</body>
+</html>`
+	fmt.Fprint(w, html)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
