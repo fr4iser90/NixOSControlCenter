@@ -14,8 +14,8 @@ in
 
   imports = [
     ./options.nix
-    ./commands.nix
   ] ++ (if (cfg.enable or false) then [
+    ./commands.nix
     ./config.nix
   ] else []);
 }

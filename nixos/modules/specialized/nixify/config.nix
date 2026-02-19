@@ -71,28 +71,28 @@ in
         ProtectHome = "read-only";
         
         # Allow write access to ISO output directory if enabled
-        ReadWritePaths = lib.optionals cfg.isoBuilder.enable [ cfg.isoBuilder.outputDir ];
+        ReadWritePaths = lib.optionals (cfg.isoBuilder.enable or false) [ (cfg.isoBuilder.outputDir or "/var/lib/nixify/isos") ];
       };
       
       environment = {
         PORT = toString cfg.webService.port;
         HOST = cfg.webService.host;
-        MAPPING_DB_PATH = toString cfg.mapping.databasePath;
+        MAPPING_DB_PATH = toString (cfg.mapping.databasePath or ./mapping/mapping-database.json);
       };
       
       wantedBy = lib.mkIf cfg.webService.autoStart [ "multi-user.target" ];
     };
     
     # Snapshot-Scripts bereitstellen
-    environment.systemPackages = lib.mkIf cfg.snapshot.enable [
+    environment.systemPackages = lib.mkIf (cfg.snapshot.enable or true) [
       snapshotScripts.windows
       snapshotScripts.macos
       snapshotScripts.linux
     ];
     
     # Create ISO output directory if enabled
-    systemd.tmpfiles.rules = lib.mkIf cfg.isoBuilder.enable [
-      "d ${cfg.isoBuilder.outputDir} 0755 root root -"
+    systemd.tmpfiles.rules = lib.mkIf (cfg.isoBuilder.enable or false) [
+      "d ${cfg.isoBuilder.outputDir or "/var/lib/nixify/isos"} 0755 root root -"
     ];
   };
 }
