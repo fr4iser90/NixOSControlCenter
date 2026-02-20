@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html"
 	"html/template"
 	"io"
 	"log"
@@ -171,6 +172,8 @@ func main() {
 	log.Printf("🚀 Nixify Web Service starting on %s", addr)
 	log.Printf("📁 Data directory: %s", dataDir)
 
+	// Note: TLS is handled by Traefik reverse proxy (see docker-compose.traefik.yml)
+	// The service runs HTTP internally, Traefik terminates TLS and forwards to this service
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
@@ -585,14 +588,14 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		zipPath := filepath.Join(s.dataDir, fmt.Sprintf("session-%s-configs.zip", sessionID))
 		cmd := exec.Command("zip", "-r", zipPath, configsDir)
 		if err := cmd.Run(); err != nil {
-			// Fallback: serve directory listing
+			// Fallback: serve directory listing (with XSS protection)
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			fmt.Fprintf(w, "Configs generated in: %s\n\n", configsDir)
+			fmt.Fprintf(w, "Configs generated in: %s\n\n", html.EscapeString(configsDir))
 			fmt.Fprintf(w, "Files:\n")
 			files, _ := os.ReadDir(configsDir)
 			for _, file := range files {
 				if !file.IsDir() {
-					fmt.Fprintf(w, "- %s\n", file.Name())
+					fmt.Fprintf(w, "- %s\n", html.EscapeString(file.Name()))
 				}
 			}
 			return
@@ -755,6 +758,7 @@ func (s *Server) handleDownloadWindows(w http.ResponseWriter, r *http.Request) {
 	s.setSecurityHeaders(w)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=nixify-scan.ps1")
+	// Security: Script is embedded via //go:embed, no user input, safe to output directly
 	fmt.Fprint(w, s.getScript("windows"))
 }
 
@@ -762,6 +766,7 @@ func (s *Server) handleDownloadMacOS(w http.ResponseWriter, r *http.Request) {
 	s.setSecurityHeaders(w)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=nixify-scan.sh")
+	// Security: Script is embedded via //go:embed, no user input, safe to output directly
 	fmt.Fprint(w, s.getScript("macos"))
 }
 
@@ -769,6 +774,7 @@ func (s *Server) handleDownloadLinux(w http.ResponseWriter, r *http.Request) {
 	s.setSecurityHeaders(w)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=nixify-scan.sh")
+	// Security: Script is embedded via //go:embed, no user input, safe to output directly
 	fmt.Fprint(w, s.getScript("linux"))
 }
 

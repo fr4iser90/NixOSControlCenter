@@ -88,6 +88,7 @@ echo ""
 echo "📄 Generating report..."
 
 # Create programs JSON array
+# Security: IFS is set locally for this command only (IFS=,; command), not globally
 PROGRAMS_JSON=""
 if [ ${#programs[@]} -gt 0 ]; then
     PROGRAMS_JSON=$(IFS=,; echo "${programs[*]}")

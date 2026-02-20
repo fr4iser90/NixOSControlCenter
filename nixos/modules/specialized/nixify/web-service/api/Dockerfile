@@ -26,8 +26,14 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /build/nixify-web-service .
 
-# Create data directory
-RUN mkdir -p /var/lib/nixify
+# Create non-root user for security
+RUN addgroup -g 1000 nixify && \
+    adduser -D -u 1000 -G nixify nixify
+
+# Create data directory with proper permissions
+RUN mkdir -p /var/lib/nixify && \
+    chown -R nixify:nixify /var/lib/nixify && \
+    chown -R nixify:nixify /app
 
 # Expose port
 EXPOSE 8080
@@ -36,6 +42,9 @@ EXPOSE 8080
 ENV PORT=8080
 ENV HOST=0.0.0.0
 ENV DATA_DIR=/var/lib/nixify
+
+# Switch to non-root user
+USER nixify
 
 # Run the service
 CMD ["./nixify-web-service"]
