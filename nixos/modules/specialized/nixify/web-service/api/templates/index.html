@@ -237,127 +237,127 @@
 {{end}}
     <div class="container">
         <header>
-            <h1>🚀 Nixify</h1>
-            <p class="subtitle">Windows/macOS/Linux → NixOS System-DNA-Extractor</p>
+            <h1>{{.T "header.title"}}</h1>
+            <p class="subtitle">{{.T "header.subtitle"}}</p>
         </header>
         
         <div class="section">
-            <h2>📋 Was ist NixOS?</h2>
+            <h2>{{.T "sections.what_is_nixos"}}</h2>
             <div class="info-box success">
-                <h3>✨ Deklarative System-Konfiguration</h3>
-                <p>Dein gesamtes System wird in einer einzigen Konfigurationsdatei beschrieben. Keine manuellen Änderungen mehr, die später vergessen werden.</p>
+                <h3>{{.T "nixos.declarative.title"}}</h3>
+                <p>{{.T "nixos.declarative.text"}}</p>
             </div>
             
             <div class="info-box success">
-                <h3>🔒 Immutable & Reproduzierbar</h3>
-                <p>Jede System-Generation ist unveränderlich und kann jederzeit wiederhergestellt werden. Identische Systeme auf verschiedenen Maschinen.</p>
+                <h3>{{.T "nixos.immutable.title"}}</h3>
+                <p>{{.T "nixos.immutable.text"}}</p>
             </div>
             
             <div class="info-box success">
-                <h3>🔄 Atomic Updates & Rollbacks</h3>
-                <p>System-Updates sind atomar - entweder alles funktioniert oder nichts ändert sich. Ein-Klick-Rollback zu jeder vorherigen Generation.</p>
+                <h3>{{.T "nixos.atomic.title"}}</h3>
+                <p>{{.T "nixos.atomic.text"}}</p>
             </div>
         </div>
         
         <div class="section">
-            <h2>🎯 Was macht Nixify?</h2>
-            <p>Nixify hilft dir, von Windows/macOS/Linux zu NixOS zu migrieren, indem es:</p>
+            <h2>{{.T "sections.what_does_nixify"}}</h2>
+            <p>{{.T "nixify.description"}}</p>
             <ul>
-                <li>📦 <strong>Alle installierten Programme</strong> auf deinem System erkennt</li>
-                <li>⚙️ <strong>System-Einstellungen</strong> (Timezone, Locale, Desktop) erfasst</li>
-                <li>🖥️ <strong>Hardware-Informationen</strong> sammelt</li>
-                <li>🔧 <strong>Automatisch eine NixOS-Konfiguration</strong> generiert</li>
-                <li>💿 <strong>Optional: Custom ISO</strong> mit eingebetteter Config erstellt</li>
+                <li><strong>{{.T "nixify.features.programs"}}</strong></li>
+                <li><strong>{{.T "nixify.features.settings"}}</strong></li>
+                <li><strong>{{.T "nixify.features.hardware"}}</strong></li>
+                <li><strong>{{.T "nixify.features.config"}}</strong></li>
+                <li><strong>{{.T "nixify.features.iso"}}</strong></li>
             </ul>
         </div>
         
         <div class="section">
-            <h2>🔄 Wie funktioniert es?</h2>
+            <h2>{{.T "sections.how_it_works"}}</h2>
             <div class="workflow">
                 <div class="workflow-step">
-                    <div class="workflow-step-number">1</div>
-                    <h3>Snapshot erstellen</h3>
-                    <p>Führe das Snapshot-Script auf deinem Windows/macOS/Linux-System aus</p>
+                    <div class="workflow-step-number">{{.T "workflow.step1.number"}}</div>
+                    <h3>{{.T "workflow.step1.title"}}</h3>
+                    <p>{{.T "workflow.step1.text"}}</p>
                 </div>
                 <div class="workflow-step">
-                    <div class="workflow-step-number">2</div>
-                    <h3>Report hochladen</h3>
-                    <p>Lade den generierten Report zu diesem Service hoch</p>
+                    <div class="workflow-step-number">{{.T "workflow.step2.number"}}</div>
+                    <h3>{{.T "workflow.step2.title"}}</h3>
+                    <p>{{.T "workflow.step2.text"}}</p>
                 </div>
                 <div class="workflow-step">
-                    <div class="workflow-step-number">3</div>
-                    <h3>Config generieren</h3>
-                    <p>Der Service generiert automatisch eine NixOS-Konfiguration</p>
+                    <div class="workflow-step-number">{{.T "workflow.step3.number"}}</div>
+                    <h3>{{.T "workflow.step3.title"}}</h3>
+                    <p>{{.T "workflow.step3.text"}}</p>
                 </div>
                 <div class="workflow-step">
-                    <div class="workflow-step-number">4</div>
-                    <h3>ISO bauen (optional)</h3>
-                    <p>Erstelle ein Custom NixOS-ISO mit eingebetteter Config</p>
+                    <div class="workflow-step-number">{{.T "workflow.step4.number"}}</div>
+                    <h3>{{.T "workflow.step4.title"}}</h3>
+                    <p>{{.T "workflow.step4.text"}}</p>
                 </div>
                 <div class="workflow-step">
-                    <div class="workflow-step-number">5</div>
-                    <h3>Installieren</h3>
-                    <p>Installiere NixOS mit der generierten Konfiguration</p>
+                    <div class="workflow-step-number">{{.T "workflow.step5.number"}}</div>
+                    <h3>{{.T "workflow.step5.title"}}</h3>
+                    <p>{{.T "workflow.step5.text"}}</p>
                 </div>
             </div>
         </div>
         
         <div class="section">
-            <h2>📥 Snapshot-Scripts herunterladen</h2>
-            <p>Lade das passende Script für dein System herunter und führe es aus:</p>
+            <h2>{{.T "sections.download_scripts"}}</h2>
+            <p>{{.T "download.instructions"}}</p>
             <div class="download-grid">
                 <div class="download-card">
-                    <h3>🪟 Windows</h3>
-                    <p>PowerShell Script</p>
-                    <a href="/download/windows" class="btn">Download</a>
+                    <h3>{{.T "download.windows.title"}}</h3>
+                    <p>{{.T "download.windows.description"}}</p>
+                    <a href="/download/windows" class="btn">{{.T "download.button"}}</a>
                     <p style="margin-top: 10px; font-size: 0.9em; color: #858585;">
-                        <code>nixify-scan.ps1</code>
+                        <code>{{.T "download.windows.filename"}}</code>
                     </p>
                 </div>
                 <div class="download-card">
-                    <h3>🍎 macOS</h3>
-                    <p>Bash Script</p>
-                    <a href="/download/macos" class="btn">Download</a>
+                    <h3>{{.T "download.macos.title"}}</h3>
+                    <p>{{.T "download.macos.description"}}</p>
+                    <a href="/download/macos" class="btn">{{.T "download.button"}}</a>
                     <p style="margin-top: 10px; font-size: 0.9em; color: #858585;">
-                        <code>nixify-scan.sh</code>
+                        <code>{{.T "download.macos.filename"}}</code>
                     </p>
                 </div>
                 <div class="download-card">
-                    <h3>🐧 Linux</h3>
-                    <p>Bash Script</p>
-                    <a href="/download/linux" class="btn">Download</a>
+                    <h3>{{.T "download.linux.title"}}</h3>
+                    <p>{{.T "download.linux.description"}}</p>
+                    <a href="/download/linux" class="btn">{{.T "download.button"}}</a>
                     <p style="margin-top: 10px; font-size: 0.9em; color: #858585;">
-                        <code>nixify-scan.sh</code>
+                        <code>{{.T "download.linux.filename"}}</code>
                     </p>
                 </div>
             </div>
         </div>
         
         <div class="section">
-            <h2>📤 Report hochladen</h2>
-            <p>Nachdem du das Snapshot-Script ausgeführt hast, lade den generierten JSON-Report hier hoch:</p>
+            <h2>{{.T "sections.upload_report"}}</h2>
+            <p>{{.T "upload.description"}}</p>
             
             <div class="upload-section">
                 <div class="upload-area" id="uploadArea">
                     <input type="file" id="fileInput" accept=".json,application/json">
-                    <p style="font-size: 1.2em; margin-bottom: 10px;">📁 Datei hier ablegen oder klicken zum Auswählen</p>
-                    <p style="color: #858585; font-size: 0.9em;">Unterstützt: JSON-Dateien (max. 10MB)</p>
+                    <p style="font-size: 1.2em; margin-bottom: 10px;">{{.T "upload.drop_zone"}}</p>
+                    <p style="color: #858585; font-size: 0.9em;">{{.T "upload.supported"}}</p>
                 </div>
                 <div id="uploadError" class="error-message hidden"></div>
             </div>
             
             <div id="sessionStatus" class="hidden">
                 <div class="session-card">
-                    <h3>Session Status</h3>
-                    <p><strong>Session ID:</strong> <code id="sessionId"></code></p>
-                    <p><strong>Status:</strong> <span class="session-status" id="sessionStatusBadge">queued</span></p>
+                    <h3>{{.T "session.status_title"}}</h3>
+                    <p><strong>{{.T "session.id"}}:</strong> <code id="sessionId"></code></p>
+                    <p><strong>{{.T "session.status"}}:</strong> <span class="session-status" id="sessionStatusBadge">queued</span></p>
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressBar" style="width: 0%">0%</div>
                     </div>
                     <div id="sessionActions" class="hidden" style="margin-top: 15px;">
-                        <button class="btn" onclick="downloadConfig()">📥 Config herunterladen</button>
-                        <button class="btn btn-secondary" onclick="buildISO()" style="margin-left: 10px;">💿 ISO bauen</button>
-                        <button class="btn btn-danger hidden" onclick="downloadISO()" id="downloadISOBtn" style="margin-left: 10px;">💿 ISO herunterladen</button>
+                        <button class="btn" onclick="downloadConfig()">{{.T "session.download_config"}}</button>
+                        <button class="btn btn-secondary" onclick="buildISO()" style="margin-left: 10px;">{{.T "session.build_iso"}}</button>
+                        <button class="btn btn-danger hidden" onclick="downloadISO()" id="downloadISOBtn" style="margin-left: 10px;">{{.T "session.download_iso"}}</button>
                     </div>
                     <div id="sessionError" class="error-message hidden"></div>
                 </div>
@@ -365,108 +365,105 @@
         </div>
         
         <div class="section">
-            <h2>⚠️ Wichtige Hinweise & Einschränkungen</h2>
+            <h2>{{.T "sections.important_notes"}}</h2>
             
             <div class="info-box warning">
-                <h3>🛡️ Kernel-Level Anti-Cheats</h3>
-                <p><strong>Vanguard (Valorant), EasyAntiCheat, BattlEye</strong> und ähnliche Kernel-Level Anti-Cheats funktionieren <strong>NICHT</strong> unter Linux/NixOS.</p>
-                <p style="margin-top: 10px;">Diese Programme benötigen Windows-Kernel-Treiber und können nicht mit Wine/Proton emuliert werden.</p>
+                <h3>{{.T "warnings.kernel_anticheat.title"}}</h3>
+                <p><strong>{{.T "warnings.kernel_anticheat.text"}}</strong></p>
+                <p style="margin-top: 10px;">{{.T "warnings.kernel_anticheat.details"}}</p>
             </div>
             
             <div class="info-box info">
-                <h3>🍷 Wine & Proton</h3>
-                <p>Die meisten Windows-Programme funktionieren mit <strong>Wine</strong> oder <strong>Proton</strong> (für Spiele).</p>
+                <h3>{{.T "warnings.wine_proton.title"}}</h3>
+                <p>{{.T "warnings.wine_proton.text"}}</p>
                 <ul style="margin-top: 10px;">
-                    <li>Steam mit Proton unterstützt tausende Windows-Spiele</li>
-                    <li>Viele Windows-Anwendungen laufen mit Wine</li>
-                    <li>Native Linux-Alternativen für die meisten Programme verfügbar</li>
+                    {{range .TArray "warnings.wine_proton.features"}}
+                    <li>{{.}}</li>
+                    {{end}}
                 </ul>
             </div>
             
             <div class="info-box success">
-                <h3>✅ Was funktioniert gut</h3>
+                <h3>{{.T "warnings.what_works.title"}}</h3>
                 <ul>
-                    <li>Entwicklungstools (VS Code, Git, Docker, etc.)</li>
-                    <li>Browser (Firefox, Chrome, Edge)</li>
-                    <li>Office-Suiten (LibreOffice, OnlyOffice)</li>
-                    <li>Multimedia (VLC, OBS, GIMP, Blender)</li>
-                    <li>Die meisten Open-Source-Programme</li>
+                    {{range .TArray "warnings.what_works.items"}}
+                    <li>{{.}}</li>
+                    {{end}}
                 </ul>
             </div>
             
             <div class="info-box info">
-                <h3>📝 Über diese Konfiguration</h3>
-                <p>Diese NixOS-Konfiguration basiert auf dem <strong>NixOS Control Center</strong> - einem modularen System-Management-Framework.</p>
+                <h3>{{.T "warnings.about_config.title"}}</h3>
+                <p>{{.T "warnings.about_config.text"}}</p>
                 <ul style="margin-top: 10px;">
-                    <li>Modulare Struktur für einfache Wartung</li>
-                    <li>Automatische Module-Erkennung</li>
-                    <li>CLI & TUI-Tools für System-Management</li>
-                    <li>Reproduzierbare Builds</li>
+                    {{range .TArray "warnings.about_config.features"}}
+                    <li>{{.}}</li>
+                    {{end}}
                 </ul>
             </div>
         </div>
         
         <div class="section">
-            <h2>📊 Service Status</h2>
+            <h2>{{.T "sections.service_status"}}</h2>
             <div class="stats">
                 <div class="stat">
                     <div class="stat-value">{{.Sessions}}</div>
-                    <div class="stat-label">Active Sessions</div>
+                    <div class="stat-label">{{.T "status.active_sessions"}}</div>
                 </div>
                 <div class="stat">
                     <div class="stat-value" style="font-size: 1.2em;">{{.Host}}:{{.Port}}</div>
-                    <div class="stat-label">Service Address</div>
+                    <div class="stat-label">{{.T "status.service_address"}}</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value">✅</div>
-                    <div class="stat-label">Service Status</div>
+                    <div class="stat-value">{{.T "status.online"}}</div>
+                    <div class="stat-label">{{.T "status.service_status"}}</div>
                 </div>
             </div>
         </div>
         
         <div class="section">
-            <h2>🔌 API Endpoints</h2>
-            <p>Für Entwickler und automatisierte Workflows:</p>
+            <h2>{{.T "api.title"}}</h2>
+            <p>{{.T "api.description"}}</p>
             
             <div class="endpoint">
                 <span class="method">GET</span> <span class="path">/api/v1/health</span>
-                <p>Service health check</p>
+                <p>{{.T "api.endpoints.health"}}</p>
             </div>
             
             <div class="endpoint">
                 <span class="method">POST</span> <span class="path">/api/v1/upload</span>
-                <p>Upload snapshot report (JSON)</p>
+                <p>{{.T "api.endpoints.upload"}}</p>
             </div>
             
             <div class="endpoint">
                 <span class="method">GET</span> <span class="path">/api/v1/sessions</span>
-                <p>List all migration sessions</p>
+                <p>{{.T "api.endpoints.sessions"}}</p>
             </div>
             
             <div class="endpoint">
                 <span class="method">GET</span> <span class="path">/api/v1/session/{id}</span>
-                <p>Get session details</p>
+                <p>{{.T "api.endpoints.session"}}</p>
             </div>
             
             <div class="endpoint">
                 <span class="method">GET</span> <span class="path">/api/v1/config/{id}</span>
-                <p>Get generated NixOS configuration</p>
+                <p>{{.T "api.endpoints.config"}}</p>
             </div>
             
             <div class="endpoint">
                 <span class="method">POST</span> <span class="path">/api/v1/iso/build</span>
-                <p>Build custom NixOS ISO</p>
+                <p>{{.T "api.endpoints.iso_build"}}</p>
             </div>
             
             <div class="endpoint">
                 <span class="method">GET</span> <span class="path">/api/v1/iso/{id}/download</span>
-                <p>Download built ISO</p>
+                <p>{{.T "api.endpoints.iso_download"}}</p>
             </div>
         </div>
         
         <div class="section" style="text-align: center; color: #858585; font-size: 0.9em;">
-            <p>Nixify Web Service - Part of <a href="https://github.com/fr4iser90/NixOSControlCenter">NixOS Control Center</a></p>
-            <p style="margin-top: 10px;">Free all users from Microsoft and Apple 🚀</p>
+            <p>{{.T "footer.project"}} <a href="https://github.com/fr4iser90/NixOSControlCenter">NixOS Control Center</a></p>
+            <p style="margin-top: 10px;">{{.T "footer.tagline"}}</p>
         </div>
     </div>
     

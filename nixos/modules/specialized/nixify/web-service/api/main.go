@@ -147,6 +147,9 @@ type Server struct {
 	// Module discovery
 	modulesBasePath string // Path to nixos/ directory (either /app/nixos or /etc/nixos)
 	githubRepoURL   string // GitHub repository URL for module links
+	
+	// Debug
+	debugTranslations bool // Enable debug logging for translations
 }
 
 // loadTranslations loads i18n translations from embedded JSON files
@@ -181,7 +184,29 @@ func loadTranslations() map[string]Translations {
 	}
 	translations["es"] = esTrans
 	
+	// Debug: Log loaded translations
+	if enMap := translations["en"]; enMap != nil {
+		log.Printf("Loaded translations: en has %d top-level keys: %v", len(enMap), getMapKeys(enMap))
+	}
+	if esMap := translations["es"]; esMap != nil {
+		log.Printf("Loaded translations: es has %d top-level keys: %v", len(esMap), getMapKeys(esMap))
+		if apiVal, exists := esMap["api"]; exists {
+			log.Printf("DEBUG: es['api'] exists, type: %T", apiVal)
+		} else {
+			log.Printf("DEBUG: es['api'] DOES NOT EXIST!")
+		}
+	}
+	
 	return translations
+}
+
+// getMapKeys returns keys of a map for debugging
+func getMapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // getLanguage extracts language from request (cookie, header, or default)
@@ -219,41 +244,129 @@ func (s *Server) t(lang, key string) string {
 }
 
 // getTranslation is a helper function that can be used in templates
+// Navigates through nested map structure using dot notation (e.g., "api.endpoints.upload")
 func getTranslation(translations map[string]Translations, lang, key string) string {
+	return getTranslationWithDebug(translations, lang, key, false)
+}
+
+// getTranslationWithDebug is the internal implementation with optional debug logging
+func getTranslationWithDebug(translations map[string]Translations, lang, key string, debug bool) string {
+	if translations == nil {
+		if debug {
+			log.Printf("DEBUG getTranslation: translations map is nil for key '%s'", key)
+		}
+		return key
+	}
+	
+	// Get translation map for language, fallback to English
 	trans, ok := translations[lang]
-	if !ok {
-		trans = translations["en"] // Fallback to English
+	if !ok || trans == nil {
+		if debug {
+			log.Printf("DEBUG getTranslation: language '%s' not found, falling back to en", lang)
+		}
+		trans = translations["en"]
+		if trans == nil {
+			if debug {
+				log.Printf("DEBUG getTranslation: English translations also nil!")
+			}
+			return key
+		}
+		lang = "en"
 	}
 	
 	// Navigate through nested map using dot notation
 	parts := strings.Split(key, ".")
-	var current interface{} = trans
+	var current interface{} = map[string]interface{}(trans) // Convert Translations to map[string]interface{}
 	
-	for _, part := range parts {
-		if m, ok := current.(map[string]interface{}); ok {
-			current = m[part]
-		} else {
-			return key // Key not found, return key itself
+	for i, part := range parts {
+		// Type assert current to map
+		m, ok := current.(map[string]interface{})
+		if !ok {
+			if debug {
+				log.Printf("DEBUG getTranslation: Part %d '%s' is not a map, current type: %T, value: %v", i, part, current, current)
+			}
+			// Try English fallback if not already using English
+			if lang != "en" {
+				if enTrans, ok := translations["en"]; ok && enTrans != nil {
+					// Restart from English root
+					result := navigateMap(enTrans, parts[i:])
+					if result != "" {
+						return result
+					}
+				}
+			}
+			return key
 		}
+		
+		// Get value from map
+		val, exists := m[part]
+		if !exists {
+			if debug {
+				log.Printf("DEBUG getTranslation: Key '%s' not found in map at part %d, available keys: %v", part, i, getMapKeys(m))
+			}
+			// Try English fallback if not already using English
+			if lang != "en" {
+				if enTrans, ok := translations["en"]; ok && enTrans != nil {
+					// Restart from English root
+					result := navigateMap(enTrans, parts[i:])
+					if result != "" {
+						return result
+					}
+				}
+			}
+			// Key not found - return key itself
+			return key
+		}
+		
+		current = val
 	}
 	
-	// Convert to string
+	// Convert final value to string
 	if str, ok := current.(string); ok {
 		return str
 	}
 	
-	return key // Fallback to key if not found
+	if debug {
+		log.Printf("DEBUG getTranslation: Final value for '%s' is not a string, type: %T, value: %v", key, current, current)
+	}
+	return key
+}
+
+// navigateMap navigates through a Translations map using a path of keys
+func navigateMap(m Translations, parts []string) string {
+	var current interface{} = m
+	
+	for _, part := range parts {
+		m, ok := current.(map[string]interface{})
+		if !ok {
+			return ""
+		}
+		
+		val, exists := m[part]
+		if !exists {
+			return ""
+		}
+		
+		current = val
+	}
+	
+	if str, ok := current.(string); ok {
+		return str
+	}
+	
+	return ""
 }
 
 // TemplateData holds data for template rendering with i18n support
 type TemplateData struct {
 	Lang        string
 	Nonce       string
-	Title       string
-	Description string
 	CurrentPath string
-	T           func(string) string
-	TArray      func(string) []string
+	tFunc       func(string) string
+	tArrayFunc  func(string) []string
+	Host        string
+	Port        string
+	Sessions    int
 	ProgramsJSON string // For mappings page
 	ModulesJSON  string // For modules page
 	Modules      []ModuleInfo // For modules page
@@ -263,13 +376,34 @@ type TemplateData struct {
 	// Additional fields can be added per page
 }
 
+// T is a method that can be called from templates
+func (td TemplateData) T(key string) string {
+	return td.tFunc(key)
+}
+
+// TArray is a method that can be called from templates
+func (td TemplateData) TArray(key string) []string {
+	return td.tArrayFunc(key)
+}
+
 // newTemplateData creates a new TemplateData with i18n support
 func (s *Server) newTemplateData(r *http.Request, nonce string) TemplateData {
 	lang := s.getLanguage(r)
 	
-	// Create translation function
+	// Create translation function that directly accesses translations
 	tFunc := func(key string) string {
-		return s.t(lang, key)
+		s.translationsMutex.RLock()
+		defer s.translationsMutex.RUnlock()
+		
+		// Direct lookup with optional debug logging
+		result := getTranslationWithDebug(s.translations, lang, key, s.debugTranslations)
+		if result == key && key != "" && s.debugTranslations {
+			// Only log missing translations when debug is enabled
+			if len(key) < 50 {
+				log.Printf("WARNING: Translation not found for key '%s' in language '%s'", key, lang)
+			}
+		}
+		return result
 	}
 	
 	// Create array translation function (for arrays in JSON)
@@ -307,18 +441,15 @@ func (s *Server) newTemplateData(r *http.Request, nonce string) TemplateData {
 		return []string{}
 	}
 	
-	// Get meta info
-	metaTitle := s.t(lang, "meta.title")
-	metaDesc := s.t(lang, "meta.description")
-	
 	return TemplateData{
 		Lang:        lang,
 		Nonce:       nonce,
-		Title:       metaTitle,
-		Description: metaDesc,
 		CurrentPath: r.URL.Path,
-		T:           tFunc,
-		TArray:      tArrayFunc,
+		tFunc:       tFunc,
+		tArrayFunc:  tArrayFunc,
+		Host:        s.host,
+		Port:        s.port,
+		Sessions:    0, // Will be set by handlers that need it
 	}
 }
 
@@ -346,15 +477,8 @@ func NewServer(port, host, dataDir string) *Server {
 	
 	// Parse templates
 	// Parse base template with all functions
-	// T function needs to access the template data to get the language
-	// Create a closure that captures translations
-	tFunc := func(data TemplateData, key string) string {
-		return getTranslation(translations, data.Lang, key)
-	}
-	
 	baseTmpl, err := template.New("base").Funcs(template.FuncMap{
 		"hasPrefix": strings.HasPrefix,
-		"T": tFunc,
 	}).Parse(baseTemplate)
 	if err != nil {
 		log.Fatalf("Failed to parse base template: %v", err)
@@ -422,6 +546,7 @@ func NewServer(port, host, dataDir string) *Server {
 		stopCleanup:   make(chan struct{}),
 		modulesBasePath: modulesBasePath,
 		githubRepoURL:   githubRepoURL,
+		debugTranslations: os.Getenv("DEBUG_TRANSLATIONS") == "true", // Enable via environment variable
 	}
 
 	// Start worker pool
@@ -502,6 +627,11 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	
 	data := s.newTemplateData(r, nonce)
+	
+	// Get session count
+	s.sessionsMutex.RLock()
+	data.Sessions = len(s.sessions)
+	s.sessionsMutex.RUnlock()
 	
 	// Execute base template, which will render the "index" block
 	if err := s.baseTemplate.ExecuteTemplate(w, "base", data); err != nil {
@@ -1729,7 +1859,8 @@ func (s *Server) setSecurityHeadersWithNonce(w http.ResponseWriter, nonce string
 	// For HTML pages, use nonce-based CSP (more secure than 'unsafe-inline')
 	// Nonce allows specific inline styles/scripts that include the nonce attribute
 	// 'unsafe-hashes' is needed for inline event handlers (onclick, etc.) and inline style attributes
-	csp := fmt.Sprintf("default-src 'self'; style-src 'self' 'nonce-%s' 'unsafe-hashes'; script-src 'self' 'nonce-%s' 'unsafe-hashes'", nonce, nonce)
+	// 'style-src-attr' and 'script-src-attr' allow inline styles/scripts in HTML attributes
+	csp := fmt.Sprintf("default-src 'self'; style-src 'self' 'nonce-%s' 'unsafe-hashes'; style-src-attr 'unsafe-inline'; script-src 'self' 'nonce-%s' 'unsafe-hashes'; script-src-attr 'unsafe-inline'", nonce, nonce)
 	w.Header().Set("Content-Security-Policy", csp)
 	w.Header().Set("X-Nonce", nonce) // Store nonce in custom header for template access
 }

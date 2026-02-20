@@ -92,14 +92,24 @@
       "description": "Bash Script",
       "filename": "nixify-scan.sh"
     },
-    "instructions": "Download the appropriate script for your system and run it:"
+    "instructions": "Download the appropriate script for your system and run it:",
+    "button": "Download"
   },
   "upload": {
     "title": "Upload Report & Manage Session",
+    "description": "After running the snapshot script, upload the generated JSON report here:",
     "drop_zone": "📁 Drop file here or click to select",
     "supported": "Supported: JSON files (max. 10MB)",
     "uploading": "📤 Uploading...",
     "error": "Upload failed"
+  },
+  "session": {
+    "status_title": "Session Status",
+    "id": "Session ID",
+    "status": "Status",
+    "download_config": "📥 Download Config",
+    "build_iso": "💿 Build ISO",
+    "download_iso": "💿 Download ISO"
   },
   "warnings": {
     "kernel_anticheat": {

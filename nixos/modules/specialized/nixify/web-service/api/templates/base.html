@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="{{.Lang}}">
 <head>
-    <title>{{.Title}}</title>
+    <title>{{.T "meta.title"}}</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="{{.Description}}">
+    <meta name="description" content="{{.T "meta.description"}}">
     <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -203,14 +203,14 @@
     <nav>
         <a href="/" class="nav-brand">🚀 Nixify</a>
         <div class="nav-links">
-            <a href="/" class="{{if eq .CurrentPath "/"}}active{{end}}">{{T . "nav.home"}}</a>
-            <a href="/mappings" class="{{if eq .CurrentPath "/mappings"}}active{{end}}">{{T . "nav.mappings"}}</a>
-            <a href="/games" class="{{if eq .CurrentPath "/games"}}active{{end}}">{{T . "nav.games"}}</a>
-            <a href="/modules" class="{{if or (eq .CurrentPath "/modules") (hasPrefix .CurrentPath "/module/")}}active{{end}}">{{T . "nav.modules"}}</a>
-            <a href="/about" class="{{if eq .CurrentPath "/about"}}active{{end}}">{{T . "nav.about"}}</a>
+            <a href="/" class="{{if eq .CurrentPath "/"}}active{{end}}">{{.T "nav.home"}}</a>
+            <a href="/mappings" class="{{if eq .CurrentPath "/mappings"}}active{{end}}">{{.T "nav.mappings"}}</a>
+            <a href="/games" class="{{if eq .CurrentPath "/games"}}active{{end}}">{{.T "nav.games"}}</a>
+            <a href="/modules" class="{{if or (eq .CurrentPath "/modules") (hasPrefix .CurrentPath "/module/")}}active{{end}}">{{.T "nav.modules"}}</a>
+            <a href="/about" class="{{if eq .CurrentPath "/about"}}active{{end}}">{{.T "nav.about"}}</a>
         </div>
         <div class="lang-selector">
-            <label for="lang-select">{{T . "nav.select_language"}}:</label>
+            <label for="lang-select">{{.T "nav.select_language"}}:</label>
             <select id="lang-select" onchange="changeLanguage(this.value)">
                 <option value="en" {{if eq .Lang "en"}}selected{{end}}>English</option>
                 <option value="de" {{if eq .Lang "de"}}selected{{end}}>Deutsch</option>
@@ -239,8 +239,8 @@
     </div>
     
     <footer>
-        <p>{{T . "footer.project"}} <a href="https://github.com/fr4iser90/NixOSControlCenter" target="_blank">NixOS Control Center</a></p>
-        <p style="margin-top: 10px;">{{T . "footer.tagline"}}</p>
+        <p>{{.T "footer.project"}} <a href="https://github.com/fr4iser90/NixOSControlCenter" target="_blank">NixOS Control Center</a></p>
+        <p style="margin-top: 10px;">{{.T "footer.tagline"}}</p>
     </footer>
     
     <script nonce="{{.Nonce}}">
