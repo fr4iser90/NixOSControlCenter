@@ -215,9 +215,14 @@ func (s *Server) t(lang, key string) string {
 	s.translationsMutex.RLock()
 	defer s.translationsMutex.RUnlock()
 	
-	trans, ok := s.translations[lang]
+	return getTranslation(s.translations, lang, key)
+}
+
+// getTranslation is a helper function that can be used in templates
+func getTranslation(translations map[string]Translations, lang, key string) string {
+	trans, ok := translations[lang]
 	if !ok {
-		trans = s.translations["en"] // Fallback to English
+		trans = translations["en"] // Fallback to English
 	}
 	
 	// Navigate through nested map using dot notation
@@ -237,7 +242,7 @@ func (s *Server) t(lang, key string) string {
 		return str
 	}
 	
-	return key
+	return key // Fallback to key if not found
 }
 
 // TemplateData holds data for template rendering with i18n support
@@ -340,58 +345,56 @@ func NewServer(port, host, dataDir string) *Server {
 	translations := loadTranslations()
 	
 	// Parse templates
-	tmpl, err := template.New("index").Parse(indexTemplate)
-	if err != nil {
-		log.Fatalf("Failed to parse template: %v", err)
+	// Parse base template with all functions
+	// T function needs to access the template data to get the language
+	// Create a closure that captures translations
+	tFunc := func(data TemplateData, key string) string {
+		return getTranslation(translations, data.Lang, key)
 	}
 	
-	reviewTmpl, err := template.New("review").Parse(reviewTemplate)
-	if err != nil {
-		log.Fatalf("Failed to parse review template: %v", err)
-	}
-	
-	// Parse base template and add child templates
 	baseTmpl, err := template.New("base").Funcs(template.FuncMap{
 		"hasPrefix": strings.HasPrefix,
+		"T": tFunc,
 	}).Parse(baseTemplate)
 	if err != nil {
 		log.Fatalf("Failed to parse base template: %v", err)
 	}
 	
-	// Add mappings template to base
-	mappingsTmpl, err := baseTmpl.New("mappings").Parse(mappingsTemplate)
+	// Add all child templates to base
+	_, err = baseTmpl.New("index").Parse(indexTemplate)
+	if err != nil {
+		log.Fatalf("Failed to parse index template: %v", err)
+	}
+	
+	_, err = baseTmpl.New("review").Parse(reviewTemplate)
+	if err != nil {
+		log.Fatalf("Failed to parse review template: %v", err)
+	}
+	
+	_, err = baseTmpl.New("mappings").Parse(mappingsTemplate)
 	if err != nil {
 		log.Fatalf("Failed to parse mappings template: %v", err)
 	}
 	
-	// Add games template to base
-	gamesTmpl, err := baseTmpl.New("games").Parse(gamesTemplate)
+	_, err = baseTmpl.New("games").Parse(gamesTemplate)
 	if err != nil {
 		log.Fatalf("Failed to parse games template: %v", err)
 	}
 	
-	// Add about template to base
-	aboutTmpl, err := baseTmpl.New("about").Parse(aboutTemplate)
+	_, err = baseTmpl.New("about").Parse(aboutTemplate)
 	if err != nil {
 		log.Fatalf("Failed to parse about template: %v", err)
 	}
 	
-	modulesTmpl, err := baseTmpl.New("modules").Parse(modulesTemplate)
+	_, err = baseTmpl.New("modules").Parse(modulesTemplate)
 	if err != nil {
 		log.Fatalf("Failed to parse modules template: %v", err)
 	}
 	
-	moduleDetailTmpl, err := baseTmpl.New("module-detail").Parse(moduleDetailTemplate)
+	_, err = baseTmpl.New("module-detail").Parse(moduleDetailTemplate)
 	if err != nil {
 		log.Fatalf("Failed to parse module-detail template: %v", err)
 	}
-	
-	// Store base template (which now contains all child templates)
-	_ = mappingsTmpl
-	_ = gamesTmpl
-	_ = aboutTmpl
-	_ = modulesTmpl
-	_ = moduleDetailTmpl
 
 	server := &Server{
 		sessions:      make(map[string]*Session),
@@ -399,8 +402,8 @@ func NewServer(port, host, dataDir string) *Server {
 		port:          port,
 		host:          host,
 		dataDir:       dataDir,
-		template:      tmpl,
-		reviewTemplate: reviewTmpl,
+		template:      nil, // Not used anymore, we use baseTemplate
+		reviewTemplate: nil, // Not used anymore, we use baseTemplate
 		baseTemplate:  baseTmpl, // Contains all child templates
 		mappingsTemplate: baseTmpl, // Use base for all
 		gamesTemplate: baseTmpl, // Use base for all
@@ -489,35 +492,20 @@ func main() {
 }
 
 func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
-	// Generate nonce for this request
 	nonce, err := generateNonce()
 	if err != nil {
 		log.Printf("Failed to generate nonce: %v", err)
-		nonce = "" // Fallback to unsafe-inline if nonce generation fails
+		nonce = ""
 	}
 	
-	// Set security headers with nonce for HTML page
 	s.setSecurityHeadersWithNonce(w, nonce)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	
-	s.sessionsMutex.RLock()
-	sessionCount := len(s.sessions)
-	s.sessionsMutex.RUnlock()
+	data := s.newTemplateData(r, nonce)
 	
-	data := struct {
-		Sessions int
-		Host     string
-		Port     string
-		Nonce    string // Add nonce to template data
-	}{
-		Sessions: sessionCount,
-		Host:     s.host,
-		Port:     s.port,
-		Nonce:    nonce,
-	}
-	
-	if err := s.template.Execute(w, data); err != nil {
-		log.Printf("Failed to execute template: %v", err)
+	// Execute base template, which will render the "index" block
+	if err := s.baseTemplate.ExecuteTemplate(w, "base", data); err != nil {
+		log.Printf("Failed to execute root template: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }

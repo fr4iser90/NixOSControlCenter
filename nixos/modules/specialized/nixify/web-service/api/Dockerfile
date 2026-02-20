@@ -1,5 +1,4 @@
 # Multi-stage build for Nixify Web Service
-# Build context should be repository root (../../../../)
 # Stage 1: Build Go binary
 FROM golang:1.23-alpine AS builder
 
