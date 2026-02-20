@@ -31,7 +31,7 @@
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │ Empfängt Snapshot-Report                              │  │
 │  │ → Mappt Programme zu NixOS-Modulen                   │  │
-│  │ → Generiert modulare system-config.nix               │  │
+│  │ → Generiert configs/*.nix Dateien                    │  │
 │  │ → Validiert Config                                    │  │
 │  │ → Bietet Download-Optionen:                          │  │
 │  │   • Config-Dateien (für bestehende NixOS-Install)   │  │
@@ -71,7 +71,7 @@
 **Was hier passiert:**
 - **Web-Service** läuft (systemd)
 - Empfängt Reports von Ziel-Systemen
-- Generiert **system-config.nix**
+- Generiert **configs/*.nix** Dateien
 - Baut **Custom ISO** (optional)
 
 **Commands auf NixOS:**
@@ -132,7 +132,7 @@ ncc nixify download <id>    # Config/ISO herunterladen
 **Features:**
 - Snapshot-Report empfangen
 - Programm-Mapping zu NixOS-Modulen
-- system-config.nix generieren
+- configs/*.nix Dateien generieren
 - ISO-Image mit Config bauen
 - Download-Bereitstellung
 
@@ -141,7 +141,7 @@ ncc nixify download <id>    # Config/ISO herunterladen
 **Zweck:** Automatische Installation mit Config
 
 **Features:**
-- Eingebettete system-config.nix
+- Eingebettetes configs/ Verzeichnis
 - Automatische Installation
 - Oder: Manueller Installer mit Config-Import
 
@@ -451,7 +451,7 @@ EOF
 
 ### 5.5 Config-Generator
 
-**Zweck:** system-config.nix aus Snapshot-Report generieren
+**Zweck:** configs/*.nix Dateien aus Snapshot-Report generieren
 
 **Datei:** `web-service/config-generator/generator.nix`
 
@@ -605,18 +605,25 @@ let
   };
   
   # Custom Config einbetten
-  customConfig = pkgs.writeText "system-config.nix" (builtins.readFile systemConfig);
+  # Configs-Verzeichnis erstellen
+  configsDir = pkgs.runCommand "nixify-configs" {} ''
+    mkdir -p $out/configs
+    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: content:
+      "echo ${lib.escapeShellArg content} > $out/configs/${name}"
+    ) sessionConfigs)}
+  '';
   
   # Installer-Script anpassen
   installerScript = pkgs.writeScript "auto-install.sh" ''
     #!/bin/bash
-    # Automatische Installation mit Config
+    # Automatische Installation mit Configs
     
-    # Config kopieren
-    cp /mnt/cdrom/system-config.nix /mnt/etc/nixos/
+    # Configs kopieren
+    mkdir -p /mnt/etc/nixos/configs
+    cp -r /mnt/cdrom/configs/* /mnt/etc/nixos/configs/
     
-    # Installation starten
-    nixos-install --system-config /mnt/etc/nixos/system-config.nix
+    # Installation starten (configs werden automatisch von flake.nix geladen)
+    nixos-install
   '';
   
 in
@@ -624,7 +631,7 @@ pkgs.isoImage.installer {
   name = "nixos-nixified";
   baseIso = baseIso;
   extraFiles = {
-    "system-config.nix" = customConfig;
+    "configs" = configsDir;
     "auto-install.sh" = installerScript;
   };
 }

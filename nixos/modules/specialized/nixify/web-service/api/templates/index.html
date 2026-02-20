@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Nixify - Windows/macOS/Linux → NixOS Migration</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            color: #d4d4d4;
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        header { text-align: center; padding: 40px 20px; }
+        h1 { color: #4ec9b0; font-size: 2.5em; margin-bottom: 10px; }
+        .subtitle { color: #858585; font-size: 1.2em; margin-bottom: 30px; }
+        
+        .section { 
+            background: #252526; 
+            border-radius: 8px; 
+            padding: 30px; 
+            margin: 20px 0;
+            border-left: 4px solid #4ec9b0;
+        }
+        h2 { color: #569cd6; margin-bottom: 20px; font-size: 1.8em; }
+        h3 { color: #4ec9b0; margin: 20px 0 10px 0; }
+        
+        .info-box {
+            background: #1e1e1e;
+            border: 1px solid #3e3e3e;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        .warning { border-left: 4px solid #f48771; background: #2a1f1f; }
+        .success { border-left: 4px solid #4ec9b0; background: #1f2a2a; }
+        .info { border-left: 4px solid #569cd6; background: #1f1f2a; }
+        
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .download-card {
+            background: #1e1e1e;
+            border: 1px solid #3e3e3e;
+            border-radius: 6px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .download-card:hover {
+            transform: translateY(-2px);
+            border-color: #4ec9b0;
+        }
+        .download-card h3 { margin-top: 0; }
+        .btn {
+            display: inline-block;
+            background: #4ec9b0;
+            color: #1e1e1e;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-top: 10px;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: #5ed9c0; }
+        
+        .endpoint { 
+            margin: 10px 0; 
+            padding: 15px; 
+            background: #1e1e1e; 
+            border-left: 3px solid #4ec9b0;
+            border-radius: 4px;
+        }
+        .method { 
+            color: #4ec9b0; 
+            font-weight: bold; 
+            display: inline-block;
+            width: 80px;
+            background: #252526;
+            padding: 4px 8px;
+            border-radius: 3px;
+            text-align: center;
+        }
+        .path { color: #ce9178; font-family: monospace; }
+        
+        code { 
+            background: #1e1e1e; 
+            padding: 2px 6px; 
+            border-radius: 3px; 
+            font-family: 'Courier New', monospace;
+            color: #ce9178;
+        }
+        
+        .workflow {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .workflow-step {
+            flex: 1;
+            min-width: 200px;
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 6px;
+            border-top: 3px solid #4ec9b0;
+        }
+        .workflow-step-number {
+            background: #4ec9b0;
+            color: #1e1e1e;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        ul { margin-left: 20px; margin-top: 10px; }
+        li { margin: 8px 0; }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .stat {
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+            padding: 15px;
+            background: #1e1e1e;
+            border-radius: 6px;
+        }
+        .stat-value {
+            font-size: 2em;
+            color: #4ec9b0;
+            font-weight: bold;
+        }
+        .stat-label {
+            color: #858585;
+            font-size: 0.9em;
+        }
+        
+        a { color: #4ec9b0; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        
+        /* Upload Form */
+        .upload-section {
+            background: #1e1e1e;
+            border: 2px dashed #4ec9b0;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .upload-area {
+            cursor: pointer;
+            padding: 40px;
+            border: 2px dashed #3e3e3e;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #4ec9b0;
+            background: #252526;
+        }
+        .upload-area.dragover {
+            border-color: #4ec9b0;
+            background: #1f2a2a;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .btn-secondary {
+            background: #569cd6;
+            color: #1e1e1e;
+        }
+        .btn-secondary:hover {
+            background: #6aadd6;
+        }
+        .btn-danger {
+            background: #f48771;
+            color: #1e1e1e;
+        }
+        .btn-danger:hover {
+            background: #f59a88;
+        }
+        
+        /* Session Status */
+        .session-card {
+            background: #1e1e1e;
+            border: 1px solid #3e3e3e;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        .session-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        .status-queued { background: #569cd6; color: #1e1e1e; }
+        .status-processing { background: #4ec9b0; color: #1e1e1e; }
+        .status-ready { background: #4ec9b0; color: #1e1e1e; }
+        .status-building_iso { background: #569cd6; color: #1e1e1e; }
+        .status-iso_ready { background: #4ec9b0; color: #1e1e1e; }
+        .status-error { background: #f48771; color: #1e1e1e; }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #252526;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4ec9b0;
+            transition: width 0.3s;
+            text-align: center;
+            line-height: 20px;
+            font-size: 0.8em;
+            color: #1e1e1e;
+        }
+        
+        .hidden { display: none; }
+        .error-message {
+            background: #2a1f1f;
+            border-left: 4px solid #f48771;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 Nixify</h1>
+            <p class="subtitle">Windows/macOS/Linux → NixOS System-DNA-Extractor</p>
+        </header>
+        
+        <div class="section">
+            <h2>📋 Was ist NixOS?</h2>
+            <div class="info-box success">
+                <h3>✨ Deklarative System-Konfiguration</h3>
+                <p>Dein gesamtes System wird in einer einzigen Konfigurationsdatei beschrieben. Keine manuellen Änderungen mehr, die später vergessen werden.</p>
+            </div>
+            
+            <div class="info-box success">
+                <h3>🔒 Immutable & Reproduzierbar</h3>
+                <p>Jede System-Generation ist unveränderlich und kann jederzeit wiederhergestellt werden. Identische Systeme auf verschiedenen Maschinen.</p>
+            </div>
+            
+            <div class="info-box success">
+                <h3>🔄 Atomic Updates & Rollbacks</h3>
+                <p>System-Updates sind atomar - entweder alles funktioniert oder nichts ändert sich. Ein-Klick-Rollback zu jeder vorherigen Generation.</p>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>🎯 Was macht Nixify?</h2>
+            <p>Nixify hilft dir, von Windows/macOS/Linux zu NixOS zu migrieren, indem es:</p>
+            <ul>
+                <li>📦 <strong>Alle installierten Programme</strong> auf deinem System erkennt</li>
+                <li>⚙️ <strong>System-Einstellungen</strong> (Timezone, Locale, Desktop) erfasst</li>
+                <li>🖥️ <strong>Hardware-Informationen</strong> sammelt</li>
+                <li>🔧 <strong>Automatisch eine NixOS-Konfiguration</strong> generiert</li>
+                <li>💿 <strong>Optional: Custom ISO</strong> mit eingebetteter Config erstellt</li>
+            </ul>
+        </div>
+        
+        <div class="section">
+            <h2>🔄 Wie funktioniert es?</h2>
+            <div class="workflow">
+                <div class="workflow-step">
+                    <div class="workflow-step-number">1</div>
+                    <h3>Snapshot erstellen</h3>
+                    <p>Führe das Snapshot-Script auf deinem Windows/macOS/Linux-System aus</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">2</div>
+                    <h3>Report hochladen</h3>
+                    <p>Lade den generierten Report zu diesem Service hoch</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">3</div>
+                    <h3>Config generieren</h3>
+                    <p>Der Service generiert automatisch eine NixOS-Konfiguration</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">4</div>
+                    <h3>ISO bauen (optional)</h3>
+                    <p>Erstelle ein Custom NixOS-ISO mit eingebetteter Config</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">5</div>
+                    <h3>Installieren</h3>
+                    <p>Installiere NixOS mit der generierten Konfiguration</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>📥 Snapshot-Scripts herunterladen</h2>
+            <p>Lade das passende Script für dein System herunter und führe es aus:</p>
+            <div class="download-grid">
+                <div class="download-card">
+                    <h3>🪟 Windows</h3>
+                    <p>PowerShell Script</p>
+                    <a href="/download/windows" class="btn">Download</a>
+                    <p style="margin-top: 10px; font-size: 0.9em; color: #858585;">
+                        <code>nixify-scan.ps1</code>
+                    </p>
+                </div>
+                <div class="download-card">
+                    <h3>🍎 macOS</h3>
+                    <p>Bash Script</p>
+                    <a href="/download/macos" class="btn">Download</a>
+                    <p style="margin-top: 10px; font-size: 0.9em; color: #858585;">
+                        <code>nixify-scan.sh</code>
+                    </p>
+                </div>
+                <div class="download-card">
+                    <h3>🐧 Linux</h3>
+                    <p>Bash Script</p>
+                    <a href="/download/linux" class="btn">Download</a>
+                    <p style="margin-top: 10px; font-size: 0.9em; color: #858585;">
+                        <code>nixify-scan.sh</code>
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>📤 Report hochladen</h2>
+            <p>Nachdem du das Snapshot-Script ausgeführt hast, lade den generierten JSON-Report hier hoch:</p>
+            
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <input type="file" id="fileInput" accept=".json,application/json">
+                    <p style="font-size: 1.2em; margin-bottom: 10px;">📁 Datei hier ablegen oder klicken zum Auswählen</p>
+                    <p style="color: #858585; font-size: 0.9em;">Unterstützt: JSON-Dateien (max. 10MB)</p>
+                </div>
+                <div id="uploadError" class="error-message hidden"></div>
+            </div>
+            
+            <div id="sessionStatus" class="hidden">
+                <div class="session-card">
+                    <h3>Session Status</h3>
+                    <p><strong>Session ID:</strong> <code id="sessionId"></code></p>
+                    <p><strong>Status:</strong> <span class="session-status" id="sessionStatusBadge">queued</span></p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressBar" style="width: 0%">0%</div>
+                    </div>
+                    <div id="sessionActions" class="hidden" style="margin-top: 15px;">
+                        <button class="btn" onclick="downloadConfig()">📥 Config herunterladen</button>
+                        <button class="btn btn-secondary" onclick="buildISO()" style="margin-left: 10px;">💿 ISO bauen</button>
+                        <button class="btn btn-danger hidden" onclick="downloadISO()" id="downloadISOBtn" style="margin-left: 10px;">💿 ISO herunterladen</button>
+                    </div>
+                    <div id="sessionError" class="error-message hidden"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>⚠️ Wichtige Hinweise & Einschränkungen</h2>
+            
+            <div class="info-box warning">
+                <h3>🛡️ Kernel-Level Anti-Cheats</h3>
+                <p><strong>Vanguard (Valorant), EasyAntiCheat, BattlEye</strong> und ähnliche Kernel-Level Anti-Cheats funktionieren <strong>NICHT</strong> unter Linux/NixOS.</p>
+                <p style="margin-top: 10px;">Diese Programme benötigen Windows-Kernel-Treiber und können nicht mit Wine/Proton emuliert werden.</p>
+            </div>
+            
+            <div class="info-box info">
+                <h3>🍷 Wine & Proton</h3>
+                <p>Die meisten Windows-Programme funktionieren mit <strong>Wine</strong> oder <strong>Proton</strong> (für Spiele).</p>
+                <ul style="margin-top: 10px;">
+                    <li>Steam mit Proton unterstützt tausende Windows-Spiele</li>
+                    <li>Viele Windows-Anwendungen laufen mit Wine</li>
+                    <li>Native Linux-Alternativen für die meisten Programme verfügbar</li>
+                </ul>
+            </div>
+            
+            <div class="info-box success">
+                <h3>✅ Was funktioniert gut</h3>
+                <ul>
+                    <li>Entwicklungstools (VS Code, Git, Docker, etc.)</li>
+                    <li>Browser (Firefox, Chrome, Edge)</li>
+                    <li>Office-Suiten (LibreOffice, OnlyOffice)</li>
+                    <li>Multimedia (VLC, OBS, GIMP, Blender)</li>
+                    <li>Die meisten Open-Source-Programme</li>
+                </ul>
+            </div>
+            
+            <div class="info-box info">
+                <h3>📝 Über diese Konfiguration</h3>
+                <p>Diese NixOS-Konfiguration basiert auf dem <strong>NixOS Control Center</strong> - einem modularen System-Management-Framework.</p>
+                <ul style="margin-top: 10px;">
+                    <li>Modulare Struktur für einfache Wartung</li>
+                    <li>Automatische Module-Erkennung</li>
+                    <li>CLI & TUI-Tools für System-Management</li>
+                    <li>Reproduzierbare Builds</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>📊 Service Status</h2>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value">{{.Sessions}}</div>
+                    <div class="stat-label">Active Sessions</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" style="font-size: 1.2em;">{{.Host}}:{{.Port}}</div>
+                    <div class="stat-label">Service Address</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">✅</div>
+                    <div class="stat-label">Service Status</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>🔌 API Endpoints</h2>
+            <p>Für Entwickler und automatisierte Workflows:</p>
+            
+            <div class="endpoint">
+                <span class="method">GET</span> <span class="path">/api/v1/health</span>
+                <p>Service health check</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">POST</span> <span class="path">/api/v1/upload</span>
+                <p>Upload snapshot report (JSON)</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">GET</span> <span class="path">/api/v1/sessions</span>
+                <p>List all migration sessions</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">GET</span> <span class="path">/api/v1/session/{id}</span>
+                <p>Get session details</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">GET</span> <span class="path">/api/v1/config/{id}</span>
+                <p>Get generated NixOS configuration</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">POST</span> <span class="path">/api/v1/iso/build</span>
+                <p>Build custom NixOS ISO</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">GET</span> <span class="path">/api/v1/iso/{id}/download</span>
+                <p>Download built ISO</p>
+            </div>
+        </div>
+        
+        <div class="section" style="text-align: center; color: #858585; font-size: 0.9em;">
+            <p>Nixify Web Service - Part of <a href="https://github.com/fr4iser90/NixOSControlCenter">NixOS Control Center</a></p>
+            <p style="margin-top: 10px;">Free all users from Microsoft and Apple 🚀</p>
+        </div>
+    </div>
+    
+    <script>
+        let currentSessionId = null;
+        let statusCheckInterval = null;
+        
+        // Upload handling
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadError = document.getElementById('uploadError');
+        const sessionStatus = document.getElementById('sessionStatus');
+        
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        function handleFile(file) {
+            if (!file.name.endsWith('.json')) {
+                showError('Nur JSON-Dateien werden unterstützt!');
+                return;
+            }
+            
+            if (file.size > 10 * 1024 * 1024) {
+                showError('Datei zu groß! Maximum: 10MB');
+                return;
+            }
+            
+            uploadError.classList.add('hidden');
+            uploadArea.innerHTML = '<p>📤 Lade hoch...</p>';
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    uploadReport(json);
+                } catch (err) {
+                    showError('Ungültige JSON-Datei: ' + err.message);
+                    resetUploadArea();
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        function uploadReport(report) {
+            fetch('/api/v1/upload', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(report)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(text || 'Upload fehlgeschlagen');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                currentSessionId = data.session_id;
+                sessionStatus.classList.remove('hidden');
+                document.getElementById('sessionId').textContent = currentSessionId;
+                updateSessionStatus();
+                startStatusPolling();
+                resetUploadArea();
+            })
+            .catch(error => {
+                showError('Upload fehlgeschlagen: ' + error.message);
+                resetUploadArea();
+            });
+        }
+        
+        function resetUploadArea() {
+            uploadArea.innerHTML = `
+                <input type="file" id="fileInput" accept=".json,application/json">
+                <p style="font-size: 1.2em; margin-bottom: 10px;">📁 Datei hier ablegen oder klicken zum Auswählen</p>
+                <p style="color: #858585; font-size: 0.9em;">Unterstützt: JSON-Dateien (max. 10MB)</p>
+            `;
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFile(e.target.files[0]);
+                }
+            });
+        }
+        
+        function showError(message) {
+            uploadError.textContent = message;
+            uploadError.classList.remove('hidden');
+        }
+        
+        function startStatusPolling() {
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+            }
+            statusCheckInterval = setInterval(updateSessionStatus, 3000); // Check every 3 seconds
+        }
+        
+        function updateSessionStatus() {
+            if (!currentSessionId) return;
+            
+            fetch(`/api/v1/session/${currentSessionId}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Session nicht gefunden');
+                    return response.json();
+                })
+                .then(session => {
+                    const statusBadge = document.getElementById('sessionStatusBadge');
+                    const progressBar = document.getElementById('progressBar');
+                    const sessionActions = document.getElementById('sessionActions');
+                    const sessionError = document.getElementById('sessionError');
+                    const downloadISOBtn = document.getElementById('downloadISOBtn');
+                    
+                    statusBadge.textContent = session.status;
+                    statusBadge.className = 'session-status status-' + session.status;
+                    
+                    // Update progress
+                    let progress = 0;
+                    if (session.status === 'queued') progress = 10;
+                    else if (session.status === 'processing') progress = 50;
+                    else if (session.status === 'ready') progress = 100;
+                    else if (session.status === 'building_iso') progress = 75;
+                    else if (session.status === 'iso_ready') progress = 100;
+                    else if (session.status === 'error') progress = 0;
+                    
+                    progressBar.style.width = progress + '%';
+                    progressBar.textContent = progress + '%';
+                    
+                    // Show actions when ready
+                    if (session.status === 'ready' || session.status === 'iso_ready') {
+                        sessionActions.classList.remove('hidden');
+                        if (session.status === 'iso_ready') {
+                            downloadISOBtn.classList.remove('hidden');
+                        } else {
+                            downloadISOBtn.classList.add('hidden');
+                        }
+                    } else {
+                        sessionActions.classList.add('hidden');
+                    }
+                    
+                    // Show error if any
+                    if (session.status === 'error' && session.error) {
+                        sessionError.textContent = 'Fehler: ' + session.error;
+                        sessionError.classList.remove('hidden');
+                    } else {
+                        sessionError.classList.add('hidden');
+                    }
+                    
+                    // Stop polling if done or error
+                    if (session.status === 'ready' || session.status === 'iso_ready' || session.status === 'error') {
+                        clearInterval(statusCheckInterval);
+                    }
+                })
+                .catch(error => {
+                    console.error('Status check failed:', error);
+                });
+        }
+        
+        function downloadConfig() {
+            if (!currentSessionId) return;
+            window.location.href = `/api/v1/config/${currentSessionId}`;
+        }
+        
+        function buildISO() {
+            if (!currentSessionId) return;
+            
+            fetch('/api/v1/iso/build', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    session_id: currentSessionId,
+                    variant: 'plasma'
+                })
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('ISO-Build fehlgeschlagen');
+                return response.json();
+            })
+            .then(data => {
+                startStatusPolling(); // Resume polling for ISO build status
+            })
+            .catch(error => {
+                alert('Fehler beim ISO-Build: ' + error.message);
+            });
+        }
+        
+        function downloadISO() {
+            if (!currentSessionId) return;
+            window.location.href = `/api/v1/iso/${currentSessionId}/download`;
+        }
+    </script>
+</body>
+</html>

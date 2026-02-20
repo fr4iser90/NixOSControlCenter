@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  nixify-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nixify-web-service
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - HOST=0.0.0.0
+      - DATA_DIR=/var/lib/nixify
+    volumes:
+      # Mount data directory for persistence
+      - nixify-data:/var/lib/nixify
+      # Optional: Mount mapping database if you have it
+      # - ./mapping:/app/mapping:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  nixify-data:
+    driver: local

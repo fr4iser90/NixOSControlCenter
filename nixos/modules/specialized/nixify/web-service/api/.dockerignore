@@ -1,0 +1,6 @@
+# Ignore files for Docker build
+*.md
+.git
+.gitignore
+gomod2nix.toml
+*.nix

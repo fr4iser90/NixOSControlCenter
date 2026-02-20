@@ -252,7 +252,7 @@ Diese Checkliste führt durch die komplette Implementierung des Nixify-Moduls.
 - [ ] Nix-Config-Generator
 - [ ] Snapshot-Report parsen
 - [ ] Programm-Mapping anwenden
-- [ ] system-config.nix generieren
+- [ ] configs/*.nix Dateien generieren
 - [ ] Config-Validierung
 
 **Datei:** `web-service/config-generator/generator.nix`
@@ -278,7 +278,7 @@ Diese Checkliste führt durch die komplette Implementierung des Nixify-Moduls.
 
 **Aufgaben:**
 - [ ] NixOS ISO als Base
-- [ ] system-config.nix einbetten
+- [ ] configs/ Verzeichnis auf ISO einbetten
 - [ ] Auto-Installer-Script
 - [ ] ISO-Generierung
 - [ ] Checksum-Generierung

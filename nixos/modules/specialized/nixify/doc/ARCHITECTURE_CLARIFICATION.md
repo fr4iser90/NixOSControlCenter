@@ -39,7 +39,7 @@ powershell -ExecutionPolicy Bypass -File nixify-scan.ps1
 **Was passiert hier:**
 - **Web-Service** läuft (systemd)
 - Empfängt Reports von Ziel-Systemen
-- Generiert **system-config.nix**
+- Generiert **configs/*.nix** Dateien
 - Baut **Custom ISO** (optional)
 
 **Commands:**
@@ -99,7 +99,7 @@ ncc nixify service stop     # Service stoppen
 │                                          │
 │  3. Verarbeitet Report                  │
 │     → Mappt Programme zu NixOS-Modulen  │
-│     → Generiert system-config.nix       │
+│     → Generiert configs/*.nix Dateien   │
 │                                          │
 │  4. Bietet Download an                 │
 │     → Config-Dateien (ZIP)              │
@@ -189,7 +189,7 @@ GET  /api/v1/iso/{id}       # ISO-Download
 3. **Config-Generierung**
    - Report parsen
    - Programme zu Modulen mappen
-   - system-config.nix generieren
+   - configs/*.nix Dateien generieren
 
 4. **ISO-Builder** (optional)
    - Custom ISO mit Config

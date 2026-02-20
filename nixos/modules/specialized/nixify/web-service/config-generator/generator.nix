@@ -1,5 +1,5 @@
 # Nixify Config Generator
-# Generiert system-config.nix aus Snapshot-Report
+# Generiert configs/*.nix Dateien aus Snapshot-Report
 
 { snapshotReport, mappingDatabase, getModuleApi, ... }:
 
@@ -7,10 +7,6 @@ let
   # Parse Snapshot-Report
   report = builtins.fromJSON (builtins.readFile snapshotReport);
   mapping = builtins.fromJSON (builtins.readFile mappingDatabase);
-  
-  # Nutze bestehende Module-APIs
-  moduleManager = getModuleApi "module-manager";
-  systemManager = getModuleApi "system-manager";
   
   # Helper: Find program in mapping (with aliases)
   findProgramMapping = programName: 
@@ -38,9 +34,13 @@ let
   packages = builtins.filter (p: p != null && p.nixos_package != null) mappedPrograms;
   packageNames = builtins.map (p: p.nixos_package) packages;
   
+  # Unique package names
+  uniquePackages = builtins.attrValues (builtins.listToAttrs (builtins.map (p: { name = p; value = p; }) packageNames));
+  
   # Module extrahieren (nur die mit module)
   modules = builtins.filter (p: p != null && p.module != null) mappedPrograms;
   moduleNames = builtins.map (p: p.module) modules;
+  uniqueModules = builtins.attrValues (builtins.listToAttrs (builtins.map (m: { name = m; value = m; }) moduleNames));
   
   # Desktop-Environment basierend auf OS
   desktopEnv = if report.os == "linux" then
@@ -53,55 +53,78 @@ let
   else
     (mapping.desktop_mapping.${report.os} or { preferred_de = "plasma" }).preferred_de;
   
-  # Hostname aus OS generieren
-  hostname = if report.os == "linux" then
-    "${(builtins.head (builtins.split " " (report.distro.name or "linux")))}-nixified"
-  else
-    "${report.os}-nixified";
-  
-in
-{
-  # System-Identität
-  systemType = "desktop";
-  hostName = hostname;
-  
-  # System-Version
-  system = {
-    stateVersion = "25.11";
-    channel = "stable";
-    bootloader = "systemd-boot";
-  };
-  
-  # Desktop-Environment
-  desktop = {
-    enable = true;
-    environment = desktopEnv;
-  };
-  
-  # Packages (unique list)
-  packages = builtins.attrValues (builtins.listToAttrs (builtins.map (p: { name = p; value = p; }) packageNames));
-  
-  # Modules (unique list)
-  modules = builtins.attrValues (builtins.listToAttrs (builtins.map (m: { name = m; value = m; }) moduleNames));
-  
-  # System-Einstellungen
+  # Timezone und Locale
   timeZone = report.settings.timezone or "Europe/Berlin";
   locale = report.settings.locale or "en_US.UTF-8";
   
-  # Hardware-Info (für Dokumentation)
-  hardware = {
-    cpu = report.hardware.cpu or "unknown";
-    ram = report.hardware.ram or 0;
-    gpu = report.hardware.gpu or "unknown";
+  # Generate desktop-config.nix
+  desktopConfig = ''
+{
+  # Desktop-Environment
+  desktop = {
+    enable = true;
+    environment = "${desktopEnv}";
   };
+}
+'';
   
-  # Metadata
+  # Generate packages-config.nix
+  packagesList = builtins.concatStringsSep "\n    " (builtins.map (p: "\"${p}\"") uniquePackages);
+  packagesConfig = ''
+{
+  # Packages from snapshot
+  packages = {
+    systemPackages = [
+    ${packagesList}
+    ];
+  };
+}
+'';
+  
+  # Generate localization-config.nix
+  localizationConfig = ''
+{
+  # System Settings
+  localization = {
+    timeZone = "${timeZone}";
+    locale = "${locale}";
+  };
+}
+'';
+  
+  # Generate module-manager-config.nix (if modules found)
+  modulesList = if uniqueModules != [] then
+    builtins.concatStringsSep "\n      " (builtins.map (m: "${m}.enable = true;") uniqueModules)
+  else "";
+  
+  moduleManagerConfig = if uniqueModules != [] then ''
+{
+  # Modules from snapshot
+  modules = {
+${modulesList}
+  };
+}
+'' else "";
+  
+in
+{
+  # Config files as strings (ready to write to configs/ directory)
+  configs = {
+    "desktop-config.nix" = desktopConfig;
+    "packages-config.nix" = packagesConfig;
+    "localization-config.nix" = localizationConfig;
+  } // (if moduleManagerConfig != "" then {
+    "module-manager-config.nix" = moduleManagerConfig;
+  } else {});
+  
+  # Metadata for reference
   metadata = {
     source_os = report.os;
     source_version = report.version or "unknown";
     generated_at = report.timestamp;
     programs_count = builtins.length report.programs;
-    packages_count = builtins.length packageNames;
-    modules_count = builtins.length moduleNames;
+    packages_count = builtins.length uniquePackages;
+    modules_count = builtins.length uniqueModules;
+    desktop = desktopEnv;
   };
 }

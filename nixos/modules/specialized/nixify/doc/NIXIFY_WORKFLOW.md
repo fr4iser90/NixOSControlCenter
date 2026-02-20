@@ -101,7 +101,7 @@ Dieses Dokument erklärt den **kompletten Workflow** des Nixify-Moduls.
 │  1. Parst JSON-Report                                   │
 │  2. Mappt Programme zu NixOS-Modulen                   │
 │     → Nutzt mapping-database.json                       │
-│  3. Generiert system-config.nix                        │
+│  3. Generiert configs/*.nix Dateien                    │
 │     → Nutzt bestehende Module-APIs                      │
 │     → module-manager API                                │
 │     → system-manager API                                │
@@ -577,7 +577,7 @@ generatedConfig
 
 4. **Server verarbeitet** (auf NixOS):
    - Nutzt bestehende Module-APIs
-   - Generiert system-config.nix
+   - Generiert configs/*.nix Dateien
    - Bietet Download an
 
 5. **User erhält:**
