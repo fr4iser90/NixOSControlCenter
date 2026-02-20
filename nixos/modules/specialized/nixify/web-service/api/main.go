@@ -88,6 +88,12 @@ type Report struct {
 }
 
 // ModuleInfo represents information about a NixOS Control Center module
+type DocInfo struct {
+	Name  string `json:"name"`  // "README", "SECURITY", "ROADMAP", etc.
+	Path  string `json:"path"`  // Full path to the doc file
+	Title string `json:"title"` // Display title
+}
+
 type ModuleInfo struct {
 	Name        string   `json:"name"`
 	Category    string   `json:"category"`
@@ -103,6 +109,8 @@ type ModuleInfo struct {
 	ReadmePath  string   `json:"readme_path,omitempty"`
 	GitHubURL   string   `json:"github_url,omitempty"`
 	Assets      []string `json:"assets,omitempty"` // Subdirectories like tui/, scripts/, etc.
+	Docs        []DocInfo `json:"docs,omitempty"` // Documentation files from doc/
+	DocAssets   []string  `json:"doc_assets,omitempty"` // Assets from doc/assets/
 }
 
 // Translations holds i18n translations
@@ -373,6 +381,7 @@ type TemplateData struct {
 	Module       *ModuleInfo // For module detail page
 	ReadmeContent string // For module detail page
 	DefaultNixContent string // For module detail page
+	DocContents  map[string]string // For module detail page: doc name -> content
 	// Additional fields can be added per page
 }
 
@@ -782,6 +791,21 @@ func (s *Server) handleModules(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleModuleDetail(w http.ResponseWriter, r *http.Request) {
+	// Extract path parts (e.g., /module/nixify or /module/nixify/asset/image.png)
+	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(pathParts) < 2 {
+		http.Error(w, "Module name required", http.StatusBadRequest)
+		return
+	}
+	
+	moduleName := pathParts[1]
+	
+	// Check if this is an asset request (e.g., /module/nixify/asset/image.png)
+	if len(pathParts) >= 4 && pathParts[2] == "asset" {
+		s.handleModuleAsset(w, r, moduleName, pathParts[3])
+		return
+	}
+	
 	nonce, err := generateNonce()
 	if err != nil {
 		log.Printf("Failed to generate nonce: %v", err)
@@ -790,15 +814,6 @@ func (s *Server) handleModuleDetail(w http.ResponseWriter, r *http.Request) {
 	
 	s.setSecurityHeadersWithNonce(w, nonce)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	
-	// Extract module name from URL (e.g., /module/nixify)
-	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(pathParts) < 2 {
-		http.Error(w, "Module name required", http.StatusBadRequest)
-		return
-	}
-	
-	moduleName := pathParts[1]
 	
 	// Discover modules and find the requested one
 	modules, err := s.discoverModules()
@@ -821,10 +836,16 @@ func (s *Server) handleModuleDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	// Read README content if available
+	// Read README content if available (from root or doc/)
 	readmeContent := ""
 	if content, err := os.ReadFile(module.ReadmePath); err == nil {
 		readmeContent = string(content)
+	} else {
+		// Try doc/README.md
+		docReadmePath := filepath.Join(module.Path, "doc", "README.md")
+		if content, err := os.ReadFile(docReadmePath); err == nil {
+			readmeContent = string(content)
+		}
 	}
 	
 	// Read default.nix snippet (first 50 lines)
@@ -839,17 +860,98 @@ func (s *Server) handleModuleDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	
+	// Load all documentation files from doc/
+	docContents := make(map[string]string)
+	for _, doc := range module.Docs {
+		if content, err := os.ReadFile(doc.Path); err == nil {
+			docContents[doc.Name] = string(content)
+		}
+	}
+	
 	data := s.newTemplateData(r, nonce)
 	data.CurrentPath = r.URL.Path
 	data.Module = module
 	data.ReadmeContent = readmeContent
 	data.DefaultNixContent = defaultNixContent
+	data.DocContents = docContents
 	
 	// Execute base template, which will render the "module-detail" block
 	if err := s.baseTemplate.ExecuteTemplate(w, "base", data); err != nil {
 		log.Printf("Failed to execute module detail template: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
+}
+
+// handleModuleAsset serves asset files from doc/assets/ directory
+func (s *Server) handleModuleAsset(w http.ResponseWriter, r *http.Request, moduleName, assetName string) {
+	// Security: Sanitize asset name to prevent path traversal
+	assetName = filepath.Base(assetName) // Remove any path components
+	if assetName == "" || assetName == "." || assetName == ".." {
+		http.Error(w, "Invalid asset name", http.StatusBadRequest)
+		return
+	}
+	
+	// Discover modules and find the requested one
+	modules, err := s.discoverModules()
+	if err != nil {
+		log.Printf("Failed to discover modules: %v", err)
+		http.Error(w, "Failed to discover modules", http.StatusInternalServerError)
+		return
+	}
+	
+	var module *ModuleInfo
+	for i := range modules {
+		if modules[i].Name == moduleName {
+			module = &modules[i]
+			break
+		}
+	}
+	
+	if module == nil {
+		http.Error(w, "Module not found", http.StatusNotFound)
+		return
+	}
+	
+	// Build asset path
+	assetPath := filepath.Join(module.Path, "doc", "assets", assetName)
+	
+	// Security: Verify the asset is actually in the doc/assets directory
+	if !strings.HasPrefix(assetPath, module.Path) {
+		http.Error(w, "Invalid asset path", http.StatusBadRequest)
+		return
+	}
+	
+	// Check if file exists
+	if _, err := os.Stat(assetPath); os.IsNotExist(err) {
+		http.Error(w, "Asset not found", http.StatusNotFound)
+		return
+	}
+	
+	// Determine content type based on extension
+	ext := strings.ToLower(filepath.Ext(assetName))
+	contentType := "application/octet-stream"
+	switch ext {
+	case ".png":
+		contentType = "image/png"
+	case ".jpg", ".jpeg":
+		contentType = "image/jpeg"
+	case ".gif":
+		contentType = "image/gif"
+	case ".svg":
+		contentType = "image/svg+xml"
+	case ".webp":
+		contentType = "image/webp"
+	case ".pdf":
+		contentType = "application/pdf"
+	}
+	
+	// Set headers
+	s.setSecurityHeaders(w)
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "public, max-age=3600") // Cache for 1 hour
+	
+	// Serve file
+	http.ServeFile(w, r, assetPath)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -2055,12 +2157,14 @@ func (s *Server) parseModule(modulePath, domain, rootPath string) (ModuleInfo, e
 	// Find assets (subdirectories)
 	assets := s.findAssets(modulePath)
 	
-	// Determine status (active by default for core, check config for modules)
-	status := "active"
-	if domain == "modules" {
-		// Could check config file, but for now assume active
-		status = "active"
-	}
+	// Find documentation files from doc/ directory
+	docs := s.findModuleDocs(modulePath)
+	
+	// Find doc assets from doc/assets/ directory
+	docAssets := s.findDocAssets(modulePath)
+	
+	// Determine status by checking actual config file
+	status := s.checkModuleStatus(moduleName, category, domain)
 	
 	return ModuleInfo{
 		Name:        moduleName,
@@ -2077,6 +2181,8 @@ func (s *Server) parseModule(modulePath, domain, rootPath string) (ModuleInfo, e
 		ReadmePath:  filepath.Join(modulePath, "README.md"),
 		GitHubURL:   githubURL,
 		Assets:      assets,
+		Docs:        docs,
+		DocAssets:   docAssets,
 	}, nil
 }
 
@@ -2211,6 +2317,113 @@ func (s *Server) sanitizeSessionID(sessionID string) string {
 	}
 	
 	return sessionID
+}
+
+// checkModuleStatus determines if a module is active by checking its config file
+func (s *Server) checkModuleStatus(moduleName, category, domain string) string {
+	// Core modules are active by default if no config exists
+	// Optional modules are planned by default if no config exists
+	
+	// Build config file path
+	configPath := s.findModuleConfigPath(moduleName, category, domain)
+	
+	// Check if config file exists
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		// No config file found - use defaults
+		if domain == "core" {
+			return "active" // Core modules are active by default
+		}
+		return "planned" // Optional modules are planned by default
+	}
+	
+	// Parse config file to check enable status
+	enabled := s.parseNixConfigEnable(configPath, category)
+	if enabled {
+		return "active"
+	}
+	return "planned"
+}
+
+// findModuleConfigPath constructs the config file path for a module
+func (s *Server) findModuleConfigPath(moduleName, category, domain string) string {
+	// Category examples:
+	// - "core.base.audio" -> /etc/nixos/configs/core/base/audio/config.nix
+	// - "modules.specialized.nixify" -> /etc/nixos/configs/modules/specialized/nixify/config.nix
+	
+	// Category already contains domain and full path (e.g., "core.base.audio" or "modules.specialized.nixify")
+	// Split category into parts
+	parts := strings.Split(category, ".")
+	
+	// Build path: /etc/nixos/configs/{parts...}/config.nix
+	// The category includes the module name as the last part, so we need to replace it
+	pathParts := []string{"/etc/nixos/configs"}
+	
+	// Add all category parts except the last one (which should be the module name)
+	if len(parts) > 0 {
+		pathParts = append(pathParts, parts[:len(parts)-1]...)
+	}
+	
+	// Add module name and config.nix
+	pathParts = append(pathParts, moduleName, "config.nix")
+	
+	return filepath.Join(pathParts...)
+}
+
+// parseNixConfigEnable parses a Nix config file and checks if enable is true
+func (s *Server) parseNixConfigEnable(configPath, category string) bool {
+	// Try to read and parse the config file
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		log.Printf("Failed to read config file %s: %v", configPath, err)
+		return false
+	}
+	
+	// Simple regex-based parsing for enable field
+	// Look for: enable = true; or enable = false;
+	contentStr := string(content)
+	
+	// Try to find enable = true or enable = false
+	// This is a simple approach - for more complex configs, we might need nix-instantiate
+	lines := strings.Split(contentStr, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Match: enable = true; or enable = false;
+		if strings.Contains(line, "enable") {
+			if strings.Contains(line, "enable = true") || strings.Contains(line, "enable=true") {
+				return true
+			}
+			if strings.Contains(line, "enable = false") || strings.Contains(line, "enable=false") {
+				return false
+			}
+		}
+	}
+	
+	// If enable is not explicitly set, try using nix-instantiate for more accurate parsing
+	// This is more reliable for complex configs
+	return s.checkEnableWithNix(configPath, category)
+}
+
+// checkEnableWithNix uses nix-instantiate to check if enable is true
+func (s *Server) checkEnableWithNix(configPath, category string) bool {
+	// Extract enable path from category
+	// e.g., "modules.specialized.nixify" -> "modules.specialized.nixify.enable"
+	enablePath := category + ".enable"
+	
+	// Use nix-instantiate to evaluate the enable option
+	// nix-instantiate --eval --strict -E "(import /path/to/config.nix).modules.specialized.nixify.enable or false"
+	expr := fmt.Sprintf(`(import %s).%s or false`, configPath, enablePath)
+	
+	cmd := exec.Command("nix-instantiate", "--eval", "--strict", "-E", expr)
+	output, err := cmd.Output()
+	if err != nil {
+		// If nix-instantiate fails, fall back to default
+		log.Printf("Failed to evaluate enable status with nix-instantiate for %s: %v", category, err)
+		return false
+	}
+	
+	// Parse output (should be "true" or "false")
+	result := strings.TrimSpace(string(output))
+	return result == "true"
 }
 
 // cleanupSessions periodically removes old sessions
