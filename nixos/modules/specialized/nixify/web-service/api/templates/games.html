@@ -1,0 +1,59 @@
+{{define "content"}}
+<div class="container">
+    <header>
+        <h1>{{.T "games.title"}}</h1>
+        <p class="subtitle">{{.T "games.subtitle"}}</p>
+    </header>
+
+    <div class="section">
+        <div class="info-box warning">
+            <h3>{{.T "games.kernel_anticheat_warning.title"}}</h3>
+            <p><strong>{{.T "games.kernel_anticheat_warning.text"}}</strong></p>
+            <p style="margin-top: 10px;">{{.T "games.kernel_anticheat_warning.details"}}</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>{{.T "games.external_resources.title"}}</h2>
+        <p>{{.T "games.external_resources.description"}}</p>
+        
+        <div class="download-grid" style="margin-top: 20px;">
+            <div class="download-card">
+                <h3>{{.T "games.external_resources.protondb.title"}}</h3>
+                <p>{{.T "games.external_resources.protondb.description"}}</p>
+                <a href="{{.T "games.external_resources.protondb.url"}}" target="_blank" class="btn">Visit ProtonDB</a>
+            </div>
+            
+            <div class="download-card">
+                <h3>{{.T "games.external_resources.winehq.title"}}</h3>
+                <p>{{.T "games.external_resources.winehq.description"}}</p>
+                <a href="{{.T "games.external_resources.winehq.url"}}" target="_blank" class="btn">Visit WineHQ</a>
+            </div>
+            
+            <div class="download-card">
+                <h3>{{.T "games.external_resources.lutris.title"}}</h3>
+                <p>{{.T "games.external_resources.lutris.description"}}</p>
+                <a href="{{.T "games.external_resources.lutris.url"}}" target="_blank" class="btn">Visit Lutris</a>
+            </div>
+            
+            <div class="download-card">
+                <h3>{{.T "games.external_resources.areweanticheatyet.title"}}</h3>
+                <p>{{.T "games.external_resources.areweanticheatyet.description"}}</p>
+                <a href="{{.T "games.external_resources.areweanticheatyet.url"}}" target="_blank" class="btn">Visit AWAAC</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="info-box success">
+            <h3>{{.T "games.proton.title"}}</h3>
+            <p>{{.T "games.proton.text"}}</p>
+            <ul style="margin-top: 10px; margin-left: 20px;">
+                {{range .TArray "games.proton.features"}}
+                <li>{{.}}</li>
+                {{end}}
+            </ul>
+        </div>
+    </div>
+</div>
+{{end}}

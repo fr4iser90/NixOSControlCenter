@@ -1,0 +1,337 @@
+{
+  "meta": {
+    "title": "Nixify - Windows/macOS/Linux → NixOS Migration",
+    "description": "Migriere von Windows/macOS/Linux zu NixOS durch Extraktion von Systeminformationen und Generierung von NixOS-Konfigurationen"
+  },
+  "nav": {
+    "home": "Startseite",
+    "mappings": "Programm-Zuordnungen",
+    "games": "Spiele-Unterstützung",
+    "modules": "Module",
+    "about": "Über",
+    "select_language": "Sprache wählen"
+  },
+  "header": {
+    "title": "🚀 Nixify",
+    "subtitle": "Windows/macOS/Linux → NixOS System-DNA-Extraktor"
+  },
+  "sections": {
+    "what_is_nixos": "Was ist NixOS?",
+    "what_does_nixify": "Was macht Nixify?",
+    "how_it_works": "Wie funktioniert es?",
+    "download_scripts": "Snapshot-Scripts herunterladen",
+    "upload_report": "Report hochladen & Session verwalten",
+    "important_notes": "Wichtige Hinweise & Einschränkungen",
+    "service_status": "Service-Status",
+    "api_endpoints": "API-Endpunkte"
+  },
+  "nixos": {
+    "declarative": {
+      "title": "✨ Deklarative System-Konfiguration",
+      "text": "Dein gesamtes System wird in einer einzigen Konfigurationsdatei beschrieben. Keine manuellen Änderungen mehr, die später vergessen werden."
+    },
+    "immutable": {
+      "title": "🔒 Immutable & Reproduzierbar",
+      "text": "Jede System-Generation ist unveränderlich und kann jederzeit wiederhergestellt werden. Identische Systeme auf verschiedenen Maschinen."
+    },
+    "atomic": {
+      "title": "🔄 Atomic Updates & Rollbacks",
+      "text": "System-Updates sind atomar - entweder alles funktioniert oder nichts ändert sich. Ein-Klick-Rollback zu jeder vorherigen Generation."
+    }
+  },
+  "nixify": {
+    "description": "Nixify hilft dir, von Windows/macOS/Linux zu NixOS zu migrieren, indem es:",
+    "features": {
+      "programs": "📦 Alle installierten Programme auf deinem System erkennt",
+      "settings": "⚙️ System-Einstellungen (Timezone, Locale, Desktop) erfasst",
+      "hardware": "🖥️ Hardware-Informationen sammelt",
+      "config": "🔧 Automatisch eine NixOS-Konfiguration generiert",
+      "iso": "💿 Optional: Custom ISO mit eingebetteter Config erstellt"
+    }
+  },
+  "workflow": {
+    "step1": {
+      "number": "1",
+      "title": "Snapshot erstellen",
+      "text": "Führe das Snapshot-Script auf deinem Windows/macOS/Linux-System aus"
+    },
+    "step2": {
+      "number": "2",
+      "title": "Report hochladen",
+      "text": "Lade den generierten Report zu diesem Service hoch"
+    },
+    "step3": {
+      "number": "3",
+      "title": "Config generieren",
+      "text": "Der Service generiert automatisch eine NixOS-Konfiguration"
+    },
+    "step4": {
+      "number": "4",
+      "title": "ISO bauen (optional)",
+      "text": "Erstelle ein Custom NixOS-ISO mit eingebetteter Config"
+    },
+    "step5": {
+      "number": "5",
+      "title": "Installieren",
+      "text": "Installiere NixOS mit der generierten Konfiguration"
+    }
+  },
+  "download": {
+    "windows": {
+      "title": "🪟 Windows",
+      "description": "PowerShell Script",
+      "filename": "nixify-scan.ps1"
+    },
+    "macos": {
+      "title": "🍎 macOS",
+      "description": "Bash Script",
+      "filename": "nixify-scan.sh"
+    },
+    "linux": {
+      "title": "🐧 Linux",
+      "description": "Bash Script",
+      "filename": "nixify-scan.sh"
+    },
+    "instructions": "Lade das passende Script für dein System herunter und führe es aus:"
+  },
+  "upload": {
+    "title": "Report hochladen & Session verwalten",
+    "drop_zone": "📁 Datei hier ablegen oder klicken zum Auswählen",
+    "supported": "Unterstützt: JSON-Dateien (max. 10MB)",
+    "uploading": "📤 Lade hoch...",
+    "error": "Upload fehlgeschlagen"
+  },
+  "warnings": {
+    "kernel_anticheat": {
+      "title": "🛡️ Kernel-Level Anti-Cheats",
+      "text": "Vanguard (Valorant), EasyAntiCheat, BattlEye und ähnliche Kernel-Level Anti-Cheats funktionieren NICHT unter Linux/NixOS.",
+      "details": "Diese Programme benötigen Windows-Kernel-Treiber und können nicht mit Wine/Proton emuliert werden."
+    },
+    "wine_proton": {
+      "title": "🍷 Wine & Proton",
+      "text": "Die meisten Windows-Programme funktionieren mit Wine oder Proton (für Spiele).",
+      "features": [
+        "Steam mit Proton unterstützt tausende Windows-Spiele",
+        "Viele Windows-Anwendungen laufen mit Wine",
+        "Native Linux-Alternativen für die meisten Programme verfügbar"
+      ]
+    },
+    "what_works": {
+      "title": "✅ Was funktioniert gut",
+      "items": [
+        "Entwicklungstools (VS Code, Git, Docker, etc.)",
+        "Browser (Firefox, Chrome, Edge)",
+        "Office-Suiten (LibreOffice, OnlyOffice)",
+        "Multimedia (VLC, OBS, GIMP, Blender)",
+        "Die meisten Open-Source-Programme"
+      ]
+    },
+    "about_config": {
+      "title": "📝 Über diese Konfiguration",
+      "text": "Diese NixOS-Konfiguration basiert auf dem NixOS Control Center - einem modularen System-Management-Framework.",
+      "features": [
+        "Modulare Struktur für einfache Wartung",
+        "Automatische Module-Erkennung",
+        "CLI & TUI-Tools für System-Management",
+        "Reproduzierbare Builds"
+      ]
+    }
+  },
+  "status": {
+    "active_sessions": "Aktive Sessions",
+    "service_address": "Service-Adresse",
+    "service_status": "Service-Status",
+    "online": "✅"
+  },
+  "api": {
+    "title": "API Endpoints",
+    "description": "Für Entwickler und automatisierte Workflows:",
+    "endpoints": {
+      "health": "Service health check",
+      "upload": "Upload snapshot report (JSON)",
+      "sessions": "List all migration sessions",
+      "session": "Get session details",
+      "review": "Show review page for session",
+      "update_review": "Save review changes for session",
+      "generate": "Trigger config generation for session",
+      "config": "Get generated NixOS configuration",
+      "iso_build": "Build custom NixOS ISO",
+      "iso_download": "Download built ISO"
+    }
+  },
+  "footer": {
+    "project": "Nixify Web Service - Teil von",
+    "tagline": "Befreie alle Nutzer von Microsoft und Apple 🚀"
+  },
+  "mappings": {
+    "title": "Programm-Zuordnungen",
+    "subtitle": "Sieh, welche Programme in NixOS unterstützt werden",
+    "search": "Programme suchen...",
+    "category": "Kategorie",
+    "status": {
+      "supported": "✅ Unterstützt",
+      "partial": "⚠️ Teilweise",
+      "not_supported": "❌ Nicht unterstützt",
+      "unknown": "❓ Unbekannt"
+    },
+    "no_results": "Keine Programme gefunden",
+    "total": "Programme gesamt"
+  },
+  "games": {
+    "title": "🎮 Spiele-Unterstützung",
+    "subtitle": "Informationen zum Gaming auf NixOS/Linux",
+    "kernel_anticheat_warning": {
+      "title": "⚠️ Kernel-Level Anti-Cheats",
+      "text": "Vanguard (Valorant), EasyAntiCheat, BattlEye und ähnliche Kernel-Level Anti-Cheats funktionieren NICHT unter Linux/NixOS.",
+      "details": "Diese Programme benötigen Windows-Kernel-Treiber und können nicht mit Wine/Proton emuliert werden."
+    },
+    "external_resources": {
+      "title": "Externe Ressourcen",
+      "description": "Prüfe Spiele-Kompatibilität auf diesen vertrauenswürdigen Quellen:",
+      "protondb": {
+        "title": "ProtonDB",
+        "description": "Steam-Spiele Kompatibilitäts-Datenbank",
+        "url": "https://www.protondb.com"
+      },
+      "winehq": {
+        "title": "WineHQ AppDB",
+        "description": "Windows-Spiele Kompatibilitäts-Datenbank",
+        "url": "https://appdb.winehq.org"
+      },
+      "lutris": {
+        "title": "Lutris",
+        "description": "Spiele-Bibliothek und Kompatibilitäts-Informationen",
+        "url": "https://lutris.net"
+      },
+      "areweanticheatyet": {
+        "title": "Are We Anti-Cheat Yet?",
+        "description": "Anti-Cheat Kompatibilitäts-Tracker",
+        "url": "https://areweanticheatyet.com"
+      }
+    },
+    "proton": {
+      "title": "🍷 Proton & Wine",
+      "text": "Die meisten Windows-Spiele funktionieren mit Proton (Steam) oder Wine:",
+      "features": [
+        "Steam mit Proton unterstützt tausende Windows-Spiele",
+        "Viele Spiele laufen perfekt mit Wine",
+        "Native Linux-Spiele funktionieren out-of-the-box"
+      ]
+    }
+  },
+  "about": {
+    "title": "Über NixOS Control Center",
+    "subtitle": "Architektur und Roadmap verstehen",
+    "architecture": {
+      "title": "🏗️ Architektur",
+      "intro": "NixOS Control Center basiert auf einer deklarativen, modularen Architektur mit Nix Flakes und Home Manager.",
+      "declarative": {
+        "title": "✨ Deklarative Konfiguration",
+        "text": "Dein gesamtes System wird in Code beschrieben. Jedes Paket, jeder Service und jede Einstellung ist in Nix-Dateien definiert. Änderungen erfordern einen Rebuild, aber das gewährleistet Reproduzierbarkeit und Rollback-Fähigkeiten."
+      },
+      "components": {
+        "title": "Kernkomponenten",
+        "flake": "Haupteinstiegspunkt mit Nix Flakes für reproduzierbare Builds",
+        "homemanager": "Benutzer-Umgebungsverwaltung (Dotfiles, Benutzer-Pakete)",
+        "modular": "Konfiguration aufgeteilt in wiederverwendbare Module in configs/",
+        "modules": "Automatisches Modul-Erkennungs- und Registrierungssystem"
+      }
+    },
+    "workflow": {
+      "title": "🔄 Workflow & Gewöhnung",
+      "rebuild": {
+        "title": "⚠️ Rebuild erforderlich",
+        "text": "Im Gegensatz zu traditionellen Systemen erfordern Änderungen in NixOS einen Rebuild. Das fühlt sich zunächst anders an, gewährleistet aber, dass dein System immer in einem bekannten, reproduzierbaren Zustand ist.",
+        "note": "Jede Änderung ist atomar - entweder funktioniert alles oder nichts ändert sich. Das verhindert partielle Updates und kaputte Zustände."
+      },
+      "process": {
+        "title": "Typischer Workflow",
+        "step1": "Konfigurationsdateien in /etc/nixos/ bearbeiten",
+        "step2": "'nixos-rebuild switch' ausführen, um Änderungen anzuwenden",
+        "step3": "System wird mit neuer Konfiguration neu gebaut",
+        "step4": "Wenn etwas kaputt geht, Rollback mit 'nixos-rebuild switch --rollback'"
+      }
+    },
+    "roadmap": {
+      "title": "🗺️ Roadmap",
+      "intro": "NixOS Control Center wird aktiv entwickelt. Hier ist was geplant ist:",
+      "phases": {
+        "current": "Aktuell",
+        "planned": "Geplant",
+        "future": "Zukunfts-Vision",
+        "phase1": {
+          "title": "Phase 1: Kern-Foundation",
+          "feature1": "Modulares Konfigurationssystem",
+          "feature2": "CLI-Tools (ncc) mit Command-Registry",
+          "feature3": "TUI-Engine für interaktive Menüs"
+        },
+        "phase2": {
+          "title": "Phase 2: Erweiterte Verwaltung",
+          "feature1": "Modul-Aktivierung/Deaktivierung zum Debuggen",
+          "feature2": "Einfache Erstellung von Custom Nix-Dateien (GUI/TUI)",
+          "feature3": "Visuelle Modul-Verwaltungs-Oberfläche",
+          "feature4": "Erweiterte Debugging-Tools"
+        },
+        "phase3": {
+          "title": "Phase 3: KI-Integration",
+          "feature1": "KI-Assistent für Konfigurations-Hilfe",
+          "feature2": "Skill-System zur Erweiterung der Fähigkeiten",
+          "feature3": "Agenten-Verwaltung für automatisierte Aufgaben"
+        }
+      }
+    },
+    "advantages": {
+      "title": "✨ Vorteile",
+      "reproducible": {
+        "title": "Reproduzierbar",
+        "text": "Identische Systeme auf verschiedenen Maschinen. Teile deine Config, erhalte das gleiche Ergebnis."
+      },
+      "rollback": {
+        "title": "Ein-Klick-Rollback",
+        "text": "Jede System-Generation wird gespeichert. Rollback zu jedem vorherigen Zustand sofort."
+      },
+      "modular": {
+        "title": "Modular",
+        "text": "Wiederverwendbare Module für gängige Konfigurationen. Features einfach aktivieren/deaktivieren."
+      },
+      "future": {
+        "title": "Zukunftssicher",
+        "text": "Mit geplanter KI-Integration und Skill-System wird das System noch mächtiger."
+      }
+    }
+  },
+  "modules": {
+    "title": "🧩 Module",
+    "subtitle": "Alle NixOS Control Center Module erkunden",
+    "search": "Module suchen...",
+    "filter": {
+      "all_categories": "Alle Kategorien",
+      "core": "Core Module",
+      "optional": "Optionale Module",
+      "all_status": "Alle Status",
+      "active": "Aktiv",
+      "planned": "Geplant"
+    },
+    "no_results": "Keine Module gefunden",
+    "view_details": "Details anzeigen",
+    "version": "Version",
+    "features": {
+      "tui": "TUI",
+      "scripts": "Scripts",
+      "handlers": "Handler",
+      "lib": "Bibliothek"
+    },
+    "detail": {
+      "title": "Modul-Details",
+      "category": "Kategorie",
+      "version": "Version",
+      "status": "Status",
+      "github": "Auf GitHub ansehen",
+      "readme": "README",
+      "code": "Code",
+      "commands": "Befehle",
+      "assets": "Assets",
+      "structure": "Struktur"
+    }
+  }
+}

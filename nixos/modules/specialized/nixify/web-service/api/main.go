@@ -27,6 +27,36 @@ var indexTemplate string
 //go:embed templates/review.html
 var reviewTemplate string
 
+//go:embed templates/base.html
+var baseTemplate string
+
+//go:embed templates/mappings.html
+var mappingsTemplate string
+
+//go:embed templates/games.html
+var gamesTemplate string
+
+//go:embed templates/about.html
+var aboutTemplate string
+
+//go:embed templates/modules.html
+var modulesTemplate string
+
+//go:embed templates/module-detail.html
+var moduleDetailTemplate string
+
+//go:embed locales/en.json
+var localeEN string
+
+//go:embed locales/de.json
+var localeDE string
+
+//go:embed locales/fr.json
+var localeFR string
+
+//go:embed locales/es.json
+var localeES string
+
 //go:embed scripts/nixify-scan.ps1
 var windowsScript string
 
@@ -57,6 +87,27 @@ type Report struct {
 	Settings  map[string]interface{} `json:"settings"`
 }
 
+// ModuleInfo represents information about a NixOS Control Center module
+type ModuleInfo struct {
+	Name        string   `json:"name"`
+	Category    string   `json:"category"`
+	Path        string   `json:"path"`
+	Description string   `json:"description"`
+	Version     string   `json:"version"`
+	Status      string   `json:"status"` // "active", "planned", "deprecated"
+	HasTUI      bool     `json:"has_tui"`
+	HasScripts  bool     `json:"has_scripts"`
+	HasHandlers bool     `json:"has_handlers"`
+	HasLib      bool     `json:"has_lib"`
+	Commands    []string `json:"commands,omitempty"`
+	ReadmePath  string   `json:"readme_path,omitempty"`
+	GitHubURL   string   `json:"github_url,omitempty"`
+	Assets      []string `json:"assets,omitempty"` // Subdirectories like tui/, scripts/, etc.
+}
+
+// Translations holds i18n translations
+type Translations map[string]interface{}
+
 // Server holds the web service state
 type Server struct {
 	sessions      map[string]*Session
@@ -66,6 +117,14 @@ type Server struct {
 	dataDir       string
 	template      *template.Template      // Main template (index.html)
 	reviewTemplate *template.Template    // Review template
+	baseTemplate  *template.Template     // Base template with header/footer
+	mappingsTemplate *template.Template  // Mappings page template
+	gamesTemplate *template.Template     // Games page template
+	aboutTemplate *template.Template     // About page template
+	
+	// i18n
+	translations  map[string]Translations // lang -> translations
+	translationsMutex sync.RWMutex
 	
 	// Queue system
 	queue         chan string // Session IDs to process
@@ -84,9 +143,203 @@ type Server struct {
 	
 	// Cleanup
 	stopCleanup     chan struct{}
+	
+	// Module discovery
+	modulesBasePath string // Path to nixos/ directory (either /app/nixos or /etc/nixos)
+	githubRepoURL   string // GitHub repository URL for module links
+}
+
+// loadTranslations loads i18n translations from embedded JSON files
+func loadTranslations() map[string]Translations {
+	translations := make(map[string]Translations)
+	
+	// Load English
+	var enTrans Translations
+	if err := json.Unmarshal([]byte(localeEN), &enTrans); err != nil {
+		log.Fatalf("Failed to load English translations: %v", err)
+	}
+	translations["en"] = enTrans
+	
+	// Load German
+	var deTrans Translations
+	if err := json.Unmarshal([]byte(localeDE), &deTrans); err != nil {
+		log.Fatalf("Failed to load German translations: %v", err)
+	}
+	translations["de"] = deTrans
+	
+	// Load French
+	var frTrans Translations
+	if err := json.Unmarshal([]byte(localeFR), &frTrans); err != nil {
+		log.Fatalf("Failed to load French translations: %v", err)
+	}
+	translations["fr"] = frTrans
+	
+	// Load Spanish
+	var esTrans Translations
+	if err := json.Unmarshal([]byte(localeES), &esTrans); err != nil {
+		log.Fatalf("Failed to load Spanish translations: %v", err)
+	}
+	translations["es"] = esTrans
+	
+	return translations
+}
+
+// getLanguage extracts language from request (cookie, header, or default)
+func (s *Server) getLanguage(r *http.Request) string {
+	// Check cookie first
+	if cookie, err := r.Cookie("lang"); err == nil {
+		if _, ok := s.translations[cookie.Value]; ok {
+			return cookie.Value
+		}
+	}
+	
+	// Check Accept-Language header
+	acceptLang := r.Header.Get("Accept-Language")
+	if acceptLang != "" {
+		// Simple parsing: "de-DE,de;q=0.9,en;q=0.8" -> "de"
+		langs := strings.Split(acceptLang, ",")
+		if len(langs) > 0 {
+			lang := strings.ToLower(strings.Split(strings.TrimSpace(langs[0]), "-")[0])
+			if _, ok := s.translations[lang]; ok {
+				return lang
+			}
+		}
+	}
+	
+	// Default to English
+	return "en"
+}
+
+// t translates a key using dot notation (e.g., "nav.home")
+func (s *Server) t(lang, key string) string {
+	s.translationsMutex.RLock()
+	defer s.translationsMutex.RUnlock()
+	
+	trans, ok := s.translations[lang]
+	if !ok {
+		trans = s.translations["en"] // Fallback to English
+	}
+	
+	// Navigate through nested map using dot notation
+	parts := strings.Split(key, ".")
+	var current interface{} = trans
+	
+	for _, part := range parts {
+		if m, ok := current.(map[string]interface{}); ok {
+			current = m[part]
+		} else {
+			return key // Key not found, return key itself
+		}
+	}
+	
+	// Convert to string
+	if str, ok := current.(string); ok {
+		return str
+	}
+	
+	return key
+}
+
+// TemplateData holds data for template rendering with i18n support
+type TemplateData struct {
+	Lang        string
+	Nonce       string
+	Title       string
+	Description string
+	CurrentPath string
+	T           func(string) string
+	TArray      func(string) []string
+	ProgramsJSON string // For mappings page
+	ModulesJSON  string // For modules page
+	Modules      []ModuleInfo // For modules page
+	Module       *ModuleInfo // For module detail page
+	ReadmeContent string // For module detail page
+	DefaultNixContent string // For module detail page
+	// Additional fields can be added per page
+}
+
+// newTemplateData creates a new TemplateData with i18n support
+func (s *Server) newTemplateData(r *http.Request, nonce string) TemplateData {
+	lang := s.getLanguage(r)
+	
+	// Create translation function
+	tFunc := func(key string) string {
+		return s.t(lang, key)
+	}
+	
+	// Create array translation function (for arrays in JSON)
+	tArrayFunc := func(key string) []string {
+		s.translationsMutex.RLock()
+		defer s.translationsMutex.RUnlock()
+		
+		trans, ok := s.translations[lang]
+		if !ok {
+			trans = s.translations["en"]
+		}
+		
+		parts := strings.Split(key, ".")
+		var current interface{} = trans
+		
+		for _, part := range parts {
+			if m, ok := current.(map[string]interface{}); ok {
+				current = m[part]
+			} else {
+				return []string{}
+			}
+		}
+		
+		// Convert to string array
+		if arr, ok := current.([]interface{}); ok {
+			result := make([]string, len(arr))
+			for i, v := range arr {
+				if str, ok := v.(string); ok {
+					result[i] = str
+				}
+			}
+			return result
+		}
+		
+		return []string{}
+	}
+	
+	// Get meta info
+	metaTitle := s.t(lang, "meta.title")
+	metaDesc := s.t(lang, "meta.description")
+	
+	return TemplateData{
+		Lang:        lang,
+		Nonce:       nonce,
+		Title:       metaTitle,
+		Description: metaDesc,
+		CurrentPath: r.URL.Path,
+		T:           tFunc,
+		TArray:      tArrayFunc,
+	}
 }
 
 func NewServer(port, host, dataDir string) *Server {
+	// Determine modules base path (Docker: /app/nixos, Local: /etc/nixos)
+	modulesBasePath := os.Getenv("MODULES_BASE_PATH")
+	if modulesBasePath == "" {
+		// Try Docker path first, then local
+		if _, err := os.Stat("/app/nixos"); err == nil {
+			modulesBasePath = "/app/nixos"
+		} else if _, err := os.Stat("/etc/nixos"); err == nil {
+			modulesBasePath = "/etc/nixos"
+		} else {
+			modulesBasePath = "/app/nixos" // Default to Docker path
+		}
+	}
+	
+	// GitHub repo URL
+	githubRepoURL := os.Getenv("GITHUB_REPO_URL")
+	if githubRepoURL == "" {
+		githubRepoURL = "https://github.com/fr4iser90/NixOSControlCenter"
+	}
+	// Load translations
+	translations := loadTranslations()
+	
+	// Parse templates
 	tmpl, err := template.New("index").Parse(indexTemplate)
 	if err != nil {
 		log.Fatalf("Failed to parse template: %v", err)
@@ -96,6 +349,49 @@ func NewServer(port, host, dataDir string) *Server {
 	if err != nil {
 		log.Fatalf("Failed to parse review template: %v", err)
 	}
+	
+	// Parse base template and add child templates
+	baseTmpl, err := template.New("base").Funcs(template.FuncMap{
+		"hasPrefix": strings.HasPrefix,
+	}).Parse(baseTemplate)
+	if err != nil {
+		log.Fatalf("Failed to parse base template: %v", err)
+	}
+	
+	// Add mappings template to base
+	mappingsTmpl, err := baseTmpl.New("mappings").Parse(mappingsTemplate)
+	if err != nil {
+		log.Fatalf("Failed to parse mappings template: %v", err)
+	}
+	
+	// Add games template to base
+	gamesTmpl, err := baseTmpl.New("games").Parse(gamesTemplate)
+	if err != nil {
+		log.Fatalf("Failed to parse games template: %v", err)
+	}
+	
+	// Add about template to base
+	aboutTmpl, err := baseTmpl.New("about").Parse(aboutTemplate)
+	if err != nil {
+		log.Fatalf("Failed to parse about template: %v", err)
+	}
+	
+	modulesTmpl, err := baseTmpl.New("modules").Parse(modulesTemplate)
+	if err != nil {
+		log.Fatalf("Failed to parse modules template: %v", err)
+	}
+	
+	moduleDetailTmpl, err := baseTmpl.New("module-detail").Parse(moduleDetailTemplate)
+	if err != nil {
+		log.Fatalf("Failed to parse module-detail template: %v", err)
+	}
+	
+	// Store base template (which now contains all child templates)
+	_ = mappingsTmpl
+	_ = gamesTmpl
+	_ = aboutTmpl
+	_ = modulesTmpl
+	_ = moduleDetailTmpl
 
 	server := &Server{
 		sessions:      make(map[string]*Session),
@@ -105,6 +401,12 @@ func NewServer(port, host, dataDir string) *Server {
 		dataDir:       dataDir,
 		template:      tmpl,
 		reviewTemplate: reviewTmpl,
+		baseTemplate:  baseTmpl, // Contains all child templates
+		mappingsTemplate: baseTmpl, // Use base for all
+		gamesTemplate: baseTmpl, // Use base for all
+		aboutTemplate: baseTmpl, // Use base for all
+		translations:  translations,
+		translationsMutex: sync.RWMutex{},
 		queue:         make(chan string, 100), // Buffer 100 sessions
 		workerCount:   3,                       // 3 concurrent workers
 		rateLimiter:   make(map[string]time.Time),
@@ -115,6 +417,8 @@ func NewServer(port, host, dataDir string) *Server {
 		maxPrograms:   10000,                  // Max 10000 programs per report
 		sessionTTL:    24 * time.Hour,         // Sessions expire after 24h
 		stopCleanup:   make(chan struct{}),
+		modulesBasePath: modulesBasePath,
+		githubRepoURL:   githubRepoURL,
 	}
 
 	// Start worker pool
@@ -153,6 +457,11 @@ func main() {
 
 	// Setup routes
 	http.HandleFunc("/", server.handleRoot)
+	http.HandleFunc("/mappings", server.handleMappings)
+	http.HandleFunc("/games", server.handleGames)
+	http.HandleFunc("/about", server.handleAbout)
+	http.HandleFunc("/modules", server.handleModules)
+	http.HandleFunc("/module/", server.handleModuleDetail)
 	http.HandleFunc("/review/", server.handleReview)
 	http.HandleFunc("/api/v1/health", server.handleHealth)
 	http.HandleFunc("/api/v1/upload", server.handleUpload)
@@ -209,6 +518,192 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 	
 	if err := s.template.Execute(w, data); err != nil {
 		log.Printf("Failed to execute template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleMappings(w http.ResponseWriter, r *http.Request) {
+	nonce, err := generateNonce()
+	if err != nil {
+		log.Printf("Failed to generate nonce: %v", err)
+		nonce = ""
+	}
+	
+	s.setSecurityHeadersWithNonce(w, nonce)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	
+	// Load mapping database
+	mappingPath := os.Getenv("MAPPING_DB_PATH")
+	if mappingPath == "" {
+		mappingPath = filepath.Join(s.dataDir, "mapping-database.json")
+	}
+	
+	// Try to load from mounted path first, then fallback
+	var mappingData []byte
+	if _, err := os.Stat("/app/mapping/mapping-database.json"); err == nil {
+		mappingData, _ = os.ReadFile("/app/mapping/mapping-database.json")
+	} else if _, err := os.Stat(mappingPath); err == nil {
+		mappingData, _ = os.ReadFile(mappingPath)
+	} else {
+		// Fallback: empty programs object
+		mappingData = []byte(`{"programs": {}}`)
+	}
+	
+	var mapping map[string]interface{}
+	if err := json.Unmarshal(mappingData, &mapping); err != nil {
+		log.Printf("Failed to parse mapping database: %v", err)
+		mapping = map[string]interface{}{"programs": map[string]interface{}{}}
+	}
+	
+	// Convert programs to JSON string for JavaScript
+	programsJSON, _ := json.Marshal(mapping["programs"])
+	
+	data := s.newTemplateData(r, nonce)
+	data.ProgramsJSON = string(programsJSON)
+	
+	// Execute base template, which will render the "mappings" block
+	if err := s.baseTemplate.ExecuteTemplate(w, "base", data); err != nil {
+		log.Printf("Failed to execute mappings template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleGames(w http.ResponseWriter, r *http.Request) {
+	nonce, err := generateNonce()
+	if err != nil {
+		log.Printf("Failed to generate nonce: %v", err)
+		nonce = ""
+	}
+	
+	s.setSecurityHeadersWithNonce(w, nonce)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	
+	data := s.newTemplateData(r, nonce)
+	
+	// Execute base template, which will render the "games" block
+	if err := s.baseTemplate.ExecuteTemplate(w, "base", data); err != nil {
+		log.Printf("Failed to execute games template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
+	nonce, err := generateNonce()
+	if err != nil {
+		log.Printf("Failed to generate nonce: %v", err)
+		nonce = ""
+	}
+	
+	s.setSecurityHeadersWithNonce(w, nonce)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	
+	data := s.newTemplateData(r, nonce)
+	
+	// Execute base template, which will render the "about" block
+	if err := s.baseTemplate.ExecuteTemplate(w, "base", data); err != nil {
+		log.Printf("Failed to execute about template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleModules(w http.ResponseWriter, r *http.Request) {
+	nonce, err := generateNonce()
+	if err != nil {
+		log.Printf("Failed to generate nonce: %v", err)
+		nonce = ""
+	}
+	
+	s.setSecurityHeadersWithNonce(w, nonce)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	
+	// Discover modules
+	modules, err := s.discoverModules()
+	if err != nil {
+		log.Printf("Failed to discover modules: %v", err)
+		modules = []ModuleInfo{} // Empty list on error
+	}
+	
+	// Convert to JSON for JavaScript
+	modulesJSON, _ := json.Marshal(modules)
+	
+	data := s.newTemplateData(r, nonce)
+	data.ModulesJSON = string(modulesJSON)
+	data.Modules = modules
+	
+	// Execute base template, which will render the "modules" block
+	if err := s.baseTemplate.ExecuteTemplate(w, "base", data); err != nil {
+		log.Printf("Failed to execute modules template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleModuleDetail(w http.ResponseWriter, r *http.Request) {
+	nonce, err := generateNonce()
+	if err != nil {
+		log.Printf("Failed to generate nonce: %v", err)
+		nonce = ""
+	}
+	
+	s.setSecurityHeadersWithNonce(w, nonce)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	
+	// Extract module name from URL (e.g., /module/nixify)
+	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(pathParts) < 2 {
+		http.Error(w, "Module name required", http.StatusBadRequest)
+		return
+	}
+	
+	moduleName := pathParts[1]
+	
+	// Discover modules and find the requested one
+	modules, err := s.discoverModules()
+	if err != nil {
+		log.Printf("Failed to discover modules: %v", err)
+		http.Error(w, "Failed to discover modules", http.StatusInternalServerError)
+		return
+	}
+	
+	var module *ModuleInfo
+	for i := range modules {
+		if modules[i].Name == moduleName {
+			module = &modules[i]
+			break
+		}
+	}
+	
+	if module == nil {
+		http.Error(w, "Module not found", http.StatusNotFound)
+		return
+	}
+	
+	// Read README content if available
+	readmeContent := ""
+	if content, err := os.ReadFile(module.ReadmePath); err == nil {
+		readmeContent = string(content)
+	}
+	
+	// Read default.nix snippet (first 50 lines)
+	defaultNixContent := ""
+	defaultNixPath := filepath.Join(module.Path, "default.nix")
+	if content, err := os.ReadFile(defaultNixPath); err == nil {
+		lines := strings.Split(string(content), "\n")
+		if len(lines) > 50 {
+			defaultNixContent = strings.Join(lines[:50], "\n") + "\n// ... (truncated)"
+		} else {
+			defaultNixContent = string(content)
+		}
+	}
+	
+	data := s.newTemplateData(r, nonce)
+	data.CurrentPath = r.URL.Path
+	data.Module = module
+	data.ReadmeContent = readmeContent
+	data.DefaultNixContent = defaultNixContent
+	
+	// Execute base template, which will render the "module-detail" block
+	if err := s.baseTemplate.ExecuteTemplate(w, "base", data); err != nil {
+		log.Printf("Failed to execute module detail template: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
@@ -1327,6 +1822,235 @@ func (s *Server) validateReport(report *Report) error {
 	}
 
 	return nil
+}
+
+// discoverModules scans the filesystem for NixOS Control Center modules
+func (s *Server) discoverModules() ([]ModuleInfo, error) {
+	var modules []ModuleInfo
+	
+	// Scan core modules
+	corePath := filepath.Join(s.modulesBasePath, "core")
+	if err := s.scanModuleDirectory(corePath, "core", &modules); err != nil {
+		log.Printf("Warning: Failed to scan core modules: %v", err)
+	}
+	
+	// Scan optional modules
+	modulesPath := filepath.Join(s.modulesBasePath, "modules")
+	if err := s.scanModuleDirectory(modulesPath, "modules", &modules); err != nil {
+		log.Printf("Warning: Failed to scan optional modules: %v", err)
+	}
+	
+	return modules, nil
+}
+
+// scanModuleDirectory recursively scans a directory for modules
+func (s *Server) scanModuleDirectory(rootPath, domain string, modules *[]ModuleInfo) error {
+	return filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Skip errors, continue scanning
+		}
+		
+		// Check if this directory is a module (has default.nix and options.nix)
+		if info.IsDir() {
+			defaultNix := filepath.Join(path, "default.nix")
+			optionsNix := filepath.Join(path, "options.nix")
+			
+			if _, err := os.Stat(defaultNix); err == nil {
+				if _, err := os.Stat(optionsNix); err == nil {
+					// Found a module!
+					module, err := s.parseModule(path, domain, rootPath)
+					if err != nil {
+						log.Printf("Warning: Failed to parse module at %s: %v", path, err)
+						return nil // Continue scanning
+					}
+					*modules = append(*modules, module)
+					return filepath.SkipDir // Don't scan subdirectories
+				}
+			}
+		}
+		
+		return nil
+	})
+}
+
+// parseModule extracts information from a module directory
+func (s *Server) parseModule(modulePath, domain, rootPath string) (ModuleInfo, error) {
+	moduleName := filepath.Base(modulePath)
+	
+	// Determine category (relative path from root)
+	relPath, err := filepath.Rel(rootPath, modulePath)
+	if err != nil {
+		relPath = moduleName
+	}
+	category := domain
+	if relPath != moduleName {
+		category = domain + "." + strings.ReplaceAll(relPath, string(filepath.Separator), ".")
+	}
+	
+	// Extract description from README.md or options.nix
+	description := s.extractModuleDescription(modulePath)
+	
+	// Extract version from options.nix
+	version := s.extractModuleVersion(modulePath)
+	
+	// Check for optional directories
+	hasTUI := s.hasDirectory(modulePath, "tui")
+	hasScripts := s.hasDirectory(modulePath, "scripts")
+	hasHandlers := s.hasDirectory(modulePath, "handlers")
+	hasLib := s.hasDirectory(modulePath, "lib")
+	
+	// Extract commands from commands.nix (simple regex-based)
+	commands := s.extractCommands(modulePath)
+	
+	// Build GitHub URL
+	githubPath := strings.TrimPrefix(modulePath, s.modulesBasePath)
+	githubPath = strings.TrimPrefix(githubPath, "/")
+	githubURL := fmt.Sprintf("%s/tree/main/nixos/%s", s.githubRepoURL, githubPath)
+	
+	// Find assets (subdirectories)
+	assets := s.findAssets(modulePath)
+	
+	// Determine status (active by default for core, check config for modules)
+	status := "active"
+	if domain == "modules" {
+		// Could check config file, but for now assume active
+		status = "active"
+	}
+	
+	return ModuleInfo{
+		Name:        moduleName,
+		Category:    category,
+		Path:        modulePath,
+		Description: description,
+		Version:     version,
+		Status:      status,
+		HasTUI:      hasTUI,
+		HasScripts:  hasScripts,
+		HasHandlers: hasHandlers,
+		HasLib:      hasLib,
+		Commands:    commands,
+		ReadmePath:  filepath.Join(modulePath, "README.md"),
+		GitHubURL:   githubURL,
+		Assets:      assets,
+	}, nil
+}
+
+// extractModuleDescription tries to extract description from README.md or options.nix
+func (s *Server) extractModuleDescription(modulePath string) string {
+	// Try README.md first
+	readmePath := filepath.Join(modulePath, "README.md")
+	if content, err := os.ReadFile(readmePath); err == nil {
+		// Extract first heading or first paragraph
+		lines := strings.Split(string(content), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "# ") && len(line) > 2 {
+				return strings.TrimPrefix(line, "# ")
+			}
+			if strings.HasPrefix(line, "## ") && len(line) > 3 {
+				return strings.TrimPrefix(line, "## ")
+			}
+		}
+		// Fallback: first non-empty line
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line != "" && !strings.HasPrefix(line, "#") {
+				return line
+			}
+		}
+	}
+	
+	// Try options.nix
+	optionsPath := filepath.Join(modulePath, "options.nix")
+	if content, err := os.ReadFile(optionsPath); err == nil {
+		// Simple regex to find mkEnableOption description
+		contentStr := string(content)
+		if idx := strings.Index(contentStr, "mkEnableOption"); idx != -1 {
+			// Try to extract description from mkEnableOption
+			rest := contentStr[idx:]
+			if descIdx := strings.Index(rest, `"`); descIdx != -1 {
+				rest = rest[descIdx+1:]
+				if endIdx := strings.Index(rest, `"`); endIdx != -1 {
+					return rest[:endIdx]
+				}
+			}
+		}
+	}
+	
+	return fmt.Sprintf("%s module", filepath.Base(modulePath))
+}
+
+// extractModuleVersion extracts version from options.nix
+func (s *Server) extractModuleVersion(modulePath string) string {
+	optionsPath := filepath.Join(modulePath, "options.nix")
+	if content, err := os.ReadFile(optionsPath); err == nil {
+		contentStr := string(content)
+		// Look for _version = "x.y.z"
+		if idx := strings.Index(contentStr, "_version"); idx != -1 {
+			rest := contentStr[idx:]
+			if valIdx := strings.Index(rest, `"`); valIdx != -1 {
+				rest = rest[valIdx+1:]
+				if endIdx := strings.Index(rest, `"`); endIdx != -1 {
+					return rest[:endIdx]
+				}
+			}
+		}
+	}
+	return "1.0.0"
+}
+
+// hasDirectory checks if a directory exists
+func (s *Server) hasDirectory(modulePath, dirName string) bool {
+	dirPath := filepath.Join(modulePath, dirName)
+	info, err := os.Stat(dirPath)
+	return err == nil && info.IsDir()
+}
+
+// extractCommands extracts command names from commands.nix (simple regex-based)
+func (s *Server) extractCommands(modulePath string) []string {
+	commandsPath := filepath.Join(modulePath, "commands.nix")
+	content, err := os.ReadFile(commandsPath)
+	if err != nil {
+		return []string{}
+	}
+	
+	var commands []string
+	contentStr := string(content)
+	
+	// Look for name = "..." patterns in registerCommandsFor
+	lines := strings.Split(contentStr, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, `name = "`) {
+			// Extract command name
+			if idx := strings.Index(line, `name = "`); idx != -1 {
+				rest := line[idx+7:]
+				if endIdx := strings.Index(rest, `"`); endIdx != -1 {
+					cmdName := rest[:endIdx]
+					// Only add if it's a valid command name
+					if cmdName != "" && !strings.Contains(cmdName, " ") {
+						commands = append(commands, fmt.Sprintf("ncc %s", cmdName))
+					}
+				}
+			}
+		}
+	}
+	
+	return commands
+}
+
+// findAssets finds subdirectories that could be considered "assets"
+func (s *Server) findAssets(modulePath string) []string {
+	var assets []string
+	assetDirs := []string{"tui", "scripts", "handlers", "lib", "doc", "assets"}
+	
+	for _, dir := range assetDirs {
+		if s.hasDirectory(modulePath, dir) {
+			assets = append(assets, dir)
+		}
+	}
+	
+	return assets
 }
 
 func (s *Server) sanitizeSessionID(sessionID string) string {

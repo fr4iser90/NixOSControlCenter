@@ -1,0 +1,176 @@
+{{define "content"}}
+<div class="container">
+    <header>
+        <h1>{{.T "mappings.title"}}</h1>
+        <p class="subtitle">{{.T "mappings.subtitle"}}</p>
+    </header>
+
+    <div class="section">
+        <div style="margin-bottom: 20px;">
+            <input type="text" id="searchInput" placeholder="{{.T "mappings.search"}}" 
+                   style="width: 100%; padding: 12px; background: #1e1e1e; border: 1px solid #3e3e3e; border-radius: 4px; color: #d4d4d4; font-size: 1em;">
+        </div>
+        
+        <div id="programsList">
+            <!-- Programs will be loaded here via JavaScript -->
+        </div>
+        
+        <div id="noResults" style="display: none; text-align: center; padding: 40px; color: #858585;">
+            {{.T "mappings.no_results"}}
+        </div>
+    </div>
+</div>
+
+<style nonce="{{.Nonce}}">
+    .program-card {
+        background: #1e1e1e;
+        border: 1px solid #3e3e3e;
+        border-radius: 6px;
+        padding: 15px;
+        margin: 10px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: border-color 0.2s;
+    }
+    
+    .program-card:hover {
+        border-color: #4ec9b0;
+    }
+    
+    .program-info {
+        flex: 1;
+    }
+    
+    .program-name {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #4ec9b0;
+        margin-bottom: 5px;
+    }
+    
+    .program-category {
+        color: #858585;
+        font-size: 0.9em;
+    }
+    
+    .program-status {
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-weight: bold;
+        font-size: 0.9em;
+    }
+    
+    .status-supported {
+        background: #1f2a2a;
+        color: #4ec9b0;
+        border: 1px solid #4ec9b0;
+    }
+    
+    .status-partial {
+        background: #2a2a1f;
+        color: #f48771;
+        border: 1px solid #f48771;
+    }
+    
+    .status-not-supported {
+        background: #2a1f1f;
+        color: #f48771;
+        border: 1px solid #f48771;
+    }
+    
+    .stats {
+        text-align: center;
+        padding: 20px;
+        color: #858585;
+        font-size: 0.9em;
+    }
+</style>
+
+<script nonce="{{.Nonce}}">
+    const programs = {{.ProgramsJSON}};
+    const translations = {
+        supported: "{{.T "mappings.status.supported"}}",
+        partial: "{{.T "mappings.status.partial"}}",
+        not_supported: "{{.T "mappings.status.not_supported"}}",
+        unknown: "{{.T "mappings.status.unknown"}}",
+        category: "{{.T "mappings.category"}}",
+        total: "{{.T "mappings.total"}}"
+    };
+    
+    function renderPrograms(filteredPrograms) {
+        const container = document.getElementById('programsList');
+        const noResults = document.getElementById('noResults');
+        
+        if (filteredPrograms.length === 0) {
+            container.innerHTML = '';
+            noResults.style.display = 'block';
+            return;
+        }
+        
+        noResults.style.display = 'none';
+        container.innerHTML = filteredPrograms.map(prog => {
+            const name = prog.name || 'Unknown';
+            const category = prog.category || 'uncategorized';
+            const hasPackage = prog.nixos_package != null;
+            const hasModule = prog.module != null;
+            
+            let status = 'unknown';
+            let statusClass = 'status-not-supported';
+            let statusText = translations.unknown;
+            
+            if (hasPackage && hasModule) {
+                status = 'supported';
+                statusClass = 'status-supported';
+                statusText = translations.supported;
+            } else if (hasPackage || hasModule) {
+                status = 'partial';
+                statusClass = 'status-partial';
+                statusText = translations.partial;
+            } else {
+                status = 'not_supported';
+                statusClass = 'status-not-supported';
+                statusText = translations.not_supported;
+            }
+            
+            return `
+                <div class="program-card">
+                    <div class="program-info">
+                        <div class="program-name">${escapeHtml(name)}</div>
+                        <div class="program-category">${translations.category}: ${escapeHtml(category)}</div>
+                        ${prog.nixos_package ? `<div style="margin-top: 5px; font-size: 0.85em; color: #858585;">Package: <code>${escapeHtml(prog.nixos_package)}</code></div>` : ''}
+                        ${prog.module ? `<div style="margin-top: 5px; font-size: 0.85em; color: #858585;">Module: <code>${escapeHtml(prog.module)}</code></div>` : ''}
+                    </div>
+                    <div class="program-status ${statusClass}">${statusText}</div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        const filtered = Object.values(programs).filter(prog => {
+            const name = (prog.name || '').toLowerCase();
+            const category = (prog.category || '').toLowerCase();
+            const package = (prog.nixos_package || '').toLowerCase();
+            return name.includes(query) || category.includes(query) || package.includes(query);
+        });
+        renderPrograms(filtered);
+    });
+    
+    // Initial render
+    renderPrograms(Object.values(programs));
+    
+    // Show stats
+    const stats = document.createElement('div');
+    stats.className = 'stats';
+    stats.textContent = `${translations.total}: ${Object.keys(programs).length}`;
+    document.getElementById('programsList').parentNode.appendChild(stats);
+</script>
+{{end}}

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <title>{{.Title}}</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{{.Description}}">
+    <style nonce="{{.Nonce}}">
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            color: #d4d4d4;
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Navigation */
+        nav {
+            background: #252526;
+            border-bottom: 2px solid #3e3e3e;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .nav-brand {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #4ec9b0;
+            text-decoration: none;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .nav-links a {
+            color: #d4d4d4;
+            text-decoration: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        
+        .nav-links a:hover {
+            background: #3e3e3e;
+        }
+        
+        .nav-links a.active {
+            background: #4ec9b0;
+            color: #1e1e1e;
+        }
+        
+        .lang-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .lang-selector select {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: 1px solid #3e3e3e;
+            border-radius: 4px;
+            padding: 6px 10px;
+            cursor: pointer;
+        }
+        
+        .lang-selector select:hover {
+            border-color: #4ec9b0;
+        }
+        
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 20px;
+        }
+        
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+        }
+        
+        header { 
+            text-align: center; 
+            padding: 40px 20px; 
+        }
+        
+        h1 { 
+            color: #4ec9b0; 
+            font-size: 2.5em; 
+            margin-bottom: 10px; 
+        }
+        
+        .subtitle { 
+            color: #858585; 
+            font-size: 1.2em; 
+            margin-bottom: 30px; 
+        }
+        
+        .section { 
+            background: #252526; 
+            border-radius: 8px; 
+            padding: 30px; 
+            margin: 20px 0;
+            border-left: 4px solid #4ec9b0;
+        }
+        
+        h2 { 
+            color: #569cd6; 
+            margin-bottom: 20px; 
+            font-size: 1.8em; 
+        }
+        
+        h3 { 
+            color: #4ec9b0; 
+            margin: 20px 0 10px 0; 
+        }
+        
+        .info-box {
+            background: #1e1e1e;
+            border: 1px solid #3e3e3e;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        
+        .warning { border-left: 4px solid #f48771; background: #2a1f1f; }
+        .success { border-left: 4px solid #4ec9b0; background: #1f2a2a; }
+        .info { border-left: 4px solid #569cd6; background: #1f1f2a; }
+        
+        .btn {
+            display: inline-block;
+            background: #4ec9b0;
+            color: #1e1e1e;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-top: 10px;
+            transition: background 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .btn:hover { background: #5ed9c0; }
+        
+        code { 
+            background: #1e1e1e; 
+            padding: 2px 6px; 
+            border-radius: 3px; 
+            font-family: 'Courier New', monospace;
+            color: #ce9178;
+        }
+        
+        /* Footer */
+        footer {
+            background: #252526;
+            border-top: 2px solid #3e3e3e;
+            padding: 20px;
+            text-align: center;
+            color: #858585;
+            font-size: 0.9em;
+            margin-top: auto;
+        }
+        
+        footer a {
+            color: #4ec9b0;
+            text-decoration: none;
+        }
+        
+        footer a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            nav {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .nav-links {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .lang-selector {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+    {{block "styles" .}}{{end}}
+</head>
+<body>
+    <nav>
+        <a href="/" class="nav-brand">🚀 Nixify</a>
+        <div class="nav-links">
+            <a href="/" class="{{if eq .CurrentPath "/"}}active{{end}}">{{.T "nav.home"}}</a>
+            <a href="/mappings" class="{{if eq .CurrentPath "/mappings"}}active{{end}}">{{.T "nav.mappings"}}</a>
+            <a href="/games" class="{{if eq .CurrentPath "/games"}}active{{end}}">{{.T "nav.games"}}</a>
+            <a href="/modules" class="{{if or (eq .CurrentPath "/modules") (hasPrefix .CurrentPath "/module/")}}active{{end}}">{{.T "nav.modules"}}</a>
+            <a href="/about" class="{{if eq .CurrentPath "/about"}}active{{end}}">{{.T "nav.about"}}</a>
+        </div>
+        <div class="lang-selector">
+            <label for="lang-select">{{.T "nav.select_language"}}:</label>
+            <select id="lang-select" onchange="changeLanguage(this.value)">
+                <option value="en" {{if eq .Lang "en"}}selected{{end}}>English</option>
+                <option value="de" {{if eq .Lang "de"}}selected{{end}}>Deutsch</option>
+                <option value="fr" {{if eq .Lang "fr"}}selected{{end}}>Français</option>
+                <option value="es" {{if eq .Lang "es"}}selected{{end}}>Español</option>
+            </select>
+        </div>
+    </nav>
+    
+    <div class="main-content">
+        {{if eq .CurrentPath "/mappings"}}
+            {{template "mappings" .}}
+        {{else if eq .CurrentPath "/games"}}
+            {{template "games" .}}
+        {{else if eq .CurrentPath "/modules"}}
+            {{template "modules" .}}
+        {{else if hasPrefix .CurrentPath "/module/"}}
+            {{template "module-detail" .}}
+        {{else if eq .CurrentPath "/about"}}
+            {{template "about" .}}
+        {{else}}
+            {{block "content" .}}{{end}}
+        {{end}}
+    </div>
+    
+    <footer>
+        <p>{{.T "footer.project"}} <a href="https://github.com/fr4iser90/NixOSControlCenter" target="_blank">NixOS Control Center</a></p>
+        <p style="margin-top: 10px;">{{.T "footer.tagline"}}</p>
+    </footer>
+    
+    <script nonce="{{.Nonce}}">
+        function changeLanguage(lang) {
+            document.cookie = `lang=${lang}; path=/; max-age=31536000`; // 1 year
+            window.location.reload();
+        }
+    </script>
+    {{block "scripts" .}}{{end}}
+</body>
+</html>

@@ -9,6 +9,8 @@ services:
       - HOST=0.0.0.0
       - DATA_DIR=/var/lib/nixify
       - MAPPING_DB_PATH=/app/mapping/mapping-database.json
+      - MODULES_BASE_PATH=/app/nixos
+      - GITHUB_REPO_URL=https://github.com/fr4iser90/NixOSControlCenter
     volumes:
       - nixify-data:/var/lib/nixify
       - ./snapshot:/app/snapshot:ro

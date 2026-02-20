@@ -1,4 +1,5 @@
 # Multi-stage build for Nixify Web Service
+# Build context should be repository root (../../../../)
 # Stage 1: Build Go binary
 FROM golang:1.23-alpine AS builder
 
@@ -25,6 +26,15 @@ WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /build/nixify-web-service .
+
+# Copy complete NixOS structure from repository root
+# This allows the Go service to read module files directly and understand the full structure
+COPY nixos/core /app/nixos/core
+COPY nixos/modules /app/nixos/modules
+COPY nixos/custom /app/nixos/custom
+COPY nixos/configs /app/nixos/configs
+COPY nixos/flake.nix /app/nixos/flake.nix
+COPY nixos/flake.lock /app/nixos/flake.lock
 
 # Create non-root user for security
 RUN addgroup -g 1000 nixify && \

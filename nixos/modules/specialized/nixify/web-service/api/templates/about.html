@@ -1,0 +1,170 @@
+{{define "content"}}
+<div class="container">
+    <header>
+        <h1>{{.T "about.title"}}</h1>
+        <p class="subtitle">{{.T "about.subtitle"}}</p>
+    </header>
+
+    <div class="section">
+        <h2>{{.T "about.architecture.title"}}</h2>
+        <p>{{.T "about.architecture.intro"}}</p>
+        
+        <div class="info-box success">
+            <h3>{{.T "about.architecture.declarative.title"}}</h3>
+            <p>{{.T "about.architecture.declarative.text"}}</p>
+        </div>
+        
+        <div class="info-box info">
+            <h3>{{.T "about.architecture.components.title"}}</h3>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+                <li><strong>Flake.nix:</strong> {{.T "about.architecture.components.flake"}}</li>
+                <li><strong>Home Manager:</strong> {{.T "about.architecture.components.homemanager"}}</li>
+                <li><strong>Modular Configs:</strong> {{.T "about.architecture.components.modular"}}</li>
+                <li><strong>Module System:</strong> {{.T "about.architecture.components.modules"}}</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>{{.T "about.workflow.title"}}</h2>
+        <div class="info-box warning">
+            <h3>{{.T "about.workflow.rebuild.title"}}</h3>
+            <p>{{.T "about.workflow.rebuild.text"}}</p>
+            <p style="margin-top: 10px;"><strong>{{.T "about.workflow.rebuild.note"}}</strong></p>
+        </div>
+        
+        <div class="info-box info">
+            <h3>{{.T "about.workflow.process.title"}}</h3>
+            <ol style="margin-left: 20px; margin-top: 10px;">
+                <li>{{.T "about.workflow.process.step1"}}</li>
+                <li>{{.T "about.workflow.process.step2"}}</li>
+                <li>{{.T "about.workflow.process.step3"}}</li>
+                <li>{{.T "about.workflow.process.step4"}}</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>{{.T "about.roadmap.title"}}</h2>
+        <p>{{.T "about.roadmap.intro"}}</p>
+        
+        <div class="roadmap-timeline">
+            <div class="roadmap-item">
+                <div class="roadmap-phase">
+                    <span class="phase-badge phase-current">{{.T "about.roadmap.phases.current"}}</span>
+                    <h3>{{.T "about.roadmap.phases.phase1.title"}}</h3>
+                </div>
+                <ul class="roadmap-features">
+                    <li>✅ {{.T "about.roadmap.phases.phase1.feature1"}}</li>
+                    <li>✅ {{.T "about.roadmap.phases.phase1.feature2"}}</li>
+                    <li>🔄 {{.T "about.roadmap.phases.phase1.feature3"}}</li>
+                </ul>
+            </div>
+            
+            <div class="roadmap-item">
+                <div class="roadmap-phase">
+                    <span class="phase-badge phase-planned">{{.T "about.roadmap.phases.planned"}}</span>
+                    <h3>{{.T "about.roadmap.phases.phase2.title"}}</h3>
+                </div>
+                <ul class="roadmap-features">
+                    <li>📋 {{.T "about.roadmap.phases.phase2.feature1"}}</li>
+                    <li>📋 {{.T "about.roadmap.phases.phase2.feature2"}}</li>
+                    <li>📋 {{.T "about.roadmap.phases.phase2.feature3"}}</li>
+                    <li>📋 {{.T "about.roadmap.phases.phase2.feature4"}}</li>
+                </ul>
+            </div>
+            
+            <div class="roadmap-item">
+                <div class="roadmap-phase">
+                    <span class="phase-badge phase-future">{{.T "about.roadmap.phases.future"}}</span>
+                    <h3>{{.T "about.roadmap.phases.phase3.title"}}</h3>
+                </div>
+                <ul class="roadmap-features">
+                    <li>🔮 {{.T "about.roadmap.phases.phase3.feature1"}}</li>
+                    <li>🔮 {{.T "about.roadmap.phases.phase3.feature2"}}</li>
+                    <li>🔮 {{.T "about.roadmap.phases.phase3.feature3"}}</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>{{.T "about.advantages.title"}}</h2>
+        <div class="download-grid">
+            <div class="download-card">
+                <h3>🔄 {{.T "about.advantages.reproducible.title"}}</h3>
+                <p>{{.T "about.advantages.reproducible.text"}}</p>
+            </div>
+            <div class="download-card">
+                <h3>🔒 {{.T "about.advantages.rollback.title"}}</h3>
+                <p>{{.T "about.advantages.rollback.text"}}</p>
+            </div>
+            <div class="download-card">
+                <h3>🧩 {{.T "about.advantages.modular.title"}}</h3>
+                <p>{{.T "about.advantages.modular.text"}}</p>
+            </div>
+            <div class="download-card">
+                <h3>🚀 {{.T "about.advantages.future.title"}}</h3>
+                <p>{{.T "about.advantages.future.text"}}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style nonce="{{.Nonce}}">
+    .roadmap-timeline {
+        margin: 30px 0;
+    }
+    
+    .roadmap-item {
+        background: #1e1e1e;
+        border: 1px solid #3e3e3e;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+        border-left: 4px solid #4ec9b0;
+    }
+    
+    .roadmap-phase {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+    
+    .phase-badge {
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 0.85em;
+        font-weight: bold;
+    }
+    
+    .phase-current {
+        background: #1f2a2a;
+        color: #4ec9b0;
+        border: 1px solid #4ec9b0;
+    }
+    
+    .phase-planned {
+        background: #2a2a1f;
+        color: #f48771;
+        border: 1px solid #f48771;
+    }
+    
+    .phase-future {
+        background: #1f1f2a;
+        color: #569cd6;
+        border: 1px solid #569cd6;
+    }
+    
+    .roadmap-features {
+        margin-left: 20px;
+        margin-top: 10px;
+    }
+    
+    .roadmap-features li {
+        margin: 8px 0;
+        line-height: 1.6;
+    }
+</style>
+{{end}}

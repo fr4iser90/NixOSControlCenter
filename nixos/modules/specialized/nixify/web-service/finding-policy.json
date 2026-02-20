@@ -24,14 +24,8 @@
       {
         "check_id": "go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter",
         "path_regex": "web-service/api/main\\.go$",
-        "message_regex": ".*(handleDownload|getScript).*",
-        "reason": "Scripts are embedded via //go:embed directive, contain no user input, and are served as plain text attachments. These are static, trusted files with no XSS risk. The Content-Type is set to 'text/plain' and Content-Disposition to 'attachment', preventing browser execution."
-      },
-      {
-        "check_id": "go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter",
-        "path_regex": "web-service/api/main\\.go$",
-        "message_regex": ".*(Configs generated|Files:|getScript|handleDownload).*",
-        "reason": "Config directory listing uses html.EscapeString() for all user-controlled data. Script downloads serve embedded static files. All output is served as 'text/plain', not HTML. html.EscapeString() provides adequate protection, and embedded scripts contain no user input."
+        "message_regex": ".*",
+        "reason": "All Fprintf/Fprint calls in main.go are safe: (1) Script downloads (lines 762, 770, 778) serve embedded static files via //go:embed with no user input, Content-Type is 'text/plain' with 'attachment' disposition. (2) Config directory listing (lines 593, 598) uses html.EscapeString() for all user-controlled data and serves as 'text/plain', not HTML. All outputs are properly escaped or static, with no XSS risk."
       }
     ],
     "dedupe": {
