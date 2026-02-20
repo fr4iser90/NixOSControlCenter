@@ -4,7 +4,7 @@
     <title>Nixify - Windows/macOS/Linux → NixOS Migration</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
+    <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -484,7 +484,7 @@
         </div>
     </div>
     
-    <script>
+    <script nonce="{{.Nonce}}">
         let currentSessionId = null;
         let statusCheckInterval = null;
         
@@ -561,11 +561,13 @@
             })
             .then(data => {
                 currentSessionId = data.session_id;
-                sessionStatus.classList.remove('hidden');
-                document.getElementById('sessionId').textContent = currentSessionId;
-                updateSessionStatus();
-                startStatusPolling();
-                resetUploadArea();
+                // Redirect to review page after upload
+                if (data.review_url) {
+                    window.location.href = data.review_url;
+                } else {
+                    // Fallback: redirect to review page manually
+                    window.location.href = `/review/${data.session_id}`;
+                }
             })
             .catch(error => {
                 showError('Upload fehlgeschlagen: ' + error.message);
@@ -672,8 +674,8 @@
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    session_id: currentSessionId,
-                    variant: 'plasma'
+                    session_id: currentSessionId
+                    // variant wird aus dem generierten desktop-config.nix gelesen, nicht als Parameter!
                 })
             })
             .then(response => {

@@ -1,5 +1,7 @@
 # Nixify Config Generator
-# Generiert configs/*.nix Dateien aus Snapshot-Report
+# Generiert NUR configs/*.nix Dateien aus Snapshot-Report
+# Das komplette NixOSControlCenter Repository wird von der ISO eingebettet
+# KEINE FALLBACKS - Fehler wenn Daten fehlen!
 
 { snapshotReport, mappingDatabase, getModuleApi, ... }:
 
@@ -42,20 +44,23 @@ let
   moduleNames = builtins.map (p: p.module) modules;
   uniqueModules = builtins.attrValues (builtins.listToAttrs (builtins.map (m: { name = m; value = m; }) moduleNames));
   
-  # Desktop-Environment basierend auf OS
+  # Desktop-Environment basierend auf OS - KEINE FALLBACKS!
   desktopEnv = if report.os == "linux" then
     let
-      desktop = report.settings.desktop or "unknown";
-      linuxMapping = mapping.desktop_mapping.linux or {};
-      desktopMapping = linuxMapping.${desktop} or linuxMapping.default or { preferred_de = "plasma"; };
+      desktop = report.settings.desktop or (throw "Missing desktop in snapshot report settings");
+      linuxMapping = mapping.desktop_mapping.linux or (throw "Missing linux desktop mapping in database");
+      desktopMapping = linuxMapping.${desktop} or linuxMapping.default or (throw "No desktop mapping found for '${desktop}' and no default in mapping database");
     in
-      desktopMapping.preferred_de or "plasma"
+      desktopMapping.preferred_de or (throw "Missing preferred_de in desktop mapping for '${desktop}'")
   else
-    (mapping.desktop_mapping.${report.os} or { preferred_de = "plasma" }).preferred_de;
+    let
+      osMapping = mapping.desktop_mapping.${report.os} or (throw "Missing desktop mapping for OS '${report.os}' in mapping database");
+    in
+      osMapping.preferred_de or (throw "Missing preferred_de in desktop mapping for OS '${report.os}'");
   
-  # Timezone und Locale
-  timeZone = report.settings.timezone or "Europe/Berlin";
-  locale = report.settings.locale or "en_US.UTF-8";
+  # Timezone und Locale - KEINE FALLBACKS!
+  timeZone = report.settings.timezone or (throw "Missing timezone in snapshot report settings");
+  locale = report.settings.locale or (throw "Missing locale in snapshot report settings");
   
   # Generate desktop-config.nix
   desktopConfig = ''
@@ -108,7 +113,7 @@ ${modulesList}
   
 in
 {
-  # Config files as strings (ready to write to configs/ directory)
+  # NUR configs/*.nix Dateien - das komplette Repository kommt von der ISO!
   configs = {
     "desktop-config.nix" = desktopConfig;
     "packages-config.nix" = packagesConfig;

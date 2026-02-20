@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Review Snapshot Report - Nixify</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style nonce="{{.Nonce}}">
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            color: #d4d4d4;
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        header { text-align: center; padding: 20px; }
+        h1 { color: #4ec9b0; font-size: 2em; margin-bottom: 10px; }
+        
+        .section { 
+            background: #252526; 
+            border-radius: 8px; 
+            padding: 25px; 
+            margin: 20px 0;
+            border-left: 4px solid #4ec9b0;
+        }
+        h2 { color: #569cd6; margin-bottom: 15px; font-size: 1.5em; }
+        h3 { color: #4ec9b0; margin: 15px 0 10px 0; }
+        
+        .info-box {
+            background: #1e1e1e;
+            border: 1px solid #3e3e3e;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        
+        .editable-field {
+            background: #1e1e1e;
+            border: 1px solid #3e3e3e;
+            border-radius: 4px;
+            padding: 10px;
+            color: #d4d4d4;
+            font-size: 1em;
+            width: 100%;
+            margin: 5px 0;
+        }
+        .editable-field:focus {
+            outline: none;
+            border-color: #4ec9b0;
+        }
+        
+        select.editable-field {
+            cursor: pointer;
+        }
+        
+        .program-list {
+            max-height: 400px;
+            overflow-y: auto;
+            background: #1e1e1e;
+            border: 1px solid #3e3e3e;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        .program-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background: #252526;
+            border-radius: 4px;
+            border-left: 3px solid #4ec9b0;
+        }
+        .program-item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        .program-item label {
+            flex: 1;
+            cursor: pointer;
+        }
+        .program-source {
+            color: #858585;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: #4ec9b0;
+            color: #1e1e1e;
+            padding: 12px 24px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 10px 5px;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: #5ed9c0; }
+        .btn-secondary {
+            background: #569cd6;
+        }
+        .btn-secondary:hover { background: #6aadd6; }
+        .btn-danger {
+            background: #f48771;
+        }
+        .btn-danger:hover { background: #f59781; }
+        
+        .form-group {
+            margin: 15px 0;
+        }
+        .form-group label {
+            display: block;
+            color: #4ec9b0;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .status-review { background: #569cd6; color: #1e1e1e; }
+        .status-processing { background: #4ec9b0; color: #1e1e1e; }
+        .status-ready { background: #4ec9b0; color: #1e1e1e; }
+        .status-error { background: #f48771; color: #1e1e1e; }
+        
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+        
+        code { 
+            background: #1e1e1e; 
+            padding: 2px 6px; 
+            border-radius: 3px; 
+            font-family: 'Courier New', monospace;
+            color: #ce9178;
+        }
+        
+        .actions {
+            text-align: center;
+            padding: 20px;
+            background: #1e1e1e;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📋 Review Snapshot Report</h1>
+            <p class="subtitle">Review and edit your system information before generating NixOS configuration</p>
+            <div id="status-badge" class="status-badge status-review">Status: Review</div>
+        </header>
+        
+        <div class="section">
+            <h2>🖥️ System Information</h2>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Operating System</label>
+                    <input type="text" class="editable-field" id="os" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Version</label>
+                    <input type="text" class="editable-field" id="version" readonly>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>⚙️ Hardware</h2>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>CPU</label>
+                    <input type="text" class="editable-field" id="cpu" readonly>
+                </div>
+                <div class="form-group">
+                    <label>GPU</label>
+                    <input type="text" class="editable-field" id="gpu" readonly>
+                </div>
+                <div class="form-group">
+                    <label>RAM (GB)</label>
+                    <input type="number" class="editable-field" id="ram" readonly>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>🖥️ Desktop Environment</h2>
+            <div class="form-group">
+                <label>Desktop Environment</label>
+                <select class="editable-field" id="desktop">
+                    <option value="plasma">KDE Plasma</option>
+                    <option value="gnome">GNOME</option>
+                    <option value="xfce">XFCE</option>
+                </select>
+                <p style="margin-top: 10px; color: #858585; font-size: 0.9em;">
+                    Choose your preferred desktop environment for NixOS
+                </p>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>🌍 Localization</h2>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Timezone</label>
+                    <input type="text" class="editable-field" id="timezone">
+                </div>
+                <div class="form-group">
+                    <label>Locale</label>
+                    <input type="text" class="editable-field" id="locale">
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>📦 Programs (<span id="program-count">0</span> found)</h2>
+            <div class="info-box">
+                <p style="margin-bottom: 10px;">Select which programs should be included in your NixOS configuration:</p>
+                <button class="btn btn-secondary" onclick="selectAll()">Select All</button>
+                <button class="btn btn-secondary" onclick="deselectAll()">Deselect All</button>
+            </div>
+            <div class="program-list" id="program-list">
+                <!-- Programs will be populated by JavaScript -->
+            </div>
+        </div>
+        
+        <div class="actions">
+            <button class="btn btn-secondary" onclick="saveReview()">💾 Save Changes</button>
+            <button class="btn" onclick="generateConfig()">🚀 Generate NixOS Configuration</button>
+        </div>
+    </div>
+    
+    <script nonce="{{.Nonce}}">
+        const sessionId = window.location.pathname.split('/').pop();
+        let reportData = null;
+        
+        // Load session data
+        async function loadSession() {
+            try {
+                const response = await fetch(`/api/v1/session/${sessionId}`);
+                if (!response.ok) throw new Error('Session not found');
+                
+                const session = await response.json();
+                reportData = session.report;
+                
+                // Populate form
+                document.getElementById('os').value = reportData.os || '';
+                document.getElementById('version').value = reportData.version || reportData.distro?.version || '';
+                document.getElementById('cpu').value = reportData.hardware?.cpu || '';
+                document.getElementById('gpu').value = reportData.hardware?.gpu || '';
+                document.getElementById('ram').value = reportData.hardware?.ram ? Math.round(reportData.hardware.ram / 1024 / 1024 / 1024) : '';
+                document.getElementById('desktop').value = reportData.settings?.desktop || 'plasma';
+                document.getElementById('timezone').value = reportData.settings?.timezone || '';
+                document.getElementById('locale').value = reportData.settings?.locale || '';
+                
+                // Populate programs
+                populatePrograms(reportData.programs || []);
+                
+                // Update status badge
+                updateStatus(session.status);
+            } catch (error) {
+                alert('Error loading session: ' + error.message);
+            }
+        }
+        
+        function populatePrograms(programs) {
+            const list = document.getElementById('program-list');
+            const count = document.getElementById('program-count');
+            count.textContent = programs.length;
+            
+            list.innerHTML = '';
+            programs.forEach((program, index) => {
+                const item = document.createElement('div');
+                item.className = 'program-item';
+                item.innerHTML = `
+                    <input type="checkbox" id="prog-${index}" checked data-index="${index}">
+                    <label for="prog-${index}">
+                        <strong>${program.name || 'Unknown'}</strong>
+                        <span class="program-source">(${program.source || 'unknown'})</span>
+                    </label>
+                `;
+                list.appendChild(item);
+            });
+        }
+        
+        function selectAll() {
+            document.querySelectorAll('#program-list input[type="checkbox"]').forEach(cb => cb.checked = true);
+        }
+        
+        function deselectAll() {
+            document.querySelectorAll('#program-list input[type="checkbox"]').forEach(cb => cb.checked = false);
+        }
+        
+        async function saveReview() {
+            // Collect changes
+            const changes = {
+                settings: {
+                    desktop: document.getElementById('desktop').value,
+                    timezone: document.getElementById('timezone').value,
+                    locale: document.getElementById('locale').value,
+                },
+                programs: []
+            };
+            
+            // Collect selected programs
+            document.querySelectorAll('#program-list input[type="checkbox"]').forEach(cb => {
+                if (cb.checked) {
+                    const index = parseInt(cb.dataset.index);
+                    changes.programs.push(reportData.programs[index]);
+                }
+            });
+            
+            try {
+                const response = await fetch(`/api/v1/session/${sessionId}/review`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(changes)
+                });
+                
+                if (!response.ok) throw new Error('Failed to save review');
+                
+                alert('✅ Changes saved!');
+            } catch (error) {
+                alert('Error saving review: ' + error.message);
+            }
+        }
+        
+        async function generateConfig() {
+            // Save changes first
+            await saveReview();
+            
+            // Start generation
+            try {
+                const response = await fetch(`/api/v1/session/${sessionId}/generate`, {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) throw new Error('Failed to start generation');
+                
+                updateStatus('processing');
+                alert('🚀 Configuration generation started! You will be redirected to the status page.');
+                
+                // Redirect to main page with session ID
+                window.location.href = `/?session=${sessionId}`;
+            } catch (error) {
+                alert('Error starting generation: ' + error.message);
+            }
+        }
+        
+        function updateStatus(status) {
+            const badge = document.getElementById('status-badge');
+            badge.className = `status-badge status-${status}`;
+            badge.textContent = `Status: ${status.charAt(0).toUpperCase() + status.slice(1)}`;
+        }
+        
+        // Load on page load
+        loadSession();
+    </script>
+</body>
+</html>

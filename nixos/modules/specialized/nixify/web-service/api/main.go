@@ -2,6 +2,8 @@ package main
 
 import (
 	_ "embed"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -20,6 +22,9 @@ import (
 
 //go:embed templates/index.html
 var indexTemplate string
+
+//go:embed templates/review.html
+var reviewTemplate string
 
 //go:embed scripts/nixify-scan.ps1
 var windowsScript string
@@ -58,7 +63,8 @@ type Server struct {
 	port          string
 	host          string
 	dataDir       string
-	template      *template.Template
+	template      *template.Template      // Main template (index.html)
+	reviewTemplate *template.Template    // Review template
 	
 	// Queue system
 	queue         chan string // Session IDs to process
@@ -84,6 +90,11 @@ func NewServer(port, host, dataDir string) *Server {
 	if err != nil {
 		log.Fatalf("Failed to parse template: %v", err)
 	}
+	
+	reviewTmpl, err := template.New("review").Parse(reviewTemplate)
+	if err != nil {
+		log.Fatalf("Failed to parse review template: %v", err)
+	}
 
 	server := &Server{
 		sessions:      make(map[string]*Session),
@@ -92,6 +103,7 @@ func NewServer(port, host, dataDir string) *Server {
 		host:          host,
 		dataDir:       dataDir,
 		template:      tmpl,
+		reviewTemplate: reviewTmpl,
 		queue:         make(chan string, 100), // Buffer 100 sessions
 		workerCount:   3,                       // 3 concurrent workers
 		rateLimiter:   make(map[string]time.Time),
@@ -140,10 +152,11 @@ func main() {
 
 	// Setup routes
 	http.HandleFunc("/", server.handleRoot)
+	http.HandleFunc("/review/", server.handleReview)
 	http.HandleFunc("/api/v1/health", server.handleHealth)
 	http.HandleFunc("/api/v1/upload", server.handleUpload)
 	http.HandleFunc("/api/v1/sessions", server.handleListSessions)
-	http.HandleFunc("/api/v1/session/", server.handleGetSession)
+	http.HandleFunc("/api/v1/session/", server.handleSessionRoutes) // Unified handler for all session routes
 	http.HandleFunc("/api/v1/config/", server.handleGetConfig)
 	http.HandleFunc("/api/v1/iso/build", server.handleBuildISO)
 	http.HandleFunc("/api/v1/iso/", server.handleGetISO)
@@ -164,7 +177,15 @@ func main() {
 }
 
 func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
-	s.setSecurityHeaders(w)
+	// Generate nonce for this request
+	nonce, err := generateNonce()
+	if err != nil {
+		log.Printf("Failed to generate nonce: %v", err)
+		nonce = "" // Fallback to unsafe-inline if nonce generation fails
+	}
+	
+	// Set security headers with nonce for HTML page
+	s.setSecurityHeadersWithNonce(w, nonce)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	
 	s.sessionsMutex.RLock()
@@ -175,10 +196,12 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		Sessions int
 		Host     string
 		Port     string
+		Nonce    string // Add nonce to template data
 	}{
 		Sessions: sessionCount,
 		Host:     s.host,
 		Port:     s.port,
+		Nonce:    nonce,
 	}
 	
 	if err := s.template.Execute(w, data); err != nil {
@@ -254,11 +277,11 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create session
+	// Create session - Status "review" für Review vor Generator!
 	sessionID := uuid.New().String()
 	session := &Session{
 		ID:        sessionID,
-		Status:    "queued",
+		Status:    "review", // Review-Status - Generator läuft erst nach Review!
 		CreatedAt: time.Now(),
 		Report:    &report,
 	}
@@ -280,29 +303,12 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Add to queue (non-blocking)
-	select {
-	case s.queue <- sessionID:
-		s.sessionsMutex.Lock()
-		session.Status = "queued"
-		s.sessionsMutex.Unlock()
-	default:
-		// Queue is full
-		s.sessionsMutex.Lock()
-		session.Status = "error"
-		session.Error = "Processing queue is full"
-		s.sessionsMutex.Unlock()
-		http.Error(w, "Processing queue is full. Please try again later.", http.StatusServiceUnavailable)
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"session_id":     sessionID,
-		"status":         "queued",
-		"estimated_time": "2-5 minutes",
-		"queue_position": len(s.queue),
+		"session_id": sessionID,
+		"status":     "review",
+		"review_url": fmt.Sprintf("/review/%s", sessionID),
 	})
 }
 
@@ -347,6 +353,178 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(session)
+}
+
+// handleSessionRoutes routes different session endpoints
+func (s *Server) handleSessionRoutes(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	sessionID := s.sanitizeSessionID(path[len("/api/v1/session/"):])
+	
+	if sessionID == "" {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+	
+	// Route based on path suffix and method
+	if strings.HasSuffix(path, "/review") && r.Method == http.MethodPut {
+		s.handleUpdateReview(w, r, sessionID)
+	} else if strings.HasSuffix(path, "/generate") && r.Method == http.MethodPost {
+		s.handleGenerateConfig(w, r, sessionID)
+	} else if r.Method == http.MethodGet {
+		s.handleGetSession(w, r)
+	} else {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleReview shows the review page
+func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
+	// Generate nonce for this request
+	nonce, err := generateNonce()
+	if err != nil {
+		log.Printf("Failed to generate nonce: %v", err)
+		nonce = "" // Fallback to unsafe-inline if nonce generation fails
+	}
+	
+	// Set security headers with nonce for HTML page
+	s.setSecurityHeadersWithNonce(w, nonce)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	
+	sessionID := s.sanitizeSessionID(r.URL.Path[len("/review/"):])
+	if sessionID == "" {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+	
+	s.sessionsMutex.RLock()
+	session, ok := s.sessions[sessionID]
+	s.sessionsMutex.RUnlock()
+	
+	if !ok {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+	
+	// Add nonce to session data for template
+	type SessionWithNonce struct {
+		*Session
+		Nonce string
+	}
+	sessionData := SessionWithNonce{
+		Session: session,
+		Nonce:   nonce,
+	}
+	
+	if err := s.reviewTemplate.Execute(w, sessionData); err != nil {
+		log.Printf("Failed to execute review template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// handleUpdateReview saves review changes
+func (s *Server) handleUpdateReview(w http.ResponseWriter, r *http.Request, sessionID string) {
+	s.setSecurityHeaders(w)
+	
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	s.sessionsMutex.RLock()
+	session, ok := s.sessions[sessionID]
+	s.sessionsMutex.RUnlock()
+	
+	if !ok {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+	
+	var changes struct {
+		Settings map[string]interface{} `json:"settings"`
+		Programs []map[string]interface{} `json:"programs"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&changes); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+		return
+	}
+	
+	// Update report with changes
+	s.sessionsMutex.Lock()
+	if session.Report != nil {
+		if changes.Settings != nil {
+			if session.Report.Settings == nil {
+				session.Report.Settings = make(map[string]interface{})
+			}
+			for k, v := range changes.Settings {
+				session.Report.Settings[k] = v
+			}
+		}
+		if changes.Programs != nil {
+			session.Report.Programs = changes.Programs
+		}
+		
+		// Save updated report to disk
+		reportPath := filepath.Join(s.dataDir, fmt.Sprintf("session-%s-report.json", sessionID))
+		if err := s.saveJSON(reportPath, session.Report); err != nil {
+			log.Printf("Failed to save updated report: %v", err)
+		}
+	}
+	s.sessionsMutex.Unlock()
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "saved",
+		"message": "Review changes saved successfully",
+	})
+}
+
+// handleGenerateConfig starts config generation after review
+func (s *Server) handleGenerateConfig(w http.ResponseWriter, r *http.Request, sessionID string) {
+	s.setSecurityHeaders(w)
+	
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	s.sessionsMutex.RLock()
+	session, ok := s.sessions[sessionID]
+	s.sessionsMutex.RUnlock()
+	
+	if !ok {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+	
+	if session.Status != "review" {
+		http.Error(w, fmt.Sprintf("Session must be in 'review' status, current: %s", session.Status), http.StatusBadRequest)
+		return
+	}
+	
+	// Change status to queued and add to queue
+	s.sessionsMutex.Lock()
+	session.Status = "queued"
+	s.sessionsMutex.Unlock()
+	
+	// Add to queue (non-blocking)
+	select {
+	case s.queue <- sessionID:
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":         "queued",
+			"session_id":     sessionID,
+			"estimated_time": "2-5 minutes",
+		})
+	default:
+		// Queue is full
+		s.sessionsMutex.Lock()
+		session.Status = "error"
+		session.Error = "Processing queue is full"
+		s.sessionsMutex.Unlock()
+		http.Error(w, "Processing queue is full. Please try again later.", http.StatusServiceUnavailable)
+	}
 }
 
 func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
@@ -440,7 +618,6 @@ func (s *Server) handleBuildISO(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		SessionID string `json:"session_id"`
-		Variant   string `json:"variant,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -452,18 +629,6 @@ func (s *Server) handleBuildISO(w http.ResponseWriter, r *http.Request) {
 	req.SessionID = s.sanitizeSessionID(req.SessionID)
 	if req.SessionID == "" {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
-		return
-	}
-
-	// Validate variant
-	validVariants := map[string]bool{
-		"plasma": true,
-		"gnome":  true,
-		"xfce":   true,
-		"kde":    true,
-	}
-	if req.Variant != "" && !validVariants[strings.ToLower(req.Variant)] {
-		http.Error(w, fmt.Sprintf("Invalid variant: %s", req.Variant), http.StatusBadRequest)
 		return
 	}
 
@@ -482,7 +647,8 @@ func (s *Server) handleBuildISO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build ISO in background (via queue would be better, but for now direct)
-	go s.buildISO(req.SessionID, req.Variant)
+	// variant wird aus dem generierten desktop-config.nix gelesen, nicht als Parameter!
+	go s.buildISO(req.SessionID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
@@ -611,7 +777,7 @@ func (s *Server) processSession(sessionID string) {
 	}
 
 	// Configs are now in a directory, not a single file
-	configsDir := filepath.Join(s.dataDir, fmt.Sprintf("session-%s-configs", sessionID))
+	// configsDir already declared above
 	if _, err := os.Stat(configsDir); os.IsNotExist(err) {
 		log.Printf("Configs directory not found: %v", err)
 		s.sessionsMutex.Lock()
@@ -735,19 +901,20 @@ func (s *Server) generateBasicConfigs(sessionID, outputPath string) error {
 		return fmt.Errorf("failed to create configs directory: %v", err)
 	}
 
-	// Determine desktop environment
-	desktopEnv := "plasma"
-	if session.Report.OS == "macos" {
-		desktopEnv = "gnome"
-	} else if session.Report.OS == "linux" {
-		if desktop, ok := session.Report.Settings["desktop"].(string); ok {
-			if desktop == "GNOME" || desktop == "gnome" {
-				desktopEnv = "gnome"
-			} else if desktop == "KDE" || desktop == "kde" {
-				desktopEnv = "plasma"
-			}
-		}
+	// Determine desktop environment - KEINE FALLBACKS!
+	if session.Report.Settings == nil {
+		return fmt.Errorf("missing settings in snapshot report")
 	}
+	
+	desktop, ok := session.Report.Settings["desktop"].(string)
+	if !ok || desktop == "" {
+		return fmt.Errorf("missing desktop in snapshot report settings")
+	}
+	
+	// Desktop aus Mapping-Database lesen (wird vom Nix-Generator gemacht, hier nur für Fallback)
+	// In generateBasicConfigs sollten wir eigentlich den Nix-Generator verwenden, nicht manuell!
+	// Für jetzt: Fehler wenn kein Desktop
+	desktopEnv := desktop // Verwende Desktop aus Report direkt - Mapping wird vom Nix-Generator gemacht
 
 	// Generate desktop-config.nix
 	desktopConfig := fmt.Sprintf(`{
@@ -776,9 +943,16 @@ func (s *Server) generateBasicConfigs(sessionID, outputPath string) error {
 		return fmt.Errorf("failed to write packages-config.nix: %v", err)
 	}
 
-	// Generate localization-config.nix
-	timezone := s.getSetting(session.Report, "timezone", "Europe/Berlin")
-	locale := s.getSetting(session.Report, "locale", "en_US.UTF-8")
+	// Generate localization-config.nix - KEINE FALLBACKS!
+	timezone, ok := session.Report.Settings["timezone"].(string)
+	if !ok || timezone == "" {
+		return fmt.Errorf("missing timezone in snapshot report settings")
+	}
+	
+	locale, ok := session.Report.Settings["locale"].(string)
+	if !ok || locale == "" {
+		return fmt.Errorf("missing locale in snapshot report settings")
+	}
 	localizationConfig := fmt.Sprintf(`{
   # System Settings
   localization = {
@@ -816,7 +990,7 @@ Copy these files to /etc/nixos/configs/ on your NixOS system.
 	return nil
 }
 
-func (s *Server) buildISO(sessionID, variant string) {
+func (s *Server) buildISO(sessionID string) {
 	s.sessionsMutex.RLock()
 	session, exists := s.sessions[sessionID]
 	s.sessionsMutex.RUnlock()
@@ -826,14 +1000,46 @@ func (s *Server) buildISO(sessionID, variant string) {
 		return
 	}
 
-	log.Printf("Building ISO for session %s (variant: %s)", sessionID, variant)
+	// Read desktop environment from generated config - KEIN variant Parameter!
+	configsDir := filepath.Join(s.dataDir, fmt.Sprintf("session-%s-configs", sessionID))
+	desktopConfigPath := filepath.Join(configsDir, "desktop-config.nix")
+	
+	desktopConfigContent, err := os.ReadFile(desktopConfigPath)
+	if err != nil {
+		log.Printf("Failed to read desktop-config.nix: %v", err)
+		s.sessionsMutex.Lock()
+		session.Status = "error"
+		session.Error = fmt.Sprintf("Failed to read desktop-config.nix: %v", err)
+		s.sessionsMutex.Unlock()
+		return
+	}
+	
+	// Extract desktop environment from config (e.g. "environment = \"plasma\";")
+	desktopEnv := ""
+	if strings.Contains(string(desktopConfigContent), "environment = \"") {
+		start := strings.Index(string(desktopConfigContent), "environment = \"") + len("environment = \"")
+		end := strings.Index(string(desktopConfigContent[start:]), "\"")
+		if end > 0 {
+			desktopEnv = string(desktopConfigContent[start : start+end])
+		}
+	}
+	
+	if desktopEnv == "" {
+		log.Printf("Failed to extract desktop environment from desktop-config.nix")
+		s.sessionsMutex.Lock()
+		session.Status = "error"
+		session.Error = "Failed to extract desktop environment from generated config"
+		s.sessionsMutex.Unlock()
+		return
+	}
+
+	log.Printf("Building ISO for session %s (desktop: %s)", sessionID, desktopEnv)
 	
 	s.sessionsMutex.Lock()
 	session.Status = "building_iso"
 	s.sessionsMutex.Unlock()
 
 	// Build ISO using nix-build
-	configsDir := filepath.Join(s.dataDir, fmt.Sprintf("session-%s-configs", sessionID))
 	isoPath := filepath.Join(s.dataDir, fmt.Sprintf("session-%s.iso", sessionID))
 	
 	// Read all config files from configs directory
@@ -860,6 +1066,21 @@ func (s *Server) buildISO(sessionID, variant string) {
 	}
 	configsMap += "}"
 
+	// Find NixOSControlCenter repository path
+	// Try environment variable first, then fallback to relative path from dataDir
+	repoPath := os.Getenv("NIXOS_CONTROL_CENTER_REPO")
+	if repoPath == "" {
+		// Try to find repository relative to dataDir (go up 7 levels: session-X-configs -> nixify -> specialized -> modules -> nixos -> Git -> NixOSControlCenter)
+		possibleRepoPath := filepath.Join(s.dataDir, "..", "..", "..", "..", "..", "..", "..")
+		if _, err := os.Stat(filepath.Join(possibleRepoPath, "nixos", "flake.nix")); err == nil {
+			repoPath = filepath.Join(possibleRepoPath, "nixos")
+		} else {
+			// Fallback: use current working directory or error
+			repoPath = "/etc/nixos" // Default fallback
+			log.Printf("Warning: Could not find NixOSControlCenter repository, using fallback: %s", repoPath)
+		}
+	}
+
 	// Create ISO builder expression
 	builderExpr := fmt.Sprintf(`
 		let
@@ -867,13 +1088,14 @@ func (s *Server) buildISO(sessionID, variant string) {
 		  isoBuilder = import %s/iso-builder/iso-builder.nix {
 		    inherit pkgs;
 		    sessionConfigs = %s;
+		    nixosControlCenterRepo = %q;
 		  };
 		in
 		  isoBuilder.buildISO {
 		    sessionId = "%s";
-		    variant = "%s";
+		    repoPath = %q;
 		  }
-	`, filepath.Join(s.dataDir, ".."), configsMap, sessionID, variant)
+	`, filepath.Join(s.dataDir, ".."), configsMap, repoPath, sessionID, repoPath)
 	
 	// Build ISO (this is a placeholder - actual implementation would use nix-build)
 	cmd := exec.Command("nix-build", "--no-out-link", "-E", builderExpr)
@@ -934,12 +1156,12 @@ func (s *Server) extractPackages(report *Report) []string {
 
 func (s *Server) extractDesktop(report *Report) string {
 	if report.Settings == nil {
-		return "plasma"
+		return "" // Kein Fallback - leerer String
 	}
-	if desktop, ok := report.Settings["desktop"].(string); ok {
+	if desktop, ok := report.Settings["desktop"].(string); ok && desktop != "" {
 		return desktop
 	}
-	return "plasma"
+	return "" // Kein Fallback - leerer String
 }
 
 func (s *Server) getSetting(report *Report, key, defaultValue string) string {
@@ -954,12 +1176,40 @@ func (s *Server) getSetting(report *Report, key, defaultValue string) string {
 
 // Security and validation helpers
 
+// generateNonce creates a cryptographically secure random nonce for CSP
+func generateNonce() (string, error) {
+	bytes := make([]byte, 16)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(bytes), nil
+}
+
+// setSecurityHeaders sets security headers with CSP nonce for HTML pages
 func (s *Server) setSecurityHeaders(w http.ResponseWriter) {
+	s.setSecurityHeadersWithNonce(w, "")
+}
+
+// setSecurityHeadersWithNonce sets security headers with CSP nonce
+// If nonce is empty, generates a new one. For HTML pages, pass a nonce to allow inline styles/scripts.
+func (s *Server) setSecurityHeadersWithNonce(w http.ResponseWriter, nonce string) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("X-XSS-Protection", "1; mode=block")
 	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-	w.Header().Set("Content-Security-Policy", "default-src 'self'")
+	
+	// For API endpoints (no nonce), use strict CSP
+	if nonce == "" {
+		w.Header().Set("Content-Security-Policy", "default-src 'self'")
+		return
+	}
+	
+	// For HTML pages, use nonce-based CSP (more secure than 'unsafe-inline')
+	// Nonce allows specific inline styles/scripts that include the nonce attribute
+	// 'unsafe-hashes' is needed for inline event handlers (onclick, etc.) and inline style attributes
+	csp := fmt.Sprintf("default-src 'self'; style-src 'self' 'nonce-%s' 'unsafe-hashes'; script-src 'self' 'nonce-%s' 'unsafe-hashes'", nonce, nonce)
+	w.Header().Set("Content-Security-Policy", csp)
+	w.Header().Set("X-Nonce", nonce) // Store nonce in custom header for template access
 }
 
 func (s *Server) getClientIP(r *http.Request) string {
