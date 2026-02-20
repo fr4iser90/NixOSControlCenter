@@ -1,0 +1,4 @@
+{
+  enable = true;
+  dangerousIgnore = false;
+}

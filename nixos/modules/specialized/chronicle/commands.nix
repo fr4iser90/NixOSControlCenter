@@ -62,7 +62,11 @@ let
   _10 = builtins.trace "=== CHRONICLE DEBUG END ===" null;
 in
 {
-  config = lib.mkMerge [
-    registrationResult
-  ];
+  config = builtins.trace "DEBUG: [CHRONICLE] cfg in commands.nix = ${builtins.toJSON cfg}" (
+    builtins.trace "DEBUG: [CHRONICLE] cfg.outputDir = ${toString (cfg.outputDir or "MISSING")}" (
+      lib.mkMerge [
+        registrationResult
+      ]
+    )
+  );
 }

@@ -25,7 +25,7 @@ bootentry-manager/
 ├── default.nix                  # Main module entry point
 ├── options.nix                  # Configuration options
 ├── config.nix                   # Implementation logic & symlink management
-├── bootentry-manager-config.nix         # User configuration (symlinked)
+├── template-config.nix                 # Template configuration file
 ├── lib/                         # Shared utility functions
 │   ├── common.nix              # Common utilities
 │   └── types.nix               # Type definitions

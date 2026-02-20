@@ -1,7 +1,12 @@
-{ lib, ... }:
+{ lib, getCurrentModuleMetadata, ... }:
 
-{
-  options.systemConfig.modules.infrastructure.homelab = {
+let
+  # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
+  metadata = getCurrentModuleMetadata ./.;
+  configPath = metadata.configPath;
+in {
+  # Options must be under systemConfig prefix
+  options.systemConfig.${configPath} = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;

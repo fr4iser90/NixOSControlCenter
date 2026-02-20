@@ -14,7 +14,7 @@ in
 
   imports = [
     ./options.nix
-    ./commands.nix
+    (import ./commands.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; moduleName = moduleName; })
   ] ++ (if (cfg.enable or false) then [
     ./config.nix
     ./systemd.nix

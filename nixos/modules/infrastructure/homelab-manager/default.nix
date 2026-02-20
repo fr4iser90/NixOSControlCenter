@@ -1,11 +1,12 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleMetadata, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getCurrentModuleMetadata, ... }:
 
 with lib;
 
 let
   moduleName = baseNameOf ./. ;        # "homelab-manager" - automatisch!
   cfg = getModuleConfig moduleName;
-  moduleConfig = systemConfig.modules.infrastructure.homelab;
+  # Get module metadata (generic, not hardcoded) - use getCurrentModuleMetadata for current module
+  moduleConfig = getCurrentModuleMetadata ./.;
   
   # Check if Swarm is active
   isSwarmMode = (cfg.swarm or null) != null;
@@ -37,22 +38,20 @@ let
   else null;
 
   # Import homelab utilities
-  homelabUtils = import ./lib/homelab-utils.nix { inherit config lib pkgs systemConfig; };
+  homelabUtils = import ./lib/homelab-utils.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
 
 in {
   _module.args = {
     isSwarmMode = isSwarmMode;
   };
 
-  imports = if cfg.enable or false then
-    [
-      ./options.nix
-      (import ./config.nix { inherit moduleConfig; })
-    ] ++ (if hasDockerUser then [
-      ./handlers/homelab-create.nix
-      ./handlers/homelab-fetch.nix
-    ] else [])
-  else [];
+  imports = [
+    ./options.nix
+  ] ++ lib.optionals (cfg.enable or false) [
+    ./config.nix
+    ./handlers/homelab-create.nix
+    ./handlers/homelab-fetch.nix
+  ];
 
   # Put config attributes at top level, not in config =
   environment.systemPackages = mkIf (cfg.enable or false) (homelabUtils.config.environment.systemPackages or []);

@@ -1,7 +1,8 @@
-{ config, lib, pkgs, systemConfig, moduleConfig, ... }:
+{ config, lib, pkgs, systemConfig, moduleConfig, getModuleConfigFromPath, ... }:
 
 let
-  cfg = systemConfig.${moduleConfig.configPath};
+  # Generic: Use getModuleConfigFromPath to get config with defaults from options.nix
+  cfg = getModuleConfigFromPath moduleConfig.configPath;
   configHelpers = import ../../core/management/module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   # Default SSH config
   defaultConfig = ''
@@ -36,8 +37,8 @@ in
         moduleName = "ssh-client-manager";
         defaultConfig = defaultConfig;
       }) // {
-        # Enable module by default if system config has it
-        ${moduleConfig.configPath}.enable = lib.mkDefault (systemConfig.${moduleConfig.configPath}.enable or false);
+        # Enable module by default if config has it
+        ${moduleConfig.configPath}.enable = lib.mkDefault (cfg.enable or false);
       }
     ))
     # Implementation is handled in default.nix

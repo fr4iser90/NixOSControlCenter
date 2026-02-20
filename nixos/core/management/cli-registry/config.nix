@@ -6,7 +6,7 @@ let
 
   cfg = getModuleConfig moduleName;
   # Use the template file as default config
-  defaultConfig = builtins.readFile ./command-center-config.nix;
+  defaultConfig = builtins.readFile ./template-config.nix;
 
   # Import utilities
   ccLib = import ./lib { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };

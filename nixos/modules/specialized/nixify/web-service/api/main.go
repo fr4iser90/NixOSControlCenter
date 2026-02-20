@@ -2304,6 +2304,112 @@ func (s *Server) findAssets(modulePath string) []string {
 	return assets
 }
 
+// findModuleDocs finds documentation files from doc/ directory
+func (s *Server) findModuleDocs(modulePath string) []DocInfo {
+	var docs []DocInfo
+	docDir := filepath.Join(modulePath, "doc")
+	
+	// Check if doc directory exists
+	if _, err := os.Stat(docDir); os.IsNotExist(err) {
+		return docs
+	}
+	
+	// Read directory contents
+	entries, err := os.ReadDir(docDir)
+	if err != nil {
+		return docs
+	}
+	
+	// Common documentation file patterns
+	docExtensions := []string{".md", ".txt", ".rst"}
+	docNames := map[string]string{
+		"README.md":    "README",
+		"SECURITY.md":  "Security",
+		"ROADMAP.md":   "Roadmap",
+		"CHANGELOG.md": "Changelog",
+		"API.md":       "API Reference",
+		"USAGE.md":     "Usage Guide",
+	}
+	
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue // Skip subdirectories
+		}
+		
+		name := entry.Name()
+		ext := strings.ToLower(filepath.Ext(name))
+		
+		// Check if it's a documentation file
+		isDoc := false
+		for _, docExt := range docExtensions {
+			if ext == docExt {
+				isDoc = true
+				break
+			}
+		}
+		
+		if isDoc {
+			// Get display title
+			title := name
+			if t, ok := docNames[name]; ok {
+				title = t
+			} else {
+				// Remove extension and format
+				title = strings.TrimSuffix(name, ext)
+				title = strings.ReplaceAll(title, "_", " ")
+				title = strings.ReplaceAll(title, "-", " ")
+			}
+			
+			docs = append(docs, DocInfo{
+				Name:  strings.TrimSuffix(name, ext),
+				Path:  filepath.Join(docDir, name),
+				Title: title,
+			})
+		}
+	}
+	
+	return docs
+}
+
+// findDocAssets finds assets from doc/assets/ directory
+func (s *Server) findDocAssets(modulePath string) []string {
+	var assets []string
+	assetsDir := filepath.Join(modulePath, "doc", "assets")
+	
+	// Check if doc/assets directory exists
+	if _, err := os.Stat(assetsDir); os.IsNotExist(err) {
+		return assets
+	}
+	
+	// Read directory contents
+	entries, err := os.ReadDir(assetsDir)
+	if err != nil {
+		return assets
+	}
+	
+	// Common asset extensions
+	assetExtensions := []string{".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".pdf", ".ico"}
+	
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue // Skip subdirectories
+		}
+		
+		name := entry.Name()
+		ext := strings.ToLower(filepath.Ext(name))
+		
+		// Check if it's an asset file
+		for _, assetExt := range assetExtensions {
+			if ext == assetExt {
+				assets = append(assets, name)
+				break
+			}
+		}
+	}
+	
+	return assets
+}
+
 func (s *Server) sanitizeSessionID(sessionID string) string {
 	// Remove any path traversal or special characters
 	sessionID = strings.TrimSpace(sessionID)

@@ -20,8 +20,8 @@ let
 
   # SEMANTISCH KLAR GETRENNTE FUNKTIONEN:
 
-  # 1. getModuleConfig: Holt CONFIG aus systemConfig (MIT options.nix defaults!)
-  # getModuleConfig "network" → systemConfig.core.base.network
+  # 1. getModuleConfig: Holt CONFIG aus systemConfig (MIT template-config.nix defaults!)
+  # getModuleConfig "network" → systemConfig.core.base.network (mit template defaults als Fallback)
   getModuleConfig = moduleName:
     let
       allNames = builtins.attrNames moduleConfigAttrs;
@@ -29,7 +29,30 @@ let
       matchedModuleName = if suffixMatches != [] then builtins.head suffixMatches
                           else if builtins.hasAttr moduleName moduleConfigAttrs then moduleName
                           else null;
-      result = if matchedModuleName == null then {} else lib.attrByPath (lib.splitString "." moduleConfigAttrs.${matchedModuleName}.configPath) {} systemConfig;
+      metadata = if matchedModuleName == null then {} else moduleConfigAttrs.${matchedModuleName};
+      
+      # Get template defaults from template-config.nix if it exists
+      templateDefaults = if metadata != {} && metadata ? path then
+        let
+          templateFile = "${metadata.path}/template-config.nix";
+          # Check if file exists before trying to import
+          templateExists = builtins.pathExists templateFile;
+          templateContent = if templateExists then
+            let
+              templateImport = builtins.tryEval (import templateFile);
+            in
+              if templateImport.success then templateImport.value else {}
+            else {};
+        in
+          templateContent
+        else {};
+      
+      # Get config from systemConfig (user config files)
+      systemConfigValue = if matchedModuleName == null then {}
+        else lib.attrByPath (lib.splitString "." metadata.configPath) {} systemConfig;
+      
+      # Merge: template defaults -> systemConfig (user config)
+      result = lib.recursiveUpdate templateDefaults systemConfigValue;
     in
       # ROBUST: Immer ein AttrSet zurückgeben, auch wenn etwas schief geht
       if builtins.isAttrs result then result else {};

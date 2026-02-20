@@ -47,7 +47,7 @@ Available through ncc command-center:
 
 ## Configuration
 
-See `homelab-config.nix` for available options.
+See `template-config.nix` for available options.
 
 ## Dependencies
 

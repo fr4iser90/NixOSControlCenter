@@ -1,8 +1,7 @@
 { config, lib, pkgs, systemConfig, getModuleConfig, isSwarmMode, ... }:
 
 let
-  # Check if Swarm is active
-  isSwarmMode = isSwarmMode;
+  # isSwarmMode is passed as parameter from default.nix
 
   # Find virtualization users (preferred)
   virtUsers = lib.filterAttrs
@@ -107,7 +106,7 @@ let
   '';
 
 in {
-  environment.systemPackages = if hasVirtUsers then [
-    homelab-create
-  ] else [];
+  config = lib.mkIf (hasVirtUsers || hasAdminUsers) {
+    environment.systemPackages = [ homelab-create ];
+  };
 }

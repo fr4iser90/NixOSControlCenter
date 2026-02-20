@@ -138,7 +138,7 @@ ncc module enable homelab
 
 ### Template-System
 ```nix
-# modules/infrastructure/homelab/homelab-config.nix
+# modules/infrastructure/homelab/template-config.nix
 {
   enable = true;
   dockerSwarm = {
@@ -212,7 +212,7 @@ getModuleMetadata = modulePath: getCurrentModuleMetadata modulePath;
 # Bei Modul-Aktivierung
 ncc module enable homelab
 # → Erstellt: configs/modules/infrastructure/homelab/config.nix
-# → Inhalt: Default-Template aus homelab-config.nix
+# → Inhalt: Default-Template aus template-config.nix
 ```
 
 ## 📋 Config-Inhalte: Was gehört wohin?
