@@ -24,8 +24,14 @@
       {
         "check_id": "go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter",
         "path_regex": "web-service/api/main\\.go$",
-        "message_regex": "handleDownload(Windows|MacOS|Linux)",
+        "message_regex": ".*(handleDownload|getScript).*",
         "reason": "Scripts are embedded via //go:embed directive, contain no user input, and are served as plain text attachments. These are static, trusted files with no XSS risk. The Content-Type is set to 'text/plain' and Content-Disposition to 'attachment', preventing browser execution."
+      },
+      {
+        "check_id": "go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter",
+        "path_regex": "web-service/api/main\\.go$",
+        "message_regex": ".*(Configs generated|Files:|getScript|handleDownload).*",
+        "reason": "Config directory listing uses html.EscapeString() for all user-controlled data. Script downloads serve embedded static files. All output is served as 'text/plain', not HTML. html.EscapeString() provides adequate protection, and embedded scripts contain no user input."
       }
     ],
     "dedupe": {
