@@ -3,7 +3,7 @@
 # Das komplette NixOSControlCenter Repository wird von der ISO eingebettet
 # KEINE FALLBACKS - Fehler wenn Daten fehlen!
 
-{ snapshotReport, mappingDatabase, getModuleApi, ... }:
+{ snapshotReport, mappingDatabase, ... }:
 
 let
   # Parse Snapshot-Report

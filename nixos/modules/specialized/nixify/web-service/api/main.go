@@ -718,25 +718,58 @@ func (s *Server) handleDownloadScript(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Use /download/windows, /download/macos, or /download/linux", http.StatusBadRequest)
 }
 
+// getScript loads script from mounted directory or falls back to embedded script
+// Priority: 1. Mounted script (/app/snapshot/{platform}/nixify-scan.{ext})
+//           2. Embedded script (fallback)
+func (s *Server) getScript(platform string) string {
+	// Try mounted scripts first (for Docker deployment)
+	mountedPaths := map[string]string{
+		"windows": "/app/snapshot/windows/nixify-scan.ps1",
+		"macos":   "/app/snapshot/macos/nixify-scan.sh",
+		"linux":   "/app/snapshot/linux/nixify-scan.sh",
+	}
+	
+	if path, ok := mountedPaths[platform]; ok {
+		if content, err := os.ReadFile(path); err == nil {
+			log.Printf("Using mounted script for %s: %s", platform, path)
+			return string(content)
+		}
+		// If mounted script doesn't exist, fall through to embedded
+		log.Printf("Mounted script not found for %s at %s, using embedded script", platform, path)
+	}
+	
+	// Fallback to embedded scripts
+	switch platform {
+	case "windows":
+		return windowsScript
+	case "macos":
+		return macosScript
+	case "linux":
+		return linuxScript
+	default:
+		return ""
+	}
+}
+
 func (s *Server) handleDownloadWindows(w http.ResponseWriter, r *http.Request) {
 	s.setSecurityHeaders(w)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=nixify-scan.ps1")
-	fmt.Fprint(w, windowsScript)
+	fmt.Fprint(w, s.getScript("windows"))
 }
 
 func (s *Server) handleDownloadMacOS(w http.ResponseWriter, r *http.Request) {
 	s.setSecurityHeaders(w)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=nixify-scan.sh")
-	fmt.Fprint(w, macosScript)
+	fmt.Fprint(w, s.getScript("macos"))
 }
 
 func (s *Server) handleDownloadLinux(w http.ResponseWriter, r *http.Request) {
 	s.setSecurityHeaders(w)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=nixify-scan.sh")
-	fmt.Fprint(w, linuxScript)
+	fmt.Fprint(w, s.getScript("linux"))
 }
 
 // Worker processes sessions from the queue

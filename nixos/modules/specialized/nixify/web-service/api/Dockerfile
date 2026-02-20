@@ -6,6 +6,8 @@ WORKDIR /build
 
 # Copy go mod files
 COPY go.mod go.sum ./
+# Update go.sum to ensure correct hashes
+RUN go mod tidy
 RUN go mod download
 
 # Copy source code
@@ -17,7 +19,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o nixify-web-servic
 # Stage 2: Minimal runtime image
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata wget
 
 WORKDIR /app
 

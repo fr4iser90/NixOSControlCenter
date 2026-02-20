@@ -1,0 +1,43 @@
+services:
+  nixify-service:
+    build:
+      context: ./web-service/api
+      dockerfile: Dockerfile
+    container_name: nixify-web-service
+    environment:
+      - PORT=8080
+      - HOST=0.0.0.0
+      - DATA_DIR=/var/lib/nixify
+      - MAPPING_DB_PATH=/app/mapping/mapping-database.json
+    volumes:
+      - nixify-data:/var/lib/nixify
+      - ./snapshot:/app/snapshot:ro
+      - ./mapping:/app/mapping:ro
+      - ./web-service/config-generator:/app/config-generator:ro
+      - ./iso-builder:/app/iso-builder:ro
+    restart: unless-stopped
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.nixify.rule=Host(`nixify.${DOMAIN}`)"
+      - "traefik.http.routers.nixify.entrypoints=websecure"
+      - "traefik.http.routers.nixify.tls=true"
+      - "traefik.http.routers.nixify.priority=10"
+      - "traefik.http.routers.nixify.tls.certresolver=http_resolver"
+      - "traefik.http.services.nixify.loadbalancer.server.port=8080"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  nixify-data:
+    driver: local
+
+networks:
+  proxy:
+    name: proxy
+    external: true

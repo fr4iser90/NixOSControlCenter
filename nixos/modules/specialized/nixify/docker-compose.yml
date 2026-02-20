@@ -3,7 +3,7 @@ version: '3.8'
 services:
   nixify-service:
     build:
-      context: .
+      context: ./web-service/api
       dockerfile: Dockerfile
     container_name: nixify-web-service
     ports:
