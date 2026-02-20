@@ -1,4 +1,4 @@
-{{define "content"}}
+{{define "mappings"}}
 <div class="container">
     <header>
         <h1>{{.T "mappings.title"}}</h1>
@@ -155,7 +155,7 @@
     
     document.getElementById('searchInput').addEventListener('input', (e) => {
         const query = e.target.value.toLowerCase();
-        const filtered = Object.values(programs).filter(prog => {
+        const filtered = programs.filter(prog => {
             const name = (prog.name || '').toLowerCase();
             const category = (prog.category || '').toLowerCase();
             const package = (prog.nixos_package || '').toLowerCase();
@@ -165,12 +165,12 @@
     });
     
     // Initial render
-    renderPrograms(Object.values(programs));
+    renderPrograms(programs);
     
     // Show stats
     const stats = document.createElement('div');
     stats.className = 'stats';
-    stats.textContent = `${translations.total}: ${Object.keys(programs).length}`;
+    stats.textContent = `${translations.total}: ${programs.length}`;
     document.getElementById('programsList').parentNode.appendChild(stats);
 </script>
 {{end}}

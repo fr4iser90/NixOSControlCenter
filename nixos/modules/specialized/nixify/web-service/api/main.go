@@ -367,8 +367,8 @@ type TemplateData struct {
 	Host        string
 	Port        string
 	Sessions    int
-	ProgramsJSON string // For mappings page
-	ModulesJSON  string // For modules page
+	ProgramsJSON template.JS // For mappings page
+	ModulesJSON  template.JS // For modules page
 	Modules      []ModuleInfo // For modules page
 	Module       *ModuleInfo // For module detail page
 	ReadmeContent string // For module detail page
@@ -460,11 +460,16 @@ func NewServer(port, host, dataDir string) *Server {
 		// Try Docker path first, then local
 		if _, err := os.Stat("/app/nixos"); err == nil {
 			modulesBasePath = "/app/nixos"
+			log.Printf("📦 Using Docker modules path: %s", modulesBasePath)
 		} else if _, err := os.Stat("/etc/nixos"); err == nil {
 			modulesBasePath = "/etc/nixos"
+			log.Printf("📦 Using local modules path: %s", modulesBasePath)
 		} else {
 			modulesBasePath = "/app/nixos" // Default to Docker path
+			log.Printf("⚠️  Modules path not found, defaulting to: %s", modulesBasePath)
 		}
+	} else {
+		log.Printf("📦 Using modules path from environment: %s", modulesBasePath)
 	}
 	
 	// GitHub repo URL
@@ -673,11 +678,29 @@ func (s *Server) handleMappings(w http.ResponseWriter, r *http.Request) {
 		mapping = map[string]interface{}{"programs": map[string]interface{}{}}
 	}
 	
-	// Convert programs to JSON string for JavaScript
-	programsJSON, _ := json.Marshal(mapping["programs"])
+	// Convert programs object to array format for JavaScript
+	programsObj, ok := mapping["programs"].(map[string]interface{})
+	if !ok {
+		programsObj = make(map[string]interface{})
+	}
+	
+	// Convert to array format
+	programsArray := make([]map[string]interface{}, 0)
+	for name, progData := range programsObj {
+		progMap, ok := progData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		// Add name to the program data
+		progMap["name"] = name
+		programsArray = append(programsArray, progMap)
+	}
+	
+	// Convert to JSON for JavaScript
+	programsJSON, _ := json.Marshal(programsArray)
 	
 	data := s.newTemplateData(r, nonce)
-	data.ProgramsJSON = string(programsJSON)
+	data.ProgramsJSON = template.JS(programsJSON)
 	
 	// Execute base template, which will render the "mappings" block
 	if err := s.baseTemplate.ExecuteTemplate(w, "base", data); err != nil {
@@ -735,17 +758,20 @@ func (s *Server) handleModules(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	
 	// Discover modules
+	log.Printf("🔍 Discovering modules from: %s", s.modulesBasePath)
 	modules, err := s.discoverModules()
 	if err != nil {
 		log.Printf("Failed to discover modules: %v", err)
 		modules = []ModuleInfo{} // Empty list on error
+	} else {
+		log.Printf("✅ Discovered %d modules", len(modules))
 	}
 	
 	// Convert to JSON for JavaScript
 	modulesJSON, _ := json.Marshal(modules)
 	
 	data := s.newTemplateData(r, nonce)
-	data.ModulesJSON = string(modulesJSON)
+	data.ModulesJSON = template.JS(modulesJSON)
 	data.Modules = modules
 	
 	// Execute base template, which will render the "modules" block
