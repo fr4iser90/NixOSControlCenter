@@ -1,59 +1,41 @@
-# Homelab Manager Feature
+# Homelab Manager
 
-Feature for managing homelab environments using Docker containers, with support for both single-server and Docker Swarm modes.
+A module for managing homelab environments using Docker containers, with support for both single-server and Docker Swarm modes.
 
-## Features
+## Overview
 
-- Environment creation and configuration
-- Docker Compose stack management
-- Swarm mode support
-- User-based Docker access control
-- Integrated command-center commands
+The Homelab Manager is a **module** that provides comprehensive homelab environment management. It supports Docker Compose stack management, Docker Swarm mode, and user-based Docker access control.
 
-## Requirements
-
-- Docker installed and configured
-- Appropriate user with Docker privileges (virtualization or admin role)
-- System configuration for homelab stacks
-
-## Usage
-
-Enable the module in your user config:
+## Quick Start
 
 ```nix
 {
-  modules.infrastructure.homelab = {
-    enable = true;
-    stacks = [
+  enable = true;
+  stacks = [
       {
         name = "my-stack";
         compose = "/path/to/docker-compose.yml";
         env = "/path/to/.env";
-      }
+        }
     ];
-  };
 }
 ```
 
-## Commands
+## Features
 
-Available through ncc command-center:
+- **Environment Creation**: Create and configure homelab environments
+- **Docker Compose**: Stack management with Docker Compose
+- **Swarm Mode**: Support for Docker Swarm multi-node setups
+- **User-Based Access**: Docker access control based on user roles
+- **Integrated Commands**: Command-center integration for management
 
-- `ncc homelab create` - Create homelab environment
-- `ncc homelab fetch` - Fetch stack definitions
-- `ncc homelab status` - Show homelab status
-- `ncc homelab update` - Update stacks
-- `ncc homelab delete` - Remove homelab environment
+## Documentation
 
-## Configuration
+For detailed documentation, see:
+- [Architecture](./doc/ARCHITECTURE.md) - System architecture and design decisions
+- [Usage Guide](./doc/USAGE.md) - Detailed usage examples and best practices
 
-See `template-config.nix` for available options.
+## Related Components
 
-## Dependencies
-
-- Docker
-- Optionally: Docker Swarm for multi-node setups
-
-## Version History
-
-See CHANGELOG.md for detailed changes.
+- **Packages Module**: Docker package management
+- **User Module**: User role management for Docker access
