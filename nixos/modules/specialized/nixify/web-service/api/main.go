@@ -111,6 +111,7 @@ type ModuleInfo struct {
 	Assets      []string `json:"assets,omitempty"` // Subdirectories like tui/, scripts/, etc.
 	Docs        []DocInfo `json:"docs,omitempty"` // Documentation files from doc/
 	DocAssets   []string  `json:"doc_assets,omitempty"` // Assets from doc/assets/
+	ShowStatusBadge bool  `json:"show_status_badge"` // Whether to show status badge in UI
 }
 
 // Translations holds i18n translations
@@ -155,6 +156,9 @@ type Server struct {
 	// Module discovery
 	modulesBasePath string // Path to nixos/ directory (either /app/nixos or /etc/nixos)
 	githubRepoURL   string // GitHub repository URL for module links
+	
+	// UI configuration
+	showStatusBadge bool // Whether to show status badges in module listings
 	
 	// Debug
 	debugTranslations bool // Enable debug logging for translations
@@ -382,6 +386,7 @@ type TemplateData struct {
 	ReadmeContent string // For module detail page
 	DefaultNixContent string // For module detail page
 	DocContents  map[string]string // For module detail page: doc name -> content
+	ShowStatusBadge bool // Whether to show status badges in UI
 	// Additional fields can be added per page
 }
 
@@ -459,6 +464,7 @@ func (s *Server) newTemplateData(r *http.Request, nonce string) TemplateData {
 		Host:        s.host,
 		Port:        s.port,
 		Sessions:    0, // Will be set by handlers that need it
+		ShowStatusBadge: s.showStatusBadge,
 	}
 }
 
@@ -560,6 +566,7 @@ func NewServer(port, host, dataDir string) *Server {
 		stopCleanup:   make(chan struct{}),
 		modulesBasePath: modulesBasePath,
 		githubRepoURL:   githubRepoURL,
+		showStatusBadge: os.Getenv("SHOW_STATUS_BADGE") != "false", // Default to true, set to "false" to disable
 		debugTranslations: os.Getenv("DEBUG_TRANSLATIONS") == "true", // Enable via environment variable
 	}
 
@@ -2183,6 +2190,7 @@ func (s *Server) parseModule(modulePath, domain, rootPath string) (ModuleInfo, e
 		Assets:      assets,
 		Docs:        docs,
 		DocAssets:   docAssets,
+		ShowStatusBadge: s.showStatusBadge,
 	}, nil
 }
 

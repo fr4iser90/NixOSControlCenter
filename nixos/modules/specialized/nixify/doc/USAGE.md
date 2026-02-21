@@ -56,6 +56,19 @@ enable = true;
 webService.enable = true;
 ```
 
+### `webService.showStatusBadge`
+
+**Type**: `bool`
+**Default**: `true`
+**Description**: Show Active/Disabled status badges for modules in the web interface. When disabled, status badges and status filter are hidden.
+**Example**:
+```nix
+webService = {
+  enable = true;
+  showStatusBadge = false;  # Hide status badges
+};
+```
+
 ## Advanced Topics
 
 ### Snapshot Scripts

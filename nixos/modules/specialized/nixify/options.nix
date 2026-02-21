@@ -47,6 +47,12 @@ in
             default = false;
             description = "Automatically start web service on boot";
           };
+          
+          showStatusBadge = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Show Active/Disabled status badges for modules in the web interface";
+          };
         };
       };
       default = {};

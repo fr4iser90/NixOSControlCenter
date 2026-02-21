@@ -15,6 +15,7 @@
                 <h3>{{.T "modules.detail.version"}}</h3>
                 <p>{{.Module.Version}}</p>
             </div>
+            {{if .Module.ShowStatusBadge}}
             <div class="info-card">
                 <h3>{{.T "modules.detail.status"}}</h3>
                 <p>
@@ -27,6 +28,7 @@
                     {{end}}
                 </p>
             </div>
+            {{end}}
             <div class="info-card">
                 <h3>{{.T "modules.detail.github"}}</h3>
                 <p><a href="{{.Module.GitHubURL}}" target="_blank" rel="noopener noreferrer" class="module-link">View on GitHub →</a></p>

@@ -14,12 +14,14 @@
                 <option value="core">{{.T "modules.filter.core"}}</option>
                 <option value="modules">{{.T "modules.filter.optional"}}</option>
             </select>
+            {{if .ShowStatusBadge}}
             <select id="statusFilter" style="padding: 12px; background: #1e1e1e; border: 1px solid #3e3e3e; border-radius: 4px; color: #d4d4d4; cursor: pointer;">
                 <option value="">{{.T "modules.filter.all_status"}}</option>
                 <option value="active">{{.T "modules.filter.active"}}</option>
                 <option value="disabled">{{.T "modules.filter.disabled"}}</option>
                 <option value="planned">{{.T "modules.filter.planned"}}</option>
             </select>
+            {{end}}
         </div>
         
         <div id="modulesGrid" class="modules-grid">
@@ -197,7 +199,7 @@
                             <h3 class="module-name">🧩 ${escapeHtml(module.name)}</h3>
                             <div class="module-category">${escapeHtml(module.category)}</div>
                         </div>
-                        <span class="status-badge ${statusClass}">${statusText}</span>
+                        ${module.show_status_badge ? `<span class="status-badge ${statusClass}">${statusText}</span>` : ''}
                     </div>
                     <p class="module-description">${escapeHtml(module.description)}</p>
                     ${features.length > 0 ? `
@@ -223,7 +225,8 @@
     function filterModules() {
         const query = document.getElementById('searchInput').value.toLowerCase();
         const category = document.getElementById('categoryFilter').value;
-        const status = document.getElementById('statusFilter').value;
+        const statusFilter = document.getElementById('statusFilter');
+        const status = statusFilter ? statusFilter.value : '';
         
         const filtered = modules.filter(module => {
             const matchesSearch = !query || 
@@ -242,7 +245,10 @@
     
     document.getElementById('searchInput').addEventListener('input', filterModules);
     document.getElementById('categoryFilter').addEventListener('change', filterModules);
-    document.getElementById('statusFilter').addEventListener('change', filterModules);
+    const statusFilter = document.getElementById('statusFilter');
+    if (statusFilter) {
+        statusFilter.addEventListener('change', filterModules);
+    }
     
     // Initial render
     renderModules(modules);

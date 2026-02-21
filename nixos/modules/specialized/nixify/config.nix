@@ -93,6 +93,7 @@ in
         HOST = (cfg.webService.host or "127.0.0.1");
         DATA_DIR = "/var/lib/nixify";
         MAPPING_DB_PATH = toString (cfg.mapping.databasePath or ./mapping/mapping-database.json);
+        SHOW_STATUS_BADGE = if (cfg.webService.showStatusBadge or true) then "true" else "false";
       };
       
       wantedBy = lib.mkIf (cfg.webService.autoStart or false) [ "multi-user.target" ];
