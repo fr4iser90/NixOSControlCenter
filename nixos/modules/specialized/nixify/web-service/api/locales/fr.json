@@ -165,7 +165,7 @@
   },
   "mappings": {
     "title": "Mappages de programmes",
-    "subtitle": "Voir quels programmes sont pris en charge dans NixOS",
+    "subtitle": "Programmes fréquemment utilisés dans NixOS",
     "search": "Rechercher des programmes...",
     "category": "Catégorie",
     "alternatives": "Alternatives",
@@ -394,7 +394,7 @@
   },
   "games": {
     "title": "🎮 Support des jeux",
-    "subtitle": "Informations sur le gaming sur NixOS/Linux",
+    "subtitle": "Jeux fréquemment joués sur NixOS/Linux",
     "kernel_anticheat_warning": {
       "title": "⚠️ Anti-triche au niveau du noyau",
       "text": "Vanguard (Valorant), EasyAntiCheat, BattlEye et autres anti-triche au niveau du noyau ne fonctionnent PAS sous Linux/NixOS.",

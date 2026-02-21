@@ -165,7 +165,7 @@
   },
   "mappings": {
     "title": "Mapeos de programas",
-    "subtitle": "Ver qué programas están soportados en NixOS",
+    "subtitle": "Programas frecuentemente utilizados en NixOS",
     "search": "Buscar programas...",
     "category": "Categoría",
     "alternatives": "Alternativas",
@@ -394,7 +394,7 @@
   },
   "games": {
     "title": "🎮 Soporte de juegos",
-    "subtitle": "Información sobre gaming en NixOS/Linux",
+    "subtitle": "Juegos frecuentemente jugados en NixOS/Linux",
     "kernel_anticheat_warning": {
       "title": "⚠️ Anti-trampas a nivel de kernel",
       "text": "Vanguard (Valorant), EasyAntiCheat, BattlEye y otros anti-trampas a nivel de kernel NO funcionan en Linux/NixOS.",
