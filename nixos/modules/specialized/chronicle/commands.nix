@@ -6,24 +6,14 @@ let
   cfg = getModuleConfig moduleName;
   cliRegistry = getModuleApi "cli-registry";
   
-  # DEBUG LOGS - Will show during build (each needs unique name!)
-  _1 = builtins.trace "=== CHRONICLE DEBUG START ===" null;
-  _2 = builtins.trace "[CHRONICLE] commands.nix is being evaluated" null;
-  _3 = builtins.trace "[CHRONICLE] moduleName = ${moduleName}" null;
-  _4 = builtins.trace "[CHRONICLE] cfg.enable = ${toString (cfg.enable or false)}" null;
-  _5 = builtins.trace "[CHRONICLE] cfg = ${builtins.toJSON cfg}" null;
-  
   # Import chronicleLib
   chronicleLib = import ./lib/default.nix { inherit lib pkgs cfg; };
-  _6 = builtins.trace "[CHRONICLE] chronicleLib imported" null;
   
   backend = if (cfg.mode or "automatic") == "automatic" then "x11" else "wayland";
-  _7 = builtins.trace "[CHRONICLE] backend = ${backend}" null;
   
   recorderScript = import ./scripts/main.nix {
     inherit lib pkgs chronicleLib backend cfg;
   };
-  _8 = builtins.trace "[CHRONICLE] recorderScript created: ${recorderScript}" null;
   
   registrationResult = cliRegistry.registerCommandsFor "chronicle" [
     {
@@ -57,16 +47,9 @@ let
       '';
     }
   ];
-  
-  _9 = builtins.trace "[CHRONICLE] registrationResult = ${builtins.toJSON registrationResult}" null;
-  _10 = builtins.trace "=== CHRONICLE DEBUG END ===" null;
 in
 {
-  config = builtins.trace "DEBUG: [CHRONICLE] cfg in commands.nix = ${builtins.toJSON cfg}" (
-    builtins.trace "DEBUG: [CHRONICLE] cfg.outputDir = ${toString (cfg.outputDir or "MISSING")}" (
-      lib.mkMerge [
-        registrationResult
-      ]
-    )
-  );
+  config = lib.mkMerge [
+    registrationResult
+  ];
 }

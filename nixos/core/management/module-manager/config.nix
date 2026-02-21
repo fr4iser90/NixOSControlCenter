@@ -24,11 +24,6 @@ let
   resolvedModules = discovery.resolveDependencies discoveredModules;
   generatedAPIs = discovery.generateAPIs resolvedModules;
 
-  # DEBUG: Show discovered modules
-  debugDiscovered = builtins.trace "DEBUG: discoveredModules count = ${toString (builtins.length discoveredModules)}" (
-    builtins.trace "DEBUG: discoveredModules names = ${builtins.toJSON (map (m: m.name) discoveredModules)}" discoveredModules
-  );
-
   # Generate automatic moduleConfig for all discovered modules
   automaticModuleConfigs = lib.listToAttrs (
     map (module: {
@@ -42,11 +37,10 @@ let
         category = module.category;
         path = module.path;
       };
-    }) debugDiscovered
+    }) discoveredModules
   );
 
-  # DEBUG: Show generated configs
-  debugModuleConfigs = builtins.trace "DEBUG: automaticModuleConfigs keys = ${builtins.toJSON (builtins.attrNames automaticModuleConfigs)}" automaticModuleConfigs;
+  debugModuleConfigs = automaticModuleConfigs;
 
   # Read central module configuration
   moduleManagerConfigPath = "/etc/nixos/configs/module-manager-config.nix";
@@ -173,14 +167,7 @@ in {
             merged = lib.recursiveUpdate templateDefaults configValue;
             result = lib.recursiveUpdate merged systemConfigValue;
           in
-            # DEBUG: All logs in the return value to ensure they're evaluated
-            builtins.trace "DEBUG: [getModuleConfig] ${moduleName}: hasMetadata=${toString hasMetadata}, configPath=${toString configPath}, modulePath=${toString modulePath}" (
-              builtins.trace "DEBUG: [getModuleConfig] ${moduleName}: templateDefaults=${builtins.toJSON templateDefaults}" (
-                builtins.trace "DEBUG: [getModuleConfig] ${moduleName}: configValue=${builtins.toJSON configValue}, systemConfigValue=${builtins.toJSON systemConfigValue}" (
-                  builtins.trace "DEBUG: [getModuleConfig] ${moduleName}: result=${builtins.toJSON result}" result
-                )
-              )
-            );
+            result;
         
         # Generic function to get module config from configPath (with defaults)
         # Usage: cfg = getModuleConfigFromPath moduleConfig.configPath;

@@ -11,9 +11,6 @@ let
   # ALL modules discovered automatically
   allModules = discovery.discoverAllModules;
 
-  # Debug: Show discovered modules
-  debugModules = builtins.trace "DEBUG: Discovered modules: ${toString (map (m: m.name) allModules)}" allModules;
-
   # Helper: Generate config file for a module (PRESERVES EXISTING CONFIG!)
   updateModuleConfig = pkgs.writeShellScriptBin "update-module-config" ''
     #!${pkgs.bash}/bin/bash
