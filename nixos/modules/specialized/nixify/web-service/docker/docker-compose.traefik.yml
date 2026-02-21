@@ -10,8 +10,9 @@ services:
       - DATA_DIR=/var/lib/nixify
       - MAPPING_DB_PATH=/app/mapping/mapping-database.json
       - MODULES_BASE_PATH=/app/nixos
-      - GITHUB_REPO_URL=https://github.com/fr4iser90/NixOSControlCenter.git
+      - GITHUB_REPO_URL=https://github.com/fr4iser90/NixOSControlCenter
       - GITHUB_BRANCH=main
+      - SHOW_STATUS_BADGE=false
     volumes:
       - nixify-data:/var/lib/nixify
       - ../../snapshot:/app/snapshot:ro
