@@ -6,29 +6,6 @@ A comprehensive SSH server management system with request-based access control, 
 
 The SSH Server Manager provides a complete workflow for managing SSH access requests and temporary password authentication. It replaces the old confusing system with clear, well-named commands and proper approval workflows.
 
-## Quick Start
-
-```nix
-{
-  modules = {
-    security = {
-      ssh-server-manager = {
-        enable = true;
-        notifications = {
-          enable = true;
-          types = {
-            email = {
-              enable = true;
-              address = "admin@example.com";
-            };
-          };
-        };
-      };
-    };
-  };
-}
-```
-
 ## Features
 
 - **Request-Based Access**: Users request temporary SSH access

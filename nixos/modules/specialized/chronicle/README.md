@@ -6,17 +6,6 @@ A comprehensive system logging and documentation module that captures, analyzes,
 
 The Chronicle module provides comprehensive system logging, documentation, and analysis capabilities. It captures system events, provides analysis tools, and supports various output formats.
 
-## Quick Start
-
-```nix
-{
-  enable = true;
-  outputDir = "$HOME/.local/share/chronicle";
-  format = "html";
-  mode = "automatic";
-}
-```
-
 ## Features
 
 - **System Logging**: Comprehensive system event capture

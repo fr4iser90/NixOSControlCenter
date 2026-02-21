@@ -6,23 +6,6 @@ A module that provides virtual machine management capabilities for NixOS, includ
 
 The VM Manager is a **module** that provides comprehensive virtual machine management. It supports VM creation, configuration, storage management, and integration with various virtualization technologies.
 
-## Quick Start
-
-```nix
-{
-  modules = {
-    infrastructure = {
-      vm = {
-        enable = true;
-        storage = {
-          enable = true;
-        };
-      };
-    };
-  };
-}
-```
-
 ## Features
 
 - **VM Creation**: Create and configure virtual machines

@@ -6,20 +6,6 @@ A module that provides advanced bootloader entry management for systemd-boot, GR
 
 The Boot Entry Manager is a **module** that provides unified boot entry management across different bootloaders. It supports creating, renaming, and managing boot entries with a consistent interface regardless of the underlying bootloader.
 
-## Quick Start
-
-```nix
-{
-  modules = {
-    infrastructure = {
-      bootentry-manager = {
-        enable = true;
-      };
-    };
-  };
-}
-```
-
 ## Features
 
 - **Multi-Bootloader Support**: Works with systemd-boot, GRUB, and rEFInd

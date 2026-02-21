@@ -6,25 +6,6 @@ A core NixOS Control Center module that provides a unified CLI formatting system
 
 The CLI Formatter module is a **core module** that is always active and provides formatting capabilities for CLI applications. It offers a comprehensive API for creating styled output, interactive menus, progress bars, tables, and other CLI components.
 
-## Quick Start
-
-```nix
-{
-  cli-formatter = {
-    config = {
-      # Custom configuration options
-    };
-    components = {
-      custom-component = {
-        enable = true;
-        refreshInterval = 5;
-        template = "...";
-      };
-    };
-  };
-}
-```
-
 ## Features
 
 - **Always Active**: Core module, no enable option needed

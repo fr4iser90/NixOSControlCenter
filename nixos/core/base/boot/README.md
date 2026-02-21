@@ -6,16 +6,6 @@ A core NixOS Control Center module that provides bootloader configuration and bo
 
 The Boot System module is a **core module** that manages bootloader configuration for NixOS. It supports multiple bootloaders and provides a simple interface to switch between different boot systems.
 
-## Quick Start
-
-```nix
-{
-  boot = {
-    bootloader = "systemd-boot";  # Bootloader: "systemd-boot", "grub", "refind"
-  };
-}
-```
-
 ## Features
 
 - **Multiple Bootloaders**: Support for systemd-boot, GRUB, and rEFInd

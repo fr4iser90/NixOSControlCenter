@@ -6,23 +6,6 @@ A core NixOS Control Center module that provides centralized command registratio
 
 The CLI Registry module is a **core module** that is always active and manages all CLI commands in the NixOS Control Center. It provides a central registry where modules can register their commands, and it organizes them by categories for easy discovery and execution.
 
-## Quick Start
-
-```nix
-{
-  cli-registry = {
-    commands = [
-      {
-        name = "custom-command";
-        description = "Custom user command";
-        category = "custom";
-        script = pkgs.writeScriptBin "custom-command" "...";
-      };
-    ];
-  };
-}
-```
-
 ## Features
 
 - **Always Active**: Core module, no enable option needed

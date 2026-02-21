@@ -13,17 +13,6 @@ The Audio System module is a **core module** that manages audio services and con
 - **Audio Tools**: Common audio utilities and control applications
 - **System Integration**: Proper integration with NixOS audio services
 
-## Quick Start
-
-```nix
-{
-  audio = {
-    enable = true;           # Enable audio system (default: true)
-    system = "pipewire";     # Audio system: "pipewire", "pulseaudio", "alsa", "none"
-  };
-}
-```
-
 ## Documentation
 
 For detailed documentation, see:

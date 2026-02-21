@@ -6,21 +6,6 @@ A module for managing homelab environments using Docker containers, with support
 
 The Homelab Manager is a **module** that provides comprehensive homelab environment management. It supports Docker Compose stack management, Docker Swarm mode, and user-based Docker access control.
 
-## Quick Start
-
-```nix
-{
-  enable = true;
-  stacks = [
-      {
-        name = "my-stack";
-        compose = "/path/to/docker-compose.yml";
-        env = "/path/to/.env";
-        }
-    ];
-}
-```
-
 ## Features
 
 - **Environment Creation**: Create and configure homelab environments

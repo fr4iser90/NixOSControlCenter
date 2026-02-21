@@ -6,14 +6,6 @@ A module that provides AI workspace capabilities, including LLM integration, tra
 
 The AI Workspace module provides comprehensive AI development and deployment capabilities. It includes LLM integration, training environments, database support, and various AI services.
 
-## Quick Start
-
-```nix
-{
-  enable = true;
-}
-```
-
 ## Features
 
 - **LLM Integration**: Large language model integration and APIs

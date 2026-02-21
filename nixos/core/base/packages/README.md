@@ -6,28 +6,6 @@ A core NixOS Control Center module that provides comprehensive package managemen
 
 The Packages System module is a **core module** that manages system-wide and user-specific packages for NixOS. It provides a feature-based package organization system with automatic dependency resolution, preset configurations, and intelligent Docker mode selection.
 
-## Quick Start
-
-```nix
-{
-  packages = {
-    # Legacy format (V1)
-    packageModules = [ "gaming" "docker" "web-dev" ];
-
-    # New format (V2)
-    systemPackages = [ "firefox" "vscode" ];  # System-wide packages
-    userPackages = {
-      alice = [ "discord" "spotify" ];        # User-specific packages
-    };
-
-    # Preset configuration
-    preset = {
-      modules = [ "gaming-desktop" ];
-    };
-  };
-}
-```
-
 ## Features
 
 - **Feature-Based Packages**: Organized by features (gaming, development, virtualization)

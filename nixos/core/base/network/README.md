@@ -6,29 +6,6 @@ A core NixOS Control Center module that provides basic networking configuration,
 
 The Network System module is a **core module** that establishes the foundation for networking in NixOS. It configures basic network settings, enables NetworkManager by default, and provides firewall infrastructure with intelligent service-based rules.
 
-## Quick Start
-
-```nix
-{
-  network = {
-    networkManager = {
-      dns = "systemd-resolved";  # DNS configuration
-    };
-    networking = {
-      firewall = {
-        trustedNetworks = [ "192.168.1.0/24" ];
-      };
-      services = {
-        ssh = {
-          exposure = "public";
-          port = 22;
-        };
-      };
-    };
-  };
-}
-```
-
 ## Features
 
 - **Basic Networking**: Hostname and timezone configuration

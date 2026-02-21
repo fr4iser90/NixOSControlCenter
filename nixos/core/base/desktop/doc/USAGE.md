@@ -8,16 +8,14 @@ As a core module, the desktop system can be enabled/disabled:
 
 ```nix
 {
-  desktop = {
-    enable = true;              # Enable desktop environment (default: true)
-    environment = "plasma";     # Desktop environment: "plasma", "gnome", "xfce"
-    display = {
-      manager = "sddm";         # Display manager: "sddm", "gdm", "lightdm"
-      server = "wayland";       # Display server: "wayland", "x11", "hybrid"
-    };
-    theme = {
-      dark = true;              # Use dark theme (default: true)
-    };
+  enable = true;              # Enable desktop environment (default: true)
+  environment = "plasma";     # Desktop environment: "plasma", "gnome", "xfce"
+  display = {
+    manager = "sddm";         # Display manager: "sddm", "gdm", "lightdm"
+    server = "wayland";       # Display server: "wayland", "x11", "hybrid"
+  };
+  theme = {
+    dark = true;              # Use dark theme (default: true)
   };
 }
 ```
@@ -30,13 +28,11 @@ As a core module, the desktop system can be enabled/disabled:
 **Configuration**:
 ```nix
 {
-  desktop = {
-    enable = true;
-    environment = "plasma";
-    display = {
-      manager = "sddm";
-      server = "wayland";
-    };
+  enable = true;
+  environment = "plasma";
+  display = {
+    manager = "sddm";
+    server = "wayland";
   };
 }
 ```
@@ -48,13 +44,11 @@ As a core module, the desktop system can be enabled/disabled:
 **Configuration**:
 ```nix
 {
-  desktop = {
-    enable = true;
-    environment = "gnome";
-    display = {
-      manager = "gdm";
-      server = "wayland";
-    };
+  enable = true;
+  environment = "gnome";
+  display = {
+    manager = "gdm";
+    server = "wayland";
   };
 }
 ```
@@ -66,13 +60,11 @@ As a core module, the desktop system can be enabled/disabled:
 **Configuration**:
 ```nix
 {
-  desktop = {
-    enable = true;
-    environment = "xfce";
-    display = {
-      manager = "lightdm";
-      server = "x11";
-    };
+  enable = true;
+  environment = "xfce";
+  display = {
+    manager = "lightdm";
+    server = "x11";
   };
 }
 ```
@@ -137,12 +129,10 @@ theme.dark = false;
 1. Edit your desktop configuration:
    ```nix
    {
-     desktop = {
-       environment = "gnome";  # Change from plasma to gnome
-       display = {
-         manager = "gdm";      # Use GDM for GNOME
-         server = "wayland";    # Use Wayland
-       };
+     environment = "gnome";  # Change from plasma to gnome
+     display = {
+       manager = "gdm";      # Use GDM for GNOME
+       server = "wayland";    # Use Wayland
      };
    }
    ```
@@ -158,10 +148,8 @@ theme.dark = false;
 
 ```nix
 {
-  desktop = {
-    theme = {
-      dark = false;  # Use light theme
-    };
+  theme = {
+    dark = false;  # Use light theme
   };
 }
 ```
@@ -173,14 +161,8 @@ theme.dark = false;
 The desktop module works with audio systems:
 ```nix
 {
-  desktop = {
-    enable = true;
-    environment = "plasma";
-  };
-  audio = {
-    enable = true;
-    system = "pipewire";
-  };
+  enable = true;
+  environment = "plasma";
 }
 ```
 

@@ -8,9 +8,7 @@ As a core module, the boot system is always active. Configure it through the sys
 
 ```nix
 {
-  boot = {
-    bootloader = "systemd-boot";  # Bootloader: "systemd-boot", "grub", "refind"
-  };
+  bootloader = "systemd-boot";  # Bootloader: "systemd-boot", "grub", "refind"
 }
 ```
 
@@ -18,9 +16,7 @@ As a core module, the boot system is always active. Configure it through the sys
 
 ```nix
 {
-  boot = {
-    bootloader = "systemd-boot";  # Default bootloader
-  };
+  bootloader = "systemd-boot";  # Default bootloader
 }
 ```
 
@@ -32,9 +28,7 @@ As a core module, the boot system is always active. Configure it through the sys
 **Configuration**:
 ```nix
 {
-  boot = {
-    bootloader = "systemd-boot";
-  };
+  bootloader = "systemd-boot";
 }
 ```
 **Result**: Fast, modern bootloader with minimal configuration
@@ -45,9 +39,7 @@ As a core module, the boot system is always active. Configure it through the sys
 **Configuration**:
 ```nix
 {
-  boot = {
-    bootloader = "grub";
-  };
+  bootloader = "grub";
 }
 ```
 **Result**: GRUB bootloader with BIOS support
@@ -58,9 +50,7 @@ As a core module, the boot system is always active. Configure it through the sys
 **Configuration**:
 ```nix
 {
-  boot = {
-    bootloader = "refind";
-  };
+  bootloader = "refind";
 }
 ```
 **Result**: Graphical boot manager with multi-OS support
@@ -84,9 +74,7 @@ bootloader = "grub";
 1. Edit your boot configuration:
    ```nix
    {
-     boot = {
-       bootloader = "grub";  # Change from systemd-boot to grub
-     };
+     bootloader = "grub";  # Change from systemd-boot to grub
    }
    ```
 
@@ -110,12 +98,7 @@ bootloader = "grub";
 The boot module works with hardware detection:
 ```nix
 {
-  hardware = {
-    # Hardware-specific boot configurations
-  };
-  boot = {
-    bootloader = "systemd-boot";
-  };
+  bootloader = "systemd-boot";
 }
 ```
 
@@ -124,12 +107,7 @@ The boot module works with hardware detection:
 System type affects boot configuration:
 ```nix
 {
-  system-manager = {
-    systemType = "desktop";  # or "server"
-  };
-  boot = {
-    bootloader = "systemd-boot";
-  };
+  bootloader = "systemd-boot";
 }
 ```
 

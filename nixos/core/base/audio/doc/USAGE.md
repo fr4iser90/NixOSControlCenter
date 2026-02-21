@@ -8,10 +8,8 @@ As a core module, the audio system is enabled by default:
 
 ```nix
 {
-  audio = {
-    enable = true;           # Enable audio system (default: true)
-    system = "pipewire";     # Audio system: "pipewire", "pulseaudio", "alsa", "none"
-  };
+  enable = true;           # Enable audio system (default: true)
+  system = "pipewire";     # Audio system: "pipewire", "pulseaudio", "alsa", "none"
 }
 ```
 
@@ -23,10 +21,8 @@ As a core module, the audio system is enabled by default:
 **Configuration**:
 ```nix
 {
-  audio = {
-    enable = true;
-    system = "pipewire";
-  };
+  enable = true;
+  system = "pipewire";
 }
 ```
 **Result**: Modern audio system with low latency and PulseAudio compatibility
@@ -37,10 +33,8 @@ As a core module, the audio system is enabled by default:
 **Configuration**:
 ```nix
 {
-  audio = {
-    enable = true;
-    system = "pulseaudio";
-  };
+  enable = true;
+  system = "pulseaudio";
 }
 ```
 **Result**: Traditional audio system with wide compatibility
@@ -51,10 +45,8 @@ As a core module, the audio system is enabled by default:
 **Configuration**:
 ```nix
 {
-  audio = {
-    enable = true;
-    system = "alsa";
-  };
+  enable = true;
+  system = "alsa";
 }
 ```
 **Result**: Low-level audio interface with minimal overhead
@@ -88,9 +80,7 @@ system = "pulseaudio";
 1. Edit your audio configuration:
    ```nix
    {
-     audio = {
-       system = "pulseaudio";  # Change from pipewire to pulseaudio
-     };
+     system = "pulseaudio";  # Change from pipewire to pulseaudio
    }
    ```
 
@@ -114,14 +104,8 @@ system = "pulseaudio";
 The audio module works with desktop environments:
 ```nix
 {
-  desktop = {
-    enable = true;
-    environment = "plasma";
-  };
-  audio = {
-    enable = true;
-    system = "pipewire";
-  };
+  enable = true;
+  system = "pipewire";
 }
 ```
 

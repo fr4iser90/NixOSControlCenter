@@ -6,19 +6,6 @@ A core NixOS Control Center module that provides system localization and interna
 
 The Localization System module is a **core module** that manages system-wide localization settings for NixOS. It configures locales, keyboard layouts, timezone, and other regional preferences.
 
-## Quick Start
-
-```nix
-{
-  localization = {
-    locales = [ "en_US.UTF-8" "de_DE.UTF-8" ];  # Supported locales
-    keyboardLayout = "de";                       # Keyboard layout
-    keyboardOptions = "terminate:ctrl_alt_bksp"; # Keyboard options
-    timeZone = "Europe/Berlin";                 # System timezone
-  };
-}
-```
-
 ## Features
 
 - **Multiple Locales**: Support for multiple locale configurations

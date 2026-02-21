@@ -6,23 +6,6 @@ A core NixOS Control Center module that provides system-level management, update
 
 The System Manager module is a **core module** that provides system-level management for NixOS. It handles system updates, backups, health checks, configuration migration, and provides APIs for other modules to interact with system-level operations.
 
-## Quick Start
-
-```nix
-{
-  system-manager = {
-    # Always available (Core)
-    enableVersionChecker = true;         # Version checking
-    enableDeprecationWarnings = true;    # Deprecation warnings
-    enableChecks = true;                 # System health checks
-
-    # Optional features
-    enableUpdates = false;               # System updates (optional)
-    auto-build = false;                  # Auto-build after updates
-  };
-}
-```
-
 ## Features
 
 - **System Updates**: Configuration and channel updates

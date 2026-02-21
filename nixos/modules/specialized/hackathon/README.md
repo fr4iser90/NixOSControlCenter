@@ -6,14 +6,6 @@ A module for managing hackathon environments, providing quick setup, cleanup, an
 
 The Hackathon module provides tools for managing hackathon environments. It supports environment creation, cleanup, status checking, and project management.
 
-## Quick Start
-
-```nix
-{
-  enable = true;
-}
-```
-
 > **Note**: This module is currently under development (WIP) and may not be fully functional.
 
 ## Features

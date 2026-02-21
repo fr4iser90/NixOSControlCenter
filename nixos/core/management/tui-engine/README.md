@@ -6,16 +6,6 @@ A core NixOS Control Center module that provides a Terminal User Interface (TUI)
 
 The TUI Engine module is a **core module** that provides a comprehensive TUI framework for NixOS Control Center modules. It's built with Go and provides components for creating interactive terminal interfaces with menus, forms, tables, and more.
 
-## Quick Start
-
-```nix
-{
-  tui-engine = {
-    enable = true;  # Enable TUI engine
-  };
-}
-```
-
 ## Features
 
 - **Optional Core Module**: Can be enabled/disabled

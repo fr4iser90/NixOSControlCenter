@@ -6,19 +6,6 @@ A core NixOS Control Center module that provides the main control center interfa
 
 The NixOS Control Center (NCC) module is a **core module** that is always active and provides the main CLI interface for the NixOS Control Center. It orchestrates commands, provides the main `ncc` command, and integrates all modules into a unified control center.
 
-## Quick Start
-
-```bash
-# List all available commands
-ncc
-
-# Execute a command
-ncc system-update
-
-# Get help for a command
-ncc help system-update
-```
-
 ## Features
 
 - **Always Active**: Core module, no enable option needed

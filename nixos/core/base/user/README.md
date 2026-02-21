@@ -6,25 +6,6 @@ A comprehensive core NixOS Control Center module that provides user account mana
 
 The User System module is a **core module** that manages all system user accounts and their permissions. It provides role-based access control, automatic group assignment, sudo configuration, and shell setup.
 
-## Quick Start
-
-```nix
-{
-  users = {
-    alice = {
-      role = "admin";
-      defaultShell = "zsh";
-      autoLogin = false;
-    };
-    bob = {
-      role = "restricted-admin";
-      defaultShell = "fish";
-      autoLogin = true;  # Enables TTY auto-login
-    };
-  };
-}
-```
-
 ## Features
 
 - **Role-Based Access Control**: Admin, restricted-admin, virtualization, and guest roles

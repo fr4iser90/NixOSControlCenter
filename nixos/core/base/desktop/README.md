@@ -6,24 +6,6 @@ A core NixOS Control Center module that provides desktop environment configurati
 
 The Desktop System module is a **core module** that manages desktop environment configuration for NixOS. It supports multiple desktop environments and provides a unified interface to configure display systems, themes, and desktop features.
 
-## Quick Start
-
-```nix
-{
-  desktop = {
-    enable = true;              # Enable desktop environment (default: true)
-    environment = "plasma";     # Desktop environment: "plasma", "gnome", "xfce"
-    display = {
-      manager = "sddm";         # Display manager: "sddm", "gdm", "lightdm"
-      server = "wayland";       # Display server: "wayland", "x11", "hybrid"
-    };
-    theme = {
-      dark = true;              # Use dark theme (default: true)
-    };
-  };
-}
-```
-
 ## Features
 
 - **Multiple Desktop Environments**: Support for Plasma, GNOME, and XFCE

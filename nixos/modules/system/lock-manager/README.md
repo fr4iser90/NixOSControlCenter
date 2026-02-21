@@ -6,23 +6,6 @@ A module that provides system discovery, documentation, and secure storage of sy
 
 The Lock Manager (System Discovery) module enables automatic scanning, documentation, and secure storage of your entire system state. It captures desktop settings, installed software (including Steam games), credential metadata, and more.
 
-## Quick Start
-
-```nix
-{
-  enable = true;
-  snapshotDir = "/var/lib/nixos-control-center/snapshots";
-  scanners = {
-    desktop = true;
-    steam = true;
-    browser = true;
-    ide = true;
-    credentials = true;
-    packages = true;
-  };
-}
-```
-
 ## Features
 
 - **Automatic System Scanning**: Captures all important system settings

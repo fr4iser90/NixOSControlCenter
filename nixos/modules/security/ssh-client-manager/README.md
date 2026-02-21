@@ -6,20 +6,6 @@ A module that provides SSH client configuration management, connection managemen
 
 The SSH Client Manager is a **module** that manages SSH client configurations, connections, and keys. It provides tools for managing SSH connections, key management, and client-side SSH configuration.
 
-## Quick Start
-
-```nix
-{
-  modules = {
-    security = {
-      ssh-client-manager = {
-        enable = true;
-      };
-    };
-  };
-}
-```
-
 ## Features
 
 - **Connection Management**: Manage SSH connections and configurations

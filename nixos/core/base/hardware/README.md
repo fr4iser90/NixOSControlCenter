@@ -6,20 +6,6 @@ A core NixOS Control Center module that provides hardware detection and configur
 
 The Hardware System module is a **core module** that manages hardware-specific configurations for NixOS. It supports automatic hardware detection via system-checks and provides manual configuration options for CPU, GPU, and memory settings.
 
-## Quick Start
-
-```nix
-{
-  hardware = {
-    cpu = "intel-core";        # CPU type
-    gpu = "nvidia-intel";      # GPU type (hybrid setup)
-    ram = {
-      sizeGB = null;          # null = auto-detect via system-checks
-    };
-  };
-}
-```
-
 ## Features
 
 - **CPU Configuration**: Support for Intel, AMD, and VM CPUs
