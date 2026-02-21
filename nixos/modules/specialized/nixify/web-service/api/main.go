@@ -2426,11 +2426,8 @@ func (s *Server) sanitizeSessionID(sessionID string) string {
 }
 
 // checkModuleStatus determines if a module is active by checking its config file
-// Since module-manager automatically creates config files for all discovered modules,
-// "planned" should only occur if:
-// 1. Module was just added and nixos-rebuild switch hasn't run yet
-// 2. Activation scripts haven't executed yet
-// 3. There's an issue with config creation
+// Core modules are always active by default (unless explicitly disabled)
+// Optional modules require enable = true to be active
 func (s *Server) checkModuleStatus(moduleName, category, domain string) string {
 	// Build config file path
 	configPath := s.findModuleConfigPath(moduleName, category, domain)
@@ -2438,18 +2435,40 @@ func (s *Server) checkModuleStatus(moduleName, category, domain string) string {
 	// Check if config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		// No config file found - module is not configured yet
-		// This should be rare since module-manager auto-creates configs
-		// But can happen if nixos-rebuild switch hasn't run yet
+		// Core modules should be active by default if not configured
+		if domain == "core" {
+			return "active"
+		}
+		// Optional modules are planned if not configured
 		return "planned"
 	}
 	
-	// Parse config file to check enable status
+	// Check if enable field exists in config
+	hasEnable := s.hasEnableField(configPath)
+	
+	// Core modules: if no enable field, they're always active
+	// If enable field exists, check its value
+	if domain == "core" {
+		if !hasEnable {
+			// Core module without enable field = always active
+			// Examples: module-manager, packages (no top-level enable)
+			return "active"
+		}
+		// Core module with enable field (e.g., desktop) - check value
+		enabled := s.parseNixConfigEnable(configPath, category)
+		if enabled {
+			return "active"
+		}
+		// Core module explicitly disabled (e.g., desktop on server)
+		return "disabled"
+	}
+	
+	// Optional modules: only active if enable = true
 	enabled := s.parseNixConfigEnable(configPath, category)
 	if enabled {
 		return "active"
 	}
-	// Config file exists but enable = false -> disabled
-	// This is the normal state for modules that are discovered but not enabled
+	// Optional module with enable = false or no enable field
 	return "disabled"
 }
 
@@ -2510,6 +2529,36 @@ func (s *Server) parseNixConfigEnable(configPath, category string) bool {
 	// If enable is not explicitly set, try using nix-instantiate for more accurate parsing
 	// This is more reliable for complex configs
 	return s.checkEnableWithNix(configPath, category)
+}
+
+// hasEnableField checks if config file has an enable field
+func (s *Server) hasEnableField(configPath string) bool {
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		return false
+	}
+	contentStr := string(content)
+	lines := strings.Split(contentStr, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Check for enable field (can be "enable =", "enable=", or nested like "desktop.enable =")
+		// But ignore comments and nested structures
+		if strings.Contains(line, "enable") {
+			// Check if it's a top-level enable (not nested like "docker.enable" or "desktop.enable")
+			// Simple heuristic: if line starts with "enable" or has "enable" after opening brace
+			// Must match: "enable = true", "enable = false", "enable=true", "enable=false"
+			if strings.HasPrefix(line, "enable") {
+				// Make sure it's not a comment
+				if !strings.HasPrefix(line, "#") && !strings.HasPrefix(line, "//") {
+					// Check if it's a valid enable assignment
+					if strings.Contains(line, "=") {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
 }
 
 // checkEnableWithNix uses nix-instantiate to check if enable is true

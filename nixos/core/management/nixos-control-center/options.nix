@@ -12,7 +12,7 @@ in {
       description = "NixOS Control Center module version";
     };
 
-    enable = lib.mkEnableOption "NixOS Control Center";
+    # NOTE: No enable option - nixos-control-center is always active (Core module)
 
     # NCC API Option (GENERISCH unter configPath.api!)
     api = lib.mkOption {

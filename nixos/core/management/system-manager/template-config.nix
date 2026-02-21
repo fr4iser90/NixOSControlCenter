@@ -1,4 +1,7 @@
 {
+  # Core module - always active (no enable option)
+  # System manager is essential for system management operations
+  
   # Core system configuration
   configVersion = "1.0";
   systemType = "desktop";

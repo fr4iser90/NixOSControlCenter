@@ -18,12 +18,7 @@ in {
       description = "Module version";
     };
 
-    # For core modules, enable is usually true by default
-    enable = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Enable the NixOS Control Center command system";
-    };
+    # NOTE: No enable option - cli-registry is always active (Core module)
 
     # User preferences can be added here in future versions
     # For example:

@@ -1,6 +1,6 @@
 {
-  # CLI formatter is always enabled as infrastructure
-  enable = true;
+  # Core module - always active (no enable option)
+  # CLI formatter is essential infrastructure for all CLI output
 
   # Configuration options
   config = {

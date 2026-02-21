@@ -14,12 +14,9 @@ in {
     version = "1.0.0";
   };
 
-  # imports must be at top level
+  # CLI registry is always active (Core module, no enable option)
   imports = [
     ./options.nix      # Always import options first
-  ] ++ (if (cfg.enable or true) then [
     (import ./config.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi getCurrentModuleMetadata moduleName; })
-  ] else [
-    (import ./config.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi getCurrentModuleMetadata moduleName; })
-  ]);
+  ];
 }

@@ -15,7 +15,7 @@ in {
       description = "CLI formatter module version";
     };
 
-    enable = lib.mkEnableOption "CLI formatter";
+    # NOTE: No enable option - cli-formatter is always active (Core module)
 
     config = lib.mkOption {
       type = lib.types.attrs;

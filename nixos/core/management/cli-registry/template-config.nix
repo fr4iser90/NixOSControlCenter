@@ -1,6 +1,6 @@
 {
-  # Core module - enabled by default, but can be disabled if needed
-  enable = true;
+  # Core module - always active (no enable option)
+  # CLI registry is essential for the NixOS Control Center command system
 
   # User preferences can be added here in future versions
   # For example:
