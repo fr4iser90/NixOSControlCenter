@@ -178,11 +178,17 @@
     "subtitle": "See which programs are supported in NixOS",
     "search": "Search programs...",
     "category": "Category",
+    "alternatives": "Alternatives",
     "status": {
-      "supported": "✅ Supported",
-      "partial": "⚠️ Partial",
-      "not_supported": "❌ Not Supported",
-      "unknown": "❓ Unknown"
+      "supported": "Supported",
+      "alternative": "Alternative",
+      "wine": "Via Wine",
+      "proton": "Via Proton",
+      "flatpak": "Via Flatpak",
+      "appimage": "AppImage",
+      "module_only": "Module Only",
+      "not_supported": "Not Supported",
+      "unknown": "Unknown"
     },
     "no_results": "No programs found",
     "total": "Total programs"
@@ -227,6 +233,44 @@
         "Many games run perfectly with Wine",
         "Native Linux games work out of the box"
       ]
+    },
+    "not_working": {
+      "title": "❌ Games Not Working on Linux/NixOS",
+      "description": "The following games use kernel-level anti-cheat systems that prevent them from running on Linux/NixOS:",
+      "anticheat": "Anti-Cheat",
+      "since": "Since",
+      "status": "Status",
+      "plans": "Plans",
+      "valorant": {
+        "since": "Release (2020)",
+        "status": "Not working - Vanguard requires Windows kernel",
+        "plans": "No official Linux support planned. Riot Games has not announced any plans for Linux compatibility."
+      },
+      "lol": {
+        "since": "2024 (Vanguard integration)",
+        "status": "Not working - Vanguard kernel-level driver required",
+        "plans": "No official Linux support planned. Riot Games has not announced any plans for Linux compatibility."
+      },
+      "fortnite": {
+        "since": "2018 (EasyAntiCheat kernel mode)",
+        "status": "Not working - Kernel-level EasyAntiCheat required",
+        "plans": "No official Linux support planned. Epic Games has not announced any plans for Linux compatibility."
+      },
+      "pubg": {
+        "since": "2017 (BattlEye integration)",
+        "status": "Not working - Kernel-level BattlEye required",
+        "plans": "No official Linux support planned. Krafton has not announced any plans for Linux compatibility."
+      },
+      "r6": {
+        "since": "2018 (BattlEye integration)",
+        "status": "Not working - Kernel-level BattlEye required",
+        "plans": "No official Linux support planned. Ubisoft has not announced any plans for Linux compatibility."
+      },
+      "tarkov": {
+        "since": "2017 (BattlEye integration)",
+        "status": "Not working - Kernel-level BattlEye required",
+        "plans": "No official Linux support planned. Battlestate Games has not announced any plans for Linux compatibility."
+      }
     }
   },
   "about": {

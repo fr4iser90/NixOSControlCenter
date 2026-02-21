@@ -24,10 +24,16 @@
     const programs = {{.ProgramsJSON}};
     const translations = {
         supported: "{{.T "mappings.status.supported"}}",
-        partial: "{{.T "mappings.status.partial"}}",
+        alternative: "{{.T "mappings.status.alternative"}}",
+        wine: "{{.T "mappings.status.wine"}}",
+        proton: "{{.T "mappings.status.proton"}}",
+        flatpak: "{{.T "mappings.status.flatpak"}}",
+        appimage: "{{.T "mappings.status.appimage"}}",
+        module_only: "{{.T "mappings.status.module_only"}}",
         not_supported: "{{.T "mappings.status.not_supported"}}",
         unknown: "{{.T "mappings.status.unknown"}}",
         category: "{{.T "mappings.category"}}",
+        alternatives: "{{.T "mappings.alternatives"}}",
         total: "{{.T "mappings.total"}}"
     };
     
@@ -47,23 +53,72 @@
             const category = prog.category || 'uncategorized';
             const hasPackage = prog.nixos_package != null;
             const hasModule = prog.module != null;
+            const hasWine = prog.wine === true;
+            const hasProton = prog.proton === true;
+            const hasFlatpak = prog.flatpak != null;
+            const hasAppImage = prog.appimage === true;
+            const isAlternative = prog.nixos_package != null && prog.note && prog.note.toLowerCase().includes('alternative');
             
             let status = 'unknown';
             let statusClass = 'status-not-supported';
             let statusText = translations.unknown;
+            let statusIcon = '';
             
-            if (hasPackage && hasModule) {
-                status = 'supported';
-                statusClass = 'status-supported';
-                statusText = translations.supported;
-            } else if (hasPackage || hasModule) {
-                status = 'partial';
-                statusClass = 'status-partial';
-                statusText = translations.partial;
-            } else {
+            // Verfügbar = hat Package (egal ob Modul oder nicht)
+            if (hasPackage) {
+                if (isAlternative) {
+                    status = 'alternative';
+                    statusClass = 'status-alternative';
+                    statusText = translations.alternative;
+                    statusIcon = '🔄';
+                } else {
+                    status = 'supported';
+                    statusClass = 'status-supported';
+                    statusText = translations.supported;
+                    statusIcon = '✅';
+                }
+            }
+            // Via Wine
+            else if (hasWine) {
+                status = 'wine';
+                statusClass = 'status-wine';
+                statusText = translations.wine;
+                statusIcon = '🍷';
+            }
+            // Via Proton
+            else if (hasProton) {
+                status = 'proton';
+                statusClass = 'status-proton';
+                statusText = translations.proton;
+                statusIcon = '🎮';
+            }
+            // Via Flatpak
+            else if (hasFlatpak) {
+                status = 'flatpak';
+                statusClass = 'status-flatpak';
+                statusText = translations.flatpak;
+                statusIcon = '📦';
+            }
+            // Via AppImage
+            else if (hasAppImage) {
+                status = 'appimage';
+                statusClass = 'status-appimage';
+                statusText = translations.appimage;
+                statusIcon = '📦';
+            }
+            // Nur Modul (kein Package)
+            else if (hasModule) {
+                status = 'module_only';
+                statusClass = 'status-module';
+                statusText = translations.module_only;
+                statusIcon = '🔧';
+            }
+            // Nicht verfügbar
+            else {
                 status = 'not_supported';
                 statusClass = 'status-not-supported';
                 statusText = translations.not_supported;
+                statusIcon = '❌';
             }
             
             return `
@@ -73,8 +128,25 @@
                         <div class="program-category">${translations.category}: ${escapeHtml(category)}</div>
                         ${prog.nixos_package ? `<div class="program-meta">Package: <code>${escapeHtml(prog.nixos_package)}</code></div>` : ''}
                         ${prog.module ? `<div class="program-meta">Module: <code>${escapeHtml(prog.module)}</code></div>` : ''}
+                        ${prog.wine ? `<div class="program-meta">🍷 Runs via Wine</div>` : ''}
+                        ${prog.proton ? `<div class="program-meta">🎮 Runs via Proton (Steam)</div>` : ''}
+                        ${prog.flatpak ? `<div class="program-meta">📦 Flatpak: <code>${escapeHtml(prog.flatpak)}</code></div>` : ''}
+                        ${prog.appimage ? `<div class="program-meta">📦 AppImage available</div>` : ''}
+                        ${prog.note ? `<div class="program-note">${escapeHtml(prog.note)}</div>` : ''}
+                        ${prog.alternatives && prog.alternatives.length > 0 ? `
+                            <div class="program-alternatives">
+                                <strong>${translations.alternatives || 'Alternatives'}:</strong>
+                                ${prog.alternatives.map(alt => `
+                                    <div class="alternative-item">
+                                        <span class="alternative-name">${escapeHtml(alt.name)}</span>
+                                        ${alt.package ? `<code class="alternative-package">${escapeHtml(alt.package)}</code>` : ''}
+                                        ${alt.reason ? `<span class="alternative-reason">${escapeHtml(alt.reason)}</span>` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
                     </div>
-                    <div class="program-status ${statusClass}">${statusText}</div>
+                    <div class="program-status ${statusClass}">${statusIcon} ${statusText}</div>
                 </div>
             `;
         }).join('');

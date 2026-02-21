@@ -64,16 +64,103 @@
     border: 1px solid var(--color-success);
 }
 
-.status-partial {
+.status-alternative {
     background: var(--color-planned-bg);
     color: var(--color-warning);
     border: 1px solid var(--color-warning);
+}
+
+.status-wine {
+    background: rgba(139, 69, 19, 0.2);
+    color: #8b4513;
+    border: 1px solid #8b4513;
+}
+
+.status-proton {
+    background: rgba(0, 100, 200, 0.2);
+    color: #0064c8;
+    border: 1px solid #0064c8;
+}
+
+.status-flatpak {
+    background: rgba(69, 90, 100, 0.2);
+    color: #455a64;
+    border: 1px solid #455a64;
+}
+
+.status-appimage {
+    background: rgba(69, 90, 100, 0.2);
+    color: #455a64;
+    border: 1px solid #455a64;
+}
+
+.status-module {
+    background: var(--color-planned-bg);
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
 }
 
 .status-not-supported {
     background: var(--color-warning-bg);
     color: var(--color-warning);
     border: 1px solid var(--color-warning);
+}
+
+.program-note {
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--color-bg-tertiary);
+    border-left: 3px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+    font-size: 0.85em;
+    color: var(--color-text-secondary);
+    font-style: italic;
+}
+
+.program-alternatives {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-sm);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: 0.9em;
+}
+
+.program-alternatives strong {
+    color: var(--color-text-primary);
+    display: block;
+    margin-bottom: var(--spacing-xs);
+}
+
+.alternative-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-xs);
+    padding: var(--spacing-xs);
+    background: var(--color-bg-tertiary);
+    border-radius: var(--radius-sm);
+}
+
+.alternative-name {
+    font-weight: bold;
+    color: var(--color-primary);
+}
+
+.alternative-package {
+    background: var(--color-bg-primary);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-size: 0.85em;
+    color: var(--color-text-primary);
+    font-family: monospace;
+}
+
+.alternative-reason {
+    color: var(--color-text-secondary);
+    font-size: 0.85em;
+    font-style: italic;
+    margin-left: auto;
 }
 
 .stats {

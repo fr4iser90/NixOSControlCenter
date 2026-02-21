@@ -17,7 +17,19 @@
       "nixos_package": "google-chrome",
       "module": null,
       "category": "browser",
-      "aliases": ["chrome", "Google Chrome", "Chrome"]
+      "aliases": ["chrome", "Google Chrome", "Chrome"],
+      "alternatives": [
+        {
+          "name": "Chromium",
+          "package": "chromium",
+          "reason": "Open-source alternative ohne Google-Tracking"
+        },
+        {
+          "name": "Firefox",
+          "package": "firefox",
+          "reason": "Privacy-fokussierter Browser"
+        }
+      ]
     },
     "Chromium": {
       "nixos_package": "chromium",
@@ -35,13 +47,22 @@
       "nixos_package": "steam",
       "module": null,
       "category": "gaming",
-      "aliases": ["steam"]
+      "aliases": ["steam"],
+      "proton": true,
+      "note": "Native Steam client. Proton enables Windows games to run."
     },
     "Discord": {
       "nixos_package": "discord",
       "module": null,
       "category": "communication",
-      "aliases": ["discord"]
+      "aliases": ["discord"],
+      "alternatives": [
+        {
+          "name": "Vesktop",
+          "package": "vesktop",
+          "reason": "Privacy-freundlicher Discord-Client mit mehr Features"
+        }
+      ]
     },
     "Slack": {
       "nixos_package": "slack",
@@ -107,13 +128,46 @@
       "nixos_package": "okular",
       "module": null,
       "category": "utilities",
-      "aliases": ["acrobat", "Adobe Reader", "okular"]
+      "aliases": ["acrobat", "Adobe Reader", "okular"],
+      "wine": true,
+      "note": "Native alternative: Okular. Original Adobe Reader runs via Wine."
+    },
+    "Adobe Photoshop": {
+      "nixos_package": null,
+      "module": null,
+      "category": "multimedia",
+      "aliases": ["photoshop", "Adobe Photoshop", "PS"],
+      "wine": true,
+      "flatpak": "com.github.taiko2k.tauonmb",
+      "note": "Runs via Wine. Alternative: GIMP (native) or Krita (native)"
+    },
+    "Adobe Illustrator": {
+      "nixos_package": null,
+      "module": null,
+      "category": "multimedia",
+      "aliases": ["illustrator", "Adobe Illustrator", "AI"],
+      "wine": true,
+      "note": "Runs via Wine. Alternative: Inkscape (native)"
     },
     "Microsoft Office": {
       "nixos_package": "libreoffice",
       "module": null,
       "category": "productivity",
-      "aliases": ["office", "Microsoft Office", "libreoffice", "LibreOffice"]
+      "aliases": ["office", "Microsoft Office", "libreoffice", "LibreOffice"],
+      "wine": true,
+      "note": "Native alternative: LibreOffice. Original Microsoft Office runs via Wine.",
+      "alternatives": [
+        {
+          "name": "OnlyOffice",
+          "package": "onlyoffice-bin",
+          "reason": "Microsoft Office-kompatibles Format mit modernem UI"
+        },
+        {
+          "name": "LibreOffice",
+          "package": "libreoffice",
+          "reason": "Vollständige Office-Suite, bereits als Standard gesetzt"
+        }
+      ]
     },
     "VirtualBox": {
       "nixos_package": "virtualbox",

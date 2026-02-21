@@ -168,11 +168,17 @@
     "subtitle": "Voir quels programmes sont pris en charge dans NixOS",
     "search": "Rechercher des programmes...",
     "category": "Catégorie",
+    "alternatives": "Alternatives",
     "status": {
-      "supported": "✅ Pris en charge",
-      "partial": "⚠️ Partiel",
-      "not_supported": "❌ Non pris en charge",
-      "unknown": "❓ Inconnu"
+      "supported": "Pris en charge",
+      "alternative": "Alternative",
+      "wine": "Via Wine",
+      "proton": "Via Proton",
+      "flatpak": "Via Flatpak",
+      "appimage": "AppImage",
+      "module_only": "Module uniquement",
+      "not_supported": "Non pris en charge",
+      "unknown": "Inconnu"
     },
     "no_results": "Aucun programme trouvé",
     "total": "Total des programmes"
@@ -217,6 +223,44 @@
         "De nombreux jeux fonctionnent parfaitement avec Wine",
         "Les jeux Linux natifs fonctionnent out-of-the-box"
       ]
+    },
+    "not_working": {
+      "title": "❌ Jeux ne fonctionnant pas sous Linux/NixOS",
+      "description": "Les jeux suivants utilisent des systèmes anti-triche au niveau du noyau qui les empêchent de fonctionner sous Linux/NixOS:",
+      "anticheat": "Anti-Triche",
+      "since": "Depuis",
+      "status": "Statut",
+      "plans": "Plans",
+      "valorant": {
+        "since": "Sortie (2020)",
+        "status": "Ne fonctionne pas - Vanguard nécessite le noyau Windows",
+        "plans": "Aucun support Linux officiel prévu. Riot Games n'a annoncé aucun plan pour la compatibilité Linux."
+      },
+      "lol": {
+        "since": "2024 (intégration Vanguard)",
+        "status": "Ne fonctionne pas - Pilote Vanguard au niveau du noyau requis",
+        "plans": "Aucun support Linux officiel prévu. Riot Games n'a annoncé aucun plan pour la compatibilité Linux."
+      },
+      "fortnite": {
+        "since": "2018 (mode noyau EasyAntiCheat)",
+        "status": "Ne fonctionne pas - EasyAntiCheat au niveau du noyau requis",
+        "plans": "Aucun support Linux officiel prévu. Epic Games n'a annoncé aucun plan pour la compatibilité Linux."
+      },
+      "pubg": {
+        "since": "2017 (intégration BattlEye)",
+        "status": "Ne fonctionne pas - BattlEye au niveau du noyau requis",
+        "plans": "Aucun support Linux officiel prévu. Krafton n'a annoncé aucun plan pour la compatibilité Linux."
+      },
+      "r6": {
+        "since": "2018 (intégration BattlEye)",
+        "status": "Ne fonctionne pas - BattlEye au niveau du noyau requis",
+        "plans": "Aucun support Linux officiel prévu. Ubisoft n'a annoncé aucun plan pour la compatibilité Linux."
+      },
+      "tarkov": {
+        "since": "2017 (intégration BattlEye)",
+        "status": "Ne fonctionne pas - BattlEye au niveau du noyau requis",
+        "plans": "Aucun support Linux officiel prévu. Battlestate Games n'a annoncé aucun plan pour la compatibilité Linux."
+      }
     }
   },
   "about": {
