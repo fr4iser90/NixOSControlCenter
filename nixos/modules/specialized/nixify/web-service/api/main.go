@@ -630,7 +630,7 @@ func main() {
 	log.Printf("🚀 Nixify Web Service starting on %s", addr)
 	log.Printf("📁 Data directory: %s", dataDir)
 
-	// Note: TLS is handled by Traefik reverse proxy (see docker-compose.traefik.yml)
+	// Note: TLS is handled by Traefik reverse proxy (see web-service/docker/docker-compose.traefik.yml)
 	// The service runs HTTP internally, Traefik terminates TLS and forwards to this service
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatalf("Failed to start server: %v", err)

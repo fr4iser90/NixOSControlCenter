@@ -3,7 +3,7 @@ version: '3.8'
 services:
   nixify-service:
     build:
-      context: ./web-service/api
+      context: ../api
       dockerfile: Dockerfile
     container_name: nixify-web-service
     ports:
@@ -12,11 +12,14 @@ services:
       - PORT=8080
       - HOST=0.0.0.0
       - DATA_DIR=/var/lib/nixify
+      - GITHUB_REPO_URL=https://github.com/fr4iser90/NixOSControlCenter.git
+      - GITHUB_BRANCH=main
+      - MODULES_BASE_PATH=/app/nixos
     volumes:
       # Mount data directory for persistence
       - nixify-data:/var/lib/nixify
       # Optional: Mount mapping database if you have it
-      # - ./mapping:/app/mapping:ro
+      # - ../../mapping:/app/mapping:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/v1/health"]

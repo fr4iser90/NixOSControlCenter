@@ -1,7 +1,7 @@
 services:
   nixify-service:
     build:
-      context: ./web-service/api
+      context: ../api
       dockerfile: Dockerfile
     container_name: nixify-web-service
     environment:
@@ -10,13 +10,14 @@ services:
       - DATA_DIR=/var/lib/nixify
       - MAPPING_DB_PATH=/app/mapping/mapping-database.json
       - MODULES_BASE_PATH=/app/nixos
-      - GITHUB_REPO_URL=https://github.com/fr4iser90/NixOSControlCenter
+      - GITHUB_REPO_URL=https://github.com/fr4iser90/NixOSControlCenter.git
+      - GITHUB_BRANCH=main
     volumes:
       - nixify-data:/var/lib/nixify
-      - ./snapshot:/app/snapshot:ro
-      - ./mapping:/app/mapping:ro
-      - ./web-service/config-generator:/app/config-generator:ro
-      - ./iso-builder:/app/iso-builder:ro
+      - ../../snapshot:/app/snapshot:ro
+      - ../../mapping:/app/mapping:ro
+      - ../config-generator:/app/config-generator:ro
+      - ../../iso-builder:/app/iso-builder:ro
     restart: unless-stopped
     networks:
       - proxy

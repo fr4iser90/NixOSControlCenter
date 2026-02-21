@@ -28,6 +28,9 @@ PORT=8080 HOST=0.0.0.0 DATA_DIR=/tmp/nixify go run main.go
 ### Mit Docker Compose (empfohlen)
 
 ```bash
+# In docker Verzeichnis wechseln
+cd docker
+
 # Service bauen und starten
 docker-compose up -d
 
@@ -93,6 +96,7 @@ Für Production auf deinem Server:
 3. **Auf Server deployen:**
    ```bash
    # Mit docker-compose
+   cd docker
    docker-compose up -d
    
    # Oder mit docker run

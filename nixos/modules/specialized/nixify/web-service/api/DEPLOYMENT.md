@@ -6,23 +6,21 @@
 
 - Docker & Docker Compose
 - Traefik mit `proxy` Netzwerk
-- NixOSControlCenter Repository auf dem Server
+- Internet-Verbindung (für automatisches Repository-Klonen)
+
+**Hinweis:** Das Repository wird automatisch beim Container-Start von GitHub geklont. Ein manuelles Klonen ist nicht mehr nötig!
 
 ### Deployment
 
-1. **Repository auf Server klonen:**
+1. **Docker Compose starten:**
    ```bash
-   git clone https://github.com/fr4iser90/NixOSControlCenter.git
-   cd NixOSControlCenter
-   ```
-
-2. **Docker Compose starten:**
-   ```bash
-   cd nixos/modules/specialized/nixify/web-service/api
+   cd nixos/modules/specialized/nixify/web-service/docker
    docker-compose -f docker-compose.traefik.yml up -d
    ```
+   
+   Der Container klont beim ersten Start automatisch das Repository von GitHub.
 
-3. **Service ist erreichbar unter:**
+2. **Service ist erreichbar unter:**
    - `https://nixify.fr4iser` (via Traefik)
 
 ### Volumes & Mounts
@@ -44,6 +42,7 @@ Die folgenden Verzeichnisse werden gemountet, damit Updates ohne Rebuild möglic
 
 2. Container neu starten (lädt gemountete Scripts neu):
    ```bash
+   cd nixos/modules/specialized/nixify/web-service/docker
    docker-compose -f docker-compose.traefik.yml restart nixify-service
    ```
 
@@ -58,12 +57,14 @@ Die folgenden Verzeichnisse werden gemountet, damit Updates ohne Rebuild möglic
 
 2. Container neu starten:
    ```bash
+   cd nixos/modules/specialized/nixify/web-service/docker
    docker-compose -f docker-compose.traefik.yml restart nixify-service
    ```
 
 ### Logs anzeigen
 
 ```bash
+cd nixos/modules/specialized/nixify/web-service/docker
 docker-compose -f docker-compose.traefik.yml logs -f nixify-service
 ```
 
@@ -81,13 +82,36 @@ Das Service ist bereits für Traefik konfiguriert:
 - **Port**: 8080 (intern)
 - **Network**: `proxy` (extern)
 
+### Automatisches Repository-Klonen
+
+**Wichtig:** Beim Container-Start wird automatisch das NixOS Control Center Repository von GitHub geklont und die `nixos/` Struktur nach `/app/nixos` kopiert.
+
+**Wie es funktioniert:**
+1. Container startet → Init-Script wird ausgeführt
+2. Prüft, ob `/app/nixos` bereits existiert
+3. Falls nicht: Klont Repository von GitHub (Branch: `main` oder `GITHUB_BRANCH`)
+4. Kopiert `nixos/` Struktur nach `/app/nixos`
+5. Startet den Web-Service
+
+**Vorteile:**
+- ✅ Container hat immer die neueste Version
+- ✅ Kein manuelles Klonen nötig
+- ✅ Funktioniert auch ohne lokales Repository
+- ✅ Einfaches Update: Container neu starten
+
+**Konfiguration:**
+- `GITHUB_REPO_URL` - GitHub Repository URL (default: `https://github.com/fr4iser90/NixOSControlCenter.git`)
+- `GITHUB_BRANCH` - Branch zum Klonen (default: `main`)
+
 ### Environment Variables
 
 - `PORT=8080` - Service Port
 - `HOST=0.0.0.0` - Bind Address
 - `DATA_DIR=/var/lib/nixify` - Data Directory
 - `MAPPING_DB_PATH=/app/mapping/mapping-database.json` - Mapping Database Path
-- `NIXOS_CONTROL_CENTER_REPO=/app/nixos` - NixOS Repo Path
+- `MODULES_BASE_PATH=/app/nixos` - NixOS Modules Base Path (wird automatisch gesetzt)
+- `GITHUB_REPO_URL` - GitHub Repository URL für automatisches Klonen
+- `GITHUB_BRANCH` - Branch zum Klonen (default: `main`)
 
 ### Persistente Daten
 
@@ -98,5 +122,6 @@ Session-Daten, Reports, generierte Configs und ISOs werden im Docker Volume `nix
 docker volume inspect nixify-data
 
 # Daten löschen (wenn nötig)
+cd nixos/modules/specialized/nixify/web-service/docker
 docker-compose -f docker-compose.traefik.yml down -v
 ```
