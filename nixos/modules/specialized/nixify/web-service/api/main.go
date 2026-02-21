@@ -2304,21 +2304,9 @@ func (s *Server) findAssets(modulePath string) []string {
 	return assets
 }
 
-// findModuleDocs finds documentation files from doc/ directory
+// findModuleDocs finds documentation files from doc/ directory and root
 func (s *Server) findModuleDocs(modulePath string) []DocInfo {
 	var docs []DocInfo
-	docDir := filepath.Join(modulePath, "doc")
-	
-	// Check if doc directory exists
-	if _, err := os.Stat(docDir); os.IsNotExist(err) {
-		return docs
-	}
-	
-	// Read directory contents
-	entries, err := os.ReadDir(docDir)
-	if err != nil {
-		return docs
-	}
 	
 	// Common documentation file patterns
 	docExtensions := []string{".md", ".txt", ".rst"}
@@ -2331,42 +2319,68 @@ func (s *Server) findModuleDocs(modulePath string) []DocInfo {
 		"USAGE.md":     "Usage Guide",
 	}
 	
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue // Skip subdirectories
+	// Helper function to process a directory
+	processDir := func(dir string, isRoot bool) {
+		// Check if directory exists
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			return
 		}
 		
-		name := entry.Name()
-		ext := strings.ToLower(filepath.Ext(name))
-		
-		// Check if it's a documentation file
-		isDoc := false
-		for _, docExt := range docExtensions {
-			if ext == docExt {
-				isDoc = true
-				break
-			}
+		// Read directory contents
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return
 		}
 		
-		if isDoc {
-			// Get display title
-			title := name
-			if t, ok := docNames[name]; ok {
-				title = t
-			} else {
-				// Remove extension and format
-				title = strings.TrimSuffix(name, ext)
-				title = strings.ReplaceAll(title, "_", " ")
-				title = strings.ReplaceAll(title, "-", " ")
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue // Skip subdirectories
 			}
 			
-			docs = append(docs, DocInfo{
-				Name:  strings.TrimSuffix(name, ext),
-				Path:  filepath.Join(docDir, name),
-				Title: title,
-			})
+			name := entry.Name()
+			ext := strings.ToLower(filepath.Ext(name))
+			
+			// Check if it's a documentation file
+			isDoc := false
+			for _, docExt := range docExtensions {
+				if ext == docExt {
+					isDoc = true
+					break
+				}
+			}
+			
+			if isDoc {
+				// Skip README.md in root (handled separately)
+				if isRoot && name == "README.md" {
+					continue
+				}
+				
+				// Get display title
+				title := name
+				if t, ok := docNames[name]; ok {
+					title = t
+				} else {
+					// Remove extension and format
+					title = strings.TrimSuffix(name, ext)
+					title = strings.ReplaceAll(title, "_", " ")
+					title = strings.ReplaceAll(title, "-", " ")
+				}
+				
+				docs = append(docs, DocInfo{
+					Name:  strings.TrimSuffix(name, ext),
+					Path:  filepath.Join(dir, name),
+					Title: title,
+				})
+			}
 		}
 	}
+	
+	// First, check root for CHANGELOG.md (standard location)
+	processDir(modulePath, true)
+	
+	// Then, check doc/ directory for all other documentation
+	docDir := filepath.Join(modulePath, "doc")
+	processDir(docDir, false)
 	
 	return docs
 }

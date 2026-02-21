@@ -297,9 +297,18 @@ module-name/               # Module name
 │   ├── docker-compose.yml # Haupt-Compose
 │   ├── docker-compose.traefik.yml # Traefik-spezifisch
 │   └── Dockerfile         # Falls nötig
+├── doc/                   # Detailed documentation (RECOMMENDED)
+│   ├── README.md          # Main documentation (optional, if root README is sufficient)
+│   ├── ARCHITECTURE.md    # Architecture details
+│   ├── API.md             # API reference
+│   ├── USAGE.md           # Usage guide
+│   ├── SECURITY.md        # Security considerations
+│   ├── ROADMAP.md         # Roadmap/plans
+│   └── assets/            # Documentation assets (images, diagrams, etc.)
+│       ├── architecture.png
+│       └── workflow.svg
 ├── tests/                 # Module tests (optional)
 │   └── default.nix        # Test suite
-└── CHANGELOG.md           # Module change history (recommended)
 ```
 
 ## File Descriptions
@@ -1133,11 +1142,26 @@ See `nixos/core/base/packages/` for a complete core module example.
 }
 ```
 
-## CHANGELOG.md
+## Documentation Structure
 
+### README.md (Root)
+**Purpose**: Module overview, Quick Start, Navigation
+**Location**: `module-name/README.md`
+**Required**: Yes (for all modules)
+**Content**:
+- Module description and purpose
+- Quick Start guide
+- Basic usage examples
+- Links to detailed documentation in `doc/`
+- Key features overview
+
+**Template**: See `docs/02_architecture/example-module/doc/README_TEMPLATE.md`
+
+### CHANGELOG.md (Root)
 **Format**: Keep a Changelog
-**Location**: `module-name/CHANGELOG.md`
-**Required**: For all version changes
+**Location**: `module-name/CHANGELOG.md` (Root, NOT in doc/)
+**Required**: Recommended (for all version changes)
+**Why Root**: Standard location, easily accessible, many tools expect it here
 
 ```markdown
 # Changelog
@@ -1181,3 +1205,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Container management
 - Network configuration
 ```
+
+### doc/ Directory (Detailed Documentation)
+**Purpose**: Detailed documentation for complex modules
+**Location**: `module-name/doc/`
+**Required**: Recommended (for modules with extensive documentation)
+**Structure**:
+- `README.md` - Main documentation (optional, if root README is sufficient)
+- `ARCHITECTURE.md` - Architecture details, component descriptions
+- `API.md` - API reference, function signatures, examples
+- `USAGE.md` - Detailed usage guide, examples, best practices
+- `SECURITY.md` - Security considerations, threat model
+- `ROADMAP.md` - Development roadmap, planned features
+- `assets/` - Images, diagrams, screenshots
+
+**Web-Service Support**: The nixify web-service automatically discovers and displays:
+- All `.md`, `.txt`, `.rst` files from `doc/`
+- `CHANGELOG.md` from root (standard location)
+- Assets from `doc/assets/`
+- Special file names get nice titles (README, SECURITY, ROADMAP, CHANGELOG, API, USAGE)
+
+**Example Structure**:
+```
+module-name/
+├── README.md              # Overview, Quick Start
+├── CHANGELOG.md           # Version history (Root - standard location)
+├── doc/
+│   ├── ARCHITECTURE.md    # Architecture details
+│   ├── API.md             # API reference
+│   ├── USAGE.md           # Usage guide
+│   ├── SECURITY.md        # Security info
+│   ├── ROADMAP.md         # Roadmap
+│   └── assets/
+│       └── diagram.png
+```
+
+**Templates**: See `docs/02_architecture/example-module/doc/` for templates:
+- `README_TEMPLATE.md` - README template
+- `ARCHITECTURE_TEMPLATE.md` - Architecture documentation template
+- `API_TEMPLATE.md` - API reference template
+- `USAGE_TEMPLATE.md` - Usage guide template
