@@ -309,5 +309,25 @@
         "text": "With AI integration and skill system planned, the system will become even more powerful."
       }
     }
+  },
+  "modules": {
+    "title": "🧩 Modules",
+    "subtitle": "Explore all NixOS Control Center modules",
+    "filter": {
+      "all_status": "All Status",
+      "active": "Active",
+      "disabled": "Disabled",
+      "planned": "Planned",
+      "optional": "Optional Modules",
+      "core": "Core Modules"
+    },
+    "detail": {
+      "category": "Category",
+      "version": "Version",
+      "status": "Status",
+      "github": "GitHub",
+      "commands": "Commands",
+      "assets": "Assets"
+    }
   }
 }

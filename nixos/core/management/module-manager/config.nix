@@ -99,7 +99,7 @@ EOF
           deps = [];
         };
       }
-    ) debugDiscovered
+    ) discoveredModules
   );
 
   # Set enable options for all modules based on central config

@@ -17,6 +17,7 @@
             <select id="statusFilter" style="padding: 12px; background: #1e1e1e; border: 1px solid #3e3e3e; border-radius: 4px; color: #d4d4d4; cursor: pointer;">
                 <option value="">{{.T "modules.filter.all_status"}}</option>
                 <option value="active">{{.T "modules.filter.active"}}</option>
+                <option value="disabled">{{.T "modules.filter.disabled"}}</option>
                 <option value="planned">{{.T "modules.filter.planned"}}</option>
             </select>
         </div>
@@ -84,6 +85,12 @@
         background: #1f2a2a;
         color: #4ec9b0;
         border: 1px solid #4ec9b0;
+    }
+    
+    .status-disabled {
+        background: #2a1f1f;
+        color: #f48771;
+        border: 1px solid #f48771;
     }
     
     .status-planned {
@@ -171,8 +178,17 @@
             if (module.has_handlers) features.push(translations.features.handlers);
             if (module.has_lib) features.push(translations.features.lib);
             
-            const statusClass = module.status === 'active' ? 'status-active' : 'status-planned';
-            const statusText = module.status === 'active' ? '✅ Active' : '📋 Planned';
+            let statusClass, statusText;
+            if (module.status === 'active') {
+                statusClass = 'status-active';
+                statusText = '✅ Active';
+            } else if (module.status === 'disabled') {
+                statusClass = 'status-disabled';
+                statusText = '❌ Disabled';
+            } else {
+                statusClass = 'status-planned';
+                statusText = '📋 Planned';
+            }
             
             return `
                 <div class="module-card" onclick="window.location.href='/module/${escapeHtml(module.name)}'">

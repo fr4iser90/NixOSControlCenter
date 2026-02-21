@@ -20,6 +20,8 @@
                 <p>
                     {{if eq .Module.Status "active"}}
                         <span class="status-badge status-active">✅ Active</span>
+                    {{else if eq .Module.Status "disabled"}}
+                        <span class="status-badge status-disabled">❌ Disabled</span>
                     {{else}}
                         <span class="status-badge status-planned">📋 Planned</span>
                     {{end}}

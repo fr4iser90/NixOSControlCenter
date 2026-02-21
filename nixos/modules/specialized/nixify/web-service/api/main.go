@@ -100,7 +100,7 @@ type ModuleInfo struct {
 	Path        string   `json:"path"`
 	Description string   `json:"description"`
 	Version     string   `json:"version"`
-	Status      string   `json:"status"` // "active", "planned", "deprecated"
+	Status      string   `json:"status"` // "active", "disabled", "planned" (planned = not configured yet)
 	HasTUI      bool     `json:"has_tui"`
 	HasScripts  bool     `json:"has_scripts"`
 	HasHandlers bool     `json:"has_handlers"`
@@ -2426,20 +2426,21 @@ func (s *Server) sanitizeSessionID(sessionID string) string {
 }
 
 // checkModuleStatus determines if a module is active by checking its config file
+// Since module-manager automatically creates config files for all discovered modules,
+// "planned" should only occur if:
+// 1. Module was just added and nixos-rebuild switch hasn't run yet
+// 2. Activation scripts haven't executed yet
+// 3. There's an issue with config creation
 func (s *Server) checkModuleStatus(moduleName, category, domain string) string {
-	// Core modules are active by default if no config exists
-	// Optional modules are planned by default if no config exists
-	
 	// Build config file path
 	configPath := s.findModuleConfigPath(moduleName, category, domain)
 	
 	// Check if config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		// No config file found - use defaults
-		if domain == "core" {
-			return "active" // Core modules are active by default
-		}
-		return "planned" // Optional modules are planned by default
+		// No config file found - module is not configured yet
+		// This should be rare since module-manager auto-creates configs
+		// But can happen if nixos-rebuild switch hasn't run yet
+		return "planned"
 	}
 	
 	// Parse config file to check enable status
@@ -2447,7 +2448,9 @@ func (s *Server) checkModuleStatus(moduleName, category, domain string) string {
 	if enabled {
 		return "active"
 	}
-	return "planned"
+	// Config file exists but enable = false -> disabled
+	// This is the normal state for modules that are discovered but not enabled
+	return "disabled"
 }
 
 // findModuleConfigPath constructs the config file path for a module
