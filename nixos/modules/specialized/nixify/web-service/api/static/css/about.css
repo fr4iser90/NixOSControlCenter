@@ -1,0 +1,81 @@
+/* About Page Styles */
+.roadmap-timeline {
+    margin: var(--spacing-xl) 0;
+}
+
+.roadmap-item {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-lg);
+    margin: var(--spacing-lg) 0;
+    border-left: 4px solid var(--color-primary);
+}
+
+.roadmap-phase {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.phase-badge {
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.phase-current {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+    border: 1px solid var(--color-success);
+}
+
+.phase-planned {
+    background: var(--color-planned-bg);
+    color: var(--color-warning);
+    border: 1px solid var(--color-warning);
+}
+
+.phase-future {
+    background: var(--color-info-bg);
+    color: var(--color-info);
+    border: 1px solid var(--color-info);
+}
+
+.roadmap-features {
+    margin-left: var(--spacing-lg);
+    margin-top: var(--spacing-sm);
+}
+
+.roadmap-features li {
+    margin: 8px 0;
+    line-height: 1.6;
+}
+
+.info-box ul {
+    margin-left: var(--spacing-lg);
+    margin-top: var(--spacing-sm);
+}
+
+.info-box ol {
+    margin-left: var(--spacing-lg);
+    margin-top: var(--spacing-sm);
+}
+
+.info-box p {
+    margin-top: var(--spacing-sm);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .roadmap-item {
+        padding: var(--spacing-md);
+    }
+    
+    .roadmap-phase {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

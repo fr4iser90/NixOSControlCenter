@@ -1,0 +1,294 @@
+/* Index/Home Page Styles */
+.download-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--spacing-md);
+    margin: var(--spacing-lg) 0;
+}
+
+.download-card {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    text-align: center;
+    transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.download-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-primary);
+}
+
+.download-card h3 { 
+    margin-top: 0; 
+}
+
+.download-card-meta {
+    margin-top: var(--spacing-sm);
+    font-size: 0.9em;
+    color: var(--color-text-secondary);
+}
+
+.endpoint { 
+    margin: var(--spacing-sm) 0; 
+    padding: var(--spacing-md); 
+    background: var(--color-bg-primary); 
+    border-left: 3px solid var(--color-primary);
+    border-radius: var(--radius-md);
+}
+
+.method { 
+    color: var(--color-primary); 
+    font-weight: bold; 
+    display: inline-block;
+    width: 80px;
+    background: var(--color-bg-secondary);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    text-align: center;
+}
+
+.path { 
+    color: var(--color-text-code); 
+    font-family: monospace; 
+}
+
+.workflow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-lg);
+    margin: var(--spacing-lg) 0;
+}
+
+.workflow-step {
+    flex: 1;
+    min-width: 200px;
+    background: var(--color-bg-primary);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    border-top: 3px solid var(--color-primary);
+}
+
+.workflow-step-number {
+    background: var(--color-primary);
+    color: var(--color-text-inverse);
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-full);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-bottom: var(--spacing-sm);
+}
+
+ul { 
+    margin-left: var(--spacing-lg); 
+    margin-top: var(--spacing-sm); 
+}
+
+li { 
+    margin: 8px 0; 
+}
+
+.stats {
+    display: flex;
+    gap: var(--spacing-lg);
+    flex-wrap: wrap;
+    margin: var(--spacing-lg) 0;
+}
+
+.stat {
+    flex: 1;
+    min-width: 150px;
+    text-align: center;
+    padding: var(--spacing-md);
+    background: var(--color-bg-primary);
+    border-radius: var(--radius-lg);
+}
+
+.stat-value {
+    font-size: 2em;
+    color: var(--color-primary);
+    font-weight: bold;
+}
+
+.stat-value-small {
+    font-size: 1.2em;
+}
+
+.stat-label {
+    color: var(--color-text-secondary);
+    font-size: 0.9em;
+}
+
+a { 
+    color: var(--color-primary); 
+    text-decoration: none; 
+}
+
+a:hover { 
+    text-decoration: underline; 
+}
+
+/* Upload Form */
+.upload-section {
+    background: var(--color-bg-primary);
+    border: 2px dashed var(--color-primary);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-xxl);
+    text-align: center;
+    margin: var(--spacing-lg) 0;
+}
+
+.upload-area {
+    cursor: pointer;
+    padding: var(--spacing-xxl);
+    border: 2px dashed var(--color-border);
+    border-radius: var(--radius-lg);
+    transition: all var(--transition-normal);
+}
+
+.upload-area:hover {
+    border-color: var(--color-primary);
+    background: var(--color-bg-secondary);
+}
+
+.upload-area.dragover {
+    border-color: var(--color-primary);
+    background: var(--color-success-bg);
+}
+
+.upload-text {
+    font-size: 1.2em;
+    margin-bottom: var(--spacing-sm);
+}
+
+.upload-subtext {
+    color: var(--color-text-secondary);
+    font-size: 0.9em;
+}
+
+input[type="file"] {
+    display: none;
+}
+
+/* Session Status */
+.session-card {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    margin: var(--spacing-md) 0;
+}
+
+.session-status {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.9em;
+    font-weight: bold;
+}
+
+.status-queued { 
+    background: var(--color-secondary); 
+    color: var(--color-text-inverse); 
+}
+
+.status-processing { 
+    background: var(--color-primary); 
+    color: var(--color-text-inverse); 
+}
+
+.status-ready { 
+    background: var(--color-primary); 
+    color: var(--color-text-inverse); 
+}
+
+.status-building_iso { 
+    background: var(--color-secondary); 
+    color: var(--color-text-inverse); 
+}
+
+.status-iso_ready { 
+    background: var(--color-primary); 
+    color: var(--color-text-inverse); 
+}
+
+.status-error { 
+    background: var(--color-danger); 
+    color: var(--color-text-inverse); 
+}
+
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background: var(--color-bg-secondary);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: var(--spacing-sm) 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    transition: width var(--transition-normal);
+    text-align: center;
+    line-height: 20px;
+    font-size: 0.8em;
+    color: var(--color-text-inverse);
+}
+
+.error-message {
+    background: var(--color-warning-bg);
+    border-left: 4px solid var(--color-danger);
+    padding: var(--spacing-md);
+    margin: var(--spacing-md) 0;
+    border-radius: var(--radius-md);
+}
+
+.session-actions {
+    margin-top: var(--spacing-md);
+}
+
+.session-actions .btn {
+    margin-left: var(--spacing-sm);
+}
+
+.section-footer {
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: 0.9em;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .download-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .workflow {
+        flex-direction: column;
+    }
+    
+    .workflow-step {
+        min-width: unset;
+    }
+    
+    .stats {
+        flex-direction: column;
+    }
+    
+    .stat {
+        min-width: unset;
+    }
+    
+    .upload-section {
+        padding: var(--spacing-lg);
+    }
+    
+    .upload-area {
+        padding: var(--spacing-lg);
+    }
+}

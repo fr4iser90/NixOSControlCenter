@@ -6,86 +6,19 @@
     </header>
 
     <div class="section">
-        <div style="margin-bottom: 20px;">
-            <input type="text" id="searchInput" placeholder="{{.T "mappings.search"}}" 
-                   style="width: 100%; padding: 12px; background: #1e1e1e; border: 1px solid #3e3e3e; border-radius: 4px; color: #d4d4d4; font-size: 1em;">
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="{{.T "mappings.search"}}" class="search-input-full">
         </div>
         
         <div id="programsList">
             <!-- Programs will be loaded here via JavaScript -->
         </div>
         
-        <div id="noResults" style="display: none; text-align: center; padding: 40px; color: #858585;">
+        <div id="noResults" class="no-results">
             {{.T "mappings.no_results"}}
         </div>
     </div>
 </div>
-
-<style nonce="{{.Nonce}}">
-    .program-card {
-        background: #1e1e1e;
-        border: 1px solid #3e3e3e;
-        border-radius: 6px;
-        padding: 15px;
-        margin: 10px 0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        transition: border-color 0.2s;
-    }
-    
-    .program-card:hover {
-        border-color: #4ec9b0;
-    }
-    
-    .program-info {
-        flex: 1;
-    }
-    
-    .program-name {
-        font-size: 1.2em;
-        font-weight: bold;
-        color: #4ec9b0;
-        margin-bottom: 5px;
-    }
-    
-    .program-category {
-        color: #858585;
-        font-size: 0.9em;
-    }
-    
-    .program-status {
-        padding: 6px 12px;
-        border-radius: 4px;
-        font-weight: bold;
-        font-size: 0.9em;
-    }
-    
-    .status-supported {
-        background: #1f2a2a;
-        color: #4ec9b0;
-        border: 1px solid #4ec9b0;
-    }
-    
-    .status-partial {
-        background: #2a2a1f;
-        color: #f48771;
-        border: 1px solid #f48771;
-    }
-    
-    .status-not-supported {
-        background: #2a1f1f;
-        color: #f48771;
-        border: 1px solid #f48771;
-    }
-    
-    .stats {
-        text-align: center;
-        padding: 20px;
-        color: #858585;
-        font-size: 0.9em;
-    }
-</style>
 
 <script nonce="{{.Nonce}}">
     const programs = {{.ProgramsJSON}};
@@ -138,8 +71,8 @@
                     <div class="program-info">
                         <div class="program-name">${escapeHtml(name)}</div>
                         <div class="program-category">${translations.category}: ${escapeHtml(category)}</div>
-                        ${prog.nixos_package ? `<div style="margin-top: 5px; font-size: 0.85em; color: #858585;">Package: <code>${escapeHtml(prog.nixos_package)}</code></div>` : ''}
-                        ${prog.module ? `<div style="margin-top: 5px; font-size: 0.85em; color: #858585;">Module: <code>${escapeHtml(prog.module)}</code></div>` : ''}
+                        ${prog.nixos_package ? `<div class="program-meta">Package: <code>${escapeHtml(prog.nixos_package)}</code></div>` : ''}
+                        ${prog.module ? `<div class="program-meta">Module: <code>${escapeHtml(prog.module)}</code></div>` : ''}
                     </div>
                     <div class="program-status ${statusClass}">${statusText}</div>
                 </div>

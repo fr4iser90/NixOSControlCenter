@@ -94,7 +94,7 @@
         
         <!-- Doc Content Panels -->
         {{range $index, $doc := .Module.Docs}}
-        <div class="doc-panel" id="doc-{{$doc.Name}}" {{if ne $index 0}}style="display: none;"{{end}}>
+        <div class="doc-panel {{if ne $index 0}}hidden{{end}}" id="doc-{{$doc.Name}}">
             <div class="doc-content">
                 <pre><code>{{index $.DocContents $doc.Name}}</code></pre>
             </div>
@@ -108,7 +108,7 @@
         {{end}}
         
         {{if .DefaultNixContent}}
-        <div class="doc-panel" id="doc-code" style="display: none;">
+        <div class="doc-panel hidden" id="doc-code">
             <div class="code-content">
                 <pre><code class="language-nix">{{.DefaultNixContent}}</code></pre>
             </div>
@@ -124,8 +124,8 @@
             {{range .Module.DocAssets}}
             <div class="doc-asset-item">
                 <img src="/module/{{$.Module.Name}}/asset/{{.}}" alt="{{.}}" 
-                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                <div style="display: none; padding: 10px; background: #1e1e1e; border: 1px solid #3e3e3e; border-radius: 4px;">
+                     onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
+                <div class="doc-asset-fallback hidden">
                     <a href="/module/{{$.Module.Name}}/asset/{{.}}" target="_blank">{{.}}</a>
                 </div>
             </div>
@@ -139,7 +139,7 @@
     function showDoc(docName) {
         // Hide all panels
         document.querySelectorAll('.doc-panel').forEach(panel => {
-            panel.style.display = 'none';
+            panel.classList.add('hidden');
         });
         
         // Remove active class from all tabs
@@ -150,159 +150,11 @@
         // Show selected panel
         const panel = document.getElementById('doc-' + docName);
         if (panel) {
-            panel.style.display = 'block';
+            panel.classList.remove('hidden');
         }
         
         // Add active class to clicked tab
         event.target.classList.add('active');
     }
 </script>
-
-<style nonce="{{.Nonce}}">
-    .module-info-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 20px;
-        margin-top: 20px;
-    }
-    
-    .info-card {
-        background: #1e1e1e;
-        border: 1px solid #3e3e3e;
-        border-radius: 8px;
-        padding: 20px;
-    }
-    
-    .info-card h3 {
-        margin: 0 0 10px 0;
-        color: #4ec9b0;
-        font-size: 0.9em;
-        text-transform: uppercase;
-    }
-    
-    .info-card p {
-        margin: 0;
-        color: #d4d4d4;
-    }
-    
-    .commands-list {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        margin-top: 15px;
-    }
-    
-    .command-item {
-        background: #1e1e1e;
-        border: 1px solid #3e3e3e;
-        border-radius: 4px;
-        padding: 12px;
-        color: #4ec9b0;
-        font-family: 'Courier New', monospace;
-    }
-    
-    .assets-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 15px;
-    }
-    
-    .asset-badge {
-        padding: 8px 15px;
-        background: #252526;
-        border: 1px solid #3e3e3e;
-        border-radius: 4px;
-        color: #858585;
-        font-size: 0.9em;
-    }
-    
-    .structure-info ul {
-        list-style: none;
-        padding: 0;
-        margin: 15px 0;
-    }
-    
-    .structure-info li {
-        padding: 10px;
-        background: #1e1e1e;
-        border: 1px solid #3e3e3e;
-        border-radius: 4px;
-        margin-bottom: 10px;
-        color: #d4d4d4;
-    }
-    
-    .docs-tabs {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
-        border-bottom: 2px solid #3e3e3e;
-    }
-    
-    .doc-tab {
-        padding: 12px 20px;
-        background: transparent;
-        border: none;
-        border-bottom: 3px solid transparent;
-        color: #858585;
-        cursor: pointer;
-        font-size: 1em;
-        transition: all 0.2s;
-    }
-    
-    .doc-tab:hover {
-        color: #d4d4d4;
-    }
-    
-    .doc-tab.active {
-        color: #4ec9b0;
-        border-bottom-color: #4ec9b0;
-    }
-    
-    .doc-panel {
-        margin-top: 20px;
-    }
-    
-    .doc-content,
-    .code-content {
-        background: #1e1e1e;
-        border: 1px solid #3e3e3e;
-        border-radius: 8px;
-        padding: 20px;
-        overflow-x: auto;
-    }
-    
-    .doc-content pre,
-    .code-content pre {
-        margin: 0;
-        color: #d4d4d4;
-        font-family: 'Courier New', monospace;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-    }
-    
-    .code-content code {
-        color: #4ec9b0;
-    }
-    
-    .doc-assets-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 15px;
-        margin-top: 15px;
-    }
-    
-    .doc-asset-item {
-        background: #1e1e1e;
-        border: 1px solid #3e3e3e;
-        border-radius: 8px;
-        overflow: hidden;
-    }
-    
-    .doc-asset-item img {
-        width: 100%;
-        height: auto;
-        display: block;
-    }
-</style>
 {{end}}

@@ -9,7 +9,7 @@
         <div class="info-box warning">
             <h3>{{.T "games.kernel_anticheat_warning.title"}}</h3>
             <p><strong>{{.T "games.kernel_anticheat_warning.text"}}</strong></p>
-            <p style="margin-top: 10px;">{{.T "games.kernel_anticheat_warning.details"}}</p>
+            <p>{{.T "games.kernel_anticheat_warning.details"}}</p>
         </div>
     </div>
 
@@ -17,7 +17,7 @@
         <h2>{{.T "games.external_resources.title"}}</h2>
         <p>{{.T "games.external_resources.description"}}</p>
         
-        <div class="download-grid" style="margin-top: 20px;">
+        <div class="download-grid">
             <div class="download-card">
                 <h3>{{.T "games.external_resources.protondb.title"}}</h3>
                 <p>{{.T "games.external_resources.protondb.description"}}</p>
@@ -48,7 +48,7 @@
         <div class="info-box success">
             <h3>{{.T "games.proton.title"}}</h3>
             <p>{{.T "games.proton.text"}}</p>
-            <ul style="margin-top: 10px; margin-left: 20px;">
+            <ul>
                 {{range .TArray "games.proton.features"}}
                 <li>{{.}}</li>
                 {{end}}

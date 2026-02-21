@@ -112,6 +112,7 @@ Das Service ist bereits für Traefik konfiguriert:
 - `MODULES_BASE_PATH=/app/nixos` - NixOS Modules Base Path (wird automatisch gesetzt)
 - `GITHUB_REPO_URL` - GitHub Repository URL für automatisches Klonen
 - `GITHUB_BRANCH` - Branch zum Klonen (default: `main`)
+- `SHOW_STATUS_BADGE=true` - Zeige Active/Disabled Status-Badges in der Web-UI (setze auf `false` zum Deaktivieren)
 
 ### Persistente Daten
 

@@ -66,6 +66,30 @@ var macosScript string
 //go:embed scripts/nixify-scan-linux.sh
 var linuxScript string
 
+//go:embed static/css/base.css
+var baseCSS string
+
+//go:embed static/css/modules.css
+var modulesCSS string
+
+//go:embed static/css/mappings.css
+var mappingsCSS string
+
+//go:embed static/css/index.css
+var indexCSS string
+
+//go:embed static/css/games.css
+var gamesCSS string
+
+//go:embed static/css/about.css
+var aboutCSS string
+
+//go:embed static/css/review.css
+var reviewCSS string
+
+//go:embed static/css/module-detail.css
+var moduleDetailCSS string
+
 // Session represents a migration session
 type Session struct {
 	ID          string    `json:"id"`
@@ -625,6 +649,9 @@ func main() {
 	http.HandleFunc("/download/windows", server.handleDownloadWindows)
 	http.HandleFunc("/download/macos", server.handleDownloadMacOS)
 	http.HandleFunc("/download/linux", server.handleDownloadLinux)
+	
+	// CSS file serving
+	http.HandleFunc("/static/css/", server.handleCSS)
 
 	addr := fmt.Sprintf("%s:%s", host, port)
 	log.Printf("🚀 Nixify Web Service starting on %s", addr)
@@ -1524,6 +1551,43 @@ func (s *Server) handleDownloadLinux(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", "attachment; filename=nixify-scan.sh")
 	// Security: Script is embedded via //go:embed, no user input, safe to output directly
 	fmt.Fprint(w, s.getScript("linux"))
+}
+
+// handleCSS serves embedded CSS files
+func (s *Server) handleCSS(w http.ResponseWriter, r *http.Request) {
+	s.setSecurityHeaders(w)
+	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=3600") // Cache for 1 hour
+	
+	// Extract filename from path
+	filename := filepath.Base(r.URL.Path)
+	
+	// Map filename to embedded CSS
+	var css string
+	switch filename {
+	case "base.css":
+		css = baseCSS
+	case "modules.css":
+		css = modulesCSS
+	case "mappings.css":
+		css = mappingsCSS
+	case "index.css":
+		css = indexCSS
+	case "games.css":
+		css = gamesCSS
+	case "about.css":
+		css = aboutCSS
+	case "review.css":
+		css = reviewCSS
+	case "module-detail.css":
+		css = moduleDetailCSS
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	
+	// Security: CSS is embedded via //go:embed, no user input, safe to output directly
+	fmt.Fprint(w, css)
 }
 
 // Worker processes sessions from the queue

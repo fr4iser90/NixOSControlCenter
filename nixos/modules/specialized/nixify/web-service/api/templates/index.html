@@ -1,240 +1,4 @@
 {{define "index"}}
-{{block "styles" .}}
-<style nonce="{{.Nonce}}">
-        .container { max-width: 1200px; margin: 0 auto; }
-        header { text-align: center; padding: 40px 20px; }
-        h1 { color: #4ec9b0; font-size: 2.5em; margin-bottom: 10px; }
-        .subtitle { color: #858585; font-size: 1.2em; margin-bottom: 30px; }
-        
-        .section { 
-            background: #252526; 
-            border-radius: 8px; 
-            padding: 30px; 
-            margin: 20px 0;
-            border-left: 4px solid #4ec9b0;
-        }
-        h2 { color: #569cd6; margin-bottom: 20px; font-size: 1.8em; }
-        h3 { color: #4ec9b0; margin: 20px 0 10px 0; }
-        
-        .info-box {
-            background: #1e1e1e;
-            border: 1px solid #3e3e3e;
-            border-radius: 6px;
-            padding: 20px;
-            margin: 15px 0;
-        }
-        .warning { border-left: 4px solid #f48771; background: #2a1f1f; }
-        .success { border-left: 4px solid #4ec9b0; background: #1f2a2a; }
-        .info { border-left: 4px solid #569cd6; background: #1f1f2a; }
-        
-        .download-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
-        }
-        .download-card {
-            background: #1e1e1e;
-            border: 1px solid #3e3e3e;
-            border-radius: 6px;
-            padding: 20px;
-            text-align: center;
-            transition: transform 0.2s, border-color 0.2s;
-        }
-        .download-card:hover {
-            transform: translateY(-2px);
-            border-color: #4ec9b0;
-        }
-        .download-card h3 { margin-top: 0; }
-        .btn {
-            display: inline-block;
-            background: #4ec9b0;
-            color: #1e1e1e;
-            padding: 10px 20px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: bold;
-            margin-top: 10px;
-            transition: background 0.2s;
-        }
-        .btn:hover { background: #5ed9c0; }
-        
-        .endpoint { 
-            margin: 10px 0; 
-            padding: 15px; 
-            background: #1e1e1e; 
-            border-left: 3px solid #4ec9b0;
-            border-radius: 4px;
-        }
-        .method { 
-            color: #4ec9b0; 
-            font-weight: bold; 
-            display: inline-block;
-            width: 80px;
-            background: #252526;
-            padding: 4px 8px;
-            border-radius: 3px;
-            text-align: center;
-        }
-        .path { color: #ce9178; font-family: monospace; }
-        
-        code { 
-            background: #1e1e1e; 
-            padding: 2px 6px; 
-            border-radius: 3px; 
-            font-family: 'Courier New', monospace;
-            color: #ce9178;
-        }
-        
-        .workflow {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            margin: 20px 0;
-        }
-        .workflow-step {
-            flex: 1;
-            min-width: 200px;
-            background: #1e1e1e;
-            padding: 20px;
-            border-radius: 6px;
-            border-top: 3px solid #4ec9b0;
-        }
-        .workflow-step-number {
-            background: #4ec9b0;
-            color: #1e1e1e;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-        
-        ul { margin-left: 20px; margin-top: 10px; }
-        li { margin: 8px 0; }
-        
-        .stats {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-            margin: 20px 0;
-        }
-        .stat {
-            flex: 1;
-            min-width: 150px;
-            text-align: center;
-            padding: 15px;
-            background: #1e1e1e;
-            border-radius: 6px;
-        }
-        .stat-value {
-            font-size: 2em;
-            color: #4ec9b0;
-            font-weight: bold;
-        }
-        .stat-label {
-            color: #858585;
-            font-size: 0.9em;
-        }
-        
-        a { color: #4ec9b0; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        
-        /* Upload Form */
-        .upload-section {
-            background: #1e1e1e;
-            border: 2px dashed #4ec9b0;
-            border-radius: 8px;
-            padding: 40px;
-            text-align: center;
-            margin: 20px 0;
-        }
-        .upload-area {
-            cursor: pointer;
-            padding: 40px;
-            border: 2px dashed #3e3e3e;
-            border-radius: 6px;
-            transition: all 0.3s;
-        }
-        .upload-area:hover {
-            border-color: #4ec9b0;
-            background: #252526;
-        }
-        .upload-area.dragover {
-            border-color: #4ec9b0;
-            background: #1f2a2a;
-        }
-        input[type="file"] {
-            display: none;
-        }
-        .btn-secondary {
-            background: #569cd6;
-            color: #1e1e1e;
-        }
-        .btn-secondary:hover {
-            background: #6aadd6;
-        }
-        .btn-danger {
-            background: #f48771;
-            color: #1e1e1e;
-        }
-        .btn-danger:hover {
-            background: #f59a88;
-        }
-        
-        /* Session Status */
-        .session-card {
-            background: #1e1e1e;
-            border: 1px solid #3e3e3e;
-            border-radius: 6px;
-            padding: 20px;
-            margin: 15px 0;
-        }
-        .session-status {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.9em;
-            font-weight: bold;
-        }
-        .status-queued { background: #569cd6; color: #1e1e1e; }
-        .status-processing { background: #4ec9b0; color: #1e1e1e; }
-        .status-ready { background: #4ec9b0; color: #1e1e1e; }
-        .status-building_iso { background: #569cd6; color: #1e1e1e; }
-        .status-iso_ready { background: #4ec9b0; color: #1e1e1e; }
-        .status-error { background: #f48771; color: #1e1e1e; }
-        
-        .progress-bar {
-            width: 100%;
-            height: 20px;
-            background: #252526;
-            border-radius: 10px;
-            overflow: hidden;
-            margin: 10px 0;
-        }
-        .progress-fill {
-            height: 100%;
-            background: #4ec9b0;
-            transition: width 0.3s;
-            text-align: center;
-            line-height: 20px;
-            font-size: 0.8em;
-            color: #1e1e1e;
-        }
-        
-        .hidden { display: none; }
-        .error-message {
-            background: #2a1f1f;
-            border-left: 4px solid #f48771;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 4px;
-        }
-    </style>
-{{end}}
     <div class="container">
         <header>
             <h1>{{.T "header.title"}}</h1>
@@ -310,7 +74,7 @@
                     <h3>{{.T "download.windows.title"}}</h3>
                     <p>{{.T "download.windows.description"}}</p>
                     <a href="/download/windows" class="btn">{{.T "download.button"}}</a>
-                    <p style="margin-top: 10px; font-size: 0.9em; color: #858585;">
+                    <p class="download-card-meta">
                         <code>{{.T "download.windows.filename"}}</code>
                     </p>
                 </div>
@@ -318,7 +82,7 @@
                     <h3>{{.T "download.macos.title"}}</h3>
                     <p>{{.T "download.macos.description"}}</p>
                     <a href="/download/macos" class="btn">{{.T "download.button"}}</a>
-                    <p style="margin-top: 10px; font-size: 0.9em; color: #858585;">
+                    <p class="download-card-meta">
                         <code>{{.T "download.macos.filename"}}</code>
                     </p>
                 </div>
@@ -326,7 +90,7 @@
                     <h3>{{.T "download.linux.title"}}</h3>
                     <p>{{.T "download.linux.description"}}</p>
                     <a href="/download/linux" class="btn">{{.T "download.button"}}</a>
-                    <p style="margin-top: 10px; font-size: 0.9em; color: #858585;">
+                    <p class="download-card-meta">
                         <code>{{.T "download.linux.filename"}}</code>
                     </p>
                 </div>
@@ -340,8 +104,8 @@
             <div class="upload-section">
                 <div class="upload-area" id="uploadArea">
                     <input type="file" id="fileInput" accept=".json,application/json">
-                    <p style="font-size: 1.2em; margin-bottom: 10px;">{{.T "upload.drop_zone"}}</p>
-                    <p style="color: #858585; font-size: 0.9em;">{{.T "upload.supported"}}</p>
+                    <p class="upload-text">{{.T "upload.drop_zone"}}</p>
+                    <p class="upload-subtext">{{.T "upload.supported"}}</p>
                 </div>
                 <div id="uploadError" class="error-message hidden"></div>
             </div>
@@ -354,10 +118,10 @@
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressBar" style="width: 0%">0%</div>
                     </div>
-                    <div id="sessionActions" class="hidden" style="margin-top: 15px;">
+                    <div id="sessionActions" class="hidden session-actions">
                         <button class="btn" onclick="downloadConfig()">{{.T "session.download_config"}}</button>
-                        <button class="btn btn-secondary" onclick="buildISO()" style="margin-left: 10px;">{{.T "session.build_iso"}}</button>
-                        <button class="btn btn-danger hidden" onclick="downloadISO()" id="downloadISOBtn" style="margin-left: 10px;">{{.T "session.download_iso"}}</button>
+                        <button class="btn btn-secondary" onclick="buildISO()">{{.T "session.build_iso"}}</button>
+                        <button class="btn btn-danger hidden" onclick="downloadISO()" id="downloadISOBtn">{{.T "session.download_iso"}}</button>
                     </div>
                     <div id="sessionError" class="error-message hidden"></div>
                 </div>
@@ -370,13 +134,13 @@
             <div class="info-box warning">
                 <h3>{{.T "warnings.kernel_anticheat.title"}}</h3>
                 <p><strong>{{.T "warnings.kernel_anticheat.text"}}</strong></p>
-                <p style="margin-top: 10px;">{{.T "warnings.kernel_anticheat.details"}}</p>
+                <p>{{.T "warnings.kernel_anticheat.details"}}</p>
             </div>
             
             <div class="info-box info">
                 <h3>{{.T "warnings.wine_proton.title"}}</h3>
                 <p>{{.T "warnings.wine_proton.text"}}</p>
-                <ul style="margin-top: 10px;">
+                <ul>
                     {{range .TArray "warnings.wine_proton.features"}}
                     <li>{{.}}</li>
                     {{end}}
@@ -395,7 +159,7 @@
             <div class="info-box info">
                 <h3>{{.T "warnings.about_config.title"}}</h3>
                 <p>{{.T "warnings.about_config.text"}}</p>
-                <ul style="margin-top: 10px;">
+                <ul>
                     {{range .TArray "warnings.about_config.features"}}
                     <li>{{.}}</li>
                     {{end}}
@@ -411,7 +175,7 @@
                     <div class="stat-label">{{.T "status.active_sessions"}}</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value" style="font-size: 1.2em;">{{.Host}}:{{.Port}}</div>
+                    <div class="stat-value stat-value-small">{{.Host}}:{{.Port}}</div>
                     <div class="stat-label">{{.T "status.service_address"}}</div>
                 </div>
                 <div class="stat">
@@ -461,9 +225,9 @@
             </div>
         </div>
         
-        <div class="section" style="text-align: center; color: #858585; font-size: 0.9em;">
+        <div class="section section-footer">
             <p>{{.T "footer.project"}} <a href="https://github.com/fr4iser90/NixOSControlCenter">NixOS Control Center</a></p>
-            <p style="margin-top: 10px;">{{.T "footer.tagline"}}</p>
+            <p>{{.T "footer.tagline"}}</p>
         </div>
     </div>
     
@@ -561,8 +325,8 @@
         function resetUploadArea() {
             uploadArea.innerHTML = `
                 <input type="file" id="fileInput" accept=".json,application/json">
-                <p style="font-size: 1.2em; margin-bottom: 10px;">📁 Datei hier ablegen oder klicken zum Auswählen</p>
-                <p style="color: #858585; font-size: 0.9em;">Unterstützt: JSON-Dateien (max. 10MB)</p>
+                <p class="upload-text">📁 Datei hier ablegen oder klicken zum Auswählen</p>
+                <p class="upload-subtext">Unterstützt: JSON-Dateien (max. 10MB)</p>
             `;
             fileInput.addEventListener('change', (e) => {
                 if (e.target.files.length > 0) {

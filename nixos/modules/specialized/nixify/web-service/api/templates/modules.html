@@ -6,16 +6,24 @@
     </header>
 
     <div class="section">
-        <div style="margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap;">
-            <input type="text" id="searchInput" placeholder="{{.T "modules.search"}}" 
-                   style="flex: 1; min-width: 200px; padding: 12px; background: #1e1e1e; border: 1px solid #3e3e3e; border-radius: 4px; color: #d4d4d4; font-size: 1em;">
-            <select id="categoryFilter" style="padding: 12px; background: #1e1e1e; border: 1px solid #3e3e3e; border-radius: 4px; color: #d4d4d4; cursor: pointer;">
-                <option value="">{{.T "modules.filter.all_categories"}}</option>
+        <div class="filter-row">
+            <input type="text" id="searchInput" placeholder="{{.T "modules.search"}}" class="search-input">
+            <select id="typeFilter" class="filter-select">
+                <option value="">{{.T "modules.filter.all_types"}}</option>
                 <option value="core">{{.T "modules.filter.core"}}</option>
-                <option value="modules">{{.T "modules.filter.optional"}}</option>
+                <option value="optional">{{.T "modules.filter.optional"}}</option>
+            </select>
+            <select id="categoryFilter" class="filter-select">
+                <option value="">{{.T "modules.filter.all_categories"}}</option>
+                <option value="base">{{.T "modules.filter.base"}}</option>
+                <option value="management">{{.T "modules.filter.management"}}</option>
+                <option value="infrastructure">{{.T "modules.filter.infrastructure"}}</option>
+                <option value="security">{{.T "modules.filter.security"}}</option>
+                <option value="specialized">{{.T "modules.filter.specialized"}}</option>
+                <option value="system">{{.T "modules.filter.system"}}</option>
             </select>
             {{if .ShowStatusBadge}}
-            <select id="statusFilter" style="padding: 12px; background: #1e1e1e; border: 1px solid #3e3e3e; border-radius: 4px; color: #d4d4d4; cursor: pointer;">
+            <select id="statusFilter" class="filter-select">
                 <option value="">{{.T "modules.filter.all_status"}}</option>
                 <option value="active">{{.T "modules.filter.active"}}</option>
                 <option value="disabled">{{.T "modules.filter.disabled"}}</option>
@@ -24,129 +32,57 @@
             {{end}}
         </div>
         
-        <div id="modulesGrid" class="modules-grid">
-            <!-- Modules will be loaded here via JavaScript -->
+        <!-- Stats Bar -->
+        <div class="modules-stats">
+            <span class="stat-item">
+                <strong id="totalCount">0</strong> {{.T "modules.stats.total"}}
+            </span>
+            <span class="stat-item">
+                <strong id="coreCount">0</strong> {{.T "modules.stats.core"}}
+            </span>
+            <span class="stat-item">
+                <strong id="optionalCount">0</strong> {{.T "modules.stats.optional"}}
+            </span>
         </div>
         
-        <div id="noResults" style="display: none; text-align: center; padding: 40px; color: #858585;">
+        <!-- Grouped Modules Display -->
+        <div id="modulesContainer">
+            <!-- Core Modules Section -->
+            <div class="module-section" id="coreSection" data-type="core">
+                <div class="section-header" onclick="toggleSection('core')">
+                    <h2 class="section-title">
+                        <span class="section-icon">⚙️</span>
+                        {{.T "modules.sections.core"}}
+                        <span class="section-count" id="coreSectionCount">0</span>
+                    </h2>
+                    <button class="collapse-toggle" data-section="core" aria-label="Toggle section">−</button>
+                </div>
+                <div class="section-content" id="coreContent">
+                    <div class="modules-grid" id="coreGrid"></div>
+                </div>
+            </div>
+            
+            <!-- Optional Modules Section -->
+            <div class="module-section" id="optionalSection" data-type="optional">
+                <div class="section-header" onclick="toggleSection('optional')">
+                    <h2 class="section-title">
+                        <span class="section-icon">🧩</span>
+                        {{.T "modules.sections.optional"}}
+                        <span class="section-count" id="optionalSectionCount">0</span>
+                    </h2>
+                    <button class="collapse-toggle" data-section="optional" aria-label="Toggle section">−</button>
+                </div>
+                <div class="section-content" id="optionalContent">
+                    <div class="modules-grid" id="optionalGrid"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="noResults" class="no-results">
             {{.T "modules.no_results"}}
         </div>
     </div>
 </div>
-
-<style nonce="{{.Nonce}}">
-    .modules-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-        gap: 20px;
-        margin-top: 20px;
-    }
-    
-    .module-card {
-        background: #1e1e1e;
-        border: 1px solid #3e3e3e;
-        border-radius: 8px;
-        padding: 20px;
-        transition: border-color 0.2s, transform 0.2s;
-        cursor: pointer;
-    }
-    
-    .module-card:hover {
-        border-color: #4ec9b0;
-        transform: translateY(-2px);
-    }
-    
-    .module-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: start;
-        margin-bottom: 15px;
-    }
-    
-    .module-name {
-        font-size: 1.3em;
-        font-weight: bold;
-        color: #4ec9b0;
-        margin: 0;
-    }
-    
-    .module-category {
-        font-size: 0.85em;
-        color: #858585;
-        margin-top: 5px;
-    }
-    
-    .status-badge {
-        padding: 4px 10px;
-        border-radius: 4px;
-        font-size: 0.8em;
-        font-weight: bold;
-    }
-    
-    .status-active {
-        background: #1f2a2a;
-        color: #4ec9b0;
-        border: 1px solid #4ec9b0;
-    }
-    
-    .status-disabled {
-        background: #2a1f1f;
-        color: #f48771;
-        border: 1px solid #f48771;
-    }
-    
-    .status-planned {
-        background: #2a2a1f;
-        color: #f48771;
-        border: 1px solid #f48771;
-    }
-    
-    .module-description {
-        color: #d4d4d4;
-        margin: 15px 0;
-        line-height: 1.6;
-    }
-    
-    .module-features {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin: 15px 0;
-    }
-    
-    .feature-badge {
-        padding: 4px 8px;
-        background: #252526;
-        border: 1px solid #3e3e3e;
-        border-radius: 4px;
-        font-size: 0.8em;
-        color: #858585;
-    }
-    
-    .module-footer {
-        margin-top: 15px;
-        padding-top: 15px;
-        border-top: 1px solid #3e3e3e;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .module-version {
-        font-size: 0.85em;
-        color: #858585;
-    }
-    
-    .module-link {
-        color: #4ec9b0;
-        text-decoration: none;
-        font-size: 0.9em;
-    }
-    
-    .module-link:hover {
-        text-decoration: underline;
-    }
-</style>
 
 <script nonce="{{.Nonce}}">
     const modules = {{.ModulesJSON}};
@@ -162,18 +98,59 @@
         }
     };
     
+    // Extract subcategory from full category string (e.g., "core.base.audio" -> "base")
+    function getSubCategory(category) {
+        const parts = category.split('.');
+        if (parts.length > 1) {
+            return parts[1]; // base, management, infrastructure, etc.
+        }
+        return category;
+    }
+    
+    // Check if module is core or optional
+    function isCoreModule(category) {
+        return category.startsWith('core.');
+    }
+    
     function renderModules(filteredModules) {
-        const container = document.getElementById('modulesGrid');
-        const noResults = document.getElementById('noResults');
+        const coreModules = filteredModules.filter(m => isCoreModule(m.category));
+        const optionalModules = filteredModules.filter(m => !isCoreModule(m.category));
         
+        // Update stats
+        document.getElementById('totalCount').textContent = filteredModules.length;
+        document.getElementById('coreCount').textContent = coreModules.length;
+        document.getElementById('optionalCount').textContent = optionalModules.length;
+        document.getElementById('coreSectionCount').textContent = coreModules.length;
+        document.getElementById('optionalSectionCount').textContent = optionalModules.length;
+        
+        // Render core modules
+        renderModuleGrid('coreGrid', coreModules);
+        
+        // Render optional modules
+        renderModuleGrid('optionalGrid', optionalModules);
+        
+        // Show/hide sections
+        document.getElementById('coreSection').style.display = coreModules.length > 0 ? 'block' : 'none';
+        document.getElementById('optionalSection').style.display = optionalModules.length > 0 ? 'block' : 'none';
+        
+        // Show no results
+        const noResults = document.getElementById('noResults');
         if (filteredModules.length === 0) {
-            container.innerHTML = '';
             noResults.style.display = 'block';
+        } else {
+            noResults.style.display = 'none';
+        }
+    }
+    
+    function renderModuleGrid(containerId, modules) {
+        const container = document.getElementById(containerId);
+        
+        if (modules.length === 0) {
+            container.innerHTML = '<p class="no-modules-message">' + translations.no_results + '</p>';
             return;
         }
         
-        noResults.style.display = 'none';
-        container.innerHTML = filteredModules.map(module => {
+        container.innerHTML = modules.map(module => {
             const features = [];
             if (module.has_tui) features.push(translations.features.tui);
             if (module.has_scripts) features.push(translations.features.scripts);
@@ -192,12 +169,16 @@
                 statusText = '📋 Planned';
             }
             
+            const subCategory = getSubCategory(module.category);
+            const moduleType = isCoreModule(module.category) ? 'core' : 'optional';
+            
             return `
-                <div class="module-card" onclick="window.location.href='/module/${escapeHtml(module.name)}'">
+                <div class="module-card" data-type="${moduleType}" onclick="window.location.href='/module/${escapeHtml(module.name)}'">
                     <div class="module-header">
                         <div>
                             <h3 class="module-name">🧩 ${escapeHtml(module.name)}</h3>
                             <div class="module-category">${escapeHtml(module.category)}</div>
+                            <span class="category-badge category-${subCategory}">${escapeHtml(subCategory)}</span>
                         </div>
                         ${module.show_status_badge ? `<span class="status-badge ${statusClass}">${statusText}</span>` : ''}
                     </div>
@@ -224,7 +205,8 @@
     
     function filterModules() {
         const query = document.getElementById('searchInput').value.toLowerCase();
-        const category = document.getElementById('categoryFilter').value;
+        const typeFilter = document.getElementById('typeFilter').value;
+        const categoryFilter = document.getElementById('categoryFilter').value;
         const statusFilter = document.getElementById('statusFilter');
         const status = statusFilter ? statusFilter.value : '';
         
@@ -234,21 +216,52 @@
                 module.description.toLowerCase().includes(query) ||
                 module.category.toLowerCase().includes(query);
             
-            const matchesCategory = !category || module.category.startsWith(category);
+            const matchesType = !typeFilter || 
+                (typeFilter === 'core' && isCoreModule(module.category)) ||
+                (typeFilter === 'optional' && !isCoreModule(module.category));
+            
+            const subCategory = getSubCategory(module.category);
+            const matchesCategory = !categoryFilter || subCategory === categoryFilter;
+            
             const matchesStatus = !status || module.status === status;
             
-            return matchesSearch && matchesCategory && matchesStatus;
+            return matchesSearch && matchesType && matchesCategory && matchesStatus;
         });
         
         renderModules(filtered);
     }
     
+    function toggleSection(sectionName) {
+        const content = document.getElementById(sectionName + 'Content');
+        const toggle = document.querySelector(`[data-section="${sectionName}"]`);
+        const isCollapsed = content.classList.contains('collapsed');
+        
+        if (isCollapsed) {
+            content.classList.remove('collapsed');
+            toggle.textContent = '−';
+        } else {
+            content.classList.add('collapsed');
+            toggle.textContent = '+';
+        }
+    }
+    
+    // Event listeners
     document.getElementById('searchInput').addEventListener('input', filterModules);
+    document.getElementById('typeFilter').addEventListener('change', filterModules);
     document.getElementById('categoryFilter').addEventListener('change', filterModules);
     const statusFilter = document.getElementById('statusFilter');
     if (statusFilter) {
         statusFilter.addEventListener('change', filterModules);
     }
+    
+    // Collapse/expand sections
+    document.querySelectorAll('.collapse-toggle').forEach(toggle => {
+        toggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const section = this.dataset.section;
+            toggleSection(section);
+        });
+    });
     
     // Initial render
     renderModules(modules);
