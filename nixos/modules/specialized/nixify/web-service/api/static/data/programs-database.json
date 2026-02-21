@@ -1,0 +1,2348 @@
+{
+  "scrapedAt": "2026-02-21T16:06:44.408Z",
+  "totalPrograms": 145,
+  "sources": [
+    "alternativeto",
+    "sourceforge"
+  ],
+  "programs": [
+    {
+      "name": "VLC Media Player",
+      "link": "https://alternativeto.net/software/vlc-media-player/about/",
+      "likes": 7717,
+      "description": "Cross-platform, free media player supports multimedia files, DVDs, streaming, offers hardware acceleration, 4K, lossless audio, and more.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "video"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 7717
+    },
+    {
+      "name": "Mozilla Firefox",
+      "link": "https://alternativeto.net/software/firefox/about/",
+      "likes": 7538,
+      "description": "Open-source browser with Gecko engine, supporting HTML add-ons and providing privacy features like Enhanced Tracking Protection and third-party cookie blocking.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "browser"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 7538
+    },
+    {
+      "name": "Dropbox",
+      "link": "https://alternativeto.net/software/dropbox/about/",
+      "likes": 5563,
+      "description": "Put your files into your Dropbox on one computer, and they'll be instantly available on any of your other computers that also have Dropbox installed. Because copies of your files are stored on Dropbox",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "likes",
+      "categories": [
+        "utilities"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 5563
+    },
+    {
+      "name": "Google Chrome",
+      "link": "https://alternativeto.net/software/google-chrome/about/",
+      "likes": 4958,
+      "description": "Web browser built on an open-source platform featuring multiple account support, integrated password manager, dark mode, real-time translation, and seamless cross-device syncing.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "likes",
+      "categories": [
+        "browser"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 4958
+    },
+    {
+      "name": "Notepad++",
+      "link": "https://alternativeto.net/software/notepad-plus-plus/about/",
+      "likes": 4935,
+      "description": "Free open-source code editor and Notepad replacement supporting multiple languages, featuring high speed, low resource usage, privacy focus, and plugin extensibility.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "development"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 4935
+    },
+    {
+      "name": "7-Zip",
+      "link": "https://alternativeto.net/software/7-zip/about/",
+      "likes": 4767,
+      "description": "Efficient file archiver offering superior compression and encryption. Supports multiple formats such as TAR, ZIP, with a unique self-extracting feature.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "utilities"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 4767
+    },
+    {
+      "name": "GIMP",
+      "link": "https://alternativeto.net/software/gimp/about/",
+      "likes": 4737,
+      "description": "Free open-source suite with advanced photo retouching, composition, batch processing, plugin extensibility, custom scripting, and wide file format compatibility.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "graphics"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 4737
+    },
+    {
+      "name": "Netflix",
+      "link": "https://alternativeto.net/software/netflix/about/",
+      "likes": 3771,
+      "description": "Enjoy streaming thousands of movies and TV shows globally in stunning 4K quality, with offline viewing options to watch anytime.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "likes",
+      "categories": [
+        "video"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 3771
+    },
+    {
+      "name": "AlternativeTo",
+      "link": "https://alternativeto.net/software/alternativeto/about/",
+      "likes": 3246,
+      "description": "Explore diverse software alternatives using a crowdsourced discovery service featuring apps for Windows, Mac, Linux, and mobile, with personalized lists.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "utilities"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 3246
+    },
+    {
+      "name": "Gmail",
+      "link": "https://alternativeto.net/software/gmail/about/",
+      "likes": 3210,
+      "description": "Experience robust security, multiple accounts, chat, and fast search with efficient Gmail email management in a streamlined interface.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "likes",
+      "categories": [
+        "communication"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 3210
+    },
+    {
+      "name": "LibreOffice",
+      "link": "https://alternativeto.net/software/libreoffice/about/",
+      "likes": 3129,
+      "description": "Free and open-source office suite with advanced word processing, spreadsheets, presentations, vector graphics, math formula editor, and database tools.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "productivity"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 3129
+    },
+    {
+      "name": "TeamViewer",
+      "link": "https://alternativeto.net/software/teamviewer/about/",
+      "likes": 3103,
+      "description": "Establish remote desktop access in seconds with instant control, secure data, VoIP and webcam integration, file transfer, and fast, easy collaboration.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "likes",
+      "categories": [
+        "communication"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 3103
+    },
+    {
+      "name": "VirtualBox",
+      "link": "https://alternativeto.net/software/virtualbox/about/",
+      "likes": 2941,
+      "description": "Open source virtualization tool supporting x86/AMD64, runs on Windows, Linux, Mac, Solaris. Offers portable, lightweight, ad-free use.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "utilities"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 2941
+    },
+    {
+      "name": "Spotify",
+      "link": "https://alternativeto.net/software/spotify/about/",
+      "likes": 2803,
+      "description": "Stream millions of tracks online with genre, playlist, artist, and album browsing. Get offline listening and ad-free experience with Premium.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "likes",
+      "categories": [
+        "audio"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 2803
+    },
+    {
+      "name": "µTorrent",
+      "link": "https://alternativeto.net/software/utorrent/about/",
+      "likes": 2690,
+      "description": "Desktop client for large-scale torrent downloads, offering simultaneous downloads, bandwidth optimization, and scheduling. Supports RSS downloads.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "likes",
+      "categories": [
+        "utilities"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 2690
+    },
+    {
+      "name": "CCleaner",
+      "link": "https://alternativeto.net/software/ccleaner/about/",
+      "likes": 2684,
+      "description": "Optimizes systems by removing unused files and cleaning registries, speeding up PCs. Features include automatic cleaning, driver update, privacy protection.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "likes",
+      "categories": [
+        "utilities"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 2684
+    },
+    {
+      "name": "Stremio",
+      "link": "https://alternativeto.net/software/stremio/about/",
+      "likes": 2673,
+      "description": "Media center supporting movies, series, YouTube, and smartTV casting via DLNA/Chromecast. Offers HD, subtitles, add-ons, with no registration needed. Notice of new episodes.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "video"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 2673
+    },
+    {
+      "name": "Thunderbird",
+      "link": "https://alternativeto.net/software/mozilla-thunderbird/about/",
+      "likes": 2554,
+      "description": "Cross-platform email client providing POP/IMAP support, robust filtering, multiple accounts, and chat. Extendable via add-ons with RSS/Atom, etc.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "communication"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 2554
+    },
+    {
+      "name": "Evernote",
+      "link": "https://alternativeto.net/software/evernote/about/",
+      "likes": 2484,
+      "description": "Cross-platform app for creating and organizing notes from text, web pages, images, and voice memos. Offers security features and integrates with various tools.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "likes",
+      "categories": [
+        "graphics"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 2484
+    },
+    {
+      "name": "Steam",
+      "link": "https://alternativeto.net/software/steam/about/",
+      "likes": 2443,
+      "description": "Steam is a digital distribution, digital rights management, multiplayer and communications platform developed by Valve Corporation. It is used to distribute a wide range of games and related media ent",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "games"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 2443
+    },
+    {
+      "name": "Google Drive",
+      "link": "https://alternativeto.net/software/google-drive/about/",
+      "likes": 2443,
+      "description": "Cloud service for file storage and sync, integrated with Google Docs suite, facilitating collaboration and offering scalable storage solutions.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "likes",
+      "categories": [
+        "utilities"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 2443
+    },
+    {
+      "name": "Adobe Photoshop",
+      "link": "https://alternativeto.net/software/adobe-photoshop/about/",
+      "likes": 2424,
+      "description": "Adobe Photoshop is a raster graphics editor developed and published by Adobe for Windows and macOS. It was originally created in 1987 by Thomas and John Knoll. Since then, the software has become the ",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "likes",
+      "categories": [
+        "graphics"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 2424
+    },
+    {
+      "name": "Ubuntu",
+      "link": "https://alternativeto.net/software/ubuntu/about/",
+      "likes": 2370,
+      "description": "Ubuntu is a community developed, Linux-based operating system that is perfect for laptops, desktops and servers. It contains all the applications you need - a web browser, presentation, document and s",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "likes",
+      "categories": [
+        "productivity"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 2370
+    },
+    {
+      "name": "Audacity",
+      "link": "https://alternativeto.net/software/audacity/about/",
+      "likes": 2365,
+      "description": "Free open-source multi-track audio editor and recorder with 32-bit float processing. Supports many formats and plugins for Windows, macOS, Linux.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "audio"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 2365
+    },
+    {
+      "name": "Inkscape",
+      "link": "https://alternativeto.net/software/inkscape/about/",
+      "likes": 2314,
+      "description": "Open source vector graphics editor supporting SVG with features like custom brushes, pressure sensitivity, and layer management across multiple platforms.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "graphics"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 2314
+    },
+    {
+      "name": "Handbrake",
+      "link": "https://sourceforge.net/projects/handbrake.mirror/reviews/",
+      "likes": 2042,
+      "description": "",
+      "platforms": [],
+      "source": "sourceforge",
+      "sortSource": "newest",
+      "categories": [
+        "audio",
+        "video",
+        "graphics",
+        "development",
+        "productivity",
+        "communication",
+        "security",
+        "utilities",
+        "games",
+        "multimedia",
+        "browser",
+        "education",
+        "business",
+        "finance",
+        "health"
+      ],
+      "sources": [
+        "alternativeto",
+        "sourceforge"
+      ],
+      "downloads": 3,
+      "tags": [],
+      "rating": "3 Reviews",
+      "popularityScore": 2046.7712125471967
+    },
+    {
+      "name": "uBlock Origin",
+      "link": "https://alternativeto.net/software/ublock-origin/about/",
+      "likes": 1814,
+      "description": "This efficient browser add-on blocks ads, trackers, and malware by default employing various filter lists, acting as a comprehensive wide-spectrum blocker.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "development"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 1814
+    },
+    {
+      "name": "qBittorrent",
+      "link": "https://alternativeto.net/software/qbittorrent/about/",
+      "likes": 1790,
+      "description": "The qBittorrent project aims to provide an open-source software alternative to µTorrent.\nAdditionally, qBittorrent runs and provides the same features on all major platforms (FreeBSD, Linux, macOS, OS",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "development"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 1790
+    },
+    {
+      "name": "Blender",
+      "link": "https://alternativeto.net/software/blender/about/",
+      "likes": 1758,
+      "description": "Free open-source 3D software for modeling, texturing, rigging, animation, rendering, compositing, video editing, and simulation.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "video"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 1758
+    },
+    {
+      "name": "Rufus",
+      "link": "https://alternativeto.net/software/rufus/about/",
+      "likes": 1578,
+      "description": "Formats USB drives to various file systems and creates bootable USBs from ISOs. Supports MS-DOS/FreeDOS bootable sticks and offers BIOS or UEFI options.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "utilities"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 1578
+    },
+    {
+      "name": "Krita",
+      "link": "https://alternativeto.net/software/krita/about/",
+      "likes": 1417,
+      "description": "A free, open-source painting program for professional artists offering customizable UI, 9 brush engines, layer support, and color management.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "graphics"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 1417
+    },
+    {
+      "name": "Signal",
+      "link": "https://alternativeto.net/software/signal-private-messenger/about/",
+      "likes": 1376,
+      "description": "An encrypted messaging app focused on privacy, supporting texts, calls, photos, videos, files, and group chats, with no ads or trackers.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "communication"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 1376
+    },
+    {
+      "name": "Bitwarden",
+      "link": "https://alternativeto.net/software/bitwarden--free-password-manager/about/",
+      "likes": 1370,
+      "description": "Open-source password manager with AES-256 encryption and device sync. Store and access encrypted logins across platforms like iOS and Android.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "security"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 1370
+    },
+    {
+      "name": "Brave",
+      "link": "https://alternativeto.net/software/brave/about/",
+      "likes": 1177,
+      "description": "Fast, secure browser with built-in ad block, privacy controls, and global tracking protections. Optimizes data, speed, and battery life.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "browser"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 1177
+    },
+    {
+      "name": "Obsidian",
+      "link": "https://alternativeto.net/software/obsidian/about/",
+      "likes": 1107,
+      "description": "Obsidian is a note-taking app that lets you create a personal knowledge graph with ease. It is designed for non-linear thinking and allows you to easily link your notes together wiki-style.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "utilities"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 1107
+    },
+    {
+      "name": "LocalSend",
+      "link": "https://alternativeto.net/software/localsend/about/",
+      "likes": 383,
+      "description": "Free open-source tool offers secure, end-to-end encrypted file and message sharing over local networks across major desktop and mobile operating systems.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "security"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 383
+    },
+    {
+      "name": "Zen Browser",
+      "link": "https://alternativeto.net/software/zen-browser/about/",
+      "likes": 296,
+      "description": "Privacy-centric, open-source browser with unique UI features like vertical tabs, Split View, and Zen Glance, focusing on security and tranquility.",
+      "platforms": [],
+      "source": "alternativeto",
+      "sortSource": "newest",
+      "categories": [
+        "browser"
+      ],
+      "sources": [
+        "alternativeto"
+      ],
+      "popularityScore": 296
+    },
+    {
+      "name": "KeePass",
+      "link": "https://sourceforge.net/projects/keepass/reviews/",
+      "downloads": 605,
+      "description": "",
+      "tags": [],
+      "rating": "605 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "security"
+      ],
+      "popularityScore": 27.81755374652469
+    },
+    {
+      "name": "OpenOffice",
+      "link": "https://sourceforge.net/projects/openofficeorg.mirror/reviews/",
+      "downloads": 353,
+      "description": "",
+      "tags": [],
+      "rating": "353 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "graphics"
+      ],
+      "popularityScore": 25.477747053878225
+    },
+    {
+      "name": "Sweet Home 3D",
+      "link": "https://sourceforge.net/projects/sweethome3d/reviews/",
+      "downloads": 301,
+      "description": "",
+      "tags": [],
+      "rating": "301 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "graphics"
+      ],
+      "popularityScore": 24.78566495593843
+    },
+    {
+      "name": "MPC-HC",
+      "link": "https://sourceforge.net/projects/mpc-hc/reviews/",
+      "downloads": 296,
+      "description": "",
+      "tags": [],
+      "rating": "296 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 24.712917110589387
+    },
+    {
+      "name": "Equalizer APO",
+      "link": "https://sourceforge.net/projects/equalizerapo/reviews/",
+      "downloads": 287,
+      "description": "",
+      "tags": [],
+      "rating": "287 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "multimedia"
+      ],
+      "popularityScore": 24.578818967339924
+    },
+    {
+      "name": "PortableApps",
+      "link": "https://sourceforge.net/projects/portableapps/reviews/",
+      "downloads": 264,
+      "description": "",
+      "tags": [],
+      "rating": "264 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "education"
+      ],
+      "popularityScore": 24.216039268698314
+    },
+    {
+      "name": "XAMPP",
+      "link": "https://sourceforge.net/projects/xampp/reviews/",
+      "downloads": 238,
+      "description": "",
+      "tags": [],
+      "rating": "238 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "education"
+      ],
+      "popularityScore": 23.76576957056512
+    },
+    {
+      "name": "FreeMind",
+      "link": "https://sourceforge.net/projects/freemind/reviews/",
+      "downloads": 237,
+      "description": "",
+      "tags": [],
+      "rating": "237 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "business"
+      ],
+      "popularityScore": 23.74748346010104
+    },
+    {
+      "name": "Freeplane",
+      "link": "https://sourceforge.net/projects/freeplane/reviews/",
+      "downloads": 228,
+      "description": "",
+      "tags": [],
+      "rating": "228 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "education"
+      ],
+      "popularityScore": 23.57934847000454
+    },
+    {
+      "name": "MinGW",
+      "link": "https://sourceforge.net/projects/mingw/reviews/",
+      "downloads": 224,
+      "description": "",
+      "tags": [],
+      "rating": "224 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "development"
+      ],
+      "popularityScore": 23.50248018334163
+    },
+    {
+      "name": "Orphamiel AutoClicker",
+      "link": "https://sourceforge.net/projects/orphamielautoclicker/reviews/",
+      "downloads": 218,
+      "description": "",
+      "tags": [],
+      "rating": "218 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "system"
+      ],
+      "popularityScore": 23.384564936046047
+    },
+    {
+      "name": "Stellarium",
+      "link": "https://sourceforge.net/projects/stellarium/reviews/",
+      "downloads": 217,
+      "description": "",
+      "tags": [],
+      "rating": "217 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "games"
+      ],
+      "popularityScore": 23.364597338485297
+    },
+    {
+      "name": "WinSCP",
+      "link": "https://sourceforge.net/projects/winscp/reviews/",
+      "downloads": 209,
+      "description": "",
+      "tags": [],
+      "rating": "209 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "productivity"
+      ],
+      "popularityScore": 23.20146286111054
+    },
+    {
+      "name": "WinMerge",
+      "link": "https://sourceforge.net/projects/winmerge/reviews/",
+      "downloads": 192,
+      "description": "",
+      "tags": [],
+      "rating": "192 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "development"
+      ],
+      "popularityScore": 22.833012287035498
+    },
+    {
+      "name": "Mumble",
+      "link": "https://sourceforge.net/projects/mumble/reviews/",
+      "downloads": 169,
+      "description": "",
+      "tags": [],
+      "rating": "169 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "communication"
+      ],
+      "popularityScore": 22.278867046136735
+    },
+    {
+      "name": "Mpcbe",
+      "link": "https://sourceforge.net/projects/mpcbe/reviews/",
+      "downloads": 167,
+      "description": "",
+      "tags": [],
+      "rating": "167 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 22.227164711475833
+    },
+    {
+      "name": "Dvdstyler",
+      "link": "https://sourceforge.net/projects/dvdstyler/reviews/",
+      "downloads": 166,
+      "description": "",
+      "tags": [],
+      "rating": "166 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 22.20108088040055
+    },
+    {
+      "name": "DOSBox",
+      "link": "https://sourceforge.net/projects/dosbox/reviews/",
+      "downloads": 165,
+      "description": "",
+      "tags": [],
+      "rating": "165 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "games"
+      ],
+      "popularityScore": 22.174839442139064
+    },
+    {
+      "name": "Doublecmd",
+      "link": "https://sourceforge.net/projects/doublecmd/reviews/",
+      "downloads": 159,
+      "description": "",
+      "tags": [],
+      "rating": "159 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "text-editors"
+      ],
+      "popularityScore": 22.013971243204512
+    },
+    {
+      "name": "Lazarus",
+      "link": "https://sourceforge.net/projects/lazarus/reviews/",
+      "downloads": 158,
+      "description": "",
+      "tags": [],
+      "rating": "158 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "education"
+      ],
+      "popularityScore": 21.986570869544227
+    },
+    {
+      "name": "Ophcrack",
+      "link": "https://sourceforge.net/projects/ophcrack/reviews/",
+      "downloads": 157,
+      "description": "",
+      "tags": [],
+      "rating": "157 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "security"
+      ],
+      "popularityScore": 21.958996524092335
+    },
+    {
+      "name": "Code::Blocks",
+      "link": "https://sourceforge.net/projects/codeblocks/reviews/",
+      "downloads": 155,
+      "description": "",
+      "tags": [],
+      "rating": "155 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "development"
+      ],
+      "popularityScore": 21.903316981702915
+    },
+    {
+      "name": "TortoiseSVN",
+      "link": "https://sourceforge.net/projects/tortoisesvn/reviews/",
+      "downloads": 154,
+      "description": "",
+      "tags": [],
+      "rating": "154 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "development"
+      ],
+      "popularityScore": 21.875207208364632
+    },
+    {
+      "name": "Azureus",
+      "link": "https://sourceforge.net/projects/azureus/reviews/",
+      "downloads": 153,
+      "description": "",
+      "tags": [],
+      "rating": "153 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "education"
+      ],
+      "popularityScore": 21.84691430817599
+    },
+    {
+      "name": "ClamWin",
+      "link": "https://sourceforge.net/projects/clamwin/reviews/",
+      "downloads": 151,
+      "description": "",
+      "tags": [],
+      "rating": "151 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "database"
+      ],
+      "popularityScore": 21.78976947293169
+    },
+    {
+      "name": "Scribus",
+      "link": "https://sourceforge.net/projects/scribus/reviews/",
+      "downloads": 142,
+      "description": "",
+      "tags": [],
+      "rating": "142 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "graphics"
+      ],
+      "popularityScore": 21.522883443830562
+    },
+    {
+      "name": "Orwelldevcpp",
+      "link": "https://sourceforge.net/projects/orwelldevcpp/reviews/",
+      "downloads": 141,
+      "description": "",
+      "tags": [],
+      "rating": "141 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "development"
+      ],
+      "popularityScore": 21.4921911265538
+    },
+    {
+      "name": "Processhacker",
+      "link": "https://sourceforge.net/projects/processhacker/reviews/",
+      "downloads": 139,
+      "description": "",
+      "tags": [],
+      "rating": "139 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "security"
+      ],
+      "popularityScore": 21.43014800254095
+    },
+    {
+      "name": "Peace Equalizer Apo Extension",
+      "link": "https://sourceforge.net/projects/peace-equalizer-apo-extension/reviews/",
+      "downloads": 133,
+      "description": "",
+      "tags": [],
+      "rating": "133 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 21.238516409670858
+    },
+    {
+      "name": "Clonezilla",
+      "link": "https://sourceforge.net/projects/clonezilla/reviews/",
+      "downloads": 128,
+      "description": "",
+      "tags": [],
+      "rating": "128 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "education"
+      ],
+      "popularityScore": 21.072099696478684
+    },
+    {
+      "name": "Opencvlibrary",
+      "link": "https://sourceforge.net/projects/opencvlibrary/reviews/",
+      "downloads": 123,
+      "description": "",
+      "tags": [],
+      "rating": "123 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "browser"
+      ],
+      "popularityScore": 20.89905111439398
+    },
+    {
+      "name": "GnuCash",
+      "link": "https://sourceforge.net/projects/gnucash/reviews/",
+      "downloads": 122,
+      "description": "",
+      "tags": [],
+      "rating": "122 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "business"
+      ],
+      "popularityScore": 20.863598306747484
+    },
+    {
+      "name": "Assp",
+      "link": "https://sourceforge.net/projects/assp/reviews/",
+      "downloads": 116,
+      "description": "",
+      "tags": [],
+      "rating": "116 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "development"
+      ],
+      "popularityScore": 20.644579892269185
+    },
+    {
+      "name": "PeaZip",
+      "link": "https://sourceforge.net/projects/peazip/reviews/",
+      "downloads": 115,
+      "description": "",
+      "tags": [],
+      "rating": "115 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "business"
+      ],
+      "popularityScore": 20.606978403536118
+    },
+    {
+      "name": "Dban",
+      "link": "https://sourceforge.net/projects/dban/reviews/",
+      "downloads": 113,
+      "description": "",
+      "tags": [],
+      "rating": "113 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "security"
+      ],
+      "popularityScore": 20.530784434834196
+    },
+    {
+      "name": "Ultradefrag",
+      "link": "https://sourceforge.net/projects/ultradefrag/reviews/",
+      "downloads": 112,
+      "description": "",
+      "tags": [],
+      "rating": "112 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "health"
+      ],
+      "popularityScore": 20.492180226701816
+    },
+    {
+      "name": "VirtualDub",
+      "link": "https://sourceforge.net/projects/virtualdub/reviews/",
+      "downloads": 111,
+      "description": "",
+      "tags": [],
+      "rating": "111 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 20.453229787866576
+    },
+    {
+      "name": "Skim App",
+      "link": "https://sourceforge.net/projects/skim-app/reviews/",
+      "downloads": 109,
+      "description": "",
+      "tags": [],
+      "rating": "109 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "graphics"
+      ],
+      "popularityScore": 20.374264979406238
+    },
+    {
+      "name": "Npp Plugins",
+      "link": "https://sourceforge.net/projects/npp-plugins/reviews/",
+      "downloads": 104,
+      "description": "",
+      "tags": [],
+      "rating": "104 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "text-editors"
+      ],
+      "popularityScore": 20.170333392987803
+    },
+    {
+      "name": "Boost",
+      "link": "https://sourceforge.net/projects/boost/reviews/",
+      "downloads": 103,
+      "description": "",
+      "tags": [],
+      "rating": "103 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "development"
+      ],
+      "popularityScore": 20.128372247051722
+    },
+    {
+      "name": "The Battle for Wesnoth",
+      "link": "https://sourceforge.net/projects/wesnoth/reviews/",
+      "downloads": 102,
+      "description": "",
+      "tags": [],
+      "rating": "102 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "games"
+      ],
+      "popularityScore": 20.086001717619176
+    },
+    {
+      "name": "Warzone 2100",
+      "link": "https://sourceforge.net/projects/warzone2100/reviews/",
+      "downloads": 101,
+      "description": "",
+      "tags": [],
+      "rating": "101 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "games"
+      ],
+      "popularityScore": 20.043213737826427
+    },
+    {
+      "name": "Xiaomi Eu Multilang Miui Roms",
+      "link": "https://sourceforge.net/projects/xiaomi-eu-multilang-miui-roms/reviews/",
+      "downloads": 99,
+      "description": "",
+      "tags": [],
+      "rating": "99 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 19.9563519459755
+    },
+    {
+      "name": "HP Linux Imaging and Printing",
+      "link": "https://sourceforge.net/projects/hplip/reviews/",
+      "downloads": 95,
+      "description": "",
+      "tags": [],
+      "rating": "95 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "graphics"
+      ],
+      "popularityScore": 19.77723605288848
+    },
+    {
+      "name": "MP3Gain",
+      "link": "https://sourceforge.net/projects/mp3gain/reviews/",
+      "downloads": 93,
+      "description": "",
+      "tags": [],
+      "rating": "93 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "multimedia"
+      ],
+      "popularityScore": 19.684829485539353
+    },
+    {
+      "name": "Redobackup",
+      "link": "https://sourceforge.net/projects/redobackup/reviews/",
+      "downloads": 90,
+      "description": "",
+      "tags": [],
+      "rating": "90 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "browser"
+      ],
+      "popularityScore": 19.54242509439325
+    },
+    {
+      "name": "Dxwnd",
+      "link": "https://sourceforge.net/projects/dxwnd/reviews/",
+      "downloads": 88,
+      "description": "",
+      "tags": [],
+      "rating": "88 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 19.444826721501688
+    },
+    {
+      "name": "Scrollout",
+      "link": "https://sourceforge.net/projects/scrollout/reviews/",
+      "downloads": 85,
+      "description": "",
+      "tags": [],
+      "rating": "85 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "security"
+      ],
+      "popularityScore": 19.29418925714293
+    },
+    {
+      "name": "Webadmin",
+      "link": "https://sourceforge.net/projects/webadmin/reviews/",
+      "downloads": 83,
+      "description": "",
+      "tags": [],
+      "rating": "83 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "database"
+      ],
+      "popularityScore": 19.19078092376074
+    },
+    {
+      "name": "Openemr",
+      "link": "https://sourceforge.net/projects/openemr/reviews/",
+      "downloads": 80,
+      "description": "",
+      "tags": [],
+      "rating": "80 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "health"
+      ],
+      "popularityScore": 19.030899869919434
+    },
+    {
+      "name": "Dia Installer",
+      "link": "https://sourceforge.net/projects/dia-installer/reviews/",
+      "downloads": 78,
+      "description": "",
+      "tags": [],
+      "rating": "78 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "graphics"
+      ],
+      "popularityScore": 18.920946026904804
+    },
+    {
+      "name": "Winpenpack",
+      "link": "https://sourceforge.net/projects/winpenpack/reviews/",
+      "downloads": 77,
+      "description": "",
+      "tags": [],
+      "rating": "77 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "utilities"
+      ],
+      "popularityScore": 18.86490725172482
+    },
+    {
+      "name": "Systemrescuecd",
+      "link": "https://sourceforge.net/projects/systemrescuecd/reviews/",
+      "downloads": 75,
+      "description": "",
+      "tags": [],
+      "rating": "75 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "text-editors"
+      ],
+      "popularityScore": 18.750612633917
+    },
+    {
+      "name": "Bulk Crap Uninstaller",
+      "link": "https://sourceforge.net/projects/bulk-crap-uninstaller/reviews/",
+      "downloads": 73,
+      "description": "",
+      "tags": [],
+      "rating": "73 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "games"
+      ],
+      "popularityScore": 18.633228601204557
+    },
+    {
+      "name": "Ffdshow Tryout",
+      "link": "https://sourceforge.net/projects/ffdshow-tryout/reviews/",
+      "downloads": 71,
+      "description": "",
+      "tags": [],
+      "rating": "71 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 18.512583487190753
+    },
+    {
+      "name": "Simutrans",
+      "link": "https://sourceforge.net/projects/simutrans/reviews/",
+      "downloads": 68,
+      "description": "",
+      "tags": [],
+      "rating": "68 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "games"
+      ],
+      "popularityScore": 18.325089127062363
+    },
+    {
+      "name": "Gnuplot",
+      "link": "https://sourceforge.net/projects/gnuplot/reviews/",
+      "downloads": 67,
+      "description": "",
+      "tags": [],
+      "rating": "67 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "graphics"
+      ],
+      "popularityScore": 18.260748027008265
+    },
+    {
+      "name": "Dev Cpp",
+      "link": "https://sourceforge.net/projects/dev-cpp/reviews/",
+      "downloads": 66,
+      "description": "",
+      "tags": [],
+      "rating": "66 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "browser"
+      ],
+      "popularityScore": 18.19543935541869
+    },
+    {
+      "name": "Avidemux",
+      "link": "https://sourceforge.net/projects/avidemux/reviews/",
+      "downloads": 64,
+      "description": "",
+      "tags": [],
+      "rating": "64 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 18.06179973983887
+    },
+    {
+      "name": "Npppluginmgr",
+      "link": "https://sourceforge.net/projects/npppluginmgr/reviews/",
+      "downloads": 63,
+      "description": "",
+      "tags": [],
+      "rating": "63 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "development"
+      ],
+      "popularityScore": 17.993405494535818
+    },
+    {
+      "name": "Maxima",
+      "link": "https://sourceforge.net/projects/maxima/reviews/",
+      "downloads": 61,
+      "description": "",
+      "tags": [],
+      "rating": "61 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "education"
+      ],
+      "popularityScore": 17.85329835010767
+    },
+    {
+      "name": "FlightGear",
+      "link": "https://sourceforge.net/projects/flightgear/reviews/",
+      "downloads": 60,
+      "description": "",
+      "tags": [],
+      "rating": "60 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "games"
+      ],
+      "popularityScore": 17.781512503836435
+    },
+    {
+      "name": "Kmeleon",
+      "link": "https://sourceforge.net/projects/kmeleon/reviews/",
+      "downloads": 59,
+      "description": "",
+      "tags": [],
+      "rating": "59 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "browser"
+      ],
+      "popularityScore": 17.708520116421443
+    },
+    {
+      "name": "Xournal",
+      "link": "https://sourceforge.net/projects/xournal/reviews/",
+      "downloads": 57,
+      "description": "",
+      "tags": [],
+      "rating": "57 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "productivity"
+      ],
+      "popularityScore": 17.558748556724915
+    },
+    {
+      "name": "Netmodhttp",
+      "link": "https://sourceforge.net/projects/netmodhttp/reviews/",
+      "downloads": 55,
+      "description": "",
+      "tags": [],
+      "rating": "55 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "networking"
+      ],
+      "popularityScore": 17.403626894942438
+    },
+    {
+      "name": "Dolibarr",
+      "link": "https://sourceforge.net/projects/dolibarr/reviews/",
+      "downloads": 52,
+      "description": "",
+      "tags": [],
+      "rating": "52 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "business"
+      ],
+      "popularityScore": 17.16003343634799
+    },
+    {
+      "name": "Sox",
+      "link": "https://sourceforge.net/projects/sox/reviews/",
+      "downloads": 51,
+      "description": "",
+      "tags": [],
+      "rating": "51 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "utilities"
+      ],
+      "popularityScore": 17.075701760979364
+    },
+    {
+      "name": "Sagethumbs",
+      "link": "https://sourceforge.net/projects/sagethumbs/reviews/",
+      "downloads": 50,
+      "description": "",
+      "tags": [],
+      "rating": "50 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "graphics"
+      ],
+      "popularityScore": 16.989700043360187
+    },
+    {
+      "name": "Dvdflick",
+      "link": "https://sourceforge.net/projects/dvdflick/reviews/",
+      "downloads": 47,
+      "description": "",
+      "tags": [],
+      "rating": "47 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 16.720978579357176
+    },
+    {
+      "name": "Digitalclock4",
+      "link": "https://sourceforge.net/projects/digitalclock4/reviews/",
+      "downloads": 45,
+      "description": "",
+      "tags": [],
+      "rating": "45 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "productivity"
+      ],
+      "popularityScore": 16.532125137753436
+    },
+    {
+      "name": "Orangehrm",
+      "link": "https://sourceforge.net/projects/orangehrm/reviews/",
+      "downloads": 44,
+      "description": "",
+      "tags": [],
+      "rating": "44 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "business"
+      ],
+      "popularityScore": 16.434526764861875
+    },
+    {
+      "name": "Avogadro",
+      "link": "https://sourceforge.net/projects/avogadro/reviews/",
+      "downloads": 43,
+      "description": "",
+      "tags": [],
+      "rating": "43 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "education"
+      ],
+      "popularityScore": 16.334684555795867
+    },
+    {
+      "name": "Burn Osx",
+      "link": "https://sourceforge.net/projects/burn-osx/reviews/",
+      "downloads": 42,
+      "description": "",
+      "tags": [],
+      "rating": "42 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 16.232492903979004
+    },
+    {
+      "name": "Gnaural",
+      "link": "https://sourceforge.net/projects/gnaural/reviews/",
+      "downloads": 41,
+      "description": "",
+      "tags": [],
+      "rating": "41 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "productivity"
+      ],
+      "popularityScore": 16.127838567197355
+    },
+    {
+      "name": "Sapnweclipse",
+      "link": "https://sourceforge.net/projects/sapnweclipse/reviews/",
+      "downloads": 39,
+      "description": "",
+      "tags": [],
+      "rating": "39 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "development"
+      ],
+      "popularityScore": 15.910646070264992
+    },
+    {
+      "name": "Pseint",
+      "link": "https://sourceforge.net/projects/pseint/reviews/",
+      "downloads": 38,
+      "description": "",
+      "tags": [],
+      "rating": "38 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "development"
+      ],
+      "popularityScore": 15.797835966168101
+    },
+    {
+      "name": "Seb",
+      "link": "https://sourceforge.net/projects/seb/reviews/",
+      "downloads": 37,
+      "description": "",
+      "tags": [],
+      "rating": "37 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "security"
+      ],
+      "popularityScore": 15.68201724066995
+    },
+    {
+      "name": "Freeimage",
+      "link": "https://sourceforge.net/projects/freeimage/reviews/",
+      "downloads": 36,
+      "description": "",
+      "tags": [],
+      "rating": "36 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "business"
+      ],
+      "popularityScore": 15.563025007672874
+    },
+    {
+      "name": "Hesuvi",
+      "link": "https://sourceforge.net/projects/hesuvi/reviews/",
+      "downloads": 33,
+      "description": "",
+      "tags": [],
+      "rating": "33 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 15.185139398778876
+    },
+    {
+      "name": "Movistartv",
+      "link": "https://sourceforge.net/projects/movistartv/reviews/",
+      "downloads": 32,
+      "description": "",
+      "tags": [],
+      "rating": "32 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 15.051499783199061
+    },
+    {
+      "name": "Grandperspectiv",
+      "link": "https://sourceforge.net/projects/grandperspectiv/reviews/",
+      "downloads": 31,
+      "description": "",
+      "tags": [],
+      "rating": "31 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "text-editors"
+      ],
+      "popularityScore": 14.913616938342727
+    },
+    {
+      "name": "Geoserver",
+      "link": "https://sourceforge.net/projects/geoserver/reviews/",
+      "downloads": 30,
+      "description": "",
+      "tags": [],
+      "rating": "30 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "business"
+      ],
+      "popularityScore": 14.771212547196624
+    },
+    {
+      "name": "Open Clinic",
+      "link": "https://sourceforge.net/projects/open-clinic/reviews/",
+      "downloads": 29,
+      "description": "",
+      "tags": [],
+      "rating": "29 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "health"
+      ],
+      "popularityScore": 14.62397997898956
+    },
+    {
+      "name": "Canon Eos Digital Info",
+      "link": "https://sourceforge.net/projects/canon-eos-digital-info/reviews/",
+      "downloads": 27,
+      "description": "",
+      "tags": [],
+      "rating": "27 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "graphics"
+      ],
+      "popularityScore": 14.313637641589875
+    },
+    {
+      "name": "Snap7",
+      "link": "https://sourceforge.net/projects/snap7/reviews/",
+      "downloads": 26,
+      "description": "",
+      "tags": [],
+      "rating": "26 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "communication"
+      ],
+      "popularityScore": 14.14973347970818
+    },
+    {
+      "name": "Virtualgl",
+      "link": "https://sourceforge.net/projects/virtualgl/reviews/",
+      "downloads": 25,
+      "description": "",
+      "tags": [],
+      "rating": "25 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 13.979400086720377
+    },
+    {
+      "name": "Mpv Player Windows",
+      "link": "https://sourceforge.net/projects/mpv-player-windows/reviews/",
+      "downloads": 24,
+      "description": "",
+      "tags": [],
+      "rating": "24 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 13.80211241711606
+    },
+    {
+      "name": "Ubuntuzilla",
+      "link": "https://sourceforge.net/projects/ubuntuzilla/reviews/",
+      "downloads": 23,
+      "description": "",
+      "tags": [],
+      "rating": "23 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "system"
+      ],
+      "popularityScore": 13.617278360175929
+    },
+    {
+      "name": "Wsjt X Improved",
+      "link": "https://sourceforge.net/projects/wsjt-x-improved/reviews/",
+      "downloads": 22,
+      "description": "",
+      "tags": [],
+      "rating": "22 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "communication"
+      ],
+      "popularityScore": 13.424226808222063
+    },
+    {
+      "name": "Graphicsmagick",
+      "link": "https://sourceforge.net/projects/graphicsmagick/reviews/",
+      "downloads": 21,
+      "description": "",
+      "tags": [],
+      "rating": "21 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 13.222192947339193
+    },
+    {
+      "name": "Onvifdm",
+      "link": "https://sourceforge.net/projects/onvifdm/reviews/",
+      "downloads": 19,
+      "description": "",
+      "tags": [],
+      "rating": "19 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 12.787536009528289
+    },
+    {
+      "name": "Isphere",
+      "link": "https://sourceforge.net/projects/isphere/reviews/",
+      "downloads": 18,
+      "description": "",
+      "tags": [],
+      "rating": "18 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "productivity"
+      ],
+      "popularityScore": 12.552725051033061
+    },
+    {
+      "name": "Shotcut",
+      "link": "https://sourceforge.net/projects/shotcut/reviews/",
+      "downloads": 17,
+      "description": "",
+      "tags": [],
+      "rating": "17 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 12.30448921378274
+    },
+    {
+      "name": "Libjpeg Turbo",
+      "link": "https://sourceforge.net/projects/libjpeg-turbo/reviews/",
+      "downloads": 16,
+      "description": "",
+      "tags": [],
+      "rating": "16 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 12.041199826559248
+    },
+    {
+      "name": "Turbovnc",
+      "link": "https://sourceforge.net/projects/turbovnc/reviews/",
+      "downloads": 15,
+      "description": "",
+      "tags": [],
+      "rating": "15 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 11.760912590556813
+    },
+    {
+      "name": "Gmkvextractgui",
+      "link": "https://sourceforge.net/projects/gmkvextractgui/reviews/",
+      "downloads": 14,
+      "description": "",
+      "tags": [],
+      "rating": "14 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "utilities"
+      ],
+      "popularityScore": 11.46128035678238
+    },
+    {
+      "name": "Dos2unix",
+      "link": "https://sourceforge.net/projects/dos2unix/reviews/",
+      "downloads": 13,
+      "description": "",
+      "tags": [],
+      "rating": "13 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "utilities"
+      ],
+      "popularityScore": 11.139433523068368
+    },
+    {
+      "name": "Sumo",
+      "link": "https://sourceforge.net/projects/sumo/reviews/",
+      "downloads": 12,
+      "description": "",
+      "tags": [],
+      "rating": "12 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "communication"
+      ],
+      "popularityScore": 10.79181246047625
+    },
+    {
+      "name": "Obs Studio",
+      "link": "https://sourceforge.net/projects/obs-studio.mirror/reviews/",
+      "downloads": 11,
+      "description": "",
+      "tags": [],
+      "rating": "11 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "audio"
+      ],
+      "popularityScore": 10.41392685158225
+    },
+    {
+      "name": "Lcms",
+      "link": "https://sourceforge.net/projects/lcms/reviews/",
+      "downloads": 10,
+      "description": "",
+      "tags": [],
+      "rating": "10 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "graphics"
+      ],
+      "popularityScore": 10
+    },
+    {
+      "name": "Erp Crm Advant",
+      "link": "https://sourceforge.net/projects/erp-crm-advant/reviews/",
+      "downloads": 9,
+      "description": "",
+      "tags": [],
+      "rating": "9 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "finance"
+      ],
+      "popularityScore": 9.542425094393248
+    },
+    {
+      "name": "D77void",
+      "link": "https://sourceforge.net/projects/d77void/reviews/",
+      "downloads": 7,
+      "description": "",
+      "tags": [],
+      "rating": "7 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 8.450980400142567
+    },
+    {
+      "name": "Androidtv X86 64",
+      "link": "https://sourceforge.net/projects/androidtv-x86-64/reviews/",
+      "downloads": 6,
+      "description": "",
+      "tags": [],
+      "rating": "6 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "video"
+      ],
+      "popularityScore": 7.781512503836437
+    },
+    {
+      "name": "Losslesscut",
+      "link": "https://sourceforge.net/projects/losslesscut.mirror/reviews/",
+      "downloads": 5,
+      "description": "",
+      "tags": [],
+      "rating": "5 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "audio"
+      ],
+      "popularityScore": 6.989700043360188
+    },
+    {
+      "name": "Academix",
+      "link": "https://sourceforge.net/projects/academix/reviews/",
+      "downloads": 4,
+      "description": "",
+      "tags": [],
+      "rating": "4 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "graphics"
+      ],
+      "popularityScore": 6.020599913279624
+    },
+    {
+      "name": "Frescobaldi",
+      "link": "https://sourceforge.net/projects/frescobaldi.mirror/reviews/",
+      "downloads": 2,
+      "description": "",
+      "tags": [],
+      "rating": "2 Reviews",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "audio"
+      ],
+      "popularityScore": 3.010299956639812
+    },
+    {
+      "name": "Clementine",
+      "link": "https://sourceforge.net/projects/clementine.mirror/reviews/",
+      "downloads": 1,
+      "description": "",
+      "tags": [],
+      "rating": "1 Review",
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "audio"
+      ],
+      "popularityScore": 0
+    },
+    {
+      "name": "Mlx Audio",
+      "link": "https://sourceforge.net/projects/mlx-audio.mirror/",
+      "downloads": 0,
+      "description": "",
+      "tags": [],
+      "rating": null,
+      "source": "sourceforge",
+      "sources": [
+        "sourceforge"
+      ],
+      "categories": [
+        "audio"
+      ],
+      "popularityScore": 0
+    }
+  ]
+}

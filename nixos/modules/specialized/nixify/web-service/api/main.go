@@ -93,6 +93,12 @@ var moduleDetailCSS string
 //go:embed static/data/mapping-database.json
 var mappingDatabaseJSON string
 
+//go:embed static/data/programs-database.json
+var programsDatabaseJSON string
+
+//go:embed static/data/games-database.json
+var gamesDatabaseJSON string
+
 // Session represents a migration session
 type Session struct {
 	ID          string    `json:"id"`
@@ -408,6 +414,7 @@ type TemplateData struct {
 	Sessions    int
 	ProgramsJSON template.JS // For mappings page
 	MappingTranslationsJSON template.JS // For mappings page translations
+	GamesJSON template.JS // For games page
 	ModulesJSON  template.JS // For modules page
 	Modules      []ModuleInfo // For modules page
 	Module       *ModuleInfo // For module detail page
@@ -794,7 +801,64 @@ func (s *Server) handleGames(w http.ResponseWriter, r *http.Request) {
 	s.setSecurityHeadersWithNonce(w, nonce)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	
+	// Load games database
+	// Priority: 1. Environment variable, 2. File path, 3. Embedded database
+	var gamesData []byte
+	gamesPath := os.Getenv("GAMES_DB_PATH")
+	
+	// Try to load from file first (for development/custom games)
+	if gamesPath != "" {
+		if _, err := os.Stat(gamesPath); err == nil {
+			gamesData, _ = os.ReadFile(gamesPath)
+		}
+	}
+	
+	// Try default dataDir path
+	if len(gamesData) == 0 {
+		defaultPath := filepath.Join(s.dataDir, "games-database.json")
+		if _, err := os.Stat(defaultPath); err == nil {
+			gamesData, _ = os.ReadFile(defaultPath)
+		}
+	}
+	
+	// Try static/data path
+	if len(gamesData) == 0 {
+		staticPath := filepath.Join(s.dataDir, "..", "web-service", "api", "static", "data", "games-database.json")
+		if _, err := os.Stat(staticPath); err == nil {
+			gamesData, _ = os.ReadFile(staticPath)
+		}
+	}
+	
+	// Fallback to embedded database
+	if len(gamesData) == 0 {
+		gamesData = []byte(gamesDatabaseJSON)
+	}
+	
+	var gamesDB map[string]interface{}
+	if err := json.Unmarshal(gamesData, &gamesDB); err != nil {
+		log.Printf("Failed to parse games database: %v", err)
+		gamesDB = map[string]interface{}{"games": []interface{}{}}
+	}
+	
+	// Extract games array
+	gamesArray, ok := gamesDB["games"].([]interface{})
+	if !ok {
+		// Try to convert if it's not already an array
+		if gamesList, ok := gamesDB["games"].([]map[string]interface{}); ok {
+			gamesArray = make([]interface{}, len(gamesList))
+			for i, g := range gamesList {
+				gamesArray[i] = g
+			}
+		} else {
+			gamesArray = []interface{}{}
+		}
+	}
+	
+	// Convert to JSON for JavaScript
+	gamesJSON, _ := json.Marshal(gamesArray)
+	
 	data := s.newTemplateData(r, nonce)
+	data.GamesJSON = template.JS(gamesJSON)
 	
 	// Execute base template, which will render the "games" block
 	if err := s.baseTemplate.ExecuteTemplate(w, "base", data); err != nil {

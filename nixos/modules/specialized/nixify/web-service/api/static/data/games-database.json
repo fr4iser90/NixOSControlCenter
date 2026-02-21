@@ -1,0 +1,918 @@
+{
+  "scrapedAt": "2026-02-21T16:10:02.949Z",
+  "source": "https://de.wikipedia.org/wiki/Liste_der_erfolgreichsten_Computerspiele",
+  "totalGames": 64,
+  "duplicatesRemoved": 0,
+  "consoleGamesRemoved": 0,
+  "games": [
+    {
+      "name": "Assassin’s Creed IV: Black Flag",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Battlefield 3",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Black Myth: Wukong",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Borderlands 2",
+      "platforms": [
+        "Windows",
+        "Linux",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": true,
+      "antiCheat": null
+    },
+    {
+      "name": "Borderlands 3",
+      "platforms": [
+        "Windows",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Call of Duty 4: Modern Warfare",
+      "platforms": [
+        "Windows",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "broken",
+      "protonCompatible": false,
+      "native": false,
+      "antiCheat": "IW Anti-Cheat",
+      "brokenSince": "2007"
+    },
+    {
+      "name": "Call of Duty: Black Ops",
+      "platforms": [
+        "Windows",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "broken",
+      "protonCompatible": false,
+      "native": false,
+      "antiCheat": "Treyarch Anti-Cheat",
+      "brokenSince": "2010"
+    },
+    {
+      "name": "Call of Duty: Black Ops II",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "broken",
+      "protonCompatible": false,
+      "native": false,
+      "antiCheat": "Treyarch Anti-Cheat",
+      "brokenSince": "2012"
+    },
+    {
+      "name": "Call of Duty: Ghosts",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "broken",
+      "protonCompatible": false,
+      "native": false,
+      "antiCheat": "IW Anti-Cheat",
+      "brokenSince": "2013"
+    },
+    {
+      "name": "Call of Duty: Modern Warfare",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "broken",
+      "protonCompatible": false,
+      "native": false,
+      "antiCheat": "Ricochet",
+      "brokenSince": "2019"
+    },
+    {
+      "name": "Call of Duty: Modern Warfare 2",
+      "platforms": [
+        "Windows",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "broken",
+      "protonCompatible": false,
+      "native": false,
+      "antiCheat": "Ricochet",
+      "brokenSince": "2022"
+    },
+    {
+      "name": "Call of Duty: Modern Warfare 3",
+      "platforms": [
+        "Windows",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "broken",
+      "protonCompatible": false,
+      "native": false,
+      "antiCheat": "Ricochet",
+      "brokenSince": "2023"
+    },
+    {
+      "name": "Call of Duty: Vanguard",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "broken",
+      "protonCompatible": false,
+      "native": false,
+      "antiCheat": "Ricochet",
+      "brokenSince": "2021"
+    },
+    {
+      "name": "Call of Duty: World at War",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "broken",
+      "protonCompatible": false,
+      "native": false,
+      "antiCheat": "Treyarch Anti-Cheat",
+      "brokenSince": "2008"
+    },
+    {
+      "name": "Counter-Strike: Global Offensive",
+      "platforms": [
+        "Windows",
+        "Linux",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": false,
+      "native": true,
+      "antiCheat": null
+    },
+    {
+      "name": "Cyberpunk 2077",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null
+    },
+    {
+      "name": "Diablo III",
+      "platforms": [
+        "Windows",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null
+    },
+    {
+      "name": "Die Sims",
+      "platforms": [
+        "Windows",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Dying Light",
+      "platforms": [
+        "Windows",
+        "Linux"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": true,
+      "antiCheat": null
+    },
+    {
+      "name": "Elden Ring",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null
+    },
+    {
+      "name": "Escape from Tarkov",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "2016",
+      "sales": "",
+      "source": "manual",
+      "status": "broken",
+      "antiCheat": "BattlEye",
+      "brokenSince": "2016",
+      "protonCompatible": false,
+      "native": false
+    },
+    {
+      "name": "Fallout 4",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null
+    },
+    {
+      "name": "FIFA 11",
+      "platforms": [
+        "Windows",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "FIFA 16",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "FIFA 18",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "FIFA 19",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Fortnite",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "2017",
+      "sales": "über 350 Millionen registrierte Spieler",
+      "source": "wikipedia",
+      "status": "broken",
+      "antiCheat": "EasyAntiCheat",
+      "brokenSince": "2017",
+      "protonCompatible": false,
+      "native": false
+    },
+    {
+      "name": "Forza Horizon 4",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "Über 24 Millionen Spieler",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Garry’s Mod",
+      "platforms": [
+        "Windows",
+        "Linux",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": false,
+      "native": true,
+      "antiCheat": null
+    },
+    {
+      "name": "God of War",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "God of War: Ragnarök",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Grand Theft Auto III",
+      "platforms": [
+        "Windows",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Grand Theft Auto IV",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Grand Theft Auto V",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Grand Theft Auto: San Andreas",
+      "platforms": [
+        "Windows",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Grand Theft Auto: Vice City",
+      "platforms": [
+        "Windows",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Hogwarts Legacy",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null
+    },
+    {
+      "name": "Horizon Zero Dawn",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Human: Fall Flat",
+      "platforms": [
+        "Windows",
+        "Linux",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": false,
+      "native": true,
+      "antiCheat": null
+    },
+    {
+      "name": "It Takes Two",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Kinect Adventures!",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "broken",
+      "protonCompatible": false,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false,
+      "note": "Requires Kinect hardware"
+    },
+    {
+      "name": "League of Legends",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "2009",
+      "sales": "über 100 Millionen monatliche Spieler",
+      "source": "wikipedia",
+      "status": "broken",
+      "antiCheat": "Vanguard",
+      "brokenSince": "2020",
+      "protonCompatible": false,
+      "native": false
+    },
+    {
+      "name": "Minecraft",
+      "platforms": [
+        "Windows",
+        "Linux",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": false,
+      "native": true,
+      "antiCheat": null
+    },
+    {
+      "name": "Monster Hunter Rise",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Monster Hunter: World",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Mortal Kombat 11",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Need for Speed: Most Wanted",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Need for Speed: Underground",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Overwatch",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null
+    },
+    {
+      "name": "Palworld",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null
+    },
+    {
+      "name": "PUBG: Battlegrounds",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "broken",
+      "antiCheat": "BattlEye",
+      "brokenSince": "2017",
+      "protonCompatible": false,
+      "native": false
+    },
+    {
+      "name": "Red Dead Redemption 2",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null
+    },
+    {
+      "name": "Resident Evil 2",
+      "platforms": [
+        "Windows",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Rust",
+      "platforms": [
+        "Windows",
+        "Linux",
+        "macOS"
+      ],
+      "releaseYear": "2013",
+      "sales": "",
+      "source": "manual",
+      "status": "partial",
+      "protonCompatible": true,
+      "native": false,
+      "restricted": true,
+      "restrictedNote": "Cannot play on secured servers with Linux (EAC restriction), but works well otherwise",
+      "antiCheat": null
+    },
+    {
+      "name": "Sonic & Sega All-Stars Racing",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Sonic the Hedgehog",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "Stardew Valley",
+      "platforms": [
+        "Windows",
+        "Linux",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": false,
+      "native": true,
+      "antiCheat": null
+    },
+    {
+      "name": "Terraria",
+      "platforms": [
+        "Windows",
+        "Linux",
+        "macOS"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": false,
+      "native": true,
+      "antiCheat": null
+    },
+    {
+      "name": "Tetris",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "The Elder Scrolls V: Skyrim",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null,
+      "restricted": false
+    },
+    {
+      "name": "The Witcher 3: Wild Hunt",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null
+    },
+    {
+      "name": "Tom Clancy’s Rainbow Six Siege",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "",
+      "sales": "",
+      "source": "wikipedia",
+      "status": "broken",
+      "protonCompatible": false,
+      "native": false,
+      "antiCheat": "BattlEye",
+      "brokenSince": "2015"
+    },
+    {
+      "name": "Valorant",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "2020",
+      "sales": "",
+      "source": "manual",
+      "status": "broken",
+      "antiCheat": "Vanguard",
+      "brokenSince": "2020",
+      "protonCompatible": false,
+      "native": false
+    },
+    {
+      "name": "World of Warcraft",
+      "platforms": [
+        "Windows"
+      ],
+      "releaseYear": "2004",
+      "sales": "über 100 Millionen registrierte Accounts",
+      "source": "wikipedia",
+      "status": "works",
+      "protonCompatible": true,
+      "native": false,
+      "antiCheat": null
+    }
+  ]
+}

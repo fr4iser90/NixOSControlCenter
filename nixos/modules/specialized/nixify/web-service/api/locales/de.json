@@ -470,7 +470,34 @@
         "status": "Funktioniert nicht - Kernel-Level BattlEye erforderlich",
         "plans": "Keine offizielle Linux-Unterstützung geplant. Battlestate Games hat keine Pläne für Linux-Kompatibilität angekündigt."
       }
-    }
+    },
+    "search": "Spiele durchsuchen...",
+    "filter": {
+      "all": "Alle",
+      "works": "Funktioniert",
+      "broken": "Kaputt",
+      "partial": "Teilweise",
+      "unknown": "Unbekannt"
+    },
+    "status": {
+      "works": "✅ Funktioniert",
+      "broken": "❌ Kaputt",
+      "partial": "⚠️ Teilweise",
+      "unknown": "❓ Unbekannt"
+    },
+    "platform": {
+      "windows": "Windows",
+      "linux": "Linux",
+      "macos": "macOS"
+    },
+    "native": "Native Linux",
+    "proton_compatible": "Proton-kompatibel",
+    "anti_cheat": "Anti-Cheat",
+    "platforms": "Plattformen",
+    "broken_since": "Seit",
+    "restricted": "Eingeschränkt",
+    "note": "Hinweis",
+    "no_results": "Keine Spiele gefunden"
   },
   "about": {
     "title": "Über NixOS Control Center",

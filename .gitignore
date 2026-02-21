@@ -39,7 +39,7 @@ secret/
 secrets/
 *.secret
 hardware-configuration.nix
-
+scraper/
 # Generated documentation
 # If you generate HTML or other files during documentation generation, exclude them.
 docs/_build/

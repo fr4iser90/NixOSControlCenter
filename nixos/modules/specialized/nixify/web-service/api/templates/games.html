@@ -14,87 +14,24 @@
     </div>
 
     <div class="section">
-        <h2>{{.T "games.not_working.title"}}</h2>
-        <p>{{.T "games.not_working.description"}}</p>
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="{{.T "games.search"}}" class="search-input-full">
+        </div>
         
-        <div class="games-list">
-            <div class="game-item">
-                <div class="game-header">
-                    <h3>Valorant</h3>
-                    <span class="game-publisher">Riot Games</span>
-                </div>
-                <div class="game-details">
-                    <p><strong>{{.T "games.not_working.anticheat"}}:</strong> Vanguard (Kernel-Level)</p>
-                    <p><strong>{{.T "games.not_working.since"}}:</strong> {{.T "games.not_working.valorant.since"}}</p>
-                    <p><strong>{{.T "games.not_working.status"}}:</strong> {{.T "games.not_working.valorant.status"}}</p>
-                    <p><strong>{{.T "games.not_working.plans"}}:</strong> {{.T "games.not_working.valorant.plans"}}</p>
-                </div>
-            </div>
+        <div class="filter-bar">
+            <button class="filter-btn active" data-status="all">{{.T "games.filter.all"}}</button>
+            <button class="filter-btn" data-status="works">{{.T "games.filter.works"}}</button>
+            <button class="filter-btn" data-status="broken">{{.T "games.filter.broken"}}</button>
+            <button class="filter-btn" data-status="partial">{{.T "games.filter.partial"}}</button>
+            <button class="filter-btn" data-status="unknown">{{.T "games.filter.unknown"}}</button>
+        </div>
 
-            <div class="game-item">
-                <div class="game-header">
-                    <h3>League of Legends</h3>
-                    <span class="game-publisher">Riot Games</span>
-                </div>
-                <div class="game-details">
-                    <p><strong>{{.T "games.not_working.anticheat"}}:</strong> Vanguard (Kernel-Level, seit 2024)</p>
-                    <p><strong>{{.T "games.not_working.since"}}:</strong> {{.T "games.not_working.lol.since"}}</p>
-                    <p><strong>{{.T "games.not_working.status"}}:</strong> {{.T "games.not_working.lol.status"}}</p>
-                    <p><strong>{{.T "games.not_working.plans"}}:</strong> {{.T "games.not_working.lol.plans"}}</p>
-                </div>
-            </div>
-
-            <div class="game-item">
-                <div class="game-header">
-                    <h3>Fortnite</h3>
-                    <span class="game-publisher">Epic Games</span>
-                </div>
-                <div class="game-details">
-                    <p><strong>{{.T "games.not_working.anticheat"}}:</strong> EasyAntiCheat (Kernel-Level)</p>
-                    <p><strong>{{.T "games.not_working.since"}}:</strong> {{.T "games.not_working.fortnite.since"}}</p>
-                    <p><strong>{{.T "games.not_working.status"}}:</strong> {{.T "games.not_working.fortnite.status"}}</p>
-                    <p><strong>{{.T "games.not_working.plans"}}:</strong> {{.T "games.not_working.fortnite.plans"}}</p>
-                </div>
-            </div>
-
-            <div class="game-item">
-                <div class="game-header">
-                    <h3>PUBG: Battlegrounds</h3>
-                    <span class="game-publisher">Krafton</span>
-                </div>
-                <div class="game-details">
-                    <p><strong>{{.T "games.not_working.anticheat"}}:</strong> BattlEye (Kernel-Level)</p>
-                    <p><strong>{{.T "games.not_working.since"}}:</strong> {{.T "games.not_working.pubg.since"}}</p>
-                    <p><strong>{{.T "games.not_working.status"}}:</strong> {{.T "games.not_working.pubg.status"}}</p>
-                    <p><strong>{{.T "games.not_working.plans"}}:</strong> {{.T "games.not_working.pubg.plans"}}</p>
-                </div>
-            </div>
-
-            <div class="game-item">
-                <div class="game-header">
-                    <h3>Rainbow Six Siege</h3>
-                    <span class="game-publisher">Ubisoft</span>
-                </div>
-                <div class="game-details">
-                    <p><strong>{{.T "games.not_working.anticheat"}}:</strong> BattlEye (Kernel-Level)</p>
-                    <p><strong>{{.T "games.not_working.since"}}:</strong> {{.T "games.not_working.r6.since"}}</p>
-                    <p><strong>{{.T "games.not_working.status"}}:</strong> {{.T "games.not_working.r6.status"}}</p>
-                    <p><strong>{{.T "games.not_working.plans"}}:</strong> {{.T "games.not_working.r6.plans"}}</p>
-                </div>
-            </div>
-
-            <div class="game-item">
-                <div class="game-header">
-                    <h3>Escape from Tarkov</h3>
-                    <span class="game-publisher">Battlestate Games</span>
-                </div>
-                <div class="game-details">
-                    <p><strong>{{.T "games.not_working.anticheat"}}:</strong> BattlEye (Kernel-Level)</p>
-                    <p><strong>{{.T "games.not_working.since"}}:</strong> {{.T "games.not_working.tarkov.since"}}</p>
-                    <p><strong>{{.T "games.not_working.status"}}:</strong> {{.T "games.not_working.tarkov.status"}}</p>
-                    <p><strong>{{.T "games.not_working.plans"}}:</strong> {{.T "games.not_working.tarkov.plans"}}</p>
-                </div>
-            </div>
+        <div id="gamesList">
+            <!-- Games will be loaded here via JavaScript -->
+        </div>
+        
+        <div id="noResults" class="no-results">
+            {{.T "games.no_results"}}
         </div>
     </div>
 
@@ -141,4 +78,239 @@
         </div>
     </div>
 </div>
+
+<script nonce="{{.Nonce}}">
+    const games = {{.GamesJSON}};
+    const translations = {
+        status_works: "{{.T "games.status.works"}}",
+        status_broken: "{{.T "games.status.broken"}}",
+        status_partial: "{{.T "games.status.partial"}}",
+        status_unknown: "{{.T "games.status.unknown"}}",
+        platform_windows: "{{.T "games.platform.windows"}}",
+        platform_linux: "{{.T "games.platform.linux"}}",
+        platform_macos: "{{.T "games.platform.macos"}}",
+        native: "{{.T "games.native"}}",
+        proton_compatible: "{{.T "games.proton_compatible"}}",
+        anti_cheat: "{{.T "games.anti_cheat"}}",
+        platforms: "{{.T "games.platforms"}}",
+        broken_since: "{{.T "games.broken_since"}}",
+        restricted: "{{.T "games.restricted"}}",
+        note: "{{.T "games.note"}}"
+    };
+    
+    let filteredGames = games;
+    let currentFilter = 'all';
+    
+    function getStatusClass(status) {
+        switch(status) {
+            case 'works': return 'status-works';
+            case 'broken': return 'status-broken';
+            case 'partial': return 'status-partial';
+            case 'unknown': return 'status-unknown';
+            default: return 'status-unknown';
+        }
+    }
+    
+    function getStatusText(status) {
+        switch(status) {
+            case 'works': return translations.status_works;
+            case 'broken': return translations.status_broken;
+            case 'partial': return translations.status_partial;
+            case 'unknown': return translations.status_unknown;
+            default: return translations.status_unknown;
+        }
+    }
+    
+    function renderGames(gamesToRender) {
+        const container = document.getElementById('gamesList');
+        const noResults = document.getElementById('noResults');
+        
+        if (gamesToRender.length === 0) {
+            container.innerHTML = '';
+            noResults.style.display = 'block';
+            return;
+        }
+        
+        noResults.style.display = 'none';
+        
+        // Group games by status
+        const grouped = {
+            broken: [],
+            partial: [],
+            works: [],
+            unknown: []
+        };
+        
+        gamesToRender.forEach(game => {
+            const status = game.status || 'unknown';
+            if (grouped[status]) {
+                grouped[status].push(game);
+            } else {
+                grouped.unknown.push(game);
+            }
+        });
+        
+        // Sort each group by name
+        Object.keys(grouped).forEach(status => {
+            grouped[status].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        });
+        
+        let html = '';
+        
+        // Render broken games first
+        if (grouped.broken.length > 0) {
+            html += `<div class="games-section">
+                <h2 class="section-title status-broken">${translations.status_broken} (${grouped.broken.length})</h2>
+                <div class="games-list">`;
+            grouped.broken.forEach(game => {
+                html += renderGameCard(game);
+            });
+            html += `</div></div>`;
+        }
+        
+        // Render partial games
+        if (grouped.partial.length > 0) {
+            html += `<div class="games-section">
+                <h2 class="section-title status-partial">${translations.status_partial} (${grouped.partial.length})</h2>
+                <div class="games-list">`;
+            grouped.partial.forEach(game => {
+                html += renderGameCard(game);
+            });
+            html += `</div></div>`;
+        }
+        
+        // Render working games
+        if (grouped.works.length > 0) {
+            html += `<div class="games-section">
+                <h2 class="section-title status-works">${translations.status_works} (${grouped.works.length})</h2>
+                <div class="games-list">`;
+            grouped.works.forEach(game => {
+                html += renderGameCard(game);
+            });
+            html += `</div></div>`;
+        }
+        
+        // Render unknown games
+        if (grouped.unknown.length > 0) {
+            html += `<div class="games-section">
+                <h2 class="section-title status-unknown">${translations.status_unknown} (${grouped.unknown.length})</h2>
+                <div class="games-list">`;
+            grouped.unknown.forEach(game => {
+                html += renderGameCard(game);
+            });
+            html += `</div></div>`;
+        }
+        
+        container.innerHTML = html;
+    }
+    
+    function renderGameCard(game) {
+        const name = game.name || 'Unknown';
+        const status = game.status || 'unknown';
+        const statusClass = getStatusClass(status);
+        const statusText = getStatusText(status);
+        const platforms = game.platforms || [];
+        const antiCheat = game.antiCheat;
+        const brokenSince = game.brokenSince;
+        const restricted = game.restricted;
+        const note = game.note;
+        const native = game.native;
+        const protonCompatible = game.protonCompatible;
+        
+        let html = `<div class="game-item ${statusClass}">
+            <div class="game-header">
+                <h3>${escapeHtml(name)}</h3>
+                <span class="game-status ${statusClass}">${statusText}</span>
+            </div>
+            <div class="game-details">`;
+        
+        // Platforms
+        if (platforms.length > 0) {
+            const platformText = platforms.map(p => {
+                switch(p) {
+                    case 'Windows': return translations.platform_windows;
+                    case 'Linux': return translations.platform_linux;
+                    case 'macOS': return translations.platform_macos;
+                    default: return p;
+                }
+            }).join(', ');
+            html += `<p><strong>${translations.platforms}:</strong> ${platformText}</p>`;
+        }
+        
+        // Native/Proton info
+        if (native) {
+            html += `<p><span class="badge badge-success">${translations.native}</span></p>`;
+        } else if (protonCompatible) {
+            html += `<p><span class="badge badge-info">${translations.proton_compatible}</span></p>`;
+        }
+        
+        // Anti-Cheat info
+        if (antiCheat) {
+            html += `<p><strong>${translations.anti_cheat}:</strong> ${escapeHtml(antiCheat)} (Kernel-Level)`;
+            if (brokenSince) {
+                html += ` <span class="text-muted">(${translations.broken_since}: ${escapeHtml(brokenSince)})</span>`;
+            }
+            html += `</p>`;
+        }
+        
+        // Restricted info
+        if (restricted) {
+            html += `<p><span class="badge badge-warning">${translations.restricted}</span></p>`;
+        }
+        
+        // Note
+        if (note) {
+            html += `<p class="game-note"><em>${escapeHtml(note)}</em></p>`;
+        }
+        
+        html += `</div></div>`;
+        return html;
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    function filterGames() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        
+        filteredGames = games.filter(game => {
+            // Status filter
+            if (currentFilter !== 'all' && game.status !== currentFilter) {
+                return false;
+            }
+            
+            // Search filter
+            if (searchTerm) {
+                const name = (game.name || '').toLowerCase();
+                const antiCheat = (game.antiCheat || '').toLowerCase();
+                const platforms = (game.platforms || []).join(' ').toLowerCase();
+                if (!name.includes(searchTerm) && !antiCheat.includes(searchTerm) && !platforms.includes(searchTerm)) {
+                    return false;
+                }
+            }
+            
+            return true;
+        });
+        
+        renderGames(filteredGames);
+    }
+    
+    // Event listeners
+    document.getElementById('searchInput').addEventListener('input', filterGames);
+    
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentFilter = this.dataset.status;
+            filterGames();
+        });
+    });
+    
+    // Initial render
+    renderGames(games);
+</script>
 {{end}}

@@ -480,7 +480,34 @@
         "status": "Not working - Kernel-level BattlEye required",
         "plans": "No official Linux support planned. Battlestate Games has not announced any plans for Linux compatibility."
       }
-    }
+    },
+    "search": "Search games...",
+    "filter": {
+      "all": "All",
+      "works": "Works",
+      "broken": "Broken",
+      "partial": "Partial",
+      "unknown": "Unknown"
+    },
+    "status": {
+      "works": "✅ Works",
+      "broken": "❌ Broken",
+      "partial": "⚠️ Partial",
+      "unknown": "❓ Unknown"
+    },
+    "platform": {
+      "windows": "Windows",
+      "linux": "Linux",
+      "macos": "macOS"
+    },
+    "native": "Native Linux",
+    "proton_compatible": "Proton Compatible",
+    "anti_cheat": "Anti-Cheat",
+    "platforms": "Platforms",
+    "broken_since": "Since",
+    "restricted": "Restricted",
+    "note": "Note",
+    "no_results": "No games found"
   },
   "about": {
     "title": "About NixOS Control Center",
