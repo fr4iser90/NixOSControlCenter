@@ -80,7 +80,7 @@ in
         options = {
           databasePath = lib.mkOption {
             type = lib.types.path;
-            default = ./mapping/mapping-database.json;
+            default = ./web-service/api/static/data/mapping-database.json;
             description = "Path to mapping database JSON file";
           };
         };

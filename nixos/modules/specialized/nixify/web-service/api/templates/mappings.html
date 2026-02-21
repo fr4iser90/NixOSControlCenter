@@ -22,6 +22,7 @@
 
 <script nonce="{{.Nonce}}">
     const programs = {{.ProgramsJSON}};
+    const mappingTranslations = {{.MappingTranslationsJSON}} || {};
     const translations = {
         supported: "{{.T "mappings.status.supported"}}",
         alternative: "{{.T "mappings.status.alternative"}}",
@@ -36,6 +37,27 @@
         alternatives: "{{.T "mappings.alternatives"}}",
         total: "{{.T "mappings.total"}}"
     };
+    
+    // Translation function for mapping database texts
+    function translate(key, fallback) {
+        if (!key) return fallback || '';
+        // Remove "mappings.programs." prefix if present
+        let lookupKey = key;
+        if (key.startsWith('mappings.programs.')) {
+            lookupKey = key.substring('mappings.programs.'.length);
+        }
+        // Navigate through key path (e.g., "discord.alternatives.vesktop.reason")
+        const parts = lookupKey.split('.');
+        let current = mappingTranslations;
+        for (const part of parts) {
+            if (current && typeof current === 'object' && part in current) {
+                current = current[part];
+            } else {
+                return fallback || key;
+            }
+        }
+        return (typeof current === 'string' ? current : fallback) || key;
+    }
     
     function renderPrograms(filteredPrograms) {
         const container = document.getElementById('programsList');
@@ -132,7 +154,7 @@
                         ${prog.proton ? `<div class="program-meta">🎮 Runs via Proton (Steam)</div>` : ''}
                         ${prog.flatpak ? `<div class="program-meta">📦 Flatpak: <code>${escapeHtml(prog.flatpak)}</code></div>` : ''}
                         ${prog.appimage ? `<div class="program-meta">📦 AppImage available</div>` : ''}
-                        ${prog.note ? `<div class="program-note">${escapeHtml(prog.note)}</div>` : ''}
+                        ${prog.note_key ? `<div class="program-note">${escapeHtml(translate(prog.note_key, prog.note || ''))}</div>` : (prog.note ? `<div class="program-note">${escapeHtml(prog.note)}</div>` : '')}
                         ${prog.alternatives && prog.alternatives.length > 0 ? `
                             <div class="program-alternatives">
                                 <strong>${translations.alternatives || 'Alternatives'}:</strong>
@@ -140,7 +162,7 @@
                                     <div class="alternative-item">
                                         <span class="alternative-name">${escapeHtml(alt.name)}</span>
                                         ${alt.package ? `<code class="alternative-package">${escapeHtml(alt.package)}</code>` : ''}
-                                        ${alt.reason ? `<span class="alternative-reason">${escapeHtml(alt.reason)}</span>` : ''}
+                                        ${alt.reason_key ? `<span class="alternative-reason">${escapeHtml(translate(alt.reason_key, alt.reason || ''))}</span>` : (alt.reason ? `<span class="alternative-reason">${escapeHtml(alt.reason)}</span>` : '')}
                                     </div>
                                 `).join('')}
                             </div>

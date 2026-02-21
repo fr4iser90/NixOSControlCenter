@@ -181,7 +181,216 @@
       "unknown": "Unbekannt"
     },
     "no_results": "Keine Programme gefunden",
-    "total": "Programme gesamt"
+    "total": "Programme gesamt",
+    "programs": {
+      "discord": {
+        "alternatives": {
+          "vesktop": {
+            "reason": "Privacy-freundlicher Discord-Client mit mehr Features"
+          }
+        }
+      },
+      "steam": {
+        "note": "Native Steam-Client. Proton ermöglicht es, Windows-Spiele zu spielen."
+      },
+      "microsoft_office": {
+        "note": "Native Alternative: LibreOffice. Original Microsoft Office läuft via Wine.",
+        "alternatives": {
+          "onlyoffice": {
+            "reason": "Microsoft Office-kompatibles Format mit modernem UI"
+          },
+          "libreoffice": {
+            "reason": "Vollständige Office-Suite, bereits als Standard gesetzt"
+          }
+        }
+      },
+      "adobe_acrobat_reader": {
+        "note": "Native Alternative: Okular. Original Adobe Reader läuft via Wine.",
+        "alternatives": {
+          "okular": {
+            "reason": "KDE PDF-Viewer mit vielen Features, bereits als Standard gesetzt"
+          },
+          "evince": {
+            "reason": "GNOME PDF-Viewer, einfach und schnell"
+          },
+          "zathura": {
+            "reason": "Minimalistischer, keyboard-driven PDF-Viewer"
+          }
+        }
+      },
+      "adobe_photoshop": {
+        "note": "Läuft via Wine. Alternative: GIMP (native) oder Krita (native)",
+        "alternatives": {
+          "gimp": {
+            "reason": "Vollständige Bildbearbeitung, Photoshop-ähnlich"
+          },
+          "krita": {
+            "reason": "Digital Painting und Bildbearbeitung"
+          },
+          "darktable": {
+            "reason": "RAW-Bildbearbeitung und Fotografie-Workflow"
+          }
+        }
+      },
+      "adobe_illustrator": {
+        "note": "Läuft via Wine. Alternative: Inkscape (native)",
+        "alternatives": {
+          "inkscape": {
+            "reason": "Vektor-Grafik-Editor, Illustrator-ähnlich"
+          },
+          "krita": {
+            "reason": "Auch für Vektor-Grafik geeignet"
+          }
+        }
+      },
+      "visual_studio_code": {
+        "alternatives": {
+          "vscodium": {
+            "reason": "Open-source Fork ohne Microsoft-Telemetrie"
+          },
+          "neovim": {
+            "reason": "Moderner Vim-Fork mit LSP-Support"
+          },
+          "helix": {
+            "reason": "Moderner Modal-Editor mit Tree-sitter"
+          }
+        }
+      },
+      "firefox": {
+        "alternatives": {
+          "librewolf": {
+            "reason": "Privacy-hardened Firefox-Fork"
+          },
+          "tor_browser": {
+            "reason": "Maximale Privacy und Anonymität"
+          }
+        }
+      },
+      "google_chrome": {
+        "alternatives": {
+          "chromium": {
+            "reason": "Open-source alternative ohne Google-Tracking"
+          },
+          "firefox": {
+            "reason": "Privacy-fokussierter Browser"
+          }
+        }
+      },
+      "slack": {
+        "alternatives": {
+          "element": {
+            "reason": "Matrix-basierter Messenger mit E2E-Verschlüsselung"
+          },
+          "rocketchat": {
+            "reason": "Open-source Team-Chat Alternative"
+          }
+        }
+      },
+      "github_desktop": {
+        "alternatives": {
+          "lazygit": {
+            "reason": "Terminal-basierter Git-Client mit TUI"
+          },
+          "gitkraken": {
+            "reason": "Feature-reicher Git-Client mit Visualisierung"
+          },
+          "git_cli": {
+            "reason": "Standard Git-Command-Line-Tool"
+          }
+        }
+      },
+      "vlc": {
+        "alternatives": {
+          "vlc": {
+            "reason": "Universal Media Player, bereits als Standard gesetzt"
+          },
+          "mpv": {
+            "reason": "Minimalistischer, aber leistungsstarker Player"
+          },
+          "smplayer": {
+            "reason": "Qt-basierter Media Player mit vielen Features"
+          }
+        }
+      },
+      "spotify": {
+        "alternatives": {
+          "spotify_native": {
+            "reason": "Offizieller Spotify-Client, bereits als Standard gesetzt"
+          },
+          "ncspot": {
+            "reason": "Terminal-basierter Spotify-Client"
+          },
+          "spotify_tui": {
+            "reason": "TUI für Spotify mit SPT"
+          }
+        }
+      },
+      "7zip": {
+        "alternatives": {
+          "p7zip": {
+            "reason": "7-Zip Port für Linux, bereits als Standard gesetzt"
+          },
+          "unzip": {
+            "reason": "Standard ZIP-Tool"
+          },
+          "zip": {
+            "reason": "ZIP-Archivierung"
+          }
+        }
+      },
+      "winrar": {
+        "alternatives": {
+          "unrar": {
+            "reason": "RAR-Extraktion, bereits als Standard gesetzt"
+          },
+          "p7zip": {
+            "reason": "Unterstützt auch RAR-Archive"
+          }
+        }
+      },
+      "notepad_plus_plus": {
+        "alternatives": {
+          "notepadqq": {
+            "reason": "Qt-basierter Editor, bereits als Standard gesetzt"
+          },
+          "kate": {
+            "reason": "KDE Text-Editor mit vielen Features"
+          },
+          "gedit": {
+            "reason": "GNOME Text-Editor, einfach und schnell"
+          }
+        }
+      },
+      "virtualbox": {
+        "alternatives": {
+          "qemu_kvm": {
+            "reason": "Open-source Virtualisierung mit besserer Performance"
+          },
+          "virtualbox": {
+            "reason": "Einfach zu nutzen, bereits als Standard gesetzt"
+          }
+        }
+      },
+      "iterm2": {
+        "alternatives": {
+          "alacritty": {
+            "reason": "GPU-beschleunigter Terminal, bereits als Standard gesetzt"
+          },
+          "kitty": {
+            "reason": "Moderner Terminal mit vielen Features"
+          },
+          "wezterm": {
+            "reason": "Cross-platform Terminal mit GPU-Beschleunigung"
+          }
+        }
+      },
+      "homebrew": {
+        "note": "NixOS nutzt nix Package Manager stattdessen"
+      },
+      "chocolatey": {
+        "note": "NixOS nutzt nix Package Manager stattdessen"
+      }
+    }
   },
   "games": {
     "title": "🎮 Spiele-Unterstützung",

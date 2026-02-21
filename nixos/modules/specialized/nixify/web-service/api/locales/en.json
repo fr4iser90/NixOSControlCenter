@@ -191,7 +191,216 @@
       "unknown": "Unknown"
     },
     "no_results": "No programs found",
-    "total": "Total programs"
+    "total": "Total programs",
+    "programs": {
+      "discord": {
+        "alternatives": {
+          "vesktop": {
+            "reason": "Privacy-friendly Discord client with more features"
+          }
+        }
+      },
+      "steam": {
+        "note": "Native Steam client. Proton enables Windows games to run."
+      },
+      "microsoft_office": {
+        "note": "Native alternative: LibreOffice. Original Microsoft Office runs via Wine.",
+        "alternatives": {
+          "onlyoffice": {
+            "reason": "Microsoft Office-compatible format with modern UI"
+          },
+          "libreoffice": {
+            "reason": "Complete office suite, already set as default"
+          }
+        }
+      },
+      "adobe_acrobat_reader": {
+        "note": "Native alternative: Okular. Original Adobe Reader runs via Wine.",
+        "alternatives": {
+          "okular": {
+            "reason": "KDE PDF viewer with many features, already set as default"
+          },
+          "evince": {
+            "reason": "GNOME PDF viewer, simple and fast"
+          },
+          "zathura": {
+            "reason": "Minimalist, keyboard-driven PDF viewer"
+          }
+        }
+      },
+      "adobe_photoshop": {
+        "note": "Runs via Wine. Alternative: GIMP (native) or Krita (native)",
+        "alternatives": {
+          "gimp": {
+            "reason": "Complete image editing, similar to Photoshop"
+          },
+          "krita": {
+            "reason": "Digital painting and image editing"
+          },
+          "darktable": {
+            "reason": "RAW image editing and photography workflow"
+          }
+        }
+      },
+      "adobe_illustrator": {
+        "note": "Runs via Wine. Alternative: Inkscape (native)",
+        "alternatives": {
+          "inkscape": {
+            "reason": "Vector graphics editor, similar to Illustrator"
+          },
+          "krita": {
+            "reason": "Also suitable for vector graphics"
+          }
+        }
+      },
+      "visual_studio_code": {
+        "alternatives": {
+          "vscodium": {
+            "reason": "Open-source fork without Microsoft telemetry"
+          },
+          "neovim": {
+            "reason": "Modern Vim fork with LSP support"
+          },
+          "helix": {
+            "reason": "Modern modal editor with tree-sitter"
+          }
+        }
+      },
+      "firefox": {
+        "alternatives": {
+          "librewolf": {
+            "reason": "Privacy-hardened Firefox fork"
+          },
+          "tor_browser": {
+            "reason": "Maximum privacy and anonymity"
+          }
+        }
+      },
+      "google_chrome": {
+        "alternatives": {
+          "chromium": {
+            "reason": "Open-source alternative without Google tracking"
+          },
+          "firefox": {
+            "reason": "Privacy-focused browser"
+          }
+        }
+      },
+      "slack": {
+        "alternatives": {
+          "element": {
+            "reason": "Matrix-based messenger with E2E encryption"
+          },
+          "rocketchat": {
+            "reason": "Open-source team chat alternative"
+          }
+        }
+      },
+      "github_desktop": {
+        "alternatives": {
+          "lazygit": {
+            "reason": "Terminal-based Git client with TUI"
+          },
+          "gitkraken": {
+            "reason": "Feature-rich Git client with visualization"
+          },
+          "git_cli": {
+            "reason": "Standard Git command-line tool"
+          }
+        }
+      },
+      "vlc": {
+        "alternatives": {
+          "vlc": {
+            "reason": "Universal media player, already set as default"
+          },
+          "mpv": {
+            "reason": "Minimalist but powerful player"
+          },
+          "smplayer": {
+            "reason": "Qt-based media player with many features"
+          }
+        }
+      },
+      "spotify": {
+        "alternatives": {
+          "spotify_native": {
+            "reason": "Official Spotify client, already set as default"
+          },
+          "ncspot": {
+            "reason": "Terminal-based Spotify client"
+          },
+          "spotify_tui": {
+            "reason": "TUI for Spotify with SPT"
+          }
+        }
+      },
+      "7zip": {
+        "alternatives": {
+          "p7zip": {
+            "reason": "7-Zip port for Linux, already set as default"
+          },
+          "unzip": {
+            "reason": "Standard ZIP tool"
+          },
+          "zip": {
+            "reason": "ZIP archiving"
+          }
+        }
+      },
+      "winrar": {
+        "alternatives": {
+          "unrar": {
+            "reason": "RAR extraction, already set as default"
+          },
+          "p7zip": {
+            "reason": "Also supports RAR archives"
+          }
+        }
+      },
+      "notepad_plus_plus": {
+        "alternatives": {
+          "notepadqq": {
+            "reason": "Qt-based editor, already set as default"
+          },
+          "kate": {
+            "reason": "KDE text editor with many features"
+          },
+          "gedit": {
+            "reason": "GNOME text editor, simple and fast"
+          }
+        }
+      },
+      "virtualbox": {
+        "alternatives": {
+          "qemu_kvm": {
+            "reason": "Open-source virtualization with better performance"
+          },
+          "virtualbox": {
+            "reason": "Easy to use, already set as default"
+          }
+        }
+      },
+      "iterm2": {
+        "alternatives": {
+          "alacritty": {
+            "reason": "GPU-accelerated terminal, already set as default"
+          },
+          "kitty": {
+            "reason": "Modern terminal with many features"
+          },
+          "wezterm": {
+            "reason": "Cross-platform terminal with GPU acceleration"
+          }
+        }
+      },
+      "homebrew": {
+        "note": "NixOS uses nix package manager instead"
+      },
+      "chocolatey": {
+        "note": "NixOS uses nix package manager instead"
+      }
+    }
   },
   "games": {
     "title": "🎮 Game Support",

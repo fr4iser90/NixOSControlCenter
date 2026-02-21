@@ -90,6 +90,9 @@ var reviewCSS string
 //go:embed static/css/module-detail.css
 var moduleDetailCSS string
 
+//go:embed static/data/mapping-database.json
+var mappingDatabaseJSON string
+
 // Session represents a migration session
 type Session struct {
 	ID          string    `json:"id"`
@@ -404,6 +407,7 @@ type TemplateData struct {
 	Port        string
 	Sessions    int
 	ProgramsJSON template.JS // For mappings page
+	MappingTranslationsJSON template.JS // For mappings page translations
 	ModulesJSON  template.JS // For modules page
 	Modules      []ModuleInfo // For modules page
 	Module       *ModuleInfo // For module detail page
@@ -699,20 +703,35 @@ func (s *Server) handleMappings(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	
 	// Load mapping database
+	// Priority: 1. Environment variable, 2. File path, 3. Embedded database
+	var mappingData []byte
 	mappingPath := os.Getenv("MAPPING_DB_PATH")
-	if mappingPath == "" {
-		mappingPath = filepath.Join(s.dataDir, "mapping-database.json")
+	
+	// Try to load from file first (for development/custom mappings)
+	if mappingPath != "" {
+		if _, err := os.Stat(mappingPath); err == nil {
+			mappingData, _ = os.ReadFile(mappingPath)
+		}
 	}
 	
-	// Try to load from mounted path first, then fallback
-	var mappingData []byte
-	if _, err := os.Stat("/app/mapping/mapping-database.json"); err == nil {
-		mappingData, _ = os.ReadFile("/app/mapping/mapping-database.json")
-	} else if _, err := os.Stat(mappingPath); err == nil {
-		mappingData, _ = os.ReadFile(mappingPath)
-	} else {
-		// Fallback: empty programs object
-		mappingData = []byte(`{"programs": {}}`)
+	// Try Docker path
+	if len(mappingData) == 0 {
+		if _, err := os.Stat("/app/mapping/mapping-database.json"); err == nil {
+			mappingData, _ = os.ReadFile("/app/mapping/mapping-database.json")
+		}
+	}
+	
+	// Try default dataDir path
+	if len(mappingData) == 0 {
+		defaultPath := filepath.Join(s.dataDir, "mapping-database.json")
+		if _, err := os.Stat(defaultPath); err == nil {
+			mappingData, _ = os.ReadFile(defaultPath)
+		}
+	}
+	
+	// Fallback to embedded database
+	if len(mappingData) == 0 {
+		mappingData = []byte(mappingDatabaseJSON)
 	}
 	
 	var mapping map[string]interface{}
@@ -742,8 +761,21 @@ func (s *Server) handleMappings(w http.ResponseWriter, r *http.Request) {
 	// Convert to JSON for JavaScript
 	programsJSON, _ := json.Marshal(programsArray)
 	
+	// Get mapping translations for current language
+	lang := s.getLanguage(r)
+	mappingTranslations := make(map[string]interface{})
+	if trans, ok := s.translations[lang]; ok {
+		if mappings, ok := trans["mappings"].(map[string]interface{}); ok {
+			if programs, ok := mappings["programs"].(map[string]interface{}); ok {
+				mappingTranslations = programs
+			}
+		}
+	}
+	mappingTranslationsJSON, _ := json.Marshal(mappingTranslations)
+	
 	data := s.newTemplateData(r, nonce)
 	data.ProgramsJSON = template.JS(programsJSON)
+	data.MappingTranslationsJSON = template.JS(mappingTranslationsJSON)
 	
 	// Execute base template, which will render the "mappings" block
 	if err := s.baseTemplate.ExecuteTemplate(w, "base", data); err != nil {

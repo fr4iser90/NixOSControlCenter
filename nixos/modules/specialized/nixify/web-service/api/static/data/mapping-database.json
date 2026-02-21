@@ -1,0 +1,534 @@
+{
+  "version": "0.1.0",
+  "programs": {
+    "Visual Studio Code": {
+      "nixos_package": "vscode",
+      "module": null,
+      "category": "development",
+      "aliases": ["vscode", "code", "Visual Studio Code", "VS Code"],
+      "alternatives": [
+        {
+          "name": "VSCodium",
+          "package": "vscodium",
+          "reason_key": "mappings.programs.visual_studio_code.alternatives.vscodium.reason",
+          "reason": "Open-source Fork ohne Microsoft-Telemetrie"
+        },
+        {
+          "name": "Neovim",
+          "package": "neovim",
+          "reason_key": "mappings.programs.visual_studio_code.alternatives.neovim.reason",
+          "reason": "Moderner Vim-Fork mit LSP-Support"
+        },
+        {
+          "name": "Helix",
+          "package": "helix",
+          "reason_key": "mappings.programs.visual_studio_code.alternatives.helix.reason",
+          "reason": "Moderner Modal-Editor mit Tree-sitter"
+        }
+      ]
+    },
+    "Firefox": {
+      "nixos_package": "firefox",
+      "module": null,
+      "category": "browser",
+      "aliases": ["firefox", "Mozilla Firefox"],
+      "alternatives": [
+        {
+          "name": "LibreWolf",
+          "package": "librewolf",
+          "reason_key": "mappings.programs.firefox.alternatives.librewolf.reason",
+          "reason": "Privacy-hardened Firefox-Fork"
+        },
+        {
+          "name": "Tor Browser",
+          "package": "tor-browser-bundle-bin",
+          "reason_key": "mappings.programs.firefox.alternatives.tor_browser.reason",
+          "reason": "Maximale Privacy und Anonymität"
+        }
+      ]
+    },
+    "Google Chrome": {
+      "nixos_package": "google-chrome",
+      "module": null,
+      "category": "browser",
+      "aliases": ["chrome", "Google Chrome", "Chrome"],
+      "alternatives": [
+        {
+          "name": "Chromium",
+          "package": "chromium",
+          "reason_key": "mappings.programs.google_chrome.alternatives.chromium.reason",
+          "reason": "Open-source alternative ohne Google-Tracking"
+        },
+        {
+          "name": "Firefox",
+          "package": "firefox",
+          "reason_key": "mappings.programs.google_chrome.alternatives.firefox.reason",
+          "reason": "Privacy-fokussierter Browser"
+        }
+      ]
+    },
+    "Chromium": {
+      "nixos_package": "chromium",
+      "module": null,
+      "category": "browser",
+      "aliases": ["chromium"]
+    },
+    "Docker Desktop": {
+      "nixos_package": "docker",
+      "module": "modules.infrastructure.homelab-manager",
+      "category": "infrastructure",
+      "aliases": ["docker", "Docker", "Docker Desktop"]
+    },
+    "Steam": {
+      "nixos_package": "steam",
+      "module": null,
+      "category": "gaming",
+      "aliases": ["steam"],
+      "proton": true,
+      "note_key": "mappings.programs.steam.note",
+      "note": "Native Steam client. Proton enables Windows games to run."
+    },
+    "Discord": {
+      "nixos_package": "discord",
+      "module": null,
+      "category": "communication",
+      "aliases": ["discord"],
+      "alternatives": [
+        {
+          "name": "Vesktop",
+          "package": "vesktop",
+          "reason_key": "mappings.programs.discord.alternatives.vesktop.reason",
+          "reason": "Privacy-freundlicher Discord-Client mit mehr Features"
+        }
+      ]
+    },
+    "Slack": {
+      "nixos_package": "slack",
+      "module": null,
+      "category": "communication",
+      "aliases": ["slack"],
+      "alternatives": [
+        {
+          "name": "Element",
+          "package": "element-desktop",
+          "reason_key": "mappings.programs.slack.alternatives.element.reason",
+          "reason": "Matrix-basierter Messenger mit E2E-Verschlüsselung"
+        },
+        {
+          "name": "Rocket.Chat",
+          "package": "rocketchat-desktop",
+          "reason_key": "mappings.programs.slack.alternatives.rocketchat.reason",
+          "reason": "Open-source Team-Chat Alternative"
+        }
+      ]
+    },
+    "Git": {
+      "nixos_package": "git",
+      "module": null,
+      "category": "development",
+      "aliases": ["git", "Git"]
+    },
+    "GitHub Desktop": {
+      "nixos_package": "github-desktop",
+      "module": null,
+      "category": "development",
+      "aliases": ["github-desktop", "GitHub Desktop"],
+      "alternatives": [
+        {
+          "name": "Lazygit",
+          "package": "lazygit",
+          "reason_key": "mappings.programs.github_desktop.alternatives.lazygit.reason",
+          "reason": "Terminal-basierter Git-Client mit TUI"
+        },
+        {
+          "name": "GitKraken",
+          "package": "gitkraken",
+          "reason_key": "mappings.programs.github_desktop.alternatives.gitkraken.reason",
+          "reason": "Feature-reicher Git-Client mit Visualisierung"
+        },
+        {
+          "name": "Git CLI",
+          "package": "git",
+          "reason_key": "mappings.programs.github_desktop.alternatives.git_cli.reason",
+          "reason": "Standard Git-Command-Line-Tool"
+        }
+      ]
+    },
+    "Node.js": {
+      "nixos_package": "nodejs",
+      "module": null,
+      "category": "development",
+      "aliases": ["node", "nodejs", "Node.js"]
+    },
+    "Python": {
+      "nixos_package": "python3",
+      "module": null,
+      "category": "development",
+      "aliases": ["python", "python3", "Python"]
+    },
+    "VLC": {
+      "nixos_package": "vlc",
+      "module": null,
+      "category": "multimedia",
+      "aliases": ["vlc", "VLC media player"],
+      "alternatives": [
+        {
+          "name": "VLC",
+          "package": "vlc",
+          "reason_key": "mappings.programs.vlc.alternatives.vlc.reason",
+          "reason": "Universal Media Player, bereits als Standard gesetzt"
+        },
+        {
+          "name": "MPV",
+          "package": "mpv",
+          "reason_key": "mappings.programs.vlc.alternatives.mpv.reason",
+          "reason": "Minimalistischer, aber leistungsstarker Player"
+        },
+        {
+          "name": "SMPlayer",
+          "package": "smplayer",
+          "reason_key": "mappings.programs.vlc.alternatives.smplayer.reason",
+          "reason": "Qt-basierter Media Player mit vielen Features"
+        }
+      ]
+    },
+    "Spotify": {
+      "nixos_package": "spotify",
+      "module": null,
+      "category": "multimedia",
+      "aliases": ["spotify"],
+      "alternatives": [
+        {
+          "name": "Spotify (Native)",
+          "package": "spotify",
+          "reason_key": "mappings.programs.spotify.alternatives.spotify_native.reason",
+          "reason": "Offizieller Spotify-Client, bereits als Standard gesetzt"
+        },
+        {
+          "name": "ncspot",
+          "package": "ncspot",
+          "reason_key": "mappings.programs.spotify.alternatives.ncspot.reason",
+          "reason": "Terminal-basierter Spotify-Client"
+        },
+        {
+          "name": "Spotify-tui",
+          "package": "spotify-tui",
+          "reason_key": "mappings.programs.spotify.alternatives.spotify_tui.reason",
+          "reason": "TUI für Spotify mit SPT"
+        }
+      ]
+    },
+    "7-Zip": {
+      "nixos_package": "p7zip",
+      "module": null,
+      "category": "utilities",
+      "aliases": ["7zip", "7-Zip", "p7zip"],
+      "alternatives": [
+        {
+          "name": "p7zip",
+          "package": "p7zip",
+          "reason_key": "mappings.programs.7zip.alternatives.p7zip.reason",
+          "reason": "7-Zip Port für Linux, bereits als Standard gesetzt"
+        },
+        {
+          "name": "unzip",
+          "package": "unzip",
+          "reason_key": "mappings.programs.7zip.alternatives.unzip.reason",
+          "reason": "Standard ZIP-Tool"
+        },
+        {
+          "name": "zip",
+          "package": "zip",
+          "reason_key": "mappings.programs.7zip.alternatives.zip.reason",
+          "reason": "ZIP-Archivierung"
+        }
+      ]
+    },
+    "WinRAR": {
+      "nixos_package": "unrar",
+      "module": null,
+      "category": "utilities",
+      "aliases": ["winrar", "WinRAR", "unrar"],
+      "alternatives": [
+        {
+          "name": "unrar",
+          "package": "unrar",
+          "reason_key": "mappings.programs.winrar.alternatives.unrar.reason",
+          "reason": "RAR-Extraktion, bereits als Standard gesetzt"
+        },
+        {
+          "name": "p7zip",
+          "package": "p7zip",
+          "reason_key": "mappings.programs.winrar.alternatives.p7zip.reason",
+          "reason": "Unterstützt auch RAR-Archive"
+        }
+      ]
+    },
+    "Notepad++": {
+      "nixos_package": "notepadqq",
+      "module": null,
+      "category": "development",
+      "aliases": ["notepad++", "Notepad++", "notepadqq"],
+      "alternatives": [
+        {
+          "name": "Notepadqq",
+          "package": "notepadqq",
+          "reason_key": "mappings.programs.notepad_plus_plus.alternatives.notepadqq.reason",
+          "reason": "Qt-basierter Editor, bereits als Standard gesetzt"
+        },
+        {
+          "name": "Kate",
+          "package": "kate",
+          "reason_key": "mappings.programs.notepad_plus_plus.alternatives.kate.reason",
+          "reason": "KDE Text-Editor mit vielen Features"
+        },
+        {
+          "name": "Gedit",
+          "package": "gedit",
+          "reason_key": "mappings.programs.notepad_plus_plus.alternatives.gedit.reason",
+          "reason": "GNOME Text-Editor, einfach und schnell"
+        }
+      ]
+    },
+    "Adobe Acrobat Reader": {
+      "nixos_package": "okular",
+      "module": null,
+      "category": "utilities",
+      "aliases": ["acrobat", "Adobe Reader", "okular"],
+      "wine": true,
+      "note_key": "mappings.programs.adobe_acrobat_reader.note",
+      "note": "Native alternative: Okular. Original Adobe Reader runs via Wine.",
+      "alternatives": [
+        {
+          "name": "Okular",
+          "package": "okular",
+          "reason_key": "mappings.programs.adobe_acrobat_reader.alternatives.okular.reason",
+          "reason": "KDE PDF-Viewer mit vielen Features, bereits als Standard gesetzt"
+        },
+        {
+          "name": "Evince",
+          "package": "evince",
+          "reason_key": "mappings.programs.adobe_acrobat_reader.alternatives.evince.reason",
+          "reason": "GNOME PDF-Viewer, einfach und schnell"
+        },
+        {
+          "name": "Zathura",
+          "package": "zathura",
+          "reason_key": "mappings.programs.adobe_acrobat_reader.alternatives.zathura.reason",
+          "reason": "Minimalistischer, keyboard-driven PDF-Viewer"
+        }
+      ]
+    },
+    "Adobe Photoshop": {
+      "nixos_package": null,
+      "module": null,
+      "category": "multimedia",
+      "aliases": ["photoshop", "Adobe Photoshop", "PS"],
+      "wine": true,
+      "flatpak": "com.github.taiko2k.tauonmb",
+      "note_key": "mappings.programs.adobe_photoshop.note",
+      "note": "Runs via Wine. Alternative: GIMP (native) or Krita (native)",
+      "alternatives": [
+        {
+          "name": "GIMP",
+          "package": "gimp",
+          "reason_key": "mappings.programs.adobe_photoshop.alternatives.gimp.reason",
+          "reason": "Vollständige Bildbearbeitung, Photoshop-ähnlich"
+        },
+        {
+          "name": "Krita",
+          "package": "krita",
+          "reason_key": "mappings.programs.adobe_photoshop.alternatives.krita.reason",
+          "reason": "Digital Painting und Bildbearbeitung"
+        },
+        {
+          "name": "Darktable",
+          "package": "darktable",
+          "reason_key": "mappings.programs.adobe_photoshop.alternatives.darktable.reason",
+          "reason": "RAW-Bildbearbeitung und Fotografie-Workflow"
+        }
+      ]
+    },
+    "Adobe Illustrator": {
+      "nixos_package": null,
+      "module": null,
+      "category": "multimedia",
+      "aliases": ["illustrator", "Adobe Illustrator", "AI"],
+      "wine": true,
+      "note_key": "mappings.programs.adobe_illustrator.note",
+      "note": "Runs via Wine. Alternative: Inkscape (native)",
+      "alternatives": [
+        {
+          "name": "Inkscape",
+          "package": "inkscape",
+          "reason_key": "mappings.programs.adobe_illustrator.alternatives.inkscape.reason",
+          "reason": "Vektor-Grafik-Editor, Illustrator-ähnlich"
+        },
+        {
+          "name": "Krita",
+          "package": "krita",
+          "reason_key": "mappings.programs.adobe_illustrator.alternatives.krita.reason",
+          "reason": "Auch für Vektor-Grafik geeignet"
+        }
+      ]
+    },
+    "Microsoft Office": {
+      "nixos_package": "libreoffice",
+      "module": null,
+      "category": "productivity",
+      "aliases": ["office", "Microsoft Office", "libreoffice", "LibreOffice"],
+      "wine": true,
+      "note_key": "mappings.programs.microsoft_office.note",
+      "note": "Native alternative: LibreOffice. Original Microsoft Office runs via Wine.",
+      "alternatives": [
+        {
+          "name": "OnlyOffice",
+          "package": "onlyoffice-bin",
+          "reason_key": "mappings.programs.microsoft_office.alternatives.onlyoffice.reason",
+          "reason": "Microsoft Office-kompatibles Format mit modernem UI"
+        },
+        {
+          "name": "LibreOffice",
+          "package": "libreoffice",
+          "reason_key": "mappings.programs.microsoft_office.alternatives.libreoffice.reason",
+          "reason": "Vollständige Office-Suite, bereits als Standard gesetzt"
+        }
+      ]
+    },
+    "VirtualBox": {
+      "nixos_package": "virtualbox",
+      "module": null,
+      "category": "virtualization",
+      "aliases": ["virtualbox", "VirtualBox"],
+      "alternatives": [
+        {
+          "name": "QEMU/KVM",
+          "package": "qemu",
+          "reason_key": "mappings.programs.virtualbox.alternatives.qemu_kvm.reason",
+          "reason": "Open-source Virtualisierung mit besserer Performance"
+        },
+        {
+          "name": "VirtualBox",
+          "package": "virtualbox",
+          "reason_key": "mappings.programs.virtualbox.alternatives.virtualbox.reason",
+          "reason": "Einfach zu nutzen, bereits als Standard gesetzt"
+        }
+      ]
+    },
+    "VMware": {
+      "nixos_package": null,
+      "module": "modules.infrastructure.vm-manager",
+      "category": "virtualization",
+      "aliases": ["vmware", "VMware"]
+    },
+    "iTerm2": {
+      "nixos_package": "alacritty",
+      "module": null,
+      "category": "utilities",
+      "aliases": ["iterm", "iTerm2", "alacritty"],
+      "alternatives": [
+        {
+          "name": "Alacritty",
+          "package": "alacritty",
+          "reason_key": "mappings.programs.iterm2.alternatives.alacritty.reason",
+          "reason": "GPU-beschleunigter Terminal, bereits als Standard gesetzt"
+        },
+        {
+          "name": "Kitty",
+          "package": "kitty",
+          "reason_key": "mappings.programs.iterm2.alternatives.kitty.reason",
+          "reason": "Moderner Terminal mit vielen Features"
+        },
+        {
+          "name": "WezTerm",
+          "package": "wezterm",
+          "reason_key": "mappings.programs.iterm2.alternatives.wezterm.reason",
+          "reason": "Cross-platform Terminal mit GPU-Beschleunigung"
+        }
+      ]
+    },
+    "Homebrew": {
+      "nixos_package": null,
+      "module": null,
+      "category": "package-manager",
+      "note_key": "mappings.programs.homebrew.note",
+      "note": "NixOS uses nix package manager instead"
+    },
+    "Chocolatey": {
+      "nixos_package": null,
+      "module": null,
+      "category": "package-manager",
+      "note_key": "mappings.programs.chocolatey.note",
+      "note": "NixOS uses nix package manager instead"
+    }
+  },
+  "desktop_mapping": {
+    "windows": {
+      "preferred_de": "plasma",
+      "reason": "Most similar to Windows UI with taskbar and start menu",
+      "alternatives": ["gnome", "xfce"]
+    },
+    "macos": {
+      "preferred_de": "gnome",
+      "reason": "Most similar to macOS UI with dock and top bar",
+      "alternatives": ["plasma", "pantheon"]
+    },
+    "linux": {
+      "gnome": {
+        "preferred_de": "gnome",
+        "reason": "Same desktop environment",
+        "alternatives": []
+      },
+      "GNOME": {
+        "preferred_de": "gnome",
+        "reason": "Same desktop environment",
+        "alternatives": []
+      },
+      "kde": {
+        "preferred_de": "plasma",
+        "reason": "KDE Plasma is the modern KDE",
+        "alternatives": []
+      },
+      "KDE": {
+        "preferred_de": "plasma",
+        "reason": "KDE Plasma is the modern KDE",
+        "alternatives": []
+      },
+      "xfce": {
+        "preferred_de": "xfce",
+        "reason": "Same desktop environment",
+        "alternatives": []
+      },
+      "XFCE": {
+        "preferred_de": "xfce",
+        "reason": "Same desktop environment",
+        "alternatives": []
+      },
+      "default": {
+        "preferred_de": "plasma",
+        "reason": "Most flexible and customizable",
+        "alternatives": ["gnome", "xfce"]
+      }
+    }
+  },
+  "package_manager_mapping": {
+    "apt": {
+      "note": "Ubuntu/Debian packages can be mapped to nixpkgs equivalents"
+    },
+    "dnf": {
+      "note": "Fedora/RHEL packages can be mapped to nixpkgs equivalents"
+    },
+    "pacman": {
+      "note": "Arch packages can be mapped to nixpkgs equivalents"
+    },
+    "zypper": {
+      "note": "openSUSE packages can be mapped to nixpkgs equivalents"
+    },
+    "homebrew": {
+      "note": "Homebrew formulas can be mapped to nixpkgs equivalents"
+    },
+    "chocolatey": {
+      "note": "Chocolatey packages can be mapped to nixpkgs equivalents"
+    }
+  }
+}

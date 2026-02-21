@@ -43,7 +43,7 @@ let
       PORT="''${PORT:-${toString (cfg.webService.port or 8080)}}"
       HOST="''${HOST:-${cfg.webService.host or "127.0.0.1"}}"
       DATA_DIR="''${DATA_DIR:-/var/lib/nixify}"
-      MAPPING_DB_PATH="''${MAPPING_DB_PATH:-${toString (cfg.mapping.databasePath or ./mapping/mapping-database.json)}}"
+      MAPPING_DB_PATH="''${MAPPING_DB_PATH:-${toString (cfg.mapping.databasePath or ./web-service/api/static/data/mapping-database.json)}}"
       
       echo "Nixify Web Service (Placeholder)"
       echo "Port: $PORT"
@@ -92,7 +92,7 @@ in
         PORT = toString (cfg.webService.port or 8080);
         HOST = (cfg.webService.host or "127.0.0.1");
         DATA_DIR = "/var/lib/nixify";
-        MAPPING_DB_PATH = toString (cfg.mapping.databasePath or ./mapping/mapping-database.json);
+        MAPPING_DB_PATH = toString (cfg.mapping.databasePath or ./web-service/api/static/data/mapping-database.json);
         SHOW_STATUS_BADGE = if (cfg.webService.showStatusBadge or true) then "true" else "false";
       };
       

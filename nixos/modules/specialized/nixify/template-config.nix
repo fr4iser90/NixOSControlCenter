@@ -13,7 +13,7 @@
   };
   
   mapping = {
-    databasePath = ./mapping/mapping-database.json;
+    databasePath = ./web-service/api/static/data/mapping-database.json;
   };
   
   isoBuilder = {
