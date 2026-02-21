@@ -15,7 +15,7 @@ services:
       - GITHUB_REPO_URL=https://github.com/fr4iser90/NixOSControlCenter.git
       - GITHUB_BRANCH=main
       - MODULES_BASE_PATH=/app/nixos
-      - SHOW_STATUS_BADGE=true
+      - SHOW_STATUS_BADGE=false
     volumes:
       # Mount data directory for persistence
       - nixify-data:/var/lib/nixify

@@ -305,22 +305,39 @@
     "subtitle": "Explorar todos los módulos de NixOS Control Center",
     "search": "Buscar módulos...",
     "filter": {
+      "all_types": "Todos los tipos",
       "all_categories": "Todas las categorías",
-      "core": "Módulos Core",
-      "optional": "Módulos opcionales",
       "all_status": "Todos los estados",
       "active": "Activo",
-      "planned": "Planificado"
+      "disabled": "Desactivado",
+      "planned": "Planificado",
+      "optional": "Módulos opcionales",
+      "core": "Módulos Core",
+      "base": "Base",
+      "management": "Gestión",
+      "infrastructure": "Infraestructura",
+      "security": "Seguridad",
+      "specialized": "Especializado",
+      "system": "Sistema"
     },
-    "no_results": "No se encontraron módulos",
-    "view_details": "Ver detalles",
-    "version": "Versión",
+    "stats": {
+      "total": "Total",
+      "core": "Core",
+      "optional": "Opcional"
+    },
+    "sections": {
+      "core": "Módulos Core",
+      "optional": "Módulos opcionales"
+    },
     "features": {
       "tui": "TUI",
       "scripts": "Scripts",
       "handlers": "Manejadores",
       "lib": "Biblioteca"
     },
+    "version": "Versión",
+    "view_details": "Ver detalles",
+    "no_results": "No se encontraron módulos",
     "detail": {
       "title": "Detalles del módulo",
       "category": "Categoría",
@@ -331,7 +348,9 @@
       "code": "Código",
       "commands": "Comandos",
       "assets": "Recursos",
-      "structure": "Estructura"
+      "structure": "Estructura",
+      "documentation": "Documentación",
+      "doc_assets": "Recursos de documentación"
     }
   }
 }

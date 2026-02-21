@@ -305,22 +305,39 @@
     "subtitle": "Alle NixOS Control Center Module erkunden",
     "search": "Module suchen...",
     "filter": {
+      "all_types": "Alle Typen",
       "all_categories": "Alle Kategorien",
-      "core": "Core Module",
-      "optional": "Optionale Module",
       "all_status": "Alle Status",
       "active": "Aktiv",
-      "planned": "Geplant"
+      "disabled": "Deaktiviert",
+      "planned": "Geplant",
+      "optional": "Optionale Module",
+      "core": "Core Module",
+      "base": "Base",
+      "management": "Management",
+      "infrastructure": "Infrastruktur",
+      "security": "Sicherheit",
+      "specialized": "Spezialisiert",
+      "system": "System"
     },
-    "no_results": "Keine Module gefunden",
-    "view_details": "Details anzeigen",
-    "version": "Version",
+    "stats": {
+      "total": "Gesamt",
+      "core": "Core",
+      "optional": "Optional"
+    },
+    "sections": {
+      "core": "Core Module",
+      "optional": "Optionale Module"
+    },
     "features": {
       "tui": "TUI",
       "scripts": "Scripts",
       "handlers": "Handler",
       "lib": "Bibliothek"
     },
+    "version": "Version",
+    "view_details": "Details anzeigen",
+    "no_results": "Keine Module gefunden",
     "detail": {
       "title": "Modul-Details",
       "category": "Kategorie",
@@ -331,7 +348,9 @@
       "code": "Code",
       "commands": "Befehle",
       "assets": "Assets",
-      "structure": "Struktur"
+      "structure": "Struktur",
+      "documentation": "Dokumentation",
+      "doc_assets": "Dokumentations-Assets"
     }
   }
 }

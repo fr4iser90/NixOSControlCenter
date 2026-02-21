@@ -305,22 +305,39 @@
     "subtitle": "Explorer tous les modules NixOS Control Center",
     "search": "Rechercher des modules...",
     "filter": {
+      "all_types": "Tous les types",
       "all_categories": "Toutes les catégories",
-      "core": "Modules Core",
-      "optional": "Modules optionnels",
       "all_status": "Tous les statuts",
       "active": "Actif",
-      "planned": "Planifié"
+      "disabled": "Désactivé",
+      "planned": "Planifié",
+      "optional": "Modules optionnels",
+      "core": "Modules Core",
+      "base": "Base",
+      "management": "Gestion",
+      "infrastructure": "Infrastructure",
+      "security": "Sécurité",
+      "specialized": "Spécialisé",
+      "system": "Système"
     },
-    "no_results": "Aucun module trouvé",
-    "view_details": "Voir les détails",
-    "version": "Version",
+    "stats": {
+      "total": "Total",
+      "core": "Core",
+      "optional": "Optionnel"
+    },
+    "sections": {
+      "core": "Modules Core",
+      "optional": "Modules optionnels"
+    },
     "features": {
       "tui": "TUI",
       "scripts": "Scripts",
       "handlers": "Gestionnaires",
       "lib": "Bibliothèque"
     },
+    "version": "Version",
+    "view_details": "Voir les détails",
+    "no_results": "Aucun module trouvé",
     "detail": {
       "title": "Détails du module",
       "category": "Catégorie",
@@ -331,7 +348,9 @@
       "code": "Code",
       "commands": "Commandes",
       "assets": "Ressources",
-      "structure": "Structure"
+      "structure": "Structure",
+      "documentation": "Documentation",
+      "doc_assets": "Ressources de documentation"
     }
   }
 }
