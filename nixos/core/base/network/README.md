@@ -168,3 +168,15 @@ This module follows the unified MODULE_TEMPLATE architecture:
 - **Security-First**: Warnings for potentially unsafe configurations
 - **Modular Design**: Separate components for different network aspects
 - **Validation**: Comprehensive configuration validation
+
+## Documentation
+
+For detailed documentation, see:
+- [Architecture](./doc/ARCHITECTURE.md) - System architecture and design decisions (if available)
+- [Usage Guide](./doc/USAGE.md) - Detailed usage examples and best practices (if available)
+- [Security](./doc/SECURITY.md) - Security considerations and threat model (if available)
+
+## Related Components
+
+- **Desktop Module**: Desktop environment network integration
+- **System Manager**: System-level network management

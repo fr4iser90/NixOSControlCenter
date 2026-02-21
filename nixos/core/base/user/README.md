@@ -185,6 +185,13 @@ This module follows the unified MODULE_TEMPLATE architecture:
 - **Home Manager**: User environment management (`home-manager/`)
 - **System Config**: Central user configuration (`system-config.nix`)
 
+## Documentation
+
+For detailed documentation, see:
+- [Architecture](./doc/ARCHITECTURE.md) - System architecture and design decisions (if available)
+- [Usage Guide](./doc/USAGE.md) - Detailed usage examples and best practices (if available)
+- [Security](./doc/SECURITY.md) - Security considerations and threat model (if available)
+
 ## Troubleshooting
 
 ### Common Issues
