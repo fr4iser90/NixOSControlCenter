@@ -1,9 +1,8 @@
-{ config, lib, pkgs, systemConfig, moduleConfig, getModuleConfigFromPath, ... }:
+{ config, lib, pkgs, systemConfig, moduleConfig, getModuleConfigFromPath, configHelpers, ... }:
 
 let
   # Generic: Use getModuleConfigFromPath to get config with defaults from options.nix
   cfg = getModuleConfigFromPath moduleConfig.configPath;
-  configHelpers = import ../../core/management/module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   # Default SSH config
   defaultConfig = ''
     # SSH Client Manager Configuration

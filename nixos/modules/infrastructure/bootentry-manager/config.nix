@@ -1,10 +1,9 @@
-{ config, lib, pkgs, systemConfig, getModuleMetadata, moduleName, ... }:
+{ config, lib, pkgs, systemConfig, getModuleMetadata, moduleName, configHelpers, ... }:
 
 let
   # Modulname kommt aus default.nix (single source of truth)
   moduleMeta = getModuleMetadata moduleName;
   cfg = lib.attrByPath (lib.splitString "." moduleMeta.configPath) {} systemConfig;
-  configHelpers = import ../../../core/management/module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   # Use the template file as default config
   defaultConfig = builtins.readFile ./template-config.nix;
 in

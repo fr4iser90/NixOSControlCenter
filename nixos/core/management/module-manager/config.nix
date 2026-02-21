@@ -128,6 +128,9 @@ in {
         # Automatic module configs for all discovered modules
         moduleConfig = debugModuleConfigs;
         
+        # Config helpers for automatic config file creation
+        configHelpers = import ./lib/config-helpers.nix { inherit pkgs lib; };
+        
         # OVERRIDE getModuleConfig to use config (with defaults from options.nix)
         # instead of only systemConfig (without defaults)
         # This ensures that modules get their default values even when config files don't exist yet

@@ -1,0 +1,17 @@
+# Docker Compose (aus Root verschoben)
+# Purpose: Haupt-Docker-Compose für Modul
+
+version: '3.8'
+
+services:
+  example-service:
+    image: example:latest
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks:
+      - example-network
+
+networks:
+  example-network:
+    driver: bridge

@@ -1,0 +1,21 @@
+# Docker Compose für Web-Service
+# Purpose: Container für Web-API (wie nixify)
+
+version: '3.8'
+
+services:
+  example-web-service:
+    build:
+      context: ../api
+      dockerfile: ../api/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+    restart: unless-stopped
+    networks:
+      - example-network
+
+networks:
+  example-network:
+    driver: bridge

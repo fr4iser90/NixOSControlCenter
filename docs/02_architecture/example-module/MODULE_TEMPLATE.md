@@ -200,10 +200,6 @@ module-name/               # Module name
 ├── commands.nix           # Command-Center registration (optional)
 ├── systemd.nix            # Systemd services/timers (optional)
 ├── config.nix             # Module implementation (optional, split from default.nix if too large)
-├── tui/                   # TUI interface components (optional)
-│   ├── menu.nix           # TUI menu definition and navigation
-│   ├── actions.nix        # TUI action handlers (calls CLI commands)
-│   └── helpers.nix        # TUI-specific utility functions
 ├── lib/                   # Shared utility functions
 │   ├── default.nix        # Library exports
 │   ├── utils.nix          # General utilities
@@ -264,10 +260,43 @@ module-name/               # Module name
 ├── components/            # Small utilities (separate from submodules)
 │   ├── ui-helpers.nix     # Small utility functions
 │   ├── validation.nix     # Helper functions
-├── tui/                   # TUI interface components (optional)
-│   ├── menu.nix           # TUI menu definition and navigation
-│   ├── actions.nix        # TUI action handlers (calls CLI commands)
-│   └── helpers.nix        # TUI-specific utility functions
+├── ui/                    # Multi-Interface UI Support (optional)
+│   ├── cli/               # CLI-Interfaces (fzf, gum, etc.)
+│   │   ├── fzf/           # fzf-basierte Menus (aus Scripts extrahiert!)
+│   │   │   ├── menu.nix   # fzf Menu-Definition
+│   │   │   ├── actions.nix # fzf Action-Handler
+│   │   │   └── helpers.nix # fzf-spezifische Utilities
+│   │   └── interactive/   # Andere CLI-Interfaces (gum, etc.)
+│   │       └── ...
+│   ├── tui/               # TUI Engine Integration
+│   │   ├── menu.nix       # TUI Menu-Definition (verwendet tui-engine)
+│   │   ├── actions.nix    # TUI Action-Handler
+│   │   └── helpers.nix    # TUI-spezifische Utilities
+│   ├── gui/               # GUI für verschiedene DEs (optional)
+│   │   ├── plasma/        # KDE Plasma GUI
+│   │   │   ├── main.qml   # QML Interface
+│   │   │   └── components/# QML Components
+│   │   ├── gnome/         # GNOME GUI
+│   │   │   ├── main.py    # GTK4/Python Interface
+│   │   │   └── widgets/   # GTK Widgets
+│   │   ├── generic/       # Generic GUI (Qt/GTK)
+│   │   │   └── ...
+│   │   └── shared/        # Shared GUI Components
+│   │       └── ...
+│   └── web/               # Web-Interface (optional, wie nixify)
+│       ├── api/           # REST API
+│       │   ├── main.go    # Go API Server
+│       │   ├── handlers/  # API Handlers
+│       │   └── templates/ # HTML Templates
+│       ├── frontend/      # Frontend (React/Vue/etc.)
+│       │   └── ...
+│       └── docker/        # Docker für Web-Service
+│           ├── Dockerfile
+│           └── docker-compose.yml
+├── docker/                # Docker-Konfiguration (optional, aus Root verschoben)
+│   ├── docker-compose.yml # Haupt-Compose
+│   ├── docker-compose.traefik.yml # Traefik-spezifisch
+│   └── Dockerfile         # Falls nötig
 ├── tests/                 # Module tests (optional)
 │   └── default.nix        # Test suite
 └── CHANGELOG.md           # Module change history (recommended)
@@ -318,52 +347,53 @@ in {
 
 **Pattern**:
 ```nix
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getCurrentModuleMetadata, ... }:
+
+with lib;
+
 let
-  # Module metadata (REQUIRED - define directly here)
-  metadata = {
-    # Module classification (REQUIRED)
-    role = "optional";              # "optional" | "core" | "required"
-    name = "my-module";             # Unique module identifier
-    description = "My awesome module"; # Human-readable description
-
-    # UI categorization (REQUIRED)
-    category = "infrastructure";    # "core" | "base" | "security" | "infrastructure" | "specialized"
-    subcategory = "containers";     # Specific subcategory within category
-
-    # Stability information (RECOMMENDED)
-    stability = "stable";           # "stable" | "experimental" | "deprecated" | "beta" | "alpha"
-
-    # Version management (REQUIRED)
-    version = "1.0.0";             # SemVer: MAJOR.MINOR.PATCH
+  # Calculate module name from directory (generic, not hardcoded)
+  moduleName = baseNameOf ./. ;  # "my-module"
+  # Get config using getModuleConfig (includes template-config.nix defaults)
+  cfg = getModuleConfig moduleName;
+  # Get module metadata (for passing to config.nix if needed)
+  moduleConfig = getCurrentModuleMetadata ./.;
+in {
+  # Export moduleName via _module.args for sub-modules that need it
+  _module.args = {
+    moduleName = moduleName;
   };
 
-  cfg = systemConfig.${metadata.category}.${metadata.name} or {};
-in {
-  # REQUIRED: Export metadata for discovery system
-  _module.metadata = metadata;
-
-  # Module imports
   imports = [
-    ./options.nix  # Always import options first
-  ] ++ (if (cfg.enable or false) then [
+    ./options.nix
+    # Import commands.nix as function to pass moduleName (prevents infinite recursion)
+    # WHY FUNCTION IMPORT? See explanation below!
+    (import ./commands.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; moduleName = moduleName; })
+  ] ++ lib.optionals (cfg.enable or false) [
+    # Import sub-modules only when enabled
     ./sub-module-1
     ./sub-module-2
     ./config.nix  # Implementation logic goes here
-  ] else []);
+  ];
 }
 ```
 
 ### `options.nix`
 **Purpose**: Define all configuration options
 
-**Pattern for Core Modules**:
+**Pattern (Works for both Core and Optional Modules)**:
 ```nix
 # options.nix
+{ lib, getCurrentModuleMetadata, ... }:
+
 let
   moduleVersion = "1.0";
+  # Get module metadata to determine configPath dynamically (generic, not hardcoded)
+  metadata = getCurrentModuleMetadata ./.;
+  configPath = metadata.configPath;
 in {
-  options.systemConfig.core.base.my-module = {
+  # Options must be under systemConfig prefix with dynamic configPath
+  options.systemConfig.${configPath} = {
     # Version metadata (REQUIRED)
     _version = lib.mkOption {
       type = lib.types.str;
@@ -372,28 +402,7 @@ in {
       description = "Module version";
     };
 
-    # Core modules usually don't have enable (always active)
-    # Some core modules have enable for conditional features
-  };
-}
-```
-
-**Pattern for Optional Modules**:
-```nix
-# options.nix
-let
-  moduleVersion = "1.0";
-in {
-  options.systemConfig.modules.infrastructure.my-module = {
-    # Version metadata (REQUIRED)
-    _version = lib.mkOption {
-      type = lib.types.str;
-      default = moduleVersion;
-      internal = true;
-      description = "Module version";
-    };
-
-    # Enable option for optional modules
+    # Enable option (for optional modules, core modules may omit this)
     enable = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -406,32 +415,49 @@ in {
 }
 ```
 
+**Why dynamic configPath?**
+- **Generic**: Works for any module without hardcoding paths
+- **Automatic**: Discovery system determines the correct path
+- **Consistent**: Same pattern works for core and optional modules
+
 ### `config.nix`
 **Purpose**: Module implementation code (NixOS module configuration logic)
 
 **Pattern**:
 ```nix
-{ config, lib, pkgs, systemConfig, moduleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfigFromPath, getCurrentModuleMetadata, configHelpers, ... }:
+
 let
-  cfg = systemConfig.${moduleConfig.configPath};
-  configHelpers = import ../../core/management/module-manager/lib/config-helpers.nix {
-    inherit pkgs lib;
-  };
-  defaultConfig = builtins.readFile 
+  # Get module metadata (generic, not hardcoded)
+  moduleConfig = getCurrentModuleMetadata ./.;
+  # Get config with defaults from options.nix and template-config.nix
+  # This ensures template defaults are always available
+  cfg = getModuleConfigFromPath moduleConfig.configPath;
+  # Use the template file as default config
+  # configHelpers is available via _module.args (no import needed!)
+  defaultConfig = builtins.readFile ./template-config.nix;
 in
-  lib.mkMerge [
-    (lib.mkIf (cfg.enable or (moduleConfig.role == "core"))  # Core modules always enabled
+{
+  config = lib.mkMerge [
+    (lib.mkIf (cfg.enable or false) (
       (configHelpers.createModuleConfig {
         moduleName = "module-name";
         defaultConfig = defaultConfig;
       }) // {
         # Module implementation (only when enabled)
+        # Use cfg for user settings (includes template defaults)
         # System configuration
         # Assertions
       }
-    )
+    ))
   ];
+}
 ```
+
+**Important Notes**:
+- **Return structure**: Must return `{ config = lib.mkMerge [...] }` (not just `lib.mkMerge`)
+- **getModuleConfigFromPath**: Ensures defaults from `options.nix` and `template-config.nix` are merged
+- **template-config.nix**: Automatically loaded as fallback if config file doesn't exist
 
 
 
@@ -508,13 +534,22 @@ in {
 ##### **`getModuleConfig` - Access Module Configuration**
 ```nix
 getModuleConfig = moduleName:
-  # Returns: systemConfig.{configPath} for the module (from /etc/nixos/configs/)
-  # Example: getModuleConfig "cli-formatter" → systemConfig.core.management.system-manager.submodules.cli-formatter
+  # Returns: Merged config with template-config.nix → options.nix defaults → user config
+  # Automatically loads template-config.nix as fallback if config file doesn't exist
+  # Example: getModuleConfig "chronicle" → { enable = false; mode = "automatic"; outputDir = "$HOME/.local/share/chronicle"; ... }
 
 # Usage in modules:
 let cfg = getModuleConfig "my-module"; in
-  # Access user settings from /etc/nixos/configs/: cfg.enable, cfg.someOption, etc.
+  # Access user settings with automatic defaults:
+  # - cfg.enable (from template-config.nix or user config)
+  # - cfg.someOption (from template-config.nix or options.nix default or user config)
+  # Template defaults are ALWAYS available, even if config file doesn't exist
 ```
+
+**Merging Order**:
+1. **template-config.nix** (base defaults, always loaded if exists)
+2. **options.nix defaults** (from option definitions)
+3. **user config file** (from `/etc/nixos/configs/`, overrides everything)
 
 ##### **`getModuleMetadata` - Access Module Metadata**
 ```nix
@@ -710,30 +745,83 @@ enablePath = "core.management.system-manager.submodules.cli-formatter.enable"
   - **Rule**: If `default.nix` would contain `config = { ... }` → move it to `config.nix`
 - **Pattern**:
   ```nix
-  { config, lib, pkgs, systemConfig, moduleConfig, ... }:
+  { config, lib, pkgs, systemConfig, getModuleConfigFromPath, getCurrentModuleMetadata, configHelpers, ... }:
   let
-    cfg = systemConfig.${moduleConfig.configPath};
-    configHelpers = import ../../core/management/module-manager/lib/config-helpers.nix {
-      inherit pkgs lib;
-    };
-    defaultConfig = 
+    # Get module metadata (generic, not hardcoded)
+    moduleConfig = getCurrentModuleMetadata ./.;
+    # Get config with defaults from options.nix and template-config.nix
+    cfg = getModuleConfigFromPath moduleConfig.configPath;
+    # Use the template file as default config
+    # configHelpers is available via _module.args (no import needed!)
+    defaultConfig = builtins.readFile ./template-config.nix;
   in
-    lib.mkIf (cfg.enable or false)
-      (configHelpers.createModuleConfig {
-        moduleName = "homelab";
-        defaultConfig = defaultConfig;
-      }) // {
-        # Module implementation (only when enabled)
-        # Use cfg for user settings
-        # Define APIs here if module provides them
-        options.core.infrastructure.homelab = {
-          # API options available when module is loaded
-        };
-
-        # System configuration goes here
-        # environment.systemPackages, services, etc.
-      };
+  {
+    config = lib.mkMerge [
+      (lib.mkIf (cfg.enable or false) (
+        (configHelpers.createModuleConfig {
+          moduleName = "homelab";
+          defaultConfig = defaultConfig;
+        }) // {
+          # Module implementation (only when enabled)
+          # Use cfg for user settings (includes template defaults)
+          # System configuration goes here
+          # environment.systemPackages, services, etc.
+        }
+      ))
+    ];
+  }
   ```
+
+### `template-config.nix`
+- **Purpose**: Default configuration template (automatically loaded as fallback)
+- **Responsibilities**:
+  - Provide sensible default values for all module options
+  - Automatically loaded by `getModuleConfig` if config file doesn't exist
+  - Used as base for merging with `options.nix` defaults and user config
+- **Critical Rules**:
+  - **MUST be FLAT**: No nesting like `modules.example-module = { ... }`
+  - The file path determines nesting automatically via `config-loader.nix`
+  - Contains only the module's direct options
+- **Pattern**:
+```nix
+# template-config.nix
+# IMPORTANT: This must be FLAT - no nesting!
+# The file path automatically determines the nesting structure
+{
+  enable = false;
+  option1 = "default-value";
+  option2 = 42;
+  nested = {
+    option = false;
+  };
+}
+```
+
+**How it works**:
+1. **Automatic Loading**: `getModuleConfig` automatically loads `template-config.nix` if it exists
+2. **Fallback Chain**: `template-config.nix` → `options.nix` defaults → user config file
+3. **Merging**: All three sources are merged: `templateDefaults` → `configValue` (with options defaults) → `systemConfigValue` (user config)
+4. **File Path Nesting**: `config-loader.nix` automatically nests based on file path:
+   - `/etc/nixos/configs/modules/infrastructure/homelab/config.nix` → `systemConfig.modules.infrastructure.homelab`
+   - So `template-config.nix` should be flat: `{ enable = false; ... }`
+
+**Example**:
+```nix
+# ✅ CORRECT (flat)
+{
+  enable = false;
+  mode = "automatic";
+  outputDir = "$HOME/.local/share/chronicle";
+}
+
+# ❌ WRONG (nested - will cause double nesting!)
+{
+  modules.specialized.chronicle = {
+    enable = false;
+    mode = "automatic";
+  };
+}
+```
 
 ### `commands.nix`
 - **Purpose**: Command-Center command registration
@@ -741,7 +829,10 @@ enablePath = "core.management.system-manager.submodules.cli-formatter.enable"
   - Create all executable scripts using `pkgs.writeShellScriptBin`
   - Register commands via CLI Registry API: `cliRegistry.registerCommandsFor`
   - Define command metadata (name, description, category, help text)
-- **Critical**: Commands must be wrapped in `lib.mkMerge` and use the API
+- **Critical**: 
+  - Commands must be wrapped in `{ config = lib.mkMerge [...] }` (not just `lib.mkMerge`)
+  - `moduleName` is passed as parameter from `default.nix` (prevents infinite recursion)
+  - Use `getModuleConfig moduleName` to get config (includes template defaults)
 - **Pattern**:
 ```nix
 { config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, moduleName, ... }:
@@ -749,7 +840,9 @@ enablePath = "core.management.system-manager.submodules.cli-formatter.enable"
 with lib;
 
 let
+  # Get config using getModuleConfig (includes template-config.nix defaults)
   cfg = getModuleConfig moduleName;
+  # Get CLI registry API
   cliRegistry = getModuleApi "cli-registry";
   
   # Create script with safe defaults for build-time
@@ -757,6 +850,8 @@ let
     #!/usr/bin/env bash
     # Command implementation
     echo "Hello from my module!"
+    echo "Module: ${moduleName}"
+    echo "Enabled: ${toString (cfg.enable or false)}"
   '';
 in
 {
@@ -783,6 +878,181 @@ in
   ];
 }
 ```
+
+### UI-Architektur (Multi-Interface Support)
+
+Module können mehrere UI-Formen unterstützen:
+- **CLI**: fzf-basierte Menus (aus Scripts extrahiert)
+- **TUI**: Bubble Tea-basierte Interfaces (via tui-engine)
+- **GUI**: Desktop-Environment-spezifische GUIs (Plasma, GNOME, etc.)
+- **Web**: Optionaler Web-Service mit REST API
+
+**Wichtig:**
+- **fzf aus Scripts extrahieren**: Scripts enthalten nur reine Commands, UI-Logik in `ui/cli/fzf/`
+- **TUI via Engine**: Nutze `tui-engine` API für Bubble Tea Interfaces
+- **GUI optional**: Nur wenn Modul GUI benötigt
+- **Web optional**: Nur wenn Modul Web-Service benötigt (wie nixify)
+- **Docker einsortieren**: `docker/` oder `ui/web/docker/` statt Root
+
+#### `ui/cli/fzf/` - fzf-basierte CLI-Menus
+
+**Purpose**: fzf-Menus aus Scripts extrahiert (Scripts bleiben clean)
+
+**Pattern**:
+```nix
+# ui/cli/fzf/menu.nix
+{ lib, pkgs, cfg, ... }:
+
+let
+  # fzf Menu-Definition
+  menuItems = [
+    { name = "Connect"; action = "connect"; }
+    { name = "List"; action = "list"; }
+    { name = "Add"; action = "add"; }
+  ];
+  
+  fzfMenu = pkgs.writeShellScriptBin "ncc-example-fzf" ''
+    #!/usr/bin/env bash
+    # fzf Menu Implementation
+    SELECTION=$(printf '%s\n' "${lib.concatMapStringsSep "\n" (item: item.name) menuItems}" | ${pkgs.fzf}/bin/fzf)
+    # Handle selection...
+  '';
+in
+  fzfMenu
+```
+
+#### `ui/tui/` - TUI Engine Integration
+
+**Purpose**: Bubble Tea-basierte TUI via tui-engine
+
+**Pattern**:
+```nix
+# ui/tui/menu.nix
+{ lib, pkgs, getModuleApi, cfg, ... }:
+
+let
+  tuiEngine = getModuleApi "tui-engine";
+  
+  # TUI Menu-Definition (verwendet tui-engine Templates)
+  tui = tuiEngine.templates."5panel".createTUI
+    "📦 Example Module"
+    [ "📋 List" "🔍 Search" "⚙️ Settings" "❌ Quit" ]
+    actions.getList
+    actions.getSearch
+    actions.getDetails
+    actions.getActions;
+in
+  tui
+```
+
+#### `ui/gui/` - Desktop GUI (optional)
+
+**Purpose**: DE-spezifische GUIs (Plasma, GNOME, etc.)
+
+**Pattern**:
+```nix
+# ui/gui/plasma/main.qml (QML für Plasma)
+import QtQuick 2.15
+import QtQuick.Controls 2.15
+
+ApplicationWindow {
+    title: "Example Module"
+    // GUI Implementation
+}
+```
+
+#### `ui/web/` - Web-Interface (optional, wie nixify)
+
+**Purpose**: Web-Service mit REST API
+
+**Structure**:
+```
+ui/web/
+├── api/              # REST API Backend
+│   ├── main.go       # Go API Server
+│   ├── handlers/     # API Handlers
+│   └── templates/    # HTML Templates
+├── frontend/         # Frontend (optional)
+└── docker/           # Docker für Web-Service
+    ├── Dockerfile
+    └── docker-compose.yml
+```
+
+**Pattern**:
+```nix
+# config.nix - Web-Service Integration
+{ config, lib, pkgs, buildGoApplication, gomod2nix, ... }:
+
+let
+  webService = buildGoApplication {
+    pname = "example-web-service";
+    version = "1.0.0";
+    src = ./ui/web/api;
+    go = pkgs.go;
+    modules = ./ui/web/api/gomod2nix.toml;
+  };
+in
+{
+  systemd.services.example-web-service = {
+    enable = true;
+    serviceConfig.ExecStart = "${webService}/bin/example-web-service";
+  };
+}
+```
+
+#### `docker/` - Docker-Konfiguration
+
+**Purpose**: Docker-Compose und Dockerfiles (aus Root verschoben)
+
+**Structure**:
+```
+docker/
+├── docker-compose.yml          # Haupt-Compose
+├── docker-compose.traefik.yml  # Traefik-spezifisch
+└── Dockerfile                  # Falls nötig
+```
+
+**Wichtig**: Docker-Compose nicht im Modul-Root, sondern in `docker/` oder `ui/web/docker/` (wenn nur für Web-Service)
+
+**Why function import (Lambda)?**
+
+Das ist ein wichtiges Konzept! Hier die Erklärung:
+
+**Problem ohne Funktion-Import:**
+```nix
+# ❌ PROBLEM: Infinite Recursion!
+imports = [
+  ./commands.nix  # commands.nix braucht moduleName
+];
+# _module.args wird NACH imports evaluiert!
+# → commands.nix wird evaluiert BEVOR moduleName verfügbar ist
+# → Infinite Recursion Error!
+```
+
+**Lösung mit Funktion-Import:**
+```nix
+# ✅ LÖSUNG: Funktion-Import mit expliziten Parametern
+imports = [
+  (import ./commands.nix { 
+    inherit config lib pkgs systemConfig getModuleConfig getModuleApi; 
+    moduleName = moduleName;  # ← Explizit übergeben, sofort verfügbar!
+  })
+];
+# moduleName ist JETZT verfügbar (aus let-Block oben)
+# → commands.nix bekommt moduleName direkt als Parameter
+# → Keine Infinite Recursion!
+```
+
+**Wie funktioniert `(import ./file.nix { ... })`?**
+- `import ./file.nix` ist eine Funktion, die Parameter erwartet
+- `{ ... }` sind die Argumente, die an die Funktion übergeben werden
+- Das Ergebnis ist ein NixOS-Modul (Attribut-Set)
+- **Vorteil**: Parameter sind sofort verfügbar, nicht erst nach `_module.args` Evaluation
+
+**Zusammenfassung:**
+- **Normaler Import**: `./commands.nix` → Module wird direkt evaluiert, `_module.args` noch nicht verfügbar
+- **Funktion-Import**: `(import ./commands.nix { ... })` → Module bekommt Parameter direkt, keine Wartezeit auf `_module.args`
+- **Warum nötig**: Verhindert Infinite Recursion bei `moduleName` Zugriff
 
 ## Best Practices
 

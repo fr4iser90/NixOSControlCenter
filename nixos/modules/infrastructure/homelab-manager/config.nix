@@ -1,11 +1,10 @@
-{ config, lib, pkgs, systemConfig, getModuleConfigFromPath, getCurrentModuleMetadata, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfigFromPath, getCurrentModuleMetadata, configHelpers, ... }:
 
 let
   # Get module metadata (generic, not hardcoded)
   moduleConfig = getCurrentModuleMetadata ./.;
   # Generic: Use getModuleConfigFromPath to get config with defaults from options.nix
   cfg = getModuleConfigFromPath moduleConfig.configPath;
-  configHelpers = import ../../../core/management/module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   # Use the template file as default config
   defaultConfig = builtins.readFile ./template-config.nix;
 in
