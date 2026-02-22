@@ -1,22 +1,28 @@
 # Default VM configuration for testing
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 with lib;
 
 let
-  cfg = systemConfig.modules.infrastructure.vm;
+  # Use getModuleConfig to get the main VM config (Stage 1 pattern)
+  cfg = getModuleConfig "vm";
   libVM = import ../lib { inherit lib pkgs; };
 
   mkTestVM = distro: {
     config,
     lib,
     pkgs,
+    systemConfig,
+    getModuleConfig,
     ...
   }: let
-    vmCfg = systemConfig.modules.infrastructure.vm.testing.${distro}.vm;
+    # Access nested config via config.systemConfig (evaluated options with defaults)
+    # Fallback to empty attrset if not set
+    vmCfg = config.systemConfig.modules.infrastructure.vm.testing.${distro}.vm or {};
     vmName = "${distro}-test";
   in {
-    options.modules.vm-manager.testing.${distro}.vm = {
+    # Fix options path to match systemConfig structure
+    options.systemConfig.modules.infrastructure.vm.testing.${distro}.vm = {
       enable = mkOption {
         type = types.bool;
         default = true;
@@ -70,7 +76,7 @@ let
       };
     };
 
-    config = mkIf vmCfg.enable {
+    config = mkIf (vmCfg.enable or true) {
       # Statt command-center.commands, erstellen wir direkte Skripte
       environment.systemPackages = [
         (pkgs.writeScriptBin "vm-test-${distro}-run" ''

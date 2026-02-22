@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 with lib;
 
@@ -10,7 +10,9 @@ let
 in {
   imports = [
     ./options.nix
-  ] ++ optional (cfg.enable or false) (import ./testing { inherit config lib pkgs; });
+    # Import commands.nix as function to pass moduleName (prevents infinite recursion)
+    (import ./commands.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; moduleName = moduleName; })
+  ] ++ optional (cfg.enable or false) (import ./testing { inherit config lib pkgs systemConfig getModuleConfig; });
 
   # Removed: Redundant enable setting (already defined in options.nix)
 
