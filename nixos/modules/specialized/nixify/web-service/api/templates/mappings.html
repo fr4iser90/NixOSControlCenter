@@ -10,6 +10,30 @@
             <input type="text" id="searchInput" placeholder="{{.T "mappings.search"}}" class="search-input-full">
         </div>
         
+        <div class="filters-container">
+            <div class="filter-group">
+                <label>{{.T "mappings.filters.status"}}:</label>
+                <select id="statusFilter" class="filter-select">
+                    <option value="all">{{.T "mappings.filters.all_status"}}</option>
+                    <option value="native">{{.T "mappings.filters.native_only"}}</option>
+                    <option value="wine">{{.T "mappings.filters.wine_only"}}</option>
+                    <option value="alternative">{{.T "mappings.filters.alternative_only"}}</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>{{.T "mappings.filters.category"}}:</label>
+                <select id="categoryFilter" class="filter-select">
+                    <option value="all">{{.T "mappings.filters.all_categories"}}</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>
+                    <input type="checkbox" id="nativeOnlyToggle">
+                    {{.T "mappings.filters.native_only_checkbox"}}
+                </label>
+            </div>
+        </div>
+        
         <div id="topMigrationApps" class="top-migration-section">
             <h2 class="top-migration-title">
                 ⭐ {{.T "mappings.top_migration_apps"}}
@@ -276,28 +300,103 @@
         }
     }
     
-    // Search handler
-    document.getElementById('searchInput').addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase();
-        const filtered = programs.filter(prog => {
-            const name = (prog.name || '').toLowerCase();
-            const category = (prog.category || '').toLowerCase();
-            const package = (prog.nixos_package || '').toLowerCase();
-            return name.includes(query) || category.includes(query) || package.includes(query);
+    // Get all unique categories
+    function getCategories() {
+        const categories = new Set();
+        programs.forEach(prog => {
+            if (prog.category) {
+                categories.add(prog.category);
+            }
+        });
+        return Array.from(categories).sort();
+    }
+    
+    // Populate category filter
+    function populateCategoryFilter() {
+        const categoryFilter = document.getElementById('categoryFilter');
+        const categories = getCategories();
+        categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat;
+            option.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+            categoryFilter.appendChild(option);
+        });
+    }
+    
+    // Apply all filters
+    function applyFilters() {
+        const query = document.getElementById('searchInput').value.toLowerCase();
+        const statusFilter = document.getElementById('statusFilter').value;
+        const categoryFilter = document.getElementById('categoryFilter').value;
+        const nativeOnly = document.getElementById('nativeOnlyToggle').checked;
+        
+        let filtered = programs.filter(prog => {
+            // Search filter
+            if (query) {
+                const name = (prog.name || '').toLowerCase();
+                const category = (prog.category || '').toLowerCase();
+                const package = (prog.nixos_package || '').toLowerCase();
+                if (!name.includes(query) && !category.includes(query) && !package.includes(query)) {
+                    return false;
+                }
+            }
+            
+            // Category filter
+            if (categoryFilter !== 'all' && prog.category !== categoryFilter) {
+                return false;
+            }
+            
+            // Status filter
+            if (statusFilter !== 'all') {
+                const hasPackage = prog.nixos_package != null;
+                const hasWine = prog.wine === true;
+                const hasProton = prog.proton === true;
+                const hasModule = prog.module != null;
+                const hasAlternatives = prog.alternatives && prog.alternatives.length > 0;
+                
+                if (statusFilter === 'native' && !hasPackage && !hasModule) {
+                    return false;
+                }
+                if (statusFilter === 'wine' && !hasWine && !hasProton) {
+                    return false;
+                }
+                if (statusFilter === 'alternative' && !hasAlternatives && hasPackage) {
+                    return false;
+                }
+            }
+            
+            // Native only toggle
+            if (nativeOnly) {
+                const hasPackage = prog.nixos_package != null;
+                const hasModule = prog.module != null;
+                if (!hasPackage && !hasModule) {
+                    return false;
+                }
+            }
+            
+            return true;
         });
         
-        // Bei Suche: Top Apps ausblenden, alle Programme zeigen
-        if (query) {
+        // Bei Suche oder Filtern: Top Apps ausblenden, alle Programme zeigen
+        if (query || statusFilter !== 'all' || categoryFilter !== 'all' || nativeOnly) {
             document.getElementById('topMigrationApps').style.display = 'none';
             document.getElementById('allProgramsTitle').textContent = '{{.T "mappings.search_results"}}';
             renderPrograms(sortPrograms(filtered), 'programsList');
         } else {
-            // Leere Suche = zurück zu normaler Ansicht
+            // Keine Filter = normale Ansicht
             document.getElementById('topMigrationApps').style.display = 'block';
             document.getElementById('allProgramsTitle').textContent = '{{.T "mappings.all_programs"}}';
             renderAllPrograms();
         }
-    });
+    }
+    
+    // Search handler
+    document.getElementById('searchInput').addEventListener('input', applyFilters);
+    
+    // Filter handlers
+    document.getElementById('statusFilter').addEventListener('change', applyFilters);
+    document.getElementById('categoryFilter').addEventListener('change', applyFilters);
+    document.getElementById('nativeOnlyToggle').addEventListener('change', applyFilters);
     
     // Initial render - BEIDE GLEICH BEHANDELN
     if (!Array.isArray(programs)) {
@@ -305,6 +404,8 @@
     } else if (programs.length === 0) {
         console.warn('No programs loaded!');
     } else {
+        // Populate category filter
+        populateCategoryFilter();
         // 1. Top Apps rendern - DIREKT
         const topApps = programs.filter(prog => {
             const priority = prog.priority || prog.Priority || null;

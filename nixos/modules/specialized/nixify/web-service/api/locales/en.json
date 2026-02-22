@@ -194,6 +194,16 @@
     "top_migration_subtitle": "The most important programs for your switch to NixOS",
     "all_programs": "All Programs",
     "search_results": "Search Results",
+    "filters": {
+      "status": "Status",
+      "category": "Category",
+      "all_status": "All Status",
+      "native_only": "Native Only",
+      "wine_only": "Wine/Proton Only",
+      "alternative_only": "Alternatives Only",
+      "all_categories": "All Categories",
+      "native_only_checkbox": "Show native programs only"
+    },
     "programs": {
       "discord": {
         "alternatives": {
@@ -207,7 +217,7 @@
         "short_description": "Gaming platform with Windows compatibility via Proton"
       },
       "microsoft_office": {
-        "note": "LibreOffice is the recommended native alternative. Microsoft Office itself can be used with limitations via Wine.",
+        "note": "LibreOffice is the recommended native alternative. Microsoft Office runs via Wine.",
         "short_description": "Office suite for documents, spreadsheets and presentations",
         "alternatives": {
           "onlyoffice": {
@@ -219,7 +229,7 @@
         }
       },
       "adobe_acrobat_reader": {
-        "note": "Native alternative: Okular. Original Adobe Reader runs via Wine.",
+        "note": "Native alternative: Okular. Adobe Reader runs via Wine.",
         "alternatives": {
           "okular": {
             "reason": "KDE PDF viewer with many features, already set as default"
@@ -472,7 +482,7 @@
         }
       },
       "utorrent": {
-        "note": "Native alternative: qBittorrent or Transmission. Original µTorrent runs via Wine.",
+        "note": "Native alternative: qBittorrent or Transmission. µTorrent runs via Wine.",
         "alternatives": {
           "qbittorrent": {
             "reason": "Open-source BitTorrent client, similar to µTorrent"
@@ -486,7 +496,7 @@
         }
       },
       "evernote": {
-        "note": "Native alternative: Joplin or Obsidian. Original Evernote runs via Wine.",
+        "note": "Native alternative: Joplin or Obsidian. Evernote runs via Wine.",
         "alternatives": {
           "joplin": {
             "reason": "Open-source notes app with E2E encryption and sync"
@@ -500,7 +510,7 @@
         }
       },
       "google_drive": {
-        "note": "Native alternative: rclone or Nextcloud. Original Google Drive runs via Wine.",
+        "note": "Native alternative: rclone or Nextcloud. Google Drive runs via Wine.",
         "alternatives": {
           "rclone": {
             "reason": "CLI tool for cloud sync with Google Drive and many other providers"
