@@ -161,7 +161,7 @@
   },
   "footer": {
     "project": "Servicio Web Nixify - Parte de",
-    "tagline": "Libera a todos los usuarios de Microsoft y Apple 🚀"
+    "tagline": "Cambia a un sistema abierto y controlable 🚀"
   },
   "mappings": {
     "title": "Mapeos de programas",
@@ -170,18 +170,20 @@
     "category": "Categoría",
     "alternatives": "Alternativas",
     "status": {
-      "supported": "Soportado",
-      "alternative": "Alternativa",
-      "wine": "Via Wine",
-      "proton": "Via Proton",
+      "supported": "Nativo",
+      "alternative": "Alternativa nativa recomendada",
+      "wine": "Funciona vía Wine",
+      "proton": "Funciona vía Proton",
       "flatpak": "Via Flatpak",
-      "appimage": "AppImage",
-      "module_only": "Solo módulo",
-      "not_supported": "No soportado",
-      "unknown": "Desconocido"
+      "appimage": "AppImage disponible",
+      "module_only": "Basado en módulo"
     },
     "no_results": "No se encontraron programas",
     "total": "Total de programas",
+    "top_migration_apps": "Aplicaciones de migración principales",
+    "top_migration_subtitle": "Los programas más importantes para tu cambio a NixOS",
+    "all_programs": "Todos los programas",
+    "search_results": "Resultados de búsqueda",
     "programs": {
       "discord": {
         "alternatives": {
@@ -194,7 +196,7 @@
         "note": "Cliente Steam nativo. Proton permite ejecutar juegos de Windows."
       },
       "microsoft_office": {
-        "note": "Alternativa nativa: LibreOffice. Microsoft Office original funciona via Wine.",
+        "note": "LibreOffice es la alternativa nativa recomendada. Microsoft Office en sí puede usarse con limitaciones via Wine.",
         "alternatives": {
           "onlyoffice": {
             "reason": "Formato compatible con Microsoft Office con interfaz moderna"
@@ -301,9 +303,6 @@
       },
       "vlc": {
         "alternatives": {
-          "vlc": {
-            "reason": "Reproductor multimedia universal, ya establecido por defecto"
-          },
           "mpv": {
             "reason": "Reproductor minimalista pero potente"
           },
@@ -314,9 +313,6 @@
       },
       "spotify": {
         "alternatives": {
-          "spotify_native": {
-            "reason": "Cliente Spotify oficial, ya establecido por defecto"
-          },
           "ncspot": {
             "reason": "Cliente Spotify basado en terminal"
           },
@@ -365,9 +361,6 @@
         "alternatives": {
           "qemu_kvm": {
             "reason": "Virtualización open-source con mejor rendimiento"
-          },
-          "virtualbox": {
-            "reason": "Fácil de usar, ya establecido por defecto"
           }
         }
       },
@@ -384,11 +377,332 @@
           }
         }
       },
-      "homebrew": {
-        "note": "NixOS usa el gestor de paquetes nix en su lugar"
+      "gimp": {
+        "alternatives": {
+          "krita": {
+            "reason": "Pintura digital y edición de imágenes, especialmente para artistas"
+          },
+          "darktable": {
+            "reason": "Edición RAW y flujo de trabajo fotográfico profesional"
+          }
+        }
       },
-      "chocolatey": {
-        "note": "NixOS usa el gestor de paquetes nix en su lugar"
+      "dropbox": {
+        "alternatives": {
+          "nextcloud": {
+            "reason": "Sincronización en la nube auto-hospedada con más control y privacidad"
+          },
+          "syncthing": {
+            "reason": "Sincronización P2P sin servidor en la nube, completamente descentralizada"
+          },
+          "rclone": {
+            "reason": "Herramienta CLI para sincronización en la nube con muchos proveedores"
+          }
+        }
+      },
+      "libreoffice": {
+        "alternatives": {
+          "onlyoffice": {
+            "reason": "Formato compatible con Microsoft Office con interfaz moderna"
+          },
+          "openoffice": {
+            "reason": "Suite ofimática alternativa, menos desarrollada activamente"
+          }
+        }
+      },
+      "teamviewer": {
+        "alternatives": {
+          "anydesk": {
+            "reason": "Escritorio remoto rápido con baja latencia"
+          },
+          "rustdesk": {
+            "reason": "Escritorio remoto open-source, auto-hospedable"
+          },
+          "remmina": {
+            "reason": "Cliente VNC/RDP para varios protocolos"
+          }
+        }
+      },
+      "thunderbird": {
+        "alternatives": {
+          "evolution": {
+            "reason": "Cliente de correo GNOME con integración de calendario"
+          },
+          "geary": {
+            "reason": "Cliente de correo simple y moderno para GNOME"
+          },
+          "kmail": {
+            "reason": "Cliente de correo KDE con integración PIM completa"
+          }
+        }
+      },
+      "audacity": {
+        "alternatives": {
+          "ardour": {
+            "reason": "Editor de audio profesional y DAW"
+          },
+          "reaper": {
+            "reason": "DAW profesional, funciona vía Wine"
+          }
+        }
+      },
+      "inkscape": {
+        "alternatives": {
+          "krita": {
+            "reason": "También adecuado para gráficos vectoriales, especialmente para artistas"
+          },
+          "scribus": {
+            "reason": "Publicación de escritorio con soporte de gráficos vectoriales"
+          }
+        }
+      },
+      "utorrent": {
+        "note": "Alternativa nativa: qBittorrent o Transmission. El original µTorrent funciona vía Wine.",
+        "alternatives": {
+          "qbittorrent": {
+            "reason": "Cliente BitTorrent open-source, similar a µTorrent"
+          },
+          "transmission": {
+            "reason": "Cliente BitTorrent simple y ligero"
+          },
+          "deluge": {
+            "reason": "Cliente BitTorrent rico en funciones con soporte de plugins"
+          }
+        }
+      },
+      "evernote": {
+        "note": "Alternativa nativa: Joplin u Obsidian. El original Evernote funciona vía Wine.",
+        "alternatives": {
+          "joplin": {
+            "reason": "Aplicación de notas open-source con cifrado E2E y sincronización"
+          },
+          "obsidian": {
+            "reason": "Aplicación de notas moderna con Markdown y sistema de plugins"
+          },
+          "standard_notes": {
+            "reason": "Aplicación de notas centrada en privacidad con cifrado E2E"
+          }
+        }
+      },
+      "google_drive": {
+        "note": "Alternativa nativa: rclone o Nextcloud. El original Google Drive funciona vía Wine.",
+        "alternatives": {
+          "rclone": {
+            "reason": "Herramienta CLI para sincronización en la nube con Google Drive y muchos otros proveedores"
+          },
+          "nextcloud": {
+            "reason": "Sincronización en la nube auto-hospedada con integración de Google Drive"
+          },
+          "syncthing": {
+            "reason": "Sincronización P2P sin servidor en la nube, completamente descentralizada"
+          }
+        }
+      },
+      "ccleaner": {
+        "note": "No necesario en NixOS - El sistema es declarativo e inmutable. Para limpieza: nix-collect-garbage",
+        "alternatives": {
+          "nix_collect_garbage": {
+            "reason": "Elimina generaciones antiguas de NixOS y paquetes no referenciados"
+          },
+          "ncdu": {
+            "reason": "Análisis de almacenamiento: Muestra qué usa espacio en disco (interactivo)"
+          },
+          "baobab": {
+            "reason": "Interfaz gráfica para análisis de almacenamiento: Representación visual del uso del disco"
+          }
+        }
+      },
+      "qbittorrent": {},
+      "blender": {},
+      "krita": {
+        "alternatives": {
+          "gimp": {
+            "reason": "Edición de imagen completa, similar a GIMP"
+          },
+          "inkscape": {
+            "reason": "Editor de gráficos vectoriales"
+          }
+        }
+      },
+      "signal": {
+        "alternatives": {
+          "element": {
+            "reason": "Mensajería basada en Matrix con cifrado E2E"
+          },
+          "threema": {
+            "reason": "Mensajería centrada en privacidad, funciona vía Wine"
+          }
+        }
+      },
+      "bitwarden": {
+        "alternatives": {
+          "keepassxc": {
+            "reason": "Gestor de contraseñas open-source, almacenado localmente"
+          },
+          "pass": {
+            "reason": "Gestor de contraseñas basado en CLI con sincronización Git"
+          }
+        }
+      },
+      "brave": {
+        "alternatives": {
+          "firefox": {
+            "reason": "Navegador centrado en privacidad"
+          },
+          "librewolf": {
+            "reason": "Fork de Firefox reforzado para privacidad"
+          }
+        }
+      },
+      "obsidian": {
+        "alternatives": {
+          "joplin": {
+            "reason": "Aplicación de notas open-source con cifrado E2E"
+          },
+          "logseq": {
+            "reason": "Aplicación de notas basada en outliner con Markdown"
+          }
+        }
+      },
+      "handbrake": {},
+      "ublock_origin": {
+        "note": "Extensión de navegador, no disponible como programa independiente",
+        "alternatives": {
+          "extension": {
+            "reason": "Disponible como extensión de navegador para Firefox/Chrome"
+          },
+          "adblock": {
+            "reason": "Extensión de navegador alternativa para bloqueo de anuncios"
+          }
+        }
+      },
+      "rufus": {
+        "note": "Herramienta Windows para unidades USB arrancables. Alternativa: Ventoy o dd",
+        "alternatives": {
+          "ventoy": {
+            "reason": "Herramienta para crear unidades USB arrancables"
+          },
+          "dd": {
+            "reason": "Herramienta Linux estándar para crear medios arrancables"
+          }
+        }
+      },
+      "winscp": {
+        "note": "Cliente SFTP/SCP Windows. Alternativa: FileZilla o rsync",
+        "alternatives": {
+          "filezilla": {
+            "reason": "Cliente SFTP/FTP con interfaz gráfica"
+          },
+          "rsync": {
+            "reason": "Herramienta CLI para sincronización de archivos"
+          }
+        }
+      },
+      "localsend": {},
+      "winmerge": {
+        "note": "Herramienta de comparación de archivos Windows. Alternativa: Meld o Kompare",
+        "alternatives": {
+          "meld": {
+            "reason": "Herramienta de comparación de archivos GNOME con interfaz gráfica"
+          },
+          "kompare": {
+            "reason": "Herramienta de comparación de archivos KDE"
+          }
+        }
+      },
+      "mumble": {
+        "alternatives": {
+          "discord": {
+            "reason": "Chat de voz moderno con muchas funciones"
+          },
+          "teamspeak": {
+            "reason": "Chat de voz profesional, funciona vía Wine"
+          }
+        }
+      },
+      "stellarium": {},
+      "mpc_hc": {
+        "note": "Reproductor multimedia Windows. Alternativa: VLC o MPV",
+        "alternatives": {
+          "vlc": {
+            "reason": "Reproductor multimedia universal"
+          },
+          "mpv": {
+            "reason": "Reproductor minimalista pero potente"
+          }
+        }
+      },
+      "tortoisesvn": {
+        "note": "Cliente SVN Windows. Alternativa: Git",
+        "alternatives": {
+          "git": {
+            "reason": "Control de versiones moderno, estándar en Linux"
+          }
+        }
+      },
+      "clamwin": {
+        "note": "Antivirus Windows. Alternativa: ClamAV",
+        "alternatives": {
+          "clamav": {
+            "reason": "Antivirus open-source para Linux"
+          }
+        }
+      },
+      "devcpp": {
+        "note": "IDE C++ Windows. Alternativa: Code::Blocks",
+        "alternatives": {
+          "codeblocks": {
+            "reason": "IDE C++ con características similares"
+          }
+        }
+      },
+      "peace": {
+        "note": "Extensión de ecualizador Windows. No disponible en Linux"
+      },
+      "skim": {
+        "note": "Visor PDF macOS. Alternativa: Okular",
+        "alternatives": {
+          "okular": {
+            "reason": "Visor PDF KDE con muchas características"
+          }
+        }
+      },
+      "nppplugins": {
+        "note": "Plugins Notepad++. No disponible, ya que Notepad++ no funciona nativamente"
+      },
+      "xiaomi": {
+        "note": "ROM Android personalizada. No relevante para NixOS"
+      },
+      "bulkcrap": {
+        "note": "Desinstalador Windows. No necesario en NixOS (sistema declarativo)"
+      },
+      "ffdshow": {
+        "note": "Paquete de códecs de video Windows. No necesario en Linux"
+      },
+      "devcpp2": {
+        "note": "IDE C++ Windows. Alternativa: Code::Blocks o Visual Studio Code"
+      },
+      "openclinic": {
+        "note": "Sistema de clínica basado en web. No directamente disponible"
+      },
+      "wsjtx": {
+        "note": "Software de radioaficionado. No directamente disponible"
+      },
+      "erpcrm": {
+        "note": "Sistema ERP/CRM basado en web. No directamente disponible"
+      },
+      "mlxaudio": {
+        "note": "Herramienta de audio Windows. No disponible"
+      },
+      "autoclicker": {
+        "note": "Auto-clicador Windows. Alternativa: xdotool"
+      },
+      "codeblocks": {
+        "alternatives": {
+          "vscode": {
+            "reason": "Editor de código moderno con muchas características"
+          }
+        }
       }
     }
   },

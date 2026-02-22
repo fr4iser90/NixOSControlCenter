@@ -5,530 +5,1224 @@
       "nixos_package": "vscode",
       "module": null,
       "category": "development",
-      "aliases": ["vscode", "code", "Visual Studio Code", "VS Code"],
+      "aliases": [
+        "vscode",
+        "code",
+        "Visual Studio Code",
+        "VS Code"
+      ],
       "alternatives": [
         {
           "name": "VSCodium",
           "package": "vscodium",
-          "reason_key": "mappings.programs.visual_studio_code.alternatives.vscodium.reason",
-          "reason": "Open-source Fork ohne Microsoft-Telemetrie"
+          "reason_key": "mappings.programs.visual_studio_code.alternatives.vscodium.reason"
         },
         {
           "name": "Neovim",
           "package": "neovim",
-          "reason_key": "mappings.programs.visual_studio_code.alternatives.neovim.reason",
-          "reason": "Moderner Vim-Fork mit LSP-Support"
+          "reason_key": "mappings.programs.visual_studio_code.alternatives.neovim.reason"
         },
         {
           "name": "Helix",
           "package": "helix",
-          "reason_key": "mappings.programs.visual_studio_code.alternatives.helix.reason",
-          "reason": "Moderner Modal-Editor mit Tree-sitter"
+          "reason_key": "mappings.programs.visual_studio_code.alternatives.helix.reason"
         }
-      ]
+      ],
+      "priority": "top"
     },
     "Firefox": {
       "nixos_package": "firefox",
       "module": null,
       "category": "browser",
-      "aliases": ["firefox", "Mozilla Firefox"],
+      "aliases": [
+        "firefox",
+        "Mozilla Firefox"
+      ],
       "alternatives": [
         {
           "name": "LibreWolf",
           "package": "librewolf",
-          "reason_key": "mappings.programs.firefox.alternatives.librewolf.reason",
-          "reason": "Privacy-hardened Firefox-Fork"
+          "reason_key": "mappings.programs.firefox.alternatives.librewolf.reason"
         },
         {
           "name": "Tor Browser",
           "package": "tor-browser-bundle-bin",
-          "reason_key": "mappings.programs.firefox.alternatives.tor_browser.reason",
-          "reason": "Maximale Privacy und Anonymität"
+          "reason_key": "mappings.programs.firefox.alternatives.tor_browser.reason"
         }
-      ]
+      ],
+      "priority": "high"
     },
     "Google Chrome": {
       "nixos_package": "google-chrome",
       "module": null,
       "category": "browser",
-      "aliases": ["chrome", "Google Chrome", "Chrome"],
+      "aliases": [
+        "chrome",
+        "Google Chrome",
+        "Chrome"
+      ],
       "alternatives": [
         {
           "name": "Chromium",
           "package": "chromium",
-          "reason_key": "mappings.programs.google_chrome.alternatives.chromium.reason",
-          "reason": "Open-source alternative ohne Google-Tracking"
+          "reason_key": "mappings.programs.google_chrome.alternatives.chromium.reason"
         },
         {
           "name": "Firefox",
           "package": "firefox",
-          "reason_key": "mappings.programs.google_chrome.alternatives.firefox.reason",
-          "reason": "Privacy-fokussierter Browser"
+          "reason_key": "mappings.programs.google_chrome.alternatives.firefox.reason"
         }
-      ]
+      ],
+      "priority": "top"
     },
     "Chromium": {
       "nixos_package": "chromium",
       "module": null,
       "category": "browser",
-      "aliases": ["chromium"]
+      "aliases": [
+        "chromium"
+      ],
+      "priority": "normal"
     },
     "Docker Desktop": {
       "nixos_package": "docker",
       "module": "modules.infrastructure.homelab-manager",
       "category": "infrastructure",
-      "aliases": ["docker", "Docker", "Docker Desktop"]
+      "aliases": [
+        "docker",
+        "Docker",
+        "Docker Desktop"
+      ],
+      "priority": "high"
     },
     "Steam": {
       "nixos_package": "steam",
       "module": null,
       "category": "gaming",
-      "aliases": ["steam"],
+      "aliases": [
+        "steam"
+      ],
       "proton": true,
       "note_key": "mappings.programs.steam.note",
-      "note": "Native Steam client. Proton enables Windows games to run."
+      "priority": "top"
     },
     "Discord": {
       "nixos_package": "discord",
       "module": null,
       "category": "communication",
-      "aliases": ["discord"],
+      "aliases": [
+        "discord"
+      ],
       "alternatives": [
         {
           "name": "Vesktop",
           "package": "vesktop",
-          "reason_key": "mappings.programs.discord.alternatives.vesktop.reason",
-          "reason": "Privacy-freundlicher Discord-Client mit mehr Features"
+          "reason_key": "mappings.programs.discord.alternatives.vesktop.reason"
         }
-      ]
+      ],
+      "priority": "high"
     },
     "Slack": {
       "nixos_package": "slack",
       "module": null,
       "category": "communication",
-      "aliases": ["slack"],
+      "aliases": [
+        "slack"
+      ],
       "alternatives": [
         {
           "name": "Element",
           "package": "element-desktop",
-          "reason_key": "mappings.programs.slack.alternatives.element.reason",
-          "reason": "Matrix-basierter Messenger mit E2E-Verschlüsselung"
+          "reason_key": "mappings.programs.slack.alternatives.element.reason"
         },
         {
           "name": "Rocket.Chat",
           "package": "rocketchat-desktop",
-          "reason_key": "mappings.programs.slack.alternatives.rocketchat.reason",
-          "reason": "Open-source Team-Chat Alternative"
+          "reason_key": "mappings.programs.slack.alternatives.rocketchat.reason"
         }
-      ]
+      ],
+      "priority": "normal"
     },
     "Git": {
       "nixos_package": "git",
       "module": null,
       "category": "development",
-      "aliases": ["git", "Git"]
+      "aliases": [
+        "git",
+        "Git"
+      ],
+      "priority": "normal"
     },
     "GitHub Desktop": {
       "nixos_package": "github-desktop",
       "module": null,
       "category": "development",
-      "aliases": ["github-desktop", "GitHub Desktop"],
+      "aliases": [
+        "github-desktop",
+        "GitHub Desktop"
+      ],
       "alternatives": [
         {
           "name": "Lazygit",
           "package": "lazygit",
-          "reason_key": "mappings.programs.github_desktop.alternatives.lazygit.reason",
-          "reason": "Terminal-basierter Git-Client mit TUI"
+          "reason_key": "mappings.programs.github_desktop.alternatives.lazygit.reason"
         },
         {
           "name": "GitKraken",
           "package": "gitkraken",
-          "reason_key": "mappings.programs.github_desktop.alternatives.gitkraken.reason",
-          "reason": "Feature-reicher Git-Client mit Visualisierung"
+          "reason_key": "mappings.programs.github_desktop.alternatives.gitkraken.reason"
         },
         {
           "name": "Git CLI",
           "package": "git",
-          "reason_key": "mappings.programs.github_desktop.alternatives.git_cli.reason",
-          "reason": "Standard Git-Command-Line-Tool"
+          "reason_key": "mappings.programs.github_desktop.alternatives.git_cli.reason"
         }
-      ]
+      ],
+      "priority": "high"
     },
     "Node.js": {
       "nixos_package": "nodejs",
       "module": null,
       "category": "development",
-      "aliases": ["node", "nodejs", "Node.js"]
+      "aliases": [
+        "node",
+        "nodejs",
+        "Node.js"
+      ],
+      "priority": "normal"
     },
     "Python": {
       "nixos_package": "python3",
       "module": null,
       "category": "development",
-      "aliases": ["python", "python3", "Python"]
+      "aliases": [
+        "python",
+        "python3",
+        "Python"
+      ],
+      "priority": "normal"
     },
     "VLC": {
       "nixos_package": "vlc",
       "module": null,
       "category": "multimedia",
-      "aliases": ["vlc", "VLC media player"],
+      "aliases": [
+        "vlc",
+        "VLC media player"
+      ],
       "alternatives": [
-        {
-          "name": "VLC",
-          "package": "vlc",
-          "reason_key": "mappings.programs.vlc.alternatives.vlc.reason",
-          "reason": "Universal Media Player, bereits als Standard gesetzt"
-        },
         {
           "name": "MPV",
           "package": "mpv",
-          "reason_key": "mappings.programs.vlc.alternatives.mpv.reason",
-          "reason": "Minimalistischer, aber leistungsstarker Player"
+          "reason_key": "mappings.programs.vlc.alternatives.mpv.reason"
         },
         {
           "name": "SMPlayer",
           "package": "smplayer",
-          "reason_key": "mappings.programs.vlc.alternatives.smplayer.reason",
-          "reason": "Qt-basierter Media Player mit vielen Features"
+          "reason_key": "mappings.programs.vlc.alternatives.smplayer.reason"
         }
-      ]
+      ],
+      "priority": "high"
     },
     "Spotify": {
       "nixos_package": "spotify",
       "module": null,
       "category": "multimedia",
-      "aliases": ["spotify"],
+      "aliases": [
+        "spotify"
+      ],
       "alternatives": [
-        {
-          "name": "Spotify (Native)",
-          "package": "spotify",
-          "reason_key": "mappings.programs.spotify.alternatives.spotify_native.reason",
-          "reason": "Offizieller Spotify-Client, bereits als Standard gesetzt"
-        },
         {
           "name": "ncspot",
           "package": "ncspot",
-          "reason_key": "mappings.programs.spotify.alternatives.ncspot.reason",
-          "reason": "Terminal-basierter Spotify-Client"
+          "reason_key": "mappings.programs.spotify.alternatives.ncspot.reason"
         },
         {
           "name": "Spotify-tui",
           "package": "spotify-tui",
-          "reason_key": "mappings.programs.spotify.alternatives.spotify_tui.reason",
-          "reason": "TUI für Spotify mit SPT"
+          "reason_key": "mappings.programs.spotify.alternatives.spotify_tui.reason"
         }
-      ]
+      ],
+      "priority": "high"
     },
     "7-Zip": {
       "nixos_package": "p7zip",
       "module": null,
       "category": "utilities",
-      "aliases": ["7zip", "7-Zip", "p7zip"],
+      "aliases": [
+        "7zip",
+        "7-Zip",
+        "p7zip"
+      ],
       "alternatives": [
         {
           "name": "p7zip",
           "package": "p7zip",
-          "reason_key": "mappings.programs.7zip.alternatives.p7zip.reason",
-          "reason": "7-Zip Port für Linux, bereits als Standard gesetzt"
+          "reason_key": "mappings.programs.7zip.alternatives.p7zip.reason"
         },
         {
           "name": "unzip",
           "package": "unzip",
-          "reason_key": "mappings.programs.7zip.alternatives.unzip.reason",
-          "reason": "Standard ZIP-Tool"
+          "reason_key": "mappings.programs.7zip.alternatives.unzip.reason"
         },
         {
           "name": "zip",
           "package": "zip",
-          "reason_key": "mappings.programs.7zip.alternatives.zip.reason",
-          "reason": "ZIP-Archivierung"
+          "reason_key": "mappings.programs.7zip.alternatives.zip.reason"
         }
-      ]
+      ],
+      "priority": "normal"
     },
     "WinRAR": {
       "nixos_package": "unrar",
       "module": null,
       "category": "utilities",
-      "aliases": ["winrar", "WinRAR", "unrar"],
+      "aliases": [
+        "winrar",
+        "WinRAR",
+        "unrar"
+      ],
       "alternatives": [
         {
           "name": "unrar",
           "package": "unrar",
-          "reason_key": "mappings.programs.winrar.alternatives.unrar.reason",
-          "reason": "RAR-Extraktion, bereits als Standard gesetzt"
+          "reason_key": "mappings.programs.winrar.alternatives.unrar.reason"
         },
         {
           "name": "p7zip",
           "package": "p7zip",
-          "reason_key": "mappings.programs.winrar.alternatives.p7zip.reason",
-          "reason": "Unterstützt auch RAR-Archive"
+          "reason_key": "mappings.programs.winrar.alternatives.p7zip.reason"
         }
-      ]
+      ],
+      "priority": "normal"
     },
     "Notepad++": {
       "nixos_package": "notepadqq",
       "module": null,
       "category": "development",
-      "aliases": ["notepad++", "Notepad++", "notepadqq"],
+      "aliases": [
+        "notepad++",
+        "Notepad++",
+        "notepadqq"
+      ],
       "alternatives": [
         {
           "name": "Notepadqq",
           "package": "notepadqq",
-          "reason_key": "mappings.programs.notepad_plus_plus.alternatives.notepadqq.reason",
-          "reason": "Qt-basierter Editor, bereits als Standard gesetzt"
+          "reason_key": "mappings.programs.notepad_plus_plus.alternatives.notepadqq.reason"
         },
         {
           "name": "Kate",
           "package": "kate",
-          "reason_key": "mappings.programs.notepad_plus_plus.alternatives.kate.reason",
-          "reason": "KDE Text-Editor mit vielen Features"
+          "reason_key": "mappings.programs.notepad_plus_plus.alternatives.kate.reason"
         },
         {
           "name": "Gedit",
           "package": "gedit",
-          "reason_key": "mappings.programs.notepad_plus_plus.alternatives.gedit.reason",
-          "reason": "GNOME Text-Editor, einfach und schnell"
+          "reason_key": "mappings.programs.notepad_plus_plus.alternatives.gedit.reason"
         }
-      ]
+      ],
+      "priority": "high"
     },
     "Adobe Acrobat Reader": {
       "nixos_package": "okular",
       "module": null,
       "category": "utilities",
-      "aliases": ["acrobat", "Adobe Reader", "okular"],
+      "aliases": [
+        "acrobat",
+        "Adobe Reader",
+        "okular"
+      ],
       "wine": true,
       "note_key": "mappings.programs.adobe_acrobat_reader.note",
-      "note": "Native alternative: Okular. Original Adobe Reader runs via Wine.",
       "alternatives": [
         {
           "name": "Okular",
           "package": "okular",
-          "reason_key": "mappings.programs.adobe_acrobat_reader.alternatives.okular.reason",
-          "reason": "KDE PDF-Viewer mit vielen Features, bereits als Standard gesetzt"
+          "reason_key": "mappings.programs.adobe_acrobat_reader.alternatives.okular.reason"
         },
         {
           "name": "Evince",
           "package": "evince",
-          "reason_key": "mappings.programs.adobe_acrobat_reader.alternatives.evince.reason",
-          "reason": "GNOME PDF-Viewer, einfach und schnell"
+          "reason_key": "mappings.programs.adobe_acrobat_reader.alternatives.evince.reason"
         },
         {
           "name": "Zathura",
           "package": "zathura",
-          "reason_key": "mappings.programs.adobe_acrobat_reader.alternatives.zathura.reason",
-          "reason": "Minimalistischer, keyboard-driven PDF-Viewer"
+          "reason_key": "mappings.programs.adobe_acrobat_reader.alternatives.zathura.reason"
         }
-      ]
+      ],
+      "priority": "high"
     },
     "Adobe Photoshop": {
       "nixos_package": null,
       "module": null,
       "category": "multimedia",
-      "aliases": ["photoshop", "Adobe Photoshop", "PS"],
+      "aliases": [
+        "photoshop",
+        "Adobe Photoshop",
+        "PS"
+      ],
       "wine": true,
-      "flatpak": "com.github.taiko2k.tauonmb",
       "note_key": "mappings.programs.adobe_photoshop.note",
-      "note": "Runs via Wine. Alternative: GIMP (native) or Krita (native)",
       "alternatives": [
         {
           "name": "GIMP",
           "package": "gimp",
-          "reason_key": "mappings.programs.adobe_photoshop.alternatives.gimp.reason",
-          "reason": "Vollständige Bildbearbeitung, Photoshop-ähnlich"
+          "reason_key": "mappings.programs.adobe_photoshop.alternatives.gimp.reason"
         },
         {
           "name": "Krita",
           "package": "krita",
-          "reason_key": "mappings.programs.adobe_photoshop.alternatives.krita.reason",
-          "reason": "Digital Painting und Bildbearbeitung"
+          "reason_key": "mappings.programs.adobe_photoshop.alternatives.krita.reason"
         },
         {
           "name": "Darktable",
           "package": "darktable",
-          "reason_key": "mappings.programs.adobe_photoshop.alternatives.darktable.reason",
-          "reason": "RAW-Bildbearbeitung und Fotografie-Workflow"
+          "reason_key": "mappings.programs.adobe_photoshop.alternatives.darktable.reason"
         }
-      ]
+      ],
+      "priority": "top"
     },
     "Adobe Illustrator": {
       "nixos_package": null,
       "module": null,
       "category": "multimedia",
-      "aliases": ["illustrator", "Adobe Illustrator", "AI"],
+      "aliases": [
+        "illustrator",
+        "Adobe Illustrator",
+        "AI"
+      ],
       "wine": true,
       "note_key": "mappings.programs.adobe_illustrator.note",
-      "note": "Runs via Wine. Alternative: Inkscape (native)",
       "alternatives": [
         {
           "name": "Inkscape",
           "package": "inkscape",
-          "reason_key": "mappings.programs.adobe_illustrator.alternatives.inkscape.reason",
-          "reason": "Vektor-Grafik-Editor, Illustrator-ähnlich"
+          "reason_key": "mappings.programs.adobe_illustrator.alternatives.inkscape.reason"
         },
         {
           "name": "Krita",
           "package": "krita",
-          "reason_key": "mappings.programs.adobe_illustrator.alternatives.krita.reason",
-          "reason": "Auch für Vektor-Grafik geeignet"
+          "reason_key": "mappings.programs.adobe_illustrator.alternatives.krita.reason"
         }
-      ]
+      ],
+      "priority": "high"
     },
     "Microsoft Office": {
       "nixos_package": "libreoffice",
       "module": null,
       "category": "productivity",
-      "aliases": ["office", "Microsoft Office", "libreoffice", "LibreOffice"],
+      "aliases": [
+        "office",
+        "Microsoft Office",
+        "libreoffice",
+        "LibreOffice"
+      ],
       "wine": true,
       "note_key": "mappings.programs.microsoft_office.note",
-      "note": "Native alternative: LibreOffice. Original Microsoft Office runs via Wine.",
       "alternatives": [
         {
           "name": "OnlyOffice",
           "package": "onlyoffice-bin",
-          "reason_key": "mappings.programs.microsoft_office.alternatives.onlyoffice.reason",
-          "reason": "Microsoft Office-kompatibles Format mit modernem UI"
+          "reason_key": "mappings.programs.microsoft_office.alternatives.onlyoffice.reason"
         },
         {
           "name": "LibreOffice",
           "package": "libreoffice",
-          "reason_key": "mappings.programs.microsoft_office.alternatives.libreoffice.reason",
-          "reason": "Vollständige Office-Suite, bereits als Standard gesetzt"
+          "reason_key": "mappings.programs.microsoft_office.alternatives.libreoffice.reason"
         }
-      ]
+      ],
+      "priority": "top"
     },
     "VirtualBox": {
       "nixos_package": "virtualbox",
       "module": null,
       "category": "virtualization",
-      "aliases": ["virtualbox", "VirtualBox"],
+      "aliases": [
+        "virtualbox",
+        "VirtualBox"
+      ],
       "alternatives": [
         {
           "name": "QEMU/KVM",
           "package": "qemu",
-          "reason_key": "mappings.programs.virtualbox.alternatives.qemu_kvm.reason",
-          "reason": "Open-source Virtualisierung mit besserer Performance"
-        },
-        {
-          "name": "VirtualBox",
-          "package": "virtualbox",
-          "reason_key": "mappings.programs.virtualbox.alternatives.virtualbox.reason",
-          "reason": "Einfach zu nutzen, bereits als Standard gesetzt"
+          "reason_key": "mappings.programs.virtualbox.alternatives.qemu_kvm.reason"
         }
-      ]
+      ],
+      "priority": "high"
     },
     "VMware": {
       "nixos_package": null,
       "module": "modules.infrastructure.vm-manager",
       "category": "virtualization",
-      "aliases": ["vmware", "VMware"]
+      "aliases": [
+        "vmware",
+        "VMware"
+      ],
+      "priority": "high"
     },
     "iTerm2": {
       "nixos_package": "alacritty",
       "module": null,
       "category": "utilities",
-      "aliases": ["iterm", "iTerm2", "alacritty"],
+      "aliases": [
+        "iterm",
+        "iTerm2",
+        "alacritty"
+      ],
       "alternatives": [
         {
           "name": "Alacritty",
           "package": "alacritty",
-          "reason_key": "mappings.programs.iterm2.alternatives.alacritty.reason",
-          "reason": "GPU-beschleunigter Terminal, bereits als Standard gesetzt"
+          "reason_key": "mappings.programs.iterm2.alternatives.alacritty.reason"
         },
         {
           "name": "Kitty",
           "package": "kitty",
-          "reason_key": "mappings.programs.iterm2.alternatives.kitty.reason",
-          "reason": "Moderner Terminal mit vielen Features"
+          "reason_key": "mappings.programs.iterm2.alternatives.kitty.reason"
         },
         {
           "name": "WezTerm",
           "package": "wezterm",
-          "reason_key": "mappings.programs.iterm2.alternatives.wezterm.reason",
-          "reason": "Cross-platform Terminal mit GPU-Beschleunigung"
+          "reason_key": "mappings.programs.iterm2.alternatives.wezterm.reason"
         }
-      ]
+      ],
+      "priority": "normal"
     },
-    "Homebrew": {
+    "GIMP": {
+      "nixos_package": "gimp",
+      "module": null,
+      "category": "graphics",
+      "aliases": [
+        "gimp",
+        "GIMP",
+        "GNU Image Manipulation Program"
+      ],
+      "alternatives": [
+        {
+          "name": "Krita",
+          "package": "krita",
+          "reason_key": "mappings.programs.gimp.alternatives.krita.reason"
+        },
+        {
+          "name": "Darktable",
+          "package": "darktable",
+          "reason_key": "mappings.programs.gimp.alternatives.darktable.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "Dropbox": {
+      "nixos_package": "dropbox",
+      "module": null,
+      "category": "utilities",
+      "aliases": [
+        "dropbox",
+        "Dropbox"
+      ],
+      "alternatives": [
+        {
+          "name": "Nextcloud",
+          "package": "nextcloud-client",
+          "reason_key": "mappings.programs.dropbox.alternatives.nextcloud.reason"
+        },
+        {
+          "name": "Syncthing",
+          "package": "syncthing",
+          "reason_key": "mappings.programs.dropbox.alternatives.syncthing.reason"
+        },
+        {
+          "name": "rclone",
+          "package": "rclone",
+          "reason_key": "mappings.programs.dropbox.alternatives.rclone.reason"
+        }
+      ],
+      "priority": "high"
+    },
+    "LibreOffice": {
+      "nixos_package": "libreoffice",
+      "module": null,
+      "category": "productivity",
+      "aliases": [
+        "libreoffice",
+        "LibreOffice",
+        "LO"
+      ],
+      "alternatives": [
+        {
+          "name": "OnlyOffice",
+          "package": "onlyoffice-bin",
+          "reason_key": "mappings.programs.libreoffice.alternatives.onlyoffice.reason"
+        },
+        {
+          "name": "OpenOffice",
+          "package": "apache-openoffice",
+          "reason_key": "mappings.programs.libreoffice.alternatives.openoffice.reason"
+        }
+      ],
+      "priority": "high"
+    },
+    "TeamViewer": {
+      "nixos_package": "teamviewer",
+      "module": null,
+      "category": "communication",
+      "aliases": [
+        "teamviewer",
+        "TeamViewer"
+      ],
+      "alternatives": [
+        {
+          "name": "AnyDesk",
+          "package": "anydesk",
+          "reason_key": "mappings.programs.teamviewer.alternatives.anydesk.reason"
+        },
+        {
+          "name": "RustDesk",
+          "package": "rustdesk",
+          "reason_key": "mappings.programs.teamviewer.alternatives.rustdesk.reason"
+        },
+        {
+          "name": "Remmina",
+          "package": "remmina",
+          "reason_key": "mappings.programs.teamviewer.alternatives.remmina.reason"
+        }
+      ],
+      "priority": "high"
+    },
+    "Thunderbird": {
+      "nixos_package": "thunderbird",
+      "module": null,
+      "category": "communication",
+      "aliases": [
+        "thunderbird",
+        "Thunderbird"
+      ],
+      "alternatives": [
+        {
+          "name": "Evolution",
+          "package": "evolution",
+          "reason_key": "mappings.programs.thunderbird.alternatives.evolution.reason"
+        },
+        {
+          "name": "Geary",
+          "package": "geary",
+          "reason_key": "mappings.programs.thunderbird.alternatives.geary.reason"
+        },
+        {
+          "name": "KMail",
+          "package": "kdePackages.kmail",
+          "reason_key": "mappings.programs.thunderbird.alternatives.kmail.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "Audacity": {
+      "nixos_package": "audacity",
+      "module": null,
+      "category": "audio",
+      "aliases": [
+        "audacity",
+        "Audacity"
+      ],
+      "alternatives": [
+        {
+          "name": "Ardour",
+          "package": "ardour",
+          "reason_key": "mappings.programs.audacity.alternatives.ardour.reason"
+        },
+        {
+          "name": "Reaper",
+          "package": null,
+          "reason_key": "mappings.programs.audacity.alternatives.reaper.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "Inkscape": {
+      "nixos_package": "inkscape",
+      "module": null,
+      "category": "graphics",
+      "aliases": [
+        "inkscape",
+        "Inkscape"
+      ],
+      "alternatives": [
+        {
+          "name": "Krita",
+          "package": "krita",
+          "reason_key": "mappings.programs.inkscape.alternatives.krita.reason"
+        },
+        {
+          "name": "Scribus",
+          "package": "scribus",
+          "reason_key": "mappings.programs.inkscape.alternatives.scribus.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "µTorrent": {
       "nixos_package": null,
       "module": null,
-      "category": "package-manager",
-      "note_key": "mappings.programs.homebrew.note",
-      "note": "NixOS uses nix package manager instead"
+      "category": "utilities",
+      "aliases": [
+        "utorrent",
+        "µTorrent",
+        "uTorrent"
+      ],
+      "note_key": "mappings.programs.utorrent.note",
+      "alternatives": [
+        {
+          "name": "qBittorrent",
+          "package": "qbittorrent",
+          "reason_key": "mappings.programs.utorrent.alternatives.qbittorrent.reason"
+        },
+        {
+          "name": "Transmission",
+          "package": "transmission",
+          "reason_key": "mappings.programs.utorrent.alternatives.transmission.reason"
+        },
+        {
+          "name": "Deluge",
+          "package": "deluge",
+          "reason_key": "mappings.programs.utorrent.alternatives.deluge.reason"
+        }
+      ],
+      "priority": "normal"
     },
-    "Chocolatey": {
+    "Evernote": {
       "nixos_package": null,
       "module": null,
-      "category": "package-manager",
-      "note_key": "mappings.programs.chocolatey.note",
-      "note": "NixOS uses nix package manager instead"
+      "category": "productivity",
+      "aliases": [
+        "evernote",
+        "Evernote"
+      ],
+      "note_key": "mappings.programs.evernote.note",
+      "alternatives": [
+        {
+          "name": "Joplin",
+          "package": "joplin-desktop",
+          "reason_key": "mappings.programs.evernote.alternatives.joplin.reason"
+        },
+        {
+          "name": "Obsidian",
+          "package": "obsidian",
+          "reason_key": "mappings.programs.evernote.alternatives.obsidian.reason"
+        },
+        {
+          "name": "Standard Notes",
+          "package": "standardnotes",
+          "reason_key": "mappings.programs.evernote.alternatives.standard_notes.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "Google Drive": {
+      "nixos_package": null,
+      "module": null,
+      "category": "utilities",
+      "aliases": [
+        "googledrive",
+        "Google Drive",
+        "gdrive"
+      ],
+      "note_key": "mappings.programs.google_drive.note",
+      "alternatives": [
+        {
+          "name": "rclone",
+          "package": "rclone",
+          "reason_key": "mappings.programs.google_drive.alternatives.rclone.reason"
+        },
+        {
+          "name": "Nextcloud",
+          "package": "nextcloud-client",
+          "reason_key": "mappings.programs.google_drive.alternatives.nextcloud.reason"
+        },
+        {
+          "name": "Syncthing",
+          "package": "syncthing",
+          "reason_key": "mappings.programs.google_drive.alternatives.syncthing.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "CCleaner": {
+      "nixos_package": null,
+      "module": null,
+      "category": "utilities",
+      "aliases": [
+        "ccleaner",
+        "CCleaner"
+      ],
+      "note_key": "mappings.programs.ccleaner.note",
+      "alternatives": [
+        {
+          "name": "nix-collect-garbage",
+          "package": null,
+          "reason_key": "mappings.programs.ccleaner.alternatives.nix_collect_garbage.reason"
+        },
+        {
+          "name": "ncdu",
+          "package": "ncdu",
+          "reason_key": "mappings.programs.ccleaner.alternatives.ncdu.reason"
+        },
+        {
+          "name": "baobab",
+          "package": "baobab",
+          "reason_key": "mappings.programs.ccleaner.alternatives.baobab.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "qBittorrent": {
+      "nixos_package": "qbittorrent",
+      "module": null,
+      "category": "utilities",
+      "aliases": [
+        "qbittorrent",
+        "qBittorrent",
+        "qb"
+      ],
+      "priority": "normal"
+    },
+    "Blender": {
+      "nixos_package": "blender",
+      "module": null,
+      "category": "graphics",
+      "aliases": [
+        "blender",
+        "Blender"
+      ],
+      "priority": "normal"
+    },
+    "Krita": {
+      "nixos_package": "krita",
+      "module": null,
+      "category": "graphics",
+      "aliases": [
+        "krita",
+        "Krita"
+      ],
+      "alternatives": [
+        {
+          "name": "GIMP",
+          "package": "gimp",
+          "reason_key": "mappings.programs.krita.alternatives.gimp.reason"
+        },
+        {
+          "name": "Inkscape",
+          "package": "inkscape",
+          "reason_key": "mappings.programs.krita.alternatives.inkscape.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "Signal": {
+      "nixos_package": "signal-desktop",
+      "module": null,
+      "category": "communication",
+      "aliases": [
+        "signal",
+        "Signal",
+        "Signal Desktop"
+      ],
+      "alternatives": [
+        {
+          "name": "Element",
+          "package": "element-desktop",
+          "reason_key": "mappings.programs.signal.alternatives.element.reason"
+        },
+        {
+          "name": "Threema",
+          "package": null,
+          "reason_key": "mappings.programs.signal.alternatives.threema.reason"
+        }
+      ],
+      "priority": "high"
+    },
+    "Bitwarden": {
+      "nixos_package": "bitwarden",
+      "module": null,
+      "category": "security",
+      "aliases": [
+        "bitwarden",
+        "Bitwarden"
+      ],
+      "alternatives": [
+        {
+          "name": "KeePassXC",
+          "package": "keepassxc",
+          "reason_key": "mappings.programs.bitwarden.alternatives.keepassxc.reason"
+        },
+        {
+          "name": "pass",
+          "package": "pass",
+          "reason_key": "mappings.programs.bitwarden.alternatives.pass.reason"
+        }
+      ],
+      "priority": "high"
+    },
+    "Brave": {
+      "nixos_package": "brave",
+      "module": null,
+      "category": "browser",
+      "aliases": [
+        "brave",
+        "Brave",
+        "Brave Browser"
+      ],
+      "alternatives": [
+        {
+          "name": "Firefox",
+          "package": "firefox",
+          "reason_key": "mappings.programs.brave.alternatives.firefox.reason"
+        },
+        {
+          "name": "LibreWolf",
+          "package": "librewolf",
+          "reason_key": "mappings.programs.brave.alternatives.librewolf.reason"
+        }
+      ],
+      "priority": "high"
+    },
+    "Obsidian": {
+      "nixos_package": "obsidian",
+      "module": null,
+      "category": "productivity",
+      "aliases": [
+        "obsidian",
+        "Obsidian"
+      ],
+      "alternatives": [
+        {
+          "name": "Joplin",
+          "package": "joplin-desktop",
+          "reason_key": "mappings.programs.obsidian.alternatives.joplin.reason"
+        },
+        {
+          "name": "Logseq",
+          "package": "logseq",
+          "reason_key": "mappings.programs.obsidian.alternatives.logseq.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "Handbrake": {
+      "nixos_package": "handbrake",
+      "module": null,
+      "category": "multimedia",
+      "aliases": [
+        "handbrake",
+        "Handbrake"
+      ],
+      "priority": "normal"
+    },
+    "uBlock Origin": {
+      "nixos_package": null,
+      "module": null,
+      "category": "browser",
+      "aliases": [
+        "ublock",
+        "uBlock Origin",
+        "ublock-origin"
+      ],
+      "note_key": "mappings.programs.ublock_origin.note",
+      "alternatives": [
+        {
+          "name": "uBlock Origin (Browser Extension)",
+          "package": null,
+          "reason_key": "mappings.programs.ublock_origin.alternatives.extension.reason"
+        },
+        {
+          "name": "AdBlock Plus",
+          "package": null,
+          "reason_key": "mappings.programs.ublock_origin.alternatives.adblock.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "Rufus": {
+      "nixos_package": null,
+      "module": null,
+      "category": "utilities",
+      "aliases": [
+        "rufus",
+        "Rufus"
+      ],
+      "note_key": "mappings.programs.rufus.note",
+      "alternatives": [
+        {
+          "name": "Ventoy",
+          "package": "ventoy",
+          "reason_key": "mappings.programs.rufus.alternatives.ventoy.reason"
+        },
+        {
+          "name": "dd",
+          "package": null,
+          "reason_key": "mappings.programs.rufus.alternatives.dd.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "WinSCP": {
+      "nixos_package": null,
+      "module": null,
+      "category": "utilities",
+      "aliases": [
+        "winscp",
+        "WinSCP"
+      ],
+      "note_key": "mappings.programs.winscp.note",
+      "alternatives": [
+        {
+          "name": "FileZilla",
+          "package": "filezilla",
+          "reason_key": "mappings.programs.winscp.alternatives.filezilla.reason"
+        },
+        {
+          "name": "rsync",
+          "package": "rsync",
+          "reason_key": "mappings.programs.winscp.alternatives.rsync.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "LocalSend": {
+      "nixos_package": "localsend",
+      "module": null,
+      "category": "utilities",
+      "aliases": [
+        "localsend",
+        "LocalSend"
+      ],
+      "priority": "normal"
+    },
+    "WinMerge": {
+      "nixos_package": null,
+      "module": null,
+      "category": "development",
+      "aliases": [
+        "winmerge",
+        "WinMerge"
+      ],
+      "note_key": "mappings.programs.winmerge.note",
+      "alternatives": [
+        {
+          "name": "Meld",
+          "package": "meld",
+          "reason_key": "mappings.programs.winmerge.alternatives.meld.reason"
+        },
+        {
+          "name": "Kompare",
+          "package": "kompare",
+          "reason_key": "mappings.programs.winmerge.alternatives.kompare.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "Mumble": {
+      "nixos_package": "mumble",
+      "module": null,
+      "category": "communication",
+      "aliases": [
+        "mumble",
+        "Mumble"
+      ],
+      "alternatives": [
+        {
+          "name": "Discord",
+          "package": "discord",
+          "reason_key": "mappings.programs.mumble.alternatives.discord.reason"
+        },
+        {
+          "name": "TeamSpeak",
+          "package": null,
+          "reason_key": "mappings.programs.mumble.alternatives.teamspeak.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "Stellarium": {
+      "nixos_package": "stellarium",
+      "module": null,
+      "category": "education",
+      "aliases": [
+        "stellarium",
+        "Stellarium"
+      ],
+      "priority": "normal"
+    },
+    "Sweet Home 3D": {
+      "nixos_package": "sweethome3d",
+      "module": null,
+      "category": "graphics",
+      "aliases": [
+        "sweethome3d",
+        "Sweet Home 3D"
+      ],
+      "priority": "normal"
+    },
+    "Freeplane": {
+      "nixos_package": "freeplane",
+      "module": null,
+      "category": "productivity",
+      "aliases": [
+        "freeplane",
+        "Freeplane"
+      ],
+      "priority": "normal"
+    },
+    "Scribus": {
+      "nixos_package": "scribus",
+      "module": null,
+      "category": "graphics",
+      "aliases": [
+        "scribus",
+        "Scribus"
+      ],
+      "priority": "normal"
+    },
+    "Code::Blocks": {
+      "nixos_package": "codeblocks",
+      "module": null,
+      "category": "development",
+      "aliases": [
+        "codeblocks",
+        "Code::Blocks"
+      ],
+      "alternatives": [
+        {
+          "name": "Visual Studio Code",
+          "package": "vscode",
+          "reason_key": "mappings.programs.codeblocks.alternatives.vscode.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "TortoiseSVN": {
+      "nixos_package": null,
+      "module": null,
+      "category": "development",
+      "aliases": [
+        "tortoisesvn",
+        "TortoiseSVN"
+      ],
+      "note_key": "mappings.programs.tortoisesvn.note",
+      "alternatives": [
+        {
+          "name": "Git",
+          "package": "git",
+          "reason_key": "mappings.programs.tortoisesvn.alternatives.git.reason"
+        }
+      ],
+      "priority": "normal"
+    },
+    "Obs Studio": {
+      "nixos_package": "obs-studio",
+      "module": null,
+      "category": "multimedia",
+      "aliases": [
+        "obs",
+        "OBS Studio",
+        "obs-studio"
+      ],
+      "priority": "normal"
+    },
+    "Doublecmd": {
+      "nixos_package": "doublecmd",
+      "module": null,
+      "category": "utilities",
+      "aliases": [
+        "doublecmd",
+        "Doublecmd"
+      ],
+      "priority": "normal"
+    },
+    "Lazarus": {
+      "nixos_package": "lazarus",
+      "module": null,
+      "category": "development",
+      "aliases": [
+        "lazarus",
+        "Lazarus"
+      ],
+      "priority": "normal"
+    },
+    "ClamWin": {
+      "nixos_package": null,
+      "module": null,
+      "category": "security",
+      "aliases": [
+        "clamwin",
+        "ClamWin"
+      ],
+      "note_key": "mappings.programs.clamwin.note",
+      "alternatives": [
+        {
+          "name": "ClamAV",
+          "package": "clamav",
+          "reason_key": "mappings.programs.clamwin.alternatives.clamav.reason"
+        }
+      ],
+      "priority": "normal"
     }
   },
   "desktop_mapping": {
     "windows": {
       "preferred_de": "plasma",
-      "reason": "Most similar to Windows UI with taskbar and start menu",
-      "alternatives": ["gnome", "xfce"]
+      "alternatives": [
+        "gnome",
+        "xfce"
+      ]
     },
     "macos": {
       "preferred_de": "gnome",
-      "reason": "Most similar to macOS UI with dock and top bar",
-      "alternatives": ["plasma", "pantheon"]
+      "alternatives": [
+        "plasma",
+        "pantheon"
+      ]
     },
     "linux": {
       "gnome": {
         "preferred_de": "gnome",
-        "reason": "Same desktop environment",
         "alternatives": []
       },
       "GNOME": {
         "preferred_de": "gnome",
-        "reason": "Same desktop environment",
         "alternatives": []
       },
       "kde": {
         "preferred_de": "plasma",
-        "reason": "KDE Plasma is the modern KDE",
         "alternatives": []
       },
       "KDE": {
         "preferred_de": "plasma",
-        "reason": "KDE Plasma is the modern KDE",
         "alternatives": []
       },
       "xfce": {
         "preferred_de": "xfce",
-        "reason": "Same desktop environment",
         "alternatives": []
       },
       "XFCE": {
         "preferred_de": "xfce",
-        "reason": "Same desktop environment",
         "alternatives": []
       },
       "default": {
         "preferred_de": "plasma",
-        "reason": "Most flexible and customizable",
-        "alternatives": ["gnome", "xfce"]
+        "alternatives": [
+          "gnome",
+          "xfce"
+        ]
       }
     }
   },
   "package_manager_mapping": {
-    "apt": {
-      "note": "Ubuntu/Debian packages can be mapped to nixpkgs equivalents"
-    },
-    "dnf": {
-      "note": "Fedora/RHEL packages can be mapped to nixpkgs equivalents"
-    },
-    "pacman": {
-      "note": "Arch packages can be mapped to nixpkgs equivalents"
-    },
-    "zypper": {
-      "note": "openSUSE packages can be mapped to nixpkgs equivalents"
-    },
-    "homebrew": {
-      "note": "Homebrew formulas can be mapped to nixpkgs equivalents"
-    },
-    "chocolatey": {
-      "note": "Chocolatey packages can be mapped to nixpkgs equivalents"
-    }
+    "apt": {},
+    "dnf": {},
+    "pacman": {},
+    "zypper": {},
+    "homebrew": {},
+    "chocolatey": {}
   }
 }

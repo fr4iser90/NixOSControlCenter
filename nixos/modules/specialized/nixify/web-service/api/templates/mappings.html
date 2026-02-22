@@ -10,8 +10,23 @@
             <input type="text" id="searchInput" placeholder="{{.T "mappings.search"}}" class="search-input-full">
         </div>
         
-        <div id="programsList">
-            <!-- Programs will be loaded here via JavaScript -->
+        <div id="topMigrationApps" class="top-migration-section">
+            <h2 class="top-migration-title">
+                ⭐ {{.T "mappings.top_migration_apps"}}
+            </h2>
+            <p class="top-migration-subtitle">{{.T "mappings.top_migration_subtitle"}}</p>
+            <div id="topAppsList">
+                <!-- Top Migration Apps will be loaded here -->
+            </div>
+        </div>
+        
+        <div id="allProgramsSection" style="margin-top: var(--spacing-xl);">
+            <h2 id="allProgramsTitle" style="font-size: 1.3em; margin-bottom: var(--spacing-md); color: var(--color-text-primary);">
+                {{.T "mappings.all_programs"}}
+            </h2>
+            <div id="programsList">
+                <!-- All programs will be loaded here via JavaScript -->
+            </div>
         </div>
         
         <div id="noResults" class="no-results">
@@ -31,16 +46,14 @@
         flatpak: "{{.T "mappings.status.flatpak"}}",
         appimage: "{{.T "mappings.status.appimage"}}",
         module_only: "{{.T "mappings.status.module_only"}}",
-        not_supported: "{{.T "mappings.status.not_supported"}}",
-        unknown: "{{.T "mappings.status.unknown"}}",
         category: "{{.T "mappings.category"}}",
         alternatives: "{{.T "mappings.alternatives"}}",
         total: "{{.T "mappings.total"}}"
     };
     
     // Translation function for mapping database texts
-    function translate(key, fallback) {
-        if (!key) return fallback || '';
+    function translate(key) {
+        if (!key) return '';
         // Remove "mappings.programs." prefix if present
         let lookupKey = key;
         if (key.startsWith('mappings.programs.')) {
@@ -53,23 +66,32 @@
             if (current && typeof current === 'object' && part in current) {
                 current = current[part];
             } else {
-                return fallback || key;
+                return key; // Return key if translation not found
             }
         }
-        return (typeof current === 'string' ? current : fallback) || key;
+        return (typeof current === 'string' ? current : key);
     }
     
-    function renderPrograms(filteredPrograms) {
-        const container = document.getElementById('programsList');
+    function renderPrograms(filteredPrograms, targetContainerId) {
+        const container = document.getElementById(targetContainerId || 'programsList');
         const noResults = document.getElementById('noResults');
+        
+        if (!container) {
+            console.error('Container not found:', targetContainerId || 'programsList');
+            return '';
+        }
         
         if (filteredPrograms.length === 0) {
             container.innerHTML = '';
-            noResults.style.display = 'block';
-            return;
+            if (targetContainerId !== 'topAppsList') {
+                noResults.style.display = 'block';
+            }
+            return '';
         }
         
-        noResults.style.display = 'none';
+        if (targetContainerId !== 'topAppsList') {
+            noResults.style.display = 'none';
+        }
         container.innerHTML = filteredPrograms.map(prog => {
             const name = prog.name || 'Unknown';
             const category = prog.category || 'uncategorized';
@@ -79,25 +101,25 @@
             const hasProton = prog.proton === true;
             const hasFlatpak = prog.flatpak != null;
             const hasAppImage = prog.appimage === true;
-            const isAlternative = prog.nixos_package != null && prog.note && prog.note.toLowerCase().includes('alternative');
+            const isAlternative = prog.nixos_package != null && prog.note_key && translate(prog.note_key).toLowerCase().includes('alternative');
             
-            let status = 'unknown';
-            let statusClass = 'status-not-supported';
-            let statusText = translations.unknown;
-            let statusIcon = '';
+            let status = 'alternative';
+            let statusClass = 'status-alternative';
+            let statusText = translations.alternative;
+            let statusIcon = '🔁';
             
-            // Verfügbar = hat Package (egal ob Modul oder nicht)
+            // Native = hat Package (egal ob Modul oder nicht)
             if (hasPackage) {
                 if (isAlternative) {
                     status = 'alternative';
                     statusClass = 'status-alternative';
                     statusText = translations.alternative;
-                    statusIcon = '🔄';
+                    statusIcon = '🔁';
                 } else {
                     status = 'supported';
                     statusClass = 'status-supported';
                     statusText = translations.supported;
-                    statusIcon = '✅';
+                    statusIcon = '🟢';
                 }
             }
             // Via Wine
@@ -133,28 +155,30 @@
                 status = 'module_only';
                 statusClass = 'status-module';
                 statusText = translations.module_only;
-                statusIcon = '🔧';
+                statusIcon = '🧩';
             }
-            // Nicht verfügbar
-            else {
-                status = 'not_supported';
-                statusClass = 'status-not-supported';
-                statusText = translations.not_supported;
-                statusIcon = '❌';
+            // Hat Alternativen (Fallback)
+            else if (prog.alternatives && prog.alternatives.length > 0) {
+                status = 'alternative';
+                statusClass = 'status-alternative';
+                statusText = translations.alternative;
+                statusIcon = '🔁';
             }
             
+            const isTopApp = prog.priority === 'top';
+            const priorityClass = isTopApp ? 'program-card-top' : (prog.priority === 'high' ? 'program-card-high' : '');
+            
             return `
-                <div class="program-card">
+                <div class="program-card ${priorityClass}">
                     <div class="program-info">
-                        <div class="program-name">${escapeHtml(name)}</div>
+                        <div class="program-name">
+                            ${isTopApp ? '<span class="top-badge">⭐</span> ' : ''}${escapeHtml(name)}
+                        </div>
                         <div class="program-category">${translations.category}: ${escapeHtml(category)}</div>
                         ${prog.nixos_package ? `<div class="program-meta">Package: <code>${escapeHtml(prog.nixos_package)}</code></div>` : ''}
                         ${prog.module ? `<div class="program-meta">Module: <code>${escapeHtml(prog.module)}</code></div>` : ''}
-                        ${prog.wine ? `<div class="program-meta">🍷 Runs via Wine</div>` : ''}
-                        ${prog.proton ? `<div class="program-meta">🎮 Runs via Proton (Steam)</div>` : ''}
-                        ${prog.flatpak ? `<div class="program-meta">📦 Flatpak: <code>${escapeHtml(prog.flatpak)}</code></div>` : ''}
-                        ${prog.appimage ? `<div class="program-meta">📦 AppImage available</div>` : ''}
-                        ${prog.note_key ? `<div class="program-note">${escapeHtml(translate(prog.note_key, prog.note || ''))}</div>` : (prog.note ? `<div class="program-note">${escapeHtml(prog.note)}</div>` : '')}
+                        ${prog.flatpak && !hasPackage ? `<div class="program-meta">Flatpak: <code>${escapeHtml(prog.flatpak)}</code></div>` : ''}
+                        ${prog.note_key ? `<div class="program-note">${escapeHtml(translate(prog.note_key))}</div>` : ''}
                         ${prog.alternatives && prog.alternatives.length > 0 ? `
                             <div class="program-alternatives">
                                 <strong>${translations.alternatives || 'Alternatives'}:</strong>
@@ -162,7 +186,7 @@
                                     <div class="alternative-item">
                                         <span class="alternative-name">${escapeHtml(alt.name)}</span>
                                         ${alt.package ? `<code class="alternative-package">${escapeHtml(alt.package)}</code>` : ''}
-                                        ${alt.reason_key ? `<span class="alternative-reason">${escapeHtml(translate(alt.reason_key, alt.reason || ''))}</span>` : (alt.reason ? `<span class="alternative-reason">${escapeHtml(alt.reason)}</span>` : '')}
+                                        ${alt.reason_key ? `<span class="alternative-reason">${escapeHtml(translate(alt.reason_key))}</span>` : ''}
                                     </div>
                                 `).join('')}
                             </div>
@@ -172,12 +196,39 @@
                 </div>
             `;
         }).join('');
+        
+        container.innerHTML = html;
+        return html;
     }
     
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    // Sortiere Programme nach Priorität
+    function sortPrograms(progs) {
+        const priorityOrder = { 'top': 0, 'high': 1, 'normal': 2 };
+        return [...progs].sort((a, b) => {
+            const aPriority = priorityOrder[a.priority || 'normal'] || 2;
+            const bPriority = priorityOrder[b.priority || 'normal'] || 2;
+            if (aPriority !== bPriority) {
+                return aPriority - bPriority;
+            }
+            // Bei gleicher Priorität alphabetisch sortieren
+            return (a.name || '').localeCompare(b.name || '');
+        });
+    }
+    
+    // Render Top Migration Apps separat
+    function renderTopApps() {
+        const topApps = programs.filter(prog => prog.priority === 'top');
+        if (topApps.length > 0) {
+            renderPrograms(topApps, 'topAppsList');
+        } else {
+            document.getElementById('topMigrationApps').style.display = 'none';
+        }
     }
     
     document.getElementById('searchInput').addEventListener('input', (e) => {
@@ -188,11 +239,23 @@
             const package = (prog.nixos_package || '').toLowerCase();
             return name.includes(query) || category.includes(query) || package.includes(query);
         });
-        renderPrograms(filtered);
+        
+        // Bei Suche: Top Apps ausblenden, alle Programme zeigen
+        if (query) {
+            document.getElementById('topMigrationApps').style.display = 'none';
+            document.getElementById('allProgramsTitle').textContent = '{{.T "mappings.search_results"}}';
+        } else {
+            document.getElementById('topMigrationApps').style.display = 'block';
+            document.getElementById('allProgramsTitle').textContent = '{{.T "mappings.all_programs"}}';
+        }
+        
+        renderPrograms(sortPrograms(filtered), 'programsList');
     });
     
     // Initial render
-    renderPrograms(programs);
+    renderTopApps();
+    const allPrograms = programs.filter(prog => prog.priority !== 'top');
+    renderPrograms(sortPrograms(allPrograms), 'programsList');
     
     // Show stats
     const stats = document.createElement('div');

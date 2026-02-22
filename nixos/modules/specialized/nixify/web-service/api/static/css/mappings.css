@@ -3,6 +3,28 @@
     margin-bottom: var(--spacing-lg);
 }
 
+.top-migration-section {
+    margin-bottom: var(--spacing-xl);
+    padding: var(--spacing-lg);
+    background: linear-gradient(135deg, rgba(var(--color-primary-rgb), 0.05) 0%, rgba(var(--color-primary-rgb), 0.02) 100%);
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(var(--color-primary-rgb), 0.2);
+}
+
+.top-migration-title {
+    font-size: 1.5em;
+    margin-bottom: var(--spacing-xs);
+    color: var(--color-primary);
+    font-weight: bold;
+}
+
+.top-migration-subtitle {
+    color: var(--color-text-secondary);
+    font-size: 0.95em;
+    margin-bottom: var(--spacing-md);
+    font-style: italic;
+}
+
 .search-input-full {
     width: 100%;
     padding: 12px;
@@ -27,6 +49,41 @@
 
 .program-card:hover {
     border-color: var(--color-primary);
+}
+
+.program-card-top {
+    border: 2px solid var(--color-primary);
+    background: linear-gradient(135deg, var(--color-bg-primary) 0%, rgba(var(--color-primary-rgb), 0.08) 100%);
+    position: relative;
+    padding-left: calc(var(--spacing-md) + 4px);
+}
+
+.program-card-top::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--color-primary);
+    border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+}
+
+.program-card-top:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 4px 20px rgba(var(--color-primary-rgb), 0.25);
+    transform: translateY(-2px);
+    transition: all var(--transition-fast);
+}
+
+.program-card-high {
+    border-left: 3px solid var(--color-primary);
+}
+
+.top-badge {
+    color: var(--color-primary);
+    font-size: 1.1em;
+    margin-right: 4px;
 }
 
 .program-info {
