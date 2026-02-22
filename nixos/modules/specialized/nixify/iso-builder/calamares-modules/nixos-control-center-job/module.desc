@@ -1,0 +1,6 @@
+[module]
+name=nixos-control-center-job
+description=NixOS Control Center Installation Job
+author=fr4iser
+license=GPLv3+
+type=job

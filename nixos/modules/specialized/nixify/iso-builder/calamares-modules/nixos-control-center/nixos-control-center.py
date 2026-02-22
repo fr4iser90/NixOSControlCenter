@@ -139,33 +139,27 @@ class NixOSControlCenter(QObject):
         return self._setupProgress
     
     def run(self):
-        """Main entry point - called by Calamares"""
-        # Get target root from Calamares
-        self.target_root = libcalamares.globalstorage.value("rootMountPoint")
-        if not self.target_root:
-            libcalamares.utils.warning("No rootMountPoint found")
-            return False
-        
+        """
+        Main entry point - called by Calamares in SHOW phase (GUI only)
+        The actual installation is handled by nixos-control-center-job module
+        """
         # Get configuration
         config = libcalamares.job.configuration
         self.repo_path = config.get("repoPath", "/mnt/cdrom/nixos")
         self.shell_nix_path = config.get("shellNixPath", "/etc/nixos/shell.nix")
         self.scripts_path = config.get("scriptsPath", "/etc/nixos/shell/scripts")
         
-        # Copy repository from ISO if it exists
+        # Copy repository from ISO to live system for GUI access
         if os.path.exists("/mnt/cdrom/nixos"):
             try:
+                # Copy to a temp location for GUI access
                 subprocess.run([
-                    "cp", "-r", "/mnt/cdrom/nixos/*", f"{self.target_root}/etc/nixos/"
+                    "cp", "-r", "/mnt/cdrom/nixos", "/tmp/nixos-control-center-repo"
                 ], check=True, timeout=60)
-                self._statusMessage = "Repository copied successfully"
+                self._statusMessage = "Repository loaded"
             except Exception as e:
                 libcalamares.utils.warning(f"Failed to copy repository: {e}")
                 self._statusMessage = f"Warning: {e}"
-        
-        # Start hardware checks if enabled
-        if config.get("enableHardwareChecks", True):
-            self.startHardwareChecks()
         
         # Store backend in global storage for QML access
         libcalamares.globalstorage.insert("nixosControlCenter", self)
@@ -258,101 +252,100 @@ class NixOSControlCenter(QObject):
         self._statusMessage = f"Features: {', '.join(self.selectedFeatures)}"
         self.statusMessageChanged.emit(self._statusMessage)
     
+    def modifyCalamaresConfig(self):
+        """
+        Modify the Calamares-generated configuration.nix to import our repository.
+        This is called during the exec phase, AFTER Calamares has generated the config.
+        """
+        config_path = f"{self.target_root}/etc/nixos/configuration.nix"
+        
+        if not os.path.exists(config_path):
+            libcalamares.utils.warning(f"Calamares config not found at {config_path}")
+            return False
+        
+        try:
+            # Read the generated config
+            with open(config_path, 'r') as f:
+                config_content = f.read()
+            
+            # Check if we already modified it (avoid double modification)
+            if "nixos/modules/specialized" in config_content:
+                libcalamares.utils.info("Config already contains NixOS Control Center imports")
+                return True
+            
+            # Build the import statement
+            # The repository is at /etc/nixos/ (copied from ISO)
+            import_statement = '''
+  # NixOS Control Center - Import repository modules
+  imports = [
+    ./nixos/modules/specialized/nixify/config.nix
+  ];
+'''
+            
+            # Find the opening brace of the config and insert our import
+            # Standard Calamares config starts with: { config, pkgs, ... }:
+            # We need to add our import after the opening brace
+            if "{ config, pkgs, ... }:" in config_content:
+                # Insert after the first line
+                lines = config_content.split('\n')
+                insert_index = 1
+                for i, line in enumerate(lines):
+                    if line.strip().startswith('{') and 'config' in line:
+                        insert_index = i + 1
+                        break
+                
+                lines.insert(insert_index, import_statement)
+                config_content = '\n'.join(lines)
+            else:
+                # Fallback: append at the beginning
+                config_content = import_statement + config_content
+            
+            # Write modified config
+            with open(config_path, 'w') as f:
+                f.write(config_content)
+            
+            libcalamares.utils.info("Successfully modified Calamares configuration.nix")
+            return True
+            
+        except Exception as e:
+            libcalamares.utils.warning(f"Failed to modify Calamares config: {e}")
+            return False
+    
     @pyqtSlot()
     def startSetup(self):
-        """Start the actual setup process"""
+        """Start the actual setup process (GUI only - actual work happens in exec phase)"""
         self._setupRunning = True
         self.setupRunningChanged.emit(True)
         self._setupProgress = 0
         self.setupProgressChanged.emit(0)
         
-        try:
-            # Build selection string based on install type
-            selection_string = ""
-            
-            if self.installType == "presets":
-                # Preset installation - just the preset name
-                selection_string = self.selectedPreset
-            elif self.installType == "custom":
-                # Custom installation - format: "systemType feature1 feature2 ..."
-                features_list = []
-                if self.desktopEnv:
-                    features_list.append(self.desktopEnv)
-                features_list.extend(self.selectedFeatures)
-                selection_string = f"{self.systemType} {' '.join(features_list)}"
-            else:
-                # Advanced options - would need more logic
-                selection_string = "Advanced"
-            
-            # Create a script that will be executed in chroot
-            setup_script = f"""#!/bin/bash
-set -euo pipefail
-cd /etc/nixos
-export CORE_DIR=/etc/nixos/shell/scripts/core
-export SETUP_DIR=/etc/nixos/shell/scripts/setup
-export CHECKS_DIR=/etc/nixos/shell/scripts/checks
-export SYSTEM_CONFIG_FILE=/etc/nixos/configs/system-config.nix
-export NIXOS_CONFIG_DIR=/etc/nixos
-
-# Source the installer
-source /etc/nixos/shell/scripts/core/imports.sh
-
-# Run the installer with our selection
-echo "{selection_string}" | /etc/nixos/shell/scripts/core/init.sh
-"""
-            
-            # Write script to target system
-            script_path = f"{self.target_root}/tmp/nixos-control-center-setup.sh"
-            os.makedirs(f"{self.target_root}/tmp", exist_ok=True)
-            with open(script_path, 'w') as f:
-                f.write(setup_script)
-            os.chmod(script_path, 0o755)
-            
-            # Run setup
-            self._setupProgress = 25
-            self.setupProgressChanged.emit(25)
-            self._statusMessage = "Generating configuration..."
-            self.statusMessageChanged.emit(self._statusMessage)
-            
-            # Execute setup script
-            result = subprocess.run(
-                ["chroot", self.target_root, "bash", "/tmp/nixos-control-center-setup.sh"],
-                capture_output=True,
-                text=True,
-                timeout=600
-            )
-            
-            self._setupProgress = 75
-            self.setupProgressChanged.emit(75)
-            self._statusMessage = "Building NixOS configuration..."
-            self.statusMessageChanged.emit(self._statusMessage)
-            
-            # The deploy_config in init.sh should handle the build
-            # We just wait for it to complete
-            
-            self._setupProgress = 100
-            self.setupProgressChanged.emit(100)
-            
-            if result.returncode == 0:
-                self._statusMessage = "Setup completed successfully"
-                self.statusMessageChanged.emit(self._statusMessage)
-                return True
-            else:
-                self._statusMessage = f"Setup failed: {result.stderr[:200]}"
-                self.statusMessageChanged.emit(self._statusMessage)
-                return False
-                
-        except subprocess.TimeoutExpired:
-            self._statusMessage = "Setup timed out"
-            self.statusMessageChanged.emit(self._statusMessage)
-            return False
-        except Exception as e:
-            self._statusMessage = f"Setup error: {e}"
-            self.statusMessageChanged.emit(self._statusMessage)
-            return False
-        finally:
-            self._setupRunning = False
-            self.setupRunningChanged.emit(False)
+        # This is just for GUI feedback
+        # The actual installation happens in the exec phase via modifyCalamaresConfig()
+        self._setupProgress = 50
+        self.setupProgressChanged.emit(50)
+        self._statusMessage = "Configuration will be applied during installation..."
+        self.statusMessageChanged.emit(self._statusMessage)
+        
+        # Store selection for later use in exec phase
+        selection_data = {
+            "installType": self.installType,
+            "preset": self.selectedPreset,
+            "systemType": self.systemType,
+            "desktopEnv": self.desktopEnv,
+            "features": self.selectedFeatures
+        }
+        
+        # Save to Calamares global storage for exec phase
+        libcalamares.globalstorage.insert("nixosControlCenterSelection", selection_data)
+        
+        self._setupProgress = 100
+        self.setupProgressChanged.emit(100)
+        self._statusMessage = "Ready for installation"
+        self.statusMessageChanged.emit(self._statusMessage)
+        
+        self._setupRunning = False
+        self.setupRunningChanged.emit(False)
+        return True
     
     @pyqtSlot(int)
     def goToPage(self, page):
@@ -398,9 +391,17 @@ echo "{selection_string}" | /etc/nixos/shell/scripts/core/init.sh
 
 
 def run():
-    """Calamares module entry point"""
+    """
+    Calamares module entry point.
+    For viewqml modules: This initializes the backend for QML
+    For job modules: This runs the installation logic
+    """
     backend = NixOSControlCenter()
-    if not backend.run():
-        return ("Failed to initialize NixOS Control Center module", "")
+    result = backend.run()
     
+    # If run() returns a tuple, it's an error message
+    if isinstance(result, tuple):
+        return result
+    
+    # None means success
     return None

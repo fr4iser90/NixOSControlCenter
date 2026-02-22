@@ -76,8 +76,27 @@ let
         echo "Download not yet implemented"
         ;;
       build-iso|iso)
-        echo "Building NixOS ISO with Calamares and NixOS Control Center..."
-        echo ""
+        DESKTOP_ENV=''${2:-plasma6}  # Default: Plasma 6
+        
+        # Validate desktop environment
+        case "$DESKTOP_ENV" in
+          gnome|plasma6|xfce)
+            echo "Building NixOS ISO with Calamares and NixOS Control Center..."
+            echo "Desktop Environment: $DESKTOP_ENV"
+            echo ""
+            ;;
+          *)
+            echo "Error: Invalid desktop environment: $DESKTOP_ENV"
+            echo ""
+            echo "Valid options:"
+            echo "  gnome    - GNOME Desktop"
+            echo "  plasma6  - KDE Plasma 6 (default)"
+            echo "  xfce     - XFCE Desktop"
+            echo ""
+            echo "Usage: ncc nixify build-iso [gnome|plasma6|xfce]"
+            exit 1
+            ;;
+        esac
         
         # Get absolute path to ISO builder
         # The isoBuilderPath is set by Nix, but we need to resolve it at runtime
@@ -131,14 +150,16 @@ let
         echo "Building ISO from: $(pwd)"
         echo ""
         
-        # Check if build-iso.nix exists
-        if [ ! -f "build-iso.nix" ]; then
-          echo "Error: build-iso.nix not found in $ISO_BUILDER_DIR"
-          exit 1
+        # Select build script based on desktop environment
+        BUILD_SCRIPT="build-iso-''${DESKTOP_ENV}.nix"
+        if [ ! -f "$BUILD_SCRIPT" ]; then
+          echo "Error: $BUILD_SCRIPT not found in $ISO_BUILDER_DIR"
+          echo "Falling back to build-iso.nix with default (plasma6)"
+          BUILD_SCRIPT="build-iso.nix"
         fi
         
         # Build ISO
-        nix-build build-iso.nix
+        nix-build "$BUILD_SCRIPT"
         
         if [ $? -eq 0 ]; then
           echo ""
@@ -183,7 +204,8 @@ Commands:
     restart           Restart web service
     logs              Show service logs (follow mode)
   
-  build-iso|iso       Build custom NixOS ISO with Calamares
+         build-iso|iso [env] Build custom NixOS ISO with Calamares
+                             Options: gnome, plasma6 (default), xfce
   list                List all sessions
   show <session-id>   Show session details
   download <session-id>  Download config/ISO for session
@@ -191,8 +213,11 @@ Commands:
 Examples:
   ncc nixify service start    # Start web service
   ncc nixify service status   # Check service status
-  ncc nixify build-iso        # Build custom ISO
-  ncc nixify iso              # Alias for build-iso
+         ncc nixify build-iso        # Build ISO with Plasma 6 (default)
+         ncc nixify build-iso gnome  # Build ISO with GNOME
+         ncc nixify build-iso plasma6 # Build ISO with Plasma 6
+         ncc nixify build-iso xfce   # Build ISO with XFCE
+         ncc nixify iso              # Alias for build-iso
   ncc nixify list             # List all sessions
   ncc nixify show abc123      # Show session details
   ncc nixify download abc123  # Download config/ISO
