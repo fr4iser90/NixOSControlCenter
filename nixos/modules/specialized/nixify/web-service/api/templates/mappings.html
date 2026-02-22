@@ -400,28 +400,64 @@
     
     // Initial render - BEIDE GLEICH BEHANDELN
     if (!Array.isArray(programs)) {
-        console.error('Programs is not an array!', typeof programs);
+        console.error('Programs is not an array!', typeof programs, programs);
     } else if (programs.length === 0) {
         console.warn('No programs loaded!');
     } else {
+        console.log('Initial render - Total programs:', programs.length);
+        
         // Populate category filter
         populateCategoryFilter();
-        // 1. Top Apps rendern - DIREKT
+        
+        // Check if any filters are active
+        const statusFilter = document.getElementById('statusFilter').value;
+        const categoryFilter = document.getElementById('categoryFilter').value;
+        const nativeOnly = document.getElementById('nativeOnlyToggle').checked;
+        const hasActiveFilters = statusFilter !== 'all' || categoryFilter !== 'all' || nativeOnly;
+        
+        // Always render Top Apps first (if no active filters)
         const topApps = programs.filter(prog => {
             const priority = prog.priority || prog.Priority || null;
             return priority === 'top' || priority === 'Top';
         });
-        if (topApps.length > 0) {
-            renderPrograms(sortPrograms(topApps), 'topAppsList');
-        }
+        console.log('Initial render - Total programs:', programs.length);
+        console.log('Top apps found:', topApps.length);
         
-        // 2. Alle anderen Programme rendern - GLEICHE LOGIK
-        const allPrograms = programs.filter(prog => {
-            const priority = prog.priority;
-            return priority !== 'top';
-        });
-        if (allPrograms.length > 0) {
-            renderPrograms(sortPrograms(allPrograms), 'programsList');
+        if (hasActiveFilters) {
+            // If filters are active, use applyFilters to render everything
+            applyFilters();
+        } else {
+            // No filters - render normally
+            // 1. Top Apps rendern - DIREKT
+            if (topApps.length > 0) {
+                const topContainer = document.getElementById('topAppsList');
+                if (topContainer) {
+                    renderPrograms(sortPrograms(topApps), 'topAppsList');
+                } else {
+                    console.error('topAppsList container not found!');
+                }
+            } else {
+                // Hide top section if no top apps
+                const topSection = document.getElementById('topMigrationApps');
+                if (topSection) {
+                    topSection.style.display = 'none';
+                }
+            }
+            
+            // 2. Alle anderen Programme rendern - GLEICHE LOGIK
+            const allPrograms = programs.filter(prog => {
+                const priority = prog.priority;
+                return priority !== 'top';
+            });
+            console.log('Other programs found:', allPrograms.length);
+            if (allPrograms.length > 0) {
+                const allContainer = document.getElementById('programsList');
+                if (allContainer) {
+                    renderPrograms(sortPrograms(allPrograms), 'programsList');
+                } else {
+                    console.error('programsList container not found!');
+                }
+            }
         }
         
         // Show stats
