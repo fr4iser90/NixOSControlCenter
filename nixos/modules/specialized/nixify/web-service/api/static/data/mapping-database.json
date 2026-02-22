@@ -11,6 +11,7 @@
         "Visual Studio Code",
         "VS Code"
       ],
+      "short_description_key": "mappings.programs.visual_studio_code.short_description",
       "alternatives": [
         {
           "name": "VSCodium",
@@ -61,6 +62,7 @@
         "Google Chrome",
         "Chrome"
       ],
+      "short_description_key": "mappings.programs.google_chrome.short_description",
       "alternatives": [
         {
           "name": "Chromium",
@@ -104,6 +106,7 @@
       ],
       "proton": true,
       "note_key": "mappings.programs.steam.note",
+      "short_description_key": "mappings.programs.steam.short_description",
       "priority": "top"
     },
     "Discord": {
@@ -365,6 +368,7 @@
       ],
       "wine": true,
       "note_key": "mappings.programs.adobe_photoshop.note",
+      "short_description_key": "mappings.programs.adobe_photoshop.short_description",
       "alternatives": [
         {
           "name": "GIMP",
@@ -421,6 +425,7 @@
       ],
       "wine": true,
       "note_key": "mappings.programs.microsoft_office.note",
+      "short_description_key": "mappings.programs.microsoft_office.short_description",
       "alternatives": [
         {
           "name": "OnlyOffice",

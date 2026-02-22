@@ -193,10 +193,12 @@
         }
       },
       "steam": {
-        "note": "Native Steam-Client. Proton ermöglicht es, Windows-Spiele zu spielen."
+        "note": "Native Steam-Client. Proton ermöglicht es, Windows-Spiele zu spielen.",
+        "short_description": "Spieleplattform mit Windows-Kompatibilität via Proton"
       },
       "microsoft_office": {
         "note": "LibreOffice ist die empfohlene native Alternative. Microsoft Office selbst kann eingeschränkt via Wine genutzt werden.",
+        "short_description": "Office-Suite für Dokumente, Tabellen und Präsentationen",
         "alternatives": {
           "onlyoffice": {
             "reason": "Microsoft Office-kompatibles Format mit modernem UI"
@@ -222,6 +224,7 @@
       },
       "adobe_photoshop": {
         "note": "Läuft via Wine. Alternative: GIMP (native) oder Krita (native)",
+        "short_description": "Bildbearbeitungssoftware für professionelle Fotografie und Design",
         "alternatives": {
           "gimp": {
             "reason": "Vollständige Bildbearbeitung, Photoshop-ähnlich"
@@ -246,6 +249,7 @@
         }
       },
       "visual_studio_code": {
+        "short_description": "Code-Editor mit umfangreicher Extension-Unterstützung",
         "alternatives": {
           "vscodium": {
             "reason": "Open-source Fork ohne Microsoft-Telemetrie"
@@ -269,6 +273,7 @@
         }
       },
       "google_chrome": {
+        "short_description": "Web-Browser mit Chrome-Sync und umfangreicher Extension-Unterstützung",
         "alternatives": {
           "chromium": {
             "reason": "Open-source alternative ohne Google-Tracking"

@@ -92,7 +92,7 @@
         if (targetContainerId !== 'topAppsList') {
             noResults.style.display = 'none';
         }
-        container.innerHTML = filteredPrograms.map(prog => {
+        const html = filteredPrograms.map(prog => {
             const name = prog.name || 'Unknown';
             const category = prog.category || 'uncategorized';
             const hasPackage = prog.nixos_package != null;
@@ -174,6 +174,7 @@
                         <div class="program-name">
                             ${isTopApp ? '<span class="top-badge">⭐</span> ' : ''}${escapeHtml(name)}
                         </div>
+                        ${isTopApp && prog.short_description_key ? `<div class="program-short-description">${escapeHtml(translate(prog.short_description_key))}</div>` : ''}
                         <div class="program-category">${translations.category}: ${escapeHtml(category)}</div>
                         ${prog.nixos_package ? `<div class="program-meta">Package: <code>${escapeHtml(prog.nixos_package)}</code></div>` : ''}
                         ${prog.module ? `<div class="program-meta">Module: <code>${escapeHtml(prog.module)}</code></div>` : ''}
@@ -207,6 +208,15 @@
         return div.innerHTML;
     }
     
+    // Feste Reihenfolge für Top Migration Apps (strategisch optimiert)
+    const topAppsOrder = [
+        'Microsoft Office',
+        'Google Chrome',
+        'Visual Studio Code',
+        'Steam',
+        'Adobe Photoshop'
+    ];
+    
     // Sortiere Programme nach Priorität
     function sortPrograms(progs) {
         const priorityOrder = { 'top': 0, 'high': 1, 'normal': 2 };
@@ -216,6 +226,14 @@
             if (aPriority !== bPriority) {
                 return aPriority - bPriority;
             }
+            // Bei Top Apps: feste Reihenfolge
+            if (aPriority === 0 && bPriority === 0) {
+                const aIndex = topAppsOrder.indexOf(a.name);
+                const bIndex = topAppsOrder.indexOf(b.name);
+                if (aIndex !== -1 && bIndex !== -1) {
+                    return aIndex - bIndex;
+                }
+            }
             // Bei gleicher Priorität alphabetisch sortieren
             return (a.name || '').localeCompare(b.name || '');
         });
@@ -223,14 +241,42 @@
     
     // Render Top Migration Apps separat
     function renderTopApps() {
-        const topApps = programs.filter(prog => prog.priority === 'top');
+        if (!Array.isArray(programs)) {
+            console.error('Programs is not an array:', typeof programs);
+            return;
+        }
+        const topApps = programs.filter(prog => {
+            const priority = prog.priority || prog.Priority || null;
+            return priority === 'top' || priority === 'Top';
+        });
         if (topApps.length > 0) {
-            renderPrograms(topApps, 'topAppsList');
+            // Top Apps in strategischer Reihenfolge sortieren
+            const sortedTopApps = sortPrograms(topApps);
+            renderPrograms(sortedTopApps, 'topAppsList');
         } else {
-            document.getElementById('topMigrationApps').style.display = 'none';
+            const topSection = document.getElementById('topMigrationApps');
+            if (topSection) {
+                topSection.style.display = 'none';
+            }
         }
     }
     
+    // Function to render all programs (excluding top apps) - für Suche
+    function renderAllPrograms() {
+        if (!Array.isArray(programs) || programs.length === 0) {
+            return;
+        }
+        
+        const allPrograms = programs.filter(prog => {
+            return prog.priority !== 'top';
+        });
+        
+        if (allPrograms.length > 0) {
+            renderPrograms(sortPrograms(allPrograms), 'programsList');
+        }
+    }
+    
+    // Search handler
     document.getElementById('searchInput').addEventListener('input', (e) => {
         const query = e.target.value.toLowerCase();
         const filtered = programs.filter(prog => {
@@ -244,23 +290,51 @@
         if (query) {
             document.getElementById('topMigrationApps').style.display = 'none';
             document.getElementById('allProgramsTitle').textContent = '{{.T "mappings.search_results"}}';
+            renderPrograms(sortPrograms(filtered), 'programsList');
         } else {
+            // Leere Suche = zurück zu normaler Ansicht
             document.getElementById('topMigrationApps').style.display = 'block';
             document.getElementById('allProgramsTitle').textContent = '{{.T "mappings.all_programs"}}';
+            renderAllPrograms();
         }
-        
-        renderPrograms(sortPrograms(filtered), 'programsList');
     });
     
-    // Initial render
-    renderTopApps();
-    const allPrograms = programs.filter(prog => prog.priority !== 'top');
-    renderPrograms(sortPrograms(allPrograms), 'programsList');
-    
-    // Show stats
-    const stats = document.createElement('div');
-    stats.className = 'stats';
-    stats.textContent = `${translations.total}: ${programs.length}`;
-    document.getElementById('programsList').parentNode.appendChild(stats);
+    // Initial render - BEIDE GLEICH BEHANDELN
+    if (!Array.isArray(programs)) {
+        console.error('Programs is not an array!', typeof programs);
+    } else if (programs.length === 0) {
+        console.warn('No programs loaded!');
+    } else {
+        // 1. Top Apps rendern - DIREKT
+        const topApps = programs.filter(prog => {
+            const priority = prog.priority || prog.Priority || null;
+            return priority === 'top' || priority === 'Top';
+        });
+        if (topApps.length > 0) {
+            renderPrograms(sortPrograms(topApps), 'topAppsList');
+        }
+        
+        // 2. Alle anderen Programme rendern - GLEICHE LOGIK
+        const allPrograms = programs.filter(prog => {
+            const priority = prog.priority;
+            return priority !== 'top';
+        });
+        if (allPrograms.length > 0) {
+            renderPrograms(sortPrograms(allPrograms), 'programsList');
+        }
+        
+        // Show stats
+        const statsContainer = document.getElementById('programsList')?.parentNode;
+        if (statsContainer) {
+            const existingStats = statsContainer.querySelector('.stats');
+            if (existingStats) {
+                existingStats.remove();
+            }
+            const stats = document.createElement('div');
+            stats.className = 'stats';
+            stats.textContent = `${translations.total}: ${programs.length}`;
+            statsContainer.appendChild(stats);
+        }
+    }
 </script>
 {{end}}

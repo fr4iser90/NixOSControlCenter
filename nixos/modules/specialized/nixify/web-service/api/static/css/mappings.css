@@ -97,6 +97,14 @@
     margin-bottom: var(--spacing-xs);
 }
 
+.program-short-description {
+    color: var(--color-text-secondary);
+    font-size: 0.9em;
+    font-style: italic;
+    margin-bottom: var(--spacing-xs);
+    margin-top: -2px;
+}
+
 .program-category {
     color: var(--color-text-secondary);
     font-size: 0.9em;
