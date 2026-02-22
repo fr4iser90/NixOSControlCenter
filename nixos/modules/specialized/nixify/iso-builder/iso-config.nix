@@ -1,7 +1,7 @@
 # NixOS ISO Configuration with Calamares and NixOS Control Center Module
 # This creates a custom NixOS ISO with Calamares installer and your custom module
 
-{ pkgs, lib, config, ... }:
+{ pkgs, lib, config, desktopEnv, ... }:
 
 let
   # Path to Calamares modules
@@ -40,50 +40,61 @@ let
   '';
   
   # Merge Calamares config at BUILD TIME (not runtime)
-  # This creates a merged config based on the standard NixOS Calamares sequence
-  # The standard sequence is: welcome, locale, keyboard, users, packagechooser, notesqml@unfree, partition, summary
-  mergedCalamaresSettings = pkgs.writeText "calamares-settings.conf" ''
----
-# Calamares Settings Configuration
-# Merged with NixOS Control Center module
+  # We extend the base config from calamares-nixos-extensions by adding our custom module
+  # The base config is in pkgs.calamares-nixos-extensions/etc/calamares/settings.conf
+  baseCalamaresSettings = "${pkgs.calamares-nixos-extensions}/etc/calamares/settings.conf";
+  
+  # Create merged settings.conf that extends the base config
+  # We use a Python script to properly merge YAML and insert our module
+  mergedCalamaresSettings = pkgs.runCommand "calamares-settings-merged" {
+    nativeBuildInputs = [ pkgs.python3Packages.pyyaml ];
+  } ''
+    # Read base config
+    BASE_CONFIG="${baseCalamaresSettings}"
+    
+    # Use Python to merge YAML and insert our module
+    ${pkgs.python3}/bin/python3 <<EOF
+import yaml
+import sys
 
-modules-search: [ local ]
+# Read base config
+with open("$BASE_CONFIG", 'r') as f:
+    config = yaml.safe_load(f)
 
-sequence:
-- show:
-  - welcome
-  - locale
-  - keyboard
-  - users
-  - packagechooser
-  - notesqml@unfree
-  - partition
-  - nixos-control-center  # Our custom GUI module
-  - summary
-- exec:
-  - partition
-  - mount
-  - nixos  # Calamares generates configuration.nix here
-  - nixos-control-center-job  # Our custom job module modifies the config
-  - users
-  - umount
-- show:
-  - finished
+# Insert our module before "summary" in the show sequence
+if 'sequence' in config and isinstance(config['sequence'], list):
+    for phase in config['sequence']:
+        if isinstance(phase, dict) and 'show' in phase:
+            show_list = phase['show']
+            if 'summary' in show_list:
+                summary_idx = show_list.index('summary')
+                if 'nixos-control-center' not in show_list:
+                    show_list.insert(summary_idx, 'nixos-control-center')
+            elif 'nixos-control-center' not in show_list:
+                show_list.append('nixos-control-center')
+        
+        if isinstance(phase, dict) and 'exec' in phase:
+            exec_list = phase['exec']
+            if 'nixos' in exec_list:
+                nixos_idx = exec_list.index('nixos')
+                if 'nixos-control-center-job' not in exec_list:
+                    exec_list.insert(nixos_idx + 1, 'nixos-control-center-job')
+            elif 'nixos-control-center-job' not in exec_list:
+                exec_list.append('nixos-control-center-job')
 
-branding: nixos
-
-interface:
-  sidebar:
-    show: true
-    sidebarWidth: 200
-'';
+# Write merged config
+with open("$out", 'w') as f:
+    yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+EOF
+  '';
   
   # Merge Calamares modules.conf at BUILD TIME
-  # Standard modules are auto-discovered by Calamares, we only need to register our custom modules
+  # The base config might not have a modules.conf (modules are auto-discovered)
+  # We create one that registers our custom modules
   mergedCalamaresModules = pkgs.writeText "calamares-modules.conf" ''
 ---
 # Calamares Modules Configuration
-# Standard modules are auto-discovered, we only register our custom modules
+# Standard modules are auto-discovered by Calamares, we only register our custom modules
 
 nixos-control-center:
   path: /usr/lib/calamares/modules/nixos-control-center
@@ -92,21 +103,15 @@ nixos-control-center-job:
   path: /usr/lib/calamares/modules/nixos-control-center-job
 '';
   
-  # Desktop Environment Selection
-  # Options: "gnome", "plasma6", "xfce"
-  # Change this to switch between desktop environments
-  desktopEnv = "plasma6";  # Default: KDE Plasma 6
-  
   # Select base ISO based on desktop environment
+  # desktopEnv is passed as specialArg from build-iso-*.nix scripts (required, no default)
   baseIsoModule = 
     if desktopEnv == "gnome" then
       <nixpkgs/nixos/modules/installer/cd-dvd/installation-cd-graphical-calamares-gnome.nix>
     else if desktopEnv == "plasma6" then
       <nixpkgs/nixos/modules/installer/cd-dvd/installation-cd-graphical-calamares-plasma6.nix>
-    else if desktopEnv == "xfce" then
-      <nixpkgs/nixos/modules/installer/cd-dvd/installation-cd-graphical-calamares-xfce.nix>
     else
-      <nixpkgs/nixos/modules/installer/cd-dvd/installation-cd-graphical-calamares-plasma6.nix>;  # Default fallback
+      throw "Unknown desktop environment: ${desktopEnv}. Supported: gnome, plasma6";
 in
 {
   imports = [

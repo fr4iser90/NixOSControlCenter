@@ -9,8 +9,12 @@ let
   
   # Build NixOS system with ISO configuration
   # Use eval-config.nix directly
+  # Default to plasma6 if not specified
   isoSystem = import <nixpkgs/nixos/lib/eval-config.nix> {
     system = "x86_64-linux";
+    specialArgs = {
+      desktopEnv = "plasma6";  # Default for build-iso.nix
+    };
     modules = [
       ./iso-config.nix
     ];

@@ -1,5 +1,7 @@
 [module]
 name=nixos-control-center
+prettyName=NixOS Control Center
+prettyStatusMessage=Configuring NixOS Control Center...
 description=NixOS Control Center Setup
 author=fr4iser
 license=GPLv3+

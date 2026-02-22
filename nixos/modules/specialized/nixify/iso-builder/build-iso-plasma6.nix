@@ -10,12 +10,11 @@ let
   # Build NixOS system with ISO configuration (Plasma 6)
   isoSystem = import <nixpkgs/nixos/lib/eval-config.nix> {
     system = "x86_64-linux";
+    specialArgs = {
+      desktopEnv = "plasma6";
+    };
     modules = [
       ./iso-config.nix
-      {
-        # Override desktop environment to Plasma 6
-        _module.args.desktopEnv = "plasma6";
-      }
     ];
   };
 in

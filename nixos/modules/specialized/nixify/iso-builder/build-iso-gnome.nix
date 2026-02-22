@@ -10,12 +10,11 @@ let
   # Build NixOS system with ISO configuration (GNOME)
   isoSystem = import <nixpkgs/nixos/lib/eval-config.nix> {
     system = "x86_64-linux";
+    specialArgs = {
+      desktopEnv = "gnome";
+    };
     modules = [
       ./iso-config.nix
-      {
-        # Override desktop environment to GNOME
-        _module.args.desktopEnv = "gnome";
-      }
     ];
   };
 in

@@ -80,7 +80,7 @@ let
         
         # Validate desktop environment
         case "$DESKTOP_ENV" in
-          gnome|plasma6|xfce)
+          gnome|plasma6)
             echo "Building NixOS ISO with Calamares and NixOS Control Center..."
             echo "Desktop Environment: $DESKTOP_ENV"
             echo ""
@@ -91,9 +91,8 @@ let
             echo "Valid options:"
             echo "  gnome    - GNOME Desktop"
             echo "  plasma6  - KDE Plasma 6 (default)"
-            echo "  xfce     - XFCE Desktop"
             echo ""
-            echo "Usage: ncc nixify build-iso [gnome|plasma6|xfce]"
+            echo "Usage: ncc nixify build-iso [gnome|plasma6]"
             exit 1
             ;;
         esac
@@ -158,16 +157,36 @@ let
           BUILD_SCRIPT="build-iso.nix"
         fi
         
-        # Build ISO
-        nix-build "$BUILD_SCRIPT"
+        # Build in temporary directory to prevent nix-build from creating symlinks in main directory
+        TEMP_BUILD_DIR=$(mktemp -d)
+        TEMP_RESULT=$(mktemp -d)
+        
+        # Use absolute path to build script
+        ABS_BUILD_SCRIPT="$(readlink -f "$BUILD_SCRIPT")"
+        
+        # Build ISO in temporary directory using absolute path
+        (cd "$TEMP_BUILD_DIR" && nix-build "$ABS_BUILD_SCRIPT" --out-link "$TEMP_RESULT/result")
         
         if [ $? -eq 0 ]; then
-          echo ""
-          echo "✅ ISO build successful!"
-          echo ""
-          ISO_FILE=$(find result/iso -name "nixos-nixify-*.iso" 2>/dev/null | head -1)
-          if [ -n "$ISO_FILE" ]; then
-            ABS_ISO_PATH="$(readlink -f "$ISO_FILE")"
+          # Create result/iso/ directory in user's home to avoid permission issues
+          RESULT_ISO_DIR="$HOME/.local/share/nixify/isos"
+          mkdir -p "$RESULT_ISO_DIR"
+          
+          # Also create symlink in iso-builder directory for convenience (if writable)
+          if [ -w "$ISO_BUILDER_DIR" ]; then
+            mkdir -p "$ISO_BUILDER_DIR/result"
+            ln -sfn "$RESULT_ISO_DIR" "$ISO_BUILDER_DIR/result/iso" 2>/dev/null || true
+          fi
+          
+          # Find and copy the ISO file
+          BUILT_ISO=$(find "$TEMP_RESULT/result/iso" -name "nixos-nixify-*.iso" 2>/dev/null | head -1)
+          if [ -n "$BUILT_ISO" ]; then
+            ISO_NAME=$(basename "$BUILT_ISO")
+            cp "$BUILT_ISO" "$RESULT_ISO_DIR/$ISO_NAME"
+            echo ""
+            echo "✅ ISO build successful!"
+            echo ""
+            ABS_ISO_PATH="$(readlink -f "$RESULT_ISO_DIR/$ISO_NAME")"
             echo "ISO location: $ABS_ISO_PATH"
             echo ""
             echo "To test in QEMU:"
@@ -175,14 +194,12 @@ let
             echo ""
             echo "To write to USB:"
             echo "  sudo dd if=\"$ABS_ISO_PATH\" of=/dev/sdX bs=4M status=progress"
+            echo ""
+            echo "📦 All ISOs in $RESULT_ISO_DIR/:"
+            ls -lh "$RESULT_ISO_DIR"/*.iso 2>/dev/null | awk '{print "  - " $9 " (" $5 ")"}' || echo "  (none)"
           else
-            echo "ISO location: $(pwd)/result/iso/nixos-nixify-*.iso"
-            echo ""
-            echo "To test in QEMU:"
-            echo "  qemu-system-x86_64 -cdrom result/iso/nixos-nixify-*.iso -m 4G"
-            echo ""
-            echo "To write to USB:"
-            echo "  sudo dd if=result/iso/nixos-nixify-*.iso of=/dev/sdX bs=4M status=progress"
+            echo "Error: Could not find ISO file in build output"
+            exit 1
           fi
         else
           echo ""
@@ -205,7 +222,7 @@ Commands:
     logs              Show service logs (follow mode)
   
          build-iso|iso [env] Build custom NixOS ISO with Calamares
-                             Options: gnome, plasma6 (default), xfce
+                             Options: gnome, plasma6 (default)
   list                List all sessions
   show <session-id>   Show session details
   download <session-id>  Download config/ISO for session
@@ -216,7 +233,6 @@ Examples:
          ncc nixify build-iso        # Build ISO with Plasma 6 (default)
          ncc nixify build-iso gnome  # Build ISO with GNOME
          ncc nixify build-iso plasma6 # Build ISO with Plasma 6
-         ncc nixify build-iso xfce   # Build ISO with XFCE
          ncc nixify iso              # Alias for build-iso
   ncc nixify list             # List all sessions
   ncc nixify show abc123      # Show session details
