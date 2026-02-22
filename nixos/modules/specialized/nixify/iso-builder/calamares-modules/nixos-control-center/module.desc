@@ -1,0 +1,6 @@
+[module]
+name=nixos-control-center
+description=NixOS Control Center Setup
+author=fr4iser
+license=GPLv3+
+type=viewqml
