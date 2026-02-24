@@ -1,8 +1,7 @@
-[module]
-name=nixos-control-center-job
-prettyName=NixOS Control Center Installation
-prettyStatusMessage=Installing NixOS Control Center...
-description=NixOS Control Center Installation Job
-author=fr4iser
-license=GPLv3+
-type=job
+# SPDX-FileCopyrightText: no
+# SPDX-License-Identifier: CC0-1.0
+---
+type:       "job"
+name:       "nixos-control-center-job"
+interface:  "python"
+script:     "nixos-control-center-job.py"

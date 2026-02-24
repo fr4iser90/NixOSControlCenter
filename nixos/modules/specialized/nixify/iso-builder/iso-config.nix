@@ -22,16 +22,6 @@ let
     chmod -R u+w $out
   '';
   
-  # Wrapper package that creates symlinks in /usr/lib/calamares/modules/
-  # This makes the modules available at the expected path in the live system
-  calamaresModulesSymlinks = pkgs.runCommand "calamares-modules-symlinks" {} ''
-    mkdir -p $out/usr/lib/calamares/modules
-    
-    # Create symlinks to Calamares modules in the Nix store
-    ln -s ${calamaresModule} $out/usr/lib/calamares/modules/nixos-control-center
-    ln -s ${calamaresJobModule} $out/usr/lib/calamares/modules/nixos-control-center-job
-  '';
-  
   # NixOS Control Center repository (will be copied to ISO)
   # Get nixos/ directory (assuming we're in nixos/modules/specialized/nixify/iso-builder)
   # 4 levels up = nixos/ directory
@@ -65,18 +55,20 @@ let
   
   # Merge Calamares modules.conf at BUILD TIME
   # The base config might not have a modules.conf (modules are auto-discovered)
-  # We create one that registers our custom modules
+  # We create one that registers our custom modules with explicit Store paths
   # NOTE: mergedCalamaresSettings is created in the overlay to avoid infinite recursion
+  # IMPORTANT: We use explicit Store paths instead of copying to /usr/lib/calamares/modules/
+  # This is more "nixy" and keeps modules in the Store where they belong
   mergedCalamaresModules = pkgs.writeText "calamares-modules.conf" ''
 ---
 # Calamares Modules Configuration
-# Standard modules are auto-discovered by Calamares, we only register our custom modules
+# Modules are loaded directly from Nix store paths
 
 nixos-control-center:
-  path: /usr/lib/calamares/modules/nixos-control-center
+  path: "${toString calamaresModule}"
 
 nixos-control-center-job:
-  path: /usr/lib/calamares/modules/nixos-control-center-job
+  path: "${toString calamaresJobModule}"
 '';
   
   # Select base ISO based on desktop environment
@@ -96,6 +88,112 @@ in
 
   # Allow unfree packages (needed for firmware, etc.)
   nixpkgs.config.allowUnfree = true;
+  
+  # CRITICAL: Apply overlay EARLY to ensure calamares-nixos-extensions is patched
+  # This must be before any other configuration that uses calamares-nixos-extensions
+  nixpkgs.overlays = [
+    (final: prev: let
+      # Get base config from prev (before overlay) to avoid infinite recursion
+      baseCalamaresSettings = "${prev.calamares-nixos-extensions}/etc/calamares/settings.conf";
+      
+      # Define module paths INSIDE the overlay
+      calamaresModulePath = ./calamares-modules/nixos-control-center;
+      calamaresJobModulePath = ./calamares-modules/nixos-control-center-job;
+      
+      # Create module derivations INSIDE the overlay
+      calamaresModuleOverlay = prev.runCommand "nixos-control-center-calamares-module" {} ''
+        mkdir -p $out
+        cp -r ${calamaresModulePath}/* $out/
+        chmod -R u+w $out
+      '';
+      
+      calamaresJobModuleOverlay = prev.runCommand "nixos-control-center-job-calamares-module" {} ''
+        mkdir -p $out
+        cp -r ${calamaresJobModulePath}/* $out/
+        chmod -R u+w $out
+      '';
+      
+      # Create mergedCalamaresModules INSIDE the overlay using the overlay's module derivations
+      mergedCalamaresModules = prev.writeText "calamares-modules.conf" ''
+---
+# Calamares Modules Configuration
+# Modules are loaded directly from Nix store paths
+
+nixos-control-center:
+  path: "${toString calamaresModuleOverlay}"
+
+nixos-control-center-job:
+  path: "${toString calamaresJobModuleOverlay}"
+'';
+      
+      # Create merged settings.conf INSIDE the overlay using prev.calamares-nixos-extensions
+      mergedCalamaresSettings = prev.runCommand "calamares-settings-merged" {
+        nativeBuildInputs = [ prev.python3Packages.pyyaml ];
+      } ''
+        # Read base config
+        BASE_CONFIG="${baseCalamaresSettings}"
+        
+        # Use Python to merge YAML and insert our module
+        ${prev.python3}/bin/python3 <<EOF
+import yaml
+import sys
+
+# Read base config
+with open("$BASE_CONFIG", 'r') as f:
+    config = yaml.safe_load(f)
+
+# Note: We don't need to add /usr/lib/calamares/modules to modules-search
+# because we're using explicit Store paths in modules.conf
+# This is cleaner and more "nixy" - modules stay in the Store
+
+# Insert our module before "summary" in the show sequence
+# Also remove standard Calamares desktop module to avoid duplicate desktop selection
+if 'sequence' in config and isinstance(config['sequence'], list):
+    for phase in config['sequence']:
+        if isinstance(phase, dict) and 'show' in phase:
+            show_list = phase['show']
+            # Remove standard desktop module (has desktop selection - shown in screenshot)
+            if 'desktop' in show_list:
+                show_list.remove('desktop')
+            # Insert our module before summary
+            if 'summary' in show_list:
+                summary_idx = show_list.index('summary')
+                if 'nixos-control-center' not in show_list:
+                    show_list.insert(summary_idx, 'nixos-control-center')
+            elif 'nixos-control-center' not in show_list:
+                show_list.append('nixos-control-center')
+        
+        if isinstance(phase, dict) and 'exec' in phase:
+            exec_list = phase['exec']
+            if 'nixos' in exec_list:
+                # Replace Calamares nixos module with our flake-based installation
+                nixos_idx = exec_list.index('nixos')
+                exec_list[nixos_idx] = 'nixos-control-center-job'
+            elif 'nixos-control-center-job' not in exec_list:
+                exec_list.append('nixos-control-center-job')
+
+# Write merged config
+with open("$out", 'w') as f:
+    yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+EOF
+      '';
+    in {
+      calamares-nixos-extensions = prev.calamares-nixos-extensions.overrideAttrs (old: {
+        # Replace the settings.conf in the package with our merged one
+        postInstall = (old.postInstall or "") + ''
+          # Ensure etc/calamares directory exists
+          mkdir -p $out/etc/calamares
+          
+          # Replace settings.conf with our custom merged version
+          rm -f $out/etc/calamares/settings.conf
+          cp ${mergedCalamaresSettings} $out/etc/calamares/settings.conf
+          
+          # Copy modules.conf (always, directory now exists)
+          cp ${mergedCalamaresModules} $out/etc/calamares/modules.conf
+        '';
+      });
+    })
+  ];
 
   # ISO configuration
   # Set baseName to control the ISO filename (isoName is derived from baseName)
@@ -112,15 +210,8 @@ in
         source = nixosControlCenterRepo;
         target = "/nixos";
       }
-    # NOTE: Modules are now installed via calamaresModulesSymlinks package
-    # which creates symlinks from /usr/lib/calamares/modules/ to Store paths
-    # This ensures they're available in the live system runtime
-    # We still copy them via contents for ISO filesystem, but the symlinks
-    # make them accessible at runtime
-      {
-      source = calamaresModulesSymlinks;
-      target = "/usr";
-    }
+      # NOTE: Modules are loaded directly from Store paths via modules.conf
+      # No need to copy them to /usr/lib/calamares/modules/ - they stay in the Store
       # NOTE: settings.conf is now patched in calamares-nixos-extensions via overlay
       # We don't need to copy it separately anymore
       {
@@ -182,104 +273,23 @@ in
     git
     nix
     
+    # CRITICAL: Explicitly reference calamares-nixos-extensions to ensure overlay is applied
+    # This forces the overlay to be evaluated for this package, ensuring modules.conf is included
+    # Without this, baseIsoModule might use the unpatched version before overlay is applied
+    calamares-nixos-extensions
+    
     # CRITICAL: Force evaluation of custom directory derivations by adding them to systemPackages
     # This ensures they are built and available, even though they're also in isoImage.contents
     # The ISO builder will copy them from the store paths referenced in contents
     # Note: Only directories can be in systemPackages, not files
+    # Modules are loaded directly from Store paths via modules.conf - no copying needed
     nixosControlCenterRepo
     calamaresModule
     calamaresJobModule
-    # Wrapper package that creates symlinks - makes modules available at expected path
-    calamaresModulesSymlinks
   ];
 
   # Enable services needed for hardware detection
   services.udev.enable = true;
   hardware.enableAllFirmware = true;
-  
-  # CRITICAL: Patch calamares-nixos-extensions to use our custom settings.conf
-  # Calamares is started with --settings=/nix/store/...calamares-nixos-extensions.../settings.conf
-  # We need to override the package to use our merged settings.conf instead
-  # IMPORTANT: mergedCalamaresSettings must be created in the overlay to avoid infinite recursion
-  # because it needs prev.calamares-nixos-extensions, not pkgs.calamares-nixos-extensions
-  nixpkgs.overlays = [
-    (final: prev: let
-      # Get base config from prev (before overlay) to avoid infinite recursion
-      baseCalamaresSettings = "${prev.calamares-nixos-extensions}/etc/calamares/settings.conf";
-      
-      # Create merged settings.conf INSIDE the overlay using prev.calamares-nixos-extensions
-      mergedCalamaresSettings = prev.runCommand "calamares-settings-merged" {
-        nativeBuildInputs = [ prev.python3Packages.pyyaml ];
-      } ''
-        # Read base config
-        BASE_CONFIG="${baseCalamaresSettings}"
-        
-        # Use Python to merge YAML and insert our module
-        ${prev.python3}/bin/python3 <<EOF
-import yaml
-import sys
-
-# Read base config
-with open("$BASE_CONFIG", 'r') as f:
-    config = yaml.safe_load(f)
-
-# Add /usr/lib/calamares/modules to modules-search if not present
-if 'modules-search' in config:
-    if isinstance(config['modules-search'], list):
-        if '/usr/lib/calamares/modules' not in config['modules-search']:
-            config['modules-search'].append('/usr/lib/calamares/modules')
-    else:
-        config['modules-search'] = [config['modules-search'], '/usr/lib/calamares/modules']
-else:
-    config['modules-search'] = ['local', '/usr/lib/calamares/modules']
-
-# Insert our module before "summary" in the show sequence
-# Also remove standard Calamares desktop module to avoid duplicate desktop selection
-if 'sequence' in config and isinstance(config['sequence'], list):
-    for phase in config['sequence']:
-        if isinstance(phase, dict) and 'show' in phase:
-            show_list = phase['show']
-            # Remove standard desktop module (has desktop selection - shown in screenshot)
-            if 'desktop' in show_list:
-                show_list.remove('desktop')
-            # Insert our module before summary
-            if 'summary' in show_list:
-                summary_idx = show_list.index('summary')
-                if 'nixos-control-center' not in show_list:
-                    show_list.insert(summary_idx, 'nixos-control-center')
-            elif 'nixos-control-center' not in show_list:
-                show_list.append('nixos-control-center')
-        
-        if isinstance(phase, dict) and 'exec' in phase:
-            exec_list = phase['exec']
-            if 'nixos' in exec_list:
-                # Replace Calamares nixos module with our flake-based installation
-                nixos_idx = exec_list.index('nixos')
-                exec_list[nixos_idx] = 'nixos-control-center-job'
-            elif 'nixos-control-center-job' not in exec_list:
-                exec_list.append('nixos-control-center-job')
-
-# Write merged config
-with open("$out", 'w') as f:
-    yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
-EOF
-      '';
-    in {
-      calamares-nixos-extensions = prev.calamares-nixos-extensions.overrideAttrs (old: {
-        # Replace the settings.conf in the package with our merged one
-        postInstall = (old.postInstall or "") + ''
-          # Replace settings.conf with our custom merged version
-          rm -f $out/etc/calamares/settings.conf
-          cp ${mergedCalamaresSettings} $out/etc/calamares/settings.conf
-          
-          # Also replace modules.conf if it exists
-          if [ -f $out/etc/calamares/modules.conf ]; then
-            rm -f $out/etc/calamares/modules.conf
-          fi
-          cp ${mergedCalamaresModules} $out/etc/calamares/modules.conf
-        '';
-      });
-    })
-  ];
   
 }
