@@ -165,24 +165,47 @@ let
         ABS_BUILD_SCRIPT="$(readlink -f "$BUILD_SCRIPT")"
         
         # Build ISO in temporary directory using absolute path
-        (cd "$TEMP_BUILD_DIR" && nix-build "$ABS_BUILD_SCRIPT" --out-link "$TEMP_RESULT/result")
+        # Show DEBUG output from Python scripts
+        echo "Building ISO (this may take a while)..."
+        echo ""
+        BUILD_EXIT=0
+        (cd "$TEMP_BUILD_DIR" && nix-build "$ABS_BUILD_SCRIPT" --out-link "$TEMP_RESULT/result" 2>&1 | tee /tmp/nixify-build.log) || BUILD_EXIT=$?
         
-        if [ $? -eq 0 ]; then
+        # Show all DEBUG lines from build log
+        if [ -f /tmp/nixify-build.log ]; then
+          DEBUG_LINES=$(grep "DEBUG:" /tmp/nixify-build.log || true)
+          if [ -n "$DEBUG_LINES" ]; then
+            echo ""
+            echo "=== DEBUG OUTPUT ==="
+            echo "$DEBUG_LINES"
+            echo "==================="
+            echo ""
+          fi
+        fi
+        
+        if [ $BUILD_EXIT -eq 0 ]; then
           # Create result/iso/ directory in user's home to avoid permission issues
           RESULT_ISO_DIR="$HOME/.local/share/nixify/isos"
           mkdir -p "$RESULT_ISO_DIR"
-          
-          # Also create symlink in iso-builder directory for convenience (if writable)
-          if [ -w "$ISO_BUILDER_DIR" ]; then
-            mkdir -p "$ISO_BUILDER_DIR/result"
-            ln -sfn "$RESULT_ISO_DIR" "$ISO_BUILDER_DIR/result/iso" 2>/dev/null || true
-          fi
           
           # Find and copy the ISO file
           BUILT_ISO=$(find "$TEMP_RESULT/result/iso" -name "nixos-nixify-*.iso" 2>/dev/null | head -1)
           if [ -n "$BUILT_ISO" ]; then
             ISO_NAME=$(basename "$BUILT_ISO")
-            cp "$BUILT_ISO" "$RESULT_ISO_DIR/$ISO_NAME"
+            TARGET_ISO="$RESULT_ISO_DIR/$ISO_NAME"
+            
+            # Remove existing ISO if it exists and has wrong permissions
+            if [ -f "$TARGET_ISO" ] && [ ! -w "$TARGET_ISO" ]; then
+              echo "Removing existing ISO with wrong permissions: $TARGET_ISO"
+              rm -f "$TARGET_ISO" 2>/dev/null || {
+                echo "Warning: Could not remove existing ISO. You may need to remove it manually:"
+                echo "  rm -f $TARGET_ISO"
+              }
+            fi
+            
+            # Copy ISO and ensure correct permissions
+            cp "$BUILT_ISO" "$TARGET_ISO"
+            chmod 644 "$TARGET_ISO" 2>/dev/null || true
             echo ""
             echo "✅ ISO build successful!"
             echo ""

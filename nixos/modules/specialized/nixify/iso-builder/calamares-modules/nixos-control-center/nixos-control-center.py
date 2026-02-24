@@ -67,6 +67,16 @@ class HardwareCheckThread(QThread):
     def run_check(self, script_path):
         """Run a check script"""
         try:
+            # If target_root is "/", run directly without chroot
+            if self.target_root == "/":
+                result = subprocess.run(
+                    ["bash", script_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+            else:
+                # Otherwise use chroot for installed system
             result = subprocess.run(
                 ["chroot", self.target_root, "bash", script_path],
                 capture_output=True,
@@ -147,7 +157,10 @@ class NixOSControlCenter(QObject):
         config = libcalamares.job.configuration
         self.repo_path = config.get("repoPath", "/mnt/cdrom/nixos")
         self.shell_nix_path = config.get("shellNixPath", "/etc/nixos/shell.nix")
-        self.scripts_path = config.get("scriptsPath", "/etc/nixos/shell/scripts")
+        scripts_path_config = config.get("scriptsPath", "/etc/nixos/shell/scripts")
+        
+        # During GUI phase, we run on live system (target_root = "/")
+        self.target_root = "/"
         
         # Copy repository from ISO to live system for GUI access
         if os.path.exists("/mnt/cdrom/nixos"):
@@ -156,10 +169,17 @@ class NixOSControlCenter(QObject):
                 subprocess.run([
                     "cp", "-r", "/mnt/cdrom/nixos", "/tmp/nixos-control-center-repo"
                 ], check=True, timeout=60)
+                # Use scripts from copied repo during GUI phase
+                self.scripts_path = "/tmp/nixos-control-center-repo/shell/scripts"
                 self._statusMessage = "Repository loaded"
             except Exception as e:
                 libcalamares.utils.warning(f"Failed to copy repository: {e}")
                 self._statusMessage = f"Warning: {e}"
+                # Fallback to config path if copy fails
+                self.scripts_path = scripts_path_config
+        else:
+            # Fallback if ISO not mounted
+            self.scripts_path = scripts_path_config
         
         # Store backend in global storage for QML access
         libcalamares.globalstorage.insert("nixosControlCenter", self)
