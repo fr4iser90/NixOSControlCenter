@@ -167,6 +167,47 @@ fi
 
 echo ""
 echo "4b. Prüfe squashfs (Live-System)..."
+echo ""
+echo "4b1. Prüfe /etc/calamares im squashfs..."
+if [ -d "$SQUASHFS_MOUNT/etc/calamares" ]; then
+    echo "✓ /etc/calamares gefunden im squashfs!"
+    echo "Inhalt:"
+    ls -la "$SQUASHFS_MOUNT/etc/calamares" 2>/dev/null || echo "Fehler"
+    echo ""
+    if [ -d "$SQUASHFS_MOUNT/etc/calamares/modules" ]; then
+        echo "✓ /etc/calamares/modules gefunden!"
+        ls -la "$SQUASHFS_MOUNT/etc/calamares/modules" 2>/dev/null || echo "Fehler"
+        for module in nixos-control-center nixos-control-center-job; do
+            module_path="$SQUASHFS_MOUNT/etc/calamares/modules/$module"
+            if [ -e "$module_path" ]; then
+                echo ""
+                echo "--- Unser Module: $module (in /etc/calamares/modules) ---"
+                echo "Pfad: $module_path"
+                if [ -L "$module_path" ]; then
+                    echo "→ Symlink zu: $(readlink "$module_path")"
+                fi
+                ls -la "$module_path" 2>/dev/null || echo "Fehler"
+            fi
+        done
+    else
+        echo "❌ /etc/calamares/modules nicht gefunden"
+    fi
+    if [ -f "$SQUASHFS_MOUNT/etc/calamares/settings.conf" ]; then
+        echo ""
+        echo "✓ /etc/calamares/settings.conf gefunden!"
+        echo "modules-search:"
+        grep -A 5 "modules-search:" "$SQUASHFS_MOUNT/etc/calamares/settings.conf" 2>/dev/null | head -10
+    else
+        echo "❌ /etc/calamares/settings.conf nicht gefunden"
+    fi
+else
+    echo "❌ /etc/calamares nicht gefunden im squashfs"
+    echo "Prüfe ob /etc existiert:"
+    ls -la "$SQUASHFS_MOUNT/etc" 2>/dev/null | head -10 || echo "/etc existiert nicht im squashfs"
+fi
+
+echo ""
+echo "4b2. Prüfe /usr/lib/calamares/modules im squashfs..."
 if [ -d "$SQUASHFS_MOUNT/usr/lib/calamares/modules" ]; then
     echo "✓ /usr/lib/calamares/modules gefunden im squashfs!"
     for module in nixos-control-center nixos-control-center-job; do
@@ -301,6 +342,409 @@ for module in nixos-control-center nixos-control-center-job; do
         fi
     fi
 done
+
+echo ""
+echo "=== Module-Struktur-Prüfung (Store-Pfade) ==="
+echo ""
+
+# Prüfe ob unsere Module module.desc haben (direkt im Store)
+for MODULE_PATH in \
+  "$SQUASHFS_MOUNT/pskysmzhmzh3fr2lxd9q34r7ic9w7f1v-nixos-control-center-calamares-module" \
+  "$SQUASHFS_MOUNT/320xhkfzcrrmimr3r8c0mfx3khv5j47k-nixos-control-center-job-calamares-module"; do
+  if [ -d "$MODULE_PATH" ]; then
+    MODULE_NAME=$(basename "$MODULE_PATH" | sed 's/-calamares-module$//')
+    echo "--- Module: $MODULE_NAME ---"
+    echo "Pfad: $MODULE_PATH"
+    echo ""
+    if [ -f "$MODULE_PATH/module.desc" ]; then
+      echo "✅ module.desc vorhanden:"
+      cat "$MODULE_PATH/module.desc"
+      echo ""
+    else
+      echo "❌ module.desc FEHLT!"
+      echo ""
+    fi
+    echo "Inhalt:"
+    ls -la "$MODULE_PATH" 2>/dev/null | head -15
+    echo ""
+    echo "---"
+    echo ""
+  else
+    # Versuche alle Varianten zu finden
+    FOUND=$(find "$SQUASHFS_MOUNT" -type d -name "*${MODULE_NAME}*calamares-module" 2>/dev/null | head -1)
+    if [ -n "$FOUND" ]; then
+      echo "--- Module: $MODULE_NAME (gefunden unter anderem Pfad) ---"
+      echo "Pfad: $FOUND"
+      echo ""
+      if [ -f "$FOUND/module.desc" ]; then
+        echo "✅ module.desc vorhanden:"
+        cat "$FOUND/module.desc"
+        echo ""
+      else
+        echo "❌ module.desc FEHLT!"
+        echo ""
+      fi
+      echo "Inhalt:"
+      ls -la "$FOUND" 2>/dev/null | head -15
+      echo ""
+      echo "---"
+      echo ""
+    fi
+  fi
+done
+
+echo ""
+echo "=== Calamares settings.conf Vergleich ==="
+echo ""
+
+# Prüfe welche settings.conf Calamares verwenden würde
+SETTINGS_FILES=$(find "$SQUASHFS_MOUNT" -path "*/calamares-nixos-extensions*/etc/calamares/settings.conf" 2>/dev/null)
+if [ -z "$SETTINGS_FILES" ]; then
+  echo "⚠️  Keine settings.conf in calamares-nixos-extensions gefunden"
+else
+  echo "$SETTINGS_FILES" | while read -r SETTINGS; do
+    PACKAGE_NAME=$(echo "$SETTINGS" | sed 's|.*/\([^/]*-calamares-nixos-extensions[^/]*\)/.*|\1|')
+    echo "--- settings.conf: $PACKAGE_NAME ---"
+    echo "Vollständiger Pfad: $SETTINGS"
+    echo ""
+    echo "modules-search:"
+    grep -A 3 "modules-search:" "$SETTINGS" 2>/dev/null | head -5 || echo "nicht gefunden"
+    echo ""
+    echo "Enthält nixos-control-center in sequence (show)?"
+    if grep -A 20 "show:" "$SETTINGS" 2>/dev/null | grep -qi "nixos-control-center"; then
+      echo "✅ GEFUNDEN"
+      grep -A 20 "show:" "$SETTINGS" 2>/dev/null | grep -i "nixos-control-center"
+    else
+      echo "❌ NICHT GEFUNDEN"
+    fi
+    echo ""
+    echo "Enthält nixos-control-center-job in sequence (exec)?"
+    if grep -A 20 "exec:" "$SETTINGS" 2>/dev/null | grep -qi "nixos-control-center-job"; then
+      echo "✅ GEFUNDEN"
+      grep -A 20 "exec:" "$SETTINGS" 2>/dev/null | grep -i "nixos-control-center-job"
+    else
+      echo "❌ NICHT GEFUNDEN"
+    fi
+    echo ""
+    echo "---"
+    echo ""
+  done
+fi
+
+echo ""
+echo "=== modules.conf Vergleich ==="
+echo ""
+
+# Prüfe alle modules.conf
+MODULES_CONF_FILES=$(find "$SQUASHFS_MOUNT" -path "*/calamares-nixos-extensions*/etc/calamares/modules.conf" 2>/dev/null)
+if [ -z "$MODULES_CONF_FILES" ]; then
+  echo "⚠️  Keine modules.conf in calamares-nixos-extensions gefunden"
+else
+  echo "$MODULES_CONF_FILES" | while read -r MODULES_CONF; do
+    PACKAGE_NAME=$(echo "$MODULES_CONF" | sed 's|.*/\([^/]*-calamares-nixos-extensions[^/]*\)/.*|\1|')
+    echo "--- modules.conf: $PACKAGE_NAME ---"
+    echo "Vollständiger Pfad: $MODULES_CONF"
+    echo ""
+    cat "$MODULES_CONF"
+    echo ""
+    echo "Prüfe ob Module-Pfade existieren:"
+    grep "path:" "$MODULES_CONF" 2>/dev/null | sed 's/.*path: *"\([^"]*\)".*/\1/' | while read -r MODULE_STORE_PATH; do
+      # Entferne /nix/store/ Präfix für Squashfs-Prüfung
+      MODULE_REL_PATH=$(echo "$MODULE_STORE_PATH" | sed 's|^/nix/store/||')
+      if [ -d "$SQUASHFS_MOUNT/$MODULE_REL_PATH" ]; then
+        echo "✅ $MODULE_STORE_PATH existiert im Squashfs"
+      else
+        echo "❌ $MODULE_STORE_PATH existiert NICHT im Squashfs"
+        echo "   Gesucht unter: $SQUASHFS_MOUNT/$MODULE_REL_PATH"
+      fi
+    done
+    echo ""
+    echo "---"
+    echo ""
+  done
+fi
+
+echo ""
+echo "=== Zwei-Versionen-Problem ==="
+echo ""
+
+# Prüfe ob es immer noch zwei Versionen gibt
+CALAMARES_EXTENSIONS=$(find "$SQUASHFS_MOUNT" -type d -name "*-calamares-nixos-extensions-*" 2>/dev/null)
+COUNT=$(echo "$CALAMARES_EXTENSIONS" | wc -l)
+echo "Gefundene calamares-nixos-extensions Versionen: $COUNT"
+if [ "$COUNT" -gt 1 ]; then
+  echo "❌ PROBLEM: Es gibt immer noch mehrere Versionen!"
+  echo "$CALAMARES_EXTENSIONS" | while read -r EXT_PATH; do
+    echo ""
+    echo "--- Version: $(basename "$EXT_PATH") ---"
+    if [ -f "$EXT_PATH/etc/calamares/modules.conf" ]; then
+      echo "✅ Hat modules.conf"
+      echo "Inhalt:"
+      cat "$EXT_PATH/etc/calamares/modules.conf"
+    else
+      echo "❌ Hat KEINE modules.conf"
+    fi
+    echo ""
+  done
+else
+  echo "✅ Nur eine Version gefunden"
+fi
+
+echo ""
+echo "=== Detaillierte Module-Validierung ==="
+echo ""
+
+# Funktion zum Validieren von module.desc
+validate_module_desc() {
+    local MODULE_PATH="$1"
+    local MODULE_NAME="$2"
+    local DESC_FILE="$MODULE_PATH/module.desc"
+    
+    if [ ! -f "$DESC_FILE" ]; then
+        echo "❌ module.desc fehlt für $MODULE_NAME"
+        return 1
+    fi
+    
+    echo "--- Validierung: $MODULE_NAME ---"
+    echo "module.desc Pfad: $DESC_FILE"
+    echo ""
+    
+    # Prüfe ob es YAML ist (beginnt mit --- oder hat : )
+    if ! head -1 "$DESC_FILE" | grep -qE "^---|^#"; then
+        echo "⚠️  WARNUNG: module.desc sieht nicht wie YAML aus (sollte mit '---' oder '#' beginnen)"
+    fi
+    
+    # Prüfe required fields
+    local HAS_TYPE=false
+    local HAS_INTERFACE=false
+    local HAS_NAME=false
+    local HAS_SCRIPT=false
+    
+    if grep -qE "^type:" "$DESC_FILE"; then
+        HAS_TYPE=true
+        TYPE_VALUE=$(grep "^type:" "$DESC_FILE" | sed 's/.*type: *"\([^"]*\)".*/\1/' | sed 's/.*type: *\([^ ]*\).*/\1/' | head -1)
+        echo "✅ type: $TYPE_VALUE"
+    else
+        echo "❌ type: FEHLT (required)"
+    fi
+    
+    if grep -qE "^interface:" "$DESC_FILE"; then
+        HAS_INTERFACE=true
+        INTERFACE_VALUE=$(grep "^interface:" "$DESC_FILE" | sed 's/.*interface: *"\([^"]*\)".*/\1/' | sed 's/.*interface: *\([^ ]*\).*/\1/' | head -1)
+        echo "✅ interface: $INTERFACE_VALUE"
+    else
+        echo "❌ interface: FEHLT (required)"
+    fi
+    
+    if grep -qE "^name:" "$DESC_FILE"; then
+        HAS_NAME=true
+        NAME_VALUE=$(grep "^name:" "$DESC_FILE" | sed 's/.*name: *"\([^"]*\)".*/\1/' | sed 's/.*name: *\([^ ]*\).*/\1/' | head -1)
+        echo "✅ name: $NAME_VALUE"
+        
+        # Prüfe ob name mit Modul-Name übereinstimmt
+        if [ "$NAME_VALUE" != "$MODULE_NAME" ]; then
+            echo "⚠️  WARNUNG: name ($NAME_VALUE) stimmt nicht mit Modul-Name ($MODULE_NAME) überein"
+        fi
+    else
+        echo "⚠️  name: FEHLT (empfohlen für besseres Debugging)"
+    fi
+    
+    if grep -qE "^script:" "$DESC_FILE"; then
+        HAS_SCRIPT=true
+        SCRIPT_VALUE=$(grep "^script:" "$DESC_FILE" | sed 's/.*script: *"\([^"]*\)".*/\1/' | sed 's/.*script: *\([^ ]*\).*/\1/' | head -1)
+        echo "✅ script: $SCRIPT_VALUE"
+        
+        # Prüfe ob Script-Datei existiert
+        if [ -f "$MODULE_PATH/$SCRIPT_VALUE" ]; then
+            echo "✅ Script-Datei existiert: $SCRIPT_VALUE"
+        else
+            echo "❌ Script-Datei fehlt: $SCRIPT_VALUE"
+        fi
+    elif grep -qE "^load:" "$DESC_FILE"; then
+        LOAD_VALUE=$(grep "^load:" "$DESC_FILE" | sed 's/.*load: *"\([^"]*\)".*/\1/' | sed 's/.*load: *\([^ ]*\).*/\1/' | head -1)
+        echo "✅ load: $LOAD_VALUE (für qtplugin)"
+        
+        if [ -f "$MODULE_PATH/$LOAD_VALUE" ]; then
+            echo "✅ Load-Datei existiert: $LOAD_VALUE"
+        else
+            echo "❌ Load-Datei fehlt: $LOAD_VALUE"
+        fi
+    else
+        echo "⚠️  script: oder load: FEHLT (benötigt für python/qtplugin)"
+    fi
+    
+    # Prüfe Interface-Konsistenz
+    if [ "$HAS_INTERFACE" = true ] && [ "$HAS_SCRIPT" = true ]; then
+        if [ "$INTERFACE_VALUE" = "python" ] && [ -n "$SCRIPT_VALUE" ]; then
+            echo "✅ Interface 'python' mit 'script:' ist konsistent"
+        elif [ "$INTERFACE_VALUE" = "qtplugin" ] && [ -n "$SCRIPT_VALUE" ]; then
+            echo "⚠️  WARNUNG: Interface 'qtplugin' sollte 'load:' verwenden, nicht 'script:'"
+        fi
+    fi
+    
+    echo ""
+}
+
+# Funktion zum Prüfen von Python-Imports
+check_python_imports() {
+    local MODULE_PATH="$1"
+    local MODULE_NAME="$2"
+    local PYTHON_FILE="$3"
+    
+    if [ ! -f "$PYTHON_FILE" ]; then
+        return
+    fi
+    
+    echo "--- Python-Import-Check: $MODULE_NAME ---"
+    echo "Python-Datei: $PYTHON_FILE"
+    echo ""
+    
+    # Prüfe ob libcalamares importiert wird
+    if grep -q "^import libcalamares\|^from libcalamares" "$PYTHON_FILE"; then
+        echo "✅ libcalamares wird importiert"
+    else
+        echo "❌ libcalamares wird NICHT importiert (required für Calamares-Module)"
+    fi
+    
+    # Liste alle Imports
+    echo "Gefundene Imports:"
+    grep -E "^import |^from " "$PYTHON_FILE" | head -10 || echo "Keine Imports gefunden"
+    echo ""
+}
+
+# Finde alle unsere Module im Squashfs
+echo "Suche nach unseren Modulen im Squashfs..."
+CUSTOM_MODULES=$(find "$SQUASHFS_MOUNT" -type d -name "*nixos-control-center*calamares-module" 2>/dev/null)
+
+if [ -z "$CUSTOM_MODULES" ]; then
+    echo "❌ Keine Custom-Module gefunden im Squashfs"
+else
+    echo "$CUSTOM_MODULES" | while read -r MODULE_PATH; do
+        MODULE_NAME=$(basename "$MODULE_PATH" | sed 's/-calamares-module$//')
+        
+        echo ""
+        echo "=========================================="
+        echo "=== Detaillierte Analyse: $MODULE_NAME ==="
+        echo "=========================================="
+        echo ""
+        
+        # Validierung module.desc
+        validate_module_desc "$MODULE_PATH" "$MODULE_NAME"
+        
+        # Prüfe Dateien
+        echo "--- Datei-Struktur ---"
+        echo "Verzeichnis: $MODULE_PATH"
+        echo ""
+        echo "Dateien:"
+        ls -la "$MODULE_PATH" 2>/dev/null || echo "Fehler beim Auflisten"
+        echo ""
+        
+        # Prüfe Python-Imports
+        PYTHON_FILE=$(find "$MODULE_PATH" -name "*.py" -type f | head -1)
+        if [ -n "$PYTHON_FILE" ]; then
+            check_python_imports "$MODULE_PATH" "$MODULE_NAME" "$PYTHON_FILE"
+        fi
+        
+        # Prüfe ob ui.qml existiert (für viewqml)
+        if [ -f "$MODULE_PATH/ui.qml" ]; then
+            echo "✅ ui.qml vorhanden (benötigt für viewqml)"
+        elif grep -q "type:.*viewqml" "$MODULE_PATH/module.desc" 2>/dev/null; then
+            echo "⚠️  ui.qml fehlt (benötigt für viewqml Module)"
+        fi
+        
+        # Prüfe Berechtigungen
+        echo "--- Berechtigungen ---"
+        if [ -f "$MODULE_PATH/module.desc" ]; then
+            DESC_PERMS=$(stat -c "%a %U:%G" "$MODULE_PATH/module.desc" 2>/dev/null || echo "unbekannt")
+            echo "module.desc: $DESC_PERMS"
+        fi
+        if [ -n "$PYTHON_FILE" ]; then
+            PYTHON_PERMS=$(stat -c "%a %U:%G" "$PYTHON_FILE" 2>/dev/null || echo "unbekannt")
+            echo "$(basename "$PYTHON_FILE"): $PYTHON_PERMS"
+            if [ ! -x "$PYTHON_FILE" ]; then
+                echo "⚠️  Python-Datei ist nicht ausführbar (sollte +x haben)"
+            fi
+        fi
+        echo ""
+        
+        echo "---"
+        echo ""
+    done
+fi
+
+echo ""
+echo "=== Calamares Module-Loading Simulation ==="
+echo ""
+
+# Simuliere wie Calamares Module lädt
+MODULES_CONF_FILE=$(find "$SQUASHFS_MOUNT" -path "*/calamares-nixos-extensions*/etc/calamares/modules.conf" 2>/dev/null | head -1)
+if [ -n "$MODULES_CONF_FILE" ]; then
+    echo "modules.conf: $MODULES_CONF_FILE"
+    echo ""
+    echo "Calamares würde folgende Module laden:"
+    echo ""
+    
+    # Parse modules.conf und prüfe jeden Eintrag
+    grep -E "^[a-z-]+:" "$MODULES_CONF_FILE" | sed 's/:$//' | while read -r MODULE_KEY; do
+        MODULE_PATH_LINE=$(grep -A 1 "^$MODULE_KEY:" "$MODULES_CONF_FILE" | grep "path:" | sed 's/.*path: *"\([^"]*\)".*/\1/')
+        
+        if [ -n "$MODULE_PATH_LINE" ]; then
+            echo "Module: $MODULE_KEY"
+            echo "  Konfigurierter Pfad: $MODULE_PATH_LINE"
+            
+            # Konvertiere Store-Pfad zu Squashfs-Pfad
+            MODULE_REL_PATH=$(echo "$MODULE_PATH_LINE" | sed 's|^/nix/store/||')
+            MODULE_FULL_PATH="$SQUASHFS_MOUNT/$MODULE_REL_PATH"
+            
+            if [ -d "$MODULE_FULL_PATH" ]; then
+                echo "  ✅ Pfad existiert im Squashfs"
+                
+                # Prüfe module.desc
+                if [ -f "$MODULE_FULL_PATH/module.desc" ]; then
+                    echo "  ✅ module.desc vorhanden"
+                    
+                    # Prüfe ob name übereinstimmt
+                    MODULE_NAME=$(grep "^name:" "$MODULE_FULL_PATH/module.desc" 2>/dev/null | sed 's/.*name: *"\([^"]*\)".*/\1/' | sed 's/.*name: *\([^ ]*\).*/\1/' | head -1)
+                    if [ -n "$MODULE_NAME" ]; then
+                        if [ "$MODULE_NAME" = "$MODULE_KEY" ]; then
+                            echo "  ✅ name stimmt überein: $MODULE_NAME"
+                        else
+                            echo "  ⚠️  name ($MODULE_NAME) stimmt nicht mit Key ($MODULE_KEY) überein"
+                        fi
+                    fi
+                else
+                    echo "  ❌ module.desc FEHLT"
+                fi
+                
+                # Prüfe Script/Load
+                SCRIPT=$(grep "^script:" "$MODULE_FULL_PATH/module.desc" 2>/dev/null | sed 's/.*script: *"\([^"]*\)".*/\1/' | sed 's/.*script: *\([^ ]*\).*/\1/' | head -1)
+                LOAD=$(grep "^load:" "$MODULE_FULL_PATH/module.desc" 2>/dev/null | sed 's/.*load: *"\([^"]*\)".*/\1/' | sed 's/.*load: *\([^ ]*\).*/\1/' | head -1)
+                
+                if [ -n "$SCRIPT" ]; then
+                    if [ -f "$MODULE_FULL_PATH/$SCRIPT" ]; then
+                        echo "  ✅ Script vorhanden: $SCRIPT"
+                    else
+                        echo "  ❌ Script fehlt: $SCRIPT"
+                    fi
+                elif [ -n "$LOAD" ]; then
+                    if [ -f "$MODULE_FULL_PATH/$LOAD" ]; then
+                        echo "  ✅ Load-Datei vorhanden: $LOAD"
+                    else
+                        echo "  ❌ Load-Datei fehlt: $LOAD"
+                    fi
+                else
+                    echo "  ⚠️  Kein script: oder load: in module.desc"
+                fi
+            else
+                echo "  ❌ Pfad existiert NICHT im Squashfs"
+                echo "     Gesucht unter: $MODULE_FULL_PATH"
+            fi
+            echo ""
+        fi
+    done
+else
+    echo "⚠️  Keine modules.conf gefunden"
+fi
 
 echo ""
 echo "=== Debug abgeschlossen ==="

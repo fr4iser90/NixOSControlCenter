@@ -99,6 +99,62 @@ Auflistung aller Ansätze, die ich versucht habe, ohne Korrekturen:
 - Ergebnis: ISO wird gebaut, aber Custom-Derivationen sind nicht in der Closure der ISO.
 - Validierung: `nix-store -qR` zeigt, dass Custom-Derivationen nicht in der Closure sind.
 
+### Ansatz 18-19: (Platzhalter für weitere fehlgeschlagene Ansätze)
+
+### Ansatz 20: `storeContents` OHNE `lib.mkAfter` + `system.build.isoImage.overrideAttrs` (✅ ERFOLGREICH)
+- Siehe Abschnitt "✅ ERFOLGREICHE LÖSUNG (Ansatz 20)" unten.
+
+### Ansatz 21: `prev.path` + `builtins.readFile` + `writeText` + `@out@` Substitution + `buildInputs` (✅ ERFOLGREICH)
+- Was: `baseCalamaresSettings` liest die base config direkt aus dem nixpkgs Source (`prev.path`) mit `builtins.readFile`, statt die gebaute Derivation zu referenzieren.
+- Ziel: Vermeidet "closure inflation" - die unpatched `calamares-nixos-extensions` Derivation wird nicht als Build-Input inkludiert.
+- Implementierung:
+  ```nix
+  # Statt: baseCalamaresSettings = "${prev.calamares-nixos-extensions}/etc/calamares/settings.conf";
+  baseCalamaresSettingsContentRaw = builtins.readFile "${prev.path}/pkgs/by-name/ca/calamares-nixos-extensions/src/config/settings.conf";
+  baseConfigFile = prev.writeText "calamares-base-settings.conf" baseCalamaresSettingsContentRaw;
+  
+  # Step 1: Replace @out@ with placeholder, parse YAML, merge config
+  mergedCalamaresSettingsStep1 = prev.runCommand "calamares-settings-step1" {
+    nativeBuildInputs = [ prev.python3Packages.pyyaml ];
+  } ''
+    cp ${baseConfigFile} base_config.yaml
+    sed -i 's|@out@|PLACEHOLDER_OUT_PATH|g' base_config.yaml
+    # ... Python merges YAML ...
+  '';
+  
+  # Step 2: Substitute placeholder in postInstall
+  patchedCalamaresExtensions = prev.calamares-nixos-extensions.overrideAttrs (old: {
+    postInstall = (old.postInstall or "") + ''
+      cp ${mergedCalamaresSettings} $out/etc/calamares/settings.conf
+      substituteInPlace $out/etc/calamares/settings.conf --replace-fail PLACEHOLDER_OUT_PATH $out
+    '';
+  });
+  
+  # CRITICAL: Add buildInputs to calamares-nixos to force patched version
+  calamares-nixos = prev.runCommand "calamares-wrapped" {
+    buildInputs = [ final.calamares-nixos-extensions ];  # Force patched version
+    # ...
+  } '';
+  ```
+- **Fehler behoben:**
+  1. `echo "$baseConfigContent"` konnte spezielle Zeichen (`@`, `%`, etc.) nicht richtig handhaben → YAML-Parsing-Fehler
+  2. `builtins.toJSON` + direkte String-Substitution in Python → Syntax-Fehler (String-Literal gebrochen)
+  3. `builtins.toBase64` existiert nicht in Nix → Evaluierungs-Fehler
+  4. `@out@` Platzhalter in Source-Datei → YAML-Parsing-Fehler → Lösung: `sed` ersetzt `@out@` durch `PLACEHOLDER_OUT_PATH`, dann `substituteInPlace` in `postInstall`
+  5. `calamares-wrapped` referenzierte unpatched Version → Lösung: `buildInputs = [ final.calamares-nixos-extensions ];` hinzugefügt
+- **Finale Lösung:** 
+  - `writeText` erstellt eine kleine Derivation mit nur dem Text-Inhalt
+  - `@out@` wird durch `sed` ersetzt, bevor YAML geparst wird
+  - `substituteInPlace` ersetzt Platzhalter in `postInstall` mit tatsächlichem `$out` Pfad
+  - `buildInputs` in `calamares-nixos` zwingt die patched Version als Dependency
+- Status: **✅ ERFOLGREICH** - Validiert
+- **Validierung:**
+  ```bash
+  nix-store -qR <iso-derivation> | grep "calamares-nixos-extensions" | wc -l
+  # Ergebnis: 1 (nur noch eine Version!)
+  ```
+- **Ergebnis:** ✅ **Nur eine `calamares-nixos-extensions` Version im Closure** (die patched Version)
+
 ---
 
 ## Hauptproblem
