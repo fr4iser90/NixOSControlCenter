@@ -222,18 +222,40 @@ in {
         script = "${systemUpdateMainScript}/bin/ncc-system-update-main";
         category = "System Management";
         description = "Update NixOS configuration from repository";
-        shortHelp = "system-update [--auto-build] [--source=remote|local] [--branch=name] - Update NixOS configuration";
+        shortHelp = "system-update [options] - Update NixOS configuration";
         longHelp = ''
           Update NixOS configuration from repository with automatic migration support.
 
           Options:
-            --auto-build    Automatically build after update (default: false)
-            --source        Update source (remote or local)
-            --branch        Branch name for remote updates
+            --yes, -y, --auto    Skip all confirmation prompts (dangerous warning, build prompt)
+            --local              Automatically select local directory update (option 2)
+            --remote             Automatically select remote repository update (option 1)
+            --channels           Automatically select channel update (option 3)
+            --auto-build         Automatically build and switch after update
+            --verbose, -v        Show verbose output during update
+            --force-migration    Force migration even if versions match
+            --force-update       Force update even if versions match
+            --cleanup            Remove modules that no longer exist in source
+
+          Examples:
+            # Interactive update (default)
+            ncc system-update
+
+            # Fully automated local update with rebuild
+            ncc system-update --yes --local --auto-build
+
+            # Local update without rebuild
+            ncc system-update -y --local
+
+            # Remote update with auto-confirm
+            ncc system-update --auto --remote --auto-build
+
+            # Channel update
+            ncc system-update --yes --channels
+
+          Note: This command requires root privileges. The script will check for root and prompt for sudo if needed.
         '';
-        permission = "system.update";
         requiresSudo = true;
-        dangerous = true;
       }
     ])
   ];

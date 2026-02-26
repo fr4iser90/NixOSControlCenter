@@ -86,11 +86,14 @@ let
     #!${pkgs.bash}/bin/bash
     set -e
 
-    # Parse arguments for verbose mode, force-migration, force-update, and cleanup
+    # Parse arguments for verbose mode, force-migration, force-update, cleanup, and auto-confirm
     VERBOSE=false
     FORCE_MIGRATION=false
     FORCE_UPDATE=false
     CLEANUP=false
+    AUTO_CONFIRM=false
+    AUTO_SOURCE=""
+    AUTO_BUILD=false
     for arg in "$@"; do
       case "$arg" in
         --verbose|--debug|-v)
@@ -104,6 +107,21 @@ let
           ;;
         --cleanup)
           CLEANUP=true
+          ;;
+        --yes|-y|--auto)
+          AUTO_CONFIRM=true
+          ;;
+        --local)
+          AUTO_SOURCE="local"
+          ;;
+        --remote)
+          AUTO_SOURCE="remote"
+          ;;
+        --channels)
+          AUTO_SOURCE="channels"
+          ;;
+        --auto-build)
+          AUTO_BUILD=true
           ;;
       esac
     done
@@ -119,24 +137,70 @@ let
     NIXOS_DIR="/etc/nixos"
     BACKUP_ROOT="${backupSettings.directory}"
     
+    # Show dangerous warning unless auto-confirm is enabled
+    if [ "$AUTO_CONFIRM" != "true" ]; then
+      ${ui.messages.warning "WARNING: This command is potentially dangerous!"}
+      ${ui.messages.info "This may cause system instability or data loss."}
+      while true; do
+        printf "Do you want to continue? (yes/no): "
+        read confirm_choice
+        case $confirm_choice in
+          yes|y|Y)
+            ${ui.messages.info "Proceeding with dangerous command..."}
+            echo ""
+            break
+            ;;
+          no|n|N)
+            ${ui.messages.info "Operation cancelled by user."}
+            exit 0
+            ;;
+          *)
+            ${ui.messages.error "Please answer yes or no"}
+            ;;
+        esac
+      done
+    fi
+    
     ${ui.text.header "NixOS System Update"}
     
     # Step 1: Check system configuration (validates + migrates if needed)
     # ncc-config-check already outputs status messages, so we just check the exit code
     if ! ${configModule.configCheck}/bin/ncc-config-check $([ "$VERBOSE" = "true" ] && echo "--verbose") 2>&1; then
       ${ui.messages.warning "Configuration has issues (migration may have been attempted)"}
-      ${ui.messages.info "You may want to review the configuration before proceeding"}
+      if [ "$AUTO_CONFIRM" != "true" ]; then
+        ${ui.messages.info "You may want to review the configuration before proceeding"}
+      fi
     fi
     
-    ${ui.messages.info "Select update source or action:"}
-    
-    echo "1) Update Configuration (Remote Repository)"
-    echo "2) Update Configuration (Local Directory)"
-    echo "3) Update Channels (flake inputs)"
-    
-    while true; do
+    # Auto-select source if specified
+    if [ -n "$AUTO_SOURCE" ]; then
+      case "$AUTO_SOURCE" in
+        local)
+          source_choice=2
+          ;;
+        remote)
+          source_choice=1
+          ;;
+        channels)
+          source_choice=3
+          ;;
+        *)
+          ${ui.messages.error "Invalid auto-source value: $AUTO_SOURCE"}
+          exit 1
+          ;;
+      esac
+    else
+      ${ui.messages.info "Select update source or action:"}
+      
+      echo "1) Update Configuration (Remote Repository)"
+      echo "2) Update Configuration (Local Directory)"
+      echo "3) Update Channels (flake inputs)"
+      
       printf "Select option (1-3): "
       read source_choice
+    fi
+    
+    while true; do
       case $source_choice in
         1)
           # Remote update configuration
@@ -716,8 +780,8 @@ EOF
     ${ui.messages.success "Update completed successfully!"}
     ${ui.tables.keyValue "Backup created in" "$BACKUP_DIR"}
     
-    # Check if auto-build is enabled - also update this part
-    if [ "$autoBuild" = "true" ]; then
+    # Check if auto-build or --auto-build flag is enabled
+    if [ "$AUTO_BUILD" = "true" ] || [ "$autoBuild" = "true" ]; then
       ${ui.messages.loading "Auto-build enabled, building configuration..."}
       BUILD_CMD="${if systemChecks then "sudo ncc build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
       
@@ -739,6 +803,9 @@ EOF
           ${ui.messages.error "Auto-build failed! Check logs for details."}
         fi
       fi
+    elif [ "$AUTO_CONFIRM" = "true" ]; then
+      # Auto-confirm enabled but no auto-build - skip build prompt
+      ${ui.messages.info "Skipping build. You can manually run: ${if systemChecks then "sudo ncc build switch" else "sudo nixos-rebuild switch"} --flake /etc/nixos#${hostname}"}
     else
       ${prompt_build}
     fi
