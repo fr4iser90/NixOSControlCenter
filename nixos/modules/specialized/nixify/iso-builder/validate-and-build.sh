@@ -158,7 +158,7 @@ if command -v ncc &> /dev/null; then
     fi
 else
     print_info "ncc nicht gefunden, verwende nix-build direkt..."
-    FULL_ISO=$(nix-build -E "with import <nixpkgs> {}; let eval = import <nixpkgs/nixos/lib/eval-config.nix> { system = \"x86_64-linux\"; specialArgs = { desktopEnv = \"${DESKTOP_ENV}\"; }; modules = [ ${ISO_CONFIG} ]; }; in eval.config.system.build.isoImage" 2>&1 | tail -1)
+    FULL_ISO=$(nix-build -E "with import <nixpkgs> {}; let eval = import <nixpkgs/nixos/lib/eval-config.nix> { system = \"x86_64-linux\"; specialArgs = { desktopEnv = \"${DESKTOP_ENV}\"; }; modules = [ ${ISO_CONFIG} ]; }; in eval.config.system.build.isoImage" --no-out-link 2>&1 | tail -1)
     
     if [ -n "${FULL_ISO}" ] && [ -d "${FULL_ISO}" ]; then
         print_success "ISO erfolgreich gebaut: ${FULL_ISO}"
