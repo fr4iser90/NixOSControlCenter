@@ -153,7 +153,7 @@ class NixOSControlCenter(QObject):
         Main entry point - called by Calamares in SHOW phase (GUI only)
         The actual installation is handled by nixos-control-center-job module
         """
-        # Get configuration
+        # Get configuration - Calamares loads from /etc/calamares/modules/nixos-control-center.yaml
         config = libcalamares.job.configuration
         self.repo_path = config.get("repoPath", "/mnt/cdrom/nixos")
         self.shell_nix_path = config.get("shellNixPath", "/etc/nixos/shell.nix")

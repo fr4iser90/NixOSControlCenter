@@ -792,4 +792,57 @@ else
 fi
 
 echo ""
+echo "=== MODULE CONFIG FILES CHECK (/etc/calamares/modules/) ==="
+echo ""
+
+# CRITICAL: Prüfe ob nixos-control-center.yaml in /etc/calamares/modules/ ist!
+if [ -n "$ETC_DERIV" ]; then
+    if [ -d "$ETC_DERIV/etc/calamares/modules" ]; then
+        echo "✅ /etc/calamares/modules/ existiert in etc-Derivation"
+        echo ""
+        echo "Dateien in /etc/calamares/modules/:"
+        ls -la "$ETC_DERIV/etc/calamares/modules/" 2>/dev/null || echo "Fehler beim Auflisten"
+        echo ""
+        
+        # Prüfe unsere Config
+        if [ -f "$ETC_DERIV/etc/calamares/modules/nixos-control-center.yaml" ]; then
+            echo "✅✅✅ ERFOLG: nixos-control-center.yaml GEFUNDEN!"
+            echo ""
+            echo "Inhalt:"
+            echo "---"
+            cat "$ETC_DERIV/etc/calamares/modules/nixos-control-center.yaml"
+            echo "---"
+        else
+            echo "❌❌❌ FEHLER: nixos-control-center.yaml NICHT GEFUNDEN!"
+            echo "Module-Config muss in /etc/calamares/modules/ sein!"
+        fi
+        
+        # Prüfe ob .conf Dateien im Modul-Verzeichnis sind (sollte nicht sein!)
+        echo ""
+        echo "=== Prüfe Modul-Verzeichnisse auf .conf/.yaml Dateien ==="
+        CUSTOM_MODULES_DIR=$(grep "custom-calamares-modules" "$ETC_DERIV/etc/calamares/settings.conf" 2>/dev/null | sed 's/.*\/nix\/store\/\([^\/]*-custom-calamares-modules\).*/\1/' | head -1)
+        
+        if [ -n "$CUSTOM_MODULES_DIR" ]; then
+            MODULE_PATH="$SQUASHFS_MOUNT/$CUSTOM_MODULES_DIR/nixos-control-center"
+            if [ -d "$MODULE_PATH" ]; then
+                echo "Module-Verzeichnis: $MODULE_PATH"
+                echo ""
+                
+                CONF_FILES=$(find "$MODULE_PATH" -maxdepth 1 \( -name "*.conf" -o -name "*.yaml" \) -type f 2>/dev/null)
+                if [ -n "$CONF_FILES" ]; then
+                    echo "❌❌❌ PROBLEM: .conf/.yaml Dateien im Modul-Verzeichnis gefunden:"
+                    echo "$CONF_FILES"
+                    echo "Diese Dateien sollten NICHT im Modul-Verzeichnis sein!"
+                    echo "Sie verursachen das @ Problem!"
+                else
+                    echo "✅✅✅ ERFOLG: KEINE .conf/.yaml Dateien im Modul-Verzeichnis!"
+                fi
+            fi
+        fi
+    else
+        echo "❌ /etc/calamares/modules/ existiert NICHT in etc-Derivation!"
+    fi
+fi
+
+echo ""
 echo "Aufräumen mit: sudo umount $SQUASHFS_MOUNT && sudo umount $MOUNT_POINT"

@@ -33,9 +33,11 @@ final: prev: let
   # This ensures Nix rebuilds when:
   # 1. ANY file in the directory changes (via builtins.path)
   # 2. module.desc content changes (via writeText derivation)
+  # 3. buildTimestamp changes (forces rebuild with --force-rebuild)
   calamaresModuleOverlay = prev.runCommand "nixos-control-center-calamares-module" {
     src = calamaresModuleSrc;  # Store-Pfad des Verzeichnisses (tracks all files)
     moduleDescFile = prev.writeText "module.desc" calamaresModuleDesc;  # Separate derivation for module.desc
+    inherit buildTimestamp;  # CRITICAL: Force rebuild when timestamp changes
   } ''
     mkdir -p $out
     # Copy all files EXCEPT module.desc from Store-Pfad
@@ -47,12 +49,24 @@ final: prev: let
   calamaresJobModuleOverlay = prev.runCommand "nixos-control-center-job-calamares-module" {
     src = calamaresJobModuleSrc;  # Store-Pfad des Verzeichnisses
     moduleDescFile = prev.writeText "module.desc" calamaresJobModuleDesc;  # Separate derivation
+    inherit buildTimestamp;  # CRITICAL: Force rebuild when timestamp changes
   } ''
     mkdir -p $out
     # Copy all files EXCEPT module.desc from Store-Pfad
     find $src -mindepth 1 -maxdepth 1 ! -name module.desc -exec cp -r {} $out/ \;
     # Copy module.desc from separate derivation
     cp $moduleDescFile $out/module.desc
+  '';
+  
+  # CRITICAL: Create a parent directory containing both modules
+  # Calamares modules-search expects directories CONTAINING modules, not the modules themselves
+  # Structure: custom-calamares-modules/
+  #              ├── nixos-control-center/
+  #              └── nixos-control-center-job/
+  customCalamaresModulesDir = prev.runCommand "custom-calamares-modules" {} ''
+    mkdir -p $out
+    ln -s ${calamaresModuleOverlay} $out/nixos-control-center
+    ln -s ${calamaresJobModuleOverlay} $out/nixos-control-center-job
   '';
   
   # Create modules.conf
@@ -115,27 +129,31 @@ for path in ['local', '$out/lib/calamares/modules', 'modules']:
     if path not in config['modules-search']:
         config['modules-search'].append(path)
 
-# ADD our custom module Store paths - THIS IS THE FIX!
-# Calamares searches these directories for modules
-config['modules-search'].append('${toString calamaresModuleOverlay}')
-config['modules-search'].append('${toString calamaresJobModuleOverlay}')
+# ADD our custom modules parent directory - THIS IS THE FIX!
+# Calamares searches WITHIN this directory for modules (not the modules themselves)
+# This directory contains: nixos-control-center/ and nixos-control-center-job/
+config['modules-search'].append('${toString customCalamaresModulesDir}')
 
 # Insert our module before "summary" in the show sequence
+# CRITICAL: Only modify the FIRST show: sequence (not the finished sequence)
 # Also remove standard Calamares desktop module to avoid duplicate desktop selection
 if 'sequence' in config and isinstance(config['sequence'], list):
+    modified_first_show = False
     for phase in config['sequence']:
-        if isinstance(phase, dict) and 'show' in phase:
+        if isinstance(phase, dict) and 'show' in phase and not modified_first_show:
             show_list = phase['show']
             # Remove standard desktop module
             if 'desktop' in show_list:
                 show_list.remove('desktop')
-            # Insert our module before summary
+            # Insert our module before summary (only in FIRST show sequence)
             if 'summary' in show_list:
                 summary_idx = show_list.index('summary')
                 if 'nixos-control-center' not in show_list:
                     show_list.insert(summary_idx, 'nixos-control-center')
+                modified_first_show = True
             elif 'nixos-control-center' not in show_list:
                 show_list.append('nixos-control-center')
+                modified_first_show = True
         
         if isinstance(phase, dict) and 'exec' in phase:
             exec_list = phase['exec']
@@ -163,22 +181,42 @@ EOF
         exit 1
       fi
       
-      # Copy modules.conf with error handling
-      echo "DEBUG: Copying modules.conf from ${mergedCalamaresModules}..."
-      if [ -f ${mergedCalamaresModules} ]; then
-        cp ${mergedCalamaresModules} $out/etc/calamares/modules.conf
-        echo "DEBUG: ✓ modules.conf copied successfully"
-        echo "DEBUG: modules.conf content:"
-        cat $out/etc/calamares/modules.conf
-      else
-        echo "ERROR: mergedCalamaresModules not found at ${mergedCalamaresModules}"
-        exit 1
-      fi
+      # NOTE: modules.conf with path: entries is NOT compatible with modules-search!
+      # Calamares will find modules via modules-search directories, not via modules.conf path:
+      # DO NOT copy modules.conf - modules are discovered via modules-search paths
+      echo "DEBUG: Skipping modules.conf (modules discovered via modules-search)"
+      
+      # Create modules config directory
+      mkdir -p $out/etc/calamares/modules
+      
+      # Copy module config files to /etc/calamares/modules/
+      # CRITICAL: Config files must be in /etc/calamares/modules/, NOT in module directory!
+      # Otherwise Calamares treats them as instance configs and creates @modulename
+      cat > $out/etc/calamares/modules/nixos-control-center.yaml <<'NIXOSCONFIG'
+---
+# NixOS Control Center Calamares Module Configuration
+
+# Path to NixOS Control Center repository on ISO
+repoPath: "/mnt/cdrom/nixos"
+
+# Path to shell.nix installer
+shellNixPath: "/etc/nixos/shell.nix"
+
+# Path to scripts directory
+scriptsPath: "/etc/nixos/shell/scripts"
+
+# Enable hardware checks
+enableHardwareChecks: true
+NIXOSCONFIG
+      
+      echo "DEBUG: Created /etc/calamares/modules/nixos-control-center.yaml"
       
       # Verify final structure
       echo "================================================"
       echo "DEBUG: Final /etc/calamares structure:"
       ls -la $out/etc/calamares/
+      echo "DEBUG: /etc/calamares/modules/ structure:"
+      ls -la $out/etc/calamares/modules/
       echo "================================================"
     '';
   });
