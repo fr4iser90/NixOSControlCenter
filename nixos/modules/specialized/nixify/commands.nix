@@ -77,6 +77,17 @@ let
         ;;
       build-iso|iso)
         DESKTOP_ENV=''${2:-plasma6}  # Default: Plasma 6
+        FORCE_REBUILD_FLAG=""
+        
+        # Check for --force-rebuild or -f flag (can be 2nd or 3rd argument)
+        if [ "''${2}" = "--force-rebuild" ] || [ "''${2}" = "-f" ]; then
+          DESKTOP_ENV="plasma6"
+          FORCE_REBUILD_FLAG="--arg forceRebuild true"
+          echo "Force rebuild enabled (ignoring cache)"
+        elif [ "''${3}" = "--force-rebuild" ] || [ "''${3}" = "-f" ]; then
+          FORCE_REBUILD_FLAG="--arg forceRebuild true"
+          echo "Force rebuild enabled (ignoring cache)"
+        fi
         
         # Validate desktop environment
         case "$DESKTOP_ENV" in
@@ -92,7 +103,7 @@ let
             echo "  gnome    - GNOME Desktop"
             echo "  plasma6  - KDE Plasma 6 (default)"
             echo ""
-            echo "Usage: ncc nixify build-iso [gnome|plasma6]"
+            echo "Usage: ncc nixify build-iso [gnome|plasma6] [--force-rebuild|-f]"
             exit 1
             ;;
         esac
@@ -169,7 +180,7 @@ let
         echo "Building ISO (this may take a while)..."
         echo ""
         BUILD_EXIT=0
-        (cd "$TEMP_BUILD_DIR" && nix-build "$ABS_BUILD_SCRIPT" --out-link "$TEMP_RESULT/result" 2>&1 | tee /tmp/nixify-build.log) || BUILD_EXIT=$?
+        (cd "$TEMP_BUILD_DIR" && nix-build "$ABS_BUILD_SCRIPT" $FORCE_REBUILD_FLAG --out-link "$TEMP_RESULT/result" 2>&1 | tee /tmp/nixify-build.log) || BUILD_EXIT=$?
         
         # Show all DEBUG lines from build log
         if [ -f /tmp/nixify-build.log ]; then

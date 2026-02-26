@@ -1,7 +1,7 @@
 # NixOS ISO Configuration with Calamares and NixOS Control Center Module
 # This creates a custom NixOS ISO with Calamares installer and your custom module
 
-{ pkgs, lib, config, desktopEnv, ... }:
+{ pkgs, lib, config, desktopEnv, buildTimestamp ? "cached", ... }:
 
 let
   # NixOS Control Center repository (will be copied to ISO)
@@ -82,12 +82,18 @@ in
     baseName = lib.mkForce "nixos-nixify-${desktopEnv}-${config.system.nixos.version}-${pkgs.stdenv.hostPlatform.system}";
   };
   
-  # CRITICAL: Use environment.etc to create /etc/calamares/modules.conf in the live system
+  # CRITICAL: Use environment.etc to create /etc/calamares files in the live system
   # isoImage.contents only copies to ISO filesystem, not to live system's tmpfs
   # environment.etc creates files in /etc at boot time in the live system
-  environment.etc."calamares/modules.conf" = {
-    source = mergedCalamaresModules;
-    mode = "0644";
+  environment.etc = {
+    "calamares/modules.conf" = {
+      source = mergedCalamaresModules;
+      mode = "0644";
+    };
+    "calamares/settings.conf" = {
+      source = "${pkgs.calamares-nixos-extensions}/etc/calamares/settings.conf";
+      mode = "0644";
+    };
   };
 
   isoImage = {
@@ -97,6 +103,13 @@ in
       {
         source = nixosControlCenterRepo;
         target = "/nixos";
+      }
+      # CRITICAL FIX: Copy /etc/calamares from patched calamares-nixos-extensions directly to ISO
+      # This bypasses environment.etc which only runs at boot time
+      # The ISO needs the files AT BUILD TIME in the squashfs
+      {
+        source = "${pkgs.calamares-nixos-extensions}/etc/calamares";
+        target = "/etc/calamares";
       }
     ];
     
@@ -123,6 +136,10 @@ in
   # daher verwenden wir lib.mkOverride mit hoher Priorität
   system.build.isoImage = lib.mkOverride 1000 (
     (config.system.build.isoImage).overrideAttrs (old: {
+      # CRITICAL: Use buildTimestamp to invalidate ISO cache when calamares changes
+      # This ensures ISO is rebuilt when --force-rebuild is used
+      inherit buildTimestamp;
+      
       buildInputs = (old.buildInputs or []) ++ [
         nixosControlCenterRepo
         calamaresModule
@@ -170,5 +187,28 @@ in
   # Enable services needed for hardware detection
   services.udev.enable = true;
   hardware.enableAllFirmware = true;
+  
+  # CRITICAL FIX: Force overlay-applied calamares-nixos-extensions into system closure
+  # This ensures the NEW patched version (with modules.conf) is used instead of cached old version
+  # system.extraDependencies is included in system.build.toplevel closure
+  system.extraDependencies = [
+    pkgs.calamares-nixos-extensions  # This is the overlay-applied version with modules.conf
+    calamaresModule
+    calamaresJobModule
+  ];
+  
+  # CRITICAL: Create symlinks for Calamares modules in standard location
+  # This ensures Calamares can find modules even if modules.conf is not loaded
+  # Defense in depth: Module discovery works via:
+  # 1. modules.conf (path: entries) - primary method
+  # 2. /usr/lib/calamares/modules/ - fallback for standard module discovery
+  # 3. /etc/calamares/modules.conf - environment.etc backup
+  systemd.tmpfiles.rules = [
+    # Create /usr/lib/calamares/modules directory
+    "d /usr/lib/calamares/modules 0755 root root -"
+    # Symlink our custom modules into standard Calamares module directory
+    "L+ /usr/lib/calamares/modules/nixos-control-center - - - - ${calamaresModule}"
+    "L+ /usr/lib/calamares/modules/nixos-control-center-job - - - - ${calamaresJobModule}"
+  ];
   
 }

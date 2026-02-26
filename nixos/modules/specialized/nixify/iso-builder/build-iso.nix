@@ -1,18 +1,27 @@
 # Build script for NixOS ISO with Calamares and NixOS Control Center
 # Usage: nix-build build-iso.nix
+# Usage (force rebuild): nix-build build-iso.nix --arg forceRebuild true
 #
 # CRITICAL: nixpkgs nur EINMAL importieren und Overlay darauf anwenden
 # Dann dieses pkgs an eval-config.nix übergeben
 # Das verhindert zwei nixpkgs-Instanzen → keine doppelte calamares-nixos-extensions
+
+{ forceRebuild ? false }:
 
 let
   # Path to Calamares modules (relative to this file)
   calamaresModulePath = ./calamares-modules/nixos-control-center;
   calamaresJobModulePath = ./calamares-modules/nixos-control-center-job;
   
-  # Import overlay function
+  # Build timestamp for force rebuild
+  rebuildTimestamp = if forceRebuild 
+    then builtins.toString builtins.currentTime 
+    else "cached";
+  
+  # Import overlay function with rebuild timestamp
   calamaresOverlay = import ./calamares-overlay-function.nix {
     inherit calamaresModulePath calamaresJobModulePath;
+    buildTimestamp = rebuildTimestamp;
   };
   
   # Import nixpkgs EINMAL mit Overlay
@@ -32,6 +41,7 @@ let
     pkgs = pkgs;  # CRITICAL: Overlay-appliziertes pkgs übergeben
     specialArgs = {
       desktopEnv = "plasma6";  # Default for build-iso.nix
+      buildTimestamp = rebuildTimestamp;  # Pass timestamp to iso-config
     };
     modules = [
       ./iso-config.nix

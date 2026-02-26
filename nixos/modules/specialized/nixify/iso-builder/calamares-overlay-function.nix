@@ -6,8 +6,10 @@
 # - Only patch calamares-nixos-extensions
 # - calamares-nixos is NOT touched (it automatically uses patched extensions)
 # - No runCommand wrapper, no sed on store paths, no string magic
+#
+# FORCE REBUILD: 2026-02-26-11:30 - Added debug output and error handling
 
-{ calamaresModulePath, calamaresJobModulePath }:
+{ calamaresModulePath, calamaresJobModulePath, buildTimestamp ? "cached" }:
 
 final: prev: let
   # Use builtins.path to track the entire directory as input
@@ -74,11 +76,26 @@ in {
   calamares-nixos-extensions = prev.calamares-nixos-extensions.overrideAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ prev.python3Packages.pyyaml ];
     
+    # FORCE REBUILD: Use buildTimestamp parameter to control caching
+    # When buildTimestamp changes, Nix will rebuild this derivation
+    # "cached" = use cache, current timestamp = force rebuild
+    inherit buildTimestamp;
+    
     postInstall = (old.postInstall or "") + ''
+      # Debug: Show build timestamp
+      echo "DEBUG: Build timestamp: ${buildTimestamp}"
+      # Debug: Show build progress
+      echo "================================================"
+      echo "DEBUG: Patching calamares-nixos-extensions"
+      echo "DEBUG: Output directory: $out"
+      echo "================================================"
+      
       # Ensure etc/calamares directory exists
       mkdir -p $out/etc/calamares
+      echo "DEBUG: Created $out/etc/calamares directory"
       
       # Create merged settings.conf by modifying the base config
+      echo "DEBUG: Creating merged settings.conf..."
       ${prev.python3}/bin/python3 <<EOF
 import yaml
 import sys
@@ -88,6 +105,20 @@ base_config_content = """${baseCalamaresSettingsContentRaw}""".replace("@out@", 
 
 # Parse YAML
 config = yaml.safe_load(base_config_content)
+
+# Ensure modules-search includes custom module locations
+if 'modules-search' not in config:
+    config['modules-search'] = []
+
+# Add standard paths first
+for path in ['local', '$out/lib/calamares/modules', 'modules']:
+    if path not in config['modules-search']:
+        config['modules-search'].append(path)
+
+# ADD our custom module Store paths - THIS IS THE FIX!
+# Calamares searches these directories for modules
+config['modules-search'].append('${toString calamaresModuleOverlay}')
+config['modules-search'].append('${toString calamaresJobModuleOverlay}')
 
 # Insert our module before "summary" in the show sequence
 # Also remove standard Calamares desktop module to avoid duplicate desktop selection
@@ -118,10 +149,37 @@ if 'sequence' in config and isinstance(config['sequence'], list):
 # Write merged config
 with open("$out/etc/calamares/settings.conf", 'w') as f:
     yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+print("DEBUG: settings.conf created successfully")
 EOF
       
-      # Copy modules.conf
-      cp ${mergedCalamaresModules} $out/etc/calamares/modules.conf
+      echo "DEBUG: Verifying settings.conf..."
+      if [ -f "$out/etc/calamares/settings.conf" ]; then
+        echo "DEBUG: ✓ settings.conf exists"
+        echo "DEBUG: modules-search configuration:"
+        grep -A 3 "modules-search:" "$out/etc/calamares/settings.conf" || echo "WARNING: modules-search not found"
+      else
+        echo "ERROR: settings.conf was not created!"
+        exit 1
+      fi
+      
+      # Copy modules.conf with error handling
+      echo "DEBUG: Copying modules.conf from ${mergedCalamaresModules}..."
+      if [ -f ${mergedCalamaresModules} ]; then
+        cp ${mergedCalamaresModules} $out/etc/calamares/modules.conf
+        echo "DEBUG: ✓ modules.conf copied successfully"
+        echo "DEBUG: modules.conf content:"
+        cat $out/etc/calamares/modules.conf
+      else
+        echo "ERROR: mergedCalamaresModules not found at ${mergedCalamaresModules}"
+        exit 1
+      fi
+      
+      # Verify final structure
+      echo "================================================"
+      echo "DEBUG: Final /etc/calamares structure:"
+      ls -la $out/etc/calamares/
+      echo "================================================"
     '';
   });
   

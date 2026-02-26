@@ -749,4 +749,47 @@ fi
 echo ""
 echo "=== Debug abgeschlossen ==="
 echo ""
+echo "=== /etc Derivation Diagnose ==="
+echo ""
+
+# Finde etc-Derivation mit /etc/calamares
+# Es gibt mehrere *-etc Derivationen (fontconfig-etc, system-etc, etc.)
+# Wir suchen die mit /etc/calamares
+ETC_DERIV=$(find "$SQUASHFS_MOUNT" -maxdepth 1 -type d -name "*-etc" 2>/dev/null | while read -r etc_dir; do
+    if [ -d "$etc_dir/etc/calamares" ]; then
+        echo "$etc_dir"
+        break
+    fi
+done)
+
+if [ -n "$ETC_DERIV" ]; then
+    echo "✅ etc-Derivation gefunden: $ETC_DERIV"
+    echo ""
+    
+    # Prüfe modules.conf
+    if [ -f "$ETC_DERIV/etc/calamares/modules.conf" ]; then
+        echo "✅ modules.conf in etc-Derivation:"
+        echo "---"
+        cat "$ETC_DERIV/etc/calamares/modules.conf"
+        echo "---"
+    else
+        echo "❌ modules.conf NICHT in etc-Derivation"
+    fi
+    echo ""
+    
+    # Prüfe settings.conf
+    if [ -f "$ETC_DERIV/etc/calamares/settings.conf" ]; then
+        echo "✅ settings.conf in etc-Derivation"
+        echo ""
+        echo "--- modules-search Sektion: ---"
+        grep -A 10 "modules-search:" "$ETC_DERIV/etc/calamares/settings.conf" 2>/dev/null || echo "modules-search nicht gefunden"
+        echo "---"
+    else
+        echo "❌ settings.conf NICHT in etc-Derivation"
+    fi
+else
+    echo "❌ Keine etc-Derivation gefunden"
+fi
+
+echo ""
 echo "Aufräumen mit: sudo umount $SQUASHFS_MOUNT && sudo umount $MOUNT_POINT"
