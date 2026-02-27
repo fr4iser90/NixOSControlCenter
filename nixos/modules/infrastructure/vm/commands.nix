@@ -124,12 +124,14 @@ let
   in [
     {
       name = "test-${distro}-run";
+      domain = "vm";
+      parent = "vm";
       description = "Start ${distro} test VM";
       category = "infrastructure";
       script = "${runScript}/bin/ncc-vm-test-${distro}-run";
       arguments = [];
       dependencies = [ "qemu" "libvirt" ];
-      shortHelp = "vm test-${distro}-run - Start ${distro} test VM";
+      shortHelp = "test-${distro}-run - Start ${distro} test VM";
       longHelp = ''
         Start a test VM with ${distro}.
         
@@ -145,12 +147,14 @@ let
     }
     {
       name = "test-${distro}-reset";
+      domain = "vm";
+      parent = "vm";
       description = "Reset ${distro} test VM (delete disk and config)";
       category = "infrastructure";
       script = "${resetScript}/bin/ncc-vm-test-${distro}-reset";
       arguments = [];
       dependencies = [ "libvirt" ];
-      shortHelp = "vm test-${distro}-reset - Reset ${distro} test VM";
+      shortHelp = "test-${distro}-reset - Reset ${distro} test VM";
       longHelp = ''
         Reset the ${distro} test VM by:
         - Stopping the VM if running
@@ -164,23 +168,26 @@ let
     }
   ]) availableDistros;
   
-  # Combine all commands into a single list
+  # Combine all commands into a single list - HIERARCHICAL STRUCTURE
   allCommands = [
+    # VM Domain Manager (TUI launcher)
     {
       name = "vm";
+      domain = "vm";
+      type = "manager";
       description = "VM Manager - Manage virtual machines";
       category = "infrastructure";
       script = "${vmStatus}/bin/ncc-vm-status";
-      arguments = ["status" "list"] ++ (lib.concatMap (d: ["test-${d}-run" "test-${d}-reset"]) availableDistros);
-      shortHelp = "vm - VM Manager commands";
+      shortHelp = "vm - VM Manager (TUI)";
       longHelp = ''
         VM Manager provides commands to manage virtual machines.
         
-        Commands:
-          status              Show VM manager status
-          list                List available test distros
-          test-<distro>-run   Start a test VM with specified distro
-          test-<distro>-reset  Reset a test VM (deletes disk)
+        Usage:
+          ncc vm              - Show VM status (TUI)
+          ncc vm status       - Show VM manager status
+          ncc vm list         - List available test distros
+          ncc vm test-<distro>-run   - Start test VM
+          ncc vm test-<distro>-reset - Reset test VM
         
         Examples:
           ncc vm status
@@ -189,14 +196,17 @@ let
           ncc vm test-ubuntu-reset
       '';
     }
+    # Subcommand: status
     {
-      name = "vm-status";
+      name = "status";
+      domain = "vm";
+      parent = "vm";
       description = "Show VM manager status and running VMs";
       category = "infrastructure";
       script = "${vmStatus}/bin/ncc-vm-status";
       arguments = [];
       dependencies = [ "libvirt" ];
-      shortHelp = "vm-status - Show VM manager status";
+      shortHelp = "status - Show VM manager status";
       longHelp = ''
         Display current VM manager status including:
         - Libvirt daemon status
@@ -204,13 +214,16 @@ let
         - All defined VMs
       '';
     }
+    # Subcommand: list
     {
-      name = "vm-list";
+      name = "list";
+      domain = "vm";
+      parent = "vm";
       description = "List available test VM distros";
       category = "infrastructure";
       script = "${vmList}/bin/ncc-vm-list";
       arguments = [];
-      shortHelp = "vm-list - List available test distros";
+      shortHelp = "list - List available test distros";
       longHelp = ''
         Display all available distros for test VMs.
         

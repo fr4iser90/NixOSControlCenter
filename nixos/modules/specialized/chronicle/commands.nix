@@ -18,11 +18,13 @@ let
   registrationResult = cliRegistry.registerCommandsFor "chronicle" [
     {
       name = "chronicle";
+      domain = "chronicle";
+      type = "manager";
       description = "Chronicle - Your Digital Work Memory";
       category = "specialized";
       script = "${recorderScript}/bin/chronicle";
       arguments = ["start" "stop" "capture" "status" "list" "cleanup" "test"];
-      shortHelp = "chronicle <command> - Record and analyze workflows";
+      shortHelp = "chronicle - Record and analyze workflows";
       longHelp = ''
         Chronicle - Your Digital Work Memory
         

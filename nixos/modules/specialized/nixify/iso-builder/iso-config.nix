@@ -1,12 +1,10 @@
 # NixOS ISO Configuration with Calamares and NixOS Control Center Module
-# This creates a custom NixOS ISO with Calamares installer and your custom module
+# CLEAN VERSION - Store-only, no hardcoded paths
 
 { pkgs, lib, config, desktopEnv, buildTimestamp ? "cached", ... }:
 
 let
   # NixOS Control Center repository (will be copied to ISO)
-  # Get nixos/ directory (assuming we're in nixos/modules/specialized/nixify/iso-builder)
-  # 4 levels up = nixos/ directory
   nixosDir = builtins.path {
     path = ../../../..;
     filter = path: type:
@@ -14,8 +12,6 @@ let
       (type == "regular" && !(builtins.match ".*\\.git.*" path != null));
   };
   
-  # Get shell/ directory from repository root
-  # 5 levels up = Repository-Root, then shell/
   shellDir = builtins.path {
     path = ../../../../../shell;
     filter = path: type:
@@ -25,200 +21,82 @@ let
   
   nixosControlCenterRepo = pkgs.runCommand "nixos-control-center-repo" {} ''
     mkdir -p $out
-    # Copy nixos/ directory
     cp -r ${nixosDir}/* $out/ 2>/dev/null || true
-    # Copy shell/ directory
     mkdir -p $out/shell
     cp -r ${shellDir}/* $out/shell/ 2>/dev/null || true
-    # Remove build artifacts and git
     rm -rf $out/.git $out/result $out/result-* $out/*.iso 2>/dev/null || true
     chmod -R u+w $out
   '';
   
-  # Module derivations are now defined in calamares-overlay.nix
-  # Reference them from pkgs (which has the overlay applied)
-  calamaresModule = pkgs.calamaresModule;
+  # Module derivation from overlay (job only - no viewqml!)
   calamaresJobModule = pkgs.calamaresJobModule;
   
-  # CRITICAL: Also get the custom modules parent directory
-  # This is what we add to storeContents (not the individual modules)
-  customCalamaresModulesDir = pkgs.runCommand "custom-calamares-modules" {} ''
-    mkdir -p $out
-    ln -s ${calamaresModule} $out/nixos-control-center
-    ln -s ${calamaresJobModule} $out/nixos-control-center-job
-  '';
-  
-  # NOTE: modules.conf is NO LONGER USED!
-  # Modules are discovered via modules-search paths in settings.conf
-  # See calamares-overlay-function.nix where modules-search is configured
-  
   # Select base ISO based on desktop environment
-  # desktopEnv is passed as specialArg from build-iso-*.nix scripts (required, no default)
   baseIsoModule = 
     if desktopEnv == "gnome" then
       <nixpkgs/nixos/modules/installer/cd-dvd/installation-cd-graphical-calamares-gnome.nix>
     else if desktopEnv == "plasma6" then
-      ./base-iso-patched.nix  # Use patched version that uses local installation-cd-graphical-calamares.nix
+      ./base-iso-patched.nix
     else
       throw "Unknown desktop environment: ${desktopEnv}. Supported: gnome, plasma6";
 in
 {
-  # CRITICAL: Overlay is now applied in build-iso-plasma6.nix BEFORE eval-config.nix
-  # This ensures only ONE nixpkgs instance exists → only ONE calamares-nixos-extensions
-  # No need to import overlay module here, pkgs is already overlay-applied
-  # CRITICAL: nixpkgs.config.allowUnfree is set in build-iso-plasma6.nix when creating pkgs
-  # Cannot set it here because pkgs is externally created
-  imports = [
-    baseIsoModule
-  ];
+  imports = [ baseIsoModule ];
 
   # ISO configuration
-  # Set baseName to control the ISO filename (isoName is derived from baseName)
-  # Include desktop environment in name for clarity
   image = {
     baseName = lib.mkForce "nixos-nixify-${desktopEnv}-${config.system.nixos.version}-${pkgs.stdenv.hostPlatform.system}";
   };
-  
-  # CRITICAL: Use environment.etc to create /etc/calamares/ files in the live system
-  # isoImage.contents only copies to ISO filesystem, not to live system's tmpfs
-  # environment.etc creates files in /etc at boot time in the live system
-  # NOTE: modules.conf is NO LONGER NEEDED - modules discovered via modules-search
-  environment.etc."calamares/settings.conf" = {
-    source = "${pkgs.calamares-nixos-extensions}/etc/calamares/settings.conf";
-    mode = "0644";
-  };
-  
-  # CRITICAL: Module config must be in /etc/calamares/modules/ NOT in module directory!
-  # Otherwise Calamares treats it as instance config and creates @modulename
-  # IMPORTANT: Do NOT include leading '---' - Calamares adds it automatically!
-  # environment.etc creates symlinks, and Calamares adds '---' when reading via symlink
-  environment.etc."calamares/modules/nixos-control-center.yaml".text = ''
-    # NixOS Control Center Calamares Module Configuration
-
-    # Path to NixOS Control Center repository on ISO
-    repoPath: "/mnt/cdrom/nixos"
-
-    # Path to shell.nix installer
-    shellNixPath: "/etc/nixos/shell.nix"
-
-    # Path to scripts directory
-    scriptsPath: "/etc/nixos/shell/scripts"
-
-    # Enable hardware checks
-    enableHardwareChecks: true
-  '';
 
   isoImage = {
-    
-    # Use lib.mkAfter to append to baseIsoModule's contents
+    # Copy NixOS Control Center repo to ISO
     contents = lib.mkAfter [
       {
         source = nixosControlCenterRepo;
         target = "/nixos";
       }
-      # CRITICAL FIX: Copy /etc/calamares from patched calamares-nixos-extensions directly to ISO
-      # This bypasses environment.etc which only runs at boot time
-      # The ISO needs the files AT BUILD TIME in the squashfs
-      {
-        source = "${pkgs.calamares-nixos-extensions}/etc/calamares";
-        target = "/etc/calamares";
-      }
     ];
     
-    # CRITICAL: Use lib.mkAfter to APPEND to baseIsoModule's storeContents
-    # Do NOT overwrite, as baseIsoModule already includes system.build.toplevel
-    # This ensures both the base storeContents AND our custom derivations are included
-    # NOTE: We add customCalamaresModulesDir which contains both modules as symlinks
+    # Include modules in Store (job only!)
     storeContents = lib.mkAfter [
       nixosControlCenterRepo
-      customCalamaresModulesDir
+      calamaresJobModule
     ];
     
-    # Make repository accessible from installer
     makeEfiBootable = true;
     makeUsbBootable = true;
   };
   
-  # CRITICAL: Falls storeContents allein nicht funktioniert,
-  # zwinge die ISO-Derivation, direkt von unseren Derivationen abzuhängen
-  # Dies macht die Derivationen zu direkten Dependencies der ISO
-  # Community-Lösung: overrideAttrs auf der Derivation selbst
-  # WICHTIG: Wir müssen dies NACH der Definition von isoImage machen,
-  # daher verwenden wir lib.mkOverride mit hoher Priorität
+  # Force ISO rebuild when config changes
   system.build.isoImage = lib.mkOverride 1000 (
     (config.system.build.isoImage).overrideAttrs (old: {
-      # CRITICAL: Use buildTimestamp to invalidate ISO cache when calamares changes
-      # This ensures ISO is rebuilt when --force-rebuild is used
       inherit buildTimestamp;
-      
       buildInputs = (old.buildInputs or []) ++ [
         nixosControlCenterRepo
-        calamaresModule
         calamaresJobModule
       ];
     })
   );
 
-  # System packages needed for Calamares module
-  # CRITICAL: Also include custom directory derivations to force them as dependencies
-  # Note: Files (mergedCalamaresSettings, mergedCalamaresModules) cannot be in systemPackages
-  # They are already referenced in isoImage.contents and will be built as dependencies
+  # System packages
   environment.systemPackages = with pkgs; lib.mkAfter [
-    # Python dependencies for Calamares module
     python3
     python3Packages.pyqt5
-    
-    # Tools for hardware checks
-    pciutils  # lspci for GPU detection
-    usbutils  # lsusb
-    dmidecode  # Hardware info
-    
-    # NixOS Control Center dependencies
+    pciutils
+    usbutils
+    dmidecode
     bash
     git
     nix
-    
-    # CRITICAL: Explicitly reference calamares-nixos-extensions to ensure overlay is applied
-    # This forces the overlay to be evaluated for this package, ensuring modules.conf is included
-    # Without this, baseIsoModule might use the unpatched version before overlay is applied
-    # NOTE: We use pkgs. explicitly here to ensure overlay is applied
-    pkgs.calamares-nixos-extensions
-    
-    # CRITICAL: Force evaluation of custom directory derivations by adding them to systemPackages
-    # This ensures they are built and available, even though they're also in isoImage.contents
-    # The ISO builder will copy them from the store paths referenced in contents
-    # Note: Only directories can be in systemPackages, not files
-    # Modules are loaded directly from Store paths via modules.conf - no copying needed
-    nixosControlCenterRepo
-    calamaresModule
-    calamaresJobModule
+    pkgs.calamares-nixos
   ];
 
-  # Enable services needed for hardware detection
   services.udev.enable = true;
   hardware.enableAllFirmware = true;
   
-  # CRITICAL FIX: Force overlay-applied calamares-nixos-extensions into system closure
-  # This ensures the NEW patched version (with modules.conf) is used instead of cached old version
-  # system.extraDependencies is included in system.build.toplevel closure
+  # Force into closure
   system.extraDependencies = [
-    pkgs.calamares-nixos-extensions  # This is the overlay-applied version with modules.conf
-    calamaresModule
+    pkgs.calamares-nixos-extensions
     calamaresJobModule
   ];
-  
-  # CRITICAL: Create symlinks for Calamares modules in standard location
-  # This ensures Calamares can find modules even if modules.conf is not loaded
-  # Defense in depth: Module discovery works via:
-  # 1. modules.conf (path: entries) - primary method
-  # 2. /usr/lib/calamares/modules/ - fallback for standard module discovery
-  # 3. /etc/calamares/modules.conf - environment.etc backup
-  systemd.tmpfiles.rules = [
-    # Create /usr/lib/calamares/modules directory
-    "d /usr/lib/calamares/modules 0755 root root -"
-    # Symlink our custom modules into standard Calamares module directory
-    "L+ /usr/lib/calamares/modules/nixos-control-center - - - - ${calamaresModule}"
-    "L+ /usr/lib/calamares/modules/nixos-control-center-job - - - - ${calamaresJobModule}"
-  ];
-  
 }

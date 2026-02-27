@@ -60,14 +60,40 @@ in {
         ];
     }
     (cliRegistry.registerCommandsFor "system-manager" [
+      # System Domain Manager (TUI launcher)
       {
-        name = "check-module-versions";
-          description = "Check module versions for Core and Features and update status";
-          category = "system";
-          script = "${checkVersions.checkVersionsScript}/bin/ncc-check-module-versions";
-          arguments = [];
-          dependencies = [ "nix" ];
-          shortHelp = "check-module-versions - Check module versions for Core and Features";
+        name = "system";
+        domain = "system";
+        type = "manager";
+        description = "System lifecycle management";
+        category = "system";
+        script = "${prebuildCheckScript}/bin/build";
+        shortHelp = "system - System management (TUI)";
+        longHelp = ''
+          System management provides commands for system lifecycle.
+          
+          Usage:
+            ncc system                    - System TUI
+            ncc system build              - Build configuration
+            ncc system update             - Update from repository
+            ncc system check-versions     - Check module versions
+            ncc system update-modules     - Update modules
+            ncc system migrate-config     - Migrate configuration
+            ncc system validate-config    - Validate configuration
+            ncc system report             - Generate system report
+        '';
+      }
+      # Subcommand: check-versions
+      {
+        name = "check-versions";
+        domain = "system";
+        parent = "system";
+        description = "Check module versions for Core and Features and update status";
+        category = "system";
+        script = "${checkVersions.checkVersionsScript}/bin/ncc-check-module-versions";
+        arguments = [];
+        dependencies = [ "nix" ];
+        shortHelp = "check-versions - Check module versions";
           longHelp = ''
             Check the version status of all modules (Core and Features):
             - Installed: Current version on the system
@@ -78,110 +104,101 @@ in {
             Shows both Core modules (systemConfig.*) and optional modules (modules.*).
           '';
         }
-        {
-          name = "update-modules";
-          description = "Update modules with automatic migration support";
-          category = "system";
-          script = "${updateModules.updateModulesScript}/bin/ncc-update-modules";
-          arguments = [
-            "--module"
-            "--dry-run"
-            "--auto"
-          ];
-          dependencies = [ "nix" ];
-          shortHelp = "update-modules [--module=name] [--dry-run] [--auto] - Update modules";
-          longHelp = ''
-            Update features to their latest versions:
-            - --module=name: Update specific module only
-            - --dry-run: Show what would be updated without making changes
-            - --auto: Skip confirmation prompts
-            
-            Features with automatic migration will be updated automatically.
-            Features without migration will show a warning.
-          '';
-        }
-        {
-          name = "migrate-system-config";
-          description = "Migrate system-config.nix from monolithic to modular structure";
-          category = "system";
-          script = "${configMigration.migration.migrateSystemConfig}/bin/ncc-migrate-config";
-          arguments = [];
-          dependencies = [ "nix" ];
-          shortHelp = "migrate-system-config - Migrate system-config.nix to modular structure";
-          longHelp = ''
-            Migrates the system configuration from monolithic to modular structure:
+      # Subcommand: update-modules
+      {
+        name = "update-modules";
+        domain = "system";
+        parent = "system";
+        description = "Update modules with automatic migration support";
+        category = "system";
+        script = "${updateModules.updateModulesScript}/bin/ncc-update-modules";
+        arguments = [
+          "--module"
+          "--dry-run"
+          "--auto"
+        ];
+        dependencies = [ "nix" ];
+        shortHelp = "update-modules - Update modules";
+        longHelp = ''
+          Update features to their latest versions:
+          - --module=name: Update specific module only
+          - --dry-run: Show what would be updated without making changes
+          - --auto: Skip confirmation prompts
+          
+          Features with automatic migration will be updated automatically.
+          Features without migration will show a warning.
+        '';
+      }
+      # Subcommand: migrate-config
+      {
+        name = "migrate-config";
+        domain = "system";
+        parent = "system";
+        description = "Migrate system-config.nix from monolithic to modular structure";
+        category = "system";
+        script = "${configMigration.migration.migrateSystemConfig}/bin/ncc-migrate-config";
+        arguments = [];
+        dependencies = [ "nix" ];
+        shortHelp = "migrate-config - Migrate system-config.nix";
+        longHelp = ''
+          Migrates the system configuration from monolithic to modular structure:
 
-            Migration Process:
-            - Creates backup of current system-config.nix
-            - Extracts config sections to separate files in configs/:
-              * modules → configs/module-manager-config.nix
-              * desktop → configs/desktop-config.nix
-              * hardware → configs/hardware-config.nix
-              * network → configs/network-config.nix
-              * logging → configs/logging-config.nix
-            - Keeps only critical values in system-config.nix
-            - Preserves all existing configuration values
+          Migration Process:
+          - Creates backup of current system-config.nix
+          - Extracts config sections to separate files in configs/:
+            * modules → configs/module-manager-config.nix
+            * desktop → configs/desktop-config.nix
+            * hardware → configs/hardware-config.nix
+            * network → configs/network-config.nix
+            * logging → configs/logging-config.nix
+          - Keeps only critical values in system-config.nix
+          - Preserves all existing configuration values
 
-            This migration is safe and creates backups automatically.
-            Run 'ncc validate-system-config' to check if migration is needed.
-          '';
-        }
-        {
-          name = "validate-system-config";
-          description = "Validate system-config.nix structure and configuration";
-          category = "system";
-          script = "${configValidator.validateSystemConfig}/bin/ncc-validate-config";
-          arguments = [];
-          dependencies = [ "nix" ];
-          shortHelp = "validate-system-config - Validate system-config.nix structure";
-          longHelp = ''
-            Validates the system configuration structure and checks:
+          This migration is safe and creates backups automatically.
+        '';
+      }
+      # Subcommand: validate-config
+      {
+        name = "validate-config";
+        domain = "system";
+        parent = "system";
+        description = "Validate system-config.nix structure and configuration";
+        category = "system";
+        script = "${configValidator.validateSystemConfig}/bin/ncc-validate-config";
+        arguments = [];
+        dependencies = [ "nix" ];
+        shortHelp = "validate-config - Validate system-config.nix";
+        longHelp = ''
+          Validates the system configuration structure and checks:
 
-            Validation Checks:
-            - Nix syntax validity
-            - Required critical values presence:
-              * systemType, hostName, system.channel
-              * system.bootloader, allowUnfree, users, timeZone
-            - Modular structure check (configs/ directory)
-            - Detects old monolithic structure
+          Validation Checks:
+          - Nix syntax validity
+          - Required critical values presence:
+            * systemType, hostName, system.channel
+            * system.bootloader, allowUnfree, users, timeZone
+          - Modular structure check (configs/ directory)
+          - Detects old monolithic structure
 
-            Recommendations:
-            - If old structure detected, run 'ncc migrate-system-config'
-            - Ensures configuration follows best practices
-            - Helps identify configuration issues before rebuild
-
-            Exit codes:
-            - 0: All checks passed
-            - 1: Errors or warnings found
-          '';
-        }
-        {
-          name = "desktop-manager";
-          description = "Enable or disable desktop environment";
-          category = "system";
-          script = "${enableDesktopScript}/bin/enable-desktop";
-          arguments = [ "enable|disable" ];
-          dependencies = [ "nix" ];
-          shortHelp = "Enable or disable the desktop environment";
-          longHelp = ''
-            Allows enabling or disabling the desktop environment:
-            - "enable" to activate the desktop
-            - "disable" to deactivate the desktop
-            Requires sudo privileges and triggers system rebuild.
-          '';
-        }
+          Exit codes:
+          - 0: All checks passed
+          - 1: Errors or warnings found
+        '';
+      }
       ])
     # System Checks Commands (enabled by default in core, but configurable)
     (lib.mkIf (cfg.enableChecks or true)
       (cliRegistry.registerCommandsFor "system-checks" [
+        # Subcommand: build
         {
           name = "build";
+          domain = "system";
+          parent = "system";
           description = "Build and activate NixOS configuration with safety checks";
           category = "system";
           script = "${prebuildCheckScript}/bin/build";
           arguments = ["switch" "boot" "test" "build"];
           dependencies = [ "nix" ];
-          shortHelp = "build <command> - Build with preflight checks";
+          shortHelp = "build - Build with preflight checks";
           longHelp = ''
             Build and activate NixOS configuration with preflight safety checks
 
@@ -198,31 +215,37 @@ in {
       ]))
     # System Logging Commands (converted from component - always enabled in core)
     (cliRegistry.registerCommandsFor "system-logging" [
+      # Subcommand: report
       {
-        name = "log-system-report";
+        name = "report";
+        domain = "system";
+        parent = "system";
         script = "${systemReportScript.script}/bin/ncc-log-system-report";
         category = "system";
         description = "Generate system report with configured collectors";
-        shortHelp = "log-system-report - Generate system report";
+        shortHelp = "report - Generate system report";
         longHelp = ''
           Generate a comprehensive system report using configured collectors.
 
           Examples:
-            ncc-log-system-report                    # Generate default report
-            ncc-log-system-report --level debug     # Generate debug report
-            ncc-log-system-report --list-collectors # List available collectors
-            ncc-log-system-report --enable profile  # Enable specific collector
+            ncc system report                    # Generate default report
+            ncc system report --level debug      # Generate debug report
+            ncc system report --list-collectors  # List available collectors
+            ncc system report --enable profile   # Enable specific collector
         '';
       }
     ])
     # System Update Commands (converted from component - always enabled in core)
     (cliRegistry.registerCommandsFor "system-update" [
+      # Subcommand: update
       {
-        name = "system-update";
+        name = "update";
+        domain = "system";
+        parent = "system";
         script = "${systemUpdateMainScript}/bin/ncc-system-update-main";
-        category = "System Management";
+        category = "system";
         description = "Update NixOS configuration from repository";
-        shortHelp = "system-update [options] - Update NixOS configuration";
+        shortHelp = "update - Update NixOS configuration";
         longHelp = ''
           Update NixOS configuration from repository with automatic migration support.
 

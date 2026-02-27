@@ -34,33 +34,30 @@ def extract_hostname_from_flake(flake_path):
         return "nixos"
 
 
-def generate_configs_from_selection(target_root, selection):
+def generate_configs_from_selection(target_root, packagechooser_data):
     """
-    Generate configs based on user selection from GUI.
+    Generate configs based on user selection from packagechooser.
     Creates configs in {target_root}/etc/nixos/configs/
+    
+    packagechooser_data format:
+    {
+        "systemtype": ["desktop"] or ["server"],
+        "desktop": ["plasma"] or ["gnome"] or ["xfce"] or ["none"],
+        "features": ["docker", "virt-manager", ...]  # multiple possible
+    }
     """
     configs_dir = f"{target_root}/etc/nixos/configs"
     os.makedirs(configs_dir, exist_ok=True)
     
-    install_type = selection.get("installType", "")
-    preset = selection.get("preset", "")
-    system_type = selection.get("systemType", "desktop")
-    desktop_env = selection.get("desktopEnv", "")
-    features = selection.get("features", [])
+    # Extract selections from packagechooser
+    system_type = packagechooser_data.get("systemtype", ["desktop"])[0] if packagechooser_data.get("systemtype") else "desktop"
+    desktop_list = packagechooser_data.get("desktop", [])
+    desktop_env = desktop_list[0] if desktop_list and desktop_list[0] != "none" else ""
+    features = packagechooser_data.get("features", [])
     
-    libcalamares.utils.info(f"Generating configs: type={install_type}, preset={preset}, system={system_type}, desktop={desktop_env}")
+    libcalamares.utils.info(f"PackageChooser selections: system={system_type}, desktop={desktop_env}, features={features}")
     
-    # If preset is selected, try to copy preset file
-    if install_type == "presets" and preset:
-        preset_path = f"{target_root}/etc/nixos/shell/scripts/setup/modes/presets/{preset.lower().replace(' ', '-')}.nix"
-        if os.path.exists(preset_path):
-            # Copy preset as system-config.nix
-            subprocess.run(["cp", preset_path, f"{configs_dir}/system-config.nix"], check=False)
-            libcalamares.utils.info(f"Copied preset: {preset}")
-        else:
-            libcalamares.utils.warning(f"Preset file not found: {preset_path}")
-    
-    # Generate system-config.nix if it doesn't exist
+    # Generate system-config.nix
     system_config_path = f"{configs_dir}/system-config.nix"
     if not os.path.exists(system_config_path):
         system_config = f'''{{
@@ -140,11 +137,13 @@ def install_nixos_with_flake():
     if not target_root:
         return ("No rootMountPoint found", "")
     
-    # Get user selection from GUI (stored in globalStorage)
-    selection = libcalamares.globalstorage.value("nixosControlCenterSelection")
-    if not selection:
-        libcalamares.utils.warning("No user selection found, using defaults")
-        selection = {}
+    # Get user selection from packagechooser (stored in globalStorage)
+    packagechooser_data = libcalamares.globalstorage.value("packagechooser")
+    if not packagechooser_data:
+        libcalamares.utils.warning("No packagechooser data found, using defaults")
+        packagechooser_data = {}
+    
+    libcalamares.utils.debug(f"PackageChooser data: {json.dumps(packagechooser_data, indent=2)}")
     
     # Copy repository from ISO if it exists
     if os.path.exists("/mnt/cdrom/nixos"):
@@ -159,9 +158,9 @@ def install_nixos_with_flake():
     else:
         return ("Repository not found on ISO at /mnt/cdrom/nixos", "")
     
-    # Generate configs based on user selection
+    # Generate configs based on packagechooser selection
     try:
-        generate_configs_from_selection(target_root, selection)
+        generate_configs_from_selection(target_root, packagechooser_data)
     except Exception as e:
         libcalamares.utils.warning(f"Failed to generate configs: {e}, continuing with default configs")
         
@@ -177,13 +176,13 @@ def install_nixos_with_flake():
     # Generate hardware-configuration.nix if it doesn't exist
     hardware_config_path = f"{target_root}/etc/nixos/hardware-configuration.nix"
     if not os.path.exists(hardware_config_path):
-            try:
+        try:
             libcalamares.utils.info("Generating hardware-configuration.nix...")
-                subprocess.run([
+            subprocess.run([
                 "nixos-generate-config", "--root", target_root, "--no-filesystems"
             ], check=True, timeout=60)
             libcalamares.utils.info("hardware-configuration.nix generated")
-            except Exception as e:
+        except Exception as e:
             libcalamares.utils.warning(f"Failed to generate hardware-configuration.nix: {e}")
             # Continue anyway, flake might have its own hardware config
     

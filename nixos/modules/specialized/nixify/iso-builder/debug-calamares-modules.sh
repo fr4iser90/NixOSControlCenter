@@ -408,22 +408,35 @@ else
     echo "Vollständiger Pfad: $SETTINGS"
     echo ""
     echo "modules-search:"
-    grep -A 3 "modules-search:" "$SETTINGS" 2>/dev/null | head -5 || echo "nicht gefunden"
+    grep -A 5 "modules-search:" "$SETTINGS" 2>/dev/null | head -8 || echo "nicht gefunden"
     echo ""
+    
+    # CRITICAL: Check if module is defined as INSTANCE (causes @ problem!)
+    echo "=== INSTANCE CHECK ==="
+    echo "Prüfe ob nixos-control-center als INSTANCE definiert ist:"
+    if grep -A 10 "^instances:" "$SETTINGS" 2>/dev/null | grep -qi "nixos-control-center"; then
+      echo "❌❌❌ FEHLER: Modul ist als INSTANCE definiert!"
+      echo "Dies verursacht den '@nixos-control-center@nixos-control-center' Fehler!"
+      grep -A 10 "^instances:" "$SETTINGS" 2>/dev/null | grep -i "nixos-control-center"
+    else
+      echo "✅ Modul ist NICHT als Instance definiert (korrekt)"
+    fi
+    echo ""
+    
     echo "Enthält nixos-control-center in sequence (show)?"
     if grep -A 20 "show:" "$SETTINGS" 2>/dev/null | grep -qi "nixos-control-center"; then
-      echo "✅ GEFUNDEN"
+      echo "✅ GEFUNDEN in show:"
       grep -A 20 "show:" "$SETTINGS" 2>/dev/null | grep -i "nixos-control-center"
     else
-      echo "❌ NICHT GEFUNDEN"
+      echo "❌ NICHT GEFUNDEN in show: (Modul wird nicht angezeigt!)"
     fi
     echo ""
     echo "Enthält nixos-control-center-job in sequence (exec)?"
     if grep -A 20 "exec:" "$SETTINGS" 2>/dev/null | grep -qi "nixos-control-center-job"; then
-      echo "✅ GEFUNDEN"
+      echo "✅ GEFUNDEN in exec:"
       grep -A 20 "exec:" "$SETTINGS" 2>/dev/null | grep -i "nixos-control-center-job"
     else
-      echo "❌ NICHT GEFUNDEN"
+      echo "❌ NICHT GEFUNDEN in exec:"
     fi
     echo ""
     echo "---"
@@ -631,6 +644,29 @@ else
         # Validierung module.desc
         validate_module_desc "$MODULE_PATH" "$MODULE_NAME"
         
+        # CRITICAL: Validate YAML syntax - check for # comments!
+        echo "--- YAML SYNTAX CHECK ---"
+        DESC_FILE="$MODULE_PATH/module.desc"
+        if [ -f "$DESC_FILE" ]; then
+            # Check if first lines have # for comments (SPDX headers)
+            FIRST_LINE=$(head -1 "$DESC_FILE")
+            if echo "$FIRST_LINE" | grep -q "^#"; then
+                echo "✅✅✅ ERFOLG: module.desc hat korrekte # Kommentare!"
+                echo "Erste Zeile: $FIRST_LINE"
+            elif echo "$FIRST_LINE" | grep -qi "SPDX"; then
+                echo "❌❌❌ FEHLER: SPDX Zeile OHNE # gefunden!"
+                echo "Erste Zeile: $FIRST_LINE"
+                echo "Dies ist INVALID YAML und verursacht Calamares Fehler!"
+            else
+                echo "⚠️  Erste Zeile ist weder # noch SPDX"
+                echo "Erste Zeile: $FIRST_LINE"
+            fi
+            echo ""
+            echo "Erste 5 Zeilen von module.desc:"
+            head -5 "$DESC_FILE"
+        fi
+        echo ""
+        
         # Prüfe Dateien
         echo "--- Datei-Struktur ---"
         echo "Verzeichnis: $MODULE_PATH"
@@ -812,6 +848,21 @@ if [ -n "$ETC_DERIV" ]; then
             echo "---"
             cat "$ETC_DERIV/etc/calamares/modules/nixos-control-center.yaml"
             echo "---"
+            echo ""
+            
+            # CRITICAL: Check for double --- problem
+            echo "=== YAML VALIDATION ==="
+            DASH_COUNT=$(head -5 "$ETC_DERIV/etc/calamares/modules/nixos-control-center.yaml" | grep -c "^---$" || true)
+            echo "Anzahl '---' in ersten 5 Zeilen: $DASH_COUNT"
+            
+            if [ "$DASH_COUNT" -eq 1 ]; then
+                echo "✅✅✅ PERFEKT: Nur EIN '---' gefunden! (KORREKT)"
+            elif [ "$DASH_COUNT" -eq 0 ]; then
+                echo "⚠️⚠️⚠️ WARNUNG: Kein '---' gefunden! (Calamares fügt es hinzu)"
+            elif [ "$DASH_COUNT" -gt 1 ]; then
+                echo "❌❌❌ FEHLER: MEHRFACHE '---' GEFUNDEN! (DOPPELT = INVALID YAML!)"
+                echo "Dies verursacht den @ Fehler!"
+            fi
         else
             echo "❌❌❌ FEHLER: nixos-control-center.yaml NICHT GEFUNDEN!"
             echo "Module-Config muss in /etc/calamares/modules/ sein!"

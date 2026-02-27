@@ -38,7 +38,7 @@ let
       case $build_choice in
         y|Y)
           ${ui.messages.loading "Building system configuration..."}
-          BUILD_CMD="${if systemChecks then "sudo ncc build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
+          BUILD_CMD="${if systemChecks then "sudo ncc system build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
           
           # Run build and capture exit code
           if $BUILD_CMD 2>&1; then
@@ -64,7 +64,7 @@ let
           break
           ;;
         n|N)
-          ${ui.messages.info "Skipping build. You can manually run: ${if systemChecks then "sudo ncc build switch" else "sudo nixos-rebuild switch"} --flake /etc/nixos#${hostname}"}
+          ${ui.messages.info "Skipping build. You can manually run: ${if systemChecks then "sudo ncc system build switch" else "sudo nixos-rebuild switch"} --flake /etc/nixos#${hostname}"}
           break
           ;;
         *)
@@ -783,7 +783,7 @@ EOF
     # Check if auto-build or --auto-build flag is enabled
     if [ "$AUTO_BUILD" = "true" ] || [ "$autoBuild" = "true" ]; then
       ${ui.messages.loading "Auto-build enabled, building configuration..."}
-      BUILD_CMD="${if systemChecks then "sudo ncc build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
+      BUILD_CMD="${if systemChecks then "sudo ncc system build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
       
       if $BUILD_CMD 2>&1; then
         ${ui.messages.success "System successfully updated and rebuilt!"}
@@ -805,7 +805,7 @@ EOF
       fi
     elif [ "$AUTO_CONFIRM" = "true" ]; then
       # Auto-confirm enabled but no auto-build - skip build prompt
-      ${ui.messages.info "Skipping build. You can manually run: ${if systemChecks then "sudo ncc build switch" else "sudo nixos-rebuild switch"} --flake /etc/nixos#${hostname}"}
+      ${ui.messages.info "Skipping build. You can manually run: ${if systemChecks then "sudo ncc system build switch" else "sudo nixos-rebuild switch"} --flake /etc/nixos#${hostname}"}
     else
       ${prompt_build}
     fi

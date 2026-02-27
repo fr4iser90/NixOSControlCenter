@@ -284,6 +284,7 @@ in
     (cliRegistry.registerCommandsFor "nixify" [
       {
         name = "nixify";
+        domain = "nixify";
         type = "manager";
         description = "Windows/macOS/Linux → NixOS System-DNA-Extractor";
         script = "${nixifyServiceScript}/bin/ncc-nixify";

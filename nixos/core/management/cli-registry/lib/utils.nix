@@ -16,8 +16,17 @@ in
     userModuleCfg = getModuleConfig "user";
     # Verwende userAttrs aus der bestehenden user config (wie in user/config.nix)
     userAttrs = lib.filterAttrs (n: v: builtins.isAttrs v) userModuleCfg;
+    
+    # Hierarchical command support: if command has parent, also match "parent-name"
+    parentName = cmd.parent or null;
+    hierarchicalName = if parentName != null then "${parentName}-${cmd.name}" else null;
+    
+    # Generate case pattern: "name|parent-name)" if hierarchical, else just "name)"
+    casePattern = if hierarchicalName != null 
+      then "${cmd.name}|${hierarchicalName})"
+      else "${cmd.name})";
   in ''
-      ${cmd.name})
+      ${casePattern}
       ${if permission != null then ''
         # Get current user securely via UID (not spoofable)
         current_uid=$(id -ru)

@@ -36,8 +36,10 @@ in
   lib.mkMerge [
     # PRIMARY: Bubble Tea module manager (ONLY INTERFACE)
     (cliRegistry.registerCommandsFor "module-manager" [
+    # Modules Domain Manager (TUI)
     {
-      name = "module-manager";
+      name = "modules";
+      domain = "modules";
       description = "Interactive module management TUI";
       category = "system";
       script = "${moduleManagerTui}/bin/ncc-module-manager";
@@ -47,14 +49,33 @@ in
       dangerous = false;
       arguments = [];
       dependencies = [ "bubbletea" ];
-      shortHelp = "module-manager - Toggle NixOS modules";
+      shortHelp = "modules - Module management (TUI)";
       longHelp = ''
         Interactive module management with modern Bubble Tea TUI.
-        Runtime discovery of all available modules.
-        Real-time status from config files.
-        Beautiful terminal interface with advanced features.
-        No rebuild required to see new modules.
+        
+        Usage:
+          ncc modules           - Open TUI
+          ncc modules enable    - Enable module (future)
+          ncc modules disable   - Disable module (future)
+        
+        Features:
+        - Runtime discovery of all available modules
+        - Real-time status from config files
+        - Beautiful terminal interface with advanced features
+        - No rebuild required to see new modules
       '';
+    }
+    # Internal helper command
+    {
+      name = "get-module-data";
+      domain = "modules";
+      parent = "modules";
+      internal = true;
+      description = "Internal: Get module discovery data";
+      category = "system";
+      script = "${moduleManagerTui}/bin/ncc-module-manager";
+      arguments = ["get-module-data"];
+      shortHelp = "get-module-data - Internal discovery helper";
     }
     ])
   ]

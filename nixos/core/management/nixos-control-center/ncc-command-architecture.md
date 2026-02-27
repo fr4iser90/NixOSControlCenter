@@ -27,8 +27,8 @@ NCC soll sich wie ein **Betriebssystem-Interface** anfühlen:
 **Das sind Dinge, die sich wie Shell-Builtins anfühlen.**
 
 ```bash
-ncc build              # System bauen
-ncc system-update      # System aktualisieren
+ncc system build       # System bauen
+ncc system update      # System aktualisieren
 ncc switch             # System wechseln
 ncc rollback           # System zurücksetzen
 ```
@@ -119,7 +119,7 @@ scope = lib.types.enum [
 ])
 ```
 
-**Usage:** `ncc system-update`, `ncc build` (flach, direkt)
+**Usage:** `ncc system update`, `ncc system build` (hierarchisch, domain-basiert)
 
 ### 2.3 Feature-Module (scope = "module")
 

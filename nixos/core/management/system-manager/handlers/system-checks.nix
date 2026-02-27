@@ -2,24 +2,28 @@
 
 let
   # System Checks Handler
-  # Bietet prebuild/postbuild Checks als reine Component
-
-  # Import check modules directly (not as submodule imports)
+  # Imports ALL check modules and ensures their scripts are in systemPackages
+  
+  # Import check modules with ALL required parameters
   hardwareUtils = import ../components/system-checks/prebuild/checks/hardware/utils.nix { inherit config lib; };
+  cpuCheck = import ../components/system-checks/prebuild/checks/hardware/cpu.nix { inherit config lib pkgs systemConfig getModuleApi; };
   gpuCheck = import ../components/system-checks/prebuild/checks/hardware/gpu.nix { inherit config lib pkgs systemConfig getModuleApi; };
-  cpuCheck = import ../components/system-checks/prebuild/checks/hardware/cpu.nix { inherit config lib; };
   memoryCheck = import ../components/system-checks/prebuild/checks/hardware/memory.nix { inherit config lib pkgs systemConfig getModuleApi; };
   usersCheck = import ../components/system-checks/prebuild/checks/system/users.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
 
 in {
-  # System Checks Component Implementation
+  # Merge all check module configs to ensure ALL scripts are available
+  imports = [
+    cpuCheck
+    gpuCheck  
+    memoryCheck
+    usersCheck
+  ];
 
-  # Required packages for checks
+  # Base system packages for hardware detection
   environment.systemPackages = with pkgs; [
     pciutils
     usbutils
     lshw
-  ] ++ (gpuCheck.environment.systemPackages or [])
-    ++ (memoryCheck.environment.systemPackages or [])
-    ++ (usersCheck.environment.systemPackages or []);
+  ];
 }

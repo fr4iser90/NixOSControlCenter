@@ -106,6 +106,26 @@
         default = false;
         description = "Whether this is a dangerous command that needs confirmation";
       };
+
+      # Hierarchical command support
+      domain = lib.mkOption {
+        type = lib.types.str;
+        description = "Domain this command belongs to (e.g., 'system', 'vm', 'modules')";
+        example = "system";
+      };
+
+      parent = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Parent command for subcommands (hierarchical structure)";
+        example = "vm";
+      };
+
+      internal = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Hide from public help (for internal/helper commands)";
+      };
     };
   };
 }

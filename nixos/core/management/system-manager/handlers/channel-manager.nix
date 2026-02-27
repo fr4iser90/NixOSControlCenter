@@ -34,7 +34,7 @@ let
 
     # Rebuild system
     ${ui.messages.loading "Rebuilding system..."}
-    BUILD_CMD="${if systemChecks then "sudo ncc build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
+    BUILD_CMD="${if systemChecks then "sudo ncc system build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
     
     if $BUILD_CMD 2>&1; then
       ${ui.messages.success "System successfully rebuilt!"}
@@ -79,7 +79,7 @@ in {
         longHelp = ''
           Updates the flake inputs / channels by running 'nix flake update'
           and then rebuilds the system using 'nixos-rebuild switch'
-          or 'ncc build switch' if system checks are enabled.
+          or 'ncc system build switch' if system checks are enabled.
           Requires sudo privileges.
         '';
       }

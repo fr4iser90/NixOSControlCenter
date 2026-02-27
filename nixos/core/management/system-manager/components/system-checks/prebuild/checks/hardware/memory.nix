@@ -15,9 +15,27 @@ let
     
     ${ui.text.header "Memory Configuration Check"}
     
-    # Get total memory in GB (rounded)
+    # Get total memory in GB
     TOTAL_MEM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
-    DETECTED_GB=$(( (TOTAL_MEM_KB + 524288) / 1048576 ))  # Round up to nearest GB
+    DETECTED_RAW_GB=$(( (TOTAL_MEM_KB + 524288) / 1048576 ))  # Round up to nearest GB
+    
+    # Round to standard RAM sizes (8, 16, 32, 64, 128, etc.)
+    # Hardware always reserves some RAM, so 31 GB → 32 GB, 15 GB → 16 GB, etc.
+    if [ $DETECTED_RAW_GB -ge 120 ]; then
+      DETECTED_GB=128
+    elif [ $DETECTED_RAW_GB -ge 60 ]; then
+      DETECTED_GB=64
+    elif [ $DETECTED_RAW_GB -ge 28 ]; then
+      DETECTED_GB=32
+    elif [ $DETECTED_RAW_GB -ge 14 ]; then
+      DETECTED_GB=16
+    elif [ $DETECTED_RAW_GB -ge 6 ]; then
+      DETECTED_GB=8
+    elif [ $DETECTED_RAW_GB -ge 3 ]; then
+      DETECTED_GB=4
+    else
+      DETECTED_GB=$DETECTED_RAW_GB
+    fi
     
     # Show detected memory
     ${ui.messages.info "System Memory:"}

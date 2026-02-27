@@ -77,12 +77,12 @@ class HardwareCheckThread(QThread):
                 )
             else:
                 # Otherwise use chroot for installed system
-            result = subprocess.run(
-                ["chroot", self.target_root, "bash", script_path],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
+                result = subprocess.run(
+                    ["chroot", self.target_root, "bash", script_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
             return (result.returncode, result.stdout)
         except subprocess.TimeoutExpired:
             return (1, "Check timed out")

@@ -54,24 +54,59 @@ in
       esac
     }
 
-    # Hauptfunktion für Befehle
+    # Hierarchische Command Resolution
     function run_command() {
       local cmd="$1"
       shift
+      
+      # No command → show help
       if [[ -z "$cmd" ]]; then
         show_help
         exit 0
       fi
+      
+      # help command
+      if [[ "$cmd" == "help" ]]; then
+        show_command_help "$1"
+        exit 0
+      fi
+      
+      # Check if it's a direct command (flat)
       case "$cmd" in
-        help)
-          show_command_help "$1"
-          ;;
         ${caseBlock}
         *)
-          ${ui.badges.error "Unknown command '$cmd'"}
-          ${ui.text.newline}
-          show_help
-          exit 1
+          # Not a direct command → could be hierarchical
+          # Try: ncc <domain> <action> [args]
+          local action="$1"
+          
+          if [[ -z "$action" ]]; then
+            # No action → try to execute domain command (TUI)
+            # Example: ncc system → execute system TUI
+            case "$cmd" in
+              ${caseBlock}
+              *)
+                ${ui.badges.error "Unknown command or domain '$cmd'"}
+                ${ui.text.newline}
+                show_help
+                exit 1
+                ;;
+            esac
+          else
+            # Has action → try hierarchical: ncc <domain> <action>
+            shift  # Remove action from args
+            local full_cmd="$cmd-$action"
+            
+            # Try to execute as hierarchical command
+            case "$full_cmd" in
+              ${caseBlock}
+              *)
+                ${ui.badges.error "Unknown command '$cmd $action'"}
+                ${ui.text.newline}
+                show_help
+                exit 1
+                ;;
+            esac
+          fi
           ;;
       esac
     }
