@@ -1,4 +1,4 @@
-{ lib, getCurrentModuleMetadata, ... }:
+{ lib, pkgs, getCurrentModuleMetadata, ... }:
 
 let
   # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
@@ -7,7 +7,7 @@ let
 in {
   # SSH Client Manager Options
   # This module defines all configuration options for the SSH client manager
-  options.${configPath} = {
+  options.systemConfig.${configPath} = {
     # Version metadata (internal)
     _version = lib.mkOption {
       type = lib.types.str;
@@ -151,6 +151,12 @@ in {
     # This script shows detailed information about selected servers
     connectionPreviewScript = lib.mkOption {
       type = lib.types.package;
+      default = lib.getBin (pkgs.writeShellScriptBin "ssh-connection-preview" ''
+        #!${pkgs.bash}/bin/bash
+        # Minimal fallback preview script to avoid missing attribute errors.
+        # It prints the selected server entry.
+        echo "SSH Server: $1"
+      '');
       description = "Script for the FZF preview feature in the SSH Manager.";
     };
   };

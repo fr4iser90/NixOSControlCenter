@@ -9,7 +9,6 @@ in
 {
   _module.args = {
     chronicleCfg = cfg;
-    moduleName = moduleName;
   };
 
   imports = [

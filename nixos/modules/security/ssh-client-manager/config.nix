@@ -1,6 +1,8 @@
-{ config, lib, pkgs, systemConfig, moduleConfig, getModuleConfigFromPath, configHelpers, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfigFromPath, getCurrentModuleMetadata, ... }:
 
 let
+  configHelpers = import ../../../core/management/module-manager/lib/config-helpers.nix { inherit pkgs lib; };
+  moduleConfig = getCurrentModuleMetadata ./.;
   # Generic: Use getModuleConfigFromPath to get config with defaults from options.nix
   cfg = getModuleConfigFromPath moduleConfig.configPath;
   # Default SSH config
@@ -30,15 +32,17 @@ let
     }
   '';
 in
-  lib.mkMerge [
+{
+  config = lib.mkMerge [
     (lib.mkIf (cfg.enable or false) (
       (configHelpers.createModuleConfig {
         moduleName = "ssh-client-manager";
         defaultConfig = defaultConfig;
       }) // {
         # Enable module by default if config has it
-        ${moduleConfig.configPath}.enable = lib.mkDefault (cfg.enable or false);
+        systemConfig.${moduleConfig.configPath}.enable = lib.mkDefault (cfg.enable or false);
       }
     ))
     # Implementation is handled in default.nix
-  ]
+  ];
+}

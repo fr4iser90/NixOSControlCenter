@@ -1,4 +1,4 @@
-{ config, lib, pkgs, sshClientCfg, ... }:
+{ config, lib, pkgs, sshClientCfg, getCurrentModuleMetadata, getModuleApi, ... }:
 
 let
   ui = getModuleApi "cli-formatter";
@@ -114,7 +114,7 @@ let
   '';
 in {
   config = {
-    modules.security.ssh-client-manager = {
+    systemConfig.${(getCurrentModuleMetadata ../.).configPath} = {
       sshClientManagerKeyUtils = sshClientManagerKeyUtils;
     };
   };

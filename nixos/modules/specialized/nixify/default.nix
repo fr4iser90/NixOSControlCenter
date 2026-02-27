@@ -9,7 +9,6 @@ in
 {
   _module.args = {
     nixifyCfg = cfg;
-    nixifyModuleName = moduleName;  # EINMAL berechnet, eindeutiger Name!
   };
 
   imports = [

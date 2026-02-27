@@ -1,10 +1,9 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, nixifyModuleName, buildGoApplication ? null, gomod2nix ? null, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, buildGoApplication ? null, gomod2nix ? null, ... }:
 
 with lib;
 
 let
-  # moduleName aus _module.args - NUR EINMAL berechnet in default.nix!
-  moduleName = nixifyModuleName;
+  moduleName = baseNameOf ./.;
   cfg = getModuleConfig moduleName;
   # Note: getModuleApi calls removed - not currently used in config.nix
   # They can be added back when needed for config generation

@@ -13,8 +13,8 @@ in {
   imports = [
     ./options.nix
   ] ++ optionals (cfg.enable or false) [
-    ./commands.nix
     ./config.nix
+    ./commands.nix
     ./handlers/ssh-client-handler.nix
     ./scripts/ssh-client-manager.nix
     ./lib/ssh-key-utils.nix

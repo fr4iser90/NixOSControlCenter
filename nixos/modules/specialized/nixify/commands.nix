@@ -1,10 +1,9 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, nixifyModuleName, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 with lib;
 
 let
-  # moduleName aus _module.args - NUR EINMAL berechnet in default.nix!
-  moduleName = nixifyModuleName;
+  moduleName = baseNameOf ./.;
   cfg = getModuleConfig moduleName;
   cliRegistry = getModuleApi "cli-registry";
   

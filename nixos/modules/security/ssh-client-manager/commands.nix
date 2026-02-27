@@ -1,8 +1,9 @@
-{ config, lib, pkgs, systemConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getCurrentModuleMetadata, getModuleApi, ... }:
 
 with lib;
 
 let
+  moduleConfig = getCurrentModuleMetadata ./.;
   cfg = systemConfig.${moduleConfig.configPath};
   cliRegistry = getModuleApi "cli-registry";
   moduleName = baseNameOf ./. ;
@@ -14,7 +15,7 @@ in {
         name = "ssh-client-manager";
         description = "Manage SSH client connections";
         category = "network";
-        script = "${config.modules.security.ssh-client-manager.sshClientManagerScript}/bin/ncc-ssh-client-manager-main";
+        script = "${config.systemConfig.${moduleConfig.configPath}.sshClientManagerScript}/bin/ncc-ssh-client-manager-main";
         arguments = [];
         dependencies = [ "openssh" "fzf" "sshpass" ];
         shortHelp = "ssh-client-manager - Manage SSH client connections";
