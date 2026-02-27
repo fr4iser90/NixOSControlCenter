@@ -60,29 +60,6 @@ in {
         ];
     }
     (cliRegistry.registerCommandsFor "system-manager" [
-      # System Domain Manager (TUI launcher)
-      {
-        name = "system";
-        domain = "system";
-        type = "manager";
-        description = "System lifecycle management";
-        category = "system";
-        script = "${prebuildCheckScript}/bin/build";
-        shortHelp = "system - System management (TUI)";
-        longHelp = ''
-          System management provides commands for system lifecycle.
-          
-          Usage:
-            ncc system                    - System TUI
-            ncc system build              - Build configuration
-            ncc system update             - Update from repository
-            ncc system check-versions     - Check module versions
-            ncc system update-modules     - Update modules
-            ncc system migrate-config     - Migrate configuration
-            ncc system validate-config    - Validate configuration
-            ncc system report             - Generate system report
-        '';
-      }
       # Subcommand: check-versions
       {
         name = "check-versions";

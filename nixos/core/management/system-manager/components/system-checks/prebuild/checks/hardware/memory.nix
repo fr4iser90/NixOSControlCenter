@@ -109,6 +109,7 @@ in {
       {
         name = "check-memory";
         category = "system-checks";
+        internal = true;  # Don't show in main help - called by ncc system build
         description = "Check memory configuration before system rebuild";
         script = "${prebuildScript}/bin/prebuild-check-memory";
         shortHelp = "check-memory - Verify RAM configuration";

@@ -74,6 +74,7 @@ in {
       {
         name = "check-users";
         category = "system-checks";
+        internal = true;  # Don't show in main help - called by ncc system build
         description = "Check user configuration before system rebuild";
         script = "${prebuildScript}/bin/prebuild-check-users";
         shortHelp = "check-users - Verify user configuration";

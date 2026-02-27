@@ -40,8 +40,8 @@ let
           ${ui.messages.loading "Building system configuration..."}
           BUILD_CMD="${if systemChecks then "sudo ncc system build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
           
-          # Run build and capture exit code
-          if $BUILD_CMD 2>&1; then
+          # Run build and capture exit code (sh -c completely isolates from parent shell)
+          if sh -c "$BUILD_CMD" 2>&1; then
             ${ui.messages.success "System successfully updated and rebuilt!"}
           else
             EXIT_CODE=$?
@@ -785,7 +785,7 @@ EOF
       ${ui.messages.loading "Auto-build enabled, building configuration..."}
       BUILD_CMD="${if systemChecks then "sudo ncc system build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
       
-      if $BUILD_CMD 2>&1; then
+      if sh -c "$BUILD_CMD" 2>&1; then
         ${ui.messages.success "System successfully updated and rebuilt!"}
       else
         EXIT_CODE=$?

@@ -119,9 +119,12 @@ in
   getUniqueCategories = commands:
     lib.unique (lib.map (command: command.category) commands);
 
-  # Generate command list string
+  # Generate command list string (only show top-level commands without parent)
   generateCommandList = commands:
-    lib.concatMapStringsSep "\n" (cmd: "  ${cmd.name} - ${cmd.description}") commands;
+    let
+      topLevelCommands = lib.filter (cmd: (cmd.parent or null) == null && !(cmd.internal or false)) commands;
+    in
+      lib.concatMapStringsSep "\n" (cmd: "  ${cmd.name} - ${cmd.description}") topLevelCommands;
 
   # Get valid commands string
   getValidCommands = commands:

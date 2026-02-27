@@ -36,7 +36,7 @@ let
     ${ui.messages.loading "Rebuilding system..."}
     BUILD_CMD="${if systemChecks then "sudo ncc system build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
     
-    if $BUILD_CMD 2>&1; then
+    if sh -c "$BUILD_CMD" 2>&1; then
       ${ui.messages.success "System successfully rebuilt!"}
     else
       EXIT_CODE=$?
@@ -70,6 +70,8 @@ in {
     (cliRegistry.registerCommandsFor "channel-manager" [
       {
         name = "update-channels";
+        domain = "system";
+        parent = "system";
         description = "Update Nix flake inputs / channels and rebuild the system";
         category = "system";
         script = "${updateChannelsScript}/bin/ncc-update-channels";
