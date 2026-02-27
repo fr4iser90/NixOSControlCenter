@@ -8,18 +8,75 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/bubbles/list"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Prompt mode
+		if m.uiState == StatePrompt {
+			switch msg.String() {
+			case "enter":
+				if m.promptIndex < len(m.promptInputs)-1 {
+					m.promptIndex++
+					m.promptInputs[m.promptIndex].Focus()
+					return m, nil
+				}
+				return m, m.runPromptedActionCmd()
+			case "esc":
+				m.uiState = StateNormal
+				return m, nil
+			}
+			var cmd tea.Cmd
+			m.promptInputs[m.promptIndex], cmd = m.promptInputs[m.promptIndex].Update(msg)
+			return m, cmd
+		}
+
+		// Action dialog mode
+		if m.uiState == StateActionDialog {
+			switch msg.String() {
+			case "up", "k":
+				if m.actionIndex > 0 {
+					m.actionIndex--
+				}
+				return m, nil
+			case "down", "j":
+				if m.actionIndex < len(m.selectedModule.Actions)-1 {
+					m.actionIndex++
+				}
+				return m, nil
+			case "enter":
+				return m, m.startSelectedAction()
+			case "esc":
+				m.uiState = StateNormal
+				return m, nil
+			}
+		}
+
 		switch {
-	case key.Matches(msg, m.keys.runAction):
+		case key.Matches(msg, m.keys.runAction):
 			if m.list.SelectedItem() != nil {
 				selected := m.list.SelectedItem().(ModuleItem)
-				return m, m.runSelectedActionCmd(selected)
+				m.selectedModule = selected
+				if len(selected.Actions) > 0 {
+					m.uiState = StateActionDialog
+					m.actionIndex = 0
+					return m, nil
+				}
+				return m, m.runSelectedActionCmd(selected, selected.Action, selected.Args)
 			}
+
+		case key.Matches(msg, m.keys.connect):
+			return m, m.runShortcutAction("connect")
+		case key.Matches(msg, m.keys.delete):
+			return m, m.runShortcutAction("delete")
+		case key.Matches(msg, m.keys.edit):
+			return m, m.runShortcutAction("edit")
+		case key.Matches(msg, m.keys.newItem):
+			return m, m.runShortcutAction("add")
 
 		case key.Matches(msg, m.keys.toggle):
 			// Toggle details view
@@ -103,12 +160,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case ActionExecutedMsg:
-		// Action executed - no state change yet
-		return m, nil
+		// Action executed - refresh list and return to normal state
+		m.uiState = StateNormal
+		return m, refreshModulesCmd()
 
 	case ModulesRefreshedMsg:
-		// Handle modules refreshed
-		// TODO: Update modules list
+		if msg.Error != nil {
+			return m, nil
+		}
+		m.modules = msg.Modules
+		items := make([]list.Item, len(msg.Modules))
+		for i, module := range msg.Modules {
+			items[i] = module
+		}
+		m.list.SetItems(items)
+		m.updatePanels()
 		return m, nil
 	}
 
@@ -163,27 +229,121 @@ func (m Model) disableModuleCmd(moduleName string) tea.Cmd {
 	}
 }
 
+
 func refreshModulesCmd() tea.Cmd {
 	return func() tea.Msg {
-		// TODO: Call runtime discovery and return updated modules
-		return ModulesRefreshedMsg{}
+		modules, err := GetModulesFromNixFunction(getEnvCmd("NCC_TUI_LIST_CMD"))
+		if err != nil {
+			return ModulesRefreshedMsg{Error: err}
+		}
+		return ModulesRefreshedMsg{Modules: modules}
 	}
 }
 
 // Run selected action via NCC_TUI_ACTION_CMD
-func (m Model) runSelectedActionCmd(selected ModuleItem) tea.Cmd {
+func (m Model) runSelectedActionCmd(selected ModuleItem, action string, args []ActionArg) tea.Cmd {
 	return func() tea.Msg {
 		cmdTemplate := os.Getenv("NCC_TUI_ACTION_CMD")
 		if cmdTemplate == "" {
 			return ActionExecutedMsg{Success: false, Error: fmt.Errorf("NCC_TUI_ACTION_CMD not set")}
 		}
 		cmdStr := strings.ReplaceAll(cmdTemplate, "{name}", selected.Name)
+		cmdStr = strings.ReplaceAll(cmdStr, "{action}", action)
+		for _, arg := range args {
+			cmdStr = strings.ReplaceAll(cmdStr, "{arg:"+arg.Name+"}", arg.Default)
+		}
 		err := exec.Command("bash", "-c", cmdStr).Run()
 		if err != nil {
 			return ActionExecutedMsg{Success: false, Error: err}
 		}
 		return ActionExecutedMsg{Success: true}
 	}
+}
+
+func (m Model) startSelectedAction() tea.Cmd {
+	if m.actionIndex < 0 || m.actionIndex >= len(m.selectedModule.Actions) {
+		m.uiState = StateNormal
+		return nil
+	}
+	selectedAction := m.selectedModule.Actions[m.actionIndex]
+	if len(selectedAction.Args) == 0 {
+		return m.runSelectedActionCmd(m.selectedModule, selectedAction.Name, selectedAction.Args)
+	}
+	m.selectedAction = selectedAction
+	m.promptArgs = selectedAction.Args
+	m.promptInputs = make([]textinput.Model, len(selectedAction.Args))
+	for i, arg := range selectedAction.Args {
+		input := textinput.New()
+		input.Placeholder = arg.Prompt
+		input.Prompt = arg.Name + ": "
+		if arg.Default != "" {
+			input.SetValue(arg.Default)
+		}
+		if arg.Secret {
+			input.EchoMode = textinput.EchoPassword
+			input.EchoCharacter = '•'
+		}
+		if i == 0 {
+			input.Focus()
+		}
+		m.promptInputs[i] = input
+	}
+	m.promptIndex = 0
+	m.uiState = StatePrompt
+	return nil
+}
+
+func (m Model) runShortcutAction(name string) tea.Cmd {
+	if m.list.SelectedItem() == nil {
+		return nil
+	}
+	selected := m.list.SelectedItem().(ModuleItem)
+	for _, action := range selected.Actions {
+		if action.Name == name {
+			m.selectedModule = selected
+			m.selectedAction = action
+			if len(action.Args) == 0 {
+				return m.runSelectedActionCmd(selected, action.Name, action.Args)
+			}
+			m.promptArgs = action.Args
+			m.promptInputs = make([]textinput.Model, len(action.Args))
+			for i, arg := range action.Args {
+				input := textinput.New()
+				input.Placeholder = arg.Prompt
+				input.Prompt = arg.Name + ": "
+				if arg.Default != "" {
+					input.SetValue(arg.Default)
+				}
+				if arg.Secret {
+					input.EchoMode = textinput.EchoPassword
+					input.EchoCharacter = '•'
+				}
+				if i == 0 {
+					input.Focus()
+				}
+				m.promptInputs[i] = input
+			}
+			m.promptIndex = 0
+			m.uiState = StatePrompt
+			return nil
+		}
+	}
+	return nil
+}
+
+func (m Model) runPromptedActionCmd() tea.Cmd {
+	for i := range m.promptArgs {
+		m.promptArgs[i].Default = m.promptInputs[i].Value()
+	}
+	selected := m.selectedModule
+	action := m.selectedAction.Name
+	args := m.promptArgs
+	m.uiState = StateNormal
+	return m.runSelectedActionCmd(selected, action, args)
+}
+
+func getEnvCmd(key string) string {
+	return os.Getenv(key)
 }
 
 // Messages

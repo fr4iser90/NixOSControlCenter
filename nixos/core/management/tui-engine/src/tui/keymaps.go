@@ -5,6 +5,10 @@ import "github.com/charmbracelet/bubbles/key"
 type keyMap struct {
 	toggle  key.Binding
   runAction key.Binding
+	connect key.Binding
+	delete  key.Binding
+	edit    key.Binding
+	newItem key.Binding
 	enable  key.Binding
 	disable key.Binding
 	refresh key.Binding
@@ -21,6 +25,22 @@ func newKeyMap() *keyMap {
 			key.WithKeys("enter"),
 			key.WithHelp("enter", "run action"),
 		),
+			connect: key.NewBinding(
+				key.WithKeys("enter"),
+				key.WithHelp("enter", "connect"),
+			),
+			delete: key.NewBinding(
+				key.WithKeys("ctrl+x"),
+				key.WithHelp("ctrl+x", "delete"),
+			),
+			edit: key.NewBinding(
+				key.WithKeys("ctrl+e"),
+				key.WithHelp("ctrl+e", "edit"),
+			),
+			newItem: key.NewBinding(
+				key.WithKeys("ctrl+n"),
+				key.WithHelp("ctrl+n", "new"),
+			),
 		enable: key.NewBinding(
 			key.WithKeys("e"),
 			key.WithHelp("e", "enable module"),

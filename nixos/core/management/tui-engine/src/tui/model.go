@@ -1,11 +1,14 @@
 package tui
 
 import (
+	"encoding/json"
 	"os"
+	"os/exec"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -17,6 +20,22 @@ type ModuleItem struct {
 	Status          string `json:"status"`
 	Category        string `json:"category"`
 	Path            string `json:"path"`
+	Action          string `json:"action"`
+	Args            []ActionArg `json:"args"`
+	Actions         []ActionDef `json:"actions"`
+}
+
+type ActionArg struct {
+	Name    string `json:"name"`
+	Prompt  string `json:"prompt"`
+	Secret  bool   `json:"secret"`
+	Default string `json:"default"`
+}
+
+type ActionDef struct {
+	Name  string      `json:"name"`
+	Label string      `json:"label"`
+	Args  []ActionArg `json:"args"`
 }
 
 func (i ModuleItem) Title() string       { return i.Name }
@@ -55,6 +74,14 @@ type Model struct {
 	width  int
 	height int
 
+	// Action dialog / prompt state
+	uiState         UIState
+	actionIndex     int
+	selectedAction  ActionDef
+	promptInputs    []textinput.Model
+	promptArgs      []ActionArg
+	promptIndex     int
+
 	// Scrollable viewports for all panels
 	contentViewport viewport.Model
 	menuViewport    viewport.Model
@@ -62,6 +89,14 @@ type Model struct {
 	infoViewport    viewport.Model
 	statsViewport   viewport.Model
 }
+
+type UIState int
+
+const (
+	StateNormal UIState = iota
+	StateActionDialog
+	StatePrompt
+)
 
 func NewModel(modules []ModuleItem, getListCmd, getFilterCmd, getDetailsCmd, getActionsCmd, getStatsCmd string) Model {
 	// Create list items from modules
@@ -116,6 +151,8 @@ func NewModel(modules []ModuleItem, getListCmd, getFilterCmd, getDetailsCmd, get
 		filterViewport:  filterVp,
 		infoViewport:    infoVp,
 		statsViewport:   statsVp,
+		uiState:         StateNormal,
+		actionIndex:     0,
 	}
 
 	// Initialize viewport content
@@ -129,4 +166,18 @@ func (m Model) Init() tea.Cmd {
 		tea.EnterAltScreen,
 		m.spinner.Tick,
 	)
+}
+
+func GetModulesFromNixFunction(nixCmd string) ([]ModuleItem, error) {
+	cmd := exec.Command("bash", "-c", nixCmd)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var modules []ModuleItem
+	if err := json.Unmarshal(output, &modules); err != nil {
+		return nil, err
+	}
+	return modules, nil
 }

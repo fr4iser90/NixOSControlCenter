@@ -6,6 +6,10 @@ Complete overview of all domains and their commands.
 
 ## Domain Overview
 
+> **Important:** Domains are **user-facing CLI namespaces** and are **not automatically derived** from module folder names.
+> A module folder can stay generic/technical (e.g., `module-manager`, `system-manager`) while the domain remains short and clean (e.g., `modules`, `system`).
+> This keeps the CLI concise without forcing renames in the module layout.
+
 ```
 ncc
 
@@ -68,6 +72,8 @@ ncc system validate-config      # Validate configuration
 ### `modules` - Module Management
 
 **Module:** `core/management/module-manager`
+
+> Note: The module folder is `module-manager`, but the CLI domain is `modules` (intentional: short, user-friendly).
 
 **TUI:** `ncc modules`
 

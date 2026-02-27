@@ -38,7 +38,7 @@ func main() {
 
 	// Get initial modules from runtime discovery via getListCmd
 	// log.Println("🐛 DEBUG: Getting modules from Nix function...")
-	modules, err := getModulesFromNixFunction(getListCmd)
+	modules, err := tui.GetModulesFromNixFunction(getListCmd)
 	if err != nil {
 		// log.Println("🐛 DEBUG: Failed to get modules: %v", err)
 		log.Fatal("Failed to get modules:", err)

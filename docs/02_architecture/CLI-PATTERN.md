@@ -72,6 +72,9 @@ ncc test-arch-run              # No domain context
 
 ## Domain Hierarchy
 
+> **Domains are user-facing namespaces** and **do not have to match module folder names**.
+> Keep module folders generic/technical if you want; choose domains that are short and clean for CLI UX.
+
 ### Core Domains
 System lifecycle management
 ```

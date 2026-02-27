@@ -23,6 +23,8 @@ let
       ${lib.optionalString (actionCmd != null) ''
         export NCC_TUI_ACTION_CMD="${actionCmd}"
       ''}
+      export NCC_TUI_LIST_CMD="${getList}"
+      export NCC_TUI_DETAILS_CMD="${getDetails}"
       ${lib.optionalString (layout != null) ''
         export NCC_TUI_LAYOUT="${layout}"
       ''}

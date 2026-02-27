@@ -726,6 +726,36 @@ func (m Model) renderFilterContent() string {
 func (m Model) renderInfoContent() string {
 	// ✅ Renamed to ACTIONS - show what user can DO
 	content := "⚙️ ACTIONS\n\n"
+
+	if m.uiState == StateActionDialog {
+		content += "Select action:\n\n"
+		for i, action := range m.selectedModule.Actions {
+			marker := "  "
+			if i == m.actionIndex {
+				marker = "> "
+			}
+			label := action.Label
+			if label == "" {
+				label = action.Name
+			}
+			content += fmt.Sprintf("%s%s\n", marker, label)
+		}
+		content += "\nEnter: confirm • Esc: cancel"
+		return content
+	}
+
+	if m.uiState == StatePrompt {
+		content += "Fill inputs:\n\n"
+		for i, input := range m.promptInputs {
+			marker := "  "
+			if i == m.promptIndex {
+				marker = "> "
+			}
+			content += fmt.Sprintf("%s%s\n", marker, input.View())
+		}
+		content += "\nEnter: next/submit • Esc: cancel"
+		return content
+	}
 	
 	if m.selectedModule.Name == "" {
 		content += "Select a module to see\navailable actions.\n\n"
@@ -812,6 +842,12 @@ func (m Model) renderStatsContent() string {
 }
 
 func (m Model) renderContentPanelContent() string {
+	if m.uiState == StateActionDialog {
+		return "Choose an action for the selected item."
+	}
+	if m.uiState == StatePrompt {
+		return "Provide the required inputs to run this action."
+	}
 	if m.showDetails && m.selectedModule.Name != "" {
 		return m.renderModuleDetails()
 	} else {
