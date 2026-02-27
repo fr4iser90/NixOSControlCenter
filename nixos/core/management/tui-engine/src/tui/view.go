@@ -374,6 +374,40 @@ func (tr *TemplateRegistry) SelectTemplate(width, height int, preference string)
 	}
 }
 
+// FZF-style Template (2 panels: list + preview/actions)
+type FzfLayoutTemplate struct {
+	contentProvider ContentProvider
+}
+
+func NewFzfLayoutTemplate(contentProvider ContentProvider) *FzfLayoutTemplate {
+	return &FzfLayoutTemplate{contentProvider: contentProvider}
+}
+
+func (t *FzfLayoutTemplate) GetMinWidth() int  { return 60 }
+func (t *FzfLayoutTemplate) GetMinHeight() int { return 8 }
+
+func (t *FzfLayoutTemplate) GetPanels() []PanelConfig {
+	return []PanelConfig{
+		{Title: "", MinWidth: 25, Weight: 0.35, Style: PanelStyleBordered},
+		{Title: "", MinWidth: 35, Weight: 0.65, Style: PanelStyleBordered},
+	}
+}
+
+func (t *FzfLayoutTemplate) Render(m Model, dims *LayoutDimensions) string {
+	header := m.renderHeader(dims)
+	footer := m.renderFooter(dims)
+
+	lm := NewLayoutManager(m.width, m.height)
+	bodyWidth, bodyHeight := lm.GetAvailableDimensions()
+	widths := lm.DistributeWidths(bodyWidth, t.GetPanels())
+
+	menu := m.renderViewportPanel("", m.menuViewport, widths[0], bodyHeight)
+	preview := m.renderViewportPanel("", m.contentViewport, widths[1], bodyHeight)
+	body := lipgloss.JoinHorizontal(lipgloss.Top, menu, preview)
+
+	return lipgloss.JoinVertical(lipgloss.Left, header, body, footer)
+}
+
 // Content Provider Interface
 type ContentProvider interface {
 	GetContent(panelName string) string
@@ -848,11 +882,24 @@ func (m Model) renderContentPanelContent() string {
 	if m.uiState == StatePrompt {
 		return "Provide the required inputs to run this action."
 	}
+	if os.Getenv("NCC_TUI_LAYOUT") == "fzf" {
+		return m.renderPreviewContent()
+	}
 	if m.showDetails && m.selectedModule.Name != "" {
 		return m.renderModuleDetails()
 	} else {
 		return m.renderModulePreview()
 	}
+}
+
+func (m Model) renderPreviewContent() string {
+	cmd := os.Getenv("NCC_TUI_DETAILS_CMD")
+	if cmd == "" || m.selectedModule.Name == "" {
+		return ""
+	}
+	cmdStr := fmt.Sprintf("%s %q", cmd, m.selectedModule.Name)
+	output := m.getNixContent(cmdStr)
+	return output
 }
 
 func (m Model) renderModulePreview() string {
@@ -942,9 +989,15 @@ func (m Model) renderResponsiveLayout() string {
 	templateRegistry.Register("compact", NewCompactLayoutTemplate(cp))
 	templateRegistry.Register("medium", NewMediumLayoutTemplate(cp))
 	templateRegistry.Register("full", NewFullLayoutTemplate(cp))
+	templateRegistry.Register("fzf", NewFzfLayoutTemplate(cp))
 
 	// ✅ 5. Select appropriate template
-	template := templateRegistry.SelectTemplate(m.width, m.height, preferredLayout)
+	var template Template
+	if preferredLayout != "" {
+		template = templateRegistry.Get(preferredLayout)
+	} else {
+		template = templateRegistry.SelectTemplate(m.width, m.height, preferredLayout)
+	}
 	log.Printf("🐛 DEBUG renderResponsiveLayout(): Template selected: %T\n", template)
 
 	if template == nil {

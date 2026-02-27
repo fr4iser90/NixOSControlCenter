@@ -105,13 +105,17 @@ func NewModel(modules []ModuleItem, getListCmd, getFilterCmd, getDetailsCmd, get
 		items[i] = module
 	}
 
-	// Initialize list
-	l := list.New(items, list.NewDefaultDelegate(), 0, 0)
-	if title := os.Getenv("NCC_TUI_TITLE"); title != "" {
-		l.Title = title
-	} else {
-		l.Title = "📦 Module Manager"
-	}
+	// Initialize list (single-line delegate)
+	delegate := list.NewDefaultDelegate()
+	delegate.ShowDescription = false
+	delegate.SetSpacing(0)
+	delegate.SetHeight(1)
+	l := list.New(items, delegate, 0, 0)
+	// No list title for FZF-like output
+	l.Title = ""
+	l.SetShowTitle(false)
+	l.SetShowStatusBar(false)
+	l.SetShowHelp(false)
 
 	// Initialize other components
 	s := spinner.New()
