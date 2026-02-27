@@ -1,8 +1,8 @@
-{ config, lib, pkgs, systemConfig, getCurrentModuleMetadata, getModuleConfig, getModuleApi, moduleName, ... }:
+{ config, lib, pkgs, systemConfig, getCurrentModuleMetadata, getModuleConfig, getModuleApi, ... }:
 
 let
   ui = getModuleApi "cli-formatter";
-  cfg = getModuleConfig moduleName;
+  cfg = getModuleConfig (baseNameOf ../.);
 
   # Centralized SSH Connection Handler
   # This module contains all SSH connection logic in one place

@@ -1,11 +1,26 @@
-{ config, lib, pkgs, systemConfig, getCurrentModuleMetadata, getModuleConfig, getModuleApi, moduleName, ... }:
+{ config, lib, pkgs, systemConfig, getCurrentModuleMetadata, getModuleConfig, getModuleApi, ... }:
 
 with lib;
 
 let
   ui = getModuleApi "cli-formatter";
-  cliRegistry = getModuleApi "cli-registry";
-  cfg = getModuleConfig moduleName;
+  moduleConfig = getCurrentModuleMetadata ../.;
+  cfg = lib.attrByPath (["systemConfig"] ++ lib.splitString "." moduleConfig.configPath) {} config;
+  # Build helper strings directly (Option A) so they are always available
+  serverUtilsModule = import ../lib/ssh-server-utils.nix {
+    inherit config lib pkgs getCurrentModuleMetadata getModuleApi;
+    sshClientCfg = cfg;
+  };
+  keyUtilsModule = import ../lib/ssh-key-utils.nix {
+    inherit config lib pkgs getCurrentModuleMetadata getModuleApi;
+    sshClientCfg = cfg;
+  };
+  handlerModule = import ../handlers/ssh-client-handler.nix {
+    inherit config lib pkgs systemConfig getCurrentModuleMetadata getModuleConfig getModuleApi;
+  };
+  serverUtils = serverUtilsModule.config.systemConfig.${moduleConfig.configPath}.sshClientManagerServerUtils or "";
+  keyUtils = keyUtilsModule.config.systemConfig.${moduleConfig.configPath}.sshClientManagerKeyUtils or "";
+  connectionHandler = handlerModule.config.systemConfig.${moduleConfig.configPath}.sshConnectionHandler or "";
 in {
   config = mkIf (cfg.enable or false) (let
     # Main SSH Client Manager Script
@@ -14,9 +29,9 @@ in {
       #!${pkgs.bash}/bin/bash
           
       # Include server utilities, key utilities, and connection handler
-      ${cfg.sshClientManagerServerUtils}
-      ${cfg.sshClientManagerKeyUtils}
-      ${cfg.sshConnectionHandler}
+      ${serverUtils}
+      ${keyUtils}
+      ${connectionHandler}
 
       # Handle different actions based on user selection
       # Parameters: selection (server choice), action (connect/delete/edit/new)
@@ -179,8 +194,7 @@ in {
       # Start the main function
       main
     '';
-  in lib.mkMerge [
-    {
+  in {
       # Add the SSH client manager script to system packages
       environment.systemPackages = [
         sshClientManagerScript
@@ -191,24 +205,5 @@ in {
         sshClientManagerScript = sshClientManagerScript;
       };
     }
-    (cliRegistry.registerCommandsFor "ssh-client-manager" [
-      {
-        name = "ssh-client-manager";
-        description = "Manage SSH client connections";
-        category = "network";
-        script = "${sshClientManagerScript}/bin/ncc-ssh-client-manager-main";
-        arguments = [
-          "--test"
-        ];
-        dependencies = [ pkgs.openssh ];
-        shortHelp = "Manage and configure SSH clients and connections";
-        longHelp = ''
-          Manage SSH client connections, configure settings, and perform various actions related to SSH.
-
-          Options:
-            --test       Run a test connection
-        '';
-      }
-    ])
-  ]);
+  );
 }

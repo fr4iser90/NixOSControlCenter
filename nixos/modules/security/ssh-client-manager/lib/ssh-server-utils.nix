@@ -70,10 +70,15 @@ let
             --marker="${cfg.fzf.theme.marker}" \
             --header="Available SSH Servers" \
             --header-first \
-            ${lib.optionalString cfg.fzf.preview.enable ''
-              --preview "${cfg.connectionPreviewScript}/bin/ssh-connection-preview {}" \
+            ${lib.optionalString cfg.fzf.preview.enable (let
+              previewBin = (cfg.connectionPreviewScript or (lib.getBin (pkgs.writeShellScriptBin "ssh-connection-preview" ''
+                #!${pkgs.bash}/bin/bash
+                echo "SSH Server: $1"
+              '')));
+            in ''
+              --preview "${previewBin}/bin/ssh-connection-preview {}" \
               --preview-window="${cfg.fzf.preview.position}"
-            ''} \
+            '')} \
             --expect=ctrl-x,ctrl-e,ctrl-n,enter 2>/dev/null)
         
         # Parse the selection and action

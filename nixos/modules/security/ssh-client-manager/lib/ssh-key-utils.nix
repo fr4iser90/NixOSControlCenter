@@ -15,8 +15,10 @@ let
       local key_file="/home/$USER/.ssh/id_rsa_''${server//./_}"
       
       ${ui.messages.loading "Generating new SSH key for $server..."}
+      
       ssh-keygen -t rsa -b 4096 -f "$key_file" -N "" -C "$USER@$server"
       ${ui.messages.success "Generated new SSH key: $key_file"}
+      
       
       echo "Would you like to copy this key to the server? (y/n)"
       read -r response

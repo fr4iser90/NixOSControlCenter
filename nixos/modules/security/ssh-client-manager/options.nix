@@ -37,6 +37,7 @@ in {
     # Internal option for SSH key utilities (set by ssh-key-utils.nix)
     sshClientManagerKeyUtils = lib.mkOption {
       type = lib.types.str;
+      default = "";
       internal = true;
       description = "SSH-Key utility functions";
     };
@@ -44,6 +45,7 @@ in {
     # Internal option for SSH server utilities (set by ssh-server-utils.nix)
     sshClientManagerServerUtils = lib.mkOption {
       type = lib.types.str;
+      default = "";
       internal = true;
       description = "SSH-Server entry utility functions";
     };
@@ -51,6 +53,7 @@ in {
     # Internal option for the centralized connection handler (set by connection-handler.nix)
     sshConnectionHandler = lib.mkOption {
       type = lib.types.str;
+      default = "";
       internal = true;
       description = "Centralized SSH connection handler functions";
     };
@@ -58,6 +61,7 @@ in {
     # Internal option for the main SSH client manager script (set by main.nix)
     sshClientManagerScript = lib.mkOption {
       type = lib.types.str;
+      default = "";
       internal = true;
       description = "SSH-Server entry utility functions";
     };
