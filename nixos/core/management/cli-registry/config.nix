@@ -19,9 +19,7 @@ let
 
   # API definition - always available
   # Commands werden von anderen Modulen hinzugefügt
-  apiValue = {
-    categories = [];  # Wird später berechnet
-  };
+  apiValue = import ./api.nix { inherit lib; };
 
 in
 {

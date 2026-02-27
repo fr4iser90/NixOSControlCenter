@@ -2,7 +2,9 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -13,6 +15,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch {
+	case key.Matches(msg, m.keys.runAction):
+			if m.list.SelectedItem() != nil {
+				selected := m.list.SelectedItem().(ModuleItem)
+				return m, m.runSelectedActionCmd(selected)
+			}
+
 		case key.Matches(msg, m.keys.toggle):
 			// Toggle details view
 			m.showDetails = !m.showDetails
@@ -42,10 +50,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		// ✅ KEINE Fallbacks - valide Größe oder Error!
-		if m.width < 80 || m.height < 20 {
-			return m, tea.Quit // Exit mit Error - User muss Terminal vergrößern
-		}
+		// Allow small terminals; emergency layout will handle sizing
 
 		// Update list size based on available space
 		h, v := m.docStyle.GetFrameSize()
@@ -95,6 +100,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ModuleDisabledMsg:
 		// Handle module disabled
 		// TODO: Update module status and refresh list
+		return m, nil
+
+	case ActionExecutedMsg:
+		// Action executed - no state change yet
 		return m, nil
 
 	case ModulesRefreshedMsg:
@@ -161,6 +170,22 @@ func refreshModulesCmd() tea.Cmd {
 	}
 }
 
+// Run selected action via NCC_TUI_ACTION_CMD
+func (m Model) runSelectedActionCmd(selected ModuleItem) tea.Cmd {
+	return func() tea.Msg {
+		cmdTemplate := os.Getenv("NCC_TUI_ACTION_CMD")
+		if cmdTemplate == "" {
+			return ActionExecutedMsg{Success: false, Error: fmt.Errorf("NCC_TUI_ACTION_CMD not set")}
+		}
+		cmdStr := strings.ReplaceAll(cmdTemplate, "{name}", selected.Name)
+		err := exec.Command("bash", "-c", cmdStr).Run()
+		if err != nil {
+			return ActionExecutedMsg{Success: false, Error: err}
+		}
+		return ActionExecutedMsg{Success: true}
+	}
+}
+
 // Messages
 type ModuleEnabledMsg struct {
 	Success    bool
@@ -176,5 +201,10 @@ type ModuleDisabledMsg struct {
 
 type ModulesRefreshedMsg struct {
 	Modules []ModuleItem
+	Error   error
+}
+
+type ActionExecutedMsg struct {
+	Success bool
 	Error   error
 }

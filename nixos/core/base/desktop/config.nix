@@ -1,16 +1,13 @@
-{ config, lib, systemConfig, getModuleConfig, moduleName, ... }:
+{ lib, systemConfig, ... }:
 let
-  # Discovery: Modulname aus Dateisystem ableiten (wie options.nix!)
-  moduleName = baseNameOf (dirOf ./.);  # ← desktop aus core/base/desktop/
-  cfg = getModuleConfig moduleName;
-  locCfg = getModuleConfig "localization";
+  cfg = lib.attrByPath ["core" "base" "desktop"] {} systemConfig;
+  locCfg = lib.attrByPath ["core" "base" "localization"] {} systemConfig;
 
   # Use keyboard settings from localization module
   keyboardLayout = locCfg.keyboardLayout or "us";
   keyboardOptions = locCfg.keyboardOptions or "";
 in
-{
-  config = lib.mkIf (cfg.enable or true) {
+lib.mkIf (cfg.enable or true) {
       environment = {
         variables = {
           XKB_DEFAULT_LAYOUT = keyboardLayout;
@@ -48,5 +45,4 @@ in
         }
       ];
 
-  };
 }

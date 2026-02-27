@@ -15,7 +15,7 @@
     fzf         # Fuzzy finder for quick file and command searching
     iotop       # Monitor disk I/O usage by processes
     iftop       # Display real-time bandwidth usage by network connections
-    ufw         # Uncomplicated Firewall for managing firewall rules
+    # ufw package not present in this nixpkgs revision; remove to avoid build failure
     nmap        # Network scanner for auditing and monitoring networks
     gnupg       # Encryption and signing tool for secure communications
     jq

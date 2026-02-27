@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getCurrentModuleMetadata, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getCurrentModuleMetadata, getModuleApi, ... }:
 
 let
   # Single Source: Modulname nur einmal definieren
@@ -16,7 +16,7 @@ in {
   imports = [
     ./options.nix
     (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })
-    (import ./commands.nix { inherit config lib pkgs systemConfig getCurrentModuleMetadata; })
+    (import ./commands.nix { inherit config lib pkgs systemConfig getModuleApi; })
     ./password-manager.nix
   ];
 }

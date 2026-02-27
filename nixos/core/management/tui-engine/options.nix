@@ -29,6 +29,24 @@
       description = "pkgs for accessing Nix packages";
     };
 
+    tuiBinary = lib.mkOption {
+      type = lib.types.anything;
+      internal = true;
+      description = "Built tui-engine binary";
+    };
+
+    createTuiScript = lib.mkOption {
+      type = lib.types.anything;
+      internal = true;
+      description = "Generic TUI script builder";
+    };
+
+    domainTui = lib.mkOption {
+      type = lib.types.anything;
+      internal = true;
+      description = "Domain TUI helpers";
+    };
+
     writeScriptBin = lib.mkOption {
       type = lib.types.anything;
       internal = true;

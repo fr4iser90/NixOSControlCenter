@@ -1,10 +1,12 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 let
   # Discovery: Modulname aus Dateisystem ableiten
   moduleName = baseNameOf ./. ;  # ← packages aus core/base/packages/
   cfg = getModuleConfig moduleName;
   systemManagerCfg = getModuleConfig "system-manager";  # Anderes Modul, bleibt hardcoded
+  cfgRaw = lib.attrByPath ["core" "base" "packages"] {} systemConfig;
+  systemManagerCfgRaw = lib.attrByPath ["core" "management" "system-manager"] {} systemConfig;
 
   # Import package module metadata for validation
   packageMetadata = import ./lib/metadata.nix;
@@ -17,7 +19,7 @@ let
 
 
   # Load package modules (V1 format)
-  allModules = cfg.packageModules or [];
+  allModules = cfgRaw.packageModules or [];
 
   # Determine actual Docker mode - enabled if "docker" or "docker-rootless" in packageModules
   dockerMode = let
@@ -49,11 +51,9 @@ in {
   imports = [
     ./options.nix
     (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })
-    (import ./commands.nix { inherit config lib pkgs getModuleConfig moduleName; })
-    (let
-      systemType = systemManagerCfg.systemType or "desktop";
-    in
-      basePackages.${systemType} or (throw "Unknown system type: ${systemType}"))
+    ./commands.nix
+    ./components/base/desktop.nix
+    ./components/base/server.nix
   ] ++ moduleModules ++ dockerModules;
 
   # System packages from systemPackages option
@@ -83,4 +83,5 @@ in {
       }
     ) cfg.userPackages;
   };
+
 }

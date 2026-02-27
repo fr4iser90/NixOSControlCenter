@@ -65,6 +65,27 @@ in
         - No rebuild required to see new modules
       '';
     }
+    # Alias: module-manager -> modules
+    {
+      name = "module-manager";
+      domain = "modules";
+      description = "Module management TUI (alias)";
+      category = "system";
+      script = "${moduleManagerTui}/bin/ncc-module-manager";
+      type = "manager";
+      permission = "system.manage";
+      requiresSudo = true;
+      dangerous = false;
+      arguments = [];
+      dependencies = [ "bubbletea" ];
+      shortHelp = "module-manager - Module management (TUI)";
+      longHelp = ''
+        Alias for:
+          ncc modules
+
+        Interactive module management with modern Bubble Tea TUI.
+      '';
+    }
     # Internal helper command
     {
       name = "get-module-data";

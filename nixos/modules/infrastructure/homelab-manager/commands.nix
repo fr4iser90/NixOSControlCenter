@@ -11,7 +11,7 @@ let
   ui = getModuleApi "cli-formatter";
 
   # TUI Actions script
-  tuiActions = import ./tui/actions.nix { inherit config lib pkgs; };
+  tuiActions = import ./ui/tui/actions.nix { inherit config lib pkgs; };
 
   # Basic CLI commands (placeholder implementations)
   homelabStatus = pkgs.writeShellScriptBin "ncc-homelab-status" ''

@@ -9,6 +9,7 @@ let
   cliRegistry = getModuleApi "cli-registry";
   # Get UI utilities
   ui = getModuleApi "cli-formatter";
+  vmTui = (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi systemConfig moduleName; }).tuiScript;
   # Get VM library
   libVM = import ./lib { inherit lib pkgs; };
   
@@ -177,7 +178,7 @@ let
       type = "manager";
       description = "VM Manager - Manage virtual machines";
       category = "infrastructure";
-      script = "${vmStatus}/bin/ncc-vm-status";
+      script = "${vmTui}/bin/ncc-vm-tui";
       shortHelp = "vm - VM Manager (TUI)";
       longHelp = ''
         VM Manager provides commands to manage virtual machines.

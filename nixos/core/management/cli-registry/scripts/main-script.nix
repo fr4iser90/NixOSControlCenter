@@ -4,6 +4,7 @@ let
   ui = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
   ccLib = import ../lib { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
+  rootTui = (import ../ui/tui/default.nix { inherit config lib pkgs; }).tuiScript;
 
   # Dynamische Inhalte vorbereiten
   # Get commands from CLI Registry API (collects from all modules)
@@ -27,7 +28,7 @@ in
     # Hilfefunktion anzeigen
     function show_help() {
       ${ui.text.header "NixOS Control Center"}
-      ${ui.text.normal "Usage: ncc <command> [arguments]"}
+      ${ui.text.normal "Usage: ncc <domain> [action]"}
       ${ui.text.normal "       ncc help <command>"}
       ${ui.text.newline}
       ${ui.text.subHeader "Available commands:"}
@@ -59,10 +60,9 @@ in
       local cmd="$1"
       shift
       
-      # No command → show help
+      # No command → show TUI root menu
       if [[ -z "$cmd" ]]; then
-        show_help
-        exit 0
+        exec ${rootTui}/bin/ncc-ncc-tui
       fi
       
       # help command

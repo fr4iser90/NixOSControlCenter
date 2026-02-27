@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"os"
+
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -34,6 +36,7 @@ type Model struct {
 	getFilterCmd  string
 	getDetailsCmd string
 	getActionsCmd string
+	getStatsCmd   string
 
 	// 5-panel layout state
 	selectedModule ModuleItem
@@ -60,7 +63,7 @@ type Model struct {
 	statsViewport   viewport.Model
 }
 
-func NewModel(modules []ModuleItem, getListCmd, getFilterCmd, getDetailsCmd, getActionsCmd string) Model {
+func NewModel(modules []ModuleItem, getListCmd, getFilterCmd, getDetailsCmd, getActionsCmd, getStatsCmd string) Model {
 	// Create list items from modules
 	items := make([]list.Item, len(modules))
 	for i, module := range modules {
@@ -69,7 +72,11 @@ func NewModel(modules []ModuleItem, getListCmd, getFilterCmd, getDetailsCmd, get
 
 	// Initialize list
 	l := list.New(items, list.NewDefaultDelegate(), 0, 0)
-	l.Title = "📦 Module Manager"
+	if title := os.Getenv("NCC_TUI_TITLE"); title != "" {
+		l.Title = title
+	} else {
+		l.Title = "📦 Module Manager"
+	}
 
 	// Initialize other components
 	s := spinner.New()
@@ -99,6 +106,7 @@ func NewModel(modules []ModuleItem, getListCmd, getFilterCmd, getDetailsCmd, get
 		getFilterCmd:    getFilterCmd,
 		getDetailsCmd:   getDetailsCmd,
 		getActionsCmd:   getActionsCmd,
+		getStatsCmd:     getStatsCmd,
 		filterStatus:    "all",
 		showDetails:     false,
 		width:           120, // Default width

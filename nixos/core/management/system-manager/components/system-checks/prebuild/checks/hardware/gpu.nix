@@ -146,6 +146,7 @@ in {
     (cliRegistry.registerCommandsFor "system-checks-gpu" [
       {
         name = "check-gpu";
+        domain = "system";
         category = "system-checks";
         internal = true;  # Don't show in main help - called by ncc system build
         description = "Check GPU configuration before system rebuild";

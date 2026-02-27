@@ -6,6 +6,7 @@ let
   # CLI formatter API - Vollständig API-basiert, kein hardcoded Pfad!
   ui = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
+  lockTui = (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi systemConfig moduleConfig; }).tuiScript;
 
   # Feature configuration - API-basiert, kein hardcoded Pfad!
   cfg = systemConfig.${moduleConfig.configPath};
@@ -215,6 +216,19 @@ in
   in {
     # Command registration via CLI registry API - KEINE HARDCODED PFADE!
     (cliRegistry.registerCommandsFor "lock-manager" [
+      {
+        name = "lock";
+        domain = "lock";
+        description = "Lock manager TUI";
+        category = "system";
+        script = "${lockTui}/bin/ncc-lock-tui";
+        arguments = [];
+        type = "manager";
+        shortHelp = "lock - Lock Manager (TUI)";
+        longHelp = ''
+          Lock manager TUI placeholder.
+        '';
+      }
       {
         name = "discover";
         description = "Scan system and create encrypted snapshot";

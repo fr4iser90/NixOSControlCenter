@@ -27,6 +27,7 @@ let
   # CLI APIs - elegant registration
   formatter = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
+  systemTui = (import ./ui/tui/domain.nix { inherit config lib pkgs getModuleApi; }).tuiScript;
 
   # System Checks Scripts (converted from component)
   postbuildCheckScript = import ./components/system-checks/scripts/postbuild-checks.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
@@ -60,6 +61,20 @@ in {
         ];
     }
     (cliRegistry.registerCommandsFor "system-manager" [
+      # Domain TUI launcher
+      {
+        name = "system";
+        domain = "system";
+        description = "System management TUI";
+        category = "system";
+        script = "${systemTui}/bin/ncc-system-tui";
+        arguments = [];
+        type = "manager";
+        shortHelp = "system - System Manager (TUI)";
+        longHelp = ''
+          Interactive system manager TUI.
+        '';
+      }
       # Subcommand: check-versions
       {
         name = "check-versions";

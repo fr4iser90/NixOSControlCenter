@@ -1,13 +1,24 @@
-{ config, lib, pkgs, systemConfig, getCurrentModuleMetadata, ... }:
+{ config, lib, pkgs, getModuleApi ? null, moduleName ? (baseNameOf ./.), systemConfig ? null, ... }:
 let
-  # Use dynamic config access like other modules
-  metadata = getCurrentModuleMetadata ./.;  # ← Wie in options.nix!
-  cfg = systemConfig.${metadata.configPath};
+  cfg = lib.attrByPath ["core" "base" "user"] {} systemConfig;
+  cliRegistry = getModuleApi "cli-registry";
+  userTui = (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi systemConfig; }).tuiScript;
 in
-  lib.mkIf (cfg.enable or true) {
-    # TODO: Add user management commands?
-    # - ncc user-create
-    # - ncc user-delete
-    # - ncc user-list
-    # - ncc user-modify
-  }
+{
+  config = lib.mkIf (cfg.enable or true)
+    (cliRegistry.registerCommandsFor "user" [
+      {
+        name = "user";
+        domain = "user";
+        description = "User manager TUI";
+        category = "base";
+        script = "${userTui}/bin/ncc-user-tui";
+        arguments = [];
+        type = "manager";
+        shortHelp = "user - User Manager (TUI)";
+        longHelp = ''
+          User manager TUI placeholder.
+        '';
+      }
+    ]);
+}

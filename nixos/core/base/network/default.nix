@@ -1,5 +1,5 @@
 # modules/networking/default.nix
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 let
   # Single Source: Modulname nur einmal definieren
@@ -26,7 +26,7 @@ in {
     version = "1.0.0";
   };
 
-  imports = networkingModules;
+  imports = networkingModules ++ [ (import ./commands.nix { inherit config lib pkgs getModuleApi moduleName systemConfig; }) ];
 
   # Basic networking configuration
   networking = {

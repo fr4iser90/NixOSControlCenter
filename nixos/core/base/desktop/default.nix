@@ -1,12 +1,8 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getCurrentModuleMetadata, ... }:
 
 let
   # Discovery: Modulname aus Dateisystem ableiten
   moduleName = baseNameOf ./. ;  # ← desktop aus core/base/desktop/
-  cfg = getModuleConfig moduleName;
-
-  # DEBUG: cfg Wert anzeigen
-  debugCfg = cfg;  # Für spätere Verwendung
 in {
   _module.metadata = {
     role = "core";
@@ -18,12 +14,13 @@ in {
   };
 
 
-  imports = if cfg.enable or false then [
+  imports = [
     ./options.nix
     ./components/display-managers
     ./components/display-servers
     ./components/environments
     ./components/themes
-    (import ./config.nix { inherit config lib systemConfig getModuleConfig moduleName; })
-  ] else [];
+    (import ./config.nix { inherit lib systemConfig; })
+    (import ./commands.nix { inherit config lib pkgs getModuleApi moduleName systemConfig getCurrentModuleMetadata; })
+  ];
 }

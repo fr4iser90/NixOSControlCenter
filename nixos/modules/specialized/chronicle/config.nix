@@ -96,12 +96,10 @@ let
 
   # GUI script (if enabled)
   guiScript = lib.optionalAttrs (cfg.gui.enableGtk or false) (
-    import ./gui/gtk4-app.nix { inherit lib pkgs cfg; }
+    import ./ui/gui/gtk4-app.nix { inherit lib pkgs cfg; }
   );
-
-  # Tray script (if enabled)
   trayScript = lib.optionalAttrs (cfg.gui.enableTray or false) (
-    import ./gui/tray.nix { inherit lib pkgs cfg; }
+    import ./ui/gui/tray.nix { inherit lib pkgs cfg; }
   );
 
   # API module (v2.0.0 - Phase 5)

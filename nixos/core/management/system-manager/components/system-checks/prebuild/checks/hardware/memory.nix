@@ -108,6 +108,7 @@ in {
     (cliRegistry.registerCommandsFor "system-checks-memory" [
       {
         name = "check-memory";
+        domain = "system";
         category = "system-checks";
         internal = true;  # Don't show in main help - called by ncc system build
         description = "Check memory configuration before system rebuild";

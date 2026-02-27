@@ -1,10 +1,9 @@
-# display-servers/default.nix
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
 let
-  desktopCfg = getModuleConfig "desktop";
-  displayCfg = desktopCfg.display;
-  server = displayCfg.server;
+  desktopCfg = lib.attrByPath ["core" "base" "desktop"] {} systemConfig;
+  displayCfg = desktopCfg.display or {};
+  server = displayCfg.server or "wayland";
 in {
   # Import display server configurations based on selection
   # For hybrid setups, both x11 and wayland will be imported
@@ -23,7 +22,7 @@ in {
 
   # Validate display server selection
   # Ensures only supported configurations are used
-  assertions = lib.mkIf desktopCfg.enable [{
+  assertions = lib.mkIf (desktopCfg.enable or true) [{
     assertion = builtins.elem server ["x11" "wayland" "hybrid"];
     message = "Invalid display server: ${server}";
   }];

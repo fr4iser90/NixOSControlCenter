@@ -14,18 +14,22 @@ func main() {
 	// log.Println("🐛 DEBUG: Go binary started!")
 
 	// Parse command line arguments from Nix template
-	// Args: [program] [getListCmd] [getFilterCmd] [getDetailsCmd] [getActionsCmd]
+	// Args: [program] [getListCmd] [getFilterCmd] [getDetailsCmd] [getActionsCmd] [getStatsCmd]
 	args := os.Args
 	// log.Println("🐛 DEBUG: Received %d command line args: %v", len(args), args)
 
 	if len(args) < 5 {
-		log.Fatal("Usage: program getListCmd getFilterCmd getDetailsCmd getActionsCmd")
+		log.Fatal("Usage: program getListCmd getFilterCmd getDetailsCmd getActionsCmd [getStatsCmd]")
 	}
 
 	getListCmd := args[1]
 	getFilterCmd := args[2]
 	getDetailsCmd := args[3]
 	getActionsCmd := args[4]
+	getStatsCmd := ""
+	if len(args) > 5 {
+		getStatsCmd = args[5]
+	}
 
 	// log.Println("🐛 DEBUG: getListCmd: %s", getListCmd)
 	// log.Println("🐛 DEBUG: getFilterCmd: %s", getFilterCmd)
@@ -43,7 +47,7 @@ func main() {
 
 	// Create TUI model with Nix function commands
 	// log.Println("🐛 DEBUG: Creating TUI model...")
-	model := tui.NewModel(modules, getListCmd, getFilterCmd, getDetailsCmd, getActionsCmd)
+	model := tui.NewModel(modules, getListCmd, getFilterCmd, getDetailsCmd, getActionsCmd, getStatsCmd)
 
 	// Start Bubble Tea program
 	// log.Println("🐛 DEBUG: Starting Bubble Tea program...")

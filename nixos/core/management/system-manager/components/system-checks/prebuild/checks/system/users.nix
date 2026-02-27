@@ -73,6 +73,7 @@ in {
     (cliRegistry.registerCommandsFor "system-checks-users" [
       {
         name = "check-users";
+        domain = "system";
         category = "system-checks";
         internal = true;  # Don't show in main help - called by ncc system build
         description = "Check user configuration before system rebuild";

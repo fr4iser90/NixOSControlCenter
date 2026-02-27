@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"log"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -16,7 +17,10 @@ import (
 // =============================================================================
 
 func init() {
-	// Setup debug logging to file
+	if os.Getenv("NCC_TUI_DEBUG") != "1" {
+		log.SetOutput(io.Discard)
+		return
+	}
 	logFile, err := os.OpenFile("/tmp/tui-debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err == nil {
 		log.SetOutput(logFile)
@@ -26,6 +30,16 @@ func init() {
 
 func (m Model) renderHeader(dims *LayoutDimensions) string {
 	log.Printf("🐛 DEBUG renderHeader(): dims.InnerWidth=%d\n", dims.InnerWidth)
+
+	// Allow dynamic title via env
+	if title := os.Getenv("NCC_TUI_TITLE"); title != "" {
+		content := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("39")).
+			Align(lipgloss.Center).
+			Render(title)
+		return ensureSize(content, dims.InnerWidth, dims.HeaderHeight)
+	}
 
 	// ✅ Header verwendet EXAKTE Dimensionen aus LayoutDimensions
 	content := lipgloss.NewStyle().
@@ -44,7 +58,10 @@ func (m Model) renderHeader(dims *LayoutDimensions) string {
 
 func (m Model) renderFooter(dims *LayoutDimensions) string {
 	// ✅ Footer verwendet EXAKTE Dimensionen aus LayoutDimensions
-	shortcuts := "↑/↓ Navigate • / Search • e Enable • d Disable • r Refresh • t Details • q Quit"
+	shortcuts := os.Getenv("NCC_TUI_FOOTER")
+	if shortcuts == "" {
+		shortcuts = "↑/↓ Navigate • / Search • e Enable • d Disable • r Refresh • t Details • q Quit"
+	}
 	
 	content := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("241")).
@@ -658,15 +675,7 @@ func (m Model) View() string {
 	// 🐛 DEBUG: Was passiert in View()?
 	log.Printf("🐛 DEBUG View(): width=%d height=%d\n", m.width, m.height)
 
-	// ✅ Klare Fehlermeldung bei zu kleiner Terminal
-	if m.width < 80 || m.height < 20 {
-		log.Printf("🐛 DEBUG View(): Terminal zu klein!\n")
-		return fmt.Sprintf("❌ TERMINAL ZU KLEIN!\n\n"+
-			"Aktuelle Größe: %dx%d\n"+
-			"Benötigt: mindestens 80x20\n\n"+
-			"Bitte Terminal vergrößern und neu starten!",
-			m.width, m.height)
-	}
+// Allow small terminals; emergency layout will handle sizing
 
 	if len(m.list.Items()) == 0 {
 		log.Printf("🐛 DEBUG View(): Keine Items, zeige Spinner\n")
@@ -750,6 +759,9 @@ func (m Model) renderInfoContent() string {
 }
 
 func (m Model) renderStatsContent() string {
+	if m.getStatsCmd != "" {
+		return m.getNixContent(m.getStatsCmd)
+	}
 	// ✅ Calculate real statistics
 	total := len(m.modules)
 	enabled := 0
@@ -870,6 +882,9 @@ func init() {
 func (m Model) renderResponsiveLayout() string {
 	log.Printf("🐛 DEBUG renderResponsiveLayout(): Start\n")
 
+	// Layout override via env
+	preferredLayout := strings.TrimSpace(os.Getenv("NCC_TUI_LAYOUT"))
+
 	// ✅ 1. Create border style
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -893,7 +908,7 @@ func (m Model) renderResponsiveLayout() string {
 	templateRegistry.Register("full", NewFullLayoutTemplate(cp))
 
 	// ✅ 5. Select appropriate template
-	template := templateRegistry.SelectTemplate(m.width, m.height, "")
+	template := templateRegistry.SelectTemplate(m.width, m.height, preferredLayout)
 	log.Printf("🐛 DEBUG renderResponsiveLayout(): Template selected: %T\n", template)
 
 	if template == nil {
