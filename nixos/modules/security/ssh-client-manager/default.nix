@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 with lib;
 
@@ -14,11 +14,7 @@ in {
     ./options.nix
   ] ++ optionals (cfg.enable or false) [
     ./config.nix
-    ./commands.nix
-    ./handlers/ssh-client-handler.nix
-    ./scripts/ssh-client-manager.nix
-    ./lib/ssh-key-utils.nix
-    ./lib/ssh-server-utils.nix
+    (import ./commands.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; moduleName = moduleName; })
   ];
 
   # Removed: Redundant enable setting (already defined in options.nix)

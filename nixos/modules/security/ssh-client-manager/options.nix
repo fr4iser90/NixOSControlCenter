@@ -34,38 +34,6 @@ in {
 
     enable = lib.mkEnableOption "SSH client manager";
 
-    # Internal option for SSH key utilities (set by ssh-key-utils.nix)
-    sshClientManagerKeyUtils = lib.mkOption {
-      type = lib.types.str;
-      default = "";
-      internal = true;
-      description = "SSH-Key utility functions";
-    };
-
-    # Internal option for SSH server utilities (set by ssh-server-utils.nix)
-    sshClientManagerServerUtils = lib.mkOption {
-      type = lib.types.str;
-      default = "";
-      internal = true;
-      description = "SSH-Server entry utility functions";
-    };
-
-    # Internal option for the centralized connection handler (set by connection-handler.nix)
-    sshConnectionHandler = lib.mkOption {
-      type = lib.types.str;
-      default = "";
-      internal = true;
-      description = "Centralized SSH connection handler functions";
-    };
-
-    # Internal option for the main SSH client manager script (set by main.nix)
-    sshClientManagerScript = lib.mkOption {
-      type = lib.types.str;
-      default = "";
-      internal = true;
-      description = "SSH-Server entry utility functions";
-    };
-
     # Path to the credentials file relative to user's home directory
     # This file stores server entries in format: server_ip=username
     credentialsFile = lib.mkOption {
@@ -151,17 +119,5 @@ in {
       };
     };
 
-    # Script for the FZF preview feature in the SSH Manager
-    # This script shows detailed information about selected servers
-    connectionPreviewScript = lib.mkOption {
-      type = lib.types.package;
-      default = lib.getBin (pkgs.writeShellScriptBin "ssh-connection-preview" ''
-        #!${pkgs.bash}/bin/bash
-        # Minimal fallback preview script to avoid missing attribute errors.
-        # It prints the selected server entry.
-        echo "SSH Server: $1"
-      '');
-      description = "Script for the FZF preview feature in the SSH Manager.";
-    };
   };
 }

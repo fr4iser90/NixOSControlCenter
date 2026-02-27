@@ -1,31 +1,29 @@
-{ config, lib, pkgs, systemConfig, getCurrentModuleMetadata, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 with lib;
 
 let
   ui = getModuleApi "cli-formatter";
-  moduleConfig = getCurrentModuleMetadata ../.;
-  cfg = lib.attrByPath (["systemConfig"] ++ lib.splitString "." moduleConfig.configPath) {} config;
-  # Build helper strings directly (Option A) so they are always available
+  moduleName = baseNameOf ../.;
+  cfg = getModuleConfig moduleName;
   serverUtilsModule = import ../lib/ssh-server-utils.nix {
-    inherit config lib pkgs getCurrentModuleMetadata getModuleApi;
+    inherit config lib pkgs getModuleApi;
     sshClientCfg = cfg;
   };
   keyUtilsModule = import ../lib/ssh-key-utils.nix {
-    inherit config lib pkgs getCurrentModuleMetadata getModuleApi;
+    inherit config lib pkgs getModuleApi;
     sshClientCfg = cfg;
   };
   handlerModule = import ../handlers/ssh-client-handler.nix {
-    inherit config lib pkgs systemConfig getCurrentModuleMetadata getModuleConfig getModuleApi;
+    inherit config lib pkgs systemConfig getModuleConfig getModuleApi;
   };
-  serverUtils = serverUtilsModule.config.systemConfig.${moduleConfig.configPath}.sshClientManagerServerUtils or "";
-  keyUtils = keyUtilsModule.config.systemConfig.${moduleConfig.configPath}.sshClientManagerKeyUtils or "";
-  connectionHandler = handlerModule.config.systemConfig.${moduleConfig.configPath}.sshConnectionHandler or "";
+  serverUtils = serverUtilsModule.sshClientManagerServerUtils or "";
+  keyUtils = keyUtilsModule.sshClientManagerKeyUtils or "";
+  connectionHandler = handlerModule.sshConnectionHandler or "";
 in {
-  config = mkIf (cfg.enable or false) (let
-    # Main SSH Client Manager Script
-    # This script provides the interactive interface for managing SSH connections
-    sshClientManagerScript = pkgs.writeScriptBin "ncc-ssh-client-manager-main" ''
+  # Main SSH Client Manager Script
+  # This script provides the interactive interface for managing SSH connections
+  sshClientManagerScript = pkgs.writeScriptBin "ncc-ssh-client-manager-main" ''
       #!${pkgs.bash}/bin/bash
           
       # Include server utilities, key utilities, and connection handler
@@ -194,16 +192,4 @@ in {
       # Start the main function
       main
     '';
-  in {
-      # Add the SSH client manager script to system packages
-      environment.systemPackages = [
-        sshClientManagerScript
-      ];
-
-      # Store the script reference in the service configuration
-      systemConfig.${(getCurrentModuleMetadata ../.).configPath} = {
-        sshClientManagerScript = sshClientManagerScript;
-      };
-    }
-  );
 }
