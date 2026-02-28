@@ -1,6 +1,7 @@
-{ config, lib, pkgs, getModuleConfig, moduleName, ... }:
+{ config, lib, pkgs, getModuleConfig, moduleName, systemConfig, ... }:
 let
   cfg = getModuleConfig moduleName;
+  userPackagesConfig = lib.attrByPath ["users"] {} systemConfig;
 
   # Capabilities basierend auf Rolle (für NCC Permission System)
   roleCapabilities = {
@@ -63,6 +64,24 @@ let
 
   # Filter out non-user attributes (like 'enable')
   userAttrs = lib.filterAttrs (n: v: builtins.isAttrs v) cfg;
+  # User-spezifische Pakete aus configs/users/<name>/config.nix
+  userPackages = lib.mapAttrs (name: userConfig:
+    let
+      packageSource = userPackagesConfig.${name} or {};
+    in
+      if packageSource ? userPackages && builtins.isList packageSource.userPackages
+      then packageSource.userPackages
+      else if userConfig ? userPackages && builtins.isList userConfig.userPackages
+      then userConfig.userPackages
+      else []
+  ) userAttrs;
+  # Convert package names to actual derivations
+  resolvedUserPackages = lib.mapAttrs (name: packages:
+    map (pkgName:
+      if builtins.hasAttr pkgName pkgs then pkgs.${pkgName}
+      else throw "Package '${pkgName}' not found in nixpkgs"
+    ) packages
+  ) userPackages;
   userNames = builtins.attrNames userAttrs;
 
   # Automatisches Autologin für den ersten restricted-Admin-User
@@ -130,7 +149,7 @@ in
     shell = pkgs.${userConfig.defaultShell};
     group = username;
     extraGroups = [ "users" ] ++ roleGroups.${userConfig.role};
-    packages = rolePkgs.${userConfig.role} or [];
+    packages = (rolePkgs.${userConfig.role} or []) ++ (resolvedUserPackages.${username} or []);
 
     # Lingering-Konfiguration
     linger = roleLingering.${userConfig.role} or false;
