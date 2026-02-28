@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"tui-engine/src/tui"
+	"core/management/tui-engine/src/tui"
 )
 
 func main() {

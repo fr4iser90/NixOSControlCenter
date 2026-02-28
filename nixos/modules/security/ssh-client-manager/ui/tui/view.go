@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
@@ -153,6 +154,13 @@ func (m Model) renderViewportPanel(title string, vp viewport.Model, width, heigh
 	vp.Width = width
 	vp.Height = contentHeight
 
+	// CRITICAL: For menu viewport, set YOffset to 0 to prevent scrolling
+	if title == "" {
+		log.Printf("🔍 DEBUG renderViewportPanel(): menuViewport YOffset before: %d\n", vp.YOffset)
+		vp.SetYOffset(0)
+		log.Printf("🔍 DEBUG renderViewportPanel(): menuViewport YOffset after SetYOffset(0): %d\n", vp.YOffset)
+	}
+
 	// Create border style ohne Width-Constraint
 	style := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
@@ -161,7 +169,9 @@ func (m Model) renderViewportPanel(title string, vp viewport.Model, width, heigh
 		// REMOVED: .Width(width) - lässt Panel natürliche Breite verwenden
 
 	// Combine title and viewport content
+	log.Printf("🔍 DEBUG renderViewportPanel(): Calling vp.View() for %s - YOffset: %d\n", title, vp.YOffset)
 	viewportContent := vp.View()
+	log.Printf("🔍 DEBUG renderViewportPanel(): vp.View() done for %s\n", title)
 	log.Printf("🐛 DEBUG renderViewportPanel(): %s viewport content: %d chars\n", title, len(viewportContent))
 
 	content := title + "\n\n" + viewportContent
@@ -729,12 +739,17 @@ func (m Model) View() string {
 }
 
 func (m *Model) updatePanels() {
-	// Update all viewport content
-	m.menuViewport.SetContent(m.renderModuleListContent())
+	log.Printf("🔍 DEBUG updatePanels(): Starting\n")
+	log.Printf("🔍 DEBUG updatePanels(): menuViewport YOffset before SetContent: %d\n", m.menuViewport.YOffset)
+	m.menuViewport.SetContent(m.renderStaticModuleListContent())
+	log.Printf("🔍 DEBUG updatePanels(): menuViewport YOffset after SetContent: %d\n", m.menuViewport.YOffset)
+	log.Printf("🔍 DEBUG updatePanels(): Calling renderContentPanelContent()\n")
 	m.contentViewport.SetContent(m.renderContentPanelContent())
+	log.Printf("🔍 DEBUG updatePanels(): renderContentPanelContent() done\n")
 	m.filterViewport.SetContent(m.renderFilterContent())
 	m.infoViewport.SetContent(m.renderInfoContent())
 	m.statsViewport.SetContent(m.renderStatsContent())
+	log.Printf("🔍 DEBUG updatePanels(): Done\n")
 }
 
 // OLD PANEL FUNCTIONS REMOVED - REPLACED BY TEMPLATE SYSTEM
@@ -913,13 +928,27 @@ func (m Model) renderContentPanelContent() string {
 }
 
 func (m Model) renderPreviewContent() string {
-	cmd := os.Getenv("NCC_TUI_DETAILS_CMD")
-	if cmd == "" || m.selectedModule.Name == "" {
+	log.Printf("🔍 DEBUG renderPreviewContent(): Called for server: %s\n", m.selectedModule.Name)
+	if m.selectedModule.Name == "" {
+		log.Printf("🔍 DEBUG renderPreviewContent(): No selected module, returning empty\n")
 		return ""
 	}
-	cmdStr := fmt.Sprintf("%s %q", cmd, m.selectedModule.Name)
-	output := m.getNixContent(cmdStr)
-	return output
+
+	// Check if currently loading
+	if m.previewLoading == m.selectedModule.Name {
+		log.Printf("🔍 DEBUG renderPreviewContent(): Currently loading, showing 'Loading...'\n")
+		return "Loading..."
+	}
+
+	// Use cached content if available
+	if content, ok := m.previewCache[m.selectedModule.Name]; ok {
+		log.Printf("🔍 DEBUG renderPreviewContent(): Cache hit, returning cached content (length: %d)\n", len(content))
+		return content
+	}
+
+	// No cache yet, return empty (will be loaded asynchronously)
+	log.Printf("🔍 DEBUG renderPreviewContent(): Cache miss, returning empty (async load in progress)\n")
+	return ""
 }
 
 func (m Model) renderModulePreview() string {
@@ -961,16 +990,23 @@ func (m Model) renderModuleDetails() string {
 
 // Helper function to execute Nix content functions
 func (m Model) getNixContent(nixCmd string) string {
+	log.Printf("🔍 DEBUG getNixContent(): Starting - cmd: %s\n", nixCmd)
 	if nixCmd == "" {
 		return "Content not available"
 	}
 
+	log.Printf("🔍 DEBUG getNixContent(): Executing command - THIS BLOCKS!\n")
+	startTime := time.Now()
 	cmd := exec.Command("bash", "-c", nixCmd)
 	output, err := cmd.Output()
+	duration := time.Since(startTime)
+	log.Printf("🔍 DEBUG getNixContent(): Command finished after %v - BLOCKED UI!\n", duration)
 	if err != nil {
+		log.Printf("🔍 DEBUG getNixContent(): Error: %v\n", err)
 		return fmt.Sprintf("Error: %v", err)
 	}
 
+	log.Printf("🔍 DEBUG getNixContent(): Success, output length: %d\n", len(output))
 	return strings.TrimSpace(string(output))
 }
 

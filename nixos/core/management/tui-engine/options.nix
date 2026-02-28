@@ -35,6 +35,12 @@
       description = "Built tui-engine binary";
     };
 
+    tuiEngineSrc = lib.mkOption {
+      type = lib.types.anything;
+      internal = true;
+      description = "TUI engine source with merged TUI files from all modules";
+    };
+
     createTuiScript = lib.mkOption {
       type = lib.types.anything;
       internal = true;

@@ -7,11 +7,11 @@ let
   runtimeDiscovery = (import ../../module-manager/lib/runtime_discovery.nix { inherit lib pkgs; }).runtimeDiscovery;
 
   # Build the Go binary using the same logic as package.nix
+  # Use tuiEngineSrc which has merged TUI files from all modules
   bubbleTeaBinary = config.core.management.tui-engine.buildGoApplication {
     pname = "module-manager-tui";
     version = "1.0.0";
-    src = ../.;  # Include the directory with go.mod
-  #  pwd = ../.;  # Set working directory to the source
+    src = config.core.management.tui-engine.tuiEngineSrc;  # Use tuiEngineSrc with merged files
     go = pkgs.go;  # Use the available Go version
     modules = ../gomod2nix.toml;
   #  subPackages = [ "." ];  # Build the main package

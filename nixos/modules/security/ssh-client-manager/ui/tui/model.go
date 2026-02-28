@@ -87,6 +87,11 @@ type Model struct {
 	filterViewport  viewport.Model
 	infoViewport    viewport.Model
 	statsViewport   viewport.Model
+
+	// Preview caching and async loading
+	previewCache     map[string]string // Server name -> preview content
+	previewLoading   string            // Currently loading server name
+	lastSelectedName string             // Track selection changes for debouncing
 }
 
 type UIState int
@@ -153,9 +158,12 @@ func NewModel(modules []ModuleItem, getListCmd, getFilterCmd, getDetailsCmd, get
 		menuViewport:    menuVp,
 		filterViewport:  filterVp,
 		infoViewport:    infoVp,
-		statsViewport:   statsVp,
-		uiState:         StateNormal,
-		actionIndex:     0,
+		statsViewport:     statsVp,
+		uiState:           StateNormal,
+		actionIndex:       0,
+		previewCache:      make(map[string]string),
+		previewLoading:    "",
+		lastSelectedName:  "",
 	}
 
 	// Initialize viewport content

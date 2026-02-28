@@ -1,13 +1,155 @@
 { config, lib, pkgs, buildGoApplication, gomod2nix, ... }:
 
 let
+  # Import module discovery to find all modules with TUI files
+  discoveryLib = import ../module-manager/lib/discovery.nix { inherit lib; };
+  allModules = discoveryLib.discoverAllModules;
+  
+  # Find all modules that have TUI Go files in ui/tui/
+  modulesWithTui = lib.filter (module:
+    builtins.pathExists "${module.path}/ui/tui/model.go" ||
+    builtins.pathExists "${module.path}/ui/tui/view.go" ||
+    builtins.pathExists "${module.path}/ui/tui/update.go"
+  ) allModules;
+  
+  # Merge all module TUI files into a single directory
+  # All modules have package tui, so we need to merge them into one package
+  # Original files remain unchanged, but in build context they're in the same directory
+  mergedTuiFiles = pkgs.runCommand "merged-tui-files" {
+    buildInputs = [ pkgs.coreutils ];
+  } ''
+    mkdir -p $out/core/management/tui-engine/src/tui
+    # Copy all TUI files from all modules into the same directory
+    # Files from different modules will be merged (last one wins for duplicates)
+    ${lib.concatMapStringsSep "\n" (module:
+      let
+        modulePath = toString module.path;
+        tuiDir = "${modulePath}/ui/tui";
+      in ''
+        # Copy TUI files from ${module.category}
+        if [ -d "${tuiDir}" ]; then
+          for file in "${tuiDir}"/*.go; do
+            if [ -f "$file" ]; then
+              # Use install instead of cp to handle permissions correctly
+              install -m 644 "$file" "$out/core/management/tui-engine/src/tui/$(basename "$file")"
+            fi
+          done
+        fi
+      ''
+    ) modulesWithTui}
+  '';
+  
+  # Generate go.mod content (no replace directives needed - files are merged)
+  # Module name must match the directory structure
+  goModContent = ''
+    module core/management/tui-engine
+
+    go 1.25.0
+
+    require (
+    	github.com/charmbracelet/bubbles v0.21.0
+    	github.com/charmbracelet/bubbletea v1.3.10
+    	github.com/charmbracelet/glamour v0.10.0
+    	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
+    	github.com/charmbracelet/x/exp/teatest v0.0.0-20251023181713-f594ac034d6b
+    	github.com/muesli/go-app-paths v0.2.2
+    	github.com/spf13/cobra v1.10.1
+    	github.com/stretchr/testify v1.11.1
+    	modernc.org/sqlite v1.39.1
+    )
+
+    require (
+    	github.com/alecthomas/chroma/v2 v2.20.0 // indirect
+    	github.com/atotto/clipboard v0.1.4 // indirect
+    	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
+    	github.com/aymanbagabas/go-udiff v0.3.1 // indirect
+    	github.com/aymerick/douceur v0.2.0 // indirect
+    	github.com/charmbracelet/colorprofile v0.3.2 // indirect
+    	github.com/charmbracelet/x/ansi v0.10.2 // indirect
+    	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
+    	github.com/charmbracelet/x/exp/golden v0.0.0-20251023181713-f594ac034d6b // indirect
+    	github.com/charmbracelet/x/exp/slice v0.0.0-20251023181713-f594ac034d6b // indirect
+    	github.com/charmbracelet/x/term v0.2.1 // indirect
+    	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
+    	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+    	github.com/dlclark/regexp2 v1.11.5 // indirect
+    	github.com/dustin/go-humanize v1.0.1 // indirect
+    	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
+    	github.com/google/uuid v1.6.0 // indirect
+    	github.com/gorilla/css v1.0.1 // indirect
+    	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+    	github.com/kr/pretty v0.3.1 // indirect
+    	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
+    	github.com/mattn/go-isatty v0.0.20 // indirect
+    	github.com/mattn/go-localereader v0.0.1 // indirect
+    	github.com/mattn/go-runewidth v0.0.19 // indirect
+    	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
+    	github.com/mitchellh/go-homedir v1.1.0 // indirect
+    	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
+    	github.com/muesli/cancelreader v0.2.2 // indirect
+    	github.com/muesli/reflow v0.3.0 // indirect
+    	github.com/muesli/termenv v0.16.0 // indirect
+    	github.com/ncruces/go-strftime v1.0.0 // indirect
+    	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+    	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+    	github.com/rivo/uniseg v0.4.7 // indirect
+    	github.com/rogpeppe/go-internal v1.11.0 // indirect
+    	github.com/sahilm/fuzzy v0.1.1 // indirect
+    	github.com/spf13/pflag v1.0.10 // indirect
+    	github.com/stretchr/objx v0.5.3 // indirect
+    	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+    	github.com/yuin/goldmark v1.7.13 // indirect
+    	github.com/yuin/goldmark-emoji v1.0.6 // indirect
+    	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
+    	golang.org/x/net v0.46.0 // indirect
+    	golang.org/x/sys v0.37.0 // indirect
+    	golang.org/x/term v0.36.0 // indirect
+    	golang.org/x/text v0.30.0 // indirect
+    	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
+    	gopkg.in/yaml.v3 v3.0.1 // indirect
+    	modernc.org/libc v1.66.10 // indirect
+    	modernc.org/mathutil v1.7.1 // indirect
+    	modernc.org/memory v1.11.0 // indirect
+    )
+  '';
+  
+  # Generate go.mod file
+  generatedGoMod = pkgs.writeText "go.mod" goModContent;
+  
+  # Create src with tui-engine files + merged TUI files + generated go.mod
+  # Module TUI files are merged into core/management/tui-engine/src/tui/
+  # Original files remain unchanged, but in build context they're merged
+  # Structure: $out/ = tui-engine directory (for use as src directly)
+  tuiEngineSrc = pkgs.runCommand "tui-engine-src" {
+    buildInputs = [ pkgs.coreutils ];
+  } ''
+    # Create output directory (this will be the tui-engine directory)
+    mkdir -p $out
+    # Copy tui-engine files (excluding ui/tui if it exists)
+    cp -r ${../../..}/core/management/tui-engine/* $out/ || true
+    # Set write permissions before removing
+    chmod -R u+w $out || true
+    # Remove any existing src/tui directory
+    rm -rf $out/src/tui || true
+    # Copy merged TUI files from all modules
+    mkdir -p $out/src
+    cp -r ${mergedTuiFiles}/core/management/tui-engine/src/tui $out/src/
+    # Place generated go.mod in tui-engine directory
+    install -m 644 ${generatedGoMod} $out/go.mod
+  '';
+  
   # Build tui-engine binary once
+  # src points to tui-engine directory with merged TUI files
+  # All module TUI files are merged into core/management/tui-engine/src/tui/
   tuiEngineBinary = buildGoApplication {
     pname = "tui-engine";
     version = "1.0.0";
-    src = ./.;
+    src = tuiEngineSrc;
     go = pkgs.go;
     modules = ./gomod2nix.toml;
+    # buildGoApplication will find go.mod in core/management/tui-engine/
+    # It will build from core/management/tui-engine/main.go
+    # Module TUI files are merged into core/management/tui-engine/src/tui/
   };
 
   # Generic TUI runner: uses tui-engine binary + 4 panel scripts + title
@@ -44,6 +186,7 @@ let
   apiValue = import ./api.nix { inherit lib config; } // {
     createTuiScript = createTuiScript;
     tuiBinary = tuiEngineBinary;
+    tuiEngineSrc = tuiEngineSrc;  # Expose src for module-manager-tui.nix
     domainTui = import ./lib/domain-tui.nix { inherit config lib pkgs; };
   };
 in {
@@ -58,6 +201,7 @@ in {
     writeScriptBin = pkgs.writeScriptBin;
     installShellFiles = pkgs.installShellFiles;
     tuiBinary = tuiEngineBinary;
+    tuiEngineSrc = tuiEngineSrc;  # Expose src for module-manager-tui.nix
     createTuiScript = createTuiScript;
     domainTui = apiValue.domainTui;
   };

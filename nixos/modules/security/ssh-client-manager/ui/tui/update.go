@@ -2,9 +2,11 @@ package tui
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -176,33 +178,82 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list.SetItems(items)
 		m.updatePanels()
 		return m, nil
+
+	case PreviewTriggerMsg:
+		log.Printf("🔍 DEBUG: PreviewTriggerMsg received for server: %s\n", msg.Server)
+		if msg.Server != "" {
+			if _, ok := m.previewCache[msg.Server]; !ok {
+				log.Printf("🔍 DEBUG: Cache miss, starting async load for: %s\n", msg.Server)
+				m.previewLoading = msg.Server
+				return m, loadPreviewCmd(msg.Server)
+			} else {
+				log.Printf("🔍 DEBUG: Cache hit for: %s\n", msg.Server)
+			}
+		}
+		return m, nil
+
+	case PreviewLoadedMsg:
+		log.Printf("🔍 DEBUG: PreviewLoadedMsg received for server: %s\n", msg.Server)
+		if msg.Error != nil {
+			m.previewCache[msg.Server] = fmt.Sprintf("Error: %v", msg.Error)
+			log.Printf("🔍 DEBUG: Preview load error: %v\n", msg.Error)
+		} else {
+			m.previewCache[msg.Server] = msg.Content
+			log.Printf("🔍 DEBUG: Preview loaded, content length: %d\n", len(msg.Content))
+		}
+		if m.previewLoading == msg.Server {
+			m.previewLoading = ""
+		}
+		m.contentViewport.SetContent(m.renderContentPanelContent())
+		return m, nil
 	}
 
 	// Update list
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
 
-	// Update all viewports for scrolling
+	// Update all viewports for scrolling (EXCEPT menuViewport - static list)
 	var menuCmd tea.Cmd
 	var contentCmd tea.Cmd
 	var filterCmd tea.Cmd
 	var infoCmd tea.Cmd
 	var statsCmd tea.Cmd
 
-	m.menuViewport, menuCmd = m.menuViewport.Update(msg)
+	log.Printf("🔍 DEBUG: menuViewport.Update() called - YOffset before: %d\n", m.menuViewport.YOffset)
+	// DO NOT update menuViewport - it's static, no scrolling
+	// m.menuViewport, menuCmd = m.menuViewport.Update(msg)  // DISABLED for static list
+	menuCmd = nil
+	log.Printf("🔍 DEBUG: menuViewport.Update() DISABLED - keeping static\n")
 	m.contentViewport, contentCmd = m.contentViewport.Update(msg)
 	m.filterViewport, filterCmd = m.filterViewport.Update(msg)
 	m.infoViewport, infoCmd = m.infoViewport.Update(msg)
 	m.statsViewport, statsCmd = m.statsViewport.Update(msg)
 
-	// Update selected module and panels
+	// Update selected module and trigger debounced preview loading
+	var previewCmd tea.Cmd
 	if m.list.SelectedItem() != nil {
-		m.selectedModule = m.list.SelectedItem().(ModuleItem)
+		selected := m.list.SelectedItem().(ModuleItem)
+		m.selectedModule = selected
+		
+		log.Printf("🔍 DEBUG: Selected module: %s, lastSelectedName: %s\n", selected.Name, m.lastSelectedName)
+		if selected.Name != m.lastSelectedName {
+			log.Printf("🔍 DEBUG: Selection changed, triggering debounced preview for: %s\n", selected.Name)
+			m.lastSelectedName = selected.Name
+			previewCmd = m.debouncedPreviewCmd(selected.Name)
+		}
+	} else {
+		m.lastSelectedName = ""
 	}
+	
+	log.Printf("🔍 DEBUG: Calling updatePanels()\n")
 	m.updatePanels()
+	log.Printf("🔍 DEBUG: updatePanels() done\n")
 
 	// Combine commands
 	cmds := []tea.Cmd{cmd, menuCmd, contentCmd, filterCmd, infoCmd, statsCmd}
+	if previewCmd != nil {
+		cmds = append(cmds, previewCmd)
+	}
 	return m, tea.Batch(cmds...)
 }
 
@@ -367,4 +418,57 @@ type ModulesRefreshedMsg struct {
 type ActionExecutedMsg struct {
 	Success bool
 	Error   error
+}
+
+type PreviewLoadedMsg struct {
+	Content string
+	Server  string
+	Error   error
+}
+
+type PreviewTriggerMsg struct {
+	Server string
+}
+
+// Load preview content asynchronously
+func loadPreviewCmd(server string) tea.Cmd {
+	return func() tea.Msg {
+		log.Printf("🔍 DEBUG loadPreviewCmd(): Starting async load for: %s\n", server)
+		cmd := os.Getenv("NCC_TUI_DETAILS_CMD")
+		if cmd == "" || server == "" {
+			log.Printf("🔍 DEBUG loadPreviewCmd(): No cmd or server, returning empty\n")
+			return PreviewLoadedMsg{Content: "", Server: server}
+		}
+
+		cmdStr := fmt.Sprintf("%s %q", cmd, server)
+		log.Printf("🔍 DEBUG loadPreviewCmd(): Executing: %s\n", cmdStr)
+		startTime := time.Now()
+		output, err := exec.Command("bash", "-c", cmdStr).Output()
+		duration := time.Since(startTime)
+		log.Printf("🔍 DEBUG loadPreviewCmd(): Command finished after %v\n", duration)
+
+		if err != nil {
+			log.Printf("🔍 DEBUG loadPreviewCmd(): Error: %v\n", err)
+			return PreviewLoadedMsg{
+				Content: "",
+				Server:  server,
+				Error:   err,
+			}
+		}
+
+		log.Printf("🔍 DEBUG loadPreviewCmd(): Success, output length: %d\n", len(output))
+		return PreviewLoadedMsg{
+			Content: strings.TrimSpace(string(output)),
+			Server:  server,
+		}
+	}
+}
+
+// Debounced preview loading - only load after 300ms pause
+func (m Model) debouncedPreviewCmd(serverName string) tea.Cmd {
+	log.Printf("🔍 DEBUG debouncedPreviewCmd(): Starting 300ms debounce for: %s\n", serverName)
+	return tea.Tick(300*time.Millisecond, func(time.Time) tea.Msg {
+		log.Printf("🔍 DEBUG debouncedPreviewCmd(): Debounce timer expired, sending PreviewTriggerMsg\n")
+		return PreviewTriggerMsg{Server: serverName}
+	})
 }
