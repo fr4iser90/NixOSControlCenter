@@ -740,9 +740,29 @@ func (m *Model) updatePanels() {
 // OLD PANEL FUNCTIONS REMOVED - REPLACED BY TEMPLATE SYSTEM
 
 func (m Model) renderModuleListContent() string {
-	// ✅ Remove duplicate header - list already has title
-	// Just return the list view directly
+	// Default list rendering (keeps bubbletea list behavior)
 	return m.list.View()
+}
+
+func (m Model) renderStaticModuleListContent() string {
+	// Static rendering without list.Model scrolling
+	if len(m.modules) == 0 {
+		return "No entries"
+	}
+	lines := make([]string, 0, len(m.modules)+1)
+	for i, mod := range m.modules {
+		prefix := "  "
+		if m.list.SelectedItem() != nil {
+			if selected, ok := m.list.SelectedItem().(ModuleItem); ok && selected.Name == mod.Name {
+				prefix = "> "
+			}
+		}
+		lines = append(lines, fmt.Sprintf("%s%s", prefix, mod.Name))
+		if i >= 100 {
+			break
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (m Model) renderFilterContent() string {

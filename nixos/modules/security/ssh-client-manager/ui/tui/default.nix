@@ -143,6 +143,7 @@ EOF
     footer = "enter connect • ctrl-x delete • ctrl-e edit • ctrl-n new • q quit";
     actionCmd = "ncc ssh-client-manager {action} {arg:ip} {arg:user}";
     layout = "fzf";
+    staticMenu = true;
   };
 in
 {

@@ -11,7 +11,7 @@ let
   };
 
   # Generic TUI runner: uses tui-engine binary + 4 panel scripts + title
-  createTuiScript = { name, title, getList, getFilter, getDetails, getActions, footer ? null, actionCmd ? null, getStats ? null, layout ? null }:
+  createTuiScript = { name, title, getList, getFilter, getDetails, getActions, footer ? null, actionCmd ? null, getStats ? null, layout ? null, staticMenu ? false }:
     pkgs.writeScriptBin "ncc-${name}-tui" ''
       #!${pkgs.bash}/bin/bash
       set -euo pipefail
@@ -27,6 +27,9 @@ let
       export NCC_TUI_DETAILS_CMD="${getDetails}"
       ${lib.optionalString (layout != null) ''
         export NCC_TUI_LAYOUT="${layout}"
+      ''}
+      ${lib.optionalString staticMenu ''
+        export NCC_TUI_STATIC_MENU="1"
       ''}
 
       exec ${tuiEngineBinary}/bin/tui-engine \

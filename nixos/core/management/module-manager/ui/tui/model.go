@@ -2,7 +2,6 @@ package tui
 
 import (
 	"encoding/json"
-	"os"
 	"os/exec"
 
 	"github.com/charmbracelet/bubbles/help"
