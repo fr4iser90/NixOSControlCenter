@@ -92,6 +92,7 @@ type Model struct {
 	previewCache     map[string]string // Server name -> preview content
 	previewLoading   string            // Currently loading server name
 	lastSelectedName string             // Track selection changes for debouncing
+	lastMenuYOffset  int                // Track menu scroll position to prevent unnecessary updates
 }
 
 type UIState int
@@ -164,6 +165,7 @@ func NewModel(modules []ModuleItem, getListCmd, getFilterCmd, getDetailsCmd, get
 		previewCache:      make(map[string]string),
 		previewLoading:    "",
 		lastSelectedName:  "",
+		lastMenuYOffset:   0,
 	}
 
 	// Initialize viewport content
@@ -172,7 +174,7 @@ func NewModel(modules []ModuleItem, getListCmd, getFilterCmd, getDetailsCmd, get
 	return model
 }
 
-func (m Model) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
 		tea.EnterAltScreen,
 		m.spinner.Tick,

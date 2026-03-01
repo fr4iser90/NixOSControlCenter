@@ -18,15 +18,26 @@ import (
 // =============================================================================
 
 func init() {
-	if os.Getenv("NCC_TUI_DEBUG") != "1" {
+	debugEnv := os.Getenv("NCC_TUI_DEBUG")
+	// Accept "1" or "true" as debug flags
+	if debugEnv != "1" && debugEnv != "true" {
 		log.SetOutput(io.Discard)
 		return
 	}
-	logFile, err := os.OpenFile("/tmp/tui-debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err == nil {
-		log.SetOutput(logFile)
-		log.Printf("🐛 DEBUG: Log file initialized\n")
+	
+	// Try to create log file (O_TRUNC to clear old logs, O_CREATE to create if missing)
+	logFile, err := os.OpenFile("/tmp/tui-debug.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
+	if err != nil {
+		// Fallback to stderr if file can't be created
+		log.SetOutput(os.Stderr)
+		log.Printf("⚠️ WARNING: Could not open /tmp/tui-debug.log: %v\n", err)
+		log.Printf("⚠️ WARNING: Logging to stderr instead\n")
+		return
 	}
+	
+	log.SetOutput(logFile)
+	log.Printf("🐛 DEBUG: Log file initialized at /tmp/tui-debug.log\n")
+	log.Printf("🐛 DEBUG: NCC_TUI_DEBUG=%s\n", debugEnv)
 }
 
 func (m Model) renderHeader(dims *LayoutDimensions) string {
@@ -130,9 +141,21 @@ func (m Model) renderPanel(config PanelConfig) string {
 	return style.Render(content)
 }
 
-func (m Model) renderViewportPanel(title string, vp viewport.Model, width, height int) string {
-	log.Printf("🐛 DEBUG renderViewportPanel(): %s target width=%d height=%d\n", title, width, height)
+// Helper function to set viewport dimensions before rendering
+// This ensures the viewport (passed by value) has correct dimensions
+func (m *Model) setViewportDimensions(vp *viewport.Model, width, height int) {
+	borderOverhead := 4
+	paddingOverhead := 4
+	totalVerticalOverhead := borderOverhead + paddingOverhead
+	contentHeight := height - totalVerticalOverhead
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+	vp.Width = width
+	vp.Height = contentHeight
+}
 
+func (m Model) renderViewportPanel(title string, vp viewport.Model, width, height int) string {
 	// ✅ CRITICAL FIX: Ziehe Border + Padding Overhead ab!
 	// Border: NormalBorder = 2 top + 2 bottom = 4
 	// Padding: (1,1) = 2 top + 2 bottom = 4
@@ -146,20 +169,10 @@ func (m Model) renderViewportPanel(title string, vp viewport.Model, width, heigh
 	if contentHeight < 1 {
 		contentHeight = 1 // Safety minimum
 	}
-	
-	log.Printf("🐛 DEBUG renderViewportPanel(): %s contentHeight=%d (after removing %d overhead)\n", 
-		title, contentHeight, totalVerticalOverhead)
 
-	// Update viewport dimensions with corrected height
-	vp.Width = width
-	vp.Height = contentHeight
-
-	// CRITICAL: For menu viewport, set YOffset to 0 to prevent scrolling
-	if title == "" {
-		log.Printf("🔍 DEBUG renderViewportPanel(): menuViewport YOffset before: %d\n", vp.YOffset)
-		vp.SetYOffset(0)
-		log.Printf("🔍 DEBUG renderViewportPanel(): menuViewport YOffset after SetYOffset(0): %d\n", vp.YOffset)
-	}
+	// ✅ FIX: Viewport dimensions are set BEFORE calling renderViewportPanel
+	// Don't modify vp here - it's a copy! Dimensions are set in the original model
+	// vp.Width and vp.Height are already set in the template Render() method
 
 	// Create border style ohne Width-Constraint
 	style := lipgloss.NewStyle().
@@ -167,19 +180,12 @@ func (m Model) renderViewportPanel(title string, vp viewport.Model, width, heigh
 		BorderForeground(lipgloss.Color("39")).
 		Padding(1, 1)
 		// REMOVED: .Width(width) - lässt Panel natürliche Breite verwenden
-
+	
 	// Combine title and viewport content
-	log.Printf("🔍 DEBUG renderViewportPanel(): Calling vp.View() for %s - YOffset: %d\n", title, vp.YOffset)
 	viewportContent := vp.View()
-	log.Printf("🔍 DEBUG renderViewportPanel(): vp.View() done for %s\n", title)
-	log.Printf("🐛 DEBUG renderViewportPanel(): %s viewport content: %d chars\n", title, len(viewportContent))
-
+	
 	content := title + "\n\n" + viewportContent
 	result := style.Render(content)
-	
-	actualHeight := lipgloss.Height(result)
-	log.Printf("🐛 DEBUG renderViewportPanel(): %s final height: target=%d, actual=%d\n", 
-		title, height, actualHeight)
 
 	return result
 }
@@ -411,6 +417,19 @@ func (t *FzfLayoutTemplate) Render(m Model, dims *LayoutDimensions) string {
 	bodyWidth, bodyHeight := lm.GetAvailableDimensions()
 	widths := lm.DistributeWidths(bodyWidth, t.GetPanels())
 
+	// ✅ FIX: Set viewport dimensions BEFORE calling renderViewportPanel
+	// This ensures the viewport (passed by value) has correct dimensions
+	m.setViewportDimensions(&m.menuViewport, widths[0], bodyHeight)
+	m.setViewportDimensions(&m.contentViewport, widths[1], bodyHeight)
+	
+	// ✅ CRITICAL FIX: ALWAYS set YOffset to 0 to prevent auto-scrolling
+	// NEVER use lastMenuYOffset - always keep at 0 to prevent movement
+	// IMPORTANT: Set YOffset RIGHT BEFORE calling renderViewportPanel
+	// This ensures the viewport (passed by value) has the correct YOffset
+	m.menuViewport.SetYOffset(0)
+	m.menuViewport.SetYOffset(0) // Double-call to ensure it sticks
+	m.menuViewport.SetYOffset(0) // Triple-call for extra safety
+
 	menu := m.renderViewportPanel("", m.menuViewport, widths[0], bodyHeight)
 	preview := m.renderViewportPanel("", m.contentViewport, widths[1], bodyHeight)
 	body := lipgloss.JoinHorizontal(lipgloss.Top, menu, preview)
@@ -497,6 +516,21 @@ func (t *FullLayoutTemplate) Render(m Model, dims *LayoutDimensions) string {
 	panels := t.GetPanels()
 	widths := lm.DistributeWidths(bodyWidth, panels)
 
+	// ✅ FIX: Set viewport dimensions BEFORE calling renderViewportPanel
+	m.setViewportDimensions(&m.menuViewport, widths[0], bodyHeight)
+	m.setViewportDimensions(&m.contentViewport, widths[1], bodyHeight)
+	m.setViewportDimensions(&m.filterViewport, widths[2], bodyHeight)
+	m.setViewportDimensions(&m.infoViewport, widths[3], bodyHeight)
+	m.setViewportDimensions(&m.statsViewport, widths[4], bodyHeight)
+	
+	// ✅ CRITICAL FIX: ALWAYS set YOffset to 0 to prevent auto-scrolling
+	// NEVER use lastMenuYOffset - always keep at 0 to prevent movement
+	// IMPORTANT: Set YOffset RIGHT BEFORE calling renderViewportPanel
+	// This ensures the viewport (passed by value) has the correct YOffset
+	m.menuViewport.SetYOffset(0)
+	m.menuViewport.SetYOffset(0) // Double-call to ensure it sticks
+	m.menuViewport.SetYOffset(0) // Triple-call for extra safety
+
 	// Create scrollable panels using viewports
 	menu := m.renderViewportPanel("📋 MENU", m.menuViewport, widths[0], bodyHeight)
 	content := m.renderViewportPanel("📦 CONTENT", m.contentViewport, widths[1], bodyHeight)
@@ -532,37 +566,36 @@ func (t *MediumLayoutTemplate) GetPanels() []PanelConfig {
 }
 
 func (t *MediumLayoutTemplate) Render(m Model, dims *LayoutDimensions) string {
-    log.Printf("🐛 DEBUG MediumTemplate.Render(): Start\n")
-
     // ✅ Render header and footer with EXACT dimensions
     header := m.renderHeader(dims)
-    log.Printf("🐛 DEBUG MediumTemplate.Render(): Header length: %d\n", len(header))
-
     footer := m.renderFooter(dims)
-    log.Printf("🐛 DEBUG MediumTemplate.Render(): Footer length: %d\n", len(footer))
 
     // ✅ DIMENSION-BERECHNUNG WIEDER HINZUFÜGEN!
     lm := NewLayoutManager(m.width, m.height)
     bodyWidth, bodyHeight := lm.GetAvailableDimensions()
-    log.Printf("🐛 DEBUG MediumTemplate.Render(): bodyWidth=%d bodyHeight=%d\n", bodyWidth, bodyHeight)
-
     widths := lm.DistributeWidths(bodyWidth, t.GetPanels())
-    log.Printf("🐛 DEBUG MediumTemplate.Render(): widths=%v\n", widths)
+
+    // ✅ FIX: Set viewport dimensions BEFORE calling renderViewportPanel
+    m.setViewportDimensions(&m.menuViewport, widths[0], bodyHeight)
+    m.setViewportDimensions(&m.contentViewport, widths[1], bodyHeight)
+    m.setViewportDimensions(&m.infoViewport, widths[2], bodyHeight)
+    
+    // ✅ CRITICAL FIX: ALWAYS set YOffset to 0 to prevent auto-scrolling
+    // NEVER use lastMenuYOffset - always keep at 0 to prevent movement
+    // IMPORTANT: Set YOffset RIGHT BEFORE calling renderViewportPanel
+    // This ensures the viewport (passed by value) has the correct YOffset
+    m.menuViewport.SetYOffset(0)
+    m.menuViewport.SetYOffset(0) // Double-call to ensure it sticks
+    m.menuViewport.SetYOffset(0) // Triple-call for extra safety
 
     // Dann renderViewportPanel verwenden statt View() direkt
-    log.Printf("🐛 DEBUG MediumTemplate.Render(): Erstelle Panels...\n")
     menu := m.renderViewportPanel("📋 MENU", m.menuViewport, widths[0], bodyHeight)
     content := m.renderViewportPanel("📦 CONTENT", m.contentViewport, widths[1], bodyHeight)
     info := m.renderViewportPanel("ℹ️ INFO", m.infoViewport, widths[2], bodyHeight)
-    log.Printf("🐛 DEBUG MediumTemplate.Render(): Panels erstellt\n")
 
-    log.Printf("🐛 DEBUG MediumTemplate.Render(): Join Horizontal...\n")
     body := lipgloss.JoinHorizontal(lipgloss.Top, menu, content, info)
-
-    log.Printf("🐛 DEBUG MediumTemplate.Render(): Join Vertical...\n")
     result := lipgloss.JoinVertical(lipgloss.Left, header, body, footer)
 
-    log.Printf("🐛 DEBUG MediumTemplate.Render(): Final result: %d chars\n", len(result))
     return result
 }
 
@@ -715,41 +748,43 @@ func (t *EmergencyLayoutTemplate) Render(m Model, dims *LayoutDimensions) string
 	return lipgloss.JoinVertical(lipgloss.Left, header, content)
 }
 
-func (m Model) View() string {
-	// 🐛 DEBUG: Was passiert in View()?
-	log.Printf("🐛 DEBUG View(): width=%d height=%d\n", m.width, m.height)
-
-// Allow small terminals; emergency layout will handle sizing
-
+func (m *Model) View() string {
 	if len(m.list.Items()) == 0 {
-		log.Printf("🐛 DEBUG View(): Keine Items, zeige Spinner\n")
 		return m.spinner.View()
 	}
 
-	// Update panels before rendering
-	log.Printf("🐛 DEBUG View(): Rufe updatePanels() auf\n")
-	m.updatePanels()
+	// ✅ CRITICAL FIX: ALWAYS set YOffset to 0 to prevent auto-scrolling
+	// NEVER use lastMenuYOffset - always keep at 0 to prevent movement
+	// The menu should NEVER scroll automatically, even when content changes
+	m.menuViewport.SetYOffset(0)
+	m.menuViewport.SetYOffset(0) // Double-call to ensure it sticks
 
 	// Choose layout based on terminal size
-	log.Printf("🐛 DEBUG View(): Rufe renderResponsiveLayout() auf\n")
-	result := m.renderResponsiveLayout()
-	log.Printf("🐛 DEBUG View(): renderResponsiveLayout returned: %d chars\n", len(result))
-
-	return result
+	return m.renderResponsiveLayout()
 }
 
 func (m *Model) updatePanels() {
-	log.Printf("🔍 DEBUG updatePanels(): Starting\n")
-	log.Printf("🔍 DEBUG updatePanels(): menuViewport YOffset before SetContent: %d\n", m.menuViewport.YOffset)
-	m.menuViewport.SetContent(m.renderStaticModuleListContent())
-	log.Printf("🔍 DEBUG updatePanels(): menuViewport YOffset after SetContent: %d\n", m.menuViewport.YOffset)
-	log.Printf("🔍 DEBUG updatePanels(): Calling renderContentPanelContent()\n")
+	// ✅ CRITICAL FIX: Keep menu viewport completely static - no auto-scrolling
+	// ALWAYS use 0 as YOffset - NEVER use lastMenuYOffset
+	// This prevents the menu from scrolling when content changes
+	
+	// Render menu content (all items, no centering)
+	menuContent := m.renderStaticModuleListContent()
+	m.menuViewport.SetContent(menuContent)
+	
+	// ✅ CRITICAL FIX: SetContent() ALWAYS resets YOffset to 0, so we MUST restore it immediately
+	// ALWAYS set to 0 - never use lastMenuYOffset to prevent movement
+	// We need to call SetYOffset MULTIPLE times because SetContent() might reset it
+	m.menuViewport.SetYOffset(0)
+	m.menuViewport.SetYOffset(0) // Double-call to ensure it sticks
+	m.menuViewport.SetYOffset(0) // Triple-call for extra safety
+	
+	// Don't update lastMenuYOffset here - only update it when user manually scrolls
+	
 	m.contentViewport.SetContent(m.renderContentPanelContent())
-	log.Printf("🔍 DEBUG updatePanels(): renderContentPanelContent() done\n")
 	m.filterViewport.SetContent(m.renderFilterContent())
 	m.infoViewport.SetContent(m.renderInfoContent())
 	m.statsViewport.SetContent(m.renderStatsContent())
-	log.Printf("🔍 DEBUG updatePanels(): Done\n")
 }
 
 // OLD PANEL FUNCTIONS REMOVED - REPLACED BY TEMPLATE SYSTEM
@@ -760,22 +795,33 @@ func (m Model) renderModuleListContent() string {
 }
 
 func (m Model) renderStaticModuleListContent() string {
-	// Static rendering without list.Model scrolling
+	// ✅ FIX: Render ALL items to prevent content shifting when selection changes
+	// The viewport will handle scrolling naturally, maintaining stable position
 	if len(m.modules) == 0 {
 		return "No entries"
 	}
-	lines := make([]string, 0, len(m.modules)+1)
-	for i, mod := range m.modules {
-		prefix := "  "
-		if m.list.SelectedItem() != nil {
-			if selected, ok := m.list.SelectedItem().(ModuleItem); ok && selected.Name == mod.Name {
-				prefix = "> "
+	
+	// Find selected index for highlighting
+	selectedIndex := -1
+	if m.list.SelectedItem() != nil {
+		if selected, ok := m.list.SelectedItem().(ModuleItem); ok {
+			for i, mod := range m.modules {
+				if mod.Name == selected.Name {
+					selectedIndex = i
+					break
+				}
 			}
 		}
-		lines = append(lines, fmt.Sprintf("%s%s", prefix, mod.Name))
-		if i >= 100 {
-			break
+	}
+	
+	// Render all items - viewport handles scrolling
+	lines := make([]string, len(m.modules))
+	for i, mod := range m.modules {
+		prefix := "  "
+		if i == selectedIndex {
+			prefix = "> "
 		}
+		lines[i] = fmt.Sprintf("%s%s", prefix, mod.Name)
 	}
 	return strings.Join(lines, "\n")
 }
@@ -1019,8 +1065,6 @@ func init() {
 }
 
 func (m Model) renderResponsiveLayout() string {
-	log.Printf("🐛 DEBUG renderResponsiveLayout(): Start\n")
-
 	// Layout override via env
 	preferredLayout := strings.TrimSpace(os.Getenv("NCC_TUI_LAYOUT"))
 
@@ -1031,10 +1075,6 @@ func (m Model) renderResponsiveLayout() string {
 	
 	// ✅ 2. Calculate EXACT dimensions (border-agnostic!)
 	dims := NewLayoutDimensions(m.width, m.height, borderStyle)
-	log.Printf("🐛 DEBUG Dimensions: Terminal=%dx%d, Inner=%dx%d, Body=%dx%d\n",
-		dims.TerminalWidth, dims.TerminalHeight,
-		dims.InnerWidth, dims.InnerHeight,
-		dims.BodyWidth, dims.BodyHeight)
 
 	// ✅ 3. Create content provider with current model
 	cp := NewDefaultContentProvider(&m)
@@ -1054,37 +1094,16 @@ func (m Model) renderResponsiveLayout() string {
 	} else {
 		template = templateRegistry.SelectTemplate(m.width, m.height, preferredLayout)
 	}
-	log.Printf("🐛 DEBUG renderResponsiveLayout(): Template selected: %T\n", template)
 
 	if template == nil {
-		log.Printf("🐛 DEBUG renderResponsiveLayout(): Kein Template gefunden, verwende Emergency!\n")
 		template = templateRegistry.Get("emergency")
 	}
 
 	// ✅ 6. Render inner layout with EXACT dimensions (dims explizit übergeben!)
-	log.Printf("🐛 DEBUG renderResponsiveLayout(): Rufe template.Render() auf\n")
 	innerLayout := template.Render(m, dims)
-	log.Printf("🐛 DEBUG renderResponsiveLayout(): template.Render returned: %d chars\n", len(innerLayout))
-
-	// ✅ 7. VALIDATE: Check if innerLayout has correct size
-	actualWidth := lipgloss.Width(innerLayout)
-	actualHeight := lipgloss.Height(innerLayout)
-	log.Printf("🐛 DEBUG VALIDATION: Expected=%dx%d, Actual=%dx%d\n",
-		dims.InnerWidth, dims.InnerHeight,
-		actualWidth, actualHeight)
-	
-	if actualWidth != dims.InnerWidth || actualHeight != dims.InnerHeight {
-		log.Printf("❌ SIZE MISMATCH! Template rendered wrong size!\n")
-	}
 
 	// ✅ 8. Border wraps content (OHNE Width/Height - passt sich an!)
 	borderedLayout := borderStyle.Render(innerLayout)
-	
-	finalWidth := lipgloss.Width(borderedLayout)
-	finalHeight := lipgloss.Height(borderedLayout)
-	log.Printf("🐛 DEBUG FINAL: Expected=%dx%d, Actual=%dx%d\n",
-		dims.TerminalWidth, dims.TerminalHeight,
-		finalWidth, finalHeight)
 
 	return borderedLayout
 }
@@ -1094,6 +1113,13 @@ func (m Model) renderResponsiveLayout() string {
 // OLD PANEL FUNCTIONS REMOVED - REPLACED BY TEMPLATE SYSTEM
 
 // Utility function for max
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func max(a, b int) int {
 	if a > b {
 		return a

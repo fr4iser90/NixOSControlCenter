@@ -20,6 +20,7 @@ in {
     ./options.nix
     ./config.nix
     ./commands.nix  # ✅ Commands in commands.nix per MODULE_TEMPLATE
+    ./ui/tui/module-manager-tui.nix  # ✅ Module-manager TUI (belongs here, not in tui-engine)
   ];
 }
 

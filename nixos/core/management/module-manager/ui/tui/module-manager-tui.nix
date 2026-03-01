@@ -4,26 +4,17 @@ with lib;
 
 let
   # Use hardcoded path for core module
-  runtimeDiscovery = (import ../../module-manager/lib/runtime_discovery.nix { inherit lib pkgs; }).runtimeDiscovery;
+  runtimeDiscovery = (import ../../lib/runtime_discovery.nix { inherit lib pkgs; }).runtimeDiscovery;
 
-  # Build the Go binary using the same logic as package.nix
-  # Use tuiEngineSrc which has merged TUI files from all modules
-  bubbleTeaBinary = config.core.management.tui-engine.buildGoApplication {
-    pname = "module-manager-tui";
-    version = "1.0.0";
-    src = config.core.management.tui-engine.tuiEngineSrc;  # Use tuiEngineSrc with merged files
-    go = pkgs.go;  # Use the available Go version
-    modules = ../gomod2nix.toml;
-  #  subPackages = [ "." ];  # Build the main package
-  #  nativeBuildInputs = with pkgs; [
-  #    config.core.management.tui-engine.installShellFiles
-  #  ];
-  #  postInstall = ''
-  #    installShellCompletion --cmd module-manager-tui \
-  #      --bash <($out/bin/module-manager-tui completion bash) \
-  #      --fish <($out/bin/module-manager-tui completion fish) \
-  #      --zsh <($out/bin/module-manager-tui completion zsh)
-  #  '';
+  # Get module-manager path (relative to this file: ui/tui/module-manager-tui.nix)
+  # Go up to module-manager root
+  moduleManagerPath = ../..;
+
+  # Build module-specific binary with its own TUI files
+  # Each module builds its own isolated binary
+  bubbleTeaBinary = config.core.management.tui-engine.createTuiBinary {
+    modulePath = moduleManagerPath;
+    moduleName = "module-manager";
   };
 
   # Separate Runtime Discovery Script
@@ -74,8 +65,8 @@ let
     
     # Call the Go binary with the action script paths as arguments
     # echo "DEBUG: Executing Go binary..." >&2
-    # Call the Go binary with the action script paths as arguments
-    exec ${bubbleTeaBinary}/bin/tui-engine \
+    # Call the module-specific binary (module-manager-tui, not generic tui-engine)
+    exec ${bubbleTeaBinary}/bin/module-manager-tui \
       "${actionScripts.getModuleList}" \
       "${actionScripts.getFilterPanel}" \
       "${actionScripts.getDetailsPanel}" \

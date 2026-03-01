@@ -132,6 +132,10 @@ SSH Client:
 EOF
   '';
 
+  # Get module path (go up from ui/tui/default.nix to module root)
+  # ui/tui/default.nix -> ../.. -> ssh-client-manager/
+  modulePath = ../..;
+  
   sshClientTui = tuiEngine.createTuiScript {
     name = "ssh-client";
     title = "🔐 SSH Client Manager";
@@ -144,6 +148,7 @@ EOF
     actionCmd = "ncc ssh-client-manager {action} {arg:ip} {arg:user}";
     layout = "fzf";
     staticMenu = true;
+    modulePath = modulePath;  # Pass as path, not string
   };
 in
 {

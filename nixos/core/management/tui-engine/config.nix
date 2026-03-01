@@ -5,39 +5,8 @@ let
   discoveryLib = import ../module-manager/lib/discovery.nix { inherit lib; };
   allModules = discoveryLib.discoverAllModules;
   
-  # Find all modules that have TUI Go files in ui/tui/
-  modulesWithTui = lib.filter (module:
-    builtins.pathExists "${module.path}/ui/tui/model.go" ||
-    builtins.pathExists "${module.path}/ui/tui/view.go" ||
-    builtins.pathExists "${module.path}/ui/tui/update.go"
-  ) allModules;
-  
-  # Merge all module TUI files into a single directory
-  # All modules have package tui, so we need to merge them into one package
-  # Original files remain unchanged, but in build context they're in the same directory
-  mergedTuiFiles = pkgs.runCommand "merged-tui-files" {
-    buildInputs = [ pkgs.coreutils ];
-  } ''
-    mkdir -p $out/core/management/tui-engine/src/tui
-    # Copy all TUI files from all modules into the same directory
-    # Files from different modules will be merged (last one wins for duplicates)
-    ${lib.concatMapStringsSep "\n" (module:
-      let
-        modulePath = toString module.path;
-        tuiDir = "${modulePath}/ui/tui";
-      in ''
-        # Copy TUI files from ${module.category}
-        if [ -d "${tuiDir}" ]; then
-          for file in "${tuiDir}"/*.go; do
-            if [ -f "$file" ]; then
-              # Use install instead of cp to handle permissions correctly
-              install -m 644 "$file" "$out/core/management/tui-engine/src/tui/$(basename "$file")"
-            fi
-          done
-        fi
-      ''
-    ) modulesWithTui}
-  '';
+  # TUI Engine is a BUILDER/API provider - modules keep their own TUI files!
+  # Modules build their own binaries using TUI Engine APIs
   
   # Generate go.mod content (no replace directives needed - files are merged)
   # Module name must match the directory structure
@@ -116,83 +85,160 @@ let
   # Generate go.mod file
   generatedGoMod = pkgs.writeText "go.mod" goModContent;
   
-  # Create src with tui-engine files + merged TUI files + generated go.mod
-  # Module TUI files are merged into core/management/tui-engine/src/tui/
-  # Original files remain unchanged, but in build context they're merged
-  # Structure: $out/ = tui-engine directory (for use as src directly)
-  tuiEngineSrc = pkgs.runCommand "tui-engine-src" {
+  # TUI Engine source - ONLY TUI Engine's own files, NO module files!
+  # TUI Engine is a builder/API provider - modules build their own binaries
+  tuiEngineSrc = pkgs.stdenv.mkDerivation {
+    name = "tui-engine-src";
     buildInputs = [ pkgs.coreutils ];
-  } ''
-    # Create output directory (this will be the tui-engine directory)
-    mkdir -p $out
-    # Copy tui-engine files (excluding ui/tui if it exists)
-    cp -r ${../../..}/core/management/tui-engine/* $out/ || true
-    # Set write permissions before removing
-    chmod -R u+w $out || true
-    # Remove any existing src/tui directory
-    rm -rf $out/src/tui || true
-    # Copy merged TUI files from all modules
-    mkdir -p $out/src
-    cp -r ${mergedTuiFiles}/core/management/tui-engine/src/tui $out/src/
-    # Place generated go.mod in tui-engine directory
-    install -m 644 ${generatedGoMod} $out/go.mod
-  '';
-  
-  # Build tui-engine binary once
-  # src points to tui-engine directory with merged TUI files
-  # All module TUI files are merged into core/management/tui-engine/src/tui/
-  tuiEngineBinary = buildGoApplication {
-    pname = "tui-engine";
-    version = "1.0.0";
-    src = tuiEngineSrc;
-    go = pkgs.go;
-    modules = ./gomod2nix.toml;
-    # buildGoApplication will find go.mod in core/management/tui-engine/
-    # It will build from core/management/tui-engine/main.go
-    # Module TUI files are merged into core/management/tui-engine/src/tui/
+    
+    unpackPhase = ''
+      true
+    '';
+    
+    buildPhase = ''
+      # Create output directory (this will be the tui-engine directory)
+      mkdir -p $out
+      # Copy ONLY tui-engine's own files
+      cp -r ${../../..}/core/management/tui-engine/* $out/ || true
+      # Set write permissions
+      chmod -R u+w $out || true
+      # Place generated go.mod in tui-engine directory
+      install -m 644 ${generatedGoMod} $out/go.mod
+    '';
+    
+    installPhase = ''
+      true
+    '';
   };
 
-  # Generic TUI runner: uses tui-engine binary + 4 panel scripts + title
-  createTuiScript = { name, title, getList, getFilter, getDetails, getActions, footer ? null, actionCmd ? null, getStats ? null, layout ? null, staticMenu ? false }:
-    pkgs.writeScriptBin "ncc-${name}-tui" ''
-      #!${pkgs.bash}/bin/bash
-      set -euo pipefail
+  # Function to build a TUI binary for a specific module
+  # Each module builds its own binary with its own TUI files
+  createTuiBinary = { modulePath, moduleName }:
+    let
+      # Create source directory for this module's TUI
+      moduleTuiSrc = pkgs.stdenv.mkDerivation {
+        name = "${moduleName}-tui-src";
+        buildInputs = [ pkgs.coreutils ];
+        
+        unpackPhase = ''
+          true
+        '';
+        
+        buildPhase = ''
+          # Create output directory structure
+          mkdir -p $out
+          
+          # Copy TUI Engine files (main.go, go.mod, etc.)
+          # Exclude src/tui if it exists (we'll copy module files there)
+          cp -r ${tuiEngineSrc}/* $out/ || true
+          chmod -R u+w $out || true
+          
+          # Remove empty src/tui if it exists (from tuiEngineSrc)
+          rm -rf $out/src/tui || true
+          
+          # Copy module's own TUI files into src/tui/
+          # Module TUI files stay in their own directory structure
+          # CRITICAL: This must happen AFTER copying tuiEngineSrc and removing empty src/tui
+          # NO FALLBACKS - Module MUST have its own TUI Go files
+          mkdir -p $out/src/tui
+          if [ -d "${modulePath}/ui/tui" ] && [ -n "$(ls -A ${modulePath}/ui/tui/*.go 2>/dev/null)" ]; then
+            # Module has its own TUI Go files - use them
+            cp -r ${modulePath}/ui/tui/*.go $out/src/tui/ || true
+          else
+            # Module has no TUI Go files - FAIL
+            # NO FALLBACKS - every module MUST have its own TUI files
+            echo "ERROR: Module ${moduleName} has no TUI Go files at ${modulePath}/ui/tui/" >&2
+            echo "ERROR: Every module that uses createTuiScript MUST have its own TUI Go files!" >&2
+            echo "ERROR: No fallbacks, no shared bases - each module is isolated!" >&2
+            exit 1
+          fi
+        '';
+        
+        installPhase = ''
+          true
+        '';
+      };
+    in
+      buildGoApplication {
+        pname = "${moduleName}-tui";
+        version = "1.0.0";
+        src = moduleTuiSrc;
+        go = pkgs.go;
+        modules = ./gomod2nix.toml;
+      };
 
-      export NCC_TUI_TITLE="${title}"
-      ${lib.optionalString (footer != null) ''
-        export NCC_TUI_FOOTER="${footer}"
-      ''}
-      ${lib.optionalString (actionCmd != null) ''
-        export NCC_TUI_ACTION_CMD="${actionCmd}"
-      ''}
-      export NCC_TUI_LIST_CMD="${getList}"
-      export NCC_TUI_DETAILS_CMD="${getDetails}"
-      ${lib.optionalString (layout != null) ''
-        export NCC_TUI_LAYOUT="${layout}"
-      ''}
-      ${lib.optionalString staticMenu ''
-        export NCC_TUI_STATIC_MENU="1"
-      ''}
+  # Generic TUI runner: builds module-specific binary + 4 panel scripts + title
+  # Each module gets its own isolated TUI binary with its own TUI files
+  # modulePath is REQUIRED - no fallbacks, every module MUST have its own TUI files
+  createTuiScript = { name, title, getList, getFilter, getDetails, getActions, footer ? null, actionCmd ? null, getStats ? null, layout ? null, staticMenu ? false, modulePath }:
+    let
+      # Build module-specific binary - modulePath is REQUIRED
+      # Every module MUST have its own TUI files - no exceptions, no fallbacks
+      moduleBinary = createTuiBinary {
+        modulePath = modulePath;
+        moduleName = name;
+      };
+      
+      # buildGoApplication creates binary named "tui-engine" (from package name in go.mod)
+      # NOT "${name}-tui" - the binary name comes from the Go package, not pname
+      binaryName = "tui-engine";
+    in
+      pkgs.writeScriptBin "ncc-${name}-tui" ''
+        #!${pkgs.bash}/bin/bash
+        set -euo pipefail
 
-      exec ${tuiEngineBinary}/bin/tui-engine \
-        "${getList}" \
-        "${getFilter}" \
-        "${getDetails}" \
-        "${getActions}" \
-        "${if getStats != null then getStats else ""}"
-    '';
+        # Parse --debug flag
+        DEBUG_MODE=""
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --debug|-d)
+              DEBUG_MODE="1"
+              shift
+              ;;
+            *)
+              # Unknown arguments are ignored (tui-engine doesn't accept user args)
+              shift
+              ;;
+          esac
+        done
+
+        # Set debug environment variable if --debug was passed
+        if [[ -n "$DEBUG_MODE" ]]; then
+          export NCC_TUI_DEBUG="1"
+        fi
+
+        export NCC_TUI_TITLE="${title}"
+        ${lib.optionalString (footer != null) ''
+          export NCC_TUI_FOOTER="${footer}"
+        ''}
+        ${lib.optionalString (actionCmd != null) ''
+          export NCC_TUI_ACTION_CMD="${actionCmd}"
+        ''}
+        export NCC_TUI_LIST_CMD="${getList}"
+        export NCC_TUI_DETAILS_CMD="${getDetails}"
+        ${lib.optionalString (layout != null) ''
+          export NCC_TUI_LAYOUT="${layout}"
+        ''}
+        ${lib.optionalString staticMenu ''
+          export NCC_TUI_STATIC_MENU="1"
+        ''}
+
+        exec ${moduleBinary}/bin/${binaryName} \
+          "${getList}" \
+          "${getFilter}" \
+          "${getDetails}" \
+          "${getActions}" \
+          "${if getStats != null then getStats else ""}"
+      '';
 
   # API wie cli-registry - kein cfg Build-Time dependency
   apiValue = import ./api.nix { inherit lib config; } // {
     createTuiScript = createTuiScript;
-    tuiBinary = tuiEngineBinary;
-    tuiEngineSrc = tuiEngineSrc;  # Expose src for module-manager-tui.nix
+    createTuiBinary = createTuiBinary;
+    tuiEngineSrc = tuiEngineSrc;  # Expose src for modules to build their own binaries
     domainTui = import ./lib/domain-tui.nix { inherit config lib pkgs; };
   };
 in {
-  # Import the legacy module-manager TUI script (still supported)
-  imports = [ ./scripts/module-manager-tui.nix ];
-
   # Config setzen (hardcoded path wie cli-registry)
   config.core.management.tui-engine = {
     api = apiValue;
@@ -200,9 +246,9 @@ in {
     gomod2nix = gomod2nix;
     writeScriptBin = pkgs.writeScriptBin;
     installShellFiles = pkgs.installShellFiles;
-    tuiBinary = tuiEngineBinary;
-    tuiEngineSrc = tuiEngineSrc;  # Expose src for module-manager-tui.nix
+    tuiEngineSrc = tuiEngineSrc;  # Expose src for modules to build their own binaries
     createTuiScript = createTuiScript;
+    createTuiBinary = createTuiBinary;
     domainTui = apiValue.domainTui;
   };
 }

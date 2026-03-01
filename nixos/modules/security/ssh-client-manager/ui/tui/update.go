@@ -15,7 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 )
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		// Prompt mode
@@ -212,18 +212,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
 
-	// Update all viewports for scrolling (EXCEPT menuViewport - static list)
+	// ✅ FIX: Disable menuViewport scrolling - keep it completely static
+	// Only update other viewports, menu stays fixed
 	var menuCmd tea.Cmd
 	var contentCmd tea.Cmd
 	var filterCmd tea.Cmd
 	var infoCmd tea.Cmd
 	var statsCmd tea.Cmd
 
-	log.Printf("🔍 DEBUG: menuViewport.Update() called - YOffset before: %d\n", m.menuViewport.YOffset)
-	// DO NOT update menuViewport - it's static, no scrolling
-	// m.menuViewport, menuCmd = m.menuViewport.Update(msg)  // DISABLED for static list
-	menuCmd = nil
 	log.Printf("🔍 DEBUG: menuViewport.Update() DISABLED - keeping static\n")
+	// DO NOT update menuViewport - it's static, no scrolling to prevent movement
+	// m.menuViewport, menuCmd = m.menuViewport.Update(msg)  // DISABLED
+	menuCmd = nil
+	
 	m.contentViewport, contentCmd = m.contentViewport.Update(msg)
 	m.filterViewport, filterCmd = m.filterViewport.Update(msg)
 	m.infoViewport, infoCmd = m.infoViewport.Update(msg)
@@ -231,23 +232,54 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Update selected module and trigger debounced preview loading
 	var previewCmd tea.Cmd
+	selectionChanged := false
+	
+	// ✅ FIX: Always update selectedModule to ensure preview shows current selection
+	// This ensures the preview is always in sync with the list selection
 	if m.list.SelectedItem() != nil {
 		selected := m.list.SelectedItem().(ModuleItem)
+		
+		// Always update selectedModule, even if name hasn't changed
+		// This ensures preview is always current
+		if m.selectedModule.Name != selected.Name {
+			selectionChanged = true
+		}
 		m.selectedModule = selected
 		
 		log.Printf("🔍 DEBUG: Selected module: %s, lastSelectedName: %s\n", selected.Name, m.lastSelectedName)
 		if selected.Name != m.lastSelectedName {
 			log.Printf("🔍 DEBUG: Selection changed, triggering debounced preview for: %s\n", selected.Name)
 			m.lastSelectedName = selected.Name
+			
+			// ✅ FIX: Set loading state immediately if cache miss
+			// This ensures "Loading..." is shown right away
+			if _, ok := m.previewCache[selected.Name]; !ok {
+				m.previewLoading = selected.Name
+			}
+			
 			previewCmd = m.debouncedPreviewCmd(selected.Name)
 		}
+		
+		// ✅ FIX: Update content viewport immediately when selection changes
+		// This ensures preview updates instantly, even before async load completes
+		if selectionChanged {
+			m.contentViewport.SetContent(m.renderContentPanelContent())
+		}
 	} else {
-		m.lastSelectedName = ""
+		if m.lastSelectedName != "" {
+			m.lastSelectedName = ""
+			selectionChanged = true
+			m.selectedModule = ModuleItem{} // Clear selection
+		}
 	}
 	
-	log.Printf("🔍 DEBUG: Calling updatePanels()\n")
-	m.updatePanels()
-	log.Printf("🔍 DEBUG: updatePanels() done\n")
+	// ✅ FIX: Only call full updatePanels() when selection actually changed
+	// This prevents unnecessary updates and reduces lag, but we still update content viewport above
+	if selectionChanged {
+		log.Printf("🔍 DEBUG: Selection changed, calling updatePanels()\n")
+		m.updatePanels()
+		log.Printf("🔍 DEBUG: updatePanels() done\n")
+	}
 
 	// Combine commands
 	cmds := []tea.Cmd{cmd, menuCmd, contentCmd, filterCmd, infoCmd, statsCmd}

@@ -47,6 +47,12 @@
       description = "Generic TUI script builder";
     };
 
+    createTuiBinary = lib.mkOption {
+      type = lib.types.anything;
+      internal = true;
+      description = "Function to build module-specific TUI binaries";
+    };
+
     domainTui = lib.mkOption {
       type = lib.types.anything;
       internal = true;
