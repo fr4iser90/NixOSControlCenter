@@ -178,19 +178,81 @@ let
     in
       recursiveUpdate baseConfig nestedConfig;
 
-in
-{
+  # Discover template-config.nix files from module directories
+  # Scans core/ and modules/ subdirectories under the flake root
+  discoverTemplates = configsDir:
+    let
+      discoverInDir = dir:
+        let
+          dirExists = pathExists dir;
+        in
+        if !dirExists then []
+        else
+          let
+            dirContent = readDir dir;
+            subDirs = builtins.attrNames (filterAttrs (name: type: type == "directory") dirContent);
+            templatesInDir = builtins.filter (name: name == "template-config.nix" && dirContent.${name} == "regular") (builtins.attrNames dirContent);
+            currentTemplates = builtins.map (file: dir + "/${file}") templatesInDir;
+            recursiveTemplates = builtins.concatMap (subDir: discoverInDir (dir + "/${subDir}")) subDirs;
+          in
+            currentTemplates ++ recursiveTemplates;
+    in
+      (discoverInDir "${configsDir}/core") ++ (discoverInDir "${configsDir}/modules");
+
+  # Extract domain path from a template file path
+  # Unlike user configs, templates don't have a "configs" prefix to strip
+  # Example: core/base/network/template-config.nix → ["core", "base", "network"]
+  extractTemplateDomainPath = configsDir: templatePath:
+    let
+      pathStr = toString templatePath;
+      dirStr = toString configsDir;
+      relativePath = if builtins.stringLength pathStr > builtins.stringLength dirStr
+        then builtins.substring (builtins.stringLength dirStr + 1)
+             (builtins.stringLength pathStr - builtins.stringLength dirStr - 1)
+             pathStr
+        else "";
+
+      splitPath = builtins.split "/" relativePath;
+      pathComponents = builtins.filter (p: builtins.isString p && p != "")
+        (map (s: if builtins.isString s then s else null) splitPath);
+
+      # Filter out template-config.nix file name (not matching hasSuffix ".nix" since it has a dash)
+      relevantParts = builtins.filter (p:
+        p != "template-config.nix" && p != "."
+      ) pathComponents;
+
+      # Use all parts as domain path (no tail - templates start at core/ or modules/)
+      domainPath = if builtins.length relevantParts >= 1 then relevantParts else [];
+    in
+      domainPath;
+
+  # Load a single template-config.nix file
+  loadTemplate = templatePath: configsDir:
+    let
+      domainPath = extractTemplateDomainPath configsDir templatePath;
+      loadedConfig = importNix templatePath;
+    in
+      { value = loadedConfig; path = templatePath; domainPath = domainPath; };
+
   # Load and merge all configs
   # Usage: loadSystemConfig configsDir configsPath
   loadSystemConfig = configsDir: configsPath:
     let
-      # 1. Start with empty base config (no more system-config.nix)
-      baseConfig = {};
+      # 1. Start with template defaults from module directories
+      templatePaths = discoverTemplates configsDir;
+      baseConfig = builtins.foldl' (acc: templatePath:
+        let
+          loaded = loadTemplate templatePath configsDir;
+        in
+          if loaded.value != {} then
+            mergeConfigIntoStructure loaded.domainPath loaded.value acc
+          else acc
+      ) {} templatePaths;
 
-      # 2. Dynamically discover all config files
+      # 2. Dynamically discover all user config files
       optionalConfigs = discoverConfigs configsDir configsPath;
 
-      # 3. Load and merge all discovered configs
+      # 3. Load and merge all discovered configs on top of templates
       # Order is important: later configs override earlier ones
       mergedConfig = builtins.foldl' (acc: configName:
         let
@@ -207,14 +269,11 @@ in
     in
       mergedConfig;
 
-  # Get list of discovered configs (for reference/debugging)
-  getDiscoveredConfigs = configsDir: discoverConfigs configsDir;
+ # Get list of discovered configs (for reference/debugging)
+  getDiscoveredConfigs = configsDir: configsPath: discoverConfigs configsDir configsPath;
 
-  # Export for debugging
-  extractDomainPath = extractDomainPath;
-  loadConfig = loadConfig;
-  importNix = importNix;
-  isValidConfig = isValidConfig;
-  pathExists = pathExists;
-  readFile = readFile;
+in
+{
+  loadSystemConfig = loadSystemConfig;
+  getDiscoveredConfigs = getDiscoveredConfigs;
 }

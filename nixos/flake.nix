@@ -34,7 +34,6 @@
 
     # Load and merge all configs using centralized loader
     # Only loads modular configs from configs directory
-    dummyCopy = builtins.readDir ./systemConfig;
     systemConfig = configLoader.loadSystemConfig ./. configs;
 
     # Import module discovery for automatic config paths (after systemConfig is loaded)
