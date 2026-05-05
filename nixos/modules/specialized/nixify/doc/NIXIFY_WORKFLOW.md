@@ -13,7 +13,7 @@ Dieses Dokument erklärt den **kompletten Workflow** des Nixify-Moduls.
 ### In der Config aktivieren
 
 ```nix
-# nixos/configs/modules/specialized/nixify/config.nix
+# nixos/systemConfig/modules/specialized/nixify/config.nix
 {
   modules.specialized.nixify = {
     enable = true;

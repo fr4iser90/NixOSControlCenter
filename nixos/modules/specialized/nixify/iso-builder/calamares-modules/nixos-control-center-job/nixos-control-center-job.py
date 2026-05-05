@@ -37,7 +37,7 @@ def extract_hostname_from_flake(flake_path):
 def generate_configs_from_selection(target_root, packagechooser_data):
     """
     Generate configs based on user selection from packagechooser.
-    Creates configs in {target_root}/etc/nixos/configs/
+    Creates configs in {target_root}/etc/nixos/systemConfig/
     
     packagechooser_data format:
     {
@@ -46,7 +46,7 @@ def generate_configs_from_selection(target_root, packagechooser_data):
         "features": ["docker", "virt-manager", ...]  # multiple possible
     }
     """
-    configs_dir = f"{target_root}/etc/nixos/configs"
+    configs_dir = f"{target_root}/etc/nixos/systemConfig"
     os.makedirs(configs_dir, exist_ok=True)
     
     # Extract selections from packagechooser

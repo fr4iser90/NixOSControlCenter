@@ -2,7 +2,7 @@
 
 # Helper function to update packages-config.nix
 update_packages_config() {
-    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/configs/packages-config.nix"
+    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/packages-config.nix"
     local package_modules="$1"
     
     # Create configs directory if it doesn't exist

@@ -7,7 +7,7 @@ migrate_system_config() {
     log_section "System-Config Migration"
     
     local config_file="${SYSTEM_CONFIG_FILE:-/etc/nixos/system-config.nix}"
-    local configs_dir="$(dirname "$config_file")/configs"
+    local configs_dir="$(dirname "$config_file")/systemConfig"
     
     # Check if system-config.nix exists
     if [[ ! -f "$config_file" ]]; then

@@ -10,7 +10,7 @@ fi
 
 # Helper function to update packages-config.nix
 update_packages_config() {
-    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/configs/packages-config.nix"
+    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/packages-config.nix"
     local package_modules="$1"
     
     # Create configs directory if it doesn't exist
@@ -150,9 +150,9 @@ backup_config() {
         }
     fi
     # Also backup configs directory if it exists
-    if [[ -d "$(dirname "$SYSTEM_CONFIG_FILE")/configs" ]]; then
+    if [[ -d "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" ]]; then
         local backup_root="/var/backup/nixos/directories"
-        local backup_dir="$backup_root/configs.$(date +%Y%m%d_%H%M%S)"
+        local backup_dir="$backup_root/systemConfig.$(date +%Y%m%d_%H%M%S)"
         # Create directory if it doesn't exist (ActivationScript should have created it)
         if [[ ! -d "$backup_root" ]]; then
             mkdir -p "$backup_root"
@@ -162,12 +162,12 @@ backup_config() {
             mkdir -p "$backup_root"  # Ensure it exists
         fi
         # Create backup directory and set permissions (700 for dirs, 600 for files)
-        if cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/configs" "$backup_dir" 2>/dev/null || sudo cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/configs" "$backup_dir" 2>/dev/null; then
+        if cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" "$backup_dir" 2>/dev/null || sudo cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" "$backup_dir" 2>/dev/null; then
             chmod -R 700 "$backup_dir" 2>/dev/null || sudo chmod -R 700 "$backup_dir" 2>/dev/null || true
             find "$backup_dir" -type f -exec chmod 600 {} \; 2>/dev/null || sudo find "$backup_dir" -type f -exec chmod 600 {} \; 2>/dev/null || true
             chown -R root:root "$backup_dir" 2>/dev/null || sudo chown -R root:root "$backup_dir" 2>/dev/null || true
             # Cleanup old backups (keep last 5)
-            ls -dt "$backup_root"/configs.* 2>/dev/null | tail -n +6 | xargs -r rm -rf 2>/dev/null || sudo xargs -r rm -rf 2>/dev/null || true
+            ls -dt "$backup_root"/systemConfig.* 2>/dev/null | tail -n +6 | xargs -r rm -rf 2>/dev/null || sudo xargs -r rm -rf 2>/dev/null || true
             log_info "Backup created: $backup_dir"
         fi
     fi

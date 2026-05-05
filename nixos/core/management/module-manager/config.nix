@@ -43,7 +43,7 @@ let
   debugModuleConfigs = automaticModuleConfigs;
 
   # Read central module configuration
-  moduleManagerConfigPath = "/etc/nixos/configs/module-manager-config.nix";
+  moduleManagerConfigPath = "/etc/nixos/systemConfig/module-manager-config.nix";
   moduleManagerConfig = if builtins.pathExists moduleManagerConfigPath
     then import moduleManagerConfigPath
     else import ./template-config.nix;
@@ -68,10 +68,10 @@ let
 '';
 
   # Helper: Build config file path from module category
-  # category is like "modules.infrastructure.homelab" -> /etc/nixos/configs/modules/infrastructure/homelab/config.nix
+  # category is like "modules.infrastructure.homelab" -> /etc/nixos/systemConfig/modules/infrastructure/homelab/config.nix
   buildConfigFilePath = module: let
     categoryParts = lib.splitString "." module.category;
-    configDir = lib.concatStringsSep "/" (["/etc/nixos/configs"] ++ categoryParts);
+    configDir = lib.concatStringsSep "/" (["/etc/nixos/systemConfig"] ++ categoryParts);
   in
     "${configDir}/config.nix";
 
@@ -81,7 +81,7 @@ let
       defaultConfig = getDefaultConfigForModule module;
       configFilePath = buildConfigFilePath module;
       categoryParts = lib.splitString "." module.category;
-      configDir = lib.concatStringsSep "/" (["/etc/nixos/configs"] ++ categoryParts);
+      configDir = lib.concatStringsSep "/" (["/etc/nixos/systemConfig"] ++ categoryParts);
       scriptName = "${module.domain}-${lib.replaceStrings ["."] ["-"] module.category}-config-setup";
     in
       {

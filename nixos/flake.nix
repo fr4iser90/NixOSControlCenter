@@ -12,7 +12,7 @@
     # For TUI engine Go building
     gomod2nix.url = "github:nix-community/gomod2nix";
 
-    configs.url = "path:./configs";
+    configs.url = "path:./systemConfig";
     configs.flake = false;
   };
 
@@ -34,7 +34,7 @@
 
     # Load and merge all configs using centralized loader
     # Only loads modular configs from configs directory
-    dummyCopy = builtins.readDir ./configs;
+    dummyCopy = builtins.readDir ./systemConfig;
     systemConfig = configLoader.loadSystemConfig ./. configs;
 
     # Import module discovery for automatic config paths (after systemConfig is loaded)

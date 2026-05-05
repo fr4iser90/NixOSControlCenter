@@ -745,7 +745,7 @@ EOF
     
     # ADDITIONAL PROTECTION: Ensure protected directories are not overwritten
     # Even if they were accidentally in COPY_ITEMS or copied through another directory
-    if [ -d "$NIXOS_DIR/configs" ] && [ -d "$SOURCE_DIR/configs" ]; then
+    if [ -d "$NIXOS_DIR/systemConfig" ] && [ -d "$SOURCE_DIR/systemConfig" ]; then
       ${ui.messages.info "configs/ exists in both locations - preserving existing configs (not overwriting)"}
     fi
     if [ -d "$NIXOS_DIR/custom" ] && [ -d "$SOURCE_DIR/custom" ]; then
@@ -833,20 +833,20 @@ in lib.mkMerge [
       chown root:root ${backupSettings.directory}
 
       # Create subdirectories for organized backups
-      mkdir -p ${backupSettings.directory}/configs
+      mkdir -p ${backupSettings.directory}/systemConfig
       mkdir -p ${backupSettings.directory}/directories
       mkdir -p ${backupSettings.directory}/migrations
       mkdir -p ${backupSettings.directory}/ssh
       mkdir -p ${backupSettings.directory}/system-updates
 
       # Set permissions for all subdirectories
-      chmod 700 ${backupSettings.directory}/configs
+      chmod 700 ${backupSettings.directory}/systemConfig
       chmod 700 ${backupSettings.directory}/directories
       chmod 700 ${backupSettings.directory}/migrations
       chmod 700 ${backupSettings.directory}/ssh
       chmod 700 ${backupSettings.directory}/system-updates
 
-      chown root:root ${backupSettings.directory}/configs
+      chown root:root ${backupSettings.directory}/systemConfig
       chown root:root ${backupSettings.directory}/directories
       chown root:root ${backupSettings.directory}/migrations
       chown root:root ${backupSettings.directory}/ssh

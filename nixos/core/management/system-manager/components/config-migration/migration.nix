@@ -53,7 +53,7 @@ let
     
     # All paths relative to NIXOS_CONFIG_DIR (no hardcoded paths)
     SYSTEM_CONFIG="$NIXOS_CONFIG_DIR/system-config.nix"
-    CONFIGS_DIR="$NIXOS_CONFIG_DIR/configs"
+    CONFIGS_DIR="$NIXOS_CONFIG_DIR/systemConfig"
     UTILS_PATH="$NIXOS_CONFIG_DIR/core/management/system-manager/lib/utils-config-migration.nix"
     MIGRATIONS_PATH="$NIXOS_CONFIG_DIR/core/management/system-manager/components/config-migration/schema/migrations"
     

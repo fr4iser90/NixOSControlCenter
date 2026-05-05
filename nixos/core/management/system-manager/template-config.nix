@@ -9,6 +9,6 @@
   # Nix Config
   allowUnfree = true;
   # Modules are managed via their own config files:
-  # /etc/nixos/configs/modules/*/config.nix
+  # /etc/nixos/systemConfig/modules/*/config.nix
   # Each module has its own 'enable' option
 }

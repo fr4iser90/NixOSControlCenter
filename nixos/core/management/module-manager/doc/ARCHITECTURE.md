@@ -38,7 +38,7 @@ The module automatically discovers modules by:
 ### Configuration Management
 
 The module manages configurations by:
-- Loading configurations from `/etc/nixos/configs/`
+- Loading configurations from `/etc/nixos/systemConfig/`
 - Merging with template defaults
 - Providing `getModuleConfig` function for modules
 

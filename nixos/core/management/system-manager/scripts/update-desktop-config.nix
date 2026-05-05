@@ -1,7 +1,7 @@
 { config, lib, pkgs, systemConfig }:
 
 let
-  desktopConfigPath = "/etc/nixos/configs/desktop-config.nix";
+  desktopConfigPath = "/etc/nixos/systemConfig/desktop-config.nix";
 in
 pkgs.writeShellScriptBin "update-desktop-config" ''
   #!${pkgs.bash}/bin/bash

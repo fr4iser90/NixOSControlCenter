@@ -15,7 +15,7 @@ let
 
     local module_name="$1"
     local action="$2"
-    local config_file="/etc/nixos/configs/$module_name/config.nix"
+    local config_file="/etc/nixos/systemConfig/$module_name/config.nix"
 
     echo "Setting $module_name to $action..."
 

@@ -84,7 +84,7 @@ backup_file() {
             fi
         elif echo "$file" | grep -q "^/etc/nixos/"; then
             # NixOS config → use config backup
-            backup_root="/var/backup/nixos/configs"
+            backup_root="/var/backup/nixos/systemConfig"
             backup_file="$backup_root/$(basename "$file").backup.$(date +%Y%m%d_%H%M%S)"
             # Create directory if it doesn't exist (ActivationScript should have created it)
             if [ ! -d "$backup_root" ]; then
@@ -105,7 +105,7 @@ backup_file() {
             fi
         else
             # Generic file → use config backup location
-            backup_root="/var/backup/nixos/configs"
+            backup_root="/var/backup/nixos/systemConfig"
             backup_file="$backup_root/$(basename "$file").backup.$(date +%Y%m%d_%H%M%S)"
             # Create directory if it doesn't exist (ActivationScript should have created it)
             if [ ! -d "$backup_root" ]; then

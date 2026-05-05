@@ -19,7 +19,7 @@ let
       FROM_VERSION="$2"
       TO_VERSION="$3"
       MIGRATION_FILE="$4"
-      FEATURES_CONFIG="/etc/nixos/configs/module-manager-config.nix"
+      FEATURES_CONFIG="/etc/nixos/systemConfig/module-manager-config.nix"
       BACKUP_DIR="/var/backup/nixos/migrations"
       
       ${ui.messages.info "Migrating $FEATURE_NAME: $FROM_VERSION → $TO_VERSION"}

@@ -1,4 +1,4 @@
-# Example builder: Builds objects/configs/artifacts
+# Example builder: Builds objects/systemConfig/artifacts
 # Builders construct complex objects from simpler inputs
 
 { pkgs, lib, ... }:

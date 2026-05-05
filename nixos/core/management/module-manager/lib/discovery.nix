@@ -32,7 +32,7 @@ let
               configPath = "${domain}.${currentCategory}";
               enablePath = "${domain}.${currentCategory}.enable";
               apiPath = "${domain}.${currentCategory}";
-              configFile = "/etc/nixos/configs/${domain}/${category}/${moduleName}/config.nix";
+              configFile = "/etc/nixos/systemConfig/${domain}/${category}/${moduleName}/config.nix";
               description = "${domain} ${currentCategory} module";
               dependencies = [];
               version = "1.0";

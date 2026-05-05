@@ -4,7 +4,7 @@ let
   # GENERISCH: CLI Formatter API über getModuleApi beziehen
   ui = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry"; 
-  hardwareConfigPath = "/etc/nixos/configs/core/base/hardware/config.nix";
+  hardwareConfigPath = "/etc/nixos/systemConfig/core/base/hardware/config.nix";
   
   # Use the shared update-hardware-config script from utils.nix
   # It will be automatically available via systemPackages

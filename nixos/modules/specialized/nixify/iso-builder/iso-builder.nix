@@ -7,9 +7,9 @@
 let
   # Generierte configs/*.nix Dateien
   generatedConfigsDir = pkgs.runCommand "nixify-generated-configs" {} ''
-    mkdir -p $out/configs
+    mkdir -p $out/systemConfig
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: content:
-      "echo ${lib.escapeShellArg content} > $out/configs/${name}"
+      "echo ${lib.escapeShellArg content} > $out/systemConfig/${name}"
     ) sessionConfigs)}
   '';
   
@@ -23,8 +23,8 @@ let
     cp -r ${repoPath}/* $out/
     
     # Generierte configs/*.nix in configs/ Verzeichnis kopieren
-    mkdir -p $out/configs
-    cp -r ${generatedConfigsDir}/configs/* $out/configs/
+    mkdir -p $out/systemConfig
+    cp -r ${generatedConfigsDir}/systemConfig/* $out/systemConfig/
     
     # Berechtigungen setzen
     chmod -R u+w $out
@@ -58,7 +58,7 @@ let
     echo ""
     echo "📄 Generated config files in configs/:"
     echo "---"
-    ls -la /mnt/etc/nixos/configs/
+    ls -la /mnt/etc/nixos/systemConfig/
     echo "---"
     echo ""
     read -p "Review configs above. Continue with installation? (y/n): " confirm
@@ -97,8 +97,8 @@ let
     echo "     nixos-generate-config --root /mnt"
     echo ""
     echo "  3. Review and edit configs if needed:"
-    echo "     ls -la /mnt/etc/nixos/configs/"
-    echo "     nano /mnt/etc/nixos/configs/desktop-config.nix"
+    echo "     ls -la /mnt/etc/nixos/systemConfig/"
+    echo "     nano /mnt/etc/nixos/systemConfig/desktop-config.nix"
     echo ""
     echo "  4. Run nixos-install with flake:"
     echo "     HOSTNAME=\$(grep -oP 'nixosConfigurations = \{.*?\"\\K[^\"]+' /mnt/etc/nixos/flake.nix | head -1 || echo 'nixos')"

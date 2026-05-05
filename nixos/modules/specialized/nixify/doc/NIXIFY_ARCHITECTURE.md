@@ -607,9 +607,9 @@ let
   # Custom Config einbetten
   # Configs-Verzeichnis erstellen
   configsDir = pkgs.runCommand "nixify-configs" {} ''
-    mkdir -p $out/configs
+    mkdir -p $out/systemConfig
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: content:
-      "echo ${lib.escapeShellArg content} > $out/configs/${name}"
+      "echo ${lib.escapeShellArg content} > $out/systemConfig/${name}"
     ) sessionConfigs)}
   '';
   
@@ -619,8 +619,8 @@ let
     # Automatische Installation mit Configs
     
     # Configs kopieren
-    mkdir -p /mnt/etc/nixos/configs
-    cp -r /mnt/cdrom/configs/* /mnt/etc/nixos/configs/
+    mkdir -p /mnt/etc/nixos/systemConfig
+    cp -r /mnt/cdrom/systemConfig/* /mnt/etc/nixos/systemConfig/
     
     # Installation starten (configs werden automatisch von flake.nix geladen)
     nixos-install

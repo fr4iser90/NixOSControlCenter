@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Module now properly implements management module pattern
 - All implementation logic consolidated in `config.nix`
 - Options properly defined in `options.nix`
-- User config symlinked to `/etc/nixos/configs/checks-config.nix`
+- User config symlinked to `/etc/nixos/systemConfig/checks-config.nix`
 - Added proper assertions and validation
 - Maintained all existing check functionality
 - Improved error handling and user feedback

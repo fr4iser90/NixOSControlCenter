@@ -2,7 +2,7 @@
 
 # Helper to update hosting-config.nix
 update_hosting_config() {
-    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/configs/hosting-config.nix"
+    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/hosting-config.nix"
     local email_value="$1"
     local domain_value="$2"
     
@@ -258,7 +258,7 @@ get_swarm_role() {
 
 detect_docker_mode() {
     # Check packages-config.nix for docker feature
-    local packages_config="$(dirname "$SYSTEM_CONFIG_FILE")/configs/packages-config.nix"
+    local packages_config="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/packages-config.nix"
     if [[ -f "$packages_config" ]]; then
         if grep -q '"docker"' "$packages_config"; then
             echo "docker"
@@ -380,7 +380,7 @@ update_homelab_config() {
     
     # Update desktop-config.nix if desktop setting is needed
     if [[ "$enable_desktop" == "false" ]]; then
-        local desktop_config="$(dirname "$SYSTEM_CONFIG_FILE")/configs/desktop-config.nix"
+        local desktop_config="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/desktop-config.nix"
         mkdir -p "$(dirname "$desktop_config")"
         cat > "$desktop_config" <<EOF
 {

@@ -36,14 +36,14 @@ let
   createModuleConfig = { moduleName, defaultConfig }: {
     system.activationScripts."${moduleName}-config-setup" = {
       text = ''
-        mkdir -p "/etc/nixos/configs/modules/specialized/${moduleName}"
+        mkdir -p "/etc/nixos/systemConfig/modules/specialized/${moduleName}"
 
         # Create default config if it doesn't exist
-        if [ ! -f "/etc/nixos/configs/modules/specialized/${moduleName}/config.nix" ]; then
-          cat << 'EOF' > "/etc/nixos/configs/modules/specialized/${moduleName}/config.nix"
+        if [ ! -f "/etc/nixos/systemConfig/modules/specialized/${moduleName}/config.nix" ]; then
+          cat << 'EOF' > "/etc/nixos/systemConfig/modules/specialized/${moduleName}/config.nix"
 ${defaultConfig}
 EOF
-          chmod 644 "/etc/nixos/configs/modules/specialized/${moduleName}/config.nix"
+          chmod 644 "/etc/nixos/systemConfig/modules/specialized/${moduleName}/config.nix"
           echo "Created default config for ${moduleName}"
         fi
       '';

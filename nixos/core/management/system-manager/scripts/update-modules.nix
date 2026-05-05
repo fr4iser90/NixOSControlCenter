@@ -50,7 +50,7 @@ let
     
     # Get modules directory
     MODULES_DIR="${toString ../../../../modules}"
-    MODULES_CONFIG="/etc/nixos/configs/module-manager-config.nix"
+    MODULES_CONFIG="/etc/nixos/systemConfig/module-manager-config.nix"
     
     # Collect modules that need updates
     MODULES_TO_UPDATE=()

@@ -1,4 +1,5 @@
 {
+  enable = true;
   networkManager.dns = "default";
   hostName = "nixos";
   firewall.enable = true;

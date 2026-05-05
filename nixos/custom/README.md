@@ -36,7 +36,7 @@ The following examples demonstrate how to create custom configurations:
 
   xdg.portal = {
     enable = true;
-    extraPortals = [ pkgs.xdg-desktop-portal-kde ];
+    extraPortals = [ pkgs.kdePackages.xdg-desktop-portal-kde ];
     config = {
       common.default = ["kde"];
       kde = {

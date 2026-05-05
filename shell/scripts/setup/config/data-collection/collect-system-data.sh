@@ -17,10 +17,10 @@ collect_system_data() {
 
     # Backup existing configs
     [[ -f "$SYSTEM_CONFIG_FILE" ]] && backup_file "$SYSTEM_CONFIG_FILE"
-    [[ -d "$(dirname "$SYSTEM_CONFIG_FILE")/configs" ]] && {
+    [[ -d "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" ]] && {
         log_info "Backing up existing configs directory..."
         BACKUP_ROOT="/var/backup/nixos/directories"
-        BACKUP_DIR="$BACKUP_ROOT/configs.$(date +%Y%m%d_%H%M%S)"
+        BACKUP_DIR="$BACKUP_ROOT/systemConfig.$(date +%Y%m%d_%H%M%S)"
         # Create directory if it doesn't exist (ActivationScript should have created it)
         if [ ! -d "$BACKUP_ROOT" ]; then
             mkdir -p "$BACKUP_ROOT"
@@ -30,18 +30,18 @@ collect_system_data() {
             mkdir -p "$BACKUP_ROOT"  # Ensure it exists
         fi
         # Create backup directory and set permissions (700 for dirs, 600 for files)
-        if cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/configs" "$BACKUP_DIR" 2>/dev/null || sudo cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/configs" "$BACKUP_DIR" 2>/dev/null; then
+        if cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" "$BACKUP_DIR" 2>/dev/null || sudo cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" "$BACKUP_DIR" 2>/dev/null; then
             chmod -R 700 "$BACKUP_DIR" 2>/dev/null || sudo chmod -R 700 "$BACKUP_DIR" 2>/dev/null || true
             find "$BACKUP_DIR" -type f -exec chmod 600 {} \; 2>/dev/null || sudo find "$BACKUP_DIR" -type f -exec chmod 600 {} \; 2>/dev/null || true
             chown -R root:root "$BACKUP_DIR" 2>/dev/null || sudo chown -R root:root "$BACKUP_DIR" 2>/dev/null || true
             # Cleanup old backups (keep last 5)
-            ls -dt "$BACKUP_ROOT"/configs.* 2>/dev/null | tail -n +6 | xargs -r rm -rf 2>/dev/null || sudo xargs -r rm -rf 2>/dev/null || true
+            ls -dt "$BACKUP_ROOT"/systemConfig.* 2>/dev/null | tail -n +6 | xargs -r rm -rf 2>/dev/null || sudo xargs -r rm -rf 2>/dev/null || true
             log_info "Backup created: $BACKUP_DIR"
         fi
     }
 
     # Ensure configs directory exists
-    ensure_dir "$(dirname "$SYSTEM_CONFIG_FILE")/configs"
+    ensure_dir "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig"
 
     # Create all config files
     init_system_config
@@ -145,7 +145,7 @@ init_packages_config() {
 }
 "
     
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/packages-config.nix" "$content"
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/packages-config.nix" "$content"
 }
 
 # Create desktop-config.nix
@@ -159,7 +159,7 @@ init_desktop_config() {
     local dark_mode="${DARK_MODE:-true}"
     local audio="${AUDIO:-pipewire}"
     
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/desktop-config.nix" "{
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/desktop-config.nix" "{
   # Desktop-Environment
   desktop = {
     enable = $enable_desktop;
@@ -198,7 +198,7 @@ init_localization_config() {
 }
 "
     
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/localization-config.nix" "$content"
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/localization-config.nix" "$content"
 }
 
 # Create hardware-config.nix
@@ -224,7 +224,7 @@ init_hardware_config() {
 }
 "
     
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/hardware-config.nix" "$content"
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/hardware-config.nix" "$content"
 }
 
 # Create features-config.nix - DEPRECATED
@@ -233,7 +233,7 @@ init_features_config() {
     log_warning "Use individual feature config functions instead."
 
     # Create deprecated marker file
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/features-config.nix" "{
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/features-config.nix" "{
   # DEPRECATED: This file is no longer used.
   # Features now have individual config files:
   # - bootentry-config.nix
@@ -252,7 +252,7 @@ init_logging_config() {
     log_debug "Creating logging-config.nix..."
     local build_log_level="${BUILD_LOG_LEVEL:-minimal}"
     
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/logging-config.nix" "{
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/logging-config.nix" "{
   # Build-Logging
   buildLogLevel = \"$build_log_level\";
 }
@@ -283,7 +283,7 @@ init_hosting_config() {
 }
 "
     
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/hosting-config.nix" "$content"
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/hosting-config.nix" "$content"
 }
 
 # Create overrides-config.nix
@@ -306,12 +306,12 @@ init_overrides_config() {
 }
 "
     
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/configs/overrides-config.nix" "$content"
+    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/overrides-config.nix" "$content"
 }
 
 restore_backup() {
-    # Restore system-config.nix backup (from /var/backup/nixos/configs/)
-    local backup_root="/var/backup/nixos/configs"
+    # Restore system-config.nix backup (from /var/backup/nixos/systemConfig/)
+    local backup_root="/var/backup/nixos/systemConfig"
     local latest_backup=$(ls -t "$backup_root"/system-config.nix.backup.* 2>/dev/null | head -1)
     if [[ -n "$latest_backup" && -f "$latest_backup" ]]; then
         cp "$latest_backup" "$SYSTEM_CONFIG_FILE"
@@ -320,10 +320,10 @@ restore_backup() {
     
     # Restore configs directory backup (from /var/backup/nixos/directories/)
     backup_root="/var/backup/nixos/directories"
-    local latest_dir_backup=$(ls -td "$backup_root"/configs.* 2>/dev/null | head -1)
+    local latest_dir_backup=$(ls -td "$backup_root"/systemConfig.* 2>/dev/null | head -1)
     if [[ -n "$latest_dir_backup" && -d "$latest_dir_backup" ]]; then
-        rm -rf "$(dirname "$SYSTEM_CONFIG_FILE")/configs"
-        cp -r "$latest_dir_backup" "$(dirname "$SYSTEM_CONFIG_FILE")/configs"
+        rm -rf "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig"
+        cp -r "$latest_dir_backup" "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig"
         log_info "Restored backup configs directory from $latest_dir_backup"
     fi
 }

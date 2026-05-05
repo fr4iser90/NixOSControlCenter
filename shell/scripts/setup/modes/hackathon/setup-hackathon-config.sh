@@ -2,7 +2,7 @@
 
 # Helper to update hosting-config.nix
 update_hosting_config() {
-    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/configs/hosting-config.nix"
+    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/hosting-config.nix"
     local email_value="$1"
     local domain_value="$2"
     

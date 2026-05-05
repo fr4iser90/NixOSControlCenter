@@ -1,4 +1,4 @@
-# Example collector: Gathers data from system/configs/files/APIs
+# Example collector: Gathers data from system/systemConfig/files/APIs
 # Collectors only gather data, they don't transform it
 
 { pkgs, lib, ... }:

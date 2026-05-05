@@ -12,7 +12,7 @@ let
 
     # Configuration
     readonly MODULES_BASE="/etc/nixos"
-    readonly CONFIGS_BASE="/etc/nixos/configs"
+    readonly CONFIGS_BASE="/etc/nixos/systemConfig"
 
     # Parse Nix enable value from config file
     parse_nix_enable() {

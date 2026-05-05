@@ -11,7 +11,7 @@ rec {
   # Usage: backupConfigFile originalPath backupReason
   # Example: backupConfigFile "/etc/nixos/system-config.nix" "migration"
   backupConfigFile = originalPath: backupReason: ''
-    BACKUP_ROOT="${backupRoot}/configs"
+    BACKUP_ROOT="${backupRoot}/systemConfig"
     BACKUP_FILE="$BACKUP_ROOT/$(basename "$originalPath").backup.$(date +%Y%m%d_%H%M%S)"
     
     # Create directory if it doesn't exist (ActivationScript should have created it)
@@ -37,7 +37,7 @@ rec {
   
   # Backup a directory
   # Usage: backupDirectory originalPath backupReason
-  # Example: backupDirectory "/etc/nixos/configs" "setup"
+  # Example: backupDirectory "/etc/nixos/systemConfig" "setup"
   backupDirectory = originalPath: backupReason: ''
     BACKUP_ROOT="${backupRoot}/directories"
     BACKUP_DIR="$BACKUP_ROOT/$(basename "$originalPath").$(date +%Y%m%d_%H%M%S)"

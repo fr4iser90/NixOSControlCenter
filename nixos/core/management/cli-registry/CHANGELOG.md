@@ -33,5 +33,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Module now properly implements core module pattern
 - All implementation logic moved to `config.nix`
 - Options properly defined in `options.nix`
-- User config symlinked to `/etc/nixos/configs/command-center-config.nix`
+- User config symlinked to `/etc/nixos/systemConfig/command-center-config.nix`
 - Added proper assertions and validation

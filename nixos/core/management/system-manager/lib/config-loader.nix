@@ -82,7 +82,7 @@ let
       domainPath = if builtins.length relevantParts >= 2
                    then builtins.tail relevantParts  # Remove "configs", keep module path
                    else if builtins.length relevantParts == 1 && builtins.head relevantParts == "configs"
-                   then []  # Configs in /etc/nixos/configs/ → merge at top level
+                   then []  # Configs in /etc/nixos/systemConfig/ → merge at top level
                    else relevantParts;  # Just module name, no domain (legacy)
     in
       domainPath;
@@ -104,7 +104,7 @@ let
     let
       # Search paths: Only flake configs (relative to flake root)
       searchPaths = [
-        configsPath  # ./configs (relative to flake)
+        configsPath  # ./systemConfig (relative to flake)
       ];
 
       # Find the first valid config file

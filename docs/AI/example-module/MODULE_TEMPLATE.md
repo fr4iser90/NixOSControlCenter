@@ -558,7 +558,7 @@ let cfg = getModuleConfig "my-module"; in
 **Merging Order**:
 1. **template-config.nix** (base defaults, always loaded if exists)
 2. **options.nix defaults** (from option definitions)
-3. **user config file** (from `/etc/nixos/configs/`, overrides everything)
+3. **user config file** (from `/etc/nixos/systemConfig/`, overrides everything)
 
 ##### **`getModuleMetadata` - Access Module Metadata**
 ```nix
@@ -577,7 +577,7 @@ getModuleMetadata = moduleName:
   #
   #   # FROM DISCOVERY (auto-generated):
   #   path = "core/management/system-manager/submodules/cli-formatter";  # Filesystem path
-  #   configPath = "core.management.system-manager.submodules.cli-formatter";  # Path in systemConfig (from /etc/nixos/configs/)
+  #   configPath = "core.management.system-manager.submodules.cli-formatter";  # Path in systemConfig (from /etc/nixos/systemConfig/)
   #   apiPath = "core.management.system-manager.submodules.cli-formatter";     # Base API path
   #   enablePath = "core.management.system-manager.submodules.cli-formatter.enable"; # Enable path (optional modules)
   # }
@@ -640,7 +640,7 @@ Based on module metadata + filesystem structure:
 
 #### **Automatic Path Resolution**
 Based on metadata, these paths are automatically generated:
-- **Config Path**: `systemConfig.{category}.{subcategory}.{name}` (points to user config in `/etc/nixos/configs/`)
+- **Config Path**: `systemConfig.{category}.{subcategory}.{name}` (points to user config in `/etc/nixos/systemConfig/`)
 - **API Path**: `{configPath}.api` (for API access)
 - **Enable Path**: `{configPath}.enable` (for optional modules)
 
@@ -654,7 +654,7 @@ Based on metadata, these paths are automatically generated:
   subcategory = "management.system-manager.submodules";
 }
 
-# Generated paths (point to /etc/nixos/configs/ structure)
+# Generated paths (point to /etc/nixos/systemConfig/ structure)
 configPath = "core.management.system-manager.submodules.cli-formatter"
 apiPath = "core.management.system-manager.submodules.cli-formatter.api"
 enablePath = "core.management.system-manager.submodules.cli-formatter.enable"
@@ -811,7 +811,7 @@ enablePath = "core.management.system-manager.submodules.cli-formatter.enable"
 2. **Fallback Chain**: `template-config.nix` → `options.nix` defaults → user config file
 3. **Merging**: All three sources are merged: `templateDefaults` → `configValue` (with options defaults) → `systemConfigValue` (user config)
 4. **File Path Nesting**: `config-loader.nix` automatically nests based on file path:
-   - `/etc/nixos/configs/modules/infrastructure/homelab/config.nix` → `systemConfig.modules.infrastructure.homelab`
+   - `/etc/nixos/systemConfig/modules/infrastructure/homelab/config.nix` → `systemConfig.modules.infrastructure.homelab`
    - So `template-config.nix` should be flat: `{ enable = false; ... }`
 
 **Example**:

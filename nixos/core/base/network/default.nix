@@ -1,20 +1,21 @@
 # modules/networking/default.nix
 { config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
-let
-  # Single Source: Modulname nur einmal definieren
-  moduleName = baseNameOf ./. ;  # ← network aus core/base/network/
+   let
+     # Single Source: Modulname nur einmal definieren
+     moduleName = baseNameOf ./. ;  # ← network aus core/base/network/
 
-  # Import sub-modules based on configuration
-  networkingModules = [
-    ./options.nix
-    (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })
-    ./handlers/networkmanager.nix
-    ./handlers/firewall.nix
-  ];
+     # Import sub-modules based on configuration
+     networkingModules = [
+       ./options.nix
+       (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })
+       ./handlers/networkmanager.nix
+       ./handlers/firewall.nix
+     ];
 
-  networkCfg = getModuleConfig moduleName;
-  localizationCfg = getModuleConfig "localization";  # Anderes Modul, bleibt hardcoded
+     networkCfg = getModuleConfig moduleName;
+     # LOOSE DEPENDENCY: Localization config mit Fallback wenn nicht vorhanden
+     localizationCfg = getModuleConfig "localization" // { timeZone = "Europe/Berlin"; };
 
 in {
   _module.metadata = {
@@ -39,18 +40,14 @@ in {
     # to avoid conflicts and ensure proper enable/disable handling
   };
 
-  # Time zone configuration
-  time.timeZone = localizationCfg.timeZone or "Europe/Berlin";
+   # Time zone configuration mit Fallback
+   time.timeZone = if localizationCfg.timeZone != "" then localizationCfg.timeZone else "Europe/Berlin";
 
-  # Assertions for validation
-  assertions = [
-    {
-      assertion = localizationCfg.timeZone != "";
-      message = "Time zone must be specified in localization config";
-    }
-    {
-      assertion = networkCfg.hostName != "";
-      message = "Hostname must be specified in network config";
-    }
-  ];
+   # Assertions for validation
+   assertions = [
+     {
+       assertion = networkCfg.hostName != "";
+       message = "Hostname must be specified in network config";
+     }
+   ];
 }

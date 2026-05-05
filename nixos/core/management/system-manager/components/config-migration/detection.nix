@@ -25,7 +25,7 @@ in
     # Generic config directory - can be overridden via environment variable
     NIXOS_CONFIG_DIR="''${NIXOS_CONFIG_DIR:-/etc/nixos}"
     SYSTEM_CONFIG="$NIXOS_CONFIG_DIR/system-config.nix"
-    CONFIGS_DIR="$NIXOS_CONFIG_DIR/configs"
+    CONFIGS_DIR="$NIXOS_CONFIG_DIR/systemConfig"
     
     # Set jq path
     JQ_BIN="${pkgs.jq}/bin/jq"

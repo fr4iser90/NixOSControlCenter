@@ -62,7 +62,7 @@ configHelpers.createModuleConfig {
 
 ### Configuration Loading
 
-1. **Load System Config**: Load from `/etc/nixos/configs/`
+1. **Load System Config**: Load from `/etc/nixos/systemConfig/`
 2. **Merge Template**: Merge with `template-config.nix` defaults
 3. **Merge Options**: Merge with `options.nix` defaults
 4. **Provide Access**: Make available via `getModuleConfig`
@@ -106,7 +106,7 @@ The module manager works with system-level management:
 **Issue**: Config not loading
 **Symptoms**: Module config not available
 **Solution**: 
-1. Check config file exists in `/etc/nixos/configs/`
+1. Check config file exists in `/etc/nixos/systemConfig/`
 2. Verify config path is correct
 3. Check config merging process
 **Prevention**: Ensure config files are created correctly

@@ -7,7 +7,7 @@ let
     set -euo pipefail
     
     SYSTEM_CONFIG="/etc/nixos/system-config.nix"   # SYSTEMCONFIG EXISTIERT NICHT MEHR!!!!
-    CONFIGS_DIR="/etc/nixos/configs"
+    CONFIGS_DIR="/etc/nixos/systemConfig"
     
     ERRORS=0
     WARNINGS=0

@@ -37,7 +37,7 @@ ncc user-manager    # User-Management TUI
 ### 1. Modul aktivieren
 ```bash
 ncc module enable homelab
-# → Erstellt automatisch: /etc/nixos/configs/modules/infrastructure/homelab/config.nix
+# → Erstellt automatisch: /etc/nixos/systemConfig/modules/infrastructure/homelab/config.nix
 ```
 
 ### 2. Config-Template verwenden

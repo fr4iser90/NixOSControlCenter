@@ -1816,7 +1816,7 @@ func (s *Server) generateConfig(sessionID, outputPath string) error {
 	for fileName := range result.Configs {
 		summary += fmt.Sprintf("- %s\n", fileName)
 	}
-	summary += "\nCopy these files to /etc/nixos/configs/ on your NixOS system.\n"
+	summary += "\nCopy these files to /etc/nixos/systemConfig/ on your NixOS system.\n"
 
 	summaryPath := filepath.Join(configsDir, "README.md")
 	if err := os.WriteFile(summaryPath, []byte(summary), 0644); err != nil {
@@ -1923,7 +1923,7 @@ Generated config files:
 - packages-config.nix
 - localization-config.nix
 
-Copy these files to /etc/nixos/configs/ on your NixOS system.
+Copy these files to /etc/nixos/systemConfig/ on your NixOS system.
 `, sessionID, session.Report.OS, time.Now().Format(time.RFC3339))
 	if err := os.WriteFile(filepath.Join(configsDir, "README.md"), []byte(summary), 0644); err != nil {
 		log.Printf("Failed to write README: %v", err)
@@ -2657,16 +2657,16 @@ func (s *Server) checkModuleStatus(moduleName, category, domain string) string {
 // findModuleConfigPath constructs the config file path for a module
 func (s *Server) findModuleConfigPath(moduleName, category, domain string) string {
 	// Category examples:
-	// - "core.base.audio" -> /etc/nixos/configs/core/base/audio/config.nix
-	// - "modules.specialized.nixify" -> /etc/nixos/configs/modules/specialized/nixify/config.nix
+	// - "core.base.audio" -> /etc/nixos/systemConfig/core/base/audio/config.nix
+	// - "modules.specialized.nixify" -> /etc/nixos/systemConfig/modules/specialized/nixify/config.nix
 	
 	// Category already contains domain and full path (e.g., "core.base.audio" or "modules.specialized.nixify")
 	// Split category into parts
 	parts := strings.Split(category, ".")
 	
-	// Build path: /etc/nixos/configs/{parts...}/config.nix
+	// Build path: /etc/nixos/systemConfig/{parts...}/config.nix
 	// The category includes the module name as the last part, so we need to replace it
-	pathParts := []string{"/etc/nixos/configs"}
+	pathParts := []string{"/etc/nixos/systemConfig"}
 	
 	// Add all category parts except the last one (which should be the module name)
 	if len(parts) > 0 {
