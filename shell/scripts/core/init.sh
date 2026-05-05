@@ -9,13 +9,6 @@ main() {
     
     check_hardware_config
     
-    # Check and migrate old system-config.nix structure (automatic)
-    if [[ -f "$SYSTEM_CONFIG_FILE" ]] && command -v migrate_system_config >/dev/null 2>&1; then
-        migrate_system_config || {
-            log_warn "Migration failed, continuing with setup..."
-        }
-    fi
-    
     # Collect system information
     collect_system_data || {
         log_error "System data collection failed"
@@ -55,13 +48,6 @@ main() {
                 exit 1
             }
             log_success "Configuration imported successfully"
-            
-            # Run migration AFTER config is imported (to migrate packageModules, desktop, etc. to configs/)
-            if command -v migrate_system_config >/dev/null 2>&1; then
-                migrate_system_config || {
-                    log_warn "Migration failed after config import, continuing anyway..."
-                }
-            fi
             
             # Export system type for deployment
             local system_type
@@ -219,13 +205,6 @@ setup_predefined_profile() {
     fi
     
     log_success "Predefined profile applied successfully"
-    
-    # Run migration AFTER profile is loaded (to migrate packageModules, desktop, etc. to configs/)
-    if command -v migrate_system_config >/dev/null 2>&1; then
-        migrate_system_config || {
-            log_warn "Migration failed after profile load, continuing anyway..."
-        }
-    fi
     
     # Export system type for deployment (read from profile)
     local system_type

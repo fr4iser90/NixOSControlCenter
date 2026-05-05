@@ -7,6 +7,7 @@ check_users() {
     local current_shell
     local user_block=""
     local needs_password_setup=false
+    local users_needing_passwords=()
 
     # Aktueller User
     current_user=$(whoami)
@@ -39,32 +40,36 @@ check_users() {
                         sudo chmod 600 "/etc/nixos/secrets/passwords/$username/.hashedPassword"
                     fi
                 else
-                    # Kein Passwort gefunden
+                    # Kein Passwort gefunden -> zum Setup-Queue hinzufügen
                     if [ ! -f "/etc/nixos/secrets/passwords/$username/.hashedPassword" ]; then
                         log_warning "Admin user '$username' has no password configured!"
                         needs_password_setup=true
+                        users_needing_passwords+=("$username")
                     fi
                 fi
             elif groups "$username" 2>/dev/null | grep -q "docker"; then
                 user_role="virtualization"
+                # Check password for virtualization users too
+                if getent shadow "$username" | grep -q "^$username:[^\*\!:]"; then
+                    if [ ! -f "/etc/nixos/secrets/passwords/$username/.hashedPassword" ]; then
+                        log_info "Copying existing password hash for $username..."
+                        sudo mkdir -p "/etc/nixos/secrets/passwords/$username"
+                        sudo sh -c "getent shadow $username | cut -d: -f2 > /etc/nixos/secrets/passwords/$username/.hashedPassword"
+                        sudo chown "$username:users" "/etc/nixos/secrets/passwords/$username" "/etc/nixos/secrets/passwords/$username/.hashedPassword"
+                        sudo chmod 700 "/etc/nixos/secrets/passwords/$username"
+                        sudo chmod 600 "/etc/nixos/secrets/passwords/$username/.hashedPassword"
+                    fi
+                else
+                    if [ ! -f "/etc/nixos/secrets/passwords/$username/.hashedPassword" ]; then
+                        log_warning "Virtualization user '$username' has no password configured!"
+                        needs_password_setup=true
+                        users_needing_passwords+=("$username")
+                    fi
+                fi
             else
                 user_role="guest"
             fi
 
-    # Nach dem Shell-Check und vor dem User-Block
-    if groups "$username" 2>/dev/null | grep -q "wheel"; then
-        # Wenn Passwort im Shadow existiert aber keine .hashedPassword Datei
-        if getent shadow "$username" | grep -q "^$username:[^\*\!:]" && \
-        [ ! -f "/etc/nixos/secrets/passwords/$username/.hashedPassword" ]; then
-            echo "Copying existing password hash for $username..."
-            sudo mkdir -p "/etc/nixos/secrets/passwords/$username"
-            sudo sh -c "getent shadow $username | cut -d: -f2 > /etc/nixos/secrets/passwords/$username/.hashedPassword"
-            sudo chown "$username:users" "/etc/nixos/secrets/passwords/$username" "/etc/nixos/secrets/passwords/$username/.hashedPassword"
-            sudo chmod 700 "/etc/nixos/secrets/passwords/$username"
-            sudo chmod 600 "/etc/nixos/secrets/passwords/$username/.hashedPassword"
-        fi
-    fi
-    
             # Shell-Pfad in Shell-Name umwandeln
             case "$shell" in
                 *"/bash") shell_name="bash" ;;
@@ -89,10 +94,10 @@ check_users() {
 
     # Wenn Passwörter fehlen, biete Setup an
     if [ "$needs_password_setup" = true ]; then
-        log_warning "Some admin users need password configuration!"
+        log_warning "Users need password configuration: ${users_needing_passwords[*]}"
         read -p "Do you want to set up missing passwords now? [Y/n] " response
         if [[ ! "$response" =~ ^[Nn]$ ]]; then
-            for username in $(getent group wheel | cut -d: -f4 | tr ',' ' '); do
+            for username in "${users_needing_passwords[@]}"; do
                 if ! getent shadow "$username" | grep -q "^$username:[^\*\!:]"; then
                     if [ ! -f "/etc/nixos/secrets/passwords/$username/.hashedPassword" ]; then
                         echo "Setting up password for $username..."

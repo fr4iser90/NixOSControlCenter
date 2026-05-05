@@ -90,7 +90,7 @@ init_system_config() {
     
     write_nix_config "$SYSTEM_CONFIG_FILE" "{
   # Configuration Schema Version
-  configVersion = \"2.0\";
+  configVersion = \"1.0\";
   
   # System-Identität
   systemType = \"${SYSTEM_TYPE:-desktop}\";
@@ -227,24 +227,12 @@ init_hardware_config() {
     write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/hardware-config.nix" "$content"
 }
 
-# Create features-config.nix - DEPRECATED
+# Features are now managed via individual config files in systemConfig/
+# (bootentry-config.nix, homelab-config.nix, lock-config.nix, etc.)
+# features-config.nix is no longer created
 init_features_config() {
-    log_warning "init_features_config() is deprecated. Features now use individual config files."
-    log_warning "Use individual feature config functions instead."
-
-    # Create deprecated marker file
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/features-config.nix" "{
-  # DEPRECATED: This file is no longer used.
-  # Features now have individual config files:
-  # - bootentry-config.nix
-  # - homelab-config.nix
-  # - lock-config.nix
-  # etc.
-  features = {
-    # This file is deprecated - use individual feature config files instead
-  };
-}
-"
+    log_debug "Features config is handled by individual feature config files"
+    return 0
 }
 
 # Create logging-config.nix
