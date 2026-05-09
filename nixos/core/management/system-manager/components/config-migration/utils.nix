@@ -74,7 +74,7 @@ rec {
     lib.mapAttrs (fromVersion: toVersions:
       # For now, take first available migration (direct path)
       # Chain resolution will be handled by findMigrationChain
-      lib.head (lib.attrNames toVersions)
+      let names = lib.attrNames toVersions; in if names == [] then "1.0" else lib.head names
     ) migrationPlans;
 
   # Find migration chain from source to target version

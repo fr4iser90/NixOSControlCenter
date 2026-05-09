@@ -26,7 +26,8 @@ let
   commandCenter = getModuleConfig "cli-registry";
 
   # Extract configuration values
-  username = head (attrNames (getModuleConfig "user"));
+  userCfg = getModuleConfig "user";
+  username = if attrNames userCfg == [] then "root" else head (attrNames userCfg);
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
   autoBuild = lib.attrByPath ["autoBuild"] false (getModuleConfig "system-manager");
   systemChecks = lib.attrByPath ["enable"] false (getModuleConfig "system-checks");
@@ -38,7 +39,7 @@ let
       case $build_choice in
         y|Y)
           ${ui.messages.loading "Building system configuration..."}
-          BUILD_CMD="${if systemChecks then "sudo ncc system build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
+          BUILD_CMD="sudo ncc system build switch --flake /etc/nixos#${hostname}"
           
           # Run build and capture exit code (sh -c completely isolates from parent shell)
           if sh -c "$BUILD_CMD" 2>&1; then
@@ -64,7 +65,7 @@ let
           break
           ;;
         n|N)
-          ${ui.messages.info "Skipping build. You can manually run: ${if systemChecks then "sudo ncc system build switch" else "sudo nixos-rebuild switch"} --flake /etc/nixos#${hostname}"}
+          ${ui.messages.info "Skipping build. You can manually run: sudo ncc system build switch --flake /etc/nixos#${hostname}"}
           break
           ;;
         *)
@@ -394,9 +395,9 @@ let
         # This copies the default config from the repository
         cp -r "$source_module" "$target_module" 2>/dev/null || true
       fi
-    }
-    
-    # Extract module config from system-config.nix (for Stage 0 → 1 migration)
+     }
+     
+     # Extract module config from system-config.nix (for Stage 0 → 1 migration)
     extract_module_config() {
       local system_config_file="$1"
       local module_name="$2"
@@ -467,8 +468,8 @@ let
         # Try to extract config directly as Nix attrset
         MODULE_CONFIG_NIX=$(nix-instantiate --eval --strict -E "
           let config = import $system_config_file;
-          in if config ? ''${module_name} then
-            builtins.toJSON config.''${module_name}
+        in if config ? ''${module_name} then
+              builtins.toJSON config.''${module_name}
           else
             \"{}\"
         " 2>/dev/null || echo "{}")
@@ -740,12 +741,56 @@ EOF
         fi
       else
         ${ui.messages.warning "$item not found, skipping..."}
+    fi
+     done
+     
+     # Sync template-config.nix files to systemConfig/config.nix
+      echo "=== Syncing config templates ==="
+      SYNCED=0
+      while IFS= read -r -d $'\0' tmpl_file; do
+        rel_path="''${tmpl_file#$SOURCE_DIR/}"
+        target_config="$NIXOS_DIR/systemConfig/$rel_path"
+       target_config="''${target_config/template-config.nix/config.nix}"
+        target_dir=$(dirname "$target_config")
+        if [ ! -f "$target_config" ]; then
+          mkdir -p "$target_dir"
+          cp "$tmpl_file" "$target_config"
+          echo "  [COPIED] $rel_path"
+          SYNCED=$((SYNCED + 1))
+        else
+          config_content=$(cat "$target_config" 2>/dev/null | tr -d '[:space:]#')
+          if [ -z "$config_content" ] || [ "$config_content" = "{}" ]; then
+            cp "$tmpl_file" "$target_config"
+            echo "  [REPLACED empty] $rel_path"
+            SYNCED=$((SYNCED + 1))
+          fi
+        fi
+      done < <(find "$SOURCE_DIR/core" "$SOURCE_DIR/modules" -name "template-config.nix" -print0 2>/dev/null)
+      if [ "$SYNCED" -gt 0 ]; then
+        echo "  Synced $SYNCED config(s) from templates"
+      else
+        echo "  No template sync needed"
       fi
-    done
-    
-    # ADDITIONAL PROTECTION: Ensure protected directories are not overwritten
-    # Even if they were accidentally in COPY_ITEMS or copied through another directory
-    if [ -d "$NIXOS_DIR/systemConfig" ] && [ -d "$SOURCE_DIR/systemConfig" ]; then
+      
+      # Fix placeholder hostname in synced configs
+      ADJUSTED=0
+      if [ -d "$NIXOS_DIR/systemConfig" ]; then
+        for cf in $(find "$NIXOS_DIR/systemConfig" -name "config.nix" 2>/dev/null); do
+          if grep -q 'hostName = "nixos"' "$cf" 2>/dev/null; then
+            ch=$(hostname 2>/dev/null || echo "nixos")
+            sed -i "s/hostName = \"nixos\"/hostName = \"$ch\"/g" "$cf"
+            echo "  [FIXED] hostname → $ch in $(basename $(dirname $cf))"
+            ADJUSTED=$((ADJUSTED + 1))
+          fi
+        done
+      fi
+      if [ "$ADJUSTED" -gt 0 ]; then
+        echo "  Fixed $ADJUSTED placeholder(s)"
+      fi
+     
+     # ADDITIONAL PROTECTION: Ensure protected directories are not overwritten
+     # Even if they were accidentally in COPY_ITEMS or copied through another directory
+     if [ -d "$NIXOS_DIR/systemConfig" ] && [ -d "$SOURCE_DIR/systemConfig" ]; then
       ${ui.messages.info "configs/ exists in both locations - preserving existing configs (not overwriting)"}
     fi
     if [ -d "$NIXOS_DIR/custom" ] && [ -d "$SOURCE_DIR/custom" ]; then
@@ -783,7 +828,7 @@ EOF
     # Check if auto-build or --auto-build flag is enabled
     if [ "$AUTO_BUILD" = "true" ] || [ "$autoBuild" = "true" ]; then
       ${ui.messages.loading "Auto-build enabled, building configuration..."}
-      BUILD_CMD="${if systemChecks then "sudo ncc system build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
+      BUILD_CMD="sudo ncc system build switch --flake /etc/nixos#${hostname}"
       
       if sh -c "$BUILD_CMD" 2>&1; then
         ${ui.messages.success "System successfully updated and rebuilt!"}
@@ -805,7 +850,7 @@ EOF
       fi
     elif [ "$AUTO_CONFIRM" = "true" ]; then
       # Auto-confirm enabled but no auto-build - skip build prompt
-      ${ui.messages.info "Skipping build. You can manually run: ${if systemChecks then "sudo ncc system build switch" else "sudo nixos-rebuild switch"} --flake /etc/nixos#${hostname}"}
+      ${ui.messages.info "Skipping build. You can manually run: sudo ncc system build switch --flake /etc/nixos#${hostname}"}
     else
       ${prompt_build}
     fi

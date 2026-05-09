@@ -73,17 +73,19 @@ let
       pathComponents = builtins.filter (p: builtins.isString p && p != "") 
         (map (s: if builtins.isString s then s else null) splitPath);
       
-      # Filter out config file name and current directory (no more user-configs/ directory)
+      # Filter out config file name and current directory (no more user-systemConfig/ directory)
       relevantParts = builtins.filter (p:
         !hasSuffix ".nix" p && p != "."
       ) pathComponents;
 
-      # Normal case: remove top-level directory (configs/), keep the module path
+     # Normal case: remove top-level directory (systemConfig/), keep the module path
       domainPath = if builtins.length relevantParts >= 2
-                   then builtins.tail relevantParts  # Remove "configs", keep module path
-                   else if builtins.length relevantParts == 1 && builtins.head relevantParts == "configs"
-                   then []  # Configs in /etc/nixos/systemConfig/ → merge at top level
-                   else relevantParts;  # Just module name, no domain (legacy)
+                    then builtins.tail relevantParts  # Remove "systemConfig", keep module path
+                    else if builtins.length relevantParts == 1
+                    then if builtins.head relevantParts == "systemConfig"
+                         then []  # Configs in /etc/nixos/systemConfig/ → merge at top level
+                         else relevantParts
+                    else relevantParts;  # Empty or just module name
     in
       domainPath;
   
@@ -200,7 +202,7 @@ let
       (discoverInDir "${configsDir}/core") ++ (discoverInDir "${configsDir}/modules");
 
   # Extract domain path from a template file path
-  # Unlike user configs, templates don't have a "configs" prefix to strip
+  # Unlike user configs, templates don't have a "systemConfig" prefix to strip
   # Example: core/base/network/template-config.nix → ["core", "base", "network"]
   extractTemplateDomainPath = configsDir: templatePath:
     let
