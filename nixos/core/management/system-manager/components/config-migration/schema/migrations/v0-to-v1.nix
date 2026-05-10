@@ -1,18 +1,13 @@
 { lib, ... }:
 
 {
-  fieldsToKeep = [
-    "systemType"
-    "hostName"
-    "system"
-    "allowUnfree"
-    "users"
-    "timeZone"
-  ];
+  # ALLE Felder migrieren — system-config.nix wird komplett abgelöst
+  # Jeder targetFile darf NUR EINMAL vorkommen (kein Merge-Konflikt)
+  fieldsToKeep = [];
 
   fieldsToMigrate = {
     desktop = {
-      targetFile = "desktop-config.nix";
+      targetFile = "core/base/desktop/config.nix";
       structure = {
         desktop = {
           enable = "desktop.enable";
@@ -26,7 +21,7 @@
       };
     };
     hardware = {
-      targetFile = "hardware-config.nix";
+      targetFile = "core/base/hardware/config.nix";
       fieldMappings = {
         "hardware.memory" = "hardware.ram";
       };
@@ -38,49 +33,32 @@
         };
       };
     };
-    packageModules = {
-      targetFile = "packages-config.nix";
-      structure = {
-        preset = "packageModules.preset";
-        packageModules = "packageModules.packageModules";
-        additionalPackageModules = "packageModules.additionalPackageModules";
-      };
+    packages = {
+      targetFile = "core/base/packages/config.nix";
+      rawSource = "{packageModules, overrides}";
+      rawUnwrap = true;
     };
-    locales = {
-      targetFile = "localization-config.nix";
-      structure = {
-        locales = "locales";
-        keyboardLayout = "keyboardLayout";
-        keyboardOptions = "keyboardOptions";
-      };
-    };
-    overrides = {
-      targetFile = "overrides-config.nix";
-      structure = {
-        overrides.enableSSH = "overrides.enableSSH";
-      };
-    };
-    hosting = {
-      targetFile = "hosting-config.nix";
-      structure = {
-        email = "email";
-        domain = "domain";
-        certEmail = "certEmail";
-      };
-    };
-    logging = {
-      targetFile = "logging-config.nix";
-      structure = {
-        buildLogLevel = "buildLogLevel";
-      };
+    localization = {
+      targetFile = "core/base/localization/config.nix";
+      rawSource = "{timeZone, locales, keyboardLayout, keyboardOptions, email, domain}";
+      rawUnwrap = true;
     };
     network = {
-      targetFile = "network-config.nix";
+      targetFile = "core/base/network/config.nix";
       structure = {
-        enableFirewall = "enableFirewall";
-        enablePowersave = "enablePowersave";
+        hostName = "hostName";
         networkManager.dns = "networkManager.dns";
       };
+    };
+    users = {
+      targetFile = "core/base/user/config.nix";
+      rawSource = "users";
+      rawUnwrap = true;
+    };
+    systemManager = {
+      targetFile = "core/management/system-manager/config.nix";
+      rawSource = "{systemType, allowUnfree, system, buildLogLevel, features}";
+      rawUnwrap = true;
     };
   };
 }

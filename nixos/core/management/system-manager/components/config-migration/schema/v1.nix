@@ -12,20 +12,15 @@
   hasConfigsDir = true;
   hasConfigVersion = true;
   
-  # Erwartete Config-Dateien in configs/ (optional, können fehlen)
+  # Erwartete Config-Dateien in systemConfig/ (nested paths, optional)
   expectedConfigFiles = [
-    "desktop-config.nix"
-    "hardware-config.nix"
-    # Modules have individual config files now (no more modules-config.nix)
-    "bootentry-config.nix"
-    "homelab-config.nix"
-    "lock-config.nix"
-    "packages-config.nix"
-    "localization-config.nix"
-    "network-config.nix"
-    "hosting-config.nix"
-    "overrides-config.nix"
-    "logging-config.nix"
+    "core/base/desktop/config.nix"
+    "core/base/hardware/config.nix"
+    "core/base/packages/config.nix"
+    "core/base/localization/config.nix"
+    "core/base/network/config.nix"
+    "core/base/user/config.nix"
+    "core/management/system-manager/config.nix"
   ];
   
   # Struktur-Anforderungen

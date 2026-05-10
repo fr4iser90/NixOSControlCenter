@@ -3,7 +3,7 @@
 let
   # Memory configuration: use configured value, fallback to 8GB if null
   # The activation script will update the config file for future rebuilds
-  memoryInGB = lib.attrByPath ["ram" "sizeGB"] 8 (getModuleConfig "hardware");
+  memoryInGB = let val = lib.attrByPath ["ram" "sizeGB"] null (getModuleConfig "hardware"); in if val == null then 8 else val;
 
   # Always enable memory management (we always have a fallback)
   enableMemoryManagement = true;

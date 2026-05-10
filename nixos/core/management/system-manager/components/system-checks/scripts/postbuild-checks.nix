@@ -53,10 +53,14 @@ let
       script = pkgs.writeScript "check-passwords" ''
         #!${pkgs.bash}/bin/bash
 
-        # Check admin passwords
-        for user in $(getent group wheel | cut -d: -f4 | tr ',' ' '); do
-          if ! getent shadow "$user" | grep -q "^$user:[^\*\!:]"; then
-            echo -e "''${YELLOW}⚠️  Admin user '$user' has no valid password!''${NC}"
+        # Check passwords for ALL normal users (nicht nur wheel)
+        for user in $(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 && $1 !~ /^nixbld/ {print $1}'); do
+          SHADOW_LINE=$(getent shadow "$user" 2>/dev/null)
+          SHADOW_HASH=$(echo "$SHADOW_LINE" | cut -d: -f2)
+
+          # Check 1: User has no password at all
+          if echo "$SHADOW_HASH" | grep -q '^[!\*]' || [ -z "$SHADOW_HASH" ]; then
+            echo -e "''${YELLOW}⚠️  User '$user' has no valid password!''${NC}"
 
             while true; do
               read -p "Do you want to set a password for $user now? [Y/n/s(skip)] " response
@@ -79,6 +83,18 @@ let
                   ;;
               esac
             done
+          fi
+
+          # Check 2: Compare .hashedPassword vs /etc/shadow hash
+          HASH_FILE="/etc/nixos/secrets/passwords/$user/.hashedPassword"
+          if [ -f "$HASH_FILE" ]; then
+            EXPECTED_HASH=$(cat "$HASH_FILE")
+            SHADOW_HASH=$(echo "$SHADOW_LINE" | cut -d: -f2)
+            if [ -n "$SHADOW_HASH" ] && [ "$SHADOW_HASH" != "!" ] && [ "$SHADOW_HASH" != "*" ] && [ "$SHADOW_HASH" != "$EXPECTED_HASH" ]; then
+              echo -e "''${YELLOW}⚠️  Password hash mismatch for '$user'!''${NC}"
+              echo -e "  ''${RED}.hashedPassword${NC} hash differs from ''${RED}/etc/shadow${NC}."
+              echo -e "  Run 'sudo ncc system build switch' to apply the saved password declaratively."
+            fi
           fi
         done
       '';

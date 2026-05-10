@@ -47,10 +47,9 @@ let
     let result = builtins.tryEval (builtins.readFile path);
     in if result.success then result.value else "";
 
-  # Helper: Import nix file with error handling
-  importNix = path:
-    let result = builtins.tryEval (import path);
-    in if result.success then result.value else {};
+  # Helper: Import nix file
+  # NOTE: Kein tryEval — Import-Fehler müssen sichtbar sein für Debugging
+  importNix = path: import path;
   
   # Extract domain path from file path
   # Example: core/system/audio/config.nix → ["system" "audio"]
@@ -199,7 +198,7 @@ let
           in
             currentTemplates ++ recursiveTemplates;
     in
-      (discoverInDir "${configsDir}/core") ++ (discoverInDir "${configsDir}/modules");
+      (discoverInDir (configsDir + "/core")) ++ (discoverInDir (configsDir + "/modules"));
 
   # Extract domain path from a template file path
   # Unlike user configs, templates don't have a "systemConfig" prefix to strip

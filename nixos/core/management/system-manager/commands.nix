@@ -149,6 +149,23 @@ in {
           This migration is safe and creates backups automatically.
         '';
       }
+      # Subcommand: migrate (Kurzform für v0→v1 Migration)
+      {
+        name = "migrate";
+        domain = "system";
+        parent = "system";
+        description = "Migrate system-config.nix from monolithic (v0) to modular (v1) structure";
+        category = "system";
+        script = "${configMigration.migration.migrateSystemConfig}/bin/ncc-migrate-config";
+        arguments = [];
+        dependencies = [ "nix" ];
+        shortHelp = "migrate - Migrate v0→v1 system-config.nix";
+        longHelp = ''
+          Shortcut for ncc system migrate-config.
+          Migrates the system configuration from monolithic (v0) to modular (v1) structure.
+          Creates backups automatically.
+        '';
+      }
       # Subcommand: validate-config
       {
         name = "validate-config";

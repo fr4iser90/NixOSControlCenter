@@ -31,8 +31,24 @@ in
     JQ_BIN="${pkgs.jq}/bin/jq"
     
     # Check if system-config.nix exists
+    # After migration to v1, system-config.nix is deleted - version lives in systemConfig/
     if [ ! -f "$SYSTEM_CONFIG" ]; then
-      echo "ERROR: system-config.nix not found at $SYSTEM_CONFIG" >&2
+      # Fallback: check for configVersion in systemConfig/core/management/system-manager/config.nix
+      SM_CONFIG="$CONFIGS_DIR/core/management/system-manager/config.nix"
+      if [ -f "$SM_CONFIG" ]; then
+        SM_JSON=''$(${pkgs.nix}/bin/nix-instantiate --eval --strict --json -E "import $SM_CONFIG" 2>/dev/null || echo "{}")
+        if echo "$SM_JSON" | ${pkgs.jq}/bin/jq -e 'has("configVersion")' >/dev/null 2>&1; then
+          SM_VERSION=''$(${pkgs.jq}/bin/jq -r '.configVersion' <<< "$SM_JSON")
+          echo "$SM_VERSION"
+          exit 0
+        fi
+      fi
+      # Check configs directory as final v1 indicator
+      if [ -d "$CONFIGS_DIR" ]; then
+        echo "1.0"
+        exit 0
+      fi
+      echo "ERROR: No configuration found" >&2
       exit 1
     fi
     

@@ -8,6 +8,23 @@ let
   prebuildScript = pkgs.writeScriptBin "prebuild-check-memory" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
+
+    _update_memory() {
+      local new_value="$1"
+      local config_file="${hardwareConfigPath}"
+      mkdir -p "$(dirname "$config_file")"
+      local existing_cpu=$(grep -o 'cpu = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
+      local existing_gpu=$(grep -o 'gpu = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
+      cat > "$config_file" <<EOF
+{
+  cpu = "$existing_cpu";
+  gpu = "$existing_gpu";
+  ram = {
+    sizeGB = $new_value;
+  };
+}
+EOF
+    }
     
     ${ui.text.header "Memory Configuration Check"}
     
@@ -33,18 +50,16 @@ let
     ${ui.messages.info "System Memory:"}
     ${ui.tables.keyValue "Total RAM" "$DETECTED_GB GB"}
     
-    REAL_CONFIG_FILE=$(readlink -f "${hardwareConfigPath}" 2>/dev/null || echo "${hardwareConfigPath}")
-    
-    if [ ! -f "$REAL_CONFIG_FILE" ]; then
+    if [ ! -f "${hardwareConfigPath}" ]; then
       ${ui.messages.info "hardware-config.nix not found, creating it..."}
-      update-hardware-config "${hardwareConfigPath}" "memory" "$DETECTED_GB"
+      _update_memory "$DETECTED_GB"
       ${ui.badges.success "hardware-config.nix created with detected memory."}
       exit 0
     fi
     
-    if ! CONFIGURED_GB=$(grep -E 'sizeGB\s*=' "$REAL_CONFIG_FILE" 2>/dev/null | grep -oE '[0-9]+' | head -1); then
+    if ! CONFIGURED_GB=$(grep -E 'sizeGB\s*=' "${hardwareConfigPath}" 2>/dev/null | grep -oE '[0-9]+' | head -1); then
       ${ui.messages.warning "Memory size not configured in hardware-config.nix, setting detected value..."}
-      update-hardware-config "${hardwareConfigPath}" "memory" "$DETECTED_GB"
+      _update_memory "$DETECTED_GB"
       ${ui.badges.success "Memory size set to $DETECTED_GB GB."}
       exit 0
     fi
@@ -57,7 +72,7 @@ let
       ${ui.messages.warning "Memory configuration mismatch! Auto-updating..."}
       ${ui.messages.warning "System configured for $CONFIGURED_GB GB but detected $DETECTED_GB GB"}
       
-      update-hardware-config "${hardwareConfigPath}" "memory" "$DETECTED_GB"
+      _update_memory "$DETECTED_GB"
       ${ui.badges.success "Memory configuration updated to $DETECTED_GB GB."}
     else
       ${ui.badges.success "Memory configuration matches hardware."}

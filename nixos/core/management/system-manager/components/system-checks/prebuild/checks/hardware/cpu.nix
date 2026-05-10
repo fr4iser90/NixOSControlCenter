@@ -6,12 +6,33 @@ let
 
   hardwareConfigPath = "/etc/nixos/systemConfig/core/base/hardware/config.nix";
   
-  # Use the shared update-hardware-config script from utils.nix
-  # It will be automatically available via systemPackages
-
   prebuildScript = pkgs.writeScriptBin "prebuild-check-cpu" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
+
+    _update_cpu() {
+      local new_value="$1"
+      local config_file="${hardwareConfigPath}"
+      mkdir -p "$(dirname "$config_file")"
+      local existing_gpu=$(grep -o 'gpu = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
+      local existing_memory=$(grep -A2 'ram = {' "$config_file" 2>/dev/null || echo "")
+      if [ -n "$existing_memory" ]; then
+        cat > "$config_file" <<EOF
+{
+  cpu = "$new_value";
+  gpu = "$existing_gpu";
+$existing_memory
+}
+EOF
+      else
+        cat > "$config_file" <<EOF
+{
+  cpu = "$new_value";
+  gpu = "$existing_gpu";
+}
+EOF
+      fi
+    }
 
     # CPU Detection using lscpu
     if ! CPU_INFO=$(${pkgs.util-linux}/bin/lscpu); then
@@ -31,7 +52,7 @@ let
     # Check if hardware-config.nix exists
     if [ ! -f "${hardwareConfigPath}" ]; then
       ${ui.messages.info "hardware-config.nix not found, creating it..."}
-      update-hardware-config "${hardwareConfigPath}" "cpu" "$DETECTED"
+      _update_cpu "$DETECTED"
       ${ui.badges.success "hardware-config.nix created with detected CPU."}
       exit 0
     fi
@@ -41,7 +62,6 @@ let
       exit 1
     fi
     
-    # Always show info
     ${ui.messages.info "Detected CPU: $DETECTED"}
     ${ui.messages.info "Configured CPU: $CONFIGURED"}
     
@@ -49,8 +69,7 @@ let
       ${ui.messages.warning "CPU configuration mismatch!"}
       ${ui.messages.warning "System configured for $CONFIGURED but detected $DETECTED"}
       
-      # Update CPU configuration (only CPU is changed, GPU/Memory remain unchanged)
-      update-hardware-config "${hardwareConfigPath}" "cpu" "$DETECTED"
+      _update_cpu "$DETECTED"
       ${ui.badges.success "Configuration updated."}
     else
       ${ui.badges.success "CPU configuration matches hardware."}

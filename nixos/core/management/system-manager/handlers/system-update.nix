@@ -77,7 +77,7 @@ let
   
   # Import config management (single import, clean API)
   # CLI Formatter wird von config-migration selbst geholt
-  configModule = import ./../components/config-migration { inherit config pkgs lib systemConfig getModuleApi; backupHelpers = import ../../../lib/backup-helpers.nix { inherit pkgs lib; }; };
+  configModule = import ./../components/config-migration { inherit config pkgs lib systemConfig getModuleApi; backupHelpers = import ../lib/backup-helpers.nix { inherit pkgs lib; }; };
   
   # Create script with runtime dependencies (only available for this script, not system-wide)
   systemUpdateMainScript = pkgs.symlinkJoin {
@@ -264,8 +264,68 @@ let
           SOURCE_DIR="/home/${username}/Documents/Git/NixOSControlCenter/nixos"
           
           if [ ! -d "$SOURCE_DIR" ]; then
-            ${ui.messages.error "Local source directory not found!"}
-            exit 1
+            ${ui.messages.warning "Default directory not found: $SOURCE_DIR"}
+            ${ui.messages.info "Looking for NixOS flakes in common locations..."}
+            
+            while true; do
+              echo ""
+              echo "1) Select from detected NixOS flakes (fzf)"
+              echo "2) Browse directories (fzf)"
+              echo "3) Enter path manually"
+              echo "4) Cancel"
+              printf "Select option (1-4): "
+              read local_choice
+              
+              case $local_choice in
+                1)
+                  # Auto-detect directories containing flake.nix
+                  FLAKE_DIRS=$(find /home /opt /srv /mnt -maxdepth 6 -name "flake.nix" -type f 2>/dev/null | xargs -I{} dirname {} 2>/dev/null | sort -u)
+                  
+                  if [ -z "$FLAKE_DIRS" ]; then
+                    ${ui.messages.error "No NixOS flakes found automatically"}
+                    ${ui.messages.info "Try option 2 to browse or 3 for manual entry"}
+                  else
+                    SELECTED=$(echo "$FLAKE_DIRS" | fzf --height=50% --border --prompt="Select NixOS source > ")
+                    if [ -n "$SELECTED" ] && [ -d "$SELECTED" ]; then
+                      SOURCE_DIR="$SELECTED"
+                      break
+                    fi
+                  fi
+                  ;;
+                2)
+                  # Browse with fzf + tree preview
+                  BROWSE_DIR=$(find /home /opt /srv /mnt -maxdepth 6 -type d 2>/dev/null | \
+                    fzf --height=70% --border \
+                    --header="Navigate to your NixOS source directory" \
+                    --preview='tree -C -L 1 {}' \
+                    --prompt="Directory > ")
+                  
+                  if [ -n "$BROWSE_DIR" ] && [ -d "$BROWSE_DIR" ]; then
+                    SOURCE_DIR="$BROWSE_DIR"
+                    break
+                  else
+                    ${ui.messages.error "No directory selected"}
+                  fi
+                  ;;
+                3)
+                  printf "Enter path to NixOS source directory: "
+                  read raw_path
+                  SOURCE_DIR=$(eval echo "$raw_path")
+                  if [ -d "$SOURCE_DIR" ]; then
+                    break
+                  else
+                    ${ui.messages.error "Directory not found: $SOURCE_DIR"}
+                  fi
+                  ;;
+                4)
+                  ${ui.messages.info "Update cancelled"}
+                  exit 0
+                  ;;
+                *)
+                  ${ui.messages.error "Invalid selection"}
+                  ;;
+              esac
+            done
           fi
           
           ${ui.tables.keyValue "Using local directory" "$SOURCE_DIR"}
@@ -355,45 +415,49 @@ let
       local module_name="$3"
       local item_type="$4"  # "core" or "modules"
       
-      # Check versions
-      SOURCE_VERSION=$(get_source_version "$source_module")
+      # In v1-Architektur liegt die Modul-Konfiguration in systemConfig/,
+      # NICHT im Modul-Verzeichnis (dort liegt nur die Modul-Definition config.nix)
+      SYSTEM_CONFIG_FILE="$NIXOS_DIR/systemConfig/$item_type/$module_name/config.nix"
       
-      # GENERIC: All modules use the same pattern
-      CONFIG_FILE="$target_module/$module_name/config.nix"
-      CONFIG_NAME="$module_name"
-      
-      if [ -f "$CONFIG_FILE" ]; then
-        # TARGET has config file
-        TARGET_VERSION=$(get_target_version "$target_module" "$CONFIG_NAME")
+      if [ -f "$SYSTEM_CONFIG_FILE" ]; then
+        # Config in systemConfig/ existiert → normaler Update-Prozess
+        # Config bleibt erhalten, nur Modul-Code wird ggf. aktualisiert
         
-        if [ "$SOURCE_VERSION" != "$TARGET_VERSION" ] || [ "$FORCE_MIGRATION" = "true" ]; then
-          # Migration needed (version different OR forced)
-          if [ "$VERBOSE" = "true" ]; then
-            ${ui.messages.info "Module $module_name: Migration needed (v$TARGET_VERSION → v$SOURCE_VERSION)"}
+        SOURCE_VERSION=$(get_source_version "$source_module")
+        CONFIG_FILE="$target_module/$module_name/config.nix"
+        
+        if [ -f "$CONFIG_FILE" ]; then
+          TARGET_VERSION=$(get_target_version "$target_module" "$module_name")
+          
+          if [ "$SOURCE_VERSION" != "$TARGET_VERSION" ] || [ "$FORCE_MIGRATION" = "true" ]; then
+            if [ "$VERBOSE" = "true" ]; then
+              ${ui.messages.info "Module $module_name: Migration needed (v$TARGET_VERSION → v$SOURCE_VERSION)"}
+            fi
+            update_module_code "$source_module" "$target_module"
+          elif [ "$FORCE_UPDATE" = "true" ]; then
+            if [ "$VERBOSE" = "true" ]; then
+              ${ui.messages.info "Module $module_name: Force update requested (v$SOURCE_VERSION), updating code"}
+            fi
+            update_module_code "$source_module" "$target_module"
+          else
+            if [ "$VERBOSE" = "true" ]; then
+              ${ui.messages.info "Module $module_name: No update needed (v$SOURCE_VERSION), skipping"}
+            fi
           fi
-          # TODO: Migration would be executed here (Phase 2)
-          # For now: Only update code, config files remain untouched
-          update_module_code "$source_module" "$target_module"
-        elif [ "$FORCE_UPDATE" = "true" ]; then
-          # Force update even if versions are the same
-          if [ "$VERBOSE" = "true" ]; then
-            ${ui.messages.info "Module $module_name: Force update requested (v$SOURCE_VERSION), updating code"}
-          fi
-          update_module_code "$source_module" "$target_module"
         else
-          # No update needed → versions are the same and no force flag
+          # Modul-Verzeichnis hat kein config.nix → komplett aus Source kopieren
           if [ "$VERBOSE" = "true" ]; then
-            ${ui.messages.info "Module $module_name: No update needed (v$SOURCE_VERSION), skipping"}
+            ${ui.messages.info "Module $module_name: No module config file found, copying from source"}
           fi
+          cp -r "$source_module" "$target_module" 2>/dev/null || true
         fi
       else
-        # TARGET has no config file
+        # KEINE Config in systemConfig/ → Stage 0 → 1 Migration von system-config.nix
+        # Dies passiert wenn der User noch im alten Format (v0) in system-config.nix definiert ist
         if [ "$VERBOSE" = "true" ]; then
-          ${ui.messages.info "Module $module_name: No config file found, copying from source (including config)"}
+          ${ui.messages.info "Module $module_name: No systemConfig found, running Stage 0 → 1 migration"}
         fi
-        # Copy completely (including config from repository)
-        # This copies the default config from the repository
-        cp -r "$source_module" "$target_module" 2>/dev/null || true
+        migrate_stage0_to_stage1 "$source_module" "$target_module" "$module_name" "$item_type"
       fi
      }
      
@@ -424,8 +488,10 @@ let
       fi
       
       # Extract module config with jq (if available)
+      # NOTE: Manche Module haben Plural-Namen in der Config (z.B. "users" statt "user")
+      # Daher versuchen wir sowohl Singular als auch Plural (module_name + "s")
       if command -v jq >/dev/null 2>&1; then
-        MODULE_CONFIG=$(echo "$OLD_CONFIG_JSON" | jq -c ".''${module_name} // {}" 2>/dev/null || echo "{}")
+        MODULE_CONFIG=$(echo "$OLD_CONFIG_JSON" | jq -c ".''${module_name} // .''${module_name}s // {}" 2>/dev/null || echo "{}")
         echo "$MODULE_CONFIG"
       else
         # Fallback: Try with grep (not ideal, but works for simple cases)
@@ -441,16 +507,17 @@ let
       local target_module="$2"
       local module_name="$3"
       local item_type="$4"  # "core" or "modules"
+
       local system_config_file="$NIXOS_DIR/system-config.nix"
       
-      ${ui.messages.loading "Migrating module $module_name from Stage 0 → 1..."}
-      
-      # 1. Check if system-config.nix exists
+      # v1 already active → just copy module code, skip migration noise
       if [ ! -f "$system_config_file" ]; then
-        ${ui.messages.warning "system-config.nix not found, cannot extract config"}
-        ${ui.messages.info "Copying module code only (config files will be created from defaults)"}
         update_module_code "$source_module" "$target_module"
         return 0
+      fi
+      
+      if [ "$VERBOSE" = "true" ]; then
+        ${ui.messages.loading "Migrating module $module_name from Stage 0 → 1..."}
       fi
       
       # 2. Extract module config from system-config.nix
@@ -462,16 +529,20 @@ let
       # 4. Copy module code (including options.nix)
       update_module_code "$source_module" "$target_module"
       
-      # 5. Create config file directly in module directory
-      # Extract config directly as Nix code (not JSON)
+      # 5. Create config file in systemConfig/ (v1-Architektur)
+      # Configs liegen in systemConfig/$item_type/$module_name/config.nix,
+      # NICHT im Modul-Verzeichnis (dort liegt nur der Modul-Code)
+      SYSTEM_CONFIG_DIR="$NIXOS_DIR/systemConfig/$item_type/$module_name"
+      mkdir -p "$SYSTEM_CONFIG_DIR"
+      
       if command -v nix-instantiate >/dev/null 2>&1; then
         # Try to extract config directly as Nix attrset
         MODULE_CONFIG_NIX=$(nix-instantiate --eval --strict -E "
           let config = import $system_config_file;
-        in if config ? ''${module_name} then
-              builtins.toJSON config.''${module_name}
-          else
-            \"{}\"
+              result = if config ? ''${module_name} then config.''${module_name}
+                      else if config ? ''${module_name}s then config.''${module_name}s
+                      else {};
+          in builtins.toJSON result
         " 2>/dev/null || echo "{}")
         
         # Convert JSON back to Nix (simple approach: use builtins.fromJSON in Nix)
@@ -481,24 +552,13 @@ let
 { moduleConfigJson, moduleName, moduleVersion }:
 let
   config = builtins.fromJSON moduleConfigJson;
-  hasVersion = moduleVersion != "unknown";
 in
   if config == {} then
     "{}"
-  else if hasVersion then
-    builtins.toJSON (
-      builtins.listToAttrs [{
-        name = moduleName;
-        value = config // { _version = moduleVersion; };
-      }]
-    )
   else
-    builtins.toJSON (
-      builtins.listToAttrs [{
-        name = moduleName;
-        value = config;
-      }]
-    )
+    # Config wird FLAT geschrieben (ohne moduleName-Wrapper).
+    # Der Config-Loader mapped via File-Path (systemConfig/.../config.nix → richtiger Scope).
+    builtins.toJSON (config // (if moduleVersion != "unknown" then { _version = moduleVersion; } else {}))
 TEMPEOF
         
         SOURCE_VERSION=$(get_source_version "$source_module")
@@ -525,7 +585,7 @@ TEMPEOF
           ' 2>/dev/null || echo "")
           
           if [ -n "$CONFIG_NIX" ]; then
-            cat > "$target_module/$module_name/config.nix" <<EOF
+            cat > "$SYSTEM_CONFIG_DIR/config.nix" <<EOF
 {
   $CONFIG_NIX
 }
@@ -533,19 +593,19 @@ EOF
             ${ui.messages.success "Created config.nix from system-config.nix"}
           else
             ${ui.messages.warning "Could not convert JSON to Nix format"}
-            touch "$target_module/$module_name/config.nix"
+            touch "$SYSTEM_CONFIG_DIR/config.nix"
           fi
         else
           # Fallback: Create empty config (will be filled by activationScripts)
           ${ui.messages.warning "jq not available or config empty, creating empty config"}
           ${ui.messages.info "Config will be filled with defaults by activationScripts"}
-          touch "$USER_CONFIGS_DIR/$module_name/config.nix"
+          touch "$SYSTEM_CONFIG_DIR/config.nix"
         fi
       else
         # nix-instantiate not available → create empty config
         ${ui.messages.warning "nix-instantiate not available, cannot extract config"}
         ${ui.messages.info "Creating empty config (will be filled with defaults by activationScripts)"}
-        touch "$USER_CONFIGS_DIR/$module_name/config.nix"
+        touch "$SYSTEM_CONFIG_DIR/config.nix"
       fi
       
       ${ui.messages.success "Module $module_name migrated from Stage 0 → 1"}
@@ -744,31 +804,93 @@ EOF
     fi
      done
      
-     # Sync template-config.nix files to systemConfig/config.nix
-      echo "=== Syncing config templates ==="
+      # Sync template-config.nix files to systemConfig/config.nix
+      if [ "$VERBOSE" = "true" ]; then
+        echo "=== Syncing config templates ==="
+      fi
       SYNCED=0
       while IFS= read -r -d $'\0' tmpl_file; do
         rel_path="''${tmpl_file#$SOURCE_DIR/}"
+        
+        if [[ "$rel_path" == core/base/user/* ]]; then
+          target_config="$NIXOS_DIR/systemConfig/$rel_path"
+          target_config="''${target_config/template-config.nix/config.nix}"
+          
+          if [ -f "$target_config" ]; then
+            continue
+          fi
+          
+          if [ -f "$NIXOS_DIR/system-config.nix" ] && command -v nix-instantiate >/dev/null 2>&1; then
+            if [ "$VERBOSE" = "true" ]; then
+              echo "  [MIGRATING] $rel_path - extracting users from system-config.nix..."
+            fi
+            
+            target_dir=$(dirname "$target_config")
+            TMP_EXTRACT=$(mktemp)
+            cat > "$TMP_EXTRACT" << 'NIXEOF'
+{ configFile }:
+let
+  cfg = import configFile;
+  data = if builtins.hasAttr "users" cfg then cfg.users
+         else if builtins.hasAttr "user" cfg then cfg.user
+         else {};
+  toNix = v:
+    if builtins.isBool v then if v then "true" else "false"
+    else if builtins.isInt v then toString v
+    else if builtins.isFloat v then toString v
+    else if builtins.isString v then "\"" + v + "\""
+    else if builtins.isList v then "[ " + builtins.concatStringsSep " " (map toNix v) + " ]"
+    else if builtins.isAttrs v then
+      "{ " + builtins.concatStringsSep "; " (builtins.mapAttrsToList (n: val: n + " = " + toNix val + ";") v) + " }"
+    else "null";
+in
+  "{\n" + builtins.concatStringsSep ";\n" (builtins.mapAttrsToList (n: val: "  " + n + " = " + toNix val + ";") data) + "\n}\n"
+NIXEOF
+            
+            USER_CONFIG_NIX=""
+            if command -v nix >/dev/null 2>&1; then
+              USER_CONFIG_NIX=$(nix eval --raw -f "$TMP_EXTRACT" --argstr configFile "$NIXOS_DIR/system-config.nix" 2>/dev/null || echo "")
+            fi
+            if [ -z "$USER_CONFIG_NIX" ]; then
+              USER_CONFIG_RAW=$(nix-instantiate --eval --strict "$TMP_EXTRACT" --argstr configFile "$NIXOS_DIR/system-config.nix" 2>/dev/null || echo "")
+              if [ -n "$USER_CONFIG_RAW" ]; then
+                USER_CONFIG_RAW=''${USER_CONFIG_RAW#\"}
+                USER_CONFIG_RAW=''${USER_CONFIG_RAW%\"}
+                USER_CONFIG_RAW=''${USER_CONFIG_RAW//\\\"/\"}
+                USER_CONFIG_RAW=''${USER_CONFIG_RAW//\\n/$'\n'}
+                USER_CONFIG_RAW=''${USER_CONFIG_RAW//\\t/$'\t'}
+                USER_CONFIG_NIX="$USER_CONFIG_RAW"
+              fi
+            fi
+            rm -f "$TMP_EXTRACT"
+            
+            if [ -n "$USER_CONFIG_NIX" ] && [ "$USER_CONFIG_NIX" != "{}" ] && [ "$USER_CONFIG_NIX" != "{}\n" ]; then
+              mkdir -p "$target_dir"
+              printf '%s\n' "$USER_CONFIG_NIX" > "$target_config"
+              SYNCED=$((SYNCED + 1))
+              if [ "$VERBOSE" = "true" ]; then
+                echo "  [CREATED] $(basename $target_config) in systemConfig/core/base/user/"
+              fi
+            fi
+          fi
+          continue
+        fi
+        
         target_config="$NIXOS_DIR/systemConfig/$rel_path"
-       target_config="''${target_config/template-config.nix/config.nix}"
+        target_config="''${target_config/template-config.nix/config.nix}"
         target_dir=$(dirname "$target_config")
         if [ ! -f "$target_config" ]; then
           mkdir -p "$target_dir"
           cp "$tmpl_file" "$target_config"
-          echo "  [COPIED] $rel_path"
           SYNCED=$((SYNCED + 1))
-        else
-          config_content=$(cat "$target_config" 2>/dev/null | tr -d '[:space:]#')
-          if [ -z "$config_content" ] || [ "$config_content" = "{}" ]; then
-            cp "$tmpl_file" "$target_config"
-            echo "  [REPLACED empty] $rel_path"
-            SYNCED=$((SYNCED + 1))
+          if [ "$VERBOSE" = "true" ]; then
+            echo "  [COPIED] $rel_path"
           fi
         fi
       done < <(find "$SOURCE_DIR/core" "$SOURCE_DIR/modules" -name "template-config.nix" -print0 2>/dev/null)
       if [ "$SYNCED" -gt 0 ]; then
         echo "  Synced $SYNCED config(s) from templates"
-      else
+      elif [ "$VERBOSE" = "true" ]; then
         echo "  No template sync needed"
       fi
       
@@ -825,6 +947,31 @@ EOF
     ${ui.messages.success "Update completed successfully!"}
     ${ui.tables.keyValue "Backup created in" "$BACKUP_DIR"}
     
+    # PASSWORT-INTEGRITAET: Pruefe ob konfigurierte User Passwort-Dateien haben
+    # Secrets werden nie vom Update ueberschrieben (nicht in COPY_ITEMS),
+    # aber koennen durch Config-Fehler in vorherigen Builds verloren gegangen sein.
+    ${ui.messages.loading "Checking password file integrity..."}
+    PASSWORD_DIR="$NIXOS_DIR/secrets/passwords"
+    pw_issues=0
+    if [ -d "$PASSWORD_DIR" ]; then
+      for user_dir in "$PASSWORD_DIR"/*; do
+        [ -e "$user_dir" ] || continue
+        user_name=$(basename "$user_dir")
+        if [ ! -f "$user_dir/.hashedPassword" ]; then
+          ${ui.badges.warning "User '$user_name' has password directory but no .hashedPassword file!"}
+          pw_issues=$((pw_issues + 1))
+        elif [ ! -s "$user_dir/.hashedPassword" ]; then
+          ${ui.badges.warning "User '$user_name' has empty .hashedPassword file!"}
+          pw_issues=$((pw_issues + 1))
+        fi
+      done
+    fi
+    if [ "$pw_issues" -gt 0 ]; then
+      ${ui.badges.warning "$pw_issues user(s) have password issues - they will be prompted during prebuild checks"}
+    else
+      ${ui.badges.success "Password files OK"}
+    fi
+    
     # Check if auto-build or --auto-build flag is enabled
     if [ "$AUTO_BUILD" = "true" ] || [ "$autoBuild" = "true" ]; then
       ${ui.messages.loading "Auto-build enabled, building configuration..."}
@@ -858,6 +1005,8 @@ EOF
       pkgs.git
       pkgs.rsync
       pkgs.jq
+      pkgs.fzf
+      pkgs.tree
     ];
   };
 

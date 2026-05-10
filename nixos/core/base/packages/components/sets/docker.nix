@@ -11,13 +11,14 @@
 # Für mehr Sicherheit: Verwende docker-rootless.nix (aber Swarm ist dann experimentell)
 
 { config, lib, pkgs, ... }:
+with lib;
 {
   # Root Docker aktivieren
   virtualisation.docker = {
     enable = true;
     enableOnBoot = true;
-    # Disable deprecated enableNvidia (use hardware.nvidia-container-toolkit.enable instead)
-    enableNvidia = false;
+    # Force-disable deprecated enableNvidia (use hardware.nvidia-container-toolkit.enable instead)
+    enableNvidia = mkForce false;
     # Optional: Automatisches Cleanup von alten Containern/Images
     autoPrune = {
       enable = true;

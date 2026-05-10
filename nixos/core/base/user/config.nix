@@ -64,6 +64,11 @@ let
 
   # Filter out non-user attributes (like 'enable')
   userAttrs = lib.filterAttrs (n: v: builtins.isAttrs v) cfg;
+  userNames = builtins.attrNames userAttrs;
+
+  # Prüfe ob mindestens ein Admin/Restricted-Admin existiert
+  hasPrivilegedUser = lib.any (user: userAttrs.${user}.role == "admin" || userAttrs.${user}.role == "restricted-admin") userNames;
+
   # User-spezifische Pakete aus configs/users/<name>/config.nix
   userPackages = lib.mapAttrs (name: userConfig:
     let
@@ -82,7 +87,6 @@ let
       else throw "Package '${pkgName}' not found in nixpkgs"
     ) packages
   ) userPackages;
-  userNames = builtins.attrNames userAttrs;
 
   # Automatisches Autologin für den ersten restricted-Admin-User
   autoLoginUser = lib.findFirst
@@ -118,8 +122,27 @@ in
   # Aktiviere Passwort-Management
   security.passwordManagement.enable = true;
 
+  # Assertion: Es muss mindestens ein Admin/Restricted-Admin konfiguriert sein
+  # CRITICAL: Diese Assertion feuert IMMER (auch wenn userNames leer sind).
+  # Niemals ohne User bauen lassen!
+  assertions = [{
+    assertion = userNames != [] && hasPrivilegedUser;
+    message = if userNames == [] then ''
+      CRITICAL: No users configured!
+      At least one user with role "admin" or "restricted-admin" must exist.
+      Check system-config.nix or systemConfig/core/base/user/config.nix.
+    '' else ''
+      No admin or restricted-admin user configured!
+      At least one user with role "admin" or "restricted-admin" is required to administer the system.
+      Current users: ${builtins.toString userNames}
+      Available roles: admin, restricted-admin, virtualization, guest
+    '';
+  }];
+
   # Basis-Konfiguration für alle Benutzer
-  users.mutableUsers = false;
+  # mutableUsers = false nur wenn User konfiguriert sind,
+  # sonst können User nicht per passwd angelegt werden
+  users.mutableUsers = lib.mkIf (userNames != []) false;
 
   # Definiere Standard-Gruppen
   users.groups = lib.mkMerge [
@@ -155,11 +178,10 @@ in
     linger = roleLingering.${userConfig.role} or false;
 
     # WICHTIG: Erst die Passwort-Konfiguration vom Manager holen
-    } // (config.security.passwordManagement.getUserPasswordConfig username userConfig) // {
-
-    # Dann explizit den Pfad setzen
-    hashedPasswordFile = "/etc/nixos/secrets/passwords/${username}/.hashedPassword";
-  }) userAttrs;
+    # (hashedPasswordFile nur wenn .hashedPassword existiert,
+    #  initialPassword nur wenn kein .hashedPassword aber Config-Feld gesetzt)
+    } // (config.security.passwordManagement.getUserPasswordConfig username userConfig)
+  ) userAttrs;
 
   # Sudo-Konfiguration
   security.sudo = {

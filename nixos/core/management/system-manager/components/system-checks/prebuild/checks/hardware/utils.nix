@@ -73,32 +73,26 @@
         # Memory block exists and we're not updating memory
         cat > "$config_file" <<EOF
 {
-  hardware = {
-    cpu = "$cpu_value";
-    gpu = "$gpu_value";
+  cpu = "$cpu_value";
+  gpu = "$gpu_value";
 $memory_block
-  };
 }
 EOF
       elif [ "$update_type" = "memory" ] || [ -n "$memory_block" ]; then
         # We're updating memory or memory block exists
         cat > "$config_file" <<EOF
 {
-  hardware = {
-    cpu = "$cpu_value";
-    gpu = "$gpu_value";
+  cpu = "$cpu_value";
+  gpu = "$gpu_value";
 $memory_block
-  };
 }
 EOF
       else
         # No memory block
         cat > "$config_file" <<EOF
 {
-  hardware = {
-    cpu = "$cpu_value";
-    gpu = "$gpu_value";
-  };
+  cpu = "$cpu_value";
+  gpu = "$gpu_value";
 }
 EOF
       fi

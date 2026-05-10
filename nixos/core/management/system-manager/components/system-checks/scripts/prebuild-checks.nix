@@ -75,6 +75,31 @@ in
 
     if ${pkgs.nixos-rebuild}/bin/nixos-rebuild "$@"; then
       ${ui.badges.success "Build successful!"}
+      
+      # Post-rebuild: Re-apply saved passwords to shadow.
+      # The activation step in nixos-rebuild may write "!" (locked) for users
+      # when builtins.pathExists fails in flake eval. This safety net ensures
+      # login works regardless of Nix evaluation quirks.
+      PASSWORD_DIR="/etc/nixos/secrets/passwords"
+      if [ -d "$PASSWORD_DIR" ]; then
+        for user_dir in "$PASSWORD_DIR"/*; do
+          [ -e "$user_dir" ] || continue
+          user=$(basename "$user_dir")
+          HASH_FILE="$user_dir/.hashedPassword"
+          if [ -f "$HASH_FILE" ]; then
+            SAVED_HASH=$(cat "$HASH_FILE")
+            if [ -n "$SAVED_HASH" ]; then
+              SHADOW_HASH=$(getent shadow "$user" 2>/dev/null | cut -d: -f2)
+              if [ -z "$SHADOW_HASH" ] || [ "$SHADOW_HASH" = "!" ] || [ "$SHADOW_HASH" != "$SAVED_HASH" ]; then
+                if echo "$user:$SAVED_HASH" | ${pkgs.shadow}/bin/chpasswd -e 2>/dev/null; then
+                  ${ui.badges.success "Password re-applied for $user"}
+                fi
+              fi
+            fi
+          fi
+        done
+      fi
+      
       exit 0
     else
       ${ui.badges.error "Build failed!"}

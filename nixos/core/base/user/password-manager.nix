@@ -5,10 +5,15 @@ let
     let
       passwordDir = "/etc/nixos/secrets/passwords";
       userPasswordFile = "${passwordDir}/${username}/.hashedPassword";
+      hasPasswordFile = builtins.pathExists userPasswordFile;
     in {
-      # Nur die Passwortdatei nutzen, wenn sie existiert
-      hashedPasswordFile = lib.mkIf (builtins.pathExists userPasswordFile) 
-        userPasswordFile;
+      # Wenn .hashedPassword existiert: deklarativ setzen
+      hashedPasswordFile = lib.mkIf hasPasswordFile userPasswordFile;
+
+      # Wenn kein .hashedPassword aber initialPassword im Config:
+      # NixOS setzt es beim ersten Boot (via /etc/.initial-password-<user> Flag)
+      initialPassword = lib.mkIf (!hasPasswordFile && userConfig ? initialPassword)
+        userConfig.initialPassword;
     };
 
   # Nur echte Benutzer (keine System-Accounts)
@@ -39,7 +44,7 @@ in {
     users.allowNoPasswordLogin = lib.mkForce true;
     
     # Erlaube mutable Users nur wenn keine Passwortdatei existiert
-    users.mutableUsers = lib.mkDefault (lib.mkIf (builtins.length (builtins.attrNames realUsers) == 0) true);
+    users.mutableUsers = lib.mkIf (builtins.length (builtins.attrNames realUsers) == 0) true;
     
     system.activationScripts.passwordSetup = {
       text = ''
@@ -48,27 +53,28 @@ in {
       chmod 700 /etc/nixos/secrets/passwords
       chown root:root /etc/nixos/secrets/passwords
       
-      # Liste der erlaubten Benutzer
+      # AUFRAUMUNG: Nur warnen, NIEMALS loeschen!
+      # Passwort-Ordner werden nie geloescht, da selbst ein kurzzeitiger
+      # Config-Fehler sonst alle Passwoerter unwiderruflich vernichten wuerde.
       ALLOWED_USERS="${lib.concatStringsSep " " (builtins.attrNames realUsers)}"
       
-      # Lösche nicht benötigte Verzeichnisse
       for dir in /etc/nixos/secrets/passwords/*; do
+        [ -e "$dir" ] || continue
         basename=$(basename "$dir")
-        if [[ ! " $ALLOWED_USERS " =~ " $basename " ]]; then
-          echo "Removing unauthorized password directory: $dir"
-          rm -rf "$dir"
+        if [ -n "$ALLOWED_USERS" ] && [[ ! " $ALLOWED_USERS " =~ " $basename " ]]; then
+          echo "WARNING: Orphaned password directory for '$basename' (not in current user config)"
         fi
       done
       
-      # Benutzerverzeichnisse: Nur Berechtigungen setzen
+      # Berechtigungen fuer konfigurierte User setzen
       ${lib.concatStringsSep "\n" (lib.mapAttrsToList (username: userConfig: ''
         if [ -f /etc/nixos/secrets/passwords/${username}/.hashedPassword ]; then
           chmod 600 /etc/nixos/secrets/passwords/${username}/.hashedPassword
-          chown ${username}:${username} /etc/nixos/secrets/passwords/${username}/.hashedPassword
+          chown root:root /etc/nixos/secrets/passwords/${username}/.hashedPassword
         fi
       '') realUsers)}
     '';
-      deps = [];
+      deps = [ "users" ];
     };
   };
 }

@@ -45,22 +45,31 @@ let
     WARNINGS=0
     
     # Check if system-config.nix exists
+    # v1+ uses modular systemConfig/ - system-config.nix is deleted after migration
     if [ ! -f "$SYSTEM_CONFIG" ]; then
-      ${formatter.messages.error "system-config.nix not found at $SYSTEM_CONFIG"}
-      exit 1
-    fi
-    
-    if [ "$VERBOSE" = "true" ]; then
-      ${formatter.messages.info "Validating system-config.nix..."}
-    fi
-    
-    # Validate Nix syntax
-    if ! ${pkgs.nix}/bin/nix-instantiate --parse "$SYSTEM_CONFIG" >/dev/null 2>&1; then
-      ${formatter.messages.error "system-config.nix has invalid Nix syntax"}
-      ERRORS=$((ERRORS + 1))
+      if [ -d "$CONFIGS_DIR" ]; then
+        if [ "$VERBOSE" = "true" ]; then
+          ${formatter.messages.info "Modular configuration detected (system-config.nix already migrated)"}
+          ${formatter.messages.info "Validating systemConfig/ structure..."}
+        fi
+      else
+        ${formatter.messages.error "No configuration found"}
+        ${formatter.messages.info "Neither system-config.nix nor systemConfig/ directory exists"}
+        exit 1
+      fi
     else
       if [ "$VERBOSE" = "true" ]; then
-        ${formatter.messages.success "Nix syntax is valid"}
+        ${formatter.messages.info "Validating system-config.nix..."}
+      fi
+      
+      # Validate Nix syntax of system-config.nix
+      if ! ${pkgs.nix}/bin/nix-instantiate --parse "$SYSTEM_CONFIG" >/dev/null 2>&1; then
+        ${formatter.messages.error "system-config.nix has invalid Nix syntax"}
+        ERRORS=$((ERRORS + 1))
+      else
+        if [ "$VERBOSE" = "true" ]; then
+          ${formatter.messages.success "Nix syntax is valid"}
+        fi
       fi
     fi
     
@@ -108,16 +117,24 @@ let
     REQUIRED_FIELDS=$(echo "$REQUIRED_FIELDS_MAP" | ${pkgs.jq}/bin/jq -r ".\"$CONFIG_VERSION\" // [] | .[]")
     
     # Check for required fields
+    # v1+ stores configVersion in systemConfig/core/management/system-manager/config.nix
+    if [ -f "$SYSTEM_CONFIG" ]; then
+      CHECK_CONFIG="$SYSTEM_CONFIG"
+    else
+      CHECK_CONFIG="$CONFIGS_DIR/core/management/system-manager/config.nix"
+    fi
     for field in $REQUIRED_FIELDS; do
-      if ! ${pkgs.nix}/bin/nix-instantiate --eval --strict -E \
-        "(import $SYSTEM_CONFIG).$field or null" >/dev/null 2>&1; then
-        if [ "$VERBOSE" = "true" ]; then
-          ${formatter.messages.warning "Required field '$field' not found in system-config.nix (v$CONFIG_VERSION)"}
-        fi
-        WARNINGS=$((WARNINGS + 1))
-      else
-        if [ "$VERBOSE" = "true" ]; then
-          ${formatter.messages.success "$field found"}
+      if [ -f "$CHECK_CONFIG" ]; then
+        if ! ${pkgs.nix}/bin/nix-instantiate --eval --strict -E \
+          "(import $CHECK_CONFIG).$field or null" >/dev/null 2>&1; then
+          if [ "$VERBOSE" = "true" ]; then
+            ${formatter.messages.warning "Required field '$field' not found (v$CONFIG_VERSION)"}
+          fi
+          WARNINGS=$((WARNINGS + 1))
+        else
+          if [ "$VERBOSE" = "true" ]; then
+            ${formatter.messages.success "$field found in $CHECK_CONFIG"}
+          fi
         fi
       fi
     done
@@ -128,29 +145,32 @@ let
     FORBIDDEN_FIELDS=$(echo "$STRUCTURE_INFO" | ${pkgs.jq}/bin/jq -r '.forbiddenInSystemConfig // [] | .[]')
     
     # Check if structure is minimal (for modular versions)
-    if [ "$MAX_LINES" -lt 9999 ]; then
-      LINE_COUNT=$(wc -l < "$SYSTEM_CONFIG" 2>/dev/null || echo "0")
-      if [ "$LINE_COUNT" -gt "$MAX_LINES" ]; then
-        if [ "$VERBOSE" = "true" ]; then
-          ${formatter.messages.warning "system-config.nix has more than $MAX_LINES lines (should be minimal for v$CONFIG_VERSION)"}
-          ${formatter.messages.info "Consider running 'ncc-migrate-config' to migrate to modular structure"}
+    # Only relevant when system-config.nix still exists (v0→v1 migration)
+    if [ -f "$SYSTEM_CONFIG" ]; then
+      if [ "$MAX_LINES" -lt 9999 ]; then
+        LINE_COUNT=$(wc -l < "$SYSTEM_CONFIG" 2>/dev/null || echo "0")
+        if [ "$LINE_COUNT" -gt "$MAX_LINES" ]; then
+          if [ "$VERBOSE" = "true" ]; then
+            ${formatter.messages.warning "system-config.nix has more than $MAX_LINES lines (should be minimal for v$CONFIG_VERSION)"}
+            ${formatter.messages.info "Consider running 'ncc-migrate-config' to migrate to modular structure"}
+          fi
+          WARNINGS=$((WARNINGS + 1))
         fi
-        WARNINGS=$((WARNINGS + 1))
       fi
+      
+      # Check for forbidden fields in system-config.nix
+      for field in $FORBIDDEN_FIELDS; do
+        if grep -q "$field = {" "$SYSTEM_CONFIG" 2>/dev/null || \
+           grep -q "$field = " "$SYSTEM_CONFIG" 2>/dev/null; then
+          if [ "$VERBOSE" = "true" ]; then
+            ${formatter.messages.warning "Non-critical field '$field' found in system-config.nix (v$CONFIG_VERSION)"}
+            ${formatter.messages.info "This should be in separate configs/ files"}
+            ${formatter.messages.info "Consider running 'ncc-migrate-config' to migrate to modular structure"}
+          fi
+          WARNINGS=$((WARNINGS + 1))
+        fi
+      done
     fi
-    
-    # Check for forbidden fields in system-config.nix
-    for field in $FORBIDDEN_FIELDS; do
-      if grep -q "$field = {" "$SYSTEM_CONFIG" 2>/dev/null || \
-         grep -q "$field = " "$SYSTEM_CONFIG" 2>/dev/null; then
-        if [ "$VERBOSE" = "true" ]; then
-          ${formatter.messages.warning "Non-critical field '$field' found in system-config.nix (v$CONFIG_VERSION)"}
-          ${formatter.messages.info "This should be in separate configs/ files"}
-          ${formatter.messages.info "Consider running 'ncc-migrate-config' to migrate to modular structure"}
-        fi
-        WARNINGS=$((WARNINGS + 1))
-      fi
-    done
     
     # Check if configs directory exists (for modular versions)
     # Note: hasConfigsDir is not in JSON, we check directory directly
@@ -168,20 +188,26 @@ let
         # Get expected config files for this version
         EXPECTED_FILES=$(echo "$EXPECTED_CONFIG_FILES_MAP" | ${pkgs.jq}/bin/jq -r ".\"$CONFIG_VERSION\" // [] | .[]")
         
-        # Validate each config file
-        for config_file in "$CONFIGS_DIR"/*.nix; do
-          if [ -f "$config_file" ]; then
-            CONFIG_BASENAME=$(basename "$config_file")
-            if ${pkgs.nix}/bin/nix-instantiate --parse "$config_file" >/dev/null 2>&1; then
+        # Recursively validate all config.nix files (skip aggregator configs)
+        while IFS= read -r config_file; do
+          CONFIG_BASENAME=$(echo "$config_file" | sed "s|$CONFIGS_DIR/||")
+          case "$CONFIG_BASENAME" in
+            core/config.nix|core/base/config.nix|core/management/config.nix|modules/config.nix|modules/infrastructure/config.nix|modules/security/config.nix|modules/specialized/config.nix|modules/system/config.nix)
               if [ "$VERBOSE" = "true" ]; then
-                ${formatter.messages.success "  $CONFIG_BASENAME syntax is valid"}
+                ${formatter.messages.info "  $CONFIG_BASENAME (aggregator, skipped)"}
               fi
-            else
-              ${formatter.messages.error "  $CONFIG_BASENAME has invalid Nix syntax"}
-              ERRORS=$((ERRORS + 1))
+              continue
+              ;;
+          esac
+          if ${pkgs.nix}/bin/nix-instantiate --parse "$config_file" >/dev/null 2>&1; then
+            if [ "$VERBOSE" = "true" ]; then
+              ${formatter.messages.success "  $CONFIG_BASENAME syntax is valid"}
             fi
+          else
+            ${formatter.messages.error "  $CONFIG_BASENAME has invalid Nix syntax"}
+            ERRORS=$((ERRORS + 1))
           fi
-        done
+        done < <(find "$CONFIGS_DIR" -name "config.nix" -type f 2>/dev/null)
       fi
     fi
     

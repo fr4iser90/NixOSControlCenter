@@ -62,6 +62,33 @@ let
     JQ_BIN="${pkgs.jq}/bin/jq"
     FIND_CHAIN_FILE="${findChainFile}"
     
+    # PRE-CHECK: If systemConfig/ exists with configVersion, already on v1
+    # Just clean up stale files from incomplete previous migrations
+    SM_CONFIG="$CONFIGS_DIR/core/management/system-manager/config.nix"
+    if [ -f "$SM_CONFIG" ] && grep -q "configVersion" "$SM_CONFIG" 2>/dev/null; then
+      if [ -f "$SYSTEM_CONFIG" ]; then
+        ${formatter.messages.info "Removing stale system-config.nix (v1 already active)"}
+        rm -f "$SYSTEM_CONFIG"
+      fi
+      for agg in \
+        "$CONFIGS_DIR/core/config.nix" \
+        "$CONFIGS_DIR/core/base/config.nix" \
+        "$CONFIGS_DIR/core/management/config.nix" \
+        "$CONFIGS_DIR/modules/config.nix" \
+        "$CONFIGS_DIR/modules/infrastructure/config.nix" \
+        "$CONFIGS_DIR/modules/security/config.nix" \
+        "$CONFIGS_DIR/modules/specialized/config.nix" \
+        "$CONFIGS_DIR/modules/system/config.nix"; do
+        if [ -f "$agg" ]; then
+          rm -f "$agg"
+          if [ "$VERBOSE" = "true" ]; then
+            ${formatter.messages.info "Removed stale aggregator config: $agg"}
+          fi
+        fi
+      done
+      exit 0
+    fi
+    
     # Check if system-config.nix exists
     if [ ! -f "$SYSTEM_CONFIG" ]; then
       ${formatter.messages.error "system-config.nix not found at $SYSTEM_CONFIG"}
@@ -317,43 +344,85 @@ let
               ')
             done
           fi
+          RAW_SOURCE=''$(echo "$FIELD_PLAN" | "$JQ_BIN" -r '.rawSource // empty')
+          RAW_UNWRAP=''$(echo "$FIELD_PLAN" | "$JQ_BIN" -r '.rawUnwrap // false')
           
-          NEW_CONFIG_NIX=''$(echo "$FIELD_STRUCTURE" | "$JQ_BIN" -r --argjson oldConfig "$MAPPED_CONFIG_JSON" '
-            def getPathValue(path; config):
-              reduce (path | split(".")) as $key (config;
-                if . == null then null elif type == "object" then .[$key] else null end
-              );
-            def formatValue(value):
-              if value == null or value == "" then "null"
-              elif value | type == "string" then "\"\(value)\""
-              elif value | type == "boolean" then value
-              elif value | type == "number" then value
-              elif value | type == "array" then "[ " + (value | map(formatValue) | join(", ")) + " ]"
-              elif value | type == "object" then "{ " + (value | to_entries | map("\(.key) = \(.value | formatValue)") | join("; ")) + " }"
-              else "\"\(value)\"" end;
-            def processStructure(structure; oldConfig; indent):
-              structure | to_entries | map(
-                if .value | type == "string" then
-                  (getPathValue(.value; oldConfig)) as $extracted |
-                  if $extracted != null and $extracted != "" then "\(indent)\(.key) = \($extracted | formatValue);" else "" end
-                elif .value | type == "object" then
-                  (processStructure(.value; oldConfig; indent + "  ")) as $nested |
-                  if $nested != "" then "\(indent)\(.key) = {\n\($nested)\n\(indent)};" else "" end
-                else "" end
-              ) | map(select(. != "")) | join("\n");
-            processStructure(.; $oldConfig; "  ")
-          ')
+          if [ -n "$RAW_SOURCE" ]; then
+            RAW_VALUE=''$(echo "$OLD_CONFIG_JSON" | "$JQ_BIN" -c "$RAW_SOURCE" 2>/dev/null || echo "null")
+            if [ -n "$RAW_VALUE" ] && [ "$RAW_VALUE" != "null" ]; then
+              if [ "$RAW_UNWRAP" = "true" ]; then
+                NEW_CONFIG_NIX=''$(echo "$RAW_VALUE" | "$JQ_BIN" -r --arg key "$field_name" '
+                  def fmt(v):
+                    if v == null then "null"
+                    elif v | type == "string" then "\"\(v)\""
+                    elif v | type == "boolean" then (if v then "true" else "false" end)
+                    elif v | type == "number" then (v | tostring)
+                    elif v | type == "array" then "[ " + (v | map(fmt(.)) | join(" ")) + " ]"
+                    elif v | type == "object" then
+                      "{\n" + (v | to_entries | map("  \(.key) = \(fmt(.value));") | join("\n")) + "\n}"
+                    else "\"\(v)\"" end;
+                  to_entries | map("\(.key) = \(fmt(.value));") | join("\n")
+                ')
+              else
+                NEW_CONFIG_NIX=''$(echo "$RAW_VALUE" | "$JQ_BIN" -r --arg key "$field_name" '
+                  def fmt(v):
+                    if v == null then "null"
+                    elif v | type == "string" then "\"\(v)\""
+                    elif v | type == "boolean" then (if v then "true" else "false" end)
+                    elif v | type == "number" then (v | tostring)
+                    elif v | type == "array" then "[ " + (v | map(fmt(.)) | join(" ")) + " ]"
+                    elif v | type == "object" then
+                      "{\n" + (v | to_entries | map("  \(.key) = \(fmt(.value));") | join("\n")) + "\n}"
+                    else "\"\(v)\"" end;
+                  "\($key) = \(fmt(.));"
+                ')
+              fi
+            fi
+          else
+            NEW_CONFIG_NIX=''$(echo "$FIELD_STRUCTURE" | "$JQ_BIN" -r --argjson oldConfig "$MAPPED_CONFIG_JSON" '
+              def getPathValue(path; config):
+                reduce (path | split(".")) as $key (config;
+                  if . == null then null elif type == "object" then .[$key] else null end
+                );
+              def formatValue(value):
+                if value == null or value == "" then "null"
+                elif value | type == "string" then "\"\(value)\""
+                elif value | type == "boolean" then value
+                elif value | type == "number" then value
+                elif value | type == "array" then "[ " + (value | map(formatValue(.)) | join(" ")) + " ]"
+                elif value | type == "object" then "{ " + (value | to_entries | map("\(.key) = \(formatValue(.value))") | join("; ")) + " }"
+                else "\"\(value)\"" end;
+              def processStructure(structure; oldConfig; indent):
+                structure | to_entries | map(
+                  if .value | type == "string" then
+                    (getPathValue(.value; oldConfig)) as $extracted |
+                    if $extracted != null and $extracted != "" then "\(indent)\(.key) = \(formatValue($extracted));" else "" end
+                  elif .value | type == "object" then
+                    (processStructure(.value; oldConfig; indent + "  ")) as $nested |
+                    if $nested != "" then "\(indent)\(.key) = {\n\($nested)\n\(indent)};" else "" end
+                  else "" end
+                ) | map(select(. != "")) | join("\n");
+              processStructure(.; $oldConfig; "  ")
+            ')
+          fi
           
           if [ -n "$NEW_CONFIG_NIX" ]; then
-            echo "{" > "$CONFIGS_DIR/$TARGET_FILE"
-            echo "$NEW_CONFIG_NIX" >> "$CONFIGS_DIR/$TARGET_FILE"
-            echo "}" >> "$CONFIGS_DIR/$TARGET_FILE"
+            mkdir -p "$(dirname "$CONFIGS_DIR/$TARGET_FILE")"
+            if [ ! -f "$CONFIGS_DIR/$TARGET_FILE" ]; then
+              echo "{" > "$CONFIGS_DIR/$TARGET_FILE"
+              echo "$NEW_CONFIG_NIX" >> "$CONFIGS_DIR/$TARGET_FILE"
+              echo "}" >> "$CONFIGS_DIR/$TARGET_FILE"
+            elif [ "$(tr -d ' \t\n\r' < "$CONFIGS_DIR/$TARGET_FILE" 2>/dev/null)" = "{}" ]; then
+              echo "{" > "$CONFIGS_DIR/$TARGET_FILE"
+              echo "$NEW_CONFIG_NIX" >> "$CONFIGS_DIR/$TARGET_FILE"
+              echo "}" >> "$CONFIGS_DIR/$TARGET_FILE"
+            fi
           fi
         done
         
-        # CRITICAL: Only overwrite system-config.nix AFTER all migrations succeeded
-        # If we reach here, all migrations succeeded (set -e would have stopped script on error)
-        mv "$TEMP_STEP_CONFIG" "$SYSTEM_CONFIG"
+        # CRITICAL: All migration steps succeeded
+        # Delete old system-config.nix (already backed up at start of chain)
+        rm -f "$SYSTEM_CONFIG" "$TEMP_STEP_CONFIG"
         
         CURRENT_STEP="$NEXT_STEP"
       done
@@ -398,106 +467,8 @@ let
       ${formatter.messages.info "Loaded migration plan from schema"}
     fi
     
-    # Get fieldsToKeep from migration plan
-    FIELDS_TO_KEEP=''$(echo "$MIGRATION_PLAN" | "$JQ_BIN" -r '.fieldsToKeep // [] | .[]')
-    
-    # CRITICAL: Use temp file, only overwrite if successful
-    TEMP_CONFIG=$(mktemp)
-    FIELDS_EXTRACTED=0
-    
-    # Create minimal system-config.nix in temp file using fieldsToKeep from schema
-    # NOTE: We write configVersion first, but it doesn't count as extracted field
-    echo "{" > "$TEMP_CONFIG"
-    echo "  # Configuration Schema Version" >> "$TEMP_CONFIG"
-    echo "  configVersion = \"$MIGRATION_TARGET\";" >> "$TEMP_CONFIG"
-    echo "" >> "$TEMP_CONFIG"
-    
-    # Extract and add each field from fieldsToKeep
-    for field in $FIELDS_TO_KEEP; do
-      # Handle nested fields (e.g., system.channel)
-      if [[ "$field" == *"."* ]]; then
-        # Nested field - extract from JSON and format
-        FIELD_VALUE=''$(echo "$OLD_CONFIG_JSON" | "$JQ_BIN" -c ".$field // null")
-        if [ "$FIELD_VALUE" != "null" ] && [ -n "$FIELD_VALUE" ]; then
-          # Format nested field (e.g., system = { channel = "..."; })
-          FIELD_ROOT=''$(echo "$field" | cut -d'.' -f1)
-          echo "  $FIELD_ROOT = {" >> "$TEMP_CONFIG"
-          echo "$FIELD_VALUE" | "$JQ_BIN" -r "to_entries[] | \"    \(.key) = \(.value | if type == \"string\" then \"\\\"\(.)\\\"\" elif type == \"boolean\" then . else . end);\"" >> "$TEMP_CONFIG"
-          echo "  };" >> "$TEMP_CONFIG"
-          FIELDS_EXTRACTED=$((FIELDS_EXTRACTED + 1))
-        fi
-      else
-        # Simple field - extract value and format generically
-        FIELD_VALUE=''$(echo "$OLD_CONFIG_JSON" | "$JQ_BIN" -c ".$field // empty")
-        if [ -n "$FIELD_VALUE" ] && [ "$FIELD_VALUE" != "null" ] && [ "$FIELD_VALUE" != "\"\"" ]; then
-          # Format field value generically using jq with recursive solution
-          # Supports arbitrary nesting depth
-          echo "$OLD_CONFIG_JSON" | "$JQ_BIN" -r ".$field | 
-            def formatNixValue(v; indent):
-              if v == null then \"null\"
-              elif v | type == \"string\" then \"\\\"\(v)\\\"\"
-              elif v | type == \"boolean\" then (if v then \"true\" else \"false\" end)
-              elif v | type == \"number\" then (v | tostring)
-              elif v | type == \"array\" then 
-                \"[ \" + (v | map(formatNixValue(.; indent)) | join(\", \")) + \" ]\"
-              elif v | type == \"object\" then
-                \"{\" + (
-                  v | to_entries | map(
-                    \"\\n\" + indent + \"  \(.key) = \" + formatNixValue(.value; indent + \"  \") + \";\"
-                  ) | join(\"\")
-                ) + \"\\n\" + indent + \"}\"
-              else \"\\\"\(v)\\\"\" end;
-            \"  $field = \" + formatNixValue(.; \"  \") + \";\"" >> "$TEMP_CONFIG"
-          FIELDS_EXTRACTED=$((FIELDS_EXTRACTED + 1))
-        fi
-      fi
-    done
-    
-    echo "}" >> "$TEMP_CONFIG"
-    
-    # CRITICAL: Only overwrite if we extracted fields
-    # Check if temp file only has configVersion (should have at least 5 lines: {, comment, configVersion, empty line, })
-    TEMP_LINE_COUNT=$(wc -l < "$TEMP_CONFIG" 2>/dev/null || echo "0")
-    
-    if [ "$FIELDS_EXTRACTED" -eq 0 ]; then
-      FIELD_COUNT=''$(echo "$OLD_CONFIG_JSON" | "$JQ_BIN" 'keys | length' 2>/dev/null || echo "0")
-      ${formatter.messages.error "Could not extract any required fields from old config"}
-      ${formatter.messages.warning "Migration ABORTED to prevent data loss"}
-      if [ "$VERBOSE" = "true" ]; then
-        ${formatter.text.newline}
-        ${formatter.messages.info "Debug info:"}
-        ${formatter.messages.info "- Fields extracted: $FIELDS_EXTRACTED"}
-        ${formatter.messages.info "- Temp file lines: $TEMP_LINE_COUNT (should be > 4)"}
-        ${formatter.messages.info "- Old config had $FIELD_COUNT field(s)"}
-        ${formatter.messages.info "- fieldsToKeep: $FIELDS_TO_KEEP"}
-        OLD_KEYS=$(echo "$OLD_CONFIG_JSON" | "$JQ_BIN" -c 'keys' 2>/dev/null | head -c 200 || echo 'ERROR reading JSON')
-        ${formatter.messages.info "- Old config keys: $OLD_KEYS"}
-        ${formatter.text.newline}
-        ${formatter.messages.info "Possible causes:"}
-        ${formatter.messages.info "1. jq extraction failed (check errors above)"}
-        ${formatter.messages.info "2. Field names don't match (check fieldsToKeep in migration plan)"}
-        ${formatter.messages.info "3. Old config structure is different than expected"}
-      fi
-      rm -f "$TEMP_CONFIG"
-      exit 1
-    fi
-    
-    # Additional safety check: temp file should have more than just configVersion
-    if [ "$TEMP_LINE_COUNT" -le 4 ]; then
-      ${formatter.messages.error "Temp file only contains configVersion, no other fields extracted"}
-      ${formatter.messages.warning "Migration ABORTED to prevent data loss"}
-      if [ "$VERBOSE" = "true" ]; then
-        ${formatter.messages.info "Temp file content:"}
-        cat "$TEMP_CONFIG"
-      fi
-      rm -f "$TEMP_CONFIG"
-      exit 1
-    fi
-    
-    if [ "$VERBOSE" = "true" ]; then
-      ${formatter.messages.info "Created minimal system-config.nix using fieldsToKeep from schema"}
-      ${formatter.messages.info "Successfully extracted $FIELDS_EXTRACTED required field(s)"}
-    fi
+    # v0→v1 migration: ALL fields go to systemConfig/ subdirectory configs
+    # No fields are kept in system-config.nix - it gets deleted after migration
     
     # CRITICAL: Process fieldsToMigrate BEFORE overwriting system-config.nix
     # This way if migration fails, the original file is still intact
@@ -563,64 +534,107 @@ let
         done
       fi
       
-      # Process structure recursively to extract values and generate Nix code
-      # This is the core: walk through structure, extract values using paths, generate Nix
-      NEW_CONFIG_NIX=''$(echo "$FIELD_STRUCTURE" | "$JQ_BIN" -r --argjson oldConfig "$MAPPED_CONFIG_JSON" '
-        def getPathValue(path; config):
-          reduce (path | split(".")) as $key (config;
-            if . == null then null
-            elif type == "object" then .[$key]
-            else null
-            end
-          );
-        
-        def formatValue(value):
-          if value == null or value == "" then "null"
-          elif value | type == "string" then "\"\(value)\""
-          elif value | type == "boolean" then value
-          elif value | type == "number" then value
-          elif value | type == "array" then 
-            "[ " + (value | map(formatValue) | join(", ")) + " ]"
-          elif value | type == "object" then
-            "{ " + (value | to_entries | map("\(.key) = \(.value | formatValue)") | join("; ")) + " }"
-          else "\"\(value)\""
-          end;
-        
-        def processStructure(structure; oldConfig; indent):
-          structure | to_entries | map(
-            if .value | type == "string" then
-              # Value is a path in old config - extract it
-              (getPathValue(.value; oldConfig)) as $extracted |
-              if $extracted != null and $extracted != "" then
-                "\(indent)\(.key) = \($extracted | formatValue);"
+      # Handle rawSource (dynamic keys, e.g. users, features)
+      RAW_SOURCE=''$(echo "$FIELD_PLAN" | "$JQ_BIN" -r '.rawSource // empty')
+      RAW_UNWRAP=''$(echo "$FIELD_PLAN" | "$JQ_BIN" -r '.rawUnwrap // false')
+      
+      if [ -n "$RAW_SOURCE" ]; then
+        RAW_VALUE=''$(echo "$OLD_CONFIG_JSON" | "$JQ_BIN" -c "$RAW_SOURCE" 2>/dev/null || echo "null")
+        if [ -n "$RAW_VALUE" ] && [ "$RAW_VALUE" != "null" ]; then
+          if [ "$RAW_UNWRAP" = "true" ]; then
+            NEW_CONFIG_NIX=''$(echo "$RAW_VALUE" | "$JQ_BIN" -r --arg key "$field_name" '
+              def fmt(v):
+                if v == null then "null"
+                elif v | type == "string" then "\"\(v)\""
+                elif v | type == "boolean" then (if v then "true" else "false" end)
+                elif v | type == "number" then (v | tostring)
+                elif v | type == "array" then "[ " + (v | map(fmt(.)) | join(" ")) + " ]"
+                elif v | type == "object" then
+                  "{\n" + (v | to_entries | map("  \(.key) = \(fmt(.value));") | join("\n")) + "\n}"
+                else "\"\(v)\"" end;
+              to_entries | map("\(.key) = \(fmt(.value));") | join("\n")
+            ')
+          else
+            NEW_CONFIG_NIX=''$(echo "$RAW_VALUE" | "$JQ_BIN" -r --arg key "$field_name" '
+              def fmt(v):
+                if v == null then "null"
+                elif v | type == "string" then "\"\(v)\""
+                elif v | type == "boolean" then (if v then "true" else "false" end)
+                elif v | type == "number" then (v | tostring)
+                elif v | type == "array" then "[ " + (v | map(fmt(.)) | join(" ")) + " ]"
+                elif v | type == "object" then
+                  "{\n" + (v | to_entries | map("  \(.key) = \(fmt(.value));") | join("\n")) + "\n}"
+                else "\"\(v)\"" end;
+              "\($key) = \(fmt(.));"
+            ')
+          fi
+        fi
+      else
+        # Process structure recursively to extract values and generate Nix code
+        NEW_CONFIG_NIX=''$(echo "$FIELD_STRUCTURE" | "$JQ_BIN" -r --argjson oldConfig "$MAPPED_CONFIG_JSON" '
+          def getPathValue(path; config):
+            reduce (path | split(".")) as $key (config;
+              if . == null then null
+              elif type == "object" then .[$key]
+              else null
+              end
+            );
+          
+          def formatValue(value):
+            if value == null or value == "" then "null"
+            elif value | type == "string" then "\"\(value)\""
+            elif value | type == "boolean" then value
+            elif value | type == "number" then value
+            elif value | type == "array" then 
+              "[ " + (value | map(formatValue(.)) | join(" ")) + " ]"
+            elif value | type == "object" then
+              "{ " + (value | to_entries | map("\(.key) = \(formatValue(.value))") | join("; ")) + " }"
+            else "\"\(value)\""
+            end;
+          
+          def processStructure(structure; oldConfig; indent):
+            structure | to_entries | map(
+              if .value | type == "string" then
+                (getPathValue(.value; oldConfig)) as $extracted |
+                if $extracted != null and $extracted != "" then
+                  "\(indent)\(.key) = \(formatValue($extracted));"
+                else
+                  ""
+                end
+              elif .value | type == "object" then
+                (processStructure(.value; oldConfig; indent + "  ")) as $nested |
+                if $nested != "" then
+                  "\(indent)\(.key) = {\n\($nested)\n\(indent)};"
+                else
+                  ""
+                end
               else
                 ""
               end
-            elif .value | type == "object" then
-              # Nested structure - recurse
-              (processStructure(.value; oldConfig; indent + "  ")) as $nested |
-              if $nested != "" then
-                "\(indent)\(.key) = {\n\($nested)\n\(indent)};"
-              else
-                ""
-              end
-            else
-              ""
-            end
-          ) | map(select(. != "")) | join("\n");
-        
-        processStructure(.; $oldConfig; "  ")
-      ')
+            ) | map(select(. != "")) | join("\n");
+          
+          processStructure(.; $oldConfig; "  ")
+        ')
+      fi
       
       # Write config file
-      # CRITICAL: Only create if file doesn't exist (NEVER overwrite!)
+      # CRITICAL: Only create if file doesn't exist or is empty placeholder
       if [ -n "$NEW_CONFIG_NIX" ]; then
+        mkdir -p "$(dirname "$CONFIGS_DIR/$TARGET_FILE")"
         if [ ! -f "$CONFIGS_DIR/$TARGET_FILE" ]; then
           echo "{" > "$CONFIGS_DIR/$TARGET_FILE"
           echo "$NEW_CONFIG_NIX" >> "$CONFIGS_DIR/$TARGET_FILE"
           echo "}" >> "$CONFIGS_DIR/$TARGET_FILE"
           if [ "$VERBOSE" = "true" ]; then
             ${formatter.messages.info "Created $TARGET_FILE"}
+          fi
+        elif [ "$(tr -d ' \t\n\r' < "$CONFIGS_DIR/$TARGET_FILE" 2>/dev/null)" = "{}" ]; then
+          # File exists but is empty/placeholder — overwrite with migrated data
+          echo "{" > "$CONFIGS_DIR/$TARGET_FILE"
+          echo "$NEW_CONFIG_NIX" >> "$CONFIGS_DIR/$TARGET_FILE"
+          echo "}" >> "$CONFIGS_DIR/$TARGET_FILE"
+          if [ "$VERBOSE" = "true" ]; then
+            ${formatter.messages.info "Overwrote empty placeholder $TARGET_FILE"}
           fi
         else
           if [ "$VERBOSE" = "true" ]; then
@@ -630,12 +644,48 @@ let
       fi
     done
     
-    # CRITICAL: Only overwrite system-config.nix AFTER all migrations succeeded
-    # If we reach here, all migrations succeeded (set -e would have stopped script on error)
-    mv "$TEMP_CONFIG" "$SYSTEM_CONFIG"
+    # CRITICAL: All migrations succeeded - now delete old system-config.nix
+    # It's been backed up to /var/backup/nixos/ already
+    # v1 uses modular systemConfig/ directory as the only entry point
+    rm -f "$SYSTEM_CONFIG"
+    
+    # Clean up unnecessary aggregator configs (intermediate-level config.nix)
+    # These duplicate what the leaf configs already define
+    for agg in \
+      "$CONFIGS_DIR/core/base/config.nix" \
+      "$CONFIGS_DIR/core/management/config.nix" \
+      "$CONFIGS_DIR/core/config.nix" \
+      "$CONFIGS_DIR/modules/infrastructure/config.nix" \
+      "$CONFIGS_DIR/modules/security/config.nix" \
+      "$CONFIGS_DIR/modules/specialized/config.nix" \
+      "$CONFIGS_DIR/modules/system/config.nix" \
+      "$CONFIGS_DIR/modules/config.nix"; do
+      if [ -f "$agg" ]; then
+        rm -f "$agg"
+        if [ "$VERBOSE" = "true" ]; then
+          ${formatter.messages.info "Removed aggregator config: $agg"}
+        fi
+      fi
+    done
+    
+    # Add configVersion to system-manager config (the canonical version location)
+    SM_CONFIG="$CONFIGS_DIR/core/management/system-manager/config.nix"
+    if [ -f "$SM_CONFIG" ]; then
+      if ! grep -q "configVersion" "$SM_CONFIG" 2>/dev/null; then
+        # Inject configVersion as the first field
+        sed -i '1a\  configVersion = "'"$MIGRATION_TARGET"'";' "$SM_CONFIG"
+      fi
+    else
+      # Create system-manager config with configVersion
+      mkdir -p "$(dirname "$SM_CONFIG")"
+      echo "{" > "$SM_CONFIG"
+      echo "  configVersion = \"$MIGRATION_TARGET\";" >> "$SM_CONFIG"
+      echo "}" >> "$SM_CONFIG"
+    fi
     
     if [ "$VERBOSE" = "true" ]; then
-      ${formatter.messages.info "Backup saved at: $BACKUP_FILE"}
+      ${formatter.messages.info "Old system-config.nix backed up and removed"}
+      ${formatter.messages.info "configVersion set in system-manager config"}
     fi
   '';
 

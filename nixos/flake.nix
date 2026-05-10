@@ -79,59 +79,62 @@
       ./custom
     ];
 
+  in let
+
+    # NixOS system definition — factored out so we can reference it from multiple attrs
+    mkSystem = nixpkgs.lib.nixosSystem {
+      inherit system;
+      specialArgs = {
+        inherit systemConfig discovery moduleConfig getModuleConfig getModuleMetadata getCurrentModuleMetadata getModuleApi;
+        # For TUI engine Go building
+        buildGoApplication = gomod2nix.legacyPackages.${system}.buildGoApplication;
+        gomod2nix = gomod2nix.legacyPackages.${system};
+      };
+
+      modules = [
+        ./core/management/module-manager
+      ] ++ systemModules ++ [
+        {
+          system.stateVersion = stateVersion;
+          nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+          # Unfree Konfiguration
+          nixpkgs.config = {
+            allowUnfree = systemConfig.core.management.system-manager.allowUnfree or false;
+          };
+        }
+
+        # Home Manager integration
+        home-manager.nixosModules.home-manager
+        {
+          home-manager = {
+            useGlobalPkgs = true;
+            useUserPackages = true;
+            extraSpecialArgs = {
+              inherit systemConfig discovery moduleConfig getModuleConfig getModuleMetadata getCurrentModuleMetadata;
+            };
+            users = lib.mapAttrs (username: userConfig:
+              { config, ... }: {
+                imports = [
+                  (import ./core/base/user/home-manager/roles/${userConfig.role}.nix {
+                    inherit pkgs lib config systemConfig getModuleConfig;
+                    user = username;
+                  })
+                ];
+                  home = {
+                  username = username;
+                  homeDirectory = "/home/${username}";
+                  stateVersion = stateVersion;
+                };
+            }) (systemConfig.core.base.user or {});
+          };
+        }
+      ];
+    };
+
   in {
     nixosConfigurations = {
-      "${systemConfig.core.base.network.hostName}" = nixpkgs.lib.nixosSystem {
-        inherit system;
-        specialArgs = {
-          inherit systemConfig discovery moduleConfig getModuleConfig getModuleMetadata getCurrentModuleMetadata getModuleApi;
-          # For TUI engine Go building
-          buildGoApplication = gomod2nix.legacyPackages.${system}.buildGoApplication;
-          gomod2nix = gomod2nix.legacyPackages.${system};
-        }; 
-
-        modules = [
-          ./core/management/module-manager
-        ] ++ systemModules ++ [
-          {
-            # System Version
-            system.stateVersion = stateVersion;
-
-            nix.settings.experimental-features = [ "nix-command" "flakes" ];
-
-            # Unfree Konfiguration
-            nixpkgs.config = {
-              allowUnfree = systemConfig.core.management.system-manager.allowUnfree or false;
-            };
-          }     
-          
-          # Home Manager integration
-          home-manager.nixosModules.home-manager
-          {
-            home-manager = {
-              useGlobalPkgs = true;
-              useUserPackages = true;
-              extraSpecialArgs = {
-                inherit systemConfig discovery moduleConfig getModuleConfig getModuleMetadata getCurrentModuleMetadata;
-              };
-              users = lib.mapAttrs (username: userConfig:
-                { config, ... }: {
-                  imports = [
-                    (import ./core/base/user/home-manager/roles/${userConfig.role}.nix {
-                      inherit pkgs lib config systemConfig getModuleConfig;
-                      user = username;
-                    })
-                  ];
-                    home = {
-                    username = username;
-                    homeDirectory = "/home/${username}";
-                    stateVersion = stateVersion;
-                  };
-              }) (systemConfig.core.base.user or {});
-            };
-          }
-        ];
-      };
+      "${systemConfig.core.base.network.hostName}" = mkSystem;
     };
   };
 }

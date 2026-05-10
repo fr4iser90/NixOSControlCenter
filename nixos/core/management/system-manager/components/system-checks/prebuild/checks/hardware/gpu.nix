@@ -8,6 +8,30 @@ let
   prebuildScript = pkgs.writeScriptBin "prebuild-check-gpu" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
+
+    _update_gpu() {
+      local new_value="$1"
+      local config_file="${hardwareConfigPath}"
+      mkdir -p "$(dirname "$config_file")"
+      local existing_cpu=$(grep -o 'cpu = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
+      local existing_memory=$(grep -A2 'ram = {' "$config_file" 2>/dev/null || echo "")
+      if [ -n "$existing_memory" ]; then
+        cat > "$config_file" <<EOF
+{
+  cpu = "$existing_cpu";
+  gpu = "$new_value";
+$existing_memory
+}
+EOF
+      else
+        cat > "$config_file" <<EOF
+{
+  cpu = "$existing_cpu";
+  gpu = "$new_value";
+}
+EOF
+      fi
+    }
     
     ${ui.text.header "GPU Configuration Check"}
     
@@ -42,7 +66,9 @@ let
         esac
     done < <(${pkgs.pciutils}/bin/lspci -nn | grep -E "\[0300\]|\[0302\]|\[0380\]")
 
-    echo "AMD GPU count: $amd_count"
+    if [ "$amd_count" -gt 0 ]; then
+      echo "AMD GPU count: $amd_count"
+    fi
     
     if [[ ''${gpu_types["nvidia"]-0} -eq 1 && ''${gpu_types["intel"]-0} -eq 1 ]]; then
         DETECTED="nvidia-intel"
@@ -79,14 +105,14 @@ let
     
     if [ ! -f "${hardwareConfigPath}" ]; then
       ${ui.messages.info "hardware-config.nix not found, creating it..."}
-      update-hardware-config "${hardwareConfigPath}" "gpu" "$DETECTED"
+      _update_gpu "$DETECTED"
       ${ui.badges.success "hardware-config.nix created with detected GPU."}
       exit 0
     fi
     
     if ! CONFIGURED=$(grep 'gpu =' "${hardwareConfigPath}" | cut -d'"' -f2); then
       ${ui.messages.warning "Could not find GPU configuration in hardware-config.nix, setting detected GPU..."}
-      update-hardware-config "${hardwareConfigPath}" "gpu" "$DETECTED"
+      _update_gpu "$DETECTED"
       ${ui.badges.success "GPU configuration set to $DETECTED."}
       exit 0
     fi
@@ -99,7 +125,7 @@ let
       ${ui.messages.warning "GPU configuration mismatch! Auto-updating..."}
       ${ui.messages.warning "System configured for $CONFIGURED but detected $DETECTED"}
       
-      update-hardware-config "${hardwareConfigPath}" "gpu" "$DETECTED"
+      _update_gpu "$DETECTED"
       ${ui.badges.success "GPU configuration updated to $DETECTED."}
     else
       ${ui.badges.success "GPU configuration matches hardware."}
