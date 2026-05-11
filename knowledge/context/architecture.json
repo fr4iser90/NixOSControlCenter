@@ -1,0 +1,39 @@
+{
+  "_schema": "ncc-context/architecture/1.0",
+  "_version": "1.0.0",
+  "projectName": "NixOSControlCenter (NCC)",
+  "description": "NixOS system management tool with CLI commands, modular config system, prebuild hardware checks, declarative user/package/device management, and homelab/VM/SSH functionality",
+  "highLevelStructure": {
+    "nixos": "ACTIVE CODE — all runtime logic",
+    "nixos/core": "System-level NixOS modules (base OS + management tools)",
+    "nixos/modules": "Higher-level application modules (infrastructure, security, specialized, system)",
+    "nixos/custom": "User's personal NixOS modules (preserved across updates, never overwritten)",
+    "nixos/flake.nix": "Flake entry point — imports config-loader → discovers systemConfig/",
+    "shell": "Dev shell entry point and runtime scripts",
+    "docs": "LEGACY docs — NOT maintained, historical reference only",
+    "nixify": "EMPTY — placeholder for nixify.io integration",
+    "chronicle": "EMPTY — placeholder for chronicle documentation system"
+  },
+  "updateFlow": {
+    "command": "ncc system-update",
+    "steps": [
+      { "step": 1, "action": "Validation", "tool": "ncc-validate-config", "description": "Checks systemConfig/ structure, detects config version, validates all config.nix files" },
+      { "step": 2, "action": "Migration", "tool": "ncc-migrate-config", "description": "v0→v1: extract fields, write config files, delete system-config.nix" },
+      { "step": 3, "action": "Source selection", "description": "User selects remote (GitHub) or local source" },
+      { "step": 4, "action": "File sync", "description": "Copies core/, modules/, packages/, flake.nix; preserves systemConfig/, custom/, hardware-cfg" },
+      { "step": 5, "action": "Prebuild checks", "description": "CPU/GPU/Memory detection vs hardware-config; user check" },
+      { "step": 6, "action": "nixos-rebuild", "description": "ncc system build switch --flake — builds new generation, switches on success" }
+    ]
+  },
+  "moduleLoadingChain": [
+    "flake.nix",
+    "config-loader.nix (discovers config.nix files from systemConfig/)",
+    "each config.nix loaded",
+    "module-manager/lib/module-config.nix (merges template defaults + user config)"
+  ],
+  "apiAccess": {
+    "getModuleConfig": "getModuleConfig \"module-name\" → merged config (template + options + user)",
+    "getModuleApi": "getModuleApi \"module-name\" → API attrset (build-time) or config path (runtime)",
+    "getCurrentModuleMetadata": "getCurrentModuleMetadata ./. → auto-generated metadata (name, path, configPath, apiPath)"
+  }
+}

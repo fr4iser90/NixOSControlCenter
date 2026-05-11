@@ -177,9 +177,9 @@ in
     # Lingering-Konfiguration
     linger = roleLingering.${userConfig.role} or false;
 
-    # WICHTIG: Erst die Passwort-Konfiguration vom Manager holen
-    # (hashedPasswordFile nur wenn .hashedPassword existiert,
-    #  initialPassword nur wenn kein .hashedPassword aber Config-Feld gesetzt)
+    # WICHTIG: Passwort-Konfiguration vom Manager holen
+    # (hashedPassword aus .hashedPassword per builtins.readFile,
+    #  initialPassword nur wenn Config-Feld gesetzt)
     } // (config.security.passwordManagement.getUserPasswordConfig username userConfig)
   ) userAttrs;
 

@@ -1,0 +1,26 @@
+{
+  "_schema": "ncc-domain/custom/1.0",
+  "_version": "1.0.0",
+  "path": "nixos/custom/",
+  "description": "User's personal NixOS modules — preserved across updates, never overwritten",
+  "note": "Modules prefixed with example_ are user examples/templates",
+  "modules": {
+    "example_borg_backup.nix": "Borg backup configuration example",
+    "example_command_not_found.nix": "Command-not-found integration example",
+    "example_cursor_start.nix": "Cursor/IDE start configuration example",
+    "example_isp_daily_reconnect_monitor.nix": "ISP daily reconnect monitor example",
+    "example_kde-portal-stack.nix": "KDE portal stack configuration example",
+    "example_nix_step_recorder.nix": "Nix step recorder example",
+    "example_noisetorch.nix": "Noisetorch (noise cancellation) example",
+    "example_ocr_screenshot.nix": "OCR screenshot functionality example",
+    "example_tauri-rust-desktop-dev.nix": "Tauri/Rust desktop development environment example"
+  },
+  "keyFiles": [
+    "nixos/custom/default.nix"
+  ],
+  "rules": [
+    "Never overwritten during updates",
+    "Preserved as-is",
+    "example_ prefix indicates template/example modules"
+  ]
+}

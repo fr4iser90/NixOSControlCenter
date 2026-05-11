@@ -1,0 +1,54 @@
+{
+  "_schema": "ncc-skill/common-patterns/1.0",
+  "_version": "1.0.0",
+  "nixEscaping": {
+    "rule": "Inside Nix indented strings (''...'' ), use ''${...} for literal bash variable references",
+    "examples": [
+      { "wrong": "${SOME_BASH_VAR}", "correct": "''${SOME_BASH_VAR}", "note": "Without '' prefix, Nix tries to interpolate" },
+      { "wrong": "${VAR%pattern}", "correct": "''${VAR%pattern}", "note": "Shell parameter expansion needs '' prefix" },
+      { "wrong": "${SOME_NIX_VAR}", "correct": "${SOME_NIX_VAR}", "note": "Nix variables DO NOT need '' prefix" }
+    ]
+  },
+  "moduleConfig": {
+    "description": "All module options go under systemConfig prefix",
+    "coreModules": "options.systemConfig.core.{domain}.{name}",
+    "optionalModules": "options.systemConfig.modules.{domain}.{name}",
+    "configPath": "Discovered automatically via getCurrentModuleMetadata",
+    "mergingOrder": [
+      "template-config.nix (base defaults, always loaded if exists)",
+      "options.nix defaults (from option definitions)",
+      "user config file from /etc/nixos/systemConfig/ (overrides everything)"
+    ]
+  },
+  "passwordManagement": {
+    "description": "Passwords stored in /etc/nixos/secrets/passwords/<user>/.hashedPassword",
+    "hashMethod": "openssl passwd -6 -stdin (SHA-512)",
+    "applyMethod": "chpasswd -e (reads from stdin, expects pre-hashed password)",
+    "files": "nixos/core/management/system-manager/components/system-checks/prebuild/checks/system/users.nix"
+  },
+  "prebuildChecks": {
+    "description": "Run BEFORE nixos-rebuild, so external commands may not exist yet",
+    "pattern": "Each check has INLINE bash functions (_update_cpu, _update_gpu, _update_memory) that write hardware-config.nix directly",
+    "note": "update-hardware-config script only exists AFTER nixos-rebuild switch",
+    "files": [
+      "nixos/core/management/system-manager/components/system-checks/prebuild/checks/hardware/cpu.nix",
+      "nixos/core/management/system-manager/components/system-checks/prebuild/checks/hardware/gpu.nix",
+      "nixos/core/management/system-manager/components/system-checks/prebuild/checks/hardware/memory.nix"
+    ]
+  },
+  "backupSystem": {
+    "location": "/var/backup/nixos/",
+    "retention": 5,
+    "triggered": "During migration (system-config.nix backup) and system-update"
+  },
+  "jqRequirements": {
+    "minimumVersion": "1.6+",
+    "requirement": "Must support recursive function definitions",
+    "commonError": "jq: error: formatValue/0 is not defined — use formatValue($x) not $x | formatValue"
+  },
+  "paths": {
+    "systemConfig": "/etc/nixos/systemConfig/",
+    "systemConfigLegacy": "/etc/nixos/system-config.nix",
+    "hardwareConfig": "/etc/nixos/hardware-configuration.nix"
+  }
+}

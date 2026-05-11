@@ -1,0 +1,48 @@
+{
+  "_schema": "ncc-domain/nixos/1.0",
+  "_version": "1.0.0",
+  "path": "nixos/",
+  "description": "Active codebase — all runtime NixOS modules and flake entry point",
+  "tree": {
+    "flake.nix": { "type": "file", "description": "Flake entry point — imports config-loader.nix" },
+    "core/": {
+      "description": "System-level NixOS modules (base OS + management tools)",
+      "base/": {
+        "description": "Base OS configuration",
+        "boot/": "Bootloader config (grub, systemd-boot, refind)",
+        "network/": "Network config (networkmanager, firewall, services)",
+        "audio/": "Audio system configuration",
+        "hardware/": "Hardware detection (CPU/GPU/RAM config)",
+        "user/": "User accounts, passwords, home-manager roles",
+        "desktop/": "Desktop environment (plasma, gnome, etc.)",
+        "packages/": "System packages with preset profiles (desktop/server/gaming/dev)",
+        "localization/": "Locale, keyboard layout, timezone"
+      },
+      "management/": {
+        "description": "Management tooling",
+        "system-manager/": "THE KEY MODULE — orchestrates system-update, backup, config-migration",
+        "cli-registry/": "CLI command registration system (ncc commands built here)",
+        "cli-formatter/": "Output formatting (colored messages, tables, badges, progress)",
+        "module-manager/": "Module loading, config merging with template defaults",
+        "tui-engine/": "Terminal UI framework for interactive commands"
+      }
+    },
+    "modules/": {
+      "description": "Higher-level application modules (optional, user-enabled)",
+      "infrastructure/": "VM management, homelab, bootentry-manager, docker",
+      "security/": "Security policies, firewall",
+      "specialized/": "chronicle (screen recording), AI workspace, SSH management",
+      "system/": "System-level tools (lock-manager), cleanup"
+    },
+    "custom/": {
+      "description": "User's personal NixOS modules (preserved across updates, never overwritten)",
+      "pattern": "example_*.nix — user examples/templates"
+    }
+  },
+  "keyFiles": [
+    "nixos/flake.nix",
+    "nixos/core/default.nix",
+    "nixos/modules/default.nix",
+    "nixos/custom/default.nix"
+  ]
+}

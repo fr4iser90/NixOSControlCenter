@@ -1,0 +1,70 @@
+{
+  "_schema": "ncc-skill/module-structure/1.0",
+  "_version": "1.0.0",
+  "requiredFiles": [
+    { "file": "default.nix", "purpose": "Main module entry — ONLY imports, NO config blocks", "mandatory": true },
+    { "file": "options.nix", "purpose": "All configuration option definitions", "mandatory": true },
+    { "file": "template-config.nix", "purpose": "Default values — MUST BE FLAT, no nesting", "mandatory": true }
+  ],
+  "optionalFiles": [
+    { "file": "config.nix", "purpose": "Implementation logic (move here if default.nix has config = {...})", "condition": "has implementation logic" },
+    { "file": "commands.nix", "purpose": "CLI command registration via cliRegistry", "condition": "has CLI commands" },
+    { "file": "api.nix", "purpose": "Public API for getModuleApi access", "condition": "other modules need build-time access" },
+    { "file": "types.nix", "purpose": "Custom NixOS types", "condition": "custom types needed" },
+    { "file": "systemd.nix", "purpose": "Systemd services/timers", "condition": "has systemd services" },
+    { "file": "lib/default.nix", "purpose": "Helper functions library", "condition": "has reusable helpers" }
+  ],
+  "subdirectories": [
+    { "dir": "scripts/", "purpose": "User entry point CLI commands" },
+    { "dir": "handlers/", "purpose": "Orchestration layer — coordinates collectors→processors→validators" },
+    { "dir": "collectors/", "purpose": "Data gathering — read from system/configs/files (no transformation)" },
+    { "dir": "processors/", "purpose": "Data transformation — filter, map, aggregate, normalize" },
+    { "dir": "validators/", "purpose": "Input validation — check format, constraints, rules" },
+    { "dir": "formatters/", "purpose": "Output formatting — convert to text/JSON/tables" },
+    { "dir": "ui/", "purpose": "Multi-interface UI support (cli/fzf, tui, gui, web)" },
+    { "dir": "migrations/", "purpose": "Version migrations (v1.0-to-v1.1.nix)" },
+    { "dir": "tests/", "purpose": "Module test suite" },
+    { "dir": "doc/", "purpose": "Detailed documentation (ARCHITECTURE.md, API.md, USAGE.md)" }
+  ],
+  "defaultNix": {
+    "must": [
+      "Define _module.metadata with role, name, description, category, subcategory, stability, version",
+      "Calculate moduleName = baseNameOf ./. (generic, not hardcoded)",
+      "Import options.nix always",
+      "Import commands.nix as function: (import ./commands.nix { ...; moduleName = moduleName; })"
+    ],
+    "mustNot": [
+      "Contain config = {...} blocks with implementation logic",
+      "Contain assertions",
+      "Contain system configuration",
+      "Hardcode module name"
+    ],
+    "functionImportReason": "commands.nix needs moduleName parameter. Normal import fails because _module.args is not available during import evaluation. Function import passes moduleName directly."
+  },
+  "moduleTypes": {
+    "core": {
+      "location": "nixos/core/{base,management}/",
+      "options": "systemConfig.core.{domain}.{name}",
+      "enabled": "always (no enable option)",
+      "examples": ["audio", "boot", "network", "packages", "user", "system-manager", "cli-registry", "cli-formatter", "tui-engine"]
+    },
+    "optional": {
+      "location": "nixos/modules/{infrastructure,security,specialized,system}/",
+      "options": "systemConfig.modules.{domain}.{name}",
+      "enabled": "user enables via enable = true",
+      "pattern": "lib.mkIf (cfg.enable or false) { ... }",
+      "examples": ["lock-manager", "chronicle"]
+    }
+  },
+  "metadata": {
+    "requiredFields": {
+      "role": "\"core\" | \"optional\" | \"required\"",
+      "name": "unique module identifier",
+      "description": "human-readable description",
+      "category": "\"core\" | \"base\" | \"security\" | \"infrastructure\" | \"specialized\"",
+      "subcategory": "specific subcategory",
+      "stability": "\"stable\" | \"experimental\" | \"deprecated\" | \"beta\" | \"alpha\"",
+      "version": "semver MAJOR.MINOR.PATCH"
+    }
+  }
+}

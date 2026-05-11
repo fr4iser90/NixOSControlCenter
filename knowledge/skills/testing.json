@@ -1,0 +1,22 @@
+{
+  "_schema": "ncc-skill/testing/1.0",
+  "_version": "1.0.0",
+  "testingApproach": "NixOS module testing",
+  "testLocation": "modules/default.nix pattern — each module can have tests/default.nix",
+  "testFiles": {
+    "exampleModule": "knowledge/modules/example-module/tests/default.nix",
+    "note": "Individual modules may have tests/ directory"
+  },
+  "nixosTest": {
+    "description": "NixOS modules are tested via nixpkgs's lib.modules.testSubmodule",
+    "pattern": "Evaluate module with config, assert expected values"
+  },
+  "cliTests": {
+    "description": "CLI commands tested via shell — run command, check output",
+    "tools": ["bash", "fzf for interactive tests"]
+  },
+  "configTests": {
+    "description": "Config validation tested via ncc-validate-config",
+    "file": "nixos/core/management/system-manager/components/config-migration/validator.nix"
+  }
+}

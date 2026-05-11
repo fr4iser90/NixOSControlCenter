@@ -1,0 +1,217 @@
+{
+  "_schema": "ncc-modules/core-registry/1.0",
+  "_version": "1.0.0",
+  "_lastScan": "2026-05-11T10:13:01Z",
+  "base": {
+    "audio": {
+      "path": "nixos/core/base/audio",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/core/base/audio/handlers"
+      ],
+      "description": "audio"
+    },
+    "boot": {
+      "path": "nixos/core/base/boot",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/core/base/boot/handlers"
+      ],
+      "description": "boot"
+    },
+    "desktop": {
+      "path": "nixos/core/base/desktop",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [],
+      "description": "desktop"
+    },
+    "hardware": {
+      "path": "nixos/core/base/hardware",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [],
+      "description": "hardware"
+    },
+    "localization": {
+      "path": "nixos/core/base/localization",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [],
+      "description": "localization"
+    },
+    "network": {
+      "path": "nixos/core/base/network",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/core/base/network/handlers",
+        "/workspace/NixOSControlCenter/nixos/core/base/network/lib",
+        "/workspace/NixOSControlCenter/nixos/core/base/network/processors"
+      ],
+      "description": "network"
+    },
+    "packages": {
+      "path": "nixos/core/base/packages",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/core/base/packages/lib"
+      ],
+      "description": "packages"
+    },
+    "user": {
+      "path": "nixos/core/base/user",
+      "files": [
+        "api.nix",
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "password-manager.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [],
+      "description": "user"
+    }
+  },
+  "management": {
+    "cli-formatter": {
+      "path": "nixos/core/management/cli-formatter",
+      "files": [
+        "api.nix",
+        "colors.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/core/management/cli-formatter/components",
+        "/workspace/NixOSControlCenter/nixos/core/management/cli-formatter/core",
+        "/workspace/NixOSControlCenter/nixos/core/management/cli-formatter/interactive",
+        "/workspace/NixOSControlCenter/nixos/core/management/cli-formatter/status"
+      ],
+      "description": "cli-formatter"
+    },
+    "cli-registry": {
+      "path": "nixos/core/management/cli-registry",
+      "files": [
+        "api.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/core/management/cli-registry/cli",
+        "/workspace/NixOSControlCenter/nixos/core/management/cli-registry/lib",
+        "/workspace/NixOSControlCenter/nixos/core/management/cli-registry/scripts"
+      ],
+      "description": "cli-registry"
+    },
+    "module-manager": {
+      "path": "nixos/core/management/module-manager",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/core/management/module-manager/handlers",
+        "/workspace/NixOSControlCenter/nixos/core/management/module-manager/lib",
+        "/workspace/NixOSControlCenter/nixos/core/management/module-manager/validators"
+      ],
+      "description": "module-manager"
+    },
+    "nixos-control-center": {
+      "path": "nixos/core/management/nixos-control-center",
+      "files": [
+        "api.nix",
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/core/management/nixos-control-center/api"
+      ],
+      "description": "nixos-control-center"
+    },
+    "system-manager": {
+      "path": "nixos/core/management/system-manager",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/core/management/system-manager/handlers",
+        "/workspace/NixOSControlCenter/nixos/core/management/system-manager/lib",
+        "/workspace/NixOSControlCenter/nixos/core/management/system-manager/scripts",
+        "/workspace/NixOSControlCenter/nixos/core/management/system-manager/validators"
+      ],
+      "description": "system-manager"
+    },
+    "tui-engine": {
+      "path": "nixos/core/management/tui-engine",
+      "files": [
+        "api.nix",
+        "builders.nix",
+        "config.nix",
+        "default.nix",
+        "flake.nix",
+        "options.nix",
+        "package.nix",
+        "shell.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/core/management/tui-engine/lib"
+      ],
+      "description": "tui-engine"
+    }
+  }
+}

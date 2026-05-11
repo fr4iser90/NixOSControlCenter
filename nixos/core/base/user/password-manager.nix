@@ -5,14 +5,11 @@ let
     let
       passwordDir = "/etc/nixos/secrets/passwords";
       userPasswordFile = "${passwordDir}/${username}/.hashedPassword";
-      hasPasswordFile = builtins.pathExists userPasswordFile;
+      userPasswordHash = lib.optionalString (builtins.pathExists userPasswordFile)
+        (lib.removeSuffix "\n" (builtins.readFile userPasswordFile));
     in {
-      # Wenn .hashedPassword existiert: deklarativ setzen
-      hashedPasswordFile = lib.mkIf hasPasswordFile userPasswordFile;
-
-      # Wenn kein .hashedPassword aber initialPassword im Config:
-      # NixOS setzt es beim ersten Boot (via /etc/.initial-password-<user> Flag)
-      initialPassword = lib.mkIf (!hasPasswordFile && userConfig ? initialPassword)
+      hashedPassword = lib.mkIf (userPasswordHash != "") userPasswordHash;
+      initialPassword = lib.mkIf (userConfig ? initialPassword)
         userConfig.initialPassword;
     };
 
@@ -48,7 +45,7 @@ in {
     
     system.activationScripts.passwordSetup = {
       text = ''
-      # Hauptverzeichnis
+      # Hauptverzeichnis erstellen/sicherstellen
       mkdir -p /etc/nixos/secrets/passwords
       chmod 700 /etc/nixos/secrets/passwords
       chown root:root /etc/nixos/secrets/passwords
@@ -62,17 +59,18 @@ in {
         [ -e "$dir" ] || continue
         basename=$(basename "$dir")
         if [ -n "$ALLOWED_USERS" ] && [[ ! " $ALLOWED_USERS " =~ " $basename " ]]; then
-          echo "WARNING: Orphaned password directory for '$basename' (not in current user config)"
+          echo "WARNING: Orphaned password directory for '$basename'"
         fi
       done
       
-      # Berechtigungen fuer konfigurierte User setzen
+      # Berechtigungen setzen
       ${lib.concatStringsSep "\n" (lib.mapAttrsToList (username: userConfig: ''
         if [ -f /etc/nixos/secrets/passwords/${username}/.hashedPassword ]; then
           chmod 600 /etc/nixos/secrets/passwords/${username}/.hashedPassword
           chown root:root /etc/nixos/secrets/passwords/${username}/.hashedPassword
         fi
       '') realUsers)}
+
     '';
       deps = [ "users" ];
     };
