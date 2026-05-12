@@ -1,80 +1,20 @@
 #!/usr/bin/env bash
 
-# Helper to update hosting-config.nix
+# Helper to update hosting config (v1)
 update_hosting_config() {
-    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/hosting-config.nix"
     local email_value="$1"
     local domain_value="$2"
-    
-    # Create configs directory if it doesn't exist
-    mkdir -p "$(dirname "$config_file")"
-    
-    # Write hosting-config.nix
-    cat > "$config_file" <<EOF
-{
-  email = "$email_value";
-  domain = "$domain_value";
-}
-EOF
+    write_hosting_config "$email_value" "$domain_value"
 }
 
-# Helper to update system-config.nix (only users and systemType)
+# Helper to update system config with users (v1)
 update_system_config() {
-    local temp_file=$(mktemp)
     local users_block="$1"
     local system_type="$2"
     
-    # Read existing system-config.nix
-    if [ -f "$SYSTEM_CONFIG_FILE" ]; then
-        cp "$SYSTEM_CONFIG_FILE" "$temp_file"
-    else
-        # Create minimal system-config.nix if it doesn't exist
-        cat > "$temp_file" <<EOF
-{
-  systemType = "$system_type";
-  hostName = "$(hostname)";
-  system = {
-    channel = "stable";
-    bootloader = "systemd-boot";
-  };
-  allowUnfree = true;
-  users = {};
-  timeZone = "Europe/Berlin";
-}
-EOF
-    fi
+    write_user_config "$users_block"
     
-    # Update systemType
-    sed -i "s/systemType = \".*\";/systemType = \"$system_type\";/" "$temp_file"
-    
-    # Update users block
-    # Remove existing users block
-    awk '
-    BEGIN { skip = 0; }
-    /^  users = {/ { skip = 1; next; }
-    /^  };/ { if (skip) { skip = 0; next; } }
-    { if (!skip) print; }
-    ' "$temp_file" > "${temp_file}.tmp"
-    mv "${temp_file}.tmp" "$temp_file"
-    
-    # Insert new users block before timeZone
-    if grep -q "timeZone" "$temp_file"; then
-        sed -i "/timeZone = /i\\  users = {\n$users_block\n  };" "$temp_file"
-    else
-        # Append at end before closing brace
-        sed -i '$ i\  users = {\n'"$users_block"'\n  };' "$temp_file"
-    fi
-    
-    # Apply changes
-    if [[ -w "$SYSTEM_CONFIG_FILE" ]]; then
-        mv "$temp_file" "$SYSTEM_CONFIG_FILE"
-    else
-        sudo mv "$temp_file" "$SYSTEM_CONFIG_FILE" || {
-            log_error "Failed to update system-config.nix"
-            rm "$temp_file"
-            return 1
-        }
-    fi
+    write_system_manager_config "$system_type" "false" "stable" "systemd-boot"
 }
 
 setup_hackathon_config() {
@@ -94,7 +34,7 @@ setup_hackathon_config() {
     # Export variables for later use
     export_hackathon_vars
     
-    log_success "Hackathon configuration complete"
+    log_success "Hackathon configuration complete (v1 modular)"
     return 0
 }
 
@@ -161,10 +101,10 @@ update_hackathon_config() {
       autoLogin = false;
     };"
     
-    # Update system-config.nix (users and systemType)
+    # Update system config (users and systemType)
     update_system_config "$users_block" "hackathon" || return 1
     
-    # Update hosting-config.nix (email and domain)
+    # Update hosting config (email and domain)
     update_hosting_config "$email" "$domain" || return 1
     
     return 0

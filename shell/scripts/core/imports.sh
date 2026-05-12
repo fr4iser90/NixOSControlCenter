@@ -77,7 +77,9 @@ import_file "$PROMPTS_DIR/formatting/list-formatter.sh"
 
 # 6. Core System Components
 import_file "$CORE_DIR/deploy-build.sh"                    
-import_file "$SETUP_DIR/config/secrets-setup.sh"           
+import_file "$SETUP_DIR/config/secrets-setup.sh"
+import_file "$SETUP_DIR/config/config-writer.sh"
+import_file "$SETUP_DIR/config/setup-preset-profile.sh"
 
 # 7. Data Collection and Configuration
 import_file "$SETUP_DIR/config/data-collection/collect-system-data.sh"  

@@ -1,98 +1,30 @@
 #!/usr/bin/env bash
 
-# Helper to update hosting-config.nix
+# Helper to update hosting config (v1)
 update_hosting_config() {
-    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/hosting-config.nix"
     local email_value="$1"
     local domain_value="$2"
-    
-    # Create configs directory if it doesn't exist
-    mkdir -p "$(dirname "$config_file")"
-    
-    # Write hosting-config.nix
-    cat > "$config_file" <<EOF
-{
-  email = "$email_value";
-  domain = "$domain_value";
-}
-EOF
+    write_hosting_config "$email_value" "$domain_value"
 }
 
-# Helper to update system-config.nix (users, systemType, and homelab block)
+# Helper to update system config with users (v1)
 update_system_config() {
-    local temp_file=$(mktemp)
     local users_block="$1"
     local system_type="$2"
-    local homelab_block="${3:-}"
+    local homelab_type="${3:-single}"
     
-    # Read existing system-config.nix
-    if [ -f "$SYSTEM_CONFIG_FILE" ]; then
-        cp "$SYSTEM_CONFIG_FILE" "$temp_file"
-    else
-        # Create minimal system-config.nix if it doesn't exist
-        cat > "$temp_file" <<EOF
-{
-  systemType = "$system_type";
-  hostName = "$(hostname)";
-  system = {
-    channel = "stable";
-    bootloader = "systemd-boot";
-  };
-  allowUnfree = true;
-  users = {};
-  timeZone = "Europe/Berlin";
-}
-EOF
+    # Write users to modular config location
+    write_user_config "$users_block"
+    
+    # Write homelab config if swarm role is set
+    if [[ "$system_type" == "server" ]]; then
+        write_system_manager_config "$system_type" "false" "stable" "systemd-boot"
     fi
     
-    # Update systemType
-    sed -i "s/systemType = \".*\";/systemType = \"$system_type\";/" "$temp_file"
-    
-    # Update users block
-    # Remove existing users block
-    awk '
-    BEGIN { skip = 0; }
-    /^  users = {/ { skip = 1; next; }
-    /^  };/ { if (skip) { skip = 0; next; } }
-    { if (!skip) print; }
-    ' "$temp_file" > "${temp_file}.tmp"
-    mv "${temp_file}.tmp" "$temp_file"
-    
-    # Remove existing homelab block if present
-    awk '
-    BEGIN { skip = 0; }
-    /^  homelab = {/ { skip = 1; next; }
-    /^  };/ { if (skip) { skip = 0; next; } }
-    { if (!skip) print; }
-    ' "$temp_file" > "${temp_file}.tmp"
-    mv "${temp_file}.tmp" "$temp_file"
-    
-    # Insert new users block before timeZone
-    if grep -q "timeZone" "$temp_file"; then
-        sed -i "/timeZone = /i\\  users = {\n$users_block\n  };" "$temp_file"
+    if [[ "$homelab_type" == "swarm" ]]; then
+        write_homelab_config "swarm" "true" "false"
     else
-        # Append at end before closing brace
-        sed -i '$ i\  users = {\n'"$users_block"'\n  };' "$temp_file"
-    fi
-    
-    # Insert homelab block after users block (if provided)
-    if [[ -n "$homelab_block" ]]; then
-        if grep -q "users = {" "$temp_file"; then
-            sed -i "/^  };$/a\\$homelab_block" "$temp_file"
-        else
-            sed -i '$ i\'"$homelab_block" "$temp_file"
-        fi
-    fi
-    
-    # Apply changes
-    if [[ -w "$SYSTEM_CONFIG_FILE" ]]; then
-        mv "$temp_file" "$SYSTEM_CONFIG_FILE"
-    else
-        sudo mv "$temp_file" "$SYSTEM_CONFIG_FILE" || {
-            log_error "Failed to update system-config.nix"
-            rm "$temp_file"
-            return 1
-        }
+        write_homelab_config "single" "true" "false"
     fi
 }
 
@@ -257,19 +189,23 @@ get_swarm_role() {
 }
 
 detect_docker_mode() {
-    # Check packages-config.nix for docker feature
-    local packages_config="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/packages-config.nix"
+    # Check packages config for docker feature (v1 modular location)
+    local packages_config="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/core/base/packages/config.nix"
     if [[ -f "$packages_config" ]]; then
         if grep -q '"docker"' "$packages_config"; then
             echo "docker"
             return 0
-        elif grep -q '"docker-rootless"' "$packages_config"; then
-            # Backward compatibility: docker-rootless → docker
+        fi
+    fi
+    # Also check old location for backward compatibility
+    packages_config="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/packages-config.nix"
+    if [[ -f "$packages_config" ]]; then
+        if grep -q '"docker"' "$packages_config"; then
             echo "docker"
             return 0
         fi
     fi
-    # Default to docker (wird automatisch rootless, außer bei Swarm/AI-Workspace)
+    # Default to docker
     echo "docker"
     return 0
 }
@@ -375,30 +311,15 @@ update_homelab_config() {
     # Update system-config.nix (users, systemType, and homelab block)
     update_system_config "$users_block" "server" "$homelab_block" || return 1
     
-    # Update hosting-config.nix (email and domain)
+    # Update hosting config (email and domain)
     update_hosting_config "$email" "$domain" || return 1
     
-    # Update desktop-config.nix if desktop setting is needed
+    # Update desktop config if desktop setting is needed
     if [[ "$enable_desktop" == "false" ]]; then
-        local desktop_config="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/desktop-config.nix"
-        mkdir -p "$(dirname "$desktop_config")"
-        cat > "$desktop_config" <<EOF
-{
-  desktop = {
-    enable = false;
-    environment = "plasma";
-    display = {
-      manager = "sddm";
-      server = "wayland";
-      session = "plasma";
-    };
-    theme = {
-      dark = true;
-    };
-    audio = "pipewire";
-  };
-}
-EOF
+        write_desktop_disabled || return 1
+    else
+        write_desktop_config "plasma" "sddm" "wayland" "plasma" "true" "pipewire" || return 1
+        write_audio_config "pipewire" || return 1
     fi
     
     return 0

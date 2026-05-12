@@ -164,55 +164,5 @@ get_predefined_profile_file() {
     fi
 }
 
-# Setup predefined profile by copying the profile file
-setup_predefined_profile() {
-    local profile_file="$1"
-    
-    log_section "Setting up Predefined Profile"
-    log_info "Loading profile from: $profile_file"
-    
-    # Backup existing config
-    if [[ -f "$SYSTEM_CONFIG_FILE" ]]; then
-        backup_file "$SYSTEM_CONFIG_FILE" || {
-            log_error "Failed to create backup"
-            return 1
-        }
-    fi
-    
-    # Copy profile file to system config
-    ensure_dir "$(dirname "$SYSTEM_CONFIG_FILE")"
-    cp "$profile_file" "$SYSTEM_CONFIG_FILE" || {
-        log_error "Failed to copy profile file"
-        return 1
-    }
-    
-    # Set hostname if it's null or not set
-    if grep -q 'hostName = null;' "$SYSTEM_CONFIG_FILE" || ! grep -q 'hostName = ' "$SYSTEM_CONFIG_FILE"; then
-        local current_hostname
-        current_hostname=$(hostname)
-        if [[ -n "$current_hostname" ]]; then
-            if grep -q 'hostName = null;' "$SYSTEM_CONFIG_FILE"; then
-                sed -i "s/hostName = null;/hostName = \"$current_hostname\";/" "$SYSTEM_CONFIG_FILE" || {
-                    log_warn "Failed to update hostname"
-                }
-            else
-                # Insert hostname after systemType
-                sed -i "/systemType = /a\  hostName = \"$current_hostname\";" "$SYSTEM_CONFIG_FILE" || {
-                    log_warn "Failed to add hostname"
-                }
-            fi
-        fi
-    fi
-    
-    log_success "Predefined profile applied successfully"
-    
-    # Export system type for deployment (read from profile)
-    local system_type
-    system_type=$(grep -m 1 'systemType = ' "$SYSTEM_CONFIG_FILE" | sed 's/.*systemType = "\(.*\)";.*/\1/' || echo "desktop")
-    export SYSTEM_TYPE="$system_type"
-    
-    deploy_config
-}
-
 # Execute main function if script is run directly
 check_script_execution "CORE_DIR" "main"

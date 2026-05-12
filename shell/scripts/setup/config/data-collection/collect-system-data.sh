@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+# =============================================================
+# Data Collection - System Setup
+# =============================================================
+# Collects system information and writes configs to v1 modular structure
+# Uses config-writer.sh for all config file creation
+# =============================================================
+
 collect_system_data() {
     log_section "Collecting System Information"
     
@@ -21,286 +28,116 @@ collect_system_data() {
         log_info "Backing up existing configs directory..."
         BACKUP_ROOT="/var/backup/nixos/directories"
         BACKUP_DIR="$BACKUP_ROOT/systemConfig.$(date +%Y%m%d_%H%M%S)"
-        # Create directory if it doesn't exist (ActivationScript should have created it)
         if [ ! -d "$BACKUP_ROOT" ]; then
             mkdir -p "$BACKUP_ROOT"
             chmod 700 "$BACKUP_ROOT" 2>/dev/null || sudo chmod 700 "$BACKUP_ROOT" 2>/dev/null || true
             chown root:root "$BACKUP_ROOT" 2>/dev/null || sudo chown root:root "$BACKUP_ROOT" 2>/dev/null || true
         else
-            mkdir -p "$BACKUP_ROOT"  # Ensure it exists
+            mkdir -p "$BACKUP_ROOT"
         fi
-        # Create backup directory and set permissions (700 for dirs, 600 for files)
         if cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" "$BACKUP_DIR" 2>/dev/null || sudo cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" "$BACKUP_DIR" 2>/dev/null; then
             chmod -R 700 "$BACKUP_DIR" 2>/dev/null || sudo chmod -R 700 "$BACKUP_DIR" 2>/dev/null || true
             find "$BACKUP_DIR" -type f -exec chmod 600 {} \; 2>/dev/null || sudo find "$BACKUP_DIR" -type f -exec chmod 600 {} \; 2>/dev/null || true
             chown -R root:root "$BACKUP_DIR" 2>/dev/null || sudo chown -R root:root "$BACKUP_DIR" 2>/dev/null || true
-            # Cleanup old backups (keep last 5)
             ls -dt "$BACKUP_ROOT"/systemConfig.* 2>/dev/null | tail -n +6 | xargs -r rm -rf 2>/dev/null || sudo xargs -r rm -rf 2>/dev/null || true
             log_info "Backup created: $BACKUP_DIR"
         fi
     }
 
-    # Ensure configs directory exists
-    ensure_dir "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig"
+    # Clean old-style config files (from previous versions)
+    clean_old_configs 2>/dev/null || true
 
-    # Create all config files
-    init_system_config
-    init_packages_config
-    init_desktop_config
-    init_localization_config
-    init_hardware_config
-    init_features_config
-    init_logging_config
-    init_hosting_config
-    init_overrides_config
-
-    log_success "System configuration files created"
-}
-
-# Helper function to write Nix config file
-write_nix_config() {
-    local config_file="$1"
-    local content="$2"
+    # Determine system type for this setup
+    local sys_type="${SYSTEM_TYPE:-desktop}"
+    local host_name="${HOSTNAME:-$(hostname)}"
+    local timezone="${SYSTEM_TIMEZONE:-Europe/Berlin}"
+    local bootloader="${BOOT_TYPE:-systemd-boot}"
+    local allow_unfree="${ALLOW_UNFREE:-false}"
     
-    ensure_dir "$(dirname "$config_file")"
-    cat > "$config_file" <<EOF
-$content
-EOF
-    log_debug "Created config file: $config_file"
-}
-
-# Create minimal system-config.nix
-init_system_config() {
-    log_debug "Creating system-config.nix..."
-    local current_user=$(whoami)
-    local current_shell=$(basename $(getent passwd $current_user | cut -d: -f7) 2>/dev/null || echo "bash")
-    local user_role="admin"
-    
-    # Build users block
-    local users_block=""
-    if [[ -n "${ALL_USERS:-}" ]]; then
-        users_block="$ALL_USERS"
-    else
+    # Get users from collection
+    local users_block="${ALL_USERS:-}"
+    if [[ -z "$users_block" ]]; then
+        local current_user
+        current_user=$(whoami 2>/dev/null || echo "user")
+        local current_shell
+        current_shell=$(basename "$(getent passwd "$current_user" 2>/dev/null | cut -d: -f7)" 2>/dev/null || echo "bash")
         users_block="    \"$current_user\" = {
-      role = \"$user_role\";
+      role = \"admin\";
       defaultShell = \"$current_shell\";
       autoLogin = false;
     };"
     fi
-    
-    write_nix_config "$SYSTEM_CONFIG_FILE" "{
-  # Configuration Schema Version
-  configVersion = \"1.0\";
-  
-  # System-Identität
-  systemType = \"${SYSTEM_TYPE:-desktop}\";
-  hostName = \"$(hostname)\";
-  
-  # System-Version
-  system = {
-    channel = \"stable\";
-    bootloader = \"${BOOT_TYPE:-systemd-boot}\";
-  };
-  
-  # Nix-Config
-  allowUnfree = true;
-  
-  # User-Management
-  users = {
-$users_block
-  };
-  
-  # TimeZone
-  timeZone = \"${SYSTEM_TIMEZONE:-Europe/Berlin}\";
-}
-"
-}
 
-# Create packages-config.nix
-init_packages_config() {
-    log_debug "Creating packages-config.nix..."
-    local package_modules="${PACKAGE_MODULES:-}"
-    local preset="${PRESET:-null}"
-    local additional_modules="${ADDITIONAL_PACKAGE_MODULES:-}"
+    # --- Write all v1 modular configs ---
     
-    local content="{"
-    if [[ -n "$package_modules" ]]; then
-        content+="
-  # Package-Modules direkt
-  packageModules = [ $package_modules ];"
-    elif [[ "$preset" != "null" ]]; then
-        content+="
-  # Preset verwenden
-  preset = \"$preset\";"
-        if [[ -n "$additional_modules" ]]; then
-            content+="
-  additionalPackageModules = [ $additional_modules ];"
-        fi
-    else
-        content+="
-  # Package-Modules (leer - wird später konfiguriert)
-  packageModules = [];"
-    fi
-    content+="
-}
-"
+    # 1. Minimal system-config.nix (entry point)
+    write_system_config "$sys_type" "$host_name" "$timezone" "$users_block" "$bootloader"
     
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/packages-config.nix" "$content"
-}
-
-# Create desktop-config.nix
-init_desktop_config() {
-    log_debug "Creating desktop-config.nix..."
-    local enable_desktop="${ENABLE_DESKTOP:-true}"
-    local desktop="${DESKTOP:-plasma}"
-    local display_mgr="${DISPLAY_MGR:-sddm}"
-    local display_server="${DISPLAY_SERVER:-wayland}"
-    local session="${SESSION:-plasma}"
-    local dark_mode="${DARK_MODE:-true}"
-    local audio="${AUDIO:-pipewire}"
+    # 2. System manager config (v1 modular location)
+    write_system_manager_config "$sys_type" "$allow_unfree" "stable" "$bootloader"
     
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/desktop-config.nix" "{
-  # Desktop-Environment
-  desktop = {
-    enable = $enable_desktop;
-    environment = \"$desktop\";
-    display = {
-      manager = \"$display_mgr\";
-      server = \"$display_server\";
-      session = \"$session\";
-    };
-    theme = {
-      dark = $dark_mode;
-    };
-    audio = \"$audio\";
-  };
-}
-"
-}
-
-# Create localization-config.nix
-init_localization_config() {
-    log_debug "Creating localization-config.nix..."
+    # 3. Network config
+    write_network_config "$host_name"
+    
+    # 4. Localization config
     local locale="${SYSTEM_LOCALE:-en_US.UTF-8}"
     local keyboard_layout="${SYSTEM_KEYBOARD_LAYOUT:-us}"
     local keyboard_options="${SYSTEM_KEYBOARD_OPTIONS:-}"
+    write_localization_config "$locale" "$keyboard_layout" "$keyboard_options" "$timezone"
     
-    local content="{"
-    content+="
-  # Lokalisierung
-  locales = [ \"$locale\" ];
-  keyboardLayout = \"$keyboard_layout\";"
-    if [[ -n "$keyboard_options" ]]; then
-        content+="
-  keyboardOptions = \"$keyboard_options\";"
-    fi
-    content+="
-}
-"
-    
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/localization-config.nix" "$content"
-}
-
-# Create hardware-config.nix
-init_hardware_config() {
-    log_debug "Creating hardware-config.nix..."
+    # 5. Hardware config
     local cpu="${CPU_VENDOR:-none}"
     local gpu="${GPU_CONFIG:-none}"
     local memory_gb="${MEMORY_GB:-}"
+    write_hardware_config "$cpu" "$gpu" "$memory_gb"
     
-    local content="{"
-    content+="
-  hardware = {
-    cpu = \"$cpu\";
-    gpu = \"$gpu\";"
-    if [[ -n "$memory_gb" ]]; then
-        content+="
-    ram = {
-      sizeGB = $memory_gb;
-    };"
-    fi
-    content+="
-  };
-}
-"
-    
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/hardware-config.nix" "$content"
-}
-
-# Features are now managed via individual config files in systemConfig/
-# (bootentry-config.nix, homelab-config.nix, lock-config.nix, etc.)
-# features-config.nix is no longer created
-init_features_config() {
-    log_debug "Features config is handled by individual feature config files"
-    return 0
-}
-
-# Create logging-config.nix
-init_logging_config() {
-    log_debug "Creating logging-config.nix..."
-    local build_log_level="${BUILD_LOG_LEVEL:-minimal}"
-    
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/logging-config.nix" "{
-  # Build-Logging
-  buildLogLevel = \"$build_log_level\";
-}
-"
-}
-
-# Create hosting-config.nix
-init_hosting_config() {
-    log_debug "Creating hosting-config.nix..."
-    local domain="${HOST_DOMAIN:-}"
-    local email="${HOST_EMAIL:-}"
-    
-    if [[ -z "$domain" && -z "$email" ]]; then
-        # Skip if no hosting info
-        return 0
-    fi
-    
-    local content="{"
-    if [[ -n "$email" ]]; then
-        content+="
-  email = \"$email\";"
-    fi
-    if [[ -n "$domain" ]]; then
-        content+="
-  domain = \"$domain\";"
-    fi
-    content+="
-}
-"
-    
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/hosting-config.nix" "$content"
-}
-
-# Create overrides-config.nix
-init_overrides_config() {
-    log_debug "Creating overrides-config.nix..."
-    local override_ssh="${OVERRIDE_SSH:-null}"
-    
-    local content="{"
-    content+="
-  overrides = {"
-    if [[ "$override_ssh" != "null" ]]; then
-        content+="
-    enableSSH = $override_ssh;"
+    # 6. Desktop config (if desktop mode)
+    if [[ "$sys_type" == "desktop" ]]; then
+        local desktop_env="${DESKTOP:-plasma}"
+        local display_mgr="${DISPLAY_MGR:-sddm}"
+        local display_server="${DISPLAY_SERVER:-wayland}"
+        local session="${SESSION:-plasma}"
+        local dark_mode="${DARK_MODE:-true}"
+        local audio="${AUDIO:-pipewire}"
+        write_desktop_config "$desktop_env" "$display_mgr" "$display_server" "$session" "$dark_mode" "$audio"
+        write_audio_config "$audio"
     else
-        content+="
-    enableSSH = null;"
+        write_desktop_disabled
     fi
-    content+="
-  };
-}
-"
     
-    write_nix_config "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/overrides-config.nix" "$content"
+    # 7. Packages config
+    local package_modules="${PACKAGE_MODULES:-}"
+    if [[ -n "$package_modules" ]]; then
+        # Convert space-separated to individual args
+        read -ra mod_array <<< "$package_modules"
+        write_packages_config "${mod_array[@]}"
+    else
+        write_packages_config
+    fi
+    
+    # 8. Hosting config (email/domain if provided)
+    local host_email="${HOST_EMAIL:-}"
+    local host_domain="${HOST_DOMAIN:-}"
+    if [[ -n "$host_email" || -n "$host_domain" ]]; then
+        write_hosting_config "$host_email" "$host_domain"
+    fi
+    
+    # 9. Override config (SSH)
+    local override_ssh="${OVERRIDE_SSH:-null}"
+    write_overrides_config "$override_ssh"
+    
+    # 10. Logging config
+    local build_log_level="${BUILD_LOG_LEVEL:-minimal}"
+    write_logging_config "$build_log_level"
+
+    log_success "System configuration files created (v1 modular)"
 }
 
 restore_backup() {
     # Restore system-config.nix backup (from /var/backup/nixos/systemConfig/)
     local backup_root="/var/backup/nixos/systemConfig"
-    local latest_backup=$(ls -t "$backup_root"/system-config.nix.backup.* 2>/dev/null | head -1)
+    local latest_backup
+    latest_backup=$(ls -t "$backup_root"/system-config.nix.backup.* 2>/dev/null | head -1)
     if [[ -n "$latest_backup" && -f "$latest_backup" ]]; then
         cp "$latest_backup" "$SYSTEM_CONFIG_FILE"
         log_info "Restored backup configuration from $latest_backup"
@@ -308,7 +145,8 @@ restore_backup() {
     
     # Restore configs directory backup (from /var/backup/nixos/directories/)
     backup_root="/var/backup/nixos/directories"
-    local latest_dir_backup=$(ls -td "$backup_root"/systemConfig.* 2>/dev/null | head -1)
+    local latest_dir_backup
+    latest_dir_backup=$(ls -td "$backup_root"/systemConfig.* 2>/dev/null | head -1)
     if [[ -n "$latest_dir_backup" && -d "$latest_dir_backup" ]]; then
         rm -rf "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig"
         cp -r "$latest_dir_backup" "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig"

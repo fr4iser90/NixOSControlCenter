@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# Helper function to update packages-config.nix
+# Helper function to update packages-config.nix (v1 modular path)
 update_packages_config() {
-    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/packages-config.nix"
+    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/core/base/packages/config.nix"
     local package_modules="$1"
     
     # Create configs directory if it doesn't exist
@@ -11,8 +11,7 @@ update_packages_config() {
     # Read existing package modules if config exists
     local existing_modules=""
     if [ -f "$config_file" ]; then
-        # Extract existing modules from the file
-        existing_modules=$(grep -A 100 'packageModules = \[' "$config_file" | grep -o '"[^"]*"' | tr -d '"' | tr '\n' ' ' | sed 's/ $//')
+        existing_modules=$(grep -A 100 'packageModules = \[' "$config_file" 2>/dev/null | grep -o '"[^"]*"' | tr -d '"' | tr '\n' ' ' | sed 's/ $//')
     fi
     
     # Add or remove database
@@ -37,21 +36,22 @@ update_packages_config() {
     # Write complete packages-config.nix
     cat > "$config_file" <<EOF
 {
-  # Package-Modules
   packageModules = [
 $modules_list
   ];
+  systemPackages = [];
+  userPackages = {};
+  docker.enable = false;
+  docker.root = null;
 }
 EOF
 }
 
 reset_database_state() {
-    # Remove database from packages-config.nix
     update_packages_config "" "remove"
 }
 
 enable_database() {
-    # Add database to packages-config.nix
     update_packages_config "" "add"
 }
 

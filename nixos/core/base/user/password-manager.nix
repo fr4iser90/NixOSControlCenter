@@ -5,10 +5,8 @@ let
     let
       passwordDir = "/etc/nixos/secrets/passwords";
       userPasswordFile = "${passwordDir}/${username}/.hashedPassword";
-      userPasswordHash = lib.optionalString (builtins.pathExists userPasswordFile)
-        (lib.removeSuffix "\n" (builtins.readFile userPasswordFile));
     in {
-      hashedPassword = lib.mkIf (userPasswordHash != "") userPasswordHash;
+      hashedPasswordFile = userPasswordFile;
       initialPassword = lib.mkIf (userConfig ? initialPassword)
         userConfig.initialPassword;
     };

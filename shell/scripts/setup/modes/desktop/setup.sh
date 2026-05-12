@@ -4,82 +4,49 @@
 if [[ -n "${CHECKS_DIR:-}" ]]; then
     source "$CHECKS_DIR/hardware/hardware-config.sh"
 else
-    # Fallback if CHECKS_DIR is not set
     "$(dirname "$0")"/../../checks/hardware/hardware-config.sh
 fi
 
 # Helper function to update packages-config.nix
+# Uses config-writer: write_packages_config()
 update_packages_config() {
-    local config_file="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/packages-config.nix"
     local package_modules="$1"
     
-    # Create configs directory if it doesn't exist
-    mkdir -p "$(dirname "$config_file")"
-    
-    # Read existing preset if it exists
-    local existing_preset="null"
-    local existing_additional=""
-    
-    if [ -f "$config_file" ]; then
-        existing_preset=$(grep -o 'preset = [^;]*' "$config_file" 2>/dev/null | grep -o '[^=]*$' | tr -d ' ' || echo "null")
-        existing_additional=$(grep -A1 'additionalPackageModules' "$config_file" 2>/dev/null || echo "")
-    fi
-    
-    # Build package modules list
-    local modules_list=""
     if [[ -n "$package_modules" ]]; then
-        modules_list=$(echo "$package_modules" | sed 's/^/    "/;s/$/"/' | sed 's/ /"\n    "/g')
+        read -ra mod_array <<< "$package_modules"
+        write_packages_config "${mod_array[@]}" || return 1
+    else
+        write_packages_config || return 1
     fi
-    
-    # Write complete packages-config.nix
-    cat > "$config_file" <<EOF
-{
-  # Package-Modules
-  packageModules = [
-$modules_list
-  ];
-}
-EOF
 }
 
-# Helper function to update system-config.nix (only systemType)
-update_system_type() {
-    local system_type="$1"
-    local temp_file=$(mktemp)
-    
-    # Read existing system-config.nix
-    if [ -f "$SYSTEM_CONFIG_FILE" ]; then
-        cp "$SYSTEM_CONFIG_FILE" "$temp_file"
-    else
-        # Create minimal system-config.nix if it doesn't exist
-        cat > "$temp_file" <<EOF
-{
-  systemType = "$system_type";
-  hostName = "$(hostname)";
-  system = {
-    channel = "stable";
-    bootloader = "systemd-boot";
-  };
-  allowUnfree = true;
-  users = {};
-  timeZone = "Europe/Berlin";
-}
-EOF
-    fi
-    
-    # Update systemType
-    sed -i "s/systemType = \".*\";/systemType = \"$system_type\";/" "$temp_file"
-    
-    # Apply changes
-    if [[ -w "$SYSTEM_CONFIG_FILE" ]]; then
-        mv "$temp_file" "$SYSTEM_CONFIG_FILE"
-    else
-        sudo mv "$temp_file" "$SYSTEM_CONFIG_FILE" || {
-            log_error "Failed to update system-config.nix"
-            rm "$temp_file"
+# Backup configuration including systemConfig directory
+backup_config() {
+    if [[ -f "$SYSTEM_CONFIG_FILE" ]]; then
+        backup_file "$SYSTEM_CONFIG_FILE" || {
+            log_error "Failed to create backup"
             return 1
         }
     fi
+    if [[ -d "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" ]]; then
+        local backup_root="/var/backup/nixos/directories"
+        local backup_dir="$backup_root/systemConfig.$(date +%Y%m%d_%H%M%S)"
+        if [[ ! -d "$backup_root" ]]; then
+            mkdir -p "$backup_root"
+            chmod 700 "$backup_root" 2>/dev/null || sudo chmod 700 "$backup_root" 2>/dev/null || true
+            chown root:root "$backup_root" 2>/dev/null || sudo chown root:root "$BACKUP_ROOT" 2>/dev/null || true
+        else
+            mkdir -p "$backup_root"
+        fi
+        if cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" "$backup_dir" 2>/dev/null || sudo cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" "$backup_dir" 2>/dev/null; then
+            chmod -R 700 "$backup_dir" 2>/dev/null || sudo chmod -R 700 "$backup_dir" 2>/dev/null || true
+            find "$backup_dir" -type f -exec chmod 600 {} \; 2>/dev/null || sudo find "$backup_dir" -type f -exec chmod 600 {} \; 2>/dev/null || true
+            chown -R root:root "$backup_dir" 2>/dev/null || sudo chown -R root:root "$backup_dir" 2>/dev/null || true
+            ls -dt "$backup_root"/systemConfig.* 2>/dev/null | tail -n +6 | xargs -r rm -rf 2>/dev/null || sudo xargs -r rm -rf 2>/dev/null || true
+            log_info "Backup created: $backup_dir"
+        fi
+    fi
+    return 0
 }
 
 setup_desktop() {
@@ -97,10 +64,7 @@ setup_desktop() {
     # Backup configuration
     backup_config || return 1
     
-    # Update configuration
-    update_system_type "desktop" || return 1
-    
-    # Build package modules list
+    # Update packages based on selected features
     local package_modules=""
     for feature in "$@"; do
         if [[ "$feature" == "None" ]]; then
@@ -128,7 +92,7 @@ setup_desktop() {
         fi
     done
     
-    # Update packages-config.nix
+    # Write packages config (v1)
     if [[ -n "$package_modules" ]]; then
         update_packages_config "$package_modules" || return 1
     else
@@ -139,45 +103,12 @@ setup_desktop() {
     export SYSTEM_TYPE="desktop"   
     deploy_config
 
-    log_success "Desktop profile features updated"
-}
-
-backup_config() {
-    if [[ -f "$SYSTEM_CONFIG_FILE" ]]; then
-        backup_file "$SYSTEM_CONFIG_FILE" || {
-            log_error "Failed to create backup"
-            return 1
-        }
-    fi
-    # Also backup configs directory if it exists
-    if [[ -d "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" ]]; then
-        local backup_root="/var/backup/nixos/directories"
-        local backup_dir="$backup_root/systemConfig.$(date +%Y%m%d_%H%M%S)"
-        # Create directory if it doesn't exist (ActivationScript should have created it)
-        if [[ ! -d "$backup_root" ]]; then
-            mkdir -p "$backup_root"
-            chmod 700 "$backup_root" 2>/dev/null || sudo chmod 700 "$backup_root" 2>/dev/null || true
-            chown root:root "$backup_root" 2>/dev/null || sudo chown root:root "$backup_root" 2>/dev/null || true
-        else
-            mkdir -p "$backup_root"  # Ensure it exists
-        fi
-        # Create backup directory and set permissions (700 for dirs, 600 for files)
-        if cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" "$backup_dir" 2>/dev/null || sudo cp -r "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" "$backup_dir" 2>/dev/null; then
-            chmod -R 700 "$backup_dir" 2>/dev/null || sudo chmod -R 700 "$backup_dir" 2>/dev/null || true
-            find "$backup_dir" -type f -exec chmod 600 {} \; 2>/dev/null || sudo find "$backup_dir" -type f -exec chmod 600 {} \; 2>/dev/null || true
-            chown -R root:root "$backup_dir" 2>/dev/null || sudo chown -R root:root "$backup_dir" 2>/dev/null || true
-            # Cleanup old backups (keep last 5)
-            ls -dt "$backup_root"/systemConfig.* 2>/dev/null | tail -n +6 | xargs -r rm -rf 2>/dev/null || sudo xargs -r rm -rf 2>/dev/null || true
-            log_info "Backup created: $backup_dir"
-        fi
-    fi
-    return 0
+    log_success "Desktop profile features updated (v1 modular)"
 }
 
 # Export functions
 export -f setup_desktop
 export -f update_packages_config
-export -f update_system_type
 export -f backup_config
 
 # Check script execution and run
