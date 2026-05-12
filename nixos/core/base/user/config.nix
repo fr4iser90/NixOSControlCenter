@@ -1,7 +1,10 @@
 { config, lib, pkgs, getModuleConfig, moduleName, systemConfig, ... }:
 let
   cfg = getModuleConfig moduleName;
-  userPackagesConfig = lib.attrByPath ["users"] {} systemConfig;
+
+  # Per-user configs from users/<name>/config.nix
+  # These merge into systemConfig.users.<name>
+  perUserConfigs = lib.attrByPath ["users"] {} systemConfig;
 
   # Capabilities basierend auf Rolle (für NCC Permission System)
   roleCapabilities = {
@@ -25,16 +28,7 @@ let
     admin = [ "wheel" "networkmanager" "docker" "podman" "video" "audio" "render" "input" "seat" ];
     guest = [ "networkmanager" ];
     restricted-admin = [ "wheel" "networkmanager" "video" "audio" ];
-    virtualization = [ "docker" "podman" "libvirtd" "kvm" ];  # Neue Rolle für Docker/VM-User
-  };
-
-  # User-spezifische Pakete basierend auf Rolle
-  # NOTE: Docker, QEMU, virt-manager etc. werden von Features installiert!
-  # User-Rollen geben nur Berechtigungen (Gruppen, Sudo), keine Pakete!
-  rolePkgs = {
-    virtualization = [];  # Pakete kommen von docker.nix, qemu-vm.nix, virt-manager.nix Features
-    admin = [];  # Basis-Admin-Pakete
-    guest = [];  # Basis-Guest-Pakete
+    virtualization = [ "docker" "podman" "libvirtd" "kvm" ];
   };
 
   # Sudo-Regeln basierend auf Rolle
@@ -43,14 +37,14 @@ let
       users = [ username ];
       commands = [{
         command = "ALL";
-        options = [ "NOPASSWD" ];  # Keine Passwortabfrage für Admin
+        options = [ "NOPASSWD" ];
       }];
     }]
     else if role == "restricted-admin" then [{
       users = [ username ];
       commands = [{
         command = "ALL";
-        options = [ "PASSWD" ];  # Passwortabfrage für eingeschränkte Admins
+        options = [ "PASSWD" ];
       }];
     }]
     else if role == "virtualization" then [{
@@ -69,24 +63,56 @@ let
   # Prüfe ob mindestens ein Admin/Restricted-Admin existiert
   hasPrivilegedUser = lib.any (user: userAttrs.${user}.role == "admin" || userAttrs.${user}.role == "restricted-admin") userNames;
 
-  # User-spezifische Pakete aus configs/users/<name>/config.nix
-  userPackages = lib.mapAttrs (name: userConfig:
+  # Resolve per-user config for a given username
+  # Returns the per-user config if available, otherwise the central config
+  resolveUserConfig = username:
+    if perUserConfigs ? ${username} then perUserConfigs.${username}
+    else userAttrs.${username};
+
+  # Get system-wide packages from per-user config
+  # Per-user config can define: environment.systemPackages = [...]
+  getUserSystemPackages = username:
     let
-      packageSource = userPackagesConfig.${name} or {};
+      userCfg = resolveUserConfig username;
+      envPkgs = userCfg.environment.systemPackages or [];
     in
-      if packageSource ? userPackages && builtins.isList packageSource.userPackages
-      then packageSource.userPackages
-      else if userConfig ? userPackages && builtins.isList userConfig.userPackages
-      then userConfig.userPackages
-      else []
-  ) userAttrs;
-  # Convert package names to actual derivations
+      if lib.isList envPkgs then envPkgs else [];
+
+  # Get user-specific packages from per-user config
+  # Per-user config can define: userPackages = ["vscode" "firefox"]
+  # Falls nicht definiert: zentrale Config (userConfig.userPackages)
+  getUserPackages = username:
+    let
+      userCfg = resolveUserConfig username;
+      perUserPkgs = userCfg.userPackages or [];
+      centralPkgs = if userCfg ? userPackages && builtins.isList userCfg.userPackages
+                    then userCfg.userPackages
+                    else [];
+      # Per-user packages override central packages
+      packages = if perUserPkgs != [] then perUserPkgs else centralPkgs;
+    in
+      packages;
+
+  # Resolve all user packages to derivations
   resolvedUserPackages = lib.mapAttrs (name: packages:
+    map (pkgName:
+      let
+        meta = (import ../packages/lib/metadata.nix).modules.${pkgName} or {};
+      in
+        if meta ? package then meta.package
+        else if builtins.hasAttr pkgName pkgs then pkgs.${pkgName}
+        else throw "Package '${pkgName}' not found in package metadata or nixpkgs"
+    ) packages
+  ) (lib.mapAttrs (name: _: getUserPackages name) userAttrs);
+
+  # Resolve system packages from per-user configs
+  # These go into environment.systemPackages (user-scoped, not global)
+  resolvedUserSystemPackages = lib.mapAttrs (name: packages:
     map (pkgName:
       if builtins.hasAttr pkgName pkgs then pkgs.${pkgName}
       else throw "Package '${pkgName}' not found in nixpkgs"
     ) packages
-  ) userPackages;
+  ) (lib.mapAttrs (name: _: getUserSystemPackages name) userAttrs);
 
   # Automatisches Autologin für den ersten restricted-Admin-User
   autoLoginUser = lib.findFirst
@@ -103,7 +129,7 @@ let
       enable = true;
       serviceConfig = {
         ExecStart = [
-          ""  # Leere den Standard-ExecStart
+          ""
           "${pkgs.util-linux}/sbin/agetty --autologin ${autoLoginUser} --noclear %I $TERM"
         ];
       };
@@ -117,14 +143,33 @@ let
     guest = false;
     restricted-admin = false;
   };
+
+  # Merge system overrides from per-user configs
+  # Per-user config can define: networking.*, services.*, security.*, etc.
+  userSystemOverrides = lib.mapAttrs (name: userCfg:
+    let
+      # Extract system-level overrides
+      networking = userCfg.networking or {};
+      services = userCfg.services or {};
+      security = userCfg.security or {};
+      environment = userCfg.environment or {};
+      systemd = userCfg.systemd or {};
+      programs = userCfg.programs or {};
+    in
+      {
+        inherit networking services security environment systemd programs;
+      }
+  ) perUserConfigs;
+
+  # Collect all system overrides for each user
+  # (Currently just for documentation — actual merging happens via separate modules)
+  allUserOverrides = if userNames != [] then userSystemOverrides.${(builtins.head userNames)} or {} else {};
 in
 {
   # Aktiviere Passwort-Management
   security.passwordManagement.enable = true;
 
   # Assertion: Es muss mindestens ein Admin/Restricted-Admin konfiguriert sein
-  # CRITICAL: Diese Assertion feuert IMMER (auch wenn userNames leer sind).
-  # Niemals ohne User bauen lassen!
   assertions = [{
     assertion = userNames != [] && hasPrivilegedUser;
     message = if userNames == [] then ''
@@ -140,8 +185,6 @@ in
   }];
 
   # Basis-Konfiguration für alle Benutzer
-  # mutableUsers = false nur wenn User konfiguriert sind,
-  # sonst können User nicht per passwd angelegt werden
   users.mutableUsers = lib.mkIf (userNames != []) false;
 
   # Definiere Standard-Gruppen
@@ -161,27 +204,22 @@ in
       kvm = {};
     }
 
-    # Erstelle Gruppen für jeden Benutzer
     (lib.mapAttrs (name: _: {}) userAttrs)
   ];
 
-  # Benutzer aus gefilterten userAttrs erstellen
+  # Benutzer erstellen — mit Unterstützung für per-user configs
   users.users = lib.mapAttrs (username: userConfig: {
     isNormalUser = true;
     home = "/home/${username}";
     shell = pkgs.${userConfig.defaultShell};
     group = username;
     extraGroups = [ "users" ] ++ roleGroups.${userConfig.role};
-    packages = (rolePkgs.${userConfig.role} or []) ++ (resolvedUserPackages.${username} or []);
+    # Combine central role packages + per-user system packages + resolved user packages
+    packages = (resolvedUserPackages.${username} or []);
 
-    # Lingering-Konfiguration
     linger = roleLingering.${userConfig.role} or false;
 
-    # WICHTIG: Passwort-Konfiguration vom Manager holen
-    # (hashedPassword aus .hashedPassword per builtins.readFile,
-    #  initialPassword nur wenn Config-Feld gesetzt)
-    } // (config.security.passwordManagement.getUserPasswordConfig username userConfig)
-  ) userAttrs;
+  } // (config.security.passwordManagement.getUserPasswordConfig username userConfig));
 
   # Sudo-Konfiguration
   security.sudo = {
@@ -195,8 +233,6 @@ in
   # Dynamische TTY-Konfiguration
   systemd.services = autoLoginService;
 
-  # NCC Permission System wird über API (api.nix) bereitgestellt
-
   # Aktiviere die Shells auf System-Level
   programs = {
     zsh.enable = lib.any (user: userAttrs.${user}.defaultShell == "zsh")
@@ -204,4 +240,6 @@ in
     fish.enable = lib.any (user: userAttrs.${user}.defaultShell == "fish")
       userNames;
   };
+
+  # NCC Permission System wird über API (api.nix) bereitgestellt
 }

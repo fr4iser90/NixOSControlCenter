@@ -1,8 +1,7 @@
 { lib, getCurrentModuleMetadata, ... }:
 
 let
-  # Finde eigenes Modul aus PFAD! KEIN hardcoded Name!
-  metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
+  metadata = getCurrentModuleMetadata ./.;
   configPath = metadata.configPath;
 in {
   options.${configPath} = {
@@ -12,7 +11,13 @@ in {
       internal = true;
       description = "User module version";
     };
-    # User module has no additional options - it uses systemConfig.core.base.user directly
-    # User configuration is managed centrally in system-config.nix
+    # User configuration structure:
+    #   <username> = {
+    #     role = "admin" | "guest" | "restricted-admin" | "virtualization";
+    #     defaultShell = "bash" | "zsh" | "fish";
+    #     autoLogin = false;
+    #     # Optional: initialPassword (for first login)
+    #     initialPassword = "...";
+    #   };
   };
 }

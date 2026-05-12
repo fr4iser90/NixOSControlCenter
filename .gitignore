@@ -8,6 +8,7 @@ build-gaming.sh
 ./continue
 ./continue/config.json
 NCC-Hackathon/
+opencode.json
 
 # ...but explicitly allow specific files to be tracked
 !nixos/custom/default.nix
@@ -30,6 +31,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.cocoindex_code
 
 # Project setup and boilerplate scripts
 # These scripts are meant for local development and should not be included in the repository.

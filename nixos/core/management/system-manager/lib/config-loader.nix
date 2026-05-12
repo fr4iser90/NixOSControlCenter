@@ -141,9 +141,13 @@ let
           # Recursively find all config.nix files
           findConfigs = currentDir:
             let
-              dir = builtins.readDir currentDir;
-              subDirs = builtins.attrNames (filterAttrs (name: type: type == "directory") dir);
-              configFiles = builtins.filter (name: name == "config.nix" && dir.${name} == "regular") (builtins.attrNames dir);
+              dirExists = builtins.tryEval (builtins.pathExists currentDir);
+              dir = if dirExists.success && dirExists.value
+                then builtins.tryEval (builtins.readDir currentDir)
+                else { success = false; value = {}; };
+              dirContent = if dir.success then dir.value else {};
+              subDirs = builtins.attrNames (filterAttrs (name: type: type == "directory") dirContent);
+              configFiles = builtins.filter (name: name == "config.nix" && dirContent.${name} == "regular") (builtins.attrNames dirContent);
               currentConfigs = builtins.map (file: currentDir + "/${file}") configFiles;
               recursiveConfigs = builtins.concatMap (subDir: findConfigs (currentDir + "/${subDir}")) subDirs;
             in
@@ -235,6 +239,76 @@ let
     in
       { value = loadedConfig; path = templatePath; domainPath = domainPath; };
 
+ # Extract domain path for per-user configs
+  # Unlike regular configs, per-user configs MUST merge into systemConfig.users.<name>
+  # Example: users/fr4iser/config.nix → ["users", "fr4iser"]
+  # This preserves the "users" prefix so configs merge correctly
+  extractUserDomainPath = configsPath: userConfigName:
+    let
+      # userConfigName is like "users/fr4iser"
+      # We want ["users", "fr4iser"] - keep the full path
+      parts = builtins.split "/" userConfigName;
+      pathComponents = builtins.filter (p: builtins.isString p && p != "") 
+        (map (s: if builtins.isString s then s else null) parts);
+    in
+      pathComponents;
+
+  # Load a single per-user config file
+  # Returns: { <username> = <configValue>; }
+  loadUserConfig = configsDir: configsPath: userConfigName:
+    let
+      configPath = "${configsPath}/${userConfigName}/config.nix";
+      domainPath = extractUserDomainPath configsPath userConfigName;
+      loadedConfig = if builtins.pathExists configPath then importNix configPath else {};
+    in
+      { value = loadedConfig; path = configPath; domainPath = domainPath; };
+
+  # Discover all per-user configs under users/<name>/
+  # Returns: [{ name = <username>; configName = <configName>; }]
+  # NOTE: tryEval wraps readDir directly (not pathExists) because pathExists
+  # can return true while readDir still fails with "No such file or directory"
+  discoverUserConfigs = configsDir: configsPath:
+    let
+      usersPath = "${configsPath}/users";
+      usersExist = builtins.tryEval (builtins.pathExists usersPath);
+      usersDirResult = if usersExist.success && usersExist.value
+        then builtins.tryEval (builtins.readDir usersPath)
+        else { success = false; value = null; };
+    in
+      if !usersDirResult.success then []
+      else
+        let
+          dir = usersDirResult.value;
+          userNames = builtins.filter (name:
+            dir.${name} == "directory"
+          ) (builtins.attrNames dir);
+        in
+          builtins.map (name: {
+            inherit name;
+            configName = "users/${name}";
+          }) userNames;
+
+  # Merge per-user configs into systemConfig.users.<name>
+  # Each user's config can contain: packages, home-manager, system overrides, etc.
+  mergeUserConfigs = configsDir: configsPath: baseConfig:
+    let
+      userConfigs = discoverUserConfigs configsDir configsPath;
+      mergedUsers = builtins.foldl' (acc: userConfig:
+        let
+          loaded = loadUserConfig configsDir configsPath userConfig.configName;
+          # Get the username (last component of the domain path)
+          username = builtins.head (builtins.tail loaded.domainPath);
+        in
+          if loaded.value != {} then
+            acc // { ${username} = loaded.value; }
+          else acc
+      ) {} userConfigs;
+    in
+      if mergedUsers != {} then
+        baseConfig // { users = mergedUsers; }
+      else
+        baseConfig;
+
   # Load and merge all configs
   # Usage: loadSystemConfig configsDir configsPath
   loadSystemConfig = configsDir: configsPath:
@@ -250,10 +324,14 @@ let
           else acc
       ) {} templatePaths;
 
-      # 2. Dynamically discover all user config files
+      # 2. Discover and merge per-user configs (before other configs)
+      # This ensures per-user configs can override central user config
+      baseConfigWithUsers = mergeUserConfigs configsDir configsPath baseConfig;
+
+      # 3. Dynamically discover all user config files
       optionalConfigs = discoverConfigs configsDir configsPath;
 
-      # 3. Load and merge all discovered configs on top of templates
+      # 4. Load and merge all discovered configs on top of templates
       # Order is important: later configs override earlier ones
       mergedConfig = builtins.foldl' (acc: configName:
         let
@@ -266,15 +344,25 @@ let
               newAcc
           else
             acc
-      ) baseConfig optionalConfigs;
+      ) baseConfigWithUsers optionalConfigs;
     in
       mergedConfig;
 
- # Get list of discovered configs (for reference/debugging)
+  # Get list of discovered configs (for reference/debugging)
   getDiscoveredConfigs = configsDir: configsPath: discoverConfigs configsDir configsPath;
+
+  # Get discovered per-user configs (for reference/debugging)
+  getDiscoveredUserConfigs = configsDir: configsPath:
+    let
+      userConfigs = discoverUserConfigs configsDir configsPath;
+    in
+      builtins.map (uc: uc.name) userConfigs;
 
 in
 {
   loadSystemConfig = loadSystemConfig;
   getDiscoveredConfigs = getDiscoveredConfigs;
+  getDiscoveredUserConfigs = getDiscoveredUserConfigs;
+  discoverUserConfigs = discoverUserConfigs;
+  loadUserConfig = loadUserConfig;
 }

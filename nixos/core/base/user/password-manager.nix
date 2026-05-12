@@ -1,19 +1,32 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, systemConfig, ... }:
 
 let
+  # Get per-user configs (from users/<name>/config.nix)
+  perUserConfigs = lib.attrByPath ["users"] {} systemConfig;
+
   getUserPasswordConfig = username: userConfig:
     let
       passwordDir = "/etc/nixos/secrets/passwords";
       userPasswordFile = "${passwordDir}/${username}/.hashedPassword";
+
+      # Check per-user config for initialPassword first
+      perUserPassword = if perUserConfigs ? ${username} && perUserConfigs.${username} ? initialPassword
+                        then perUserConfigs.${username}.initialPassword
+                        else null;
+
+      # Fall back to central config
+      centralPassword = if userConfig ? initialPassword then userConfig.initialPassword else null;
+
+      # Per-user config takes precedence
+      effectivePassword = if perUserPassword != null then perUserPassword else centralPassword;
     in {
       hashedPasswordFile = userPasswordFile;
-      initialPassword = lib.mkIf (userConfig ? initialPassword)
-        userConfig.initialPassword;
+      initialPassword = lib.mkIf (effectivePassword != null) effectivePassword;
     };
 
   # Nur echte Benutzer (keine System-Accounts)
-  realUsers = lib.filterAttrs (name: user: 
-    user.isNormalUser or false && 
+  realUsers = lib.filterAttrs (name: user:
+    user.isNormalUser or false &&
     !(lib.hasPrefix "nixbld" name) &&
     !(lib.elem name [
       "messagebus" "nobody" "nscd" "polkituser" "root" "sddm"
@@ -37,22 +50,22 @@ in {
   config = {
     # Erlaube temporär Logins während des Builds
     users.allowNoPasswordLogin = lib.mkForce true;
-    
+
     # Erlaube mutable Users nur wenn keine Passwortdatei existiert
     users.mutableUsers = lib.mkIf (builtins.length (builtins.attrNames realUsers) == 0) true;
-    
+
     system.activationScripts.passwordSetup = {
       text = ''
       # Hauptverzeichnis erstellen/sicherstellen
       mkdir -p /etc/nixos/secrets/passwords
       chmod 700 /etc/nixos/secrets/passwords
       chown root:root /etc/nixos/secrets/passwords
-      
+
       # AUFRAUMUNG: Nur warnen, NIEMALS loeschen!
       # Passwort-Ordner werden nie geloescht, da selbst ein kurzzeitiger
       # Config-Fehler sonst alle Passwoerter unwiderruflich vernichten wuerde.
       ALLOWED_USERS="${lib.concatStringsSep " " (builtins.attrNames realUsers)}"
-      
+
       for dir in /etc/nixos/secrets/passwords/*; do
         [ -e "$dir" ] || continue
         basename=$(basename "$dir")
@@ -60,7 +73,7 @@ in {
           echo "WARNING: Orphaned password directory for '$basename'"
         fi
       done
-      
+
       # Berechtigungen setzen
       ${lib.concatStringsSep "\n" (lib.mapAttrsToList (username: userConfig: ''
         if [ -f /etc/nixos/secrets/passwords/${username}/.hashedPassword ]; then
