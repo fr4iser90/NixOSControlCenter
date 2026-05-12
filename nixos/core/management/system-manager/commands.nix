@@ -41,12 +41,17 @@ let
     inherit config lib pkgs systemConfig getModuleConfig getModuleApi cliRegistry;
   };
   systemUpdateMainScript = systemUpdateHandler.systemUpdateMainScript;
+  # Handler returns real NixOS options (activationScripts, extra systemPackages) merged
+  # with `// { inherit systemUpdateMainScript; }`. Previously only the script path was
+  # used for CLI registration — the rest was dropped, so no activation scripts ever ran.
+  systemUpdateNixosConfig = lib.removeAttrs systemUpdateHandler [ "systemUpdateMainScript" ];
 
   backupHelpersForMigration = config.${configPath}.api.backupHelpers or (import ./lib/backup-helpers.nix { inherit pkgs lib; });
   configMigration = import ./components/config-migration/default.nix { inherit config pkgs lib systemConfig getModuleApi configPath; backupHelpers = backupHelpersForMigration; };
   configValidator = import ./validators/config-validator.nix { inherit pkgs lib; };
 in {
   config = lib.mkMerge [
+    systemUpdateNixosConfig
     {
       environment.systemPackages =
         [ checkVersions.checkVersionsScript

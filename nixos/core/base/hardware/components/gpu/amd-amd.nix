@@ -45,6 +45,7 @@
   
   hardware.graphics = {
     enable = true;
+    enable32Bit = true; # Required for Steam (32-bit), Wine, Lutris and any 32-bit GL/Vulkan client
     extraPackages = with pkgs; [
       vulkan-loader
       # vulkan-validation-layers
@@ -52,6 +53,10 @@
       # amdvlk
       # rocmPackages.rocm-runtime
       # rocmPackages.rocm-thunk
+    ];
+    extraPackages32 = with pkgs.pkgsi686Linux; [
+      vulkan-loader
+      mesa
     ];
   };
 

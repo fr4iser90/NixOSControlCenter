@@ -36,11 +36,16 @@
   hardware.amdgpu.initrd.enable = true; #Whether to enable loading amdgpu kernelModule in stage 1. Can fix lower resolution in boot screen during initramfs phase
   hardware.graphics = {
     enable = true;  # Aktiviert OpenGL-Unterstützung
+    enable32Bit = true; # Required for Steam (32-bit), Wine, Lutris and any 32-bit GL/Vulkan client
     extraPackages = with pkgs; [
       vulkan-loader       # Vulkan-Lader
       mesa                # Mesa-Treiber
       # vulkan-validation-layers
       # amdvlk  # Uncomment ONLY if you need AMDVLK for a specific reason
+    ];
+    extraPackages32 = with pkgs.pkgsi686Linux; [
+      vulkan-loader
+      mesa
     ];
   };
 
