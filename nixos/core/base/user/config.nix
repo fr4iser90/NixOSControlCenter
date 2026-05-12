@@ -219,7 +219,7 @@ in
 
     linger = roleLingering.${userConfig.role} or false;
 
-  } // (config.security.passwordManagement.getUserPasswordConfig username userConfig));
+  } // (config.security.passwordManagement.getUserPasswordConfig username userConfig)) userAttrs;
 
   # Sudo-Konfiguration
   security.sudo = {

@@ -899,7 +899,7 @@ NIXEOF
       # Per-user config contains ONLY overrides (packages, home-manager, system)
       # User definition (role, shell, autoLogin) stays in core/base/user/config.nix
       PER_USER_MIGRATED=0
-      USER_CONFIG_NIX="${NIXOS_DIR}/systemConfig/core/base/user/config.nix"
+      USER_CONFIG_NIX="''${NIXOS_DIR}/systemConfig/core/base/user/config.nix"
       
       if [ -f "$USER_CONFIG_NIX" ]; then
         TMP_PER_USER=$(mktemp)
@@ -924,14 +924,14 @@ NIXEOF
         
         if [ -n "$USER_JSON" ] && [ "$USER_JSON" != "null" ]; then
           for USERNAME in $(echo "$USER_JSON" | jq -r 'keys[]' 2>/dev/null); do
-            USER_PER_CONFIG="${NIXOS_DIR}/systemConfig/users/${USERNAME}/config.nix"
+            USER_PER_CONFIG="''${NIXOS_DIR}/systemConfig/users/''${USERNAME}/config.nix"
             
             if [ -f "$USER_PER_CONFIG" ]; then
               echo "  [SKIP] Per-user config exists: $USERNAME"
               continue
             fi
             
-            mkdir -p "${NIXOS_DIR}/systemConfig/users/${USERNAME}"
+            mkdir -p "''${NIXOS_DIR}/systemConfig/users/''${USERNAME}"
             
             cat > "$USER_PER_CONFIG" << EOF
 # Per-User Config for: $USERNAME
