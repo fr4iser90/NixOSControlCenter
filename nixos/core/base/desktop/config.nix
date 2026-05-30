@@ -1,7 +1,7 @@
-{ lib, systemConfig, ... }:
+{ lib, getModuleConfig, moduleName, ... }:
 let
-  cfg = lib.attrByPath ["core" "base" "desktop"] {} systemConfig;
-  locCfg = lib.attrByPath ["core" "base" "localization"] {} systemConfig;
+  cfg = getModuleConfig moduleName;
+  locCfg = getModuleConfig "localization";
 
   # Use keyboard settings from localization module
   keyboardLayout = locCfg.keyboardLayout or "us";

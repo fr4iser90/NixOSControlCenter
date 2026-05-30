@@ -5,4 +5,9 @@
   firewall.enable = true;
   firewall.trustedNetworks = [ ];
   services = { };
+  wifi = {
+    enable = true;
+    preserveSystemConnections = true;
+    networks = { };
+  };
 }

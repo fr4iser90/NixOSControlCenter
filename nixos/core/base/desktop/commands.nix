@@ -1,9 +1,9 @@
-{ config, lib, pkgs, getModuleApi ? null, moduleName ? (baseNameOf ./.), systemConfig ? null, ... }:
+{ config, lib, pkgs, getModuleApi ? null, getModuleConfig ? null, moduleName ? (baseNameOf ./.), ... }:
 
 let
-  cfg = lib.attrByPath ["core" "base" "desktop"] {} systemConfig;
+  cfg = getModuleConfig moduleName;
   cliRegistry = getModuleApi "cli-registry";
-  desktopTui = (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi systemConfig; }).tuiScript;
+  desktopTui = (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi getModuleConfig moduleName; }).tuiScript;
 in
 {
   config = lib.mkIf (cfg.enable or true)

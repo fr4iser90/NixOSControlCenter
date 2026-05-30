@@ -10,6 +10,7 @@
        ./options.nix
        (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName; })
        ./handlers/networkmanager.nix
+       ./handlers/wifi.nix
        ./handlers/firewall.nix
      ];
 

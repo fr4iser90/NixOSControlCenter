@@ -1,7 +1,7 @@
- { config, lib, pkgs, getModuleApi, systemConfig }:
+ { config, lib, pkgs, getModuleApi, getModuleConfig, moduleName ? "desktop" }:
 
 let
-  cfg = lib.attrByPath ["core" "base" "desktop"] {} systemConfig;
+  cfg = getModuleConfig moduleName;
   cliRegistry = getModuleApi "cli-registry";
   tuiEngine = config.core.management.tui-engine;
   # Get module path (go up from ui/tui/default.nix to module root)

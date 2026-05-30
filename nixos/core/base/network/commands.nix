@@ -4,9 +4,10 @@ let
   cfg = lib.attrByPath ["core" "base" "network"] {} systemConfig;
   cliRegistry = getModuleApi "cli-registry";
   networkTui = (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi systemConfig; }).tuiScript;
+  wifiCli = import ./scripts/wifi/default.nix { inherit pkgs; };
 in
 {
-  config = lib.mkIf (cfg.enable or true)
+  config = lib.mkIf (cfg.enable or true) (lib.mkMerge [
     (cliRegistry.registerCommandsFor "network" [
       {
         name = "network";
@@ -21,5 +22,7 @@ in
           Network manager TUI placeholder.
         '';
       }
-    ]);
+    ])
+    (cliRegistry.registerCommandsFor "wifi" wifiCli.commands)
+  ]);
 }

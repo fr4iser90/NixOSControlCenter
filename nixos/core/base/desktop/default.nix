@@ -3,6 +3,8 @@
 let
   # Discovery: Modulname aus Dateisystem ableiten
   moduleName = baseNameOf ./. ;  # ← desktop aus core/base/desktop/
+  cfg = getModuleConfig moduleName;
+  desktopEnabled = cfg.enable or true;
 in {
   _module.metadata = {
     role = "core";
@@ -13,14 +15,14 @@ in {
     version = "1.0.0";
   };
 
-
   imports = [
     ./options.nix
+    (import ./config.nix { inherit lib getModuleConfig moduleName; })
+    (import ./commands.nix { inherit config lib pkgs getModuleApi getModuleConfig moduleName getCurrentModuleMetadata; })
+  ] ++ lib.optionals desktopEnabled [
     ./components/display-managers
     ./components/display-servers
     ./components/environments
     ./components/themes
-    (import ./config.nix { inherit lib systemConfig; })
-    (import ./commands.nix { inherit config lib pkgs getModuleApi moduleName systemConfig getCurrentModuleMetadata; })
   ];
 }

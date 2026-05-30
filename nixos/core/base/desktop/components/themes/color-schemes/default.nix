@@ -1,15 +1,15 @@
 # modules/desktop/themes/color-schemes/default.nix
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 let
-  desktopCfg = lib.attrByPath ["core" "base" "desktop"] {} systemConfig;
-  themeModule = ./schemes + "/${desktopCfg.environment or "plasma"}.nix";
+  cfg = getModuleConfig "desktop";
+  themeModule = ./schemes + "/${cfg.environment or "plasma"}.nix";
 in {
-  imports = lib.optionals (desktopCfg.enable or true) [
+  imports = lib.optionals (cfg.enable or true) [
     themeModule
   ];
 
-  assertions = lib.optionals (desktopCfg.enable or true) [{
+  assertions = lib.optionals (cfg.enable or true) [{
     assertion = builtins.pathExists themeModule;
-    message = "Color scheme for desktop environment ${desktopCfg.environment} not found";
+    message = "Color scheme for desktop environment ${cfg.environment} not found";
   }];
 }
