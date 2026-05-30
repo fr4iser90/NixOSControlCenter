@@ -60,71 +60,38 @@ let
       return 1
     }
 
-    resolve_conn_name() {
-      local dev="$1" ssid="$2"
-      local name
-      name="$(find_wifi_connection "$ssid" || true)"
-      [ -n "$name" ] && { echo "$name"; return 0; }
-      name="$("$NMCLI" -t -f GENERAL.CONNECTION device show "$dev" 2>/dev/null | head -n1 | tr -d '\r' || true)"
-      case "$name" in
-        ""|*Verbindung*|*successfully*|*activated*|*ActiveConnection*|*org.freedesktop*|*org/freedesktop*)
-          name=""
-          ;;
-      esac
-      [ -n "$name" ] && { echo "$name"; return 0; }
-      echo "$ssid"
-    }
-
-    cleanup_garbage_secrets() {
-      local f base
-      shopt -s nullglob
-      for f in "$SECRETS_WIFI"/*.psk "$PERSIST"/*.psk; do
-        [ -f "$f" ] || continue
-        base="$(basename "$f" .psk)"
-        case "$base" in
-          Verbindung*|*ActiveConnection*|*org_freedesktop*|*org.freedesktop*)
-            rm -f "$f"
-            ;;
-        esac
-      done
-    }
-
     connect_wifi() {
       local ssid="$1" psk="$2" dev="$3"
       local conn_name=""
 
       conn_name="$(find_wifi_connection "$ssid" || true)"
       if [ -n "$conn_name" ]; then
-        echo "repairing broken profile: $conn_name" >&2
-        if "$NMCLI" connection modify "$conn_name" \
+        "$NMCLI" connection modify "$conn_name" \
+          connection.id "$ssid" \
           802-11-wireless.ssid "$ssid" \
           802-11-wireless-security.key-mgmt wpa-psk \
           802-11-wireless-security.psk "$psk" \
           802-11-wireless-security.psk-flags 0 \
-          connection.autoconnect yes 2>/dev/null \
-          && "$NMCLI" -w 60 connection up "$conn_name" >/dev/null 2>&1; then
-          echo "$conn_name"
-          return 0
-        fi
-        echo "repair failed — recreating profile" >&2
-        "$NMCLI" connection delete "$conn_name" 2>/dev/null || true
+          connection.autoconnect yes 2>/dev/null || true
+      else
+        "$NMCLI" connection add type wifi \
+          con-name "$ssid" \
+          ifname "$dev" \
+          ssid "$ssid" \
+          wifi-sec.key-mgmt wpa-psk \
+          wifi-sec.psk "$psk" \
+          connection.autoconnect yes 2>/dev/null || return 1
       fi
 
-      if "$NMCLI" -w 60 device wifi connect "$ssid" password "$psk" ifname "$dev" >/dev/null 2>&1; then
-        sleep 1
-        resolve_conn_name "$dev" "$ssid"
-        return 0
-      fi
-      return 1
+      "$NMCLI" -w 60 connection up "$ssid" ifname "$dev" >/dev/null 2>&1 || return 1
+      echo "$ssid"
     }
 
     persist_connection() {
-      local conn_name="$1" ssid="$2" psk="$3"
-      local stem out_file live_name
+      local ssid="$1" psk="$2"
+      local stem out_file live_name conn_name
       valid_psk "$psk" || { echo "error: invalid password" >&2; return 1; }
-      cleanup_garbage_secrets
       stem="$(sanitize_name "$ssid")"
-      [ -n "$stem" ] || stem="$(sanitize_name "$conn_name")"
       out_file="$PERSIST/$stem.nmconnection"
       live_name="$stem.nmconnection"
 
@@ -146,7 +113,7 @@ let
         802-11-wireless-security.psk-flags 0 \
         connection.autoconnect yes 2>/dev/null || true
 
-      "$NMCLI" connection export "$conn_name" "$out_file" 2>/dev/null || true
+      "$NMCLI" connection export "$ssid" "$out_file" 2>/dev/null || true
       if [ ! -f "$out_file" ]; then
         cat > "$out_file" <<EOF
 [connection]
@@ -314,8 +281,8 @@ HELP
       exit 1
     fi
 
-    persist_connection "$conn_name" "$ssid" "$psk"
-    echo "connected: $conn_name"
+    persist_connection "$ssid" "$psk"
+    echo "connected: $ssid"
   '';
 
   wifiDisconnect = pkgs.writeShellScriptBin "ncc-wifi-disconnect" ''

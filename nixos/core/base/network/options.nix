@@ -77,7 +77,8 @@ in {
         default = { };
         description = ''
           Declarative WiFi networks (networking.networkmanager.ensureProfiles).
-          When non-empty, takes precedence over preserved GUI profiles.
+          Passwords saved via ncc wifi connect (/etc/nixos/secrets/wifi/*.psk) are
+          restored at boot with embedded PSK — not via ensureProfiles.
         '';
         example = {
           MyHome = {

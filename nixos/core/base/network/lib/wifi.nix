@@ -26,10 +26,12 @@ let
             auth-alg = "open";
             key-mgmt = "wpa-psk";
             psk = net.psk;
+            "psk-flags" = 0;
           } else if (net.pskFile or null) != null then {
             auth-alg = "open";
             key-mgmt = "wpa-psk";
             psk-file = net.pskFile;
+            "psk-flags" = 0;
           } else { };
       };
     }) networks;
