@@ -50,7 +50,7 @@ let
     
     # Get modules directory
     MODULES_DIR="${toString ../../../../modules}"
-    MODULES_CONFIG="/etc/nixos/systemConfig/module-manager-config.nix"
+    MODULES_CONFIG="/etc/nixos/systemConfig/core/management/module-manager/config.nix"
     
     # Collect modules that need updates
     MODULES_TO_UPDATE=()
@@ -194,7 +194,7 @@ let
             fi
           fi
           
-          # Update version in module-manager-config.nix
+          # Update version in core/management/module-manager/config.nix
           ${ui.messages.info "  Updating version to $to..."}
           # TODO: Implement proper config file update
           ${ui.messages.success "  Migration completed: $module $from → $to"}

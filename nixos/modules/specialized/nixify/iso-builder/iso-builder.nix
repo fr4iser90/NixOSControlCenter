@@ -9,7 +9,7 @@ let
   generatedConfigsDir = pkgs.runCommand "nixify-generated-configs" {} ''
     mkdir -p $out/systemConfig
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: content:
-      "echo ${lib.escapeShellArg content} > $out/systemConfig/${name}"
+      "mkdir -p \"$(dirname $out/systemConfig/${name})\" && echo ${lib.escapeShellArg content} > $out/systemConfig/${name}"
     ) sessionConfigs)}
   '';
   
@@ -98,7 +98,7 @@ let
     echo ""
     echo "  3. Review and edit configs if needed:"
     echo "     ls -la /mnt/etc/nixos/systemConfig/"
-    echo "     nano /mnt/etc/nixos/systemConfig/desktop-config.nix"
+    echo "     nano /mnt/etc/nixos/systemConfig/core/base/desktop/config.nix"
     echo ""
     echo "  4. Run nixos-install with flake:"
     echo "     HOSTNAME=\$(grep -oP 'nixosConfigurations = \{.*?\"\\K[^\"]+' /mnt/etc/nixos/flake.nix | head -1 || echo 'nixos')"
@@ -111,7 +111,7 @@ in
   # ISO Builder Function
   # NOTE: This is a placeholder - actual ISO building requires nixos-generate-config
   # and should be done via nix-build at runtime, not during system evaluation
-  # variant wird aus dem generierten desktop-config.nix gelesen, KEIN Default!
+  # variant wird aus core/base/desktop/config.nix gelesen, KEIN Default!
   buildISO = { sessionId, repoPath ? null }:
     throw "ISO building must be done at runtime via nix-build, not during system evaluation";
   

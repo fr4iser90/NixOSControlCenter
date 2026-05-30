@@ -68,7 +68,7 @@
           ;;
       esac
       
-      # Write complete hardware-config.nix with updated value
+      # Write complete core/base/hardware/config.nix with updated value
       if [ -n "$memory_block" ] && [ "$update_type" != "memory" ]; then
         # Memory block exists and we're not updating memory
         cat > "$config_file" <<EOF

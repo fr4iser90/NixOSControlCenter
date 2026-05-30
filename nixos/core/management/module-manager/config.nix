@@ -42,8 +42,9 @@ let
 
   debugModuleConfigs = automaticModuleConfigs;
 
-  # Read central module configuration
-  moduleManagerConfigPath = "/etc/nixos/systemConfig/module-manager-config.nix";
+  # Read central module configuration (v1 modular path)
+  configPaths = import ../system-manager/lib/config-paths.nix;
+  moduleManagerConfigPath = configPaths.core.management.moduleManager;
   moduleManagerConfig = if builtins.pathExists moduleManagerConfigPath
     then import moduleManagerConfigPath
     else import ./template-config.nix;

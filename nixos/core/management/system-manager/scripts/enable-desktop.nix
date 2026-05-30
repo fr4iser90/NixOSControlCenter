@@ -5,8 +5,6 @@ with lib;
 let
   ui = getModuleApi "cli-formatter";
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
-  desktopConfigPath = "/etc/nixos/systemConfig/desktop-config.nix";
-
   updateDesktopConfig = import ./update-desktop-config.nix { inherit config lib pkgs systemConfig; };
 in
 pkgs.writeScriptBin "enable-desktop" ''

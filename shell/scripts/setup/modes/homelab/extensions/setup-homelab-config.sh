@@ -197,14 +197,6 @@ detect_docker_mode() {
             return 0
         fi
     fi
-    # Also check old location for backward compatibility
-    packages_config="$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig/packages-config.nix"
-    if [[ -f "$packages_config" ]]; then
-        if grep -q '"docker"' "$packages_config"; then
-            echo "docker"
-            return 0
-        fi
-    fi
     # Default to docker
     echo "docker"
     return 0

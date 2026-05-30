@@ -17,8 +17,10 @@
 #   └── modules/.../.../config.nix
 # =============================================================
 
-# Common path constants
-CONFIGS_BASE="${SYSTEM_CONFIG_DIR_PREFIX:-/etc/nixos}/systemConfig"
+# Common path constants (see config-paths.sh for full list)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=config-paths.sh
+source "${SCRIPT_DIR}/config-paths.sh"
 
 # ---------- General helper ----------
 

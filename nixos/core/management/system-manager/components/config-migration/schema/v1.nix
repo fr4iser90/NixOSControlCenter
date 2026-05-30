@@ -1,7 +1,7 @@
 { lib, ... }:
 
 {
-  description = "Modular structure - system-config.nix + configs/*.nix";
+  description = "Modular structure - systemConfig/**/config.nix";
   
   requiredFields = [
     "configVersion"         # MUSS vorhanden sein in v1.0

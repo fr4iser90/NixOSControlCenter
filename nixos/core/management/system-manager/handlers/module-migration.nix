@@ -19,7 +19,7 @@ let
       FROM_VERSION="$2"
       TO_VERSION="$3"
       MIGRATION_FILE="$4"
-      FEATURES_CONFIG="/etc/nixos/systemConfig/module-manager-config.nix"
+      FEATURES_CONFIG="/etc/nixos/systemConfig/core/management/module-manager/config.nix"
       BACKUP_DIR="/var/backup/nixos/migrations"
       
       ${ui.messages.info "Migrating $FEATURE_NAME: $FROM_VERSION → $TO_VERSION"}
@@ -71,7 +71,7 @@ let
       
       # Update version in module config file (now individual per module)
       if [ -f "$FEATURES_CONFIG" ]; then
-        ${ui.messages.info "Updating version in $FEATURE_NAME-config.nix..."}
+        ${ui.messages.info "Updating version in core/management/module-manager/config.nix..."}
         # Update _version for the module
         # This is a simplified version - full implementation would parse and modify Nix files properly
         ${ui.messages.warning "Version update in config file will be implemented in full migration handler"}

@@ -1,5 +1,5 @@
 # Nixify Config Generator
-# Generiert NUR configs/*.nix Dateien aus Snapshot-Report
+# Generiert v1 modular systemConfig/*.nix Dateien aus Snapshot-Report
 # Das komplette NixOSControlCenter Repository wird von der ISO eingebettet
 # KEINE FALLBACKS - Fehler wenn Daten fehlen!
 
@@ -48,7 +48,7 @@ let
   desktopEnv = if report.os == "linux" then
     let
       desktop = report.settings.desktop or (throw "Missing desktop in snapshot report settings");
-      linuxMapping = mapping.desktop_mapping.linux or (throw "Missing linux desktop mapping in database");
+      linuxMapping = mapping.desktop_mapping.linux or (throw "Missing linux desktop mapping in mapping database");
       desktopMapping = linuxMapping.${desktop} or linuxMapping.default or (throw "No desktop mapping found for '${desktop}' and no default in mapping database");
     in
       desktopMapping.preferred_de or (throw "Missing preferred_de in desktop mapping for '${desktop}'")
@@ -62,65 +62,47 @@ let
   timeZone = report.settings.timezone or (throw "Missing timezone in snapshot report settings");
   locale = report.settings.locale or (throw "Missing locale in snapshot report settings");
   
-  # Generate desktop-config.nix
+  # v1 flat config: core/base/desktop/config.nix
   desktopConfig = ''
 {
-  # Desktop-Environment
-  desktop = {
-    enable = true;
-    environment = "${desktopEnv}";
-  };
+  enable = true;
+  environment = "${desktopEnv}";
 }
 '';
   
-  # Generate packages-config.nix
+  # v1 flat config: core/base/packages/config.nix
   packagesList = builtins.concatStringsSep "\n    " (builtins.map (p: "\"${p}\"") uniquePackages);
+  modulesList = builtins.concatStringsSep "\n    " (builtins.map (m: "\"${m}\"") uniqueModules);
   packagesConfig = ''
 {
-  # Packages from snapshot
-  packages = {
-    systemPackages = [
+  packageModules = [
+    ${modulesList}
+  ];
+  systemPackages = [
     ${packagesList}
-    ];
-  };
+  ];
+  userPackages = { };
 }
 '';
   
-  # Generate localization-config.nix
+  # v1 flat config: core/base/localization/config.nix
   localizationConfig = ''
 {
-  # System Settings
-  localization = {
-    timeZone = "${timeZone}";
-    locale = "${locale}";
-  };
+  timeZone = "${timeZone}";
+  locales = [ "${locale}" ];
+  keyboardLayout = "us";
+  keyboardOptions = "";
 }
 '';
-  
-  # Generate module-manager-config.nix (if modules found)
-  modulesList = if uniqueModules != [] then
-    builtins.concatStringsSep "\n      " (builtins.map (m: "${m}.enable = true;") uniqueModules)
-  else "";
-  
-  moduleManagerConfig = if uniqueModules != [] then ''
-{
-  # Modules from snapshot
-  modules = {
-${modulesList}
-  };
-}
-'' else "";
   
 in
 {
-  # NUR configs/*.nix Dateien - das komplette Repository kommt von der ISO!
+  # v1 modular paths — nested under systemConfig/ on the target system
   configs = {
-    "desktop-config.nix" = desktopConfig;
-    "packages-config.nix" = packagesConfig;
-    "localization-config.nix" = localizationConfig;
-  } // (if moduleManagerConfig != "" then {
-    "module-manager-config.nix" = moduleManagerConfig;
-  } else {});
+    "core/base/desktop/config.nix" = desktopConfig;
+    "core/base/packages/config.nix" = packagesConfig;
+    "core/base/localization/config.nix" = localizationConfig;
+  };
   
   # Metadata for reference
   metadata = {

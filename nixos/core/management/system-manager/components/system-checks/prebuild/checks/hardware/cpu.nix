@@ -49,16 +49,16 @@ EOF
       DETECTED="none"
     fi
     
-    # Check if hardware-config.nix exists
+    # Check if core/base/hardware/config.nix exists
     if [ ! -f "${hardwareConfigPath}" ]; then
-      ${ui.messages.info "hardware-config.nix not found, creating it..."}
+      ${ui.messages.info "core/base/hardware/config.nix not found, creating it..."}
       _update_cpu "$DETECTED"
-      ${ui.badges.success "hardware-config.nix created with detected CPU."}
+      ${ui.badges.success "core/base/hardware/config.nix created with detected CPU."}
       exit 0
     fi
     
     if ! CONFIGURED=$(grep 'cpu =' "${hardwareConfigPath}" | cut -d'"' -f2); then
-      ${ui.messages.error "Could not find CPU configuration in hardware-config.nix"}
+      ${ui.messages.error "Could not find CPU configuration in core/base/hardware/config.nix"}
       exit 1
     fi
     

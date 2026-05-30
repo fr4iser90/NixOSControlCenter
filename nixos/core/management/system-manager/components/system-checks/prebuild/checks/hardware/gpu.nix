@@ -104,14 +104,14 @@ EOF
     fi
     
     if [ ! -f "${hardwareConfigPath}" ]; then
-      ${ui.messages.info "hardware-config.nix not found, creating it..."}
+      ${ui.messages.info "core/base/hardware/config.nix not found, creating it..."}
       _update_gpu "$DETECTED"
-      ${ui.badges.success "hardware-config.nix created with detected GPU."}
+      ${ui.badges.success "core/base/hardware/config.nix created with detected GPU."}
       exit 0
     fi
     
     if ! CONFIGURED=$(grep 'gpu =' "${hardwareConfigPath}" | cut -d'"' -f2); then
-      ${ui.messages.warning "Could not find GPU configuration in hardware-config.nix, setting detected GPU..."}
+      ${ui.messages.warning "Could not find GPU configuration in core/base/hardware/config.nix, setting detected GPU..."}
       _update_gpu "$DETECTED"
       ${ui.badges.success "GPU configuration set to $DETECTED."}
       exit 0
@@ -154,7 +154,7 @@ in {
           Checks:
           - Detects installed GPU hardware
           - Compares with configured GPU setting
-          - Auto-updates hardware-config.nix if needed
+          - Auto-updates core/base/hardware/config.nix if needed
           
           Supports detection of:
           - NVIDIA, AMD, Intel graphics

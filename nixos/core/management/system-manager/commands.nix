@@ -142,13 +142,14 @@ in {
 
           Migration Process:
           - Creates backup of current system-config.nix
-          - Extracts config sections to separate files in configs/:
-            * modules → configs/module-manager-config.nix
-            * desktop → configs/desktop-config.nix
-            * hardware → configs/hardware-config.nix
-            * network → configs/network-config.nix
-            * logging → configs/logging-config.nix
-          - Keeps only critical values in system-config.nix
+          - Extracts config sections to modular files in systemConfig/:
+            * desktop → core/base/desktop/config.nix
+            * hardware → core/base/hardware/config.nix
+            * packages → core/base/packages/config.nix
+            * localization → core/base/localization/config.nix
+            * network → core/base/network/config.nix
+            * users → core/base/user/config.nix
+            * system → core/management/system-manager/config.nix
           - Preserves all existing configuration values
 
           This migration is safe and creates backups automatically.

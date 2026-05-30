@@ -34,9 +34,18 @@ def extract_hostname_from_flake(flake_path):
         return "nixos"
 
 
+def write_module_config(configs_dir, module_path, content):
+    """Write a v1 modular config file under systemConfig/<module_path>/config.nix"""
+    config_dir = os.path.join(configs_dir, module_path)
+    os.makedirs(config_dir, exist_ok=True)
+    config_path = os.path.join(config_dir, "config.nix")
+    with open(config_path, 'w') as f:
+        f.write(content)
+
+
 def generate_configs_from_selection(target_root, packagechooser_data):
     """
-    Generate configs based on user selection from packagechooser.
+    Generate v1 modular configs based on user selection from packagechooser.
     Creates configs in {target_root}/etc/nixos/systemConfig/
     
     packagechooser_data format:
@@ -57,74 +66,87 @@ def generate_configs_from_selection(target_root, packagechooser_data):
     
     libcalamares.utils.info(f"PackageChooser selections: system={system_type}, desktop={desktop_env}, features={features}")
     
-    # Generate system-config.nix
-    system_config_path = f"{configs_dir}/system-config.nix"
-    if not os.path.exists(system_config_path):
-        system_config = f'''{{
-  # System Configuration
+    # core/management/system-manager/config.nix
+    system_manager_path = os.path.join(configs_dir, "core/management/system-manager/config.nix")
+    if not os.path.exists(system_manager_path):
+        system_manager_config = f'''{{
+  configVersion = "1.0";
   systemType = "{system_type}";
-  hostName = null;  # Will be set from flake
-  
+  allowUnfree = true;
   system = {{
     channel = "stable";
     bootloader = "systemd-boot";
   }};
-  
-  allowUnfree = true;
-  users = {{}};
+  buildLogLevel = "minimal";
+}}
+'''
+        write_module_config(configs_dir, "core/management/system-manager", system_manager_config)
+        libcalamares.utils.info("Generated core/management/system-manager/config.nix")
+    
+    # core/base/localization/config.nix
+    localization_path = os.path.join(configs_dir, "core/base/localization/config.nix")
+    if not os.path.exists(localization_path):
+        localization_config = '''{
   timeZone = "Europe/Berlin";
   locales = [ "en_US.UTF-8" ];
   keyboardLayout = "de";
-}}
+  keyboardOptions = "";
+}
 '''
-        with open(system_config_path, 'w') as f:
-            f.write(system_config)
-        libcalamares.utils.info("Generated system-config.nix")
+        write_module_config(configs_dir, "core/base/localization", localization_config)
+        libcalamares.utils.info("Generated core/base/localization/config.nix")
     
-    # Generate desktop-config.nix if desktop is selected
+    # core/base/desktop/config.nix
     if desktop_env:
-        desktop_config_path = f"{configs_dir}/desktop-config.nix"
-        # Determine display manager based on desktop
         display_manager = "sddm" if desktop_env == "plasma" else "gdm"
         desktop_config = f'''{{
-  # Desktop Environment
-  desktop = {{
-    enable = true;
-    environment = "{desktop_env}";
-    display = {{
-      manager = "{display_manager}";
-      server = "wayland";
-      session = "{desktop_env}";
-    }};
-    theme = {{
-      dark = true;
-    }};
-    audio = "pipewire";
+  enable = true;
+  environment = "{desktop_env}";
+  display = {{
+    manager = "{display_manager}";
+    server = "wayland";
+    session = "{desktop_env}";
   }};
+  theme = {{
+    dark = true;
+  }};
+  audio = "pipewire";
 }}
 '''
-        with open(desktop_config_path, 'w') as f:
-            f.write(desktop_config)
-        libcalamares.utils.info(f"Generated desktop-config.nix for {desktop_env}")
+        write_module_config(configs_dir, "core/base/desktop", desktop_config)
+        libcalamares.utils.info(f"Generated core/base/desktop/config.nix for {desktop_env}")
+        
+        audio_config = '''{
+  enable = true;
+  system = "pipewire";
+}
+'''
+        write_module_config(configs_dir, "core/base/audio", audio_config)
+        libcalamares.utils.info("Generated core/base/audio/config.nix")
+    else:
+        desktop_config = '''{
+  enable = false;
+}
+'''
+        write_module_config(configs_dir, "core/base/desktop", desktop_config)
+        libcalamares.utils.info("Generated core/base/desktop/config.nix (disabled)")
     
-    # Generate packages-config.nix from features
+    # core/base/packages/config.nix from features
     if features:
-        packages_config_path = f"{configs_dir}/packages-config.nix"
-        # Filter out desktop environments (already in desktop-config)
         package_modules = [f for f in features if f not in ["plasma", "gnome", "xfce"]]
         
         if package_modules:
             modules_list = "\n    ".join([f'"{m}"' for m in package_modules])
             packages_config = f'''{{
-  # Package Modules
   packageModules = [
     {modules_list}
   ];
+  systemPackages = [ ];
+  userPackages = {{ }};
 }}
 '''
-            with open(packages_config_path, 'w') as f:
-                f.write(packages_config)
-            libcalamares.utils.info(f"Generated packages-config.nix with modules: {package_modules}")
+            write_module_config(configs_dir, "core/base/packages", packages_config)
+            libcalamares.utils.info(f"Generated core/base/packages/config.nix with modules: {package_modules}")
     
     libcalamares.utils.info("Config generation completed")
 

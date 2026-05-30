@@ -124,7 +124,7 @@
     # Desktop Environments - NICHT als Module in packages/modules/!
     # Sie sind bereits in nixos/desktop/environments/ (komplexe Struktur)
     # Metadata nur für Custom Install UI-Auswahl
-    # Werden über desktop-config.nix konfiguriert, nicht über packageModules
+    # Werden über core/base/desktop/config.nix konfiguriert, nicht über packageModules
     plasma = {
       systemTypes = [ "desktop" ];
       group = "desktop-environment";
@@ -133,7 +133,7 @@
       conflicts = [ "gnome" "xfce" ];
       # WICHTIG: Kein Module-File in packages/modules/!
       # Desktop Environment ist in nixos/desktop/environments/plasma/
-      # Custom Install schreibt desktop.environment = "plasma" in desktop-config.nix
+      # Custom Install schreibt desktop.environment = "plasma" in core/base/desktop/config.nix
     };
     
     gnome = {

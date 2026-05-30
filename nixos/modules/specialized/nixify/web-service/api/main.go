@@ -1521,7 +1521,7 @@ func (s *Server) handleBuildISO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build ISO in background (via queue would be better, but for now direct)
-	// variant wird aus dem generierten desktop-config.nix gelesen, nicht als Parameter!
+	// variant wird aus core/base/desktop/config.nix gelesen, nicht als Parameter!
 	go s.buildISO(req.SessionID)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1761,6 +1761,43 @@ func (s *Server) processSession(sessionID string) {
 	log.Printf("Session %s processed successfully", sessionID)
 }
 
+// writeModuleConfigFile writes a v1 modular config under configsDir using a relative path
+// such as "core/base/desktop/config.nix".
+func writeModuleConfigFile(configsDir, relativePath, content string) error {
+	configPath := filepath.Join(configsDir, relativePath)
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return fmt.Errorf("failed to create directory for %s: %v", relativePath, err)
+	}
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %v", relativePath, err)
+	}
+	return nil
+}
+
+// collectModuleConfigFiles walks configsDir and returns relative paths to all config.nix files.
+func collectModuleConfigFiles(configsDir string) (map[string]string, error) {
+	configs := make(map[string]string)
+	err := filepath.Walk(configsDir, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if info.IsDir() || info.Name() != "config.nix" {
+			return nil
+		}
+		relPath, err := filepath.Rel(configsDir, path)
+		if err != nil {
+			return err
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		configs[filepath.ToSlash(relPath)] = string(content)
+		return nil
+	})
+	return configs, err
+}
+
 func (s *Server) generateConfig(sessionID, outputPath string) error {
 	// Generate configs/*.nix files using Nix generator
 	reportPath := filepath.Join(s.dataDir, fmt.Sprintf("session-%s-report.json", sessionID))
@@ -1801,11 +1838,10 @@ func (s *Server) generateConfig(sessionID, outputPath string) error {
 		return fmt.Errorf("failed to create configs directory: %v", err)
 	}
 
-	// Write each config file
+	// Write each v1 modular config file (supports nested paths)
 	for fileName, content := range result.Configs {
-		configPath := filepath.Join(configsDir, fileName)
-		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
-			log.Printf("Failed to write %s: %v", fileName, err)
+		if err := writeModuleConfigFile(configsDir, fileName, content); err != nil {
+			log.Printf("%v", err)
 			continue
 		}
 	}
@@ -1863,53 +1899,47 @@ func (s *Server) generateBasicConfigs(sessionID, outputPath string) error {
 	// Für jetzt: Fehler wenn kein Desktop
 	desktopEnv := desktop // Verwende Desktop aus Report direkt - Mapping wird vom Nix-Generator gemacht
 
-	// Generate desktop-config.nix
-	desktopConfig := fmt.Sprintf(`{
-  # Desktop-Environment
-  desktop = {
-    enable = true;
-    environment = "%s";
-  };
-}
-`, desktopEnv)
-	if err := os.WriteFile(filepath.Join(configsDir, "desktop-config.nix"), []byte(desktopConfig), 0644); err != nil {
-		return fmt.Errorf("failed to write desktop-config.nix: %v", err)
-	}
-
-	// Generate packages-config.nix
-	packagesConfig := `{
-  # Packages from snapshot
-  packages = {
-    systemPackages = [
-      # TODO: Map programs from snapshot to NixOS packages
-    ];
-  };
-}
-`
-	if err := os.WriteFile(filepath.Join(configsDir, "packages-config.nix"), []byte(packagesConfig), 0644); err != nil {
-		return fmt.Errorf("failed to write packages-config.nix: %v", err)
-	}
-
-	// Generate localization-config.nix - KEINE FALLBACKS!
 	timezone, ok := session.Report.Settings["timezone"].(string)
 	if !ok || timezone == "" {
 		return fmt.Errorf("missing timezone in snapshot report settings")
 	}
-	
+
 	locale, ok := session.Report.Settings["locale"].(string)
 	if !ok || locale == "" {
 		return fmt.Errorf("missing locale in snapshot report settings")
 	}
+
+	// Generate v1 modular configs
+	desktopConfig := fmt.Sprintf(`{
+  enable = true;
+  environment = "%s";
+}
+`, desktopEnv)
+	if err := writeModuleConfigFile(configsDir, "core/base/desktop/config.nix", desktopConfig); err != nil {
+		return err
+	}
+
+	packagesConfig := `{
+  packageModules = [ ];
+  systemPackages = [
+    # TODO: Map programs from snapshot to NixOS packages
+  ];
+  userPackages = { };
+}
+`
+	if err := writeModuleConfigFile(configsDir, "core/base/packages/config.nix", packagesConfig); err != nil {
+		return err
+	}
+
 	localizationConfig := fmt.Sprintf(`{
-  # System Settings
-  localization = {
-    timeZone = "%s";
-    locale = "%s";
-  };
+  timeZone = "%s";
+  locales = [ "%s" ];
+  keyboardLayout = "us";
+  keyboardOptions = "";
 }
 `, timezone, locale)
-	if err := os.WriteFile(filepath.Join(configsDir, "localization-config.nix"), []byte(localizationConfig), 0644); err != nil {
-		return fmt.Errorf("failed to write localization-config.nix: %v", err)
+	if err := writeModuleConfigFile(configsDir, "core/base/localization/config.nix", localizationConfig); err != nil {
+		return err
 	}
 
 	// Create README
@@ -1919,11 +1949,11 @@ func (s *Server) generateBasicConfigs(sessionID, outputPath string) error {
 # Generated at: %s
 
 Generated config files:
-- desktop-config.nix
-- packages-config.nix
-- localization-config.nix
+- core/base/desktop/config.nix
+- core/base/packages/config.nix
+- core/base/localization/config.nix
 
-Copy these files to /etc/nixos/systemConfig/ on your NixOS system.
+Copy these paths into /etc/nixos/systemConfig/ on your NixOS system.
 `, sessionID, session.Report.OS, time.Now().Format(time.RFC3339))
 	if err := os.WriteFile(filepath.Join(configsDir, "README.md"), []byte(summary), 0644); err != nil {
 		log.Printf("Failed to write README: %v", err)
@@ -1947,16 +1977,16 @@ func (s *Server) buildISO(sessionID string) {
 		return
 	}
 
-	// Read desktop environment from generated config - KEIN variant Parameter!
+	// Read desktop environment from v1 modular config
 	configsDir := filepath.Join(s.dataDir, fmt.Sprintf("session-%s-configs", sessionID))
-	desktopConfigPath := filepath.Join(configsDir, "desktop-config.nix")
-	
+	desktopConfigPath := filepath.Join(configsDir, "core/base/desktop/config.nix")
+
 	desktopConfigContent, err := os.ReadFile(desktopConfigPath)
 	if err != nil {
-		log.Printf("Failed to read desktop-config.nix: %v", err)
+		log.Printf("Failed to read core/base/desktop/config.nix: %v", err)
 		s.sessionsMutex.Lock()
 		session.Status = "error"
-		session.Error = fmt.Sprintf("Failed to read desktop-config.nix: %v", err)
+		session.Error = fmt.Sprintf("Failed to read core/base/desktop/config.nix: %v", err)
 		s.sessionsMutex.Unlock()
 		return
 	}
@@ -1972,7 +2002,7 @@ func (s *Server) buildISO(sessionID string) {
 	}
 	
 	if desktopEnv == "" {
-		log.Printf("Failed to extract desktop environment from desktop-config.nix")
+		log.Printf("Failed to extract desktop environment from core/base/desktop/config.nix")
 		s.sessionsMutex.Lock()
 		session.Status = "error"
 		session.Error = "Failed to extract desktop environment from generated config"
@@ -1989,27 +2019,25 @@ func (s *Server) buildISO(sessionID string) {
 	// Build ISO using nix-build
 	isoPath := filepath.Join(s.dataDir, fmt.Sprintf("session-%s.iso", sessionID))
 	
-	// Read all config files from configs directory
-	configFiles, err := os.ReadDir(configsDir)
+	// Build configs map for Nix (recursive v1 modular paths)
+	configFiles, err := collectModuleConfigFiles(configsDir)
 	if err != nil {
-		log.Printf("Failed to read configs directory: %v", err)
+		log.Printf("Failed to collect config files: %v", err)
 		s.sessionsMutex.Lock()
 		session.Status = "error"
-		session.Error = fmt.Sprintf("Failed to read configs directory: %v", err)
+		session.Error = fmt.Sprintf("Failed to collect config files: %v", err)
 		s.sessionsMutex.Unlock()
 		return
 	}
 
-	// Build configs map for Nix
 	configsMap := "{ "
-	for _, file := range configFiles {
-		if !file.IsDir() && file.Name() != "README.md" {
-			content, _ := os.ReadFile(filepath.Join(configsDir, file.Name()))
-			// Escape for Nix string
-			escaped := strings.ReplaceAll(string(content), "\"", "\\\"")
-			escaped = strings.ReplaceAll(escaped, "\n", "\\n")
-			configsMap += fmt.Sprintf("\"%s\" = \"%s\"; ", file.Name(), escaped)
+	for name, content := range configFiles {
+		if name == "README.md" {
+			continue
 		}
+		escaped := strings.ReplaceAll(content, "\"", "\\\"")
+		escaped = strings.ReplaceAll(escaped, "\n", "\\n")
+		configsMap += fmt.Sprintf("\"%s\" = \"%s\"; ", name, escaped)
 	}
 	configsMap += "}"
 

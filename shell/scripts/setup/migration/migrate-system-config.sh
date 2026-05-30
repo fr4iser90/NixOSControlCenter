@@ -3,6 +3,20 @@
 # Automatic migration from old system-config.nix to new modular structure
 # Checks if old structure exists and migrates automatically
 
+# Write a v1 modular config file: systemConfig/<module_path>/config.nix
+write_module_config() {
+    local configs_dir="$1"
+    local module_path="$2"
+    local content="$3"
+    local config_file="${configs_dir}/${module_path}/config.nix"
+
+    mkdir -p "$(dirname "$config_file")"
+    cat > "$config_file" <<EOF
+${content}
+EOF
+    log_debug "Created ${module_path}/config.nix"
+}
+
 migrate_system_config() {
     log_section "System-Config Migration"
     
@@ -141,37 +155,32 @@ migrate_to_new_structure() {
     # Create minimal system-config.nix
     create_minimal_system_config "$config_file" "$system_type" "$hostname" "$channel" "$bootloader" "$allow_unfree" "$timezone" "$users_block" || return 1
     
-    # Create desktop-config.nix
+    # Create core/base/desktop/config.nix
     if has_desktop_config "$old_config_json"; then
         create_desktop_config "$configs_dir" "$old_config_json" || return 1
     fi
     
-    # Create localization-config.nix
+    # Create core/base/localization/config.nix
     if has_localization_config "$old_config_json"; then
         create_localization_config "$configs_dir" "$old_config_json" || return 1
     fi
     
-    # Create hardware-config.nix
+    # Create core/base/hardware/config.nix
     if has_hardware_config "$old_config_json"; then
         create_hardware_config "$configs_dir" "$old_config_json" || return 1
     fi
     
-    # Create features-config.nix
-    if has_features_config "$old_config_json"; then
-        create_features_config "$configs_dir" "$old_config_json" || return 1
-    fi
-    
-    # Create packages-config.nix
+    # Create core/base/packages/config.nix
     if has_packages_config "$old_config_json"; then
         create_packages_config "$configs_dir" "$old_config_json" || return 1
     fi
     
-    # Create network-config.nix
+    # Create core/base/network/config.nix
     if has_network_config "$old_config_json"; then
         create_network_config "$configs_dir" "$old_config_json" || return 1
     fi
     
-    # Create hosting-config.nix
+    # Merge hosting fields into core/base/localization/config.nix
     if has_hosting_config "$old_config_json"; then
         create_hosting_config "$configs_dir" "$old_config_json" || return 1
     fi
@@ -351,7 +360,7 @@ EOF
     log_success "Minimal system-config.nix created"
 }
 
-# Create desktop-config.nix
+# Create core/base/desktop/config.nix
 create_desktop_config() {
     local configs_dir="$1"
     local json="$2"
@@ -384,29 +393,24 @@ create_desktop_config() {
         audio=$(grep -o 'audio.*=.*"[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "pipewire")
     fi
     
-    cat > "$configs_dir/desktop-config.nix" <<EOF
-{
-  # Desktop Environment
-  desktop = {
-    enable = $enable;
-    environment = "$env";
-    display = {
-      manager = "$manager";
-      server = "$server";
-      session = "$session";
-    };
-    theme = {
-      dark = $dark;
-    };
-    audio = "$audio";
+    write_module_config "$configs_dir" "core/base/desktop" "{
+  enable = $enable;
+  environment = \"$env\";
+  display = {
+    manager = \"$manager\";
+    server = \"$server\";
+    session = \"$session\";
   };
-}
-EOF
+  theme = {
+    dark = $dark;
+  };
+  audio = \"$audio\";
+}"
     
-    log_success "desktop-config.nix created"
+    log_success "core/base/desktop/config.nix created"
 }
 
-# Create localization-config.nix
+# Create core/base/localization/config.nix
 create_localization_config() {
     local configs_dir="$1"
     local json="$2"
@@ -427,23 +431,24 @@ create_localization_config() {
         options=$(grep -o 'keyboardOptions.*=.*"[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "")
     fi
     
-    cat > "$configs_dir/localization-config.nix" <<EOF
-{
-  # Localization
+    local loc_content="{
   locales = [ $locales ];
-  keyboardLayout = "$keyboard";
-EOF
-    
+  keyboardLayout = \"$keyboard\";"
+
     if [[ -n "$options" && "$options" != "null" && "$options" != "" ]]; then
-        echo "  keyboardOptions = \"$options\";" >> "$configs_dir/localization-config.nix"
+        loc_content+="
+  keyboardOptions = \"$options\";"
     fi
+
+    loc_content+="
+}"
+
+    write_module_config "$configs_dir" "core/base/localization" "$loc_content"
     
-    echo "}" >> "$configs_dir/localization-config.nix"
-    
-    log_success "localization-config.nix created"
+    log_success "core/base/localization/config.nix created"
 }
 
-# Create hardware-config.nix
+# Create core/base/hardware/config.nix
 create_hardware_config() {
     local configs_dir="$1"
     local json="$2"
@@ -467,25 +472,23 @@ create_hardware_config() {
                  grep -A2 'memory = {' "$config_file" 2>/dev/null | grep 'sizeGB' | grep -o '[0-9]\+' || echo "")
     fi
     
-    cat > "$configs_dir/hardware-config.nix" <<EOF
-{
-  hardware = {
-    cpu = "$cpu";
-    gpu = "$gpu";
-EOF
-    
+    local hw_content="{
+  cpu = \"$cpu\";
+  gpu = \"$gpu\";"
+
     if [[ -n "$memory" && "$memory" != "null" && "$memory" != "" ]]; then
-        cat >> "$configs_dir/hardware-config.nix" <<EOF
-    ram = {
-      sizeGB = $memory;
-    };
-EOF
+        hw_content+="
+  ram = {
+    sizeGB = $memory;
+  };"
     fi
+
+    hw_content+="
+}"
+
+    write_module_config "$configs_dir" "core/base/hardware" "$hw_content"
     
-    echo "  };" >> "$configs_dir/hardware-config.nix"
-    echo "}" >> "$configs_dir/hardware-config.nix"
-    
-    log_success "hardware-config.nix created"
+    log_success "core/base/hardware/config.nix created"
 }
 
 # Create features-config.nix - DEPRECATED
@@ -516,11 +519,13 @@ EOF
     log_warning "Created deprecated features-config.nix - migrate to individual feature configs"
 }
 
-# Create packages-config.nix
+# Create core/base/packages/config.nix
 create_packages_config() {
     local configs_dir="$1"
     local json="$2"
+    local packages_file="${configs_dir}/core/base/packages/config.nix"
     
+    mkdir -p "$(dirname "$packages_file")"
     local preset="null"
     local package_modules=""
     local additional=""
@@ -543,34 +548,34 @@ create_packages_config() {
         fi
     fi
     
-    cat > "$configs_dir/packages-config.nix" <<EOF
+    cat > "$packages_file" <<EOF
 {
 EOF
     
     if [[ "$preset" != "null" && -n "$preset" ]]; then
-        cat >> "$configs_dir/packages-config.nix" <<EOF
+        cat >> "$packages_file" <<EOF
   # Use preset
   preset = "$preset";
 EOF
         if [[ -n "$additional" && "$additional" != "[]" ]]; then
             # Filter out empty strings and format properly
-            cat >> "$configs_dir/packages-config.nix" <<EOF
+            cat >> "$packages_file" <<EOF
   additionalPackageModules = [
 EOF
             local first=true
             for module in $additional; do
                 # Skip empty strings
                 [[ -z "$module" ]] && continue
-                echo "    \"$module\"" >> "$configs_dir/packages-config.nix"
+                echo "    \"$module\"" >> "$packages_file"
             done
-            cat >> "$configs_dir/packages-config.nix" <<EOF
+            cat >> "$packages_file" <<EOF
   ];
 EOF
         fi
     else
         if [[ -n "$package_modules" && "$package_modules" != "[]" ]]; then
             # Filter out empty strings and format properly
-            cat >> "$configs_dir/packages-config.nix" <<EOF
+            cat >> "$packages_file" <<EOF
   # Package modules directly
   packageModules = [
 EOF
@@ -579,29 +584,29 @@ EOF
                 # Skip empty strings
                 [[ -z "$module" ]] && continue
                 if [[ "$first" == "true" ]]; then
-                    echo "    \"$module\"" >> "$configs_dir/packages-config.nix"
+                    echo "    \"$module\"" >> "$packages_file"
                     first=false
                 else
-                    echo "    \"$module\"" >> "$configs_dir/packages-config.nix"
+                    echo "    \"$module\"" >> "$packages_file"
                 fi
             done
-            cat >> "$configs_dir/packages-config.nix" <<EOF
+            cat >> "$packages_file" <<EOF
   ];
 EOF
         else
-            cat >> "$configs_dir/packages-config.nix" <<EOF
+            cat >> "$packages_file" <<EOF
   # Package modules (empty)
   packageModules = [];
 EOF
         fi
     fi
     
-    echo "}" >> "$configs_dir/packages-config.nix"
+    echo "}" >> "$packages_file"
     
-    log_success "packages-config.nix created"
+    log_success "core/base/packages/config.nix created"
 }
 
-# Create network-config.nix
+# Create core/base/network/config.nix
 create_network_config() {
     local configs_dir="$1"
     local json="$2"
@@ -622,25 +627,18 @@ create_network_config() {
         dns=$(grep -o 'dns.*=.*"[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "default")
     fi
     
-    cat > "$configs_dir/network-config.nix" <<EOF
-{
-  # Firewall
+    write_module_config "$configs_dir" "core/base/network" "{
   enableFirewall = $firewall;
-  
-  # NetworkManager: WiFi Powersave
   enablePowersave = $powersave;
-  
-  # NetworkManager: DNS settings
   networkManager = {
-    dns = "$dns";
+    dns = \"$dns\";
   };
-}
-EOF
+}"
     
-    log_success "network-config.nix created"
+    log_success "core/base/network/config.nix created"
 }
 
-# Create hosting-config.nix
+# Create hosting fields in core/base/localization/config.nix
 create_hosting_config() {
     local configs_dir="$1"
     local json="$2"
@@ -654,33 +652,42 @@ create_hosting_config() {
         domain=$(echo "$json" | jq -r '.domain // empty')
         cert_email=$(echo "$json" | jq -r '.certEmail // empty')
     else
-        # Fallback: Extract from Nix file directly
         local config_file="${SYSTEM_CONFIG_FILE:-/etc/nixos/system-config.nix}"
         email=$(grep -o 'email.*=.*"[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "")
         domain=$(grep -o 'domain.*=.*"[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "")
         cert_email=$(grep -o 'certEmail.*=.*"[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "")
     fi
     
-    cat > "$configs_dir/hosting-config.nix" <<EOF
-{
-EOF
-    
+    local loc_file="${configs_dir}/core/base/localization/config.nix"
+    mkdir -p "$(dirname "$loc_file")"
+
+    local loc_content="{
+  locales = [ \"en_US.UTF-8\" ];
+  keyboardLayout = \"us\";
+  keyboardOptions = \"\";"
+
     if [[ -n "$email" && "$email" != "null" && "$email" != "" ]]; then
-        echo "  email = \"$email\";" >> "$configs_dir/hosting-config.nix"
+        loc_content+="
+  email = \"$email\";"
     fi
     if [[ -n "$domain" && "$domain" != "null" && "$domain" != "" ]]; then
-        echo "  domain = \"$domain\";" >> "$configs_dir/hosting-config.nix"
+        loc_content+="
+  domain = \"$domain\";"
     fi
     if [[ -n "$cert_email" && "$cert_email" != "null" && "$cert_email" != "" ]]; then
-        echo "  certEmail = \"$cert_email\";" >> "$configs_dir/hosting-config.nix"
+        loc_content+="
+  certEmail = \"$cert_email\";"
     fi
+
+    loc_content+="
+}"
+
+    write_module_config "$configs_dir" "core/base/localization" "$loc_content"
     
-    echo "}" >> "$configs_dir/hosting-config.nix"
-    
-    log_success "hosting-config.nix created"
+    log_success "hosting fields merged into core/base/localization/config.nix"
 }
 
-# Create overrides-config.nix
+# Create core/base/overrides/config.nix
 create_overrides_config() {
     local configs_dir="$1"
     local json="$2"
@@ -690,29 +697,20 @@ create_overrides_config() {
     if command -v jq >/dev/null 2>&1; then
         ssh_override=$(echo "$json" | jq -r '.overrides.enableSSH // "null"')
     else
-        # Fallback: Extract from Nix file directly
         local config_file="${SYSTEM_CONFIG_FILE:-/etc/nixos/system-config.nix}"
         ssh_override=$(grep -o 'enableSSH.*=.*[^;]*' "$config_file" 2>/dev/null | grep -oE '(true|false|null)' | head -1 || echo "null")
     fi
     
-    cat > "$configs_dir/overrides-config.nix" <<EOF
-{
+    write_module_config "$configs_dir" "core/base/overrides" "{
   overrides = {
-EOF
+    enableSSH = ${ssh_override:-null};
+  };
+}"
     
-    if [[ "$ssh_override" != "null" && -n "$ssh_override" ]]; then
-        echo "    enableSSH = $ssh_override;" >> "$configs_dir/overrides-config.nix"
-    else
-        echo "    enableSSH = null;" >> "$configs_dir/overrides-config.nix"
-    fi
-    
-    echo "  };" >> "$configs_dir/overrides-config.nix"
-    echo "}" >> "$configs_dir/overrides-config.nix"
-    
-    log_success "overrides-config.nix created"
+    log_success "core/base/overrides/config.nix created"
 }
 
-# Create logging-config.nix
+# Merge buildLogLevel into core/management/system-manager/config.nix
 create_logging_config() {
     local configs_dir="$1"
     local json="$2"
@@ -722,19 +720,33 @@ create_logging_config() {
     if command -v jq >/dev/null 2>&1; then
         log_level=$(echo "$json" | jq -r '.buildLogLevel // "minimal"')
     else
-        # Fallback: Extract from Nix file directly
         local config_file="${SYSTEM_CONFIG_FILE:-/etc/nixos/system-config.nix}"
         log_level=$(grep -o 'buildLogLevel.*=.*"[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "minimal")
     fi
     
-    cat > "$configs_dir/logging-config.nix" <<EOF
-{
-  # Build Logging
-  buildLogLevel = "$log_level";
-}
-EOF
+    local sm_file="${configs_dir}/core/management/system-manager/config.nix"
+    mkdir -p "$(dirname "$sm_file")"
     
-    log_success "logging-config.nix created"
+    if [[ ! -f "$sm_file" ]]; then
+        write_module_config "$configs_dir" "core/management/system-manager" "{
+  configVersion = \"1.0\";
+  systemType = \"desktop\";
+  allowUnfree = false;
+  system = {
+    channel = \"stable\";
+    bootloader = \"systemd-boot\";
+  };
+  buildLogLevel = \"$log_level\";
+}"
+    else
+        if grep -q 'buildLogLevel' "$sm_file"; then
+            sed -i "s/buildLogLevel = \"[^\"]*\";/buildLogLevel = \"$log_level\";/" "$sm_file"
+        else
+            sed -i "s/^}$/  buildLogLevel = \"$log_level\";\n}/" "$sm_file"
+        fi
+    fi
+    
+    log_success "buildLogLevel merged into core/management/system-manager/config.nix"
 }
 
 # Export functions

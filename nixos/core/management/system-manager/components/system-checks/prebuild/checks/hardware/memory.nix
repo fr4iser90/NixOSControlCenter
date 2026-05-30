@@ -51,14 +51,14 @@ EOF
     ${ui.tables.keyValue "Total RAM" "$DETECTED_GB GB"}
     
     if [ ! -f "${hardwareConfigPath}" ]; then
-      ${ui.messages.info "hardware-config.nix not found, creating it..."}
+      ${ui.messages.info "core/base/hardware/config.nix not found, creating it..."}
       _update_memory "$DETECTED_GB"
-      ${ui.badges.success "hardware-config.nix created with detected memory."}
+      ${ui.badges.success "core/base/hardware/config.nix created with detected memory."}
       exit 0
     fi
     
     if ! CONFIGURED_GB=$(grep -E 'sizeGB\s*=' "${hardwareConfigPath}" 2>/dev/null | grep -oE '[0-9]+' | head -1); then
-      ${ui.messages.warning "Memory size not configured in hardware-config.nix, setting detected value..."}
+      ${ui.messages.warning "Memory size not configured in core/base/hardware/config.nix, setting detected value..."}
       _update_memory "$DETECTED_GB"
       ${ui.badges.success "Memory size set to $DETECTED_GB GB."}
       exit 0
@@ -101,7 +101,7 @@ in {
           Checks:
           - Detects installed RAM size
           - Compares with configured memory setting
-          - Auto-updates hardware-config.nix if needed
+          - Auto-updates core/base/hardware/config.nix if needed
         '';
         interactive = false;
         dependencies = [ "system-checks" ];
