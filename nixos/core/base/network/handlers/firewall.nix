@@ -26,33 +26,31 @@ in {
     (lib.mkIf firewallEnabled {
       allowPing = true;
 
-    extraCommands = ''
-      # Lösche existierende Regeln
-      iptables -F
+      extraCommands = ''
+        # Nur INPUT leeren — kein globales iptables -F: das würde Docker-Ketten
+        # (DOCKER, DOCKER-USER, FORWARD-Sprünge) leeren und Bridge-Traffic brechen.
+        iptables -F INPUT
 
-      # Standardregeln
-      iptables -P INPUT DROP
-      iptables -P FORWARD DROP
-      iptables -P OUTPUT ACCEPT
+        iptables -P INPUT DROP
+        # FORWARD muss für Docker/Podman-Bridge (Container↔Container) durchlassen;
+        # leere FORWARD-Kette + Policy DROP = TCP-Timeouts zwischen Containern.
+        iptables -P FORWARD ACCEPT
+        iptables -P OUTPUT ACCEPT
 
-      # Erlaube etablierte Verbindungen
-      iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-      iptables -A INPUT -i lo -j ACCEPT
+        iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+        iptables -A INPUT -i lo -j ACCEPT
 
-      # ICMP erlauben (für Ping)
-      iptables -A INPUT -p icmp --icmp-type echo-request -j ACCEPT
-      iptables -A INPUT -p icmp --icmp-type echo-reply -j ACCEPT
+        iptables -A INPUT -p icmp --icmp-type echo-request -j ACCEPT
+        iptables -A INPUT -p icmp --icmp-type echo-reply -j ACCEPT
 
-      # Service-spezifische Regeln
-      ${lib.concatMapStrings (service: 
-        rules.generateServiceRules service recommendations.${service} (services.${service} or {})
-      ) (builtins.attrNames recommendations)}
+        ${lib.concatMapStrings (service:
+          rules.generateServiceRules service recommendations.${service} (services.${service} or {})
+        ) (builtins.attrNames recommendations)}
 
-      # Zusätzliche vertrauenswürdige Netze
-      ${lib.concatMapStrings (net: ''
-        iptables -A INPUT -s ${net} -j ACCEPT
-      '') (lib.attrByPath ["firewall" "trustedNetworks"] [] networkCfg)}
-    '';
+        ${lib.concatMapStrings (net: ''
+          iptables -A INPUT -s ${net} -j ACCEPT
+        '') (lib.attrByPath ["firewall" "trustedNetworks"] [] networkCfg)}
+      '';
     })
   ];
 
