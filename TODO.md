@@ -1,0 +1,1 @@
+NixOS systemVersion pipeline, notify update, window on startup, remind in X days 
