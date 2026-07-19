@@ -223,7 +223,12 @@ in
         -spice port="$spice_port",disable-ticketing=on \
         -device virtio-tablet-pci \
         -device virtio-keyboard-pci \
+        ${if isWindows then ''
+        # e1000: in-box Windows driver (virtio-net needs virtio-win ISO)
+        -device e1000,netdev=net0 \
+        '' else ''
         -device virtio-net-pci,netdev=net0 \
+        ''} \
         -netdev user,id=net0 \
         -boot menu=on
     }

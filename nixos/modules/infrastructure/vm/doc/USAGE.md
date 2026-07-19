@@ -71,6 +71,7 @@ Notes:
 - **win10**: UEFI without Secure Boot (plain OVMF) + software TPM
 - **win11**: UEFI Secure Boot (OVMFFull MS keys) + software TPM
 - ISO boots via `bootindex` (not classic `-cdrom` / `-boot order`) so OVMF does not fall through to PXE
+- **Network**: QEMU user/NAT (`-netdev user`). Windows uses `e1000` (in-box driver); Linux guests use `virtio-net`
 
 ### Starting an existing libvirt domain
 
