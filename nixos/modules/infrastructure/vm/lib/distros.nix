@@ -1,4 +1,4 @@
-# modules/virtualization-management/lib/distros.nix
+# modules/infrastructure/vm/lib/distros.nix
 { lib }:
 
 with lib;
@@ -26,6 +26,7 @@ let
   supportedDistros = {
     nixos = {
       name = "NixOS";
+      osFamily = "linux";
       variants = {
         plasma5 = {
           name = "KDE Plasma";
@@ -47,6 +48,7 @@ let
 
     ubuntu = {
       name = "Ubuntu";
+      osFamily = "linux";
       variants.desktop = {
         name = "Desktop";
         getUrl = mkUbuntuUrl;
@@ -56,6 +58,7 @@ let
 
     fedora = {
       name = "Fedora";
+      osFamily = "linux";
       variants.workstation = {
         name = "Workstation";
         getUrl = mkFedoraUrl;
@@ -66,6 +69,7 @@ let
 
     arch = {
       name = "Arch Linux";
+      osFamily = "linux";
       variants.default = {
         name = "Default";
         getUrl = mkArchUrl;
@@ -74,6 +78,7 @@ let
 
     kali = {
       name = "Kali Linux";
+      osFamily = "linux";
       variants.default = {
         name = "Default";
         getUrl = mkKaliUrl;
@@ -87,6 +92,7 @@ let
 
     pop = {
       name = "Pop!_OS";
+      osFamily = "linux";
       variants = {
         intel = {
           name = "Intel/AMD";
@@ -101,6 +107,7 @@ let
 
     mint = {
       name = "Linux Mint";
+      osFamily = "linux";
       variants.cinnamon = {
         name = "Cinnamon";
         getUrl = mkMintUrl;
@@ -112,6 +119,7 @@ let
 
     zorin = {
       name = "Zorin OS";
+      osFamily = "linux";
       variants.core = {
         name = "Core";
         getUrl = mkZorinUrl;
@@ -119,20 +127,75 @@ let
         defaultMemory = 4096;
       };
     };
+
+    # Microsoft does not provide stable anonymous ISO URLs — place the ISO yourself:
+    #   sudo cp Win11.iso /var/lib/virt/testing/iso/win11.iso
+    # Or: VM_ISO=/path/to/Win11.iso ncc vm test-win11-run
+    win10 = {
+      name = "Windows 10";
+      osFamily = "windows";
+      requiresLocalIso = true;
+      defaultMemory = 8192;
+      defaultCores = 4;
+      defaultDiskSize = 64;
+      portOffset = 10;
+      variants.enterprise = {
+        name = "Enterprise Eval";
+        localIso = true;
+        defaultVersion = "22H2";
+        defaultMemory = 8192;
+        defaultCores = 4;
+        defaultDiskSize = 64;
+        isoHint = "https://www.microsoft.com/en-us/evalcenter/evaluate-windows-10-enterprise";
+      };
+    };
+
+    win11 = {
+      name = "Windows 11";
+      osFamily = "windows";
+      requiresLocalIso = true;
+      defaultMemory = 8192;
+      defaultCores = 4;
+      defaultDiskSize = 80;
+      portOffset = 11;
+      variants.enterprise = {
+        name = "Enterprise Eval";
+        localIso = true;
+        defaultVersion = "25H2";
+        defaultMemory = 8192;
+        defaultCores = 4;
+        defaultDiskSize = 80;
+        isoHint = "https://www.microsoft.com/en-us/evalcenter/evaluate-windows-11-enterprise";
+      };
+    };
   };
 in {
   # Exports
-  distros = supportedDistros;  # Als Attribut!
+  distros = supportedDistros;
 
   # Helper-Funktionen
   getDistroUrl = distro: variant: version:
-    let 
+    let
       d = supportedDistros.${distro}.variants.${variant};
-      urlParams = 
-        if distro == "nixos" 
-        then { inherit version variant; }
-        else { inherit version; };
-    in d.getUrl urlParams;
+    in
+      if (d.localIso or false) then null
+      else
+        let
+          urlParams =
+            if distro == "nixos"
+            then { inherit version variant; }
+            else { inherit version; };
+        in d.getUrl urlParams;
+
+  isLocalIso = distro: variant:
+    (supportedDistros.${distro}.requiresLocalIso or false)
+    || (supportedDistros.${distro}.variants.${variant}.localIso or false);
+
+  getOsFamily = distro:
+    supportedDistros.${distro}.osFamily or "linux";
+
+  getIsoHint = distro: variant:
+    supportedDistros.${distro}.variants.${variant}.isoHint or null;
 
   # Validierung
   validateDistro = distro: variant: version:
@@ -147,7 +210,7 @@ in {
       throw "Unknown variant ${variant} for ${distro}"
     else if version == null then
       variantAttr.defaultVersion or null
-    else if !isVersionValid version then
+    else if !(variantAttr.localIso or false) && !isVersionValid version then
       throw "Version ${version} is not available for ${distro}. Available versions: ${toString availableVersions}"
     else version;
 

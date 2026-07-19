@@ -710,7 +710,7 @@ EOF
 
     
     # Copy defined directories and files
-    # IMPORTANT: configs/ and custom/ are NEVER overwritten - only copied during migration or if missing
+    # IMPORTANT: systemConfig/ and custom/ are NEVER overwritten - user-specific
     for item in "''${COPY_ITEMS[@]}"; do
       if [ -e "$SOURCE_DIR/$item" ]; then
         ${ui.messages.loading "Copying $item..."}
@@ -718,8 +718,8 @@ EOF
         # But for directories we need to be more careful
         if [ -d "$SOURCE_DIR/$item" ]; then
           # For directories: Only copy if target doesn't exist, or only new files
-          if [ "$item" = "configs" ] || [ "$item" = "custom" ]; then
-            # configs/ and custom/ are NEVER overwritten (user-specific)
+          if [ "$item" = "custom" ]; then
+            # custom/ is NEVER overwritten (user-specific)
             if [ ! -d "$NIXOS_DIR/$item" ]; then
               ${ui.messages.loading "Copying $item... ($item/ does not exist)"}
               sudo cp -r "$SOURCE_DIR/$item" "$NIXOS_DIR/"
@@ -728,7 +728,7 @@ EOF
             fi
           elif [ "$item" = "core" ] || [ "$item" = "modules" ]; then
             # CRITICAL: Selective copying module-by-module (NEVER rm -rf!)
-            ${ui.messages.loading "Updating $item/ modules (preserving configs)..."}
+            ${ui.messages.loading "Updating $item/ modules (preserving systemConfig)..."}
             
             # Create target_dir if it doesn't exist
             mkdir -p "$NIXOS_DIR/$item"
@@ -752,13 +752,13 @@ EOF
               fi
             done
             
-            ${ui.messages.success "$item/ updated (configs preserved)"}
+            ${ui.messages.success "$item/ updated (systemConfig preserved)"}
             
             # Cleanup removed modules (only if --cleanup flag is set)
             cleanup_removed_modules "$item"
           elif [ "$item" = "packages" ]; then
             # CRITICAL: packages/ is a single module - use SAME GENERIC LOGIC as core/modules
-            ${ui.messages.loading "Updating packages/ (preserving configs)..."}
+            ${ui.messages.loading "Updating packages/ (preserving systemConfig)..."}
             
             # Create target_dir if it doesn't exist
             mkdir -p "$NIXOS_DIR/$item"
@@ -777,32 +777,19 @@ EOF
               handle_stage0_module "$SOURCE_MODULE" "$TARGET_MODULE" "$MODULE_NAME" "$item"
             fi
             
-            ${ui.messages.success "packages/ updated (configs preserved)"}
+            ${ui.messages.success "packages/ updated (systemConfig preserved)"}
           else
-            # Other directories: Overwrite completely
-            sudo rm -rf "$NIXOS_DIR/$item"
-            sudo cp -r "$SOURCE_DIR/$item" "$NIXOS_DIR/"
+            # Other directories: recursive copy of new files only
+            sudo cp -rn "$SOURCE_DIR/$item/." "$NIXOS_DIR/$item/" 2>/dev/null || sudo cp -r "$SOURCE_DIR/$item" "$NIXOS_DIR/"
           fi
         else
-          # Single files: Overwrite (except protected files)
-          if [ "$item" = "flake.nix" ]; then
-            # flake.nix: Only overwrite if it doesn't exist or is significantly different
-            if [ ! -f "$NIXOS_DIR/flake.nix" ]; then
-              ${ui.messages.loading "Copying flake.nix (does not exist)..."}
-              sudo cp "$SOURCE_DIR/$item" "$NIXOS_DIR/"
-            else
-              ${ui.messages.info "flake.nix exists, overwriting with new version..."}
-              sudo cp "$SOURCE_DIR/$item" "$NIXOS_DIR/"
-            fi
-          else
-            # Other files: Overwrite
-            sudo cp "$SOURCE_DIR/$item" "$NIXOS_DIR/"
+          # Files: copy if missing or always update flake.nix
+          if [ "$item" = "flake.nix" ] || [ ! -e "$NIXOS_DIR/$item" ]; then
+            sudo cp "$SOURCE_DIR/$item" "$NIXOS_DIR/$item"
           fi
         fi
-      else
-        ${ui.messages.warning "$item not found, skipping..."}
-    fi
-     done
+      fi
+    done
      
       # Sync template-config.nix files to systemConfig/config.nix
       if [ "$VERBOSE" = "true" ]; then
@@ -1012,10 +999,16 @@ EOF
      # ADDITIONAL PROTECTION: Ensure protected directories are not overwritten
      # Even if they were accidentally in COPY_ITEMS or copied through another directory
      if [ -d "$NIXOS_DIR/systemConfig" ] && [ -d "$SOURCE_DIR/systemConfig" ]; then
-      ${ui.messages.info "configs/ exists in both locations - preserving existing configs (not overwriting)"}
+      ${ui.messages.info "systemConfig/ exists in both locations - preserving existing systemConfig (not overwriting)"}
     fi
     if [ -d "$NIXOS_DIR/custom" ] && [ -d "$SOURCE_DIR/custom" ]; then
       ${ui.messages.info "custom/ exists in both locations - preserving existing custom modules (not overwriting)"}
+    fi
+
+    # Purge leftover pre-v1 configs/ (never leave dead legacy trees)
+    if [ -d "$NIXOS_DIR/configs" ]; then
+      ${ui.messages.loading "Cleaning leftover legacy configs/ directory..."}
+      NIXOS_CONFIG_DIR="$NIXOS_DIR" ${configModule.cleanupLegacyConfigs}/bin/ncc-cleanup-legacy-configs $([ "$VERBOSE" = "true" ] && echo "--verbose") 2>&1 || true
     fi
     
     # PROTECT: hardware-configuration.nix and flake.lock (never overwrite)
@@ -1117,6 +1110,7 @@ in lib.mkMerge [
     environment.systemPackages = [
       systemUpdateMainScript
       configModule.configCheck
+      configModule.cleanupLegacyConfigs
     ];
 
     system.activationScripts.nixosBackupDir = ''

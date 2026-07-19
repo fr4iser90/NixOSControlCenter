@@ -6,11 +6,12 @@ let
   formatter = getModuleApi "cli-formatter";
   migration = import ./migration.nix { inherit pkgs lib getModuleApi backupHelpers; };
   validator = import ./validator.nix { inherit pkgs lib getModuleApi; };
+  legacyCleanup = import ./legacy-cleanup.nix { inherit pkgs lib getModuleApi backupHelpers; };
 in
 
 {
   # Main command: ncc-config-check
-  # Validates config, attempts migration if needed, re-validates
+  # Cleans legacy paths, validates config, migrates if needed, re-validates
   configCheck = pkgs.writeShellScriptBin "ncc-config-check" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
@@ -26,10 +27,21 @@ in
     done
     
     SYSTEM_CONFIG="/etc/nixos/system-config.nix"
+    VERBOSE_FLAG=""
+    if [ "$VERBOSE" = "true" ]; then
+      VERBOSE_FLAG="--verbose"
+    fi
+
+    # Step 0: Always purge leftover pre-v1 paths (configs/ → systemConfig/)
+    # Flake only loads systemConfig/; leaving configs/ causes silent wrong edits.
+    if ! ${legacyCleanup.cleanupLegacyConfigs}/bin/ncc-cleanup-legacy-configs $VERBOSE_FLAG 2>&1; then
+      ${formatter.messages.error "Legacy config cleanup failed"}
+      exit 1
+    fi
     
     # Step 1: Validate config
     ${formatter.messages.loading "Checking system configuration..."}
-    if ${validator.validateSystemConfig}/bin/ncc-validate-config $([ "$VERBOSE" = "true" ] && echo "--verbose") 2>&1; then
+    if ${validator.validateSystemConfig}/bin/ncc-validate-config $VERBOSE_FLAG 2>&1; then
       ${formatter.messages.success "Configuration is valid"}
       exit 0
     else
@@ -39,14 +51,18 @@ in
         ${formatter.messages.info "Attempting automatic migration..."}
         
         # Step 2: Try migration
-        if ${migration.migrateSystemConfig}/bin/ncc-migrate-config $([ "$VERBOSE" = "true" ] && echo "--verbose") 2>&1; then
+        if ${migration.migrateSystemConfig}/bin/ncc-migrate-config $VERBOSE_FLAG 2>&1; then
           ${formatter.messages.success "Migration completed successfully"}
+
+          # Re-run legacy cleanup after migration (migration may recreate nothing,
+          # but keeps the invariant: never leave configs/ behind)
+          ${legacyCleanup.cleanupLegacyConfigs}/bin/ncc-cleanup-legacy-configs $VERBOSE_FLAG 2>&1 || true
           
           # Step 3: Re-validate after migration
           if [ "$VERBOSE" = "true" ]; then
             ${formatter.messages.loading "Re-validating configuration..."}
           fi
-          if ${validator.validateSystemConfig}/bin/ncc-validate-config $([ "$VERBOSE" = "true" ] && echo "--verbose") 2>&1; then
+          if ${validator.validateSystemConfig}/bin/ncc-validate-config $VERBOSE_FLAG 2>&1; then
             ${formatter.messages.success "Configuration is now valid"}
             exit 0
           else

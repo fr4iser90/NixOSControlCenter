@@ -8,6 +8,6 @@ in {
   # DIREKT EXPORTIEREN, KEIN VM NAMESPACE!
   inherit (vmLib) mkVmScript;
   inherit (typeLib) vmConfig;
-  inherit (distroLib) getDistroUrl validateDistro;
+  inherit (distroLib) getDistroUrl validateDistro isLocalIso getOsFamily getIsoHint;
   distros = distroLib.distros;
 }

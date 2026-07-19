@@ -2,6 +2,11 @@
 {
   root = "/etc/nixos/systemConfig";
 
+  # Pre-v1 leftover — must never remain after config-check / system-update
+  legacy = {
+    configsDir = "/etc/nixos/configs";
+  };
+
   core = {
     base = {
       desktop = "/etc/nixos/systemConfig/core/base/desktop/config.nix";

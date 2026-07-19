@@ -20,6 +20,8 @@ let
     # Fallback to empty attrset if not set
     vmCfg = config.systemConfig.modules.infrastructure.vm.testing.${distro}.vm or {};
     vmName = "${distro}-test";
+    defaultVariant = head (attrNames libVM.distros.${distro}.variants);
+    variantDefaults = libVM.distros.${distro}.variants.${defaultVariant} or {};
   in {
     # Fix options path to match systemConfig structure
     options.systemConfig.modules.infrastructure.vm.testing.${distro}.vm = {
@@ -31,7 +33,7 @@ let
 
       variant = mkOption {
         type = types.enum (attrNames libVM.distros.${distro}.variants);
-        default = head (attrNames libVM.distros.${distro}.variants);
+        default = defaultVariant;
         description = "Distribution variant";
       };
 
@@ -43,13 +45,13 @@ let
 
       memory = mkOption {
         type = types.int;
-        default = libVM.distros.${distro}.defaultMemory or 4096;
+        default = variantDefaults.defaultMemory or libVM.distros.${distro}.defaultMemory or 4096;
         description = "RAM in MB";
       };
 
       cores = mkOption {
         type = types.int;
-        default = libVM.distros.${distro}.defaultCores or 2;
+        default = variantDefaults.defaultCores or libVM.distros.${distro}.defaultCores or 2;
         description = "CPU cores";
       };
 
@@ -57,7 +59,7 @@ let
         enable = mkEnableOption "Remote access";
         displayPort = mkOption {
           type = types.port;
-          default = 5900 + libVM.distros.${distro}.portOffset or 0;
+          default = 5900 + (libVM.distros.${distro}.portOffset or 0);
           description = "SPICE display port";
         };
       };
@@ -70,47 +72,48 @@ let
         };
         size = mkOption {
           type = types.int;
-          default = libVM.distros.${distro}.defaultDiskSize or 40;
+          default = variantDefaults.defaultDiskSize or libVM.distros.${distro}.defaultDiskSize or 40;
           description = "Image size in GB";
         };
       };
     };
 
     config = mkIf (vmCfg.enable or true) {
-      # Statt command-center.commands, erstellen wir direkte Skripte
+      # mkVmScript already runs prepare/create/iso/start — do not duplicate
       environment.systemPackages = [
         (pkgs.writeScriptBin "vm-test-${distro}-run" ''
-          set -e
-          
+          #!${pkgs.bash}/bin/bash
+          set -euo pipefail
+
+          cleanup_and_exit() {
+            echo "Cleaning up..."
+            ${lib.optionalString ((libVM.distros.${distro}.osFamily or "linux") == "windows") ''
+            # swtpm daemon may linger
+            pkill -f 'swtpm.*/${vmName}' 2>/dev/null || true
+            ''}
+            exit 0
+          }
+          trap 'cleanup_and_exit' INT TERM
+
           ${libVM.mkVmScript {
             name = vmName;
             inherit (vmCfg) memory cores image variant version;
             distro = distro;
             stateDir = cfg.stateDir;
           }}
-
-          trap 'cleanup_and_exit' INT TERM
-          
-          cleanup_and_exit() {
-            echo "Cleaning up..."
-            sudo virsh destroy ${vmName} 2>/dev/null || true
-            exit 0
-          }
-
-          prepare_ovmf
-          create_disk
-          iso_path=$(download_iso)
-          start_vm "$iso_path"
         '')
 
         (pkgs.writeScriptBin "vm-test-${distro}-reset" ''
-          set -e
+          #!${pkgs.bash}/bin/bash
+          set -euo pipefail
           echo "Stopping VM if running..."
           sudo virsh destroy ${vmName} 2>/dev/null || true
           sudo virsh undefine ${vmName} --remove-all-storage 2>/dev/null || true
           sudo rm -f ${vmCfg.image.path}
-          sudo rm -rf ${cfg.stateDir}/testing/iso/*
-          sudo rm -rf ${cfg.stateDir}/testing/vars/*
+          sudo rm -f ${cfg.stateDir}/testing/vars/${vmName}_VARS.fd
+          sudo rm -rf ${cfg.stateDir}/testing/swtpm/${vmName}
+          # Keep shared ISOs; only remove this distro's ISO copies
+          sudo rm -f ${cfg.stateDir}/testing/iso/${distro}-${vmName}.iso
           echo "Reset complete. You can now run 'ncc vm test-${distro}-run'"
         '')
       ];

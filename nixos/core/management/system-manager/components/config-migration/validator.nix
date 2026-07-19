@@ -164,25 +164,33 @@ let
            grep -q "$field = " "$SYSTEM_CONFIG" 2>/dev/null; then
           if [ "$VERBOSE" = "true" ]; then
             ${formatter.messages.warning "Non-critical field '$field' found in system-config.nix (v$CONFIG_VERSION)"}
-            ${formatter.messages.info "This should be in separate configs/ files"}
+            ${formatter.messages.info "This should be in separate systemConfig/ files"}
             ${formatter.messages.info "Consider running 'ncc-migrate-config' to migrate to modular structure"}
           fi
           WARNINGS=$((WARNINGS + 1))
         fi
       done
     fi
+
+    # Fail loudly if pre-v1 leftover configs/ is still present (flake ignores it)
+    LEGACY_CONFIGS_DIR="/etc/nixos/configs"
+    if [ -d "$LEGACY_CONFIGS_DIR" ]; then
+      ${formatter.messages.error "Legacy configs/ directory still exists (must be cleaned)"}
+      ${formatter.messages.info "Run: ncc-cleanup-legacy-configs  (or ncc-config-check / system-update)"}
+      ERRORS=$((ERRORS + 1))
+    fi
     
-    # Check if configs directory exists (for modular versions)
+    # Check if systemConfig directory exists (for modular versions)
     # Note: hasConfigsDir is not in JSON, we check directory directly
     if [ "$CONFIG_VERSION" != "1.0" ]; then
-      # v1.0+ expects configs dir
+      # v1.0+ expects systemConfig dir
       if [ ! -d "$CONFIGS_DIR" ]; then
         if [ "$VERBOSE" = "true" ]; then
-          ${formatter.messages.info "configs/ directory does not exist (recommended for modular config v$CONFIG_VERSION)"}
+          ${formatter.messages.info "systemConfig/ directory does not exist (recommended for modular config v$CONFIG_VERSION)"}
         fi
       else
         if [ "$VERBOSE" = "true" ]; then
-          ${formatter.messages.success "configs/ directory exists"}
+          ${formatter.messages.success "systemConfig/ directory exists"}
         fi
         
         # Get expected config files for this version

@@ -17,37 +17,46 @@ let
   availableDistros = attrNames libVM.distros;
   
   # VM status command
+  # NOTE: ui.badges/messages/tables already emit `printf` lines — do not wrap in echo
+  # (nested quotes strip `\e` → broken colors / literal printf text).
   vmStatus = pkgs.writeShellScriptBin "ncc-vm-status" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
     
-    echo "${ui.badges.info "🖥️  VM Manager Status"}"
+    ${ui.badges.info "🖥️  VM Manager Status"}
     
-    # Check if libvirtd is running
+    # Check if libvirtd unit exists and is running
+    if ! systemctl cat libvirtd.service >/dev/null 2>&1; then
+      ${ui.badges.error "Libvirt is not installed"}
+      ${ui.messages.info "Enable the VM module (enable = true) in systemConfig/modules/infrastructure/vm/config.nix"}
+      ${ui.messages.info "Then rebuild: sudo nixos-rebuild switch"}
+      exit 1
+    fi
+
     if systemctl is-active --quiet libvirtd.service; then
-      echo "${ui.tables.keyValue "Libvirt Daemon" "Running"}"
+      ${ui.tables.keyValue "Libvirt Daemon" "Running"}
     else
-      echo "${ui.badges.warning "Libvirt daemon not running"}"
-      echo "${ui.messages.info "Start with: sudo systemctl start libvirtd"}"
+      ${ui.badges.warning "Libvirt daemon not running"}
+      ${ui.messages.info "Start with: sudo systemctl start libvirtd"}
       exit 1
     fi
     
     # List running VMs
     echo ""
-    echo "${ui.badges.info "Running VMs:"}"
+    ${ui.badges.info "Running VMs:"}
     if virsh list --state-running 2>/dev/null | grep -q "running"; then
       virsh list --state-running
     else
-      echo "${ui.messages.info "No VMs currently running"}"
+      ${ui.messages.info "No VMs currently running"}
     fi
     
     # List all VMs
     echo ""
-    echo "${ui.badges.info "All VMs:"}"
+    ${ui.badges.info "All VMs:"}
     if virsh list --all 2>/dev/null | grep -q "Id"; then
       virsh list --all
     else
-      echo "${ui.messages.info "No VMs defined"}"
+      ${ui.messages.info "No VMs defined"}
     fi
   '';
   
@@ -56,16 +65,16 @@ let
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
     
-    echo "${ui.badges.info "📋 Available VM Test Distros"}"
+    ${ui.badges.info "📋 Available VM Test Distros"}
     echo ""
     
     ${lib.concatMapStringsSep "\n" (distro: ''
-      echo "${ui.tables.keyValue "${distro}" "ncc vm test-${distro}-run"}"
+      ${ui.tables.keyValue "${distro}" "ncc vm test-${distro}-run"}
     '') availableDistros}
     
     echo ""
-    echo "${ui.messages.info "Use 'ncc vm test-<distro>-run' to start a test VM"}"
-    echo "${ui.messages.info "Use 'ncc vm test-<distro>-reset' to reset a test VM"}"
+    ${ui.messages.info "Use 'ncc vm test-<distro>-run' to start a test VM"}
+    ${ui.messages.info "Use 'ncc vm test-<distro>-reset' to reset a test VM"}
   '';
   
   # Create commands for each distro
@@ -80,13 +89,13 @@ let
       #!${pkgs.bash}/bin/bash
       set -euo pipefail
       
-      echo "${ui.badges.info "🚀 Starting ${distro} test VM"}"
+      ${ui.badges.info "🚀 Starting ${distro} test VM"}
       
       # Check if VM already exists and is running
       if virsh dominfo ${vmName} >/dev/null 2>&1; then
         if virsh dominfo ${vmName} | grep -q "State:.*running"; then
-          echo "${ui.badges.warning "VM ${vmName} is already running"}"
-          echo "${ui.messages.info "Use 'virsh console ${vmName}' to connect"}"
+          ${ui.badges.warning "VM ${vmName} is already running"}
+          ${ui.messages.info "Use 'virsh console ${vmName}' to connect"}
           exit 0
         fi
       fi
@@ -95,8 +104,8 @@ let
       if command -v vm-test-${distro}-run >/dev/null 2>&1; then
         exec vm-test-${distro}-run
       else
-        echo "${ui.badges.error "VM test script not found"}"
-        echo "${ui.messages.info "Make sure the VM module is enabled and rebuilt"}"
+        ${ui.badges.error "VM test script not found"}
+        ${ui.messages.info "Make sure the VM module is enabled in systemConfig/ and rebuilt"}
         exit 1
       fi
     '';
@@ -106,20 +115,20 @@ let
       #!${pkgs.bash}/bin/bash
       set -euo pipefail
       
-      echo "${ui.badges.warning "⚠️  Resetting ${distro} test VM"}"
+      ${ui.badges.warning "⚠️  Resetting ${distro} test VM"}
       
       # Use the system package script if available
       if command -v vm-test-${distro}-reset >/dev/null 2>&1; then
         exec vm-test-${distro}-reset
       else
         # Fallback: manual reset
-        echo "${ui.messages.info "Stopping VM if running..."}"
+        ${ui.messages.info "Stopping VM if running..."}
         sudo virsh destroy ${vmName} 2>/dev/null || true
         sudo virsh undefine ${vmName} --remove-all-storage 2>/dev/null || true
         sudo rm -f ${stateDir}/testing/images/${vmName}.qcow2
         sudo rm -rf ${stateDir}/testing/iso/*
         sudo rm -rf ${stateDir}/testing/vars/*
-        echo "${ui.badges.success "Reset complete"}"
+        ${ui.badges.success "Reset complete"}
       fi
     '';
   in [
@@ -233,7 +242,7 @@ let
     }
   ] ++ distroCommands;
   
-  # Register all commands via CLI Registry API
+  # Register all commands via CLI registry API
   registrationResult = cliRegistry.registerCommandsFor "vm" allCommands;
   
 in

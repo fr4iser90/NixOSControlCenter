@@ -27,15 +27,21 @@ in {
   environment.systemPackages = mkIf (cfg.enable or false) (with pkgs; [
     qemu
     virt-manager
+    virt-viewer
     spice
     spice-gtk
     spice-protocol
     swtpm
   ]);
 
+  # NixOS libvirtd group is `libvirtd` (not `libvirt`)
   systemd.tmpfiles.rules = mkIf (cfg.enable or false) [
-    "d ${stateDir} 0755 root root -"
-    "d ${stateDir}/images 0775 root libvirt -"
-    "d ${stateDir}/testing 0775 root libvirt -"
+    "d ${stateDir} 0775 root libvirtd -"
+    "d ${stateDir}/images 0775 root libvirtd -"
+    "d ${stateDir}/testing 0775 root libvirtd -"
+    "d ${stateDir}/testing/images 0775 root libvirtd -"
+    "d ${stateDir}/testing/iso 0775 root libvirtd -"
+    "d ${stateDir}/testing/vars 0775 root libvirtd -"
+    "d ${stateDir}/testing/swtpm 0775 root libvirtd -"
   ];
 }

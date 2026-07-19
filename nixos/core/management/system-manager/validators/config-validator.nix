@@ -49,20 +49,20 @@ let
       fi
     done
     
-    # Check if configs directory exists
+    # Check if systemConfig directory exists
     if [ ! -d "$CONFIGS_DIR" ]; then
-      echo "INFO: configs/ directory does not exist (optional, but recommended for modular config)"
+      echo "INFO: systemConfig/ directory does not exist (optional, but recommended for modular config)"
     else
-      echo "✓ configs/ directory exists"
+      echo "✓ systemConfig/ directory exists"
       
       # Find all config.nix files recursively
       CONFIG_FILES=$(find "$CONFIGS_DIR" -name "config.nix" -type f)
 
       if [ -z "$CONFIG_FILES" ]; then
-        echo "INFO: No config.nix files found in configs/ directory"
+        echo "INFO: No config.nix files found in systemConfig/ directory"
       else
         NUM_CONFIG_FILES=$(echo "$CONFIG_FILES" | wc -l)
-        echo "✓ Found $NUM_CONFIG_FILES config file(s) in configs/ directory"
+        echo "✓ Found $NUM_CONFIG_FILES config file(s) in systemConfig/ directory"
 
         # Validate each config file
         echo "$CONFIG_FILES" | while read -r config_file; do
@@ -92,7 +92,7 @@ let
        grep -q "modules = {" "$SYSTEM_CONFIG" 2>/dev/null || \
        grep -q "packageModules = " "$SYSTEM_CONFIG" 2>/dev/null; then
       echo "WARNING: Non-critical values found in system-config.nix"
-      echo "         These should be in separate configs/ files"
+      echo "         These should be in separate systemConfig/ files"
       echo "         Consider running 'ncc-migrate-config' to migrate to modular structure"
       WARNINGS=$((WARNINGS + 1))
     fi

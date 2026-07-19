@@ -4,7 +4,8 @@
 
 ### Enabling the Module
 
-Enable the VM manager in your configuration:
+Enable the VM manager in your configuration
+(`systemConfig/modules/infrastructure/vm/config.nix` — not `configs/`):
 
 ```nix
 {
@@ -13,6 +14,13 @@ Enable the VM manager in your configuration:
     enable = true;
   };
 }
+```
+
+Then rebuild so libvirtd/QEMU are installed:
+
+```bash
+sudo nixos-rebuild switch
+# or: ncc system rebuild
 ```
 
 ## Common Use Cases
@@ -41,6 +49,34 @@ Enable the VM manager in your configuration:
 }
 ```
 **Result**: VM storage management enabled
+
+### Use Case 3: Windows test VMs (win10 / win11)
+
+Microsoft blocks anonymous ISO mirrors. Place an eval ISO first:
+
+```bash
+# Download from Microsoft Eval Center, then:
+sudo cp ~/Downloads/Win11*.iso /var/lib/virt/testing/iso/win11.iso
+# or for Win10:
+sudo cp ~/Downloads/Win10*.iso /var/lib/virt/testing/iso/win10.iso
+
+ncc vm test-win11-run
+ncc vm test-win10-run
+
+# Or pass a path:
+VM_ISO=/path/to/Win11.iso ncc vm test-win11-run
+```
+
+### Starting an existing libvirt domain
+
+```bash
+virsh list --all
+virsh start win11          # your existing domain
+virt-manager               # GUI
+virt-viewer --connect qemu:///system win11
+```
+
+There is no bare `qemu` command — use `qemu-system-x86_64` or the wrappers above.
 
 ## Configuration Options
 

@@ -15,7 +15,7 @@ in {
 
   config = mkIf cfg.enable {
     systemd.tmpfiles.rules = [
-      "d ${cfg.basePath} 0775 root libvirt -"
+      "d ${cfg.basePath} 0775 root libvirtd -"
     ];
   };
 }

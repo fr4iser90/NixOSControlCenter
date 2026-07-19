@@ -11,6 +11,7 @@ let
   detectionModule = import ./detection.nix { inherit pkgs lib; };
   migrationModule = import ./migration.nix { inherit pkgs lib getModuleApi backupHelpers; };
   validatorModule = import ./validator.nix { inherit pkgs lib getModuleApi; };
+  legacyCleanupModule = import ./legacy-cleanup.nix { inherit pkgs lib getModuleApi backupHelpers; };
   checkModule = import ./check.nix { inherit config pkgs lib getModuleApi backupHelpers systemConfig configPath; };
 in
 
@@ -29,10 +30,14 @@ in
   
   # Validation engine (fully generic, schema-driven)
   validator = validatorModule;
+
+  # Legacy path cleanup (configs/ → systemConfig/)
+  legacyCleanup = legacyCleanupModule;
   
   # Main command (validates + migrates)
   check = checkModule;
   
   # Convenience: Direct access to main command
   configCheck = checkModule.configCheck;
+  cleanupLegacyConfigs = legacyCleanupModule.cleanupLegacyConfigs;
 }
