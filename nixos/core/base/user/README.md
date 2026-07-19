@@ -77,7 +77,9 @@ networking.firewall.allowedTCPPorts = [ 22 ];
 |------|--------|------|-------------|
 | `admin` | wheel, networkmanager, docker, podman, video, audio, render, input, seat | NOPASSWD ALL | Full system admin |
 | `restricted-admin` | wheel, networkmanager, video, audio | PASSWD ALL | Limited admin |
+| `admin` | wheel, networkmanager, docker, podman, video, audio, render, input, seat, libvirtd, kvm | full | Full system admin + VM |
 | `virtualization` | docker, podman, libvirtd, kvm | docker swarm/node only | Docker/VM management |
+| `restricted-admin` | wheel, networkmanager, video, audio, libvirtd, kvm | passwd sudo | Limited admin + VM |
 | `guest` | networkmanager | none | Read-only access |
 
 ## Directory Structure

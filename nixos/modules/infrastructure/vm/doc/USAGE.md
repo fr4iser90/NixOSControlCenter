@@ -67,6 +67,11 @@ ncc vm test-win10-run
 VM_ISO=/path/to/Win11.iso ncc vm test-win11-run
 ```
 
+Notes:
+- **win10**: UEFI without Secure Boot (plain OVMF) + software TPM
+- **win11**: UEFI Secure Boot (OVMFFull MS keys) + software TPM
+- ISO boots via `bootindex` (not classic `-cdrom` / `-boot order`) so OVMF does not fall through to PXE
+
 ### Starting an existing libvirt domain
 
 ```bash

@@ -88,8 +88,7 @@ let
           cleanup_and_exit() {
             echo "Cleaning up..."
             ${lib.optionalString ((libVM.distros.${distro}.osFamily or "linux") == "windows") ''
-            # swtpm daemon may linger
-            pkill -f 'swtpm.*/${vmName}' 2>/dev/null || true
+            pkill -f "swtpm.*ncc-vm/${vmName}" 2>/dev/null || true
             ''}
             exit 0
           }
@@ -111,7 +110,9 @@ let
           sudo virsh undefine ${vmName} --remove-all-storage 2>/dev/null || true
           sudo rm -f ${vmCfg.image.path}
           sudo rm -f ${cfg.stateDir}/testing/vars/${vmName}_VARS.fd
-          sudo rm -rf ${cfg.stateDir}/testing/swtpm/${vmName}
+          sudo rm -f ${cfg.stateDir}/testing/vars/${vmName}_VARS.uefi.fd
+          sudo rm -f ${cfg.stateDir}/testing/vars/${vmName}_VARS.ms.fd
+          rm -rf "''${XDG_RUNTIME_DIR:-/tmp}/ncc-vm/${vmName}" 2>/dev/null || true
           # Keep shared ISOs; only remove this distro's ISO copies
           sudo rm -f ${cfg.stateDir}/testing/iso/${distro}-${vmName}.iso
           echo "Reset complete. You can now run 'ncc vm test-${distro}-run'"

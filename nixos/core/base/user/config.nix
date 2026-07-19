@@ -25,9 +25,10 @@ let
 
   # Gruppen basierend auf Rolle
   roleGroups = {
-    admin = [ "wheel" "networkmanager" "docker" "podman" "video" "audio" "render" "input" "seat" ];
+    # libvirtd + kvm: needed for QEMU/KVM (/dev/kvm) and virt-manager
+    admin = [ "wheel" "networkmanager" "docker" "podman" "video" "audio" "render" "input" "seat" "libvirtd" "kvm" ];
     guest = [ "networkmanager" ];
-    restricted-admin = [ "wheel" "networkmanager" "video" "audio" ];
+    restricted-admin = [ "wheel" "networkmanager" "video" "audio" "libvirtd" "kvm" ];
     virtualization = [ "docker" "podman" "libvirtd" "kvm" ];
   };
 
