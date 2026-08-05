@@ -11,7 +11,7 @@ The Packages System module is a **core module** that manages system-wide and use
 - **Feature-Based Packages**: Organized by features (gaming, development, virtualization)
 - **Intelligent Dependencies**: Automatic dependency resolution and conflict detection
 - **Preset Configurations**: Pre-configured package sets for common use cases
-- **Docker Intelligence**: Automatic Docker mode selection (rootless vs root)
+- **Docker Intelligence**: Rootless by default; root for Swarm / AI-Workspace (`lib/docker-mode.nix`, override via `docker.root`)
 - **System/User Packages**: Separate system-wide and user-specific package management
 - **Legacy Support**: Backward compatibility with old packageModules structure
 - **CLI Management**: `ncc packages` command for adding/removing packages

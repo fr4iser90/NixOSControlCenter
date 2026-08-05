@@ -17,8 +17,14 @@
     "mergingOrder": [
       "template-config.nix (base defaults, always loaded if exists)",
       "options.nix defaults (from option definitions)",
-      "user config file from /etc/nixos/systemConfig/ (overrides everything)"
-    ]
+      "user config: monolith /etc/nixos/systemConfig.nix OR split /etc/nixos/systemConfig/**/config.nix"
+    ],
+    "layouts": {
+      "monolith": "/etc/nixos/systemConfig.nix (default for new installs, nested attrset)",
+      "split": "/etc/nixos/systemConfig/**/config.nix",
+      "convert": "ncc config-layout convert --to monolith|split",
+      "facade": "nixos/core/management/system-manager/lib/config-facade.nix (generates store bash; installer copy in shell/)"
+    }
   },
   "passwordManagement": {
     "description": "Passwords stored in /etc/nixos/secrets/passwords/<user>/.hashedPassword",
@@ -28,7 +34,7 @@
   },
   "prebuildChecks": {
     "description": "Run BEFORE nixos-rebuild, so external commands may not exist yet",
-    "pattern": "Each check has INLINE bash functions (_update_cpu, _update_gpu, _update_memory) that write hardware-config.nix directly",
+    "pattern": "Each check updates hardware via config-facade (monolith or split leaf)",
     "note": "update-hardware-config script only exists AFTER nixos-rebuild switch",
     "files": [
       "nixos/core/management/system-manager/components/system-checks/prebuild/checks/hardware/cpu.nix",
@@ -47,6 +53,7 @@
     "commonError": "jq: error: formatValue/0 is not defined — use formatValue($x) not $x | formatValue"
   },
   "paths": {
+    "systemConfigMonolith": "/etc/nixos/systemConfig.nix",
     "systemConfig": "/etc/nixos/systemConfig/",
     "systemConfigLegacy": "/etc/nixos/system-config.nix",
     "hardwareConfig": "/etc/nixos/hardware-configuration.nix"

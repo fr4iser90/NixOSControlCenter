@@ -22,7 +22,7 @@ update_system_config() {
     fi
     
     if [[ "$homelab_type" == "swarm" ]]; then
-        write_homelab_config "swarm" "true" "false"
+        write_homelab_config "swarm" "true" "false" "${swarm_role:-manager}"
     else
         write_homelab_config "single" "true" "false"
     fi
@@ -89,13 +89,18 @@ collect_homelab_info() {
     else
         # Single-Server: Ask for user setup
         use_extra_user=$(get_docker_user_setup "$docker_mode") || return 1
+        # Normalize: Homelab uses yes/no; custom setup may return extra/main
+        case "${use_extra_user,,}" in
+            y|yes|true|extra) use_extra_user="yes" ;;
+            *) use_extra_user="no" ;;
+        esac
         declare -g use_extra_user="$use_extra_user"
         if [[ "$use_extra_user" == "yes" ]]; then
             virt_user=$(get_virt_username "$virt_user") || return 1
             get_virt_password || return 1
-    if [[ "$admin_user" == "$virt_user" ]]; then
-        log_error "Admin user and virtualization user cannot be the same!"
-        return 1
+            if [[ "$admin_user" == "$virt_user" ]]; then
+                log_error "Admin user and virtualization user cannot be the same!"
+                return 1
             fi
         else
             # Use main user as admin (no extra user)
@@ -118,6 +123,17 @@ collect_homelab_info() {
 get_admin_username() {
     local default_user="$1"
     local username
+
+    if username=$(ncc_gui_answer ADMIN_USER 2>/dev/null); then
+        echo "$username"
+        return 0
+    fi
+    if declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1 && ncc_install_ui_prefer_gui; then
+        username=$(ncc_gui_ask text "Admin user" "Enter admin username" "$default_user") || return 1
+        echo "${username:-$default_user}"
+        return 0
+    fi
+
     while true; do
         read -ep $'\033[0;34m[?]\033[0m Enter admin username'"${default_user:+ [$default_user]}"': ' username
         username="${username:-$default_user}"
@@ -132,6 +148,17 @@ get_admin_username() {
 get_virt_username() {
     local default_user="$1"
     local username
+
+    if username=$(ncc_gui_answer VIRT_USER 2>/dev/null); then
+        echo "$username"
+        return 0
+    fi
+    if declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1 && ncc_install_ui_prefer_gui; then
+        username=$(ncc_gui_ask text "Virtualization user" "Enter virtualization username (docker)" "${default_user:-docker}") || return 1
+        echo "${username:-${default_user:-docker}}"
+        return 0
+    fi
+
     read -ep $'\033[0;34m[?]\033[0m Enter virtualization username(docker)'"${default_user:+ [$default_user]}"': ' username
     echo "${username:-${default_user:-docker}}"
 }
@@ -139,7 +166,20 @@ get_virt_username() {
 get_homelab_type() {
     local response
     local default_response="n"
-    
+    local from_gui
+
+    if from_gui=$(ncc_gui_answer HOMELAB_TYPE 2>/dev/null); then
+        echo "$from_gui"
+        return 0
+    fi
+    if declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1 && ncc_install_ui_prefer_gui; then
+        response=$(ncc_gui_ask yesno "Homelab topology" "Use Multi-Server (Docker Swarm)?" "$default_response") || return 1
+        case "$response" in
+            y|yes) echo "swarm"; return 0 ;;
+            *) echo "single"; return 0 ;;
+        esac
+    fi
+
     read -ep $'\033[0;34m[?]\033[0m Use Multi-Server (Docker Swarm)? (y/n)'" [${default_response}]: " response
     response="${response:-${default_response}}"
     response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
@@ -162,6 +202,21 @@ get_homelab_type() {
 
 get_swarm_role() {
     local selected
+    local from_gui
+
+    if from_gui=$(ncc_gui_answer SWARM_ROLE 2>/dev/null); then
+        echo "$from_gui"
+        return 0
+    fi
+    if declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1 && ncc_install_ui_prefer_gui; then
+        selected=$(ncc_gui_ask choice "Swarm role" "Select Swarm role" "Manager|Worker" "Manager") || return 1
+        case "$selected" in
+            Manager|manager) echo "manager"; return 0 ;;
+            Worker|worker) echo "worker"; return 0 ;;
+            *) log_error "Invalid selection"; return 1 ;;
+        esac
+    fi
+
     selected=$(printf "%s\n" "Manager" "Worker" | fzf \
         --header="Select Swarm role" \
         --height=8 \
@@ -205,15 +260,32 @@ detect_docker_mode() {
 get_docker_user_setup() {
     local docker_mode="$1"  # "docker" (wird automatisch rootless oder root entschieden)
     local default_response
-    
+    local from_gui
+    local response
+
+    if from_gui=$(ncc_gui_answer USE_EXTRA_USER 2>/dev/null) \
+        || from_gui=$(ncc_gui_answer DOCKER_USER_SETUP 2>/dev/null); then
+        case "${from_gui,,}" in
+            y|yes|true|extra) echo "yes"; return 0 ;;
+            n|no|false|main) echo "no"; return 0 ;;
+        esac
+    fi
+
     # Determine default based on Docker mode
     if [[ "$docker_mode" == "docker" ]]; then
         default_response="y"  # Root Docker → Extra User (default)
     else
         default_response="n"  # Rootless Docker → Main User (default)
     fi
-    
-    local response
+
+    if declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1 && ncc_install_ui_prefer_gui; then
+        response=$(ncc_gui_ask yesno "Docker user" "Use separate user for Docker?" "$default_response") || return 1
+        case "${response,,}" in
+            y|yes) echo "yes"; return 0 ;;
+            *) echo "no"; return 0 ;;
+        esac
+    fi
+
     while true; do
         read -ep $'\033[0;34m[?]\033[0m Use separate user for Docker? (y/n)'" [${default_response}]: " response
         response="${response:-${default_response}}"
@@ -237,6 +309,23 @@ get_docker_user_setup() {
 get_email() {
     local default_email="$1"
     local email
+
+    if email=$(ncc_gui_answer EMAIL 2>/dev/null); then
+        echo "$email"
+        return 0
+    fi
+    if declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1 && ncc_install_ui_prefer_gui; then
+        while true; do
+            email=$(ncc_gui_ask text "Email" "Enter main email address" "$default_email") || return 1
+            email="${email:-$default_email}"
+            if [[ "$email" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
+                echo "$email"
+                return 0
+            fi
+            log_error "Invalid email format"
+        done
+    fi
+
     while true; do
         read -ep $'\033[0;34m[?]\033[0m Enter main email address'"${default_email:+ [$default_email]}"': ' email
         email="${email:-$default_email}"
@@ -251,6 +340,23 @@ get_email() {
 get_domain() {
     local default_domain="$1"
     local domain
+
+    if domain=$(ncc_gui_answer DOMAIN 2>/dev/null); then
+        echo "$domain"
+        return 0
+    fi
+    if declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1 && ncc_install_ui_prefer_gui; then
+        while true; do
+            domain=$(ncc_gui_ask text "Domain" "Enter domain (e.g., example.com)" "$default_domain") || return 1
+            domain="${domain:-$default_domain}"
+            if [[ "$domain" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]]; then
+                echo "$domain"
+                return 0
+            fi
+            log_error "Invalid domain format"
+        done
+    fi
+
     while true; do
         read -ep $'\033[0;34m[?]\033[0m Enter domain (e.g., example.com)'"${default_domain:+ [$default_domain]}"': ' domain
         domain="${domain:-$default_domain}"
@@ -287,25 +393,28 @@ update_homelab_config() {
     };"
     fi
     
-    # Build homelab block (if Swarm or Single-Server)
-    local homelab_block=""
+    # Pass type token expected by update_system_config (single|swarm)
+    local homelab_type="single"
     if [[ "$swarm_role" != "none" ]]; then
-        homelab_block="  homelab = {
-    swarm = {
-      role = \"$swarm_role\";
-    };
-  };"
-    else
-        # Single-Server: homelab block without swarm
-        homelab_block="  homelab = {};"
+        homelab_type="swarm"
     fi
-    
-    # Update system-config.nix (users, systemType, and homelab block)
-    update_system_config "$users_block" "server" "$homelab_block" || return 1
+
+    # Update modular configs (users, systemType, homelab)
+    update_system_config "$users_block" "server" "$homelab_type" || return 1
     
     # Update hosting config (email and domain)
     update_hosting_config "$email" "$domain" || return 1
     
+    # Package modules: GUI selection, else Homelab defaults
+    local hl_defaults="${PRESET_DEFAULT_PACKAGES[Homelab Server]:-docker database web-server}"
+    if declare -F ncc_apply_gui_package_modules >/dev/null 2>&1; then
+        ncc_apply_gui_package_modules "$hl_defaults" || return 1
+    else
+        # shellcheck disable=SC2206
+        local arr=($hl_defaults)
+        write_packages_config "${arr[@]}" || return 1
+    fi
+
     # Update desktop config if desktop setting is needed
     if [[ "$enable_desktop" == "false" ]]; then
         write_desktop_disabled || return 1
@@ -320,8 +429,17 @@ update_homelab_config() {
 get_virt_password() {
     log_section "Password Generation Virtualization User"
     local random_hex
+    local from_gui
+    local password
+    local default_password
+
+    if from_gui=$(ncc_gui_answer VIRT_PASSWORD 2>/dev/null); then
+        virt_password="$from_gui"
+        log_success "Using password from GUI wizard"
+        return 0
+    fi
+
     if ! random_hex=$(openssl rand -hex 4 2>/dev/null); then
-        # Fallback wenn openssl fehlschlägt
         random_hex=$(head -c 8 /dev/urandom | xxd -p)
     fi
 
@@ -330,10 +448,22 @@ get_virt_password() {
         return 1
     fi
 
-    # Generiere ein garantiert valides Standardpasswort
-    local default_password="P@ssw0rd-${random_hex}"
-    local password
-    
+    default_password="P@ssw0rd-${random_hex}"
+
+    if declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1 && ncc_install_ui_prefer_gui; then
+        password=$(ncc_gui_ask password "Virt user password" \
+            "Enter password for virtualization user (or leave empty for random)." \
+            "Suggested: $default_password") || return 1
+        if [[ -z "$password" ]]; then
+            virt_password="$default_password"
+            log_success "Using random password"
+        else
+            virt_password="$password"
+            log_success "Using custom password"
+        fi
+        return 0
+    fi
+
     echo -e "\033[0;36m----------------------------------------\033[0m"
     echo -e "\033[0;36mIMPORTANT PASSWORD INFORMATION\033[0m"
     echo -e "\033[0;36m----------------------------------------\033[0m"
@@ -349,21 +479,18 @@ get_virt_password() {
         read -esp $'\033[0;34m[?]\033[0m Enter custom password (or press enter for random): ' password
         echo
 
-        # Wenn Enter gedrückt wurde, nutze Zufallspasswort
         if [[ -z "$password" ]]; then
             log_success "Using random password"
             virt_password="$default_password"
             return 0
         fi
 
-        # Prüfe Passwortlänge
         if [[ "${#password}" -lt 8 ]]; then
             log_error "Password must be at least 8 characters"
             sleep 1
             continue
         fi
 
-        # Bestätigung des Passworts
         read -esp $'\033[0;34m[?]\033[0m Confirm password: ' password_confirm
         echo
 
@@ -389,6 +516,18 @@ create_password_file() {
         return 1
     fi
 
+    local secrets_root="${SYSTEM_CONFIG_DIR:-/etc/nixos}/secrets/passwords"
+    local password_dir="${secrets_root}/${virt_user}"
+    local password_file="${password_dir}/.hashedPassword"
+    local use_sudo=0
+    [[ "${SYSTEM_CONFIG_DIR:-/etc/nixos}" == "/etc/nixos" ]] && use_sudo=1
+
+    if declare -F ncc_dry_run >/dev/null 2>&1 && ncc_dry_run; then
+        ncc_dry_skip "create password file" "$password_file" \
+            "(password length=${#virt_password}, hashing skipped)"
+        return 0
+    fi
+
     # Check if mkpasswd is available
     if ! command -v mkpasswd >/dev/null 2>&1; then
         log_error "mkpasswd command not found. Installing whois package..."
@@ -398,31 +537,39 @@ create_password_file() {
         fi
     fi
 
-    # Create password directory
-    local password_dir="/etc/nixos/secrets/passwords/${virt_user}"
     echo "Debug: Creating directory: ${password_dir}"
-    if ! sudo mkdir -p "${password_dir}"; then
-        log_error "Failed to create password directory: ${password_dir}"
-        return 1
+    if [[ $use_sudo -eq 1 ]]; then
+        sudo mkdir -p "${password_dir}" || {
+            log_error "Failed to create password directory: ${password_dir}"
+            return 1
+        }
+    else
+        mkdir -p "${password_dir}" || {
+            log_error "Failed to create password directory: ${password_dir}"
+            return 1
+        }
     fi
 
-    # Hash password and save to file
-    local password_file="${password_dir}/.hashedPassword"
     echo "Debug: Creating password file: ${password_file}"
-    if ! echo "${virt_password}" | mkpasswd -m sha-512 --stdin | sudo tee "${password_file}" > /dev/null; then
-        log_error "Failed to create password hash file: ${password_file}"
-        return 1
-    fi
-
-    # Set correct permissions
-    if ! sudo chmod 600 "${password_file}"; then
-        log_error "Failed to set password file permissions"
-        return 1
-    fi
-
-    if ! sudo chown root:root "${password_file}"; then
-        log_error "Failed to set password file ownership"
-        return 1
+    if [[ $use_sudo -eq 1 ]]; then
+        if ! echo "${virt_password}" | mkpasswd -m sha-512 --stdin | sudo tee "${password_file}" > /dev/null; then
+            log_error "Failed to create password hash file: ${password_file}"
+            return 1
+        fi
+        sudo chmod 600 "${password_file}" || {
+            log_error "Failed to set password file permissions"
+            return 1
+        }
+        sudo chown root:root "${password_file}" || {
+            log_error "Failed to set password file ownership"
+            return 1
+        }
+    else
+        if ! echo "${virt_password}" | mkpasswd -m sha-512 --stdin > "${password_file}"; then
+            log_error "Failed to create password hash file: ${password_file}"
+            return 1
+        fi
+        chmod 600 "${password_file}" || true
     fi
 
     log_success "Password file created successfully at ${password_file}"
@@ -432,7 +579,24 @@ create_password_file() {
 get_desktop_enabled() {
     local default_enabled="${1:-true}"
     local response
-    
+    local from_gui
+
+    if from_gui=$(ncc_gui_answer ENABLE_DESKTOP 2>/dev/null); then
+        echo "$from_gui"
+        return 0
+    fi
+    if declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1 && ncc_install_ui_prefer_gui; then
+        local def="y"
+        [[ "$default_enabled" == "false" || "$default_enabled" == "n" ]] && def="n"
+        response=$(ncc_gui_ask yesno "Desktop" \
+            'Enable desktop environment? ("no" is still buggy, may need restart after build)' \
+            "$def") || return 1
+        case "${response,,}" in
+            y|yes) echo "true"; return 0 ;;
+            *) echo "false"; return 0 ;;
+        esac
+    fi
+
     while true; do
         read -ep $'\033[0;34m[?]\033[0m Enable desktop environment ("no" is still buggy, need to restart after build)? (y/n) ' response
         response="${response:-${default_enabled}}"
@@ -473,14 +637,9 @@ export -f get_homelab_type
 export -f get_swarm_role
 export -f detect_docker_mode
 export -f get_docker_user_setup
-export -f log_error
-export -f log_success
-export -f log_section
-export -f update_users_homelab_block
-export -f update_email_domain
-export -f update_system_type
 export -f export_homelab_vars
 export -f create_password_file
 export -f get_virt_password
 export -f update_hosting_config
 export -f update_system_config
+export -f get_desktop_enabled

@@ -2,11 +2,14 @@
   description = "NixOS Configuration with Home Manager";
 
   inputs = {
-    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-25.11";
+    # SSOT stable release: keep nixpkgs-stable, home-manager-stable, and stateVersion in sync.
+    # Repo bump: shell/scripts/checks/system/check-nixos-version.sh
+    # Live hosts: ncc system update-channels --bump-to YY.MM (inputs only; stateVersion unchanged)
+    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-26.05";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     
     # Home-Manager Inputs für verschiedene Versionen
-    home-manager-stable.url = "github:nix-community/home-manager/release-25.11";
+    home-manager-stable.url = "github:nix-community/home-manager/release-26.05";
     home-manager-unstable.url = "github:nix-community/home-manager";
 
     # For TUI engine Go building
@@ -32,9 +35,14 @@
     # Note: lib is not available yet at this point, so config-loader must work without it
     configLoader = import ./core/management/system-manager/lib/config-loader.nix {};
 
-    # Load and merge all configs using centralized loader
-    # Only loads modular configs from configs directory
-    systemConfig = configLoader.loadSystemConfig ./. configs;
+    # Dual layout (v2):
+    #   monolith → ./systemConfig.nix (nested attrset, default for new installs)
+    #   split    → ./systemConfig/**/config.nix
+    systemConfig = configLoader.loadSystemConfig {
+      flakeRoot = ./.;
+      configsPath = configs;
+      monolithPath = if builtins.pathExists ./systemConfig.nix then ./systemConfig.nix else null;
+    };
 
     # Import module discovery for automatic config paths (after systemConfig is loaded)
     discoveryLib = import ./core/management/module-manager/lib/discovery.nix;
@@ -49,11 +57,11 @@
                    then home-manager-stable
                    else home-manager-unstable;
 
-    # Set stateVersion once for both system and home-manager
-    # NOTE: Version wird oben in inputs definiert - hier nur stateVersion setzen
-    stateVersion = if systemConfig.core.management.system-manager.system.channel == "stable"
-      then "25.11"
-      else "25.11"; # Use latest stable for unstable as well, or set to a default
+    # stateVersion for systems built from this flake (new installs / repo template).
+    # Must match the nixos-YY.MM pin above. Do not confuse with live-host upgrades:
+    # bumping channels on an existing machine should usually leave its stateVersion alone.
+    nixosRelease = "26.05";
+    stateVersion = nixosRelease;
 
     pkgs = import nixpkgs {
       inherit system;
@@ -126,7 +134,8 @@
                   homeDirectory = "/home/${username}";
                   stateVersion = stateVersion;
                 };
-            }) (systemConfig.core.base.user or {});
+            }) (lib.filterAttrs (_: v: builtins.isAttrs v)
+                 (systemConfig.core.base.user or {}));
           };
         }
       ];

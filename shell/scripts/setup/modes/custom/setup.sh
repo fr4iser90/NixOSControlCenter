@@ -50,8 +50,25 @@ backup_config() {
 get_docker_user_setup() {
     local docker_mode="$1"
     local default_response="n"
-    
     local response
+    local from_gui
+
+    if from_gui=$(ncc_gui_answer USE_EXTRA_USER 2>/dev/null) \
+        || from_gui=$(ncc_gui_answer DOCKER_USER_SETUP 2>/dev/null); then
+        case "${from_gui,,}" in
+            y|yes|true|extra) echo "extra"; return 0 ;;
+            n|no|false|main) echo "main"; return 0 ;;
+        esac
+    fi
+
+    if declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1 && ncc_install_ui_prefer_gui; then
+        response=$(ncc_gui_ask yesno "Docker user" "Use separate user for Docker?" "$default_response") || return 1
+        case "${response,,}" in
+            y|yes) echo "extra"; return 0 ;;
+            *) echo "main"; return 0 ;;
+        esac
+    fi
+
     while true; do
         read -ep $'\033[0;34m[?]\033[0m Use separate user for Docker? (y/n)'" [${default_response}]: " response
         response="${response:-${default_response}}"
@@ -83,8 +100,15 @@ setup_docker_users() {
     local users_block=""
     
     if [[ "$user_setup_mode" == "extra" ]]; then
-        read -ep $'\033[0;34m[?]\033[0m Enter virtualization username(docker) [docker]: ' virt_user
-        virt_user="${virt_user:-docker}"
+        if virt_user=$(ncc_gui_answer VIRT_USER 2>/dev/null); then
+            :
+        elif declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1 && ncc_install_ui_prefer_gui; then
+            virt_user=$(ncc_gui_ask text "Virtualization user" "Enter virtualization username (docker)" "docker") || return 1
+            virt_user="${virt_user:-docker}"
+        else
+            read -ep $'\033[0;34m[?]\033[0m Enter virtualization username(docker) [docker]: ' virt_user
+            virt_user="${virt_user:-docker}"
+        fi
         
         users_block="    \"$main_user\" = {
       role = \"admin\";
@@ -142,6 +166,11 @@ detect_and_setup_docker_users() {
     else
         local use_extra_user
         use_extra_user=$(get_docker_user_setup "docker") || return 1
+        # Accept Homelab yes/no and custom extra/main
+        case "${use_extra_user,,}" in
+            y|yes|true|extra) use_extra_user="extra" ;;
+            *) use_extra_user="main" ;;
+        esac
         setup_docker_users "$use_extra_user" "docker-rootless" || return 1
     fi
     

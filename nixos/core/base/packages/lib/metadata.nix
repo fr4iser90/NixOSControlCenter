@@ -70,10 +70,10 @@
     docker = {
       systemTypes = [ "desktop" "server" ];
       group = "virtualization";
-      description = "Docker containerization. Automatically uses rootless (safer, default). Uses root only if Docker Swarm or AI-Workspace is active.";
+      description = "Docker (rootless by default; root only for Swarm / AI-Workspace). Safer for a normal desktop admin account.";
       dependencies = [];
       conflicts = [ "podman" ];
-      legacyPath = "server.docker";  # Migration: server.docker → docker (automatic rootless)
+      legacyPath = "server.docker";  # Migration: server.docker → docker (smart rootless/root)
     };
     
     qemu-vm = {

@@ -3,12 +3,15 @@
 let
   cliRegistry = getModuleApi "cli-registry";
   # GENERISCH: CLI Formatter API über getModuleApi beziehen
-  ui = getModuleApi "cli-formatter"; 
-  
+  ui = getModuleApi "cli-formatter";
+  hw = import ../../../../../lib/hardware-config-writer.nix { inherit pkgs lib systemConfig; };
+
   prebuildScript = pkgs.writeScriptBin "prebuild-check-users" ''
     #!${pkgs.bash}/bin/bash
     set -e
-    
+
+    ${hw.preamble}
+
     ${ui.text.header "User Configuration Check"}
     
     # Get current and configured users (mit Filter für echte User)
@@ -17,21 +20,35 @@ let
     ${ui.tables.keyValue "Current users" "$CURRENT_USERS"}
     ${ui.tables.keyValue "Configured users" "$CONFIGURED_USERS"}
 
-    # CRITICAL: Runtime-Prüfung der User-Config-Datei (unabhängig von Nix-Evaluation)
-    # Die CONFIGURED_USERS oben wird bei der letzten Nix-Evaluation hardcoded.
-    # Wenn die Config-Datei seitdem geändert wurde, müssen wir hier runtime checken.
-    USER_CONFIG_FILE="/etc/nixos/systemConfig/core/base/user/config.nix"
-    if [ ! -f "$USER_CONFIG_FILE" ]; then
-      ${ui.badges.error "CRITICAL: User config file missing: $USER_CONFIG_FILE"}
-      ${ui.badges.error "Run system update with migration or create the file manually."}
+    # CRITICAL: Runtime check — layout-aware (monolith OR split leaf)
+    # CONFIGURED_USERS above is baked at Nix eval; verify live config still has users.
+    _user_config_present() {
+      local layout
+      layout=$(ncc_detect_layout 2>/dev/null || echo "split")
+      case "$layout" in
+        monolith)
+          [[ -f "$MONOLITH_FILE" ]] || return 1
+          local names
+          names=$("''${NIX_INSTANTIATE_BIN:-nix-instantiate}" --eval --strict --json -E \
+            "builtins.attrNames ((import $MONOLITH_FILE).core.base.user or {})" \
+            2>/dev/null | tr -d '[]"' | tr ',' ' ')
+          [[ -n "''${names// /}" ]]
+          ;;
+        *)
+          local f="''${CONFIG_PATH_USER:-/etc/nixos/systemConfig/core/base/user/config.nix}"
+          [[ -f "$f" ]] || return 1
+          local raw
+          raw=$(tr -d '[:space:]#' < "$f" 2>/dev/null || true)
+          [[ -n "$raw" && "$raw" != "{}" ]]
+          ;;
+      esac
+    }
+
+    if ! _user_config_present; then
+      layout_now=$(ncc_detect_layout 2>/dev/null || echo unknown)
+      ${ui.badges.error "CRITICAL: User configuration missing or empty"}
+      echo "layout=$layout_now monolith=$MONOLITH_FILE split=''${CONFIG_PATH_USER:-/etc/nixos/systemConfig/core/base/user/config.nix}" >&2
       ${ui.badges.error "Aborting - the system would delete ALL users without a config."}
-      exit 1
-    fi
-    CONFIG_RAW=$(cat "$USER_CONFIG_FILE" 2>/dev/null | tr -d '[:space:]#')
-    if [ -z "$CONFIG_RAW" ] || [ "$CONFIG_RAW" = "{}" ]; then
-      ${ui.badges.error "CRITICAL: User config file exists but is empty: $USER_CONFIG_FILE"}
-      ${ui.badges.error "The file contains only comments/whitespace. No users are configured!"}
-      ${ui.badges.error "Aborting - the system would delete ALL current users."}
       exit 1
     fi
 

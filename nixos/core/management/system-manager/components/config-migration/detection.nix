@@ -25,24 +25,50 @@ in
     # Generic config directory - can be overridden via environment variable
     NIXOS_CONFIG_DIR="''${NIXOS_CONFIG_DIR:-/etc/nixos}"
     SYSTEM_CONFIG="$NIXOS_CONFIG_DIR/system-config.nix"
+    MONOLITH_FILE="$NIXOS_CONFIG_DIR/systemConfig.nix"
     CONFIGS_DIR="$NIXOS_CONFIG_DIR/systemConfig"
     
     # Set jq path
     JQ_BIN="${pkgs.jq}/bin/jq"
     
-    # Check if system-config.nix exists
-    # After migration to v1, system-config.nix is deleted - version lives in systemConfig/
-    if [ ! -f "$SYSTEM_CONFIG" ]; then
-      # Fallback: check for configVersion in systemConfig/core/management/system-manager/config.nix
-      SM_CONFIG="$CONFIGS_DIR/core/management/system-manager/config.nix"
-      if [ -f "$SM_CONFIG" ]; then
-        SM_JSON=''$(${pkgs.nix}/bin/nix-instantiate --eval --strict --json -E "import $SM_CONFIG" 2>/dev/null || echo "{}")
-        if echo "$SM_JSON" | ${pkgs.jq}/bin/jq -e 'has("configVersion")' >/dev/null 2>&1; then
-          SM_VERSION=''$(${pkgs.jq}/bin/jq -r '.configVersion' <<< "$SM_JSON")
-          echo "$SM_VERSION"
-          exit 0
-        fi
+    read_version_from_sm_json() {
+      local json="$1"
+      if echo "$json" | "$JQ_BIN" -e 'has("configVersion")' >/dev/null 2>&1; then
+        "$JQ_BIN" -r '.configVersion' <<< "$json"
+        return 0
       fi
+      return 1
+    }
+
+    # v2 monolith: /etc/nixos/systemConfig.nix
+    if [ -f "$MONOLITH_FILE" ]; then
+      MONO_JSON=''$(${pkgs.nix}/bin/nix-instantiate --eval --strict --json -E "import $MONOLITH_FILE" 2>/dev/null || echo "{}")
+      SM_JSON=''$(echo "$MONO_JSON" | "$JQ_BIN" -c '.core.management."system-manager" // {}' 2>/dev/null || echo "{}")
+      if VER=''$(read_version_from_sm_json "$SM_JSON"); then
+        echo "$VER"
+        exit 0
+      fi
+      if VER=''$(read_version_from_sm_json "$MONO_JSON"); then
+        echo "$VER"
+        exit 0
+      fi
+      # Nested monolith without version → treat as v2
+      echo "2.0"
+      exit 0
+    fi
+
+    # Split layout: version in system-manager leaf
+    SM_CONFIG="$CONFIGS_DIR/core/management/system-manager/config.nix"
+    if [ -f "$SM_CONFIG" ]; then
+      SM_JSON=''$(${pkgs.nix}/bin/nix-instantiate --eval --strict --json -E "import $SM_CONFIG" 2>/dev/null || echo "{}")
+      if VER=''$(read_version_from_sm_json "$SM_JSON"); then
+        echo "$VER"
+        exit 0
+      fi
+    fi
+
+    # Check if system-config.nix exists (v0 legacy)
+    if [ ! -f "$SYSTEM_CONFIG" ]; then
       # Check configs directory as final v1 indicator
       if [ -d "$CONFIGS_DIR" ]; then
         echo "1.0"

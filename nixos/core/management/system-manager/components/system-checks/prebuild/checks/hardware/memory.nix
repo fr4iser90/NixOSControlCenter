@@ -2,35 +2,37 @@
 
 let
   ui = getModuleApi "cli-formatter";
-  cliRegistry = getModuleApi "cli-registry"; 
-  hardwareConfigPath = "/etc/nixos/systemConfig/core/base/hardware/config.nix";
+  cliRegistry = getModuleApi "cli-registry";
+  hw = import ../../../../../lib/hardware-config-writer.nix { inherit pkgs lib systemConfig; };
 
   prebuildScript = pkgs.writeScriptBin "prebuild-check-memory" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
 
+    ${hw.preamble}
+
     _update_memory() {
       local new_value="$1"
-      local config_file="${hardwareConfigPath}"
-      mkdir -p "$(dirname "$config_file")"
-      local existing_cpu=$(grep -o 'cpu = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
-      local existing_gpu=$(grep -o 'gpu = "[^"]*"' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "none")
-      cat > "$config_file" <<EOF
-{
-  cpu = "$existing_cpu";
-  gpu = "$existing_gpu";
+      local current existing_cpu existing_gpu
+      current=$(ncc_read_module_config "core/base/hardware" 2>/dev/null || echo "{}")
+      existing_cpu=$(echo "$current" | grep -o 'cpu = "[^"]*"' | head -1 | cut -d'"' -f2 || echo "none")
+      existing_gpu=$(echo "$current" | grep -o 'gpu = "[^"]*"' | head -1 | cut -d'"' -f2 || echo "none")
+      existing_cpu="''${existing_cpu:-none}"
+      existing_gpu="''${existing_gpu:-none}"
+      ncc_write_module_config "core/base/hardware" "{
+  cpu = \"$existing_cpu\";
+  gpu = \"$existing_gpu\";
   ram = {
     sizeGB = $new_value;
   };
-}
-EOF
+}"
     }
-    
+
     ${ui.text.header "Memory Configuration Check"}
-    
+
     TOTAL_MEM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
     DETECTED_RAW_GB=$(( (TOTAL_MEM_KB + 524288) / 1048576 ))
-    
+
     if [ $DETECTED_RAW_GB -ge 120 ]; then
       DETECTED_GB=128
     elif [ $DETECTED_RAW_GB -ge 60 ]; then
@@ -46,38 +48,32 @@ EOF
     else
       DETECTED_GB=$DETECTED_RAW_GB
     fi
-    
+
     ${ui.messages.info "System Memory:"}
     ${ui.tables.keyValue "Total RAM" "$DETECTED_GB GB"}
-    
-    if [ ! -f "${hardwareConfigPath}" ]; then
-      ${ui.messages.info "core/base/hardware/config.nix not found, creating it..."}
+
+    CURRENT=$(ncc_read_module_config "core/base/hardware" 2>/dev/null || echo "{}")
+    if ! echo "$CURRENT" | grep -qE 'sizeGB\s*='; then
+      ${ui.messages.info "hardware config missing memory, creating..."}
       _update_memory "$DETECTED_GB"
-      ${ui.badges.success "core/base/hardware/config.nix created with detected memory."}
+      ${ui.badges.success "hardware config created with detected memory."}
       exit 0
     fi
-    
-    if ! CONFIGURED_GB=$(grep -E 'sizeGB\s*=' "${hardwareConfigPath}" 2>/dev/null | grep -oE '[0-9]+' | head -1); then
-      ${ui.messages.warning "Memory size not configured in core/base/hardware/config.nix, setting detected value..."}
-      _update_memory "$DETECTED_GB"
-      ${ui.badges.success "Memory size set to $DETECTED_GB GB."}
-      exit 0
-    fi
-    
+
+    CONFIGURED_GB=$(echo "$CURRENT" | grep -E 'sizeGB\s*=' | grep -oE '[0-9]+' | head -1 || echo "")
     ${ui.text.subHeader "Memory Configuration:"}
     ${ui.tables.keyValue "Detected" "$DETECTED_GB GB"}
     ${ui.tables.keyValue "Configured" "$CONFIGURED_GB GB"}
-    
+
     if [ "$DETECTED_GB" != "$CONFIGURED_GB" ]; then
       ${ui.messages.warning "Memory configuration mismatch! Auto-updating..."}
       ${ui.messages.warning "System configured for $CONFIGURED_GB GB but detected $DETECTED_GB GB"}
-      
       _update_memory "$DETECTED_GB"
       ${ui.badges.success "Memory configuration updated to $DETECTED_GB GB."}
     else
       ${ui.badges.success "Memory configuration matches hardware."}
     fi
-    
+
     exit 0
   '';
 
@@ -96,12 +92,7 @@ in {
         script = "${prebuildScript}/bin/prebuild-check-memory";
         shortHelp = "check-memory - Verify RAM configuration";
         longHelp = ''
-          Check system memory configuration before system rebuild
-          
-          Checks:
-          - Detects installed RAM size
-          - Compares with configured memory setting
-          - Auto-updates core/base/hardware/config.nix if needed
+          Check system memory configuration before system rebuild (layout-aware).
         '';
         interactive = false;
         dependencies = [ "system-checks" ];

@@ -20,7 +20,7 @@ let
     # Fallback to empty attrset if not set
     vmCfg = config.systemConfig.modules.infrastructure.vm.testing.${distro}.vm or {};
     vmName = "${distro}-test";
-    defaultVariant = head (attrNames libVM.distros.${distro}.variants);
+    defaultVariant = libVM.distros.${distro}.preferredVariant or (head (attrNames libVM.distros.${distro}.variants));
     variantDefaults = libVM.distros.${distro}.variants.${defaultVariant} or {};
   in {
     # Fix options path to match systemConfig structure
@@ -94,6 +94,8 @@ let
           }
           trap 'cleanup_and_exit' INT TERM
 
+          # Forward CLI args into mkVmScript (--disk / --iso / --help)
+          set -- "$@"
           ${libVM.mkVmScript {
             name = vmName;
             inherit (vmCfg) memory cores image variant version;

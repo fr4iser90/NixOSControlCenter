@@ -45,7 +45,8 @@ load_mode_modules() {
 # 1. Core Dependencies
 import_file "$LIB_DIR/colors.sh"     
 import_file "$LIB_DIR/utils.sh"      
-import_file "$LIB_DIR/logging.sh"    
+import_file "$LIB_DIR/logging.sh"
+import_file "$LIB_DIR/dry-run.sh"
 
 # 2. System Information Collection
 import_file "$CHECKS_DIR/hardware/cpu.sh"      
@@ -69,6 +70,7 @@ import_file "$PROMPTS_DIR/descriptions/setup-descriptions.sh"
 import_file "$PROMPTS_DIR/setup-options.sh"                
 import_file "$PROMPTS_DIR/setup-rules.sh"                  
 import_file "$PROMPTS_DIR/validate-mode.sh"                
+import_file "$UI_DIR/gui/gui-lib.sh"
 import_file "$PROMPTS_DIR/setup-mode.sh"                   
 import_file "$PROMPTS_DIR/formatting/setup-formatting.sh"    
 import_file "$PROMPTS_DIR/formatting/setup-preview.sh"      

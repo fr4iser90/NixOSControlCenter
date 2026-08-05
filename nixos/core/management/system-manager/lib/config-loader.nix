@@ -1,9 +1,15 @@
-# Config loader for systemConfig
+# Config loader for systemConfig (v2 dual layout)
 # Can be used by both flake.nix (before module evaluation) and system-manager module
 # GENERIC: Dynamically discovers all config files and their domain structure
+#
+# Layouts:
+#   monolith → single nested file (systemConfig.nix)
+#   split    → systemConfig/**/config.nix (v1)
 { lib ? null }:
 
 let
+  layoutLib = import ./config-layout.nix { inherit lib; };
+
   # Fallback lib functions if lib is not provided
   filterAttrs = if lib != null then lib.filterAttrs else (f: set: 
     builtins.listToAttrs (builtins.filter (x: f x.name x.value) (builtins.attrValues (builtins.mapAttrs (n: v: { name = n; value = v; }) set))));
@@ -305,17 +311,16 @@ let
       ) {} userConfigs;
     in
       if mergedUsers != {} then
-        baseConfig // { users = mergedUsers; }
+        baseConfig // { users = (baseConfig.users or {}) // mergedUsers; }
       else
         baseConfig;
 
-  # Load and merge all configs
-  # Usage: loadSystemConfig configsDir configsPath
-  loadSystemConfig = configsDir: configsPath:
+  # Load templates only
+  loadTemplates = configsDir:
     let
-      # 1. Start with template defaults from module directories
       templatePaths = discoverTemplates configsDir;
-      baseConfig = builtins.foldl' (acc: templatePath:
+    in
+      builtins.foldl' (acc: templatePath:
         let
           loaded = loadTemplate templatePath configsDir;
         in
@@ -324,29 +329,91 @@ let
           else acc
       ) {} templatePaths;
 
-      # 2. Discover and merge per-user configs (before other configs)
-      # This ensures per-user configs can override central user config
+  # Load split layout (v1): discover leaf config.nix files
+  loadSplitConfig = configsDir: configsPath: baseConfig:
+    let
       baseConfigWithUsers = mergeUserConfigs configsDir configsPath baseConfig;
-
-      # 3. Dynamically discover all user config files
       optionalConfigs = discoverConfigs configsDir configsPath;
-
-      # 4. Load and merge all discovered configs on top of templates
-      # Order is important: later configs override earlier ones
       mergedConfig = builtins.foldl' (acc: configName:
         let
           loaded = loadConfig configName configsDir configsPath;
         in
           if loaded != null && loaded.value != {} then
-            let
-              newAcc = mergeConfigIntoStructure loaded.domainPath loaded.value acc;
-            in
-              newAcc
+            mergeConfigIntoStructure loaded.domainPath loaded.value acc
           else
             acc
       ) baseConfigWithUsers optionalConfigs;
     in
       mergedConfig;
+
+  # Load monolith layout (v2): single nested file
+  loadMonolithConfig = monolithPath: baseConfig:
+    let
+      mono = importNix monolithPath;
+    in
+      recursiveUpdate baseConfig mono;
+
+  # Core loader from attrset: { flakeRoot, configsPath, monolithPath ?, layout ? }
+  loadSystemConfigAttrs = {
+    flakeRoot,
+    configsPath ? null,
+    monolithPath ? null,
+    layout ? "auto",
+  }:
+    let
+      resolvedMonolith =
+        if monolithPath != null then monolithPath
+        else
+          let candidate = flakeRoot + "/systemConfig.nix";
+          in if pathExists candidate then candidate else null;
+
+      templates = loadTemplates flakeRoot;
+
+      detected =
+        if layout != "auto" then layout
+        else layoutLib.detectLayoutFromPaths {
+          monolithPath = resolvedMonolith;
+          inherit configsPath;
+          defaultLayout = "monolith";
+        };
+
+      effectiveLayout =
+        if detected == "monolith" && resolvedMonolith != null && pathExists resolvedMonolith then "monolith"
+        else if detected == "split" && configsPath != null then "split"
+        else if resolvedMonolith != null && pathExists resolvedMonolith then "monolith"
+        else if configsPath != null && layoutLib.hasSplitConfigs configsPath then "split"
+        else if configsPath != null then "split" # empty dir → templates only via split path
+        else "monolith";
+
+      loaded =
+        if effectiveLayout == "monolith" && resolvedMonolith != null then
+          loadMonolithConfig resolvedMonolith templates
+        else if configsPath != null then
+          loadSplitConfig flakeRoot configsPath templates
+        else
+          templates;
+
+      # Ensure layout metadata is visible in-memory
+      withLayoutMeta = recursiveUpdate loaded {
+        core.management.system-manager = (loaded.core.management.system-manager or {}) // {
+          layout = effectiveLayout;
+          configVersion = (loaded.core.management.system-manager.configVersion or "2.0");
+        };
+      };
+    in
+      withLayoutMeta;
+
+  # Public API:
+  #   loadSystemConfig { flakeRoot = ./.; configsPath = configs; }
+  #   loadSystemConfig ./. configs   # legacy curried form
+  loadSystemConfig = arg1:
+    if builtins.isAttrs arg1 && (arg1 ? flakeRoot || arg1 ? configsPath) then
+      loadSystemConfigAttrs ({ flakeRoot = arg1.flakeRoot or ./.; } // arg1)
+    else
+      (configsPath: loadSystemConfigAttrs {
+        flakeRoot = arg1;
+        inherit configsPath;
+      });
 
   # Get list of discovered configs (for reference/debugging)
   getDiscoveredConfigs = configsDir: configsPath: discoverConfigs configsDir configsPath;
@@ -365,4 +432,5 @@ in
   getDiscoveredUserConfigs = getDiscoveredUserConfigs;
   discoverUserConfigs = discoverUserConfigs;
   loadUserConfig = loadUserConfig;
+  layout = layoutLib;
 }

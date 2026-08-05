@@ -4,8 +4,23 @@ set -euo pipefail
 # Source core components
 source "$CORE_DIR/imports.sh"
 
+# Parse install flags early (before mutating work)
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run|--dry|dry-run)
+            ncc_dry_enable
+            ;;
+        --help|-h)
+            echo "Usage: install [--dry-run]"
+            echo "  --dry-run   Run wizard + validate writes; touch nothing on disk"
+            exit 0
+            ;;
+    esac
+done
+
 main() {
     log_header "NixOS System Setup"
+    ncc_dry_banner
     
     check_hardware_config
     
@@ -41,19 +56,24 @@ main() {
         local config_path="${selected_modules_raw#IMPORT_CONFIG:}"
         log_info "Importing configuration from: $config_path"
         if [[ -f "$config_path" ]]; then
-            backup_file "$SYSTEM_CONFIG_FILE" 2>/dev/null || true
-            ensure_dir "$(dirname "$SYSTEM_CONFIG_FILE")"
-            cp "$config_path" "$SYSTEM_CONFIG_FILE" || {
-                log_error "Failed to import configuration"
-                exit 1
-            }
-            log_success "Configuration imported successfully"
-            
-            # Export system type for deployment
-            local system_type
-            system_type=$(grep -m 1 'systemType = ' "$SYSTEM_CONFIG_FILE" | sed 's/.*systemType = "\(.*\)";.*/\1/' || echo "desktop")
-            export SYSTEM_TYPE="$system_type"
-            deploy_config
+            if ncc_dry_run; then
+                ncc_dry_skip "import config" "$config_path → $SYSTEM_CONFIG_FILE"
+                ncc_dry_skip "deploy_config" "/etc/nixos"
+            else
+                backup_file "$SYSTEM_CONFIG_FILE" 2>/dev/null || true
+                ensure_dir "$(dirname "$SYSTEM_CONFIG_FILE")"
+                cp "$config_path" "$SYSTEM_CONFIG_FILE" || {
+                    log_error "Failed to import configuration"
+                    exit 1
+                }
+                log_success "Configuration imported successfully"
+                
+                # Export system type for deployment
+                local system_type
+                system_type=$(grep -m 1 'systemType = ' "$SYSTEM_CONFIG_FILE" | sed 's/.*systemType = "\(.*\)";.*/\1/' || echo "desktop")
+                export SYSTEM_TYPE="$system_type"
+                deploy_config
+            fi
         else
             log_error "Configuration file not found: $config_path"
             exit 1
@@ -127,7 +147,11 @@ main() {
         fi
     fi
     
-    log_success "Setup complete! 🎉"
+    if ncc_dry_run; then
+        log_success "[DRY-RUN] Setup path OK — no files were written or deployed"
+    else
+        log_success "Setup complete! 🎉"
+    fi
 }
 
 # Map predefined profile names to file names

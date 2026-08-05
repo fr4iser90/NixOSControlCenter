@@ -26,7 +26,6 @@ in
       esac
     done
     
-    SYSTEM_CONFIG="/etc/nixos/system-config.nix"
     VERBOSE_FLAG=""
     if [ "$VERBOSE" = "true" ]; then
       VERBOSE_FLAG="--verbose"

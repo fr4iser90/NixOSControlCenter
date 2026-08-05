@@ -21,22 +21,24 @@ let
   # Load package modules (V1 format)
   allModules = cfgRaw.packageModules or [];
 
-  # Determine actual Docker mode - enabled if "docker" or "docker-rootless" in packageModules
-  dockerMode = let
-    hasDocker = builtins.elem "docker" allModules;
-    hasDockerRootless = builtins.elem "docker-rootless" allModules;
-  in
-    if hasDocker then "root"
-    else if hasDockerRootless then "rootless"
-    else null;
+  # Smart Docker: rootless by default; root for Swarm / AI-Workspace; docker.root override
+  dockerMode = import ./lib/docker-mode.nix {
+    inherit systemConfig;
+    packageModules = allModules;
+    dockerRoot = cfgRaw.docker.root or null;
+    dockerEnable = cfgRaw.docker.enable or false;
+  };
 
-  # Smart Docker handling
-  dockerModules = if dockerMode == "root" then [ ./components/sets/docker.nix ]
-               else if dockerMode == "rootless" then [ ./components/sets/docker-rootless.nix ]
-               else [];
+  dockerModules =
+    if dockerMode == "root" then [ ./components/sets/docker.nix ]
+    else if dockerMode == "rootless" then [ ./components/sets/docker-rootless.nix ]
+    else [];
 
-  # Load feature modules
-  moduleModules = map (mod: ./components/sets/${mod}.nix) allModules;
+  # Do not also import docker*.nix via the generic map (handled by dockerModules)
+  featureModules = builtins.filter
+    (m: m != "docker" && m != "docker-rootless")
+    allModules;
+  moduleModules = map (mod: ./components/sets/${mod}.nix) featureModules;
 
 in {
   _module.metadata = {

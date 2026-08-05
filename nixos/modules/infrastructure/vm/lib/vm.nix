@@ -14,7 +14,7 @@ in
     cores,
     image,
     distro ? "nixos",
-    variant ? "plasma5",
+    variant ? "graphical",
     version ? null,
     stateDir ? "/var/lib/virt",
     ovmf ? pkgs.OVMF,
@@ -154,7 +154,8 @@ in
     ''}
 
     function start_vm() {
-      local iso_path="$1"
+      local iso_path="''${1:-}"
+      local boot_mode="''${2:-iso}"  # iso | disk
 
       # Get free port and store it
       local spice_port
@@ -163,16 +164,26 @@ in
       echo "🚀 Starting VM..."
       echo "  Name: ${name}"
       echo "  Distro: ${distroName}"
+      echo "  Boot: $boot_mode"
       echo "  Memory: ${toString memory}MB"
       echo "  Cores: ${toString cores}"
       echo "  SPICE Display: spice://localhost:$spice_port"
       echo ""
       echo "💡 To connect: virt-viewer --connect spice://localhost:$spice_port"
+      if [ "$boot_mode" = "iso" ]; then
+        echo "💡 Force installer anytime: ncc vm test-${distro}-run --iso"
+        echo "💡 Force disk boot:         ncc vm test-${distro}-run --disk"
+      fi
       echo "⏳ Starting QEMU (this might take a moment)..."
       echo ""
 
-      if [ -z "$iso_path" ] || [ ! -f "$iso_path" ]; then
+      if [ "$boot_mode" = "iso" ] && { [ -z "$iso_path" ] || [ ! -f "$iso_path" ]; }; then
         echo "❌ Error: ISO file not found!"
+        exit 1
+      fi
+      if [ "$boot_mode" = "disk" ] && [ ! -f "${image.path}" ]; then
+        echo "❌ No disk image yet: ${image.path}" >&2
+        echo "   Install first: ncc vm test-${distro}-run" >&2
         exit 1
       fi
 
@@ -185,6 +196,41 @@ in
       if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
         echo "❌ /dev/kvm not accessible — user must be in group 'kvm' (re-login after rebuild)" >&2
         exit 1
+      fi
+
+      # Drive args: ISO boot prefers CD (bootindex=1); disk boot boots installed system only.
+      local drive_args
+      if [ "$boot_mode" = "disk" ]; then
+        ${if isWindows then ''
+        drive_args=(
+          -device ahci,id=ahci0
+          -drive if=none,id=disk0,file="${image.path}",format=qcow2
+          -device ide-hd,bus=ahci0.0,drive=disk0,bootindex=1
+        )
+        '' else ''
+        drive_args=(
+          -drive if=none,id=disk0,file="${image.path}",format=qcow2
+          -device virtio-blk-pci,drive=disk0,bootindex=1
+        )
+        ''}
+      else
+        ${if isWindows then ''
+        drive_args=(
+          -device ahci,id=ahci0
+          -drive if=none,id=disk0,file="${image.path}",format=qcow2
+          -device ide-hd,bus=ahci0.0,drive=disk0,bootindex=2
+          -drive if=none,id=cd0,media=cdrom,readonly=on,file="$iso_path"
+          -device ide-cd,bus=ahci0.1,drive=cd0,bootindex=1
+        )
+        '' else ''
+        drive_args=(
+          -drive if=none,id=disk0,file="${image.path}",format=qcow2
+          -device virtio-blk-pci,drive=disk0,bootindex=2
+          -device ahci,id=ahci0
+          -drive if=none,id=cd0,media=cdrom,readonly=on,file="$iso_path"
+          -device ide-cd,bus=ahci0.0,drive=cd0,bootindex=1
+        )
+        ''}
       fi
 
       # q35 IDE buses only allow 1 unit each — use a dedicated AHCI controller
@@ -207,18 +253,8 @@ in
         -chardev socket,id=chrtpm,path="$SWTPM_DIR/swtpm-sock" \
         -tpmdev emulator,id=tpm0,chardev=chrtpm \
         -device tpm-tis,tpmdev=tpm0 \
-        -device ahci,id=ahci0 \
-        -drive if=none,id=disk0,file="${image.path}",format=qcow2 \
-        -device ide-hd,bus=ahci0.0,drive=disk0,bootindex=2 \
-        -drive if=none,id=cd0,media=cdrom,readonly=on,file="$iso_path" \
-        -device ide-cd,bus=ahci0.1,drive=cd0,bootindex=1 \
-        '' else ''
-        -drive if=none,id=disk0,file="${image.path}",format=qcow2 \
-        -device virtio-blk-pci,drive=disk0,bootindex=2 \
-        -device ahci,id=ahci0 \
-        -drive if=none,id=cd0,media=cdrom,readonly=on,file="$iso_path" \
-        -device ide-cd,bus=ahci0.0,drive=cd0,bootindex=1 \
-        ''} \
+        '' else ""} \
+        "''${drive_args[@]}" \
         -vga qxl \
         -spice port="$spice_port",disable-ticketing=on \
         -device virtio-tablet-pci \
@@ -235,38 +271,85 @@ in
 
 
     # Main
+    # Boot mode: auto (default) | iso | disk
+    # Auto: empty/fresh qcow2 → installer ISO; disk with real data → boot installed OS
+    # Override: --disk / --iso  or  VM_BOOT=disk|iso
+    boot_mode="''${VM_BOOT:-auto}"
+    for arg in "$@"; do
+      case "$arg" in
+        --disk|--installed|--from-disk) boot_mode=disk ;;
+        --iso|--installer) boot_mode=iso ;;
+        --auto) boot_mode=auto ;;
+        -h|--help)
+          echo "Usage: ncc vm test-${distro}-run [--auto|--disk|--iso]"
+          echo "  (default)  Auto: installer if disk empty, else boot installed OS"
+          echo "  --disk     Force boot from disk (no ISO)"
+          echo "  --iso      Force installer ISO boot"
+          echo "  --auto     Same as default"
+          exit 0
+          ;;
+      esac
+    done
+
     echo "🖥️  ${distroName} Test VM Setup"
     echo "========================"
     prepare_dirs
     prepare_ovmf
     create_disk
     ${lib.optionalString isWindows "prepare_tpm"}
-    echo "💿 Checking ISO..."
-    echo "Debug: Distro = ${distro}"
-    echo "Debug: Version = ${versionString}"
-    ${if localOnly then ''
-    echo "Debug: Local ISO only (no auto-download)"
-    '' else ''
-    echo "Debug: URL = ${toString isoUrl}"
-    ''}
-    
-    iso_path="$(${isoManager.isoManager {
-      name = "${distro}-${name}";
-      inherit stateDir;
-      url = toString isoUrl;
-      distroName = distroName;
-      inherit variant;
-      version = versionString;
-      inherit localOnly;
-      inherit isoHint;
-    }})"
-    
-    echo "Debug: ISO path = $iso_path"
-    
-    if [ -z "$iso_path" ] || [ ! -f "$iso_path" ]; then
-      echo "❌ ISO management failed!"
-      exit 1
+
+    # Detect install state via allocated qcow2 size (fresh image is ~200KB; install writes GBs)
+    disk_looks_installed() {
+      local disk="${image.path}"
+      local actual=0
+      [[ -f "$disk" ]] || return 1
+      actual=$(${pkgs.qemu}/bin/qemu-img info --output=json "$disk" 2>/dev/null \
+        | ${pkgs.jq}/bin/jq -r '."actual-size" // 0' 2>/dev/null || echo 0)
+      # 64 MiB threshold — empty sparse qcow2 stays far below this
+      [[ "''${actual:-0}" -gt 67108864 ]]
+    }
+
+    if [ "$boot_mode" = "auto" ]; then
+      if disk_looks_installed; then
+        boot_mode=disk
+        echo "✓ Disk looks installed → booting from disk"
+      else
+        boot_mode=iso
+        echo "○ Disk empty/fresh → booting installer ISO"
+      fi
     fi
-    start_vm "$iso_path"
+
+    if [ "$boot_mode" = "disk" ]; then
+      echo "💾 Booting from installed disk (no ISO)..."
+      start_vm "" disk
+    else
+      echo "💿 Checking ISO..."
+      echo "Debug: Distro = ${distro}"
+      echo "Debug: Version = ${versionString}"
+      ${if localOnly then ''
+      echo "Debug: Local ISO only (no auto-download)"
+      '' else ''
+      echo "Debug: URL = ${toString isoUrl}"
+      ''}
+      
+      iso_path="$(${isoManager.isoManager {
+        name = "${distro}-${name}";
+        inherit stateDir;
+        url = toString isoUrl;
+        distroName = distroName;
+        inherit variant;
+        version = versionString;
+        inherit localOnly;
+        inherit isoHint;
+      }})"
+      
+      echo "Debug: ISO path = $iso_path"
+      
+      if [ -z "$iso_path" ] || [ ! -f "$iso_path" ]; then
+        echo "❌ ISO management failed!"
+        exit 1
+      fi
+      start_vm "$iso_path" iso
+    fi
   '';
 }

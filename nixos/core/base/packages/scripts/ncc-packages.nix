@@ -1,13 +1,24 @@
 { pkgs }:
 
+let
+  facade = import ../../../management/system-manager/lib/config-facade.nix { inherit pkgs; };
+in
 pkgs.writeShellScriptBin "ncc-packages" ''
   SCRIPT_NAME="ncc-packages"
-  VERSION="1.0.0"
+  VERSION="2.0.0"
 
   set -euo pipefail
 
   NIXOS_DIR="''${NIXOS_DIR:-/etc/nixos}"
   SYSTEM_CONFIG="$NIXOS_DIR/systemConfig"
+  MONOLITH_FILE="$NIXOS_DIR/systemConfig.nix"
+  ${facade.sourcePreamble { nixosRoot = "/etc/nixos"; }}
+  # Allow NIXOS_DIR override after preamble
+  export NIXOS_ROOT="$NIXOS_DIR"
+  export CONFIGS_BASE="$SYSTEM_CONFIG"
+  export MONOLITH_FILE="$NIXOS_DIR/systemConfig.nix"
+
+  # (path helpers below stage monolith edits and flush on EXIT)
 
   RED='\033[0;31m'
   GREEN='\033[0;32m'
@@ -52,7 +63,12 @@ pkgs.writeShellScriptBin "ncc-packages" ''
 
   Defaults:
     Without flags, single-package operations target the current user's userPackages.
-    Module operations always target systemConfig/core/base/packages/config.nix.
+    Module operations edit core.base.packages via config-facade
+    (monolith: systemConfig.nix | split: systemConfig/core/base/packages/config.nix).
+
+  Layout:
+    ncc-config-layout detect
+    ncc system config-layout convert --to monolith|split
 
   Examples:
     $SCRIPT_NAME add vscode                          Add vscode to current user
@@ -188,19 +204,59 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   }
 
   # ----------------------------------------------------------------------------
-  # Path helpers
+  # Path helpers (layout-aware: monolith stages leaf edits then flushes)
   # ----------------------------------------------------------------------------
 
+  _NCC_PKG_TMP=""
+  _NCC_USER_TMPS=()
+
+  _ncc_packages_flush() {
+      if [[ -n "''${_NCC_PKG_TMP:-}" && -f "$_NCC_PKG_TMP" ]]; then
+          ncc_write_module_config "core/base/packages" "$(cat "$_NCC_PKG_TMP")"
+          rm -f "$_NCC_PKG_TMP"
+          _NCC_PKG_TMP=""
+      fi
+      local entry
+      for entry in "''${_NCC_USER_TMPS[@]:-}"; do
+          [[ -z "$entry" ]] && continue
+          local user="''${entry%%:*}"
+          local tmp="''${entry#*:}"
+          if [[ -f "$tmp" ]]; then
+              ncc_write_module_config "users/$user" "$(cat "$tmp")"
+              rm -f "$tmp"
+          fi
+      done
+      _NCC_USER_TMPS=()
+  }
+  trap '_ncc_packages_flush' EXIT
+
   get_user_config_path() {
-      echo "$SYSTEM_CONFIG/users/$1/config.nix"
+      local user="$1"
+      if [[ "$(ncc_detect_layout)" == "monolith" ]]; then
+          local tmp
+          tmp=$(mktemp --suffix=.nix)
+          ncc_read_module_config "users/$user" > "$tmp"
+          _NCC_USER_TMPS+=("$user:$tmp")
+          echo "$tmp"
+      else
+          echo "$SYSTEM_CONFIG/users/$user/config.nix"
+      fi
   }
 
   get_system_config_path() {
-      echo "$SYSTEM_CONFIG/core/base/packages/config.nix"
+      if [[ "$(ncc_detect_layout)" == "monolith" ]]; then
+          if [[ -z "$_NCC_PKG_TMP" ]]; then
+              _NCC_PKG_TMP=$(mktemp --suffix=.nix)
+              ncc_read_module_config "core/base/packages" > "$_NCC_PKG_TMP"
+          fi
+          echo "$_NCC_PKG_TMP"
+      else
+          echo "$SYSTEM_CONFIG/core/base/packages/config.nix"
+      fi
   }
 
   get_modules_config_path() {
-      echo "$SYSTEM_CONFIG/core/base/packages/config.nix"
+      get_system_config_path
   }
 
   get_sets_dir() {

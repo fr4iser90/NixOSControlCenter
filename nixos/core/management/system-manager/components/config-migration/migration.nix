@@ -62,12 +62,18 @@ let
     JQ_BIN="${pkgs.jq}/bin/jq"
     FIND_CHAIN_FILE="${findChainFile}"
     
-    # PRE-CHECK: If systemConfig/ exists with configVersion, already on v1
+    # PRE-CHECK: If already at current schema version, only clean stale artifacts
     # Just clean up stale files from incomplete previous migrations
     SM_CONFIG="$CONFIGS_DIR/core/management/system-manager/config.nix"
-    if [ -f "$SM_CONFIG" ] && grep -q "configVersion" "$SM_CONFIG" 2>/dev/null; then
+    MONOLITH_FILE="$NIXOS_CONFIG_DIR/systemConfig.nix"
+    CURRENT_VERSION_PRE="${currentVersion}"
+    DETECTED_PRE=""
+    if [ -f "$MONOLITH_FILE" ] || [ -f "$SM_CONFIG" ] || [ -f "$SYSTEM_CONFIG" ]; then
+      DETECTED_PRE=''$(${detection.detectConfigVersion}/bin/ncc-detect-version 2>/dev/null || true)
+    fi
+    if [ "$DETECTED_PRE" = "$CURRENT_VERSION_PRE" ]; then
       if [ -f "$SYSTEM_CONFIG" ]; then
-        ${formatter.messages.info "Removing stale system-config.nix (v1 already active)"}
+        ${formatter.messages.info "Removing stale system-config.nix (v2 already active)"}
         rm -f "$SYSTEM_CONFIG"
       fi
       for agg in \
@@ -86,6 +92,22 @@ let
           fi
         fi
       done
+      exit 0
+    fi
+
+    # v1→v2 in-place bump when already on split layout without legacy system-config.nix
+    if [ "$DETECTED_PRE" = "1.0" ] && [ ! -f "$SYSTEM_CONFIG" ] && [ -f "$SM_CONFIG" ]; then
+      ${formatter.messages.info "Bumping split config from v1.0 → v2.0 (layout=split)"}
+      if grep -q "configVersion" "$SM_CONFIG"; then
+        sed -i 's/configVersion = "[^"]*"/configVersion = "2.0"/' "$SM_CONFIG"
+      else
+        sed -i '0,/{/s/{/{\n  configVersion = "2.0";/' "$SM_CONFIG"
+      fi
+      if grep -qE 'layout\s*=' "$SM_CONFIG"; then
+        sed -i 's/layout = "[^"]*"/layout = "split"/' "$SM_CONFIG"
+      else
+        sed -i '0,/{/s/{/{\n  layout = "split";/' "$SM_CONFIG"
+      fi
       exit 0
     fi
     

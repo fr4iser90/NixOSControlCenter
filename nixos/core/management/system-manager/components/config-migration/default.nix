@@ -13,6 +13,7 @@ let
   validatorModule = import ./validator.nix { inherit pkgs lib getModuleApi; };
   legacyCleanupModule = import ./legacy-cleanup.nix { inherit pkgs lib getModuleApi backupHelpers; };
   checkModule = import ./check.nix { inherit config pkgs lib getModuleApi backupHelpers systemConfig configPath; };
+  layoutModule = import ./layout.nix { inherit pkgs lib getModuleApi; };
 in
 
 {
@@ -36,8 +37,12 @@ in
   
   # Main command (validates + migrates)
   check = checkModule;
+
+  # Layout detect/convert (monolith ↔ split)
+  layout = layoutModule;
   
   # Convenience: Direct access to main command
   configCheck = checkModule.configCheck;
   cleanupLegacyConfigs = legacyCleanupModule.cleanupLegacyConfigs;
+  configLayout = layoutModule.configLayout;
 }

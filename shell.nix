@@ -2,11 +2,8 @@
 { pkgs ? import <nixpkgs> {} }:
 
 let
-  inherit (pkgs) lib;
   packages = import ./shell/packages { inherit pkgs; };
   hooks = import ./shell/hooks { inherit pkgs; };
-  scripts = import ./shell/scripts { inherit pkgs; };
-  prebuild = import ./shell/prebuild { inherit pkgs lib; };
 in
 
 pkgs.mkShell {

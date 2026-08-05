@@ -24,12 +24,10 @@ Basic user definitions go in `systemConfig/core/base/user/config.nix`:
 
 ```nix
 {
-  users = {
-    "fr4iser" = {
-      role = "admin";
-      defaultShell = "zsh";
-      autoLogin = false;
-    };
+  "fr4iser" = {
+    role = "admin";
+    defaultShell = "zsh";
+    autoLogin = false;
   };
 }
 ```

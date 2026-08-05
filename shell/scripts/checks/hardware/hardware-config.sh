@@ -20,7 +20,8 @@ check_hardware_config() {
   echo "Detected disk: $DISK"
 
   # 2. Check for hardware-configuration.nix
-  if [ -f /mnt/etc/nixos/hardware-configuration.nix ] || [ -f /etc/nixos/hardware-configuration.nix ]; then
+  local hw_cfg="${SYSTEM_CONFIG_DIR:-/etc/nixos}/hardware-configuration.nix"
+  if [ -f /mnt/etc/nixos/hardware-configuration.nix ] || [ -f "$hw_cfg" ] || [ -f /etc/nixos/hardware-configuration.nix ]; then
     echo "hardware-configuration.nix found. Exiting."
     return 0
   fi
@@ -37,6 +38,12 @@ check_hardware_config() {
   # 4. Partition and format if needed
   echo "Partitioning disk $DISK..."
   echo "WARNING: This will destroy all data on $DISK!"
+
+  if declare -F ncc_dry_run >/dev/null 2>&1 && ncc_dry_run; then
+    ncc_dry_skip "partition/format disk" "$DISK" "BOOT=$BOOT_PART ROOT=$ROOT_PART"
+    return 0
+  fi
+
   read -p 'Type "YES" to continue: ' confirm
   if [ "$confirm" != "YES" ]; then
     echo "Aborted partitioning."

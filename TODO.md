@@ -1,1 +1,1 @@
-NixOS systemVersion pipeline, notify update, window on startup, remind in X days 
+NixOS systemVersion pipeline: check-release + weekly notify timer done (channel-manager). Still open: startup window / remind in X days 

@@ -71,14 +71,21 @@ User's personal NixOS modules. **Never overwritten** during updates — preserve
 
 ---
 
-## Config System: v0 → v1 Migration
+## Config System: v0 → v1 → v2 (dual layout)
 
 | Version | Config Location | Entry Point | Status |
 |---------|----------------|-------------|--------|
-| v0 (legacy) | `/etc/nixos/system-config.nix` | flake.nix → imports system-config.nix | DEPRECATED, being removed |
-| v1 (current) | `/etc/nixos/systemConfig/**/config.nix` | flake.nix → config-loader.nix → recursive discover | **ACTIVE** |
+| v0 (legacy) | `/etc/nixos/system-config.nix` (flat) | flake imports system-config.nix | DEPRECATED |
+| v1 | `/etc/nixos/systemConfig/**/config.nix` | config-loader discover/merge | supported (layout=split) |
+| v2 (current) | **monolith** `/etc/nixos/systemConfig.nix` **or** split leaves | config-loader layout detect | **ACTIVE** |
 
-### v1 Config Structure
+### Layouts (v2)
+- **monolith (default for new installs):** one nested file `/etc/nixos/systemConfig.nix` — same attr shape as in-memory `systemConfig`
+- **split:** leaf files under `/etc/nixos/systemConfig/**/config.nix` (former v1)
+- Convert: `ncc config-layout detect|convert --to monolith|split`
+- Writers go through `config-facade.sh` (`ncc_write_module_config`)
+
+### Split Config Structure
 ```
 systemConfig/
 ├── core/
@@ -92,7 +99,7 @@ systemConfig/
 │   │   ├── packages/config.nix
 │   │   └── localization/config.nix
 │   └── management/
-│       └── system-manager/config.nix  (holds configVersion = "1.0")
+│       └── system-manager/config.nix  (configVersion + layout)
 └── modules/
     ├── infrastructure/*/config.nix
     ├── security/*/config.nix
@@ -101,19 +108,16 @@ systemConfig/
 ```
 
 ### Key Rules
-- **configVersion = "1.0"** lives in `systemConfig/core/management/system-manager/config.nix`
-- **No system-config.nix** on v1 — it's deleted after migration (backup exists in `/var/backup/nixos/`)
-- **Aggregator config.nix files** (in intermediate directories like `core/base/config.nix`) are DELETED after migration — they were v0 artifacts
-- **Leaf config.nix files** at depth 3+ (e.g., `core/base/audio/config.nix`) are the real configs
-- **template-config.nix** files in modules serve as default/template configs, copied to `config.nix` on first install
+- **configVersion = "2.0"** and **layout = "monolith"|"split"** live under `core.management.system-manager`
+- **No live dual layout** — convert removes the other form after backup
+- **No v0 system-config.nix** after migration — backup under `/var/backup/nixos/`
+- **Aggregator config.nix** in intermediate dirs are deleted
+- **template-config.nix** provide defaults; merged before user config
 
-### Migration Flow (v0 → v1)
-1. `/etc/nixos/system-config.nix` loaded as JSON via nix-instantiate
-2. Fields extracted by jq per migration plan in `schema/migrations/v0-to-v1.nix`
-3. Config files written to `systemConfig/**/config.nix`
-4. `system-config.nix` **deleted** (backup exists)
-5. Aggregator config.nix files **deleted**
-6. `configVersion = "1.0"` injected into `system-manager/config.nix`
+### Migration Flow
+1. v0 → v1: flat `system-config.nix` → split leaves (`v0-to-v1.nix`)
+2. v1 → v2: inject `configVersion`/`layout=split` (`ncc-migrate-config` / `v1-to-v2.nix`)
+3. Layout convert: `ncc-config-layout convert --to monolith|split`
 
 ---
 

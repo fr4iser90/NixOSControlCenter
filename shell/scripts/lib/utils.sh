@@ -7,14 +7,18 @@
 check_script_execution() {
     local required_var="$1"
     local main_function="$2"
-    
-    if [[ "${BASH_SOURCE[1]}" == "${0}" ]]; then
-        if [[ -z "${!required_var:-}" ]]; then
-            echo "Error: Environment not properly initialized (${required_var} missing)"
-            exit 1
-        fi
-        $main_function
+
+    # Run main only when the *calling file* is executed as the process script.
+    # When test.sh sources foo.sh, $0 is test.sh and BASH_SOURCE[1] is foo.sh → skip.
+    # When foo.sh is executed directly, both are foo.sh → run.
+    [[ "${BASH_SOURCE[1]}" == "${0}" ]] || return 0
+
+    if [[ -z "${!required_var:-}" ]]; then
+        echo "Error: Environment not properly initialized (${required_var} missing)"
+        exit 1
     fi
+    # shellcheck disable=SC2086
+    $main_function
 }
 
 # ===================
@@ -56,6 +60,12 @@ ensure_dir() {
 
 backup_file() {
     local file="$1"
+
+    if declare -F ncc_dry_run >/dev/null 2>&1 && ncc_dry_run; then
+        ncc_dry_skip "backup" "$file"
+        return 0
+    fi
+
     if [ -f "$file" ]; then
         # Determine backup location based on file path
         local backup_root

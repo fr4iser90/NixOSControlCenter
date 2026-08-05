@@ -63,15 +63,32 @@ in {
             printf '%s' "$candidate"
             return 0
           else
-            echo "❌ Existing ISO validation failed: $candidate" >&2
-            ${if localOnly then "return 1" else "rm -f \"$candidate\""}
+            echo "❌ Existing ISO is invalid/corrupt: $candidate" >&2
+            ${if localOnly then ''
+              return 1
+            '' else ''
+              local ans=y
+              if [ -t 0 ] && [ -t 1 ]; then
+                printf "Re-download from channel? [Y/n]: " >&2
+                read -r ans || ans=y
+              fi
+              case "''${ans:-y}" in
+                n|N|no|NO)
+                  echo "Aborting (kept invalid ISO)." >&2
+                  return 1
+                  ;;
+                *)
+                  rm -f "$candidate"
+                  ;;
+              esac
+            ''}
           fi
         fi
       done
 
       ${if localOnly then ''
         mkdir -p "$iso_dir" 2>/dev/null || sudo mkdir -p "$iso_dir"
-        echo "❌ No local ISO found for $distroName" >&2
+        echo "❌ No local ISO found for ${distroName}" >&2
         echo "" >&2
         echo "Microsoft does not allow anonymous ISO mirrors. Place an ISO here:" >&2
         echo "  $alt_path" >&2
@@ -84,16 +101,30 @@ in {
         return 1
       '' else ''
         mkdir -p "$iso_dir" 2>/dev/null || sudo mkdir -p "$iso_dir"
-        echo "📥 Downloading $distroName ISO..." >&2
-        ${pkgs.wget}/bin/wget \
+
+        local url="${toString url}"
+        # Fail fast if URL is gone (404) before writing a junk file
+        if ! ${pkgs.wget}/bin/wget --spider --quiet "$url" 2>/dev/null; then
+          echo "❌ ISO URL not reachable (404 or network error):" >&2
+          echo "  $url" >&2
+          echo "Hint: NixOS 26.05+ only publishes graphical/minimal ISOs (not gnome/plasma/xfce)." >&2
+          return 1
+        fi
+
+        echo "📥 Downloading ${distroName} ISO..." >&2
+        if ! ${pkgs.wget}/bin/wget \
           --progress=bar:force \
           --show-progress \
           -O "$iso_path" \
-          "${toString url}" >&2
+          "$url" >&2; then
+          echo "❌ Download failed from: $url" >&2
+          rm -f "$iso_path"
+          return 1
+        fi
           
         echo "Validating downloaded ISO..." >&2
         if ! validate_iso "$iso_path"; then
-          echo "❌ Downloaded ISO is corrupt!" >&2
+          echo "❌ Downloaded file is not a valid ISO (corrupt or wrong content): $iso_path" >&2
           rm -f "$iso_path"
           return 1
         fi

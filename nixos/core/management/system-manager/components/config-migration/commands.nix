@@ -11,30 +11,40 @@ in {
     {
       name = "config-check";
       script = "${checkScript}";
-      description = "Validate and migrate NixOS configuration (v0→v1)";
+      description = "Validate and migrate NixOS configuration (schema versions)";
       category = "system";
-      help = "ncc config-check: Validates current NixOS configuration and automatically migrates from v0 to v1 if needed.";
+      help = "ncc config-check: Validates config (monolith or split) and migrates schema if needed.";
     }
     {
       name = "config-detect-version";
       script = "${configMigrationModule.detection.detectConfigVersion}";
-      description = "Detect NixOS configuration version";
+      description = "Detect NixOS configuration schema version";
       category = "system";
-      help = "ncc config-detect-version: Detects the current NixOS configuration version (v0 or v1).";
+      help = "ncc config-detect-version: Detects schema version (v0/v1/v2) from systemConfig.nix or split leaves.";
     }
     {
       name = "config-migrate";
       script = "${configMigrationModule.migration.migrateSystemConfig}";
-      description = "Migrate NixOS configuration (v0→v1)";
+      description = "Migrate NixOS configuration schema version";
       category = "system";
-      help = "ncc config-migrate: Migrates NixOS configuration from v0 (monolithic) to v1 (modular) format.";
+      help = "ncc config-migrate: Migrates schema versions (v0→v1→v2). For layout use config-layout.";
     }
     {
       name = "config-validate";
       script = "${configMigrationModule.validator.validateSystemConfig}";
-      description = "Validate NixOS configuration structure";
+      description = "Validate NixOS configuration (monolith or split)";
       category = "system";
-      help = "ncc config-validate: Validates the structure and required fields of the current NixOS configuration.";
+      help = "ncc config-validate: Validates active layout SSOT via config-facade.";
+    }
+    {
+      name = "config-layout";
+      script = "${configMigrationModule.configLayout}/bin/ncc-config-layout";
+      description = "Detect or convert systemConfig layout (monolith ↔ split)";
+      category = "system";
+      help = ''
+        ncc system config-layout detect
+        ncc system config-layout convert --to monolith|split [--force]
+      '';
     }
     ]))
   ];

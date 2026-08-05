@@ -144,10 +144,12 @@ docker.enable = true;
 
 **Type**: `nullOr bool`
 **Default**: `null`
-**Description**: Force root Docker (null = auto-detect)
+**Description**: Docker privilege override (`null` = smart)
 **Example**:
 ```nix
 docker.root = false;  # Force rootless
+docker.root = true;   # Force root Docker
+# null (default): rootless, unless Homelab Swarm or AI-Workspace is active → root
 ```
 
 ## Advanced Topics
@@ -162,10 +164,10 @@ The module organizes packages by features:
 
 ### Docker Intelligence
 
-The module automatically selects Docker mode:
-- **Rootless**: Default mode for most users
-- **Root**: Automatically enabled when Docker Swarm or AI-Workspace is active
-- **Manual Override**: Can be manually specified via `docker.root`
+Selecting `docker` in packageModules enables Docker with smart mode (`lib/docker-mode.nix`):
+- **Rootless** (default): safer for desktop / single-admin use
+- **Root**: when Homelab Swarm or AI-Workspace is active
+- **Manual Override**: `docker.root = true|false`
 
 ### Legacy Support
 

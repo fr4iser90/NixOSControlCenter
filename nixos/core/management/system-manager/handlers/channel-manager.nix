@@ -4,69 +4,33 @@ with lib;
 
 let
   cliRegistry = getModuleApi "cli-registry";
-  ui = getModuleApi "cli-formatter";
-  commandCenter = getModuleApi "cli-registry";
-  hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
-  systemChecks = lib.attrByPath ["enable"] false (getModuleConfig "system-checks");
+  hostname = lib.attrByPath [ "hostName" ] "nixos" (getModuleConfig "network");
+  systemChecks = lib.attrByPath [ "enable" ] false (getModuleConfig "system-checks");
+  # User config (systemConfig + template): channel, etc.
+  smCfg = getModuleConfig "system-manager";
+  channel = lib.attrByPath [ "system" "channel" ] "stable" smCfg;
+  # NixOS module options (options.nix): notify flags live here, not only in systemConfig
+  nixosCfg = config.core.management.system-manager or {};
+  cmCfg = nixosCfg.components.channelManager or {};
+  onCalendar = cmCfg.checkInterval or "weekly";
+  enableNotify =
+    (nixosCfg.enableDeprecationWarnings or true)
+    && (cmCfg.enableNotify or true);
 
-  # Script to update flake inputs (channels) and rebuild
-  updateChannelsScript = pkgs.writeScriptBin "ncc-update-channels" ''
-    #!${pkgs.bash}/bin/bash
-    set -e
-
-    # Sudo-Check
-    if [ "$EUID" -ne 0 ]; then
-      ${ui.messages.error "This script must be run as root (use sudo)"}
-      ${ui.messages.info "Usage: sudo $0"}
-      exit 1
-    fi
-
-    ${ui.text.header "NixOS Channel Update"}
-
-    # Update flake inputs
-    ${ui.messages.loading "Updating flake inputs (nix flake update)..."}
-    if ! sudo nix flake update --flake /etc/nixos; then
-      ${ui.messages.error "Failed to update flake inputs!"}
-      exit 1
-    else
-      ${ui.messages.success "Flake inputs updated successfully."}
-    fi
-
-    # Rebuild system
-    ${ui.messages.loading "Rebuilding system..."}
-    BUILD_CMD="${if systemChecks then "sudo ncc system build switch --flake /etc/nixos#${hostname}" else "sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}"
-    
-    if sh -c "$BUILD_CMD" 2>&1; then
-      ${ui.messages.success "System successfully rebuilt!"}
-    else
-      EXIT_CODE=$?
-      # Check if build was successful but switch failed (common with service reload errors)
-      if [ -f /nix/var/nix/profiles/system ]; then
-        CURRENT_GEN=$(readlink /nix/var/nix/profiles/system | cut -d'-' -f2)
-        if [ -n "$CURRENT_GEN" ]; then
-          ${ui.messages.warning "Build completed, but switch encountered issues (exit code: $EXIT_CODE)"}
-          ${ui.messages.info "Current generation: $CURRENT_GEN"}
-          ${ui.messages.info "Some services may have failed to reload (e.g., dbus-broker.service)"}
-          ${ui.messages.info "This is often harmless - the system should still work correctly."}
-          ${ui.messages.info "You can verify with: sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}
-        else
-          ${ui.messages.error "Rebuild failed! Check logs for details."}
-          exit 1
-        fi
-      else
-        ${ui.messages.error "Rebuild failed! Check logs for details."}
-        exit 1
-      fi
-    fi
-  '';
-
+  channelManager = import ../components/channel-manager/default.nix {
+    inherit pkgs lib getModuleApi hostname systemChecks channel onCalendar;
+  };
 in {
   config = lib.mkMerge [
     {
       environment.systemPackages = [
-        updateChannelsScript
+        channelManager.updateChannelsScript
+        channelManager.checkReleaseScript
       ];
     }
+
+    (lib.mkIf enableNotify channelManager.notifyNixosConfig)
+
     (cliRegistry.registerCommandsFor "channel-manager" [
       {
         name = "update-channels";
@@ -74,15 +38,40 @@ in {
         parent = "system";
         description = "Update Nix flake inputs / channels and rebuild the system";
         category = "system";
-        script = "${updateChannelsScript}/bin/ncc-update-channels";
+        script = "${channelManager.updateChannelsScript}/bin/ncc-update-channels";
         arguments = [];
-        dependencies = [ "nix" ]; # Add ncc if ncc build switch is used and is a separate package
+        dependencies = [ "nix" ];
         shortHelp = "update-channels - Update flake inputs and rebuild";
         longHelp = ''
           Updates the flake inputs / channels by running 'nix flake update'
           and then rebuilds the system using 'nixos-rebuild switch'
           or 'ncc system build switch' if system checks are enabled.
           Requires sudo privileges.
+        '';
+      }
+      {
+        name = "check-release";
+        domain = "system";
+        parent = "system";
+        description = "Check whether a newer NixOS stable release is available";
+        category = "system";
+        script = "${channelManager.checkReleaseScript}/bin/ncc-check-release";
+        arguments = [ "--quiet" "--json" "--flake" ];
+        dependencies = [ "curl" "jq" ];
+        shortHelp = "check-release - Check for new NixOS stable releases";
+        longHelp = ''
+          Compares the nixos-YY.MM pin in /etc/nixos/flake.nix against the
+          latest nixos-* branch on GitHub.
+
+          Exit codes:
+            0  - already on latest stable pin
+            10 - newer stable release available
+            1  - error
+
+          Options:
+            --quiet   Suppress human-readable output
+            --json    Machine-readable JSON summary
+            --flake PATH  Alternate flake.nix to inspect
         '';
       }
     ])

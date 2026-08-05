@@ -17,7 +17,7 @@ in
   migrationPaths = utils.generateMigrationPaths (utils.discoverMigrations migrationsDir);
   
   # Current version (only thing that needs manual update when releasing new version)
-  currentVersion = "1.0";
+  currentVersion = "2.0";
   
   # Minimum supported version (lowest version in discovered schemas)
   minSupportedVersion = 

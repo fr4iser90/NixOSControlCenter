@@ -3,12 +3,15 @@
 # Das komplette NixOSControlCenter Repository wird von der ISO eingebettet
 # KEINE FALLBACKS - Fehler wenn Daten fehlen!
 
-{ snapshotReport, mappingDatabase, ... }:
+{ snapshotReport, mappingDatabase ? ../../data/mapping-database.nix, ... }:
 
 let
-  # Parse Snapshot-Report
+  # Parse Snapshot-Report (external scan input may still be JSON)
   report = builtins.fromJSON (builtins.readFile snapshotReport);
-  mapping = builtins.fromJSON (builtins.readFile mappingDatabase);
+  # Mapping DB is Nix SSOT
+  mapping = if builtins.isPath mappingDatabase || builtins.isString mappingDatabase
+    then import mappingDatabase
+    else mappingDatabase;
   
   # Helper: Find program in mapping (with aliases)
   findProgramMapping = programName: 

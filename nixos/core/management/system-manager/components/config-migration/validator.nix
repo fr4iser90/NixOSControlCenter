@@ -4,31 +4,28 @@ let
   schema = import ./schema.nix { inherit lib; };
   detection = import ./detection.nix { inherit pkgs lib; };
   formatter = getModuleApi "cli-formatter";
+  facade = import ../../lib/config-facade.nix { inherit pkgs; };
   currentVersion = schema.currentVersion;
   supportedVersions = lib.attrNames schema.schemas;
-  
-  # Build required fields map per version (for dynamic validation)
+
   requiredFieldsMap = lib.mapAttrs (version: schema: schema.requiredFields) schema.schemas;
   requiredFieldsJson = builtins.toJSON requiredFieldsMap;
-  
-  # Build structure info per version (for dynamic validation)
-  structureInfoMap = lib.mapAttrs (version: schema: 
+
+  structureInfoMap = lib.mapAttrs (version: schema:
     schema.structure or {}
   ) schema.schemas;
   structureInfoJson = builtins.toJSON structureInfoMap;
-  
-  # Build expected config files per version
+
   expectedConfigFilesMap = lib.mapAttrs (version: schema:
     schema.expectedConfigFiles or []
   ) schema.schemas;
   expectedConfigFilesJson = builtins.toJSON expectedConfigFilesMap;
-  
-  # Validation script that validates system-config.nix structure
+
+  # Validation — layout/paths ONLY via config-facade (ncc_detect_layout / MONOLITH_FILE / CONFIGS_BASE)
   validateSystemConfig = pkgs.writeShellScriptBin "ncc-validate-config" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
-    
-    # Parse arguments for verbose mode
+
     VERBOSE=false
     for arg in "$@"; do
       case "$arg" in
@@ -37,57 +34,71 @@ let
           ;;
       esac
     done
-    
-    SYSTEM_CONFIG="/etc/nixos/system-config.nix"
-    CONFIGS_DIR="/etc/nixos/systemConfig"
-    
+
+    ${facade.sourcePreamble { nixosRoot = "/etc/nixos"; }}
+
+    # Legacy v0 only (pre-v1 flat file) — not part of facade layout
+    SYSTEM_CONFIG_LEGACY="/etc/nixos/system-config.nix"
+
     ERRORS=0
     WARNINGS=0
-    
-    # Check if system-config.nix exists
-    # v1+ uses modular systemConfig/ - system-config.nix is deleted after migration
-    if [ ! -f "$SYSTEM_CONFIG" ]; then
-      if [ -d "$CONFIGS_DIR" ]; then
-        if [ "$VERBOSE" = "true" ]; then
-          ${formatter.messages.info "Modular configuration detected (system-config.nix already migrated)"}
-          ${formatter.messages.info "Validating systemConfig/ structure..."}
+
+    if ! ncc_config_present && [ ! -f "$SYSTEM_CONFIG_LEGACY" ]; then
+      ${formatter.messages.error "No configuration found"}
+      ${formatter.messages.info "Expected monolith: $MONOLITH_FILE"}
+      ${formatter.messages.info "Or split leaves under: $CONFIGS_BASE/**/config.nix"}
+      exit 1
+    fi
+
+    LAYOUT=$(ncc_detect_layout)
+    if [ "$VERBOSE" = "true" ]; then
+      ${formatter.messages.info "Layout: $LAYOUT"}
+      case "$LAYOUT" in
+        monolith) ${formatter.messages.info "SSOT: $MONOLITH_FILE"} ;;
+        split) ${formatter.messages.info "SSOT: $CONFIGS_BASE/**/config.nix"} ;;
+      esac
+    fi
+
+    # Syntax-check the active SSOT
+    case "$LAYOUT" in
+      monolith)
+        if [ -f "$MONOLITH_FILE" ]; then
+          if ! ${pkgs.nix}/bin/nix-instantiate --parse "$MONOLITH_FILE" >/dev/null 2>&1; then
+            ${formatter.messages.error "systemConfig.nix has invalid Nix syntax"}
+            ERRORS=$((ERRORS + 1))
+          elif [ "$VERBOSE" = "true" ]; then
+            ${formatter.messages.success "Monolith Nix syntax is valid"}
+          fi
         fi
-      else
-        ${formatter.messages.error "No configuration found"}
-        ${formatter.messages.info "Neither system-config.nix nor systemConfig/ directory exists"}
-        exit 1
-      fi
-    else
-      if [ "$VERBOSE" = "true" ]; then
-        ${formatter.messages.info "Validating system-config.nix..."}
-      fi
-      
-      # Validate Nix syntax of system-config.nix
-      if ! ${pkgs.nix}/bin/nix-instantiate --parse "$SYSTEM_CONFIG" >/dev/null 2>&1; then
+        ;;
+      split)
+        if [ "$VERBOSE" = "true" ]; then
+          ${formatter.messages.info "Validating split systemConfig/ leaves..."}
+        fi
+        ;;
+    esac
+
+    if [ -f "$SYSTEM_CONFIG_LEGACY" ] && [ "$VERBOSE" = "true" ]; then
+      ${formatter.messages.info "Legacy system-config.nix still present (v0)"}
+      if ! ${pkgs.nix}/bin/nix-instantiate --parse "$SYSTEM_CONFIG_LEGACY" >/dev/null 2>&1; then
         ${formatter.messages.error "system-config.nix has invalid Nix syntax"}
         ERRORS=$((ERRORS + 1))
-      else
-        if [ "$VERBOSE" = "true" ]; then
-          ${formatter.messages.success "Nix syntax is valid"}
-        fi
       fi
     fi
-    
-    # MODERN VERSION DETECTION: Use detectionPatterns from schemas via detection module
+
     CONFIG_VERSION=''$(${detection.detectConfigVersion}/bin/ncc-detect-version)
     CURRENT_VERSION="${currentVersion}"
     SUPPORTED_VERSIONS="${toString supportedVersions}"
     REQUIRED_FIELDS_MAP='${requiredFieldsJson}'
     STRUCTURE_INFO_MAP='${structureInfoJson}'
     EXPECTED_CONFIG_FILES_MAP='${expectedConfigFilesJson}'
-    
+
     if [ "$VERBOSE" = "true" ]; then
       ${formatter.messages.success "Detected config version: $CONFIG_VERSION"}
       ${formatter.messages.success "Current supported version: $CURRENT_VERSION"}
       ${formatter.messages.info "Supported versions: $SUPPORTED_VERSIONS"}
     fi
-    
-    # Check if version is supported
+
     VERSION_SUPPORTED=false
     for v in $SUPPORTED_VERSIONS; do
       if [ "$v" = "$CONFIG_VERSION" ]; then
@@ -95,60 +106,70 @@ let
         break
       fi
     done
-    
+
     if [ "$VERSION_SUPPORTED" = "false" ]; then
       if [ "$VERBOSE" = "true" ]; then
         ${formatter.messages.warning "Config version $CONFIG_VERSION not recognized (assuming v0)"}
       fi
       CONFIG_VERSION="1.0"
     fi
-    
-    # Check if migration is needed (version mismatch)
+
     if [ "$CONFIG_VERSION" != "$CURRENT_VERSION" ]; then
       if [ "$VERBOSE" = "true" ]; then
         ${formatter.messages.warning "Config version $CONFIG_VERSION does not match current version $CURRENT_VERSION"}
         ${formatter.messages.info "Migration needed - this will be handled automatically"}
       fi
-      # Count as error to trigger migration in config-check
       ERRORS=$((ERRORS + 1))
     fi
-    
-    # Get required fields for this version from schema
+
     REQUIRED_FIELDS=$(echo "$REQUIRED_FIELDS_MAP" | ${pkgs.jq}/bin/jq -r ".\"$CONFIG_VERSION\" // [] | .[]")
-    
-    # Check for required fields
-    # v1+ stores configVersion in systemConfig/core/management/system-manager/config.nix
-    if [ -f "$SYSTEM_CONFIG" ]; then
-      CHECK_CONFIG="$SYSTEM_CONFIG"
-    else
-      CHECK_CONFIG="$CONFIGS_DIR/core/management/system-manager/config.nix"
-    fi
     for field in $REQUIRED_FIELDS; do
-      if [ -f "$CHECK_CONFIG" ]; then
-        if ! ${pkgs.nix}/bin/nix-instantiate --eval --strict -E \
-          "(import $CHECK_CONFIG).$field or null" >/dev/null 2>&1; then
-          if [ "$VERBOSE" = "true" ]; then
-            ${formatter.messages.warning "Required field '$field' not found (v$CONFIG_VERSION)"}
+      FOUND=false
+      case "$LAYOUT" in
+        monolith)
+          if [ -f "$MONOLITH_FILE" ]; then
+            if ${pkgs.nix}/bin/nix-instantiate --eval --strict -E \
+              "(import $MONOLITH_FILE).core.management.\"system-manager\".$field or (import $MONOLITH_FILE).$field or null" \
+              2>/dev/null | grep -qv '^null$'; then
+              FOUND=true
+            fi
           fi
-          WARNINGS=$((WARNINGS + 1))
-        else
-          if [ "$VERBOSE" = "true" ]; then
-            ${formatter.messages.success "$field found in $CHECK_CONFIG"}
+          ;;
+        split)
+          CHECK_CONFIG="$CONFIGS_BASE/core/management/system-manager/config.nix"
+          if [ -f "$CHECK_CONFIG" ]; then
+            if ${pkgs.nix}/bin/nix-instantiate --eval --strict -E \
+              "(import $CHECK_CONFIG).$field or null" 2>/dev/null | grep -qv '^null$'; then
+              FOUND=true
+            fi
           fi
+          ;;
+      esac
+      if [ "$FOUND" = "false" ] && [ -f "$SYSTEM_CONFIG_LEGACY" ]; then
+        if ${pkgs.nix}/bin/nix-instantiate --eval --strict -E \
+          "(import $SYSTEM_CONFIG_LEGACY).$field or null" 2>/dev/null | grep -qv '^null$'; then
+          FOUND=true
         fi
       fi
+      if [ "$FOUND" = "true" ]; then
+        if [ "$VERBOSE" = "true" ]; then
+          ${formatter.messages.success "$field found"}
+        fi
+      else
+        if [ "$VERBOSE" = "true" ]; then
+          ${formatter.messages.warning "Required field '$field' not found (v$CONFIG_VERSION)"}
+        fi
+        WARNINGS=$((WARNINGS + 1))
+      fi
     done
-    
-    # Get structure info for this version
+
     STRUCTURE_INFO=$(echo "$STRUCTURE_INFO_MAP" | ${pkgs.jq}/bin/jq -r ".\"$CONFIG_VERSION\" // {}")
     MAX_LINES=$(echo "$STRUCTURE_INFO" | ${pkgs.jq}/bin/jq -r '.maxSystemConfigLines // 9999')
     FORBIDDEN_FIELDS=$(echo "$STRUCTURE_INFO" | ${pkgs.jq}/bin/jq -r '.forbiddenInSystemConfig // [] | .[]')
-    
-    # Check if structure is minimal (for modular versions)
-    # Only relevant when system-config.nix still exists (v0→v1 migration)
-    if [ -f "$SYSTEM_CONFIG" ]; then
+
+    if [ -f "$SYSTEM_CONFIG_LEGACY" ]; then
       if [ "$MAX_LINES" -lt 9999 ]; then
-        LINE_COUNT=$(wc -l < "$SYSTEM_CONFIG" 2>/dev/null || echo "0")
+        LINE_COUNT=$(wc -l < "$SYSTEM_CONFIG_LEGACY" 2>/dev/null || echo "0")
         if [ "$LINE_COUNT" -gt "$MAX_LINES" ]; then
           if [ "$VERBOSE" = "true" ]; then
             ${formatter.messages.warning "system-config.nix has more than $MAX_LINES lines (should be minimal for v$CONFIG_VERSION)"}
@@ -157,11 +178,10 @@ let
           WARNINGS=$((WARNINGS + 1))
         fi
       fi
-      
-      # Check for forbidden fields in system-config.nix
+
       for field in $FORBIDDEN_FIELDS; do
-        if grep -q "$field = {" "$SYSTEM_CONFIG" 2>/dev/null || \
-           grep -q "$field = " "$SYSTEM_CONFIG" 2>/dev/null; then
+        if grep -q "$field = {" "$SYSTEM_CONFIG_LEGACY" 2>/dev/null || \
+           grep -q "$field = " "$SYSTEM_CONFIG_LEGACY" 2>/dev/null; then
           if [ "$VERBOSE" = "true" ]; then
             ${formatter.messages.warning "Non-critical field '$field' found in system-config.nix (v$CONFIG_VERSION)"}
             ${formatter.messages.info "This should be in separate systemConfig/ files"}
@@ -172,62 +192,46 @@ let
       done
     fi
 
-    # Fail loudly if pre-v1 leftover configs/ is still present (flake ignores it)
     LEGACY_CONFIGS_DIR="/etc/nixos/configs"
     if [ -d "$LEGACY_CONFIGS_DIR" ]; then
       ${formatter.messages.error "Legacy configs/ directory still exists (must be cleaned)"}
       ${formatter.messages.info "Run: ncc-cleanup-legacy-configs  (or ncc-config-check / system-update)"}
       ERRORS=$((ERRORS + 1))
     fi
-    
-    # Check if systemConfig directory exists (for modular versions)
-    # Note: hasConfigsDir is not in JSON, we check directory directly
-    if [ "$CONFIG_VERSION" != "1.0" ]; then
-      # v1.0+ expects systemConfig dir
-      if [ ! -d "$CONFIGS_DIR" ]; then
-        if [ "$VERBOSE" = "true" ]; then
-          ${formatter.messages.info "systemConfig/ directory does not exist (recommended for modular config v$CONFIG_VERSION)"}
-        fi
-      else
-        if [ "$VERBOSE" = "true" ]; then
-          ${formatter.messages.success "systemConfig/ directory exists"}
-        fi
-        
-        # Get expected config files for this version
-        EXPECTED_FILES=$(echo "$EXPECTED_CONFIG_FILES_MAP" | ${pkgs.jq}/bin/jq -r ".\"$CONFIG_VERSION\" // [] | .[]")
-        
-        # Recursively validate all config.nix files (skip aggregator configs)
-        while IFS= read -r config_file; do
-          CONFIG_BASENAME=$(echo "$config_file" | sed "s|$CONFIGS_DIR/||")
-          case "$CONFIG_BASENAME" in
-            core/config.nix|core/base/config.nix|core/management/config.nix|modules/config.nix|modules/infrastructure/config.nix|modules/security/config.nix|modules/specialized/config.nix|modules/system/config.nix)
-              if [ "$VERBOSE" = "true" ]; then
-                ${formatter.messages.info "  $CONFIG_BASENAME (aggregator, skipped)"}
-              fi
-              continue
-              ;;
-          esac
-          if ${pkgs.nix}/bin/nix-instantiate --parse "$config_file" >/dev/null 2>&1; then
-            if [ "$VERBOSE" = "true" ]; then
-              ${formatter.messages.success "  $CONFIG_BASENAME syntax is valid"}
-            fi
-          else
-            ${formatter.messages.error "  $CONFIG_BASENAME has invalid Nix syntax"}
-            ERRORS=$((ERRORS + 1))
-          fi
-        done < <(find "$CONFIGS_DIR" -name "config.nix" -type f 2>/dev/null)
+
+    # Split only: validate leaves. Monolith must NOT require systemConfig/**/config.nix
+    if [ "$LAYOUT" = "split" ] && [ -d "$CONFIGS_BASE" ]; then
+      if [ "$VERBOSE" = "true" ]; then
+        ${formatter.messages.success "systemConfig/ directory exists"}
       fi
+      while IFS= read -r config_file; do
+        CONFIG_BASENAME=$(echo "$config_file" | sed "s|$CONFIGS_BASE/||")
+        case "$CONFIG_BASENAME" in
+          core/config.nix|core/base/config.nix|core/management/config.nix|modules/config.nix|modules/infrastructure/config.nix|modules/security/config.nix|modules/specialized/config.nix|modules/system/config.nix)
+            if [ "$VERBOSE" = "true" ]; then
+              ${formatter.messages.info "  $CONFIG_BASENAME (aggregator, skipped)"}
+            fi
+            continue
+            ;;
+        esac
+        if ${pkgs.nix}/bin/nix-instantiate --parse "$config_file" >/dev/null 2>&1; then
+          if [ "$VERBOSE" = "true" ]; then
+            ${formatter.messages.success "  $CONFIG_BASENAME syntax is valid"}
+          fi
+        else
+          ${formatter.messages.error "  $CONFIG_BASENAME has invalid Nix syntax"}
+          ERRORS=$((ERRORS + 1))
+        fi
+      done < <(find "$CONFIGS_BASE" -name "config.nix" -type f 2>/dev/null)
     fi
-    
-    # If v0, suggest migration
+
     if [ "$CONFIG_VERSION" = "1.0" ] && [ "$CONFIG_VERSION" != "$CURRENT_VERSION" ]; then
       if [ "$VERBOSE" = "true" ]; then
         ${formatter.messages.info "v0 structure detected (monolithic)"}
         ${formatter.messages.info "Consider running 'ncc-migrate-config' to migrate to v$CURRENT_VERSION (modular structure)"}
       fi
     fi
-    
-    # Summary
+
     if [ "$VERBOSE" = "true" ]; then
       ${formatter.text.newline}
       ${formatter.text.section "Validation Summary"}

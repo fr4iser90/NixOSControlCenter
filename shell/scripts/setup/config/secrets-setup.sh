@@ -35,6 +35,17 @@ setup_password() {
 
 get_password() {
     local password
+
+    if declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1 && ncc_install_ui_prefer_gui; then
+        password=$(ncc_gui_ask password "Login password" "Please enter a password for the install." "") || return 1
+        if [[ -n "$password" ]]; then
+            echo "$password"
+            return 0
+        fi
+        log_error "Password cannot be empty. Please try again."
+        return 1
+    fi
+
     while true; do
         read -sp "${BLUE}[?]${NC} Please enter a password: " password
         echo
@@ -51,7 +62,12 @@ get_password() {
 verify_password() {
     local password="$1"
     local password_confirm
-    
+
+    # GUI password dialog already confirmed — skip second TUI prompt when GUI was used
+    if declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1 && ncc_install_ui_prefer_gui; then
+        return 0
+    fi
+
     read -sp "${BLUE}[?]${NC} Please confirm the password: " password_confirm
     echo
     
@@ -72,6 +88,11 @@ save_hashed_password() {
     local password="$1"
     local output_dir="$2"
     local output_file="$3"
+
+    if declare -F ncc_dry_run >/dev/null 2>&1 && ncc_dry_run; then
+        ncc_dry_skip "save hashed password" "$output_file"
+        return 0
+    fi
     
     # Create directory
     ensure_dir "$output_dir"

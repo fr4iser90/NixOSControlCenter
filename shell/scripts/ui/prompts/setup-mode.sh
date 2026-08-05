@@ -4,6 +4,34 @@
 # echo "DEBUG in setup-mode.sh:"
 # declare -p SUB_OPTIONS # This might be sourced from setup-options.sh now
 
+# Prefer GUI when a display is available (friends / non-terminal). Override with:
+#   NCC_INSTALL_UI=gui|tui|auto   (default: auto)
+#
+# GUI helpers live in ui/gui/gui-lib.sh (sourced from imports or here as fallback).
+if ! declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1; then
+    # shellcheck source=../gui/gui-lib.sh
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../gui" && pwd)/gui-lib.sh"
+fi
+
+select_setup_mode_gui() {
+    local gui_wrapper
+    if [[ -n "${UI_DIR:-}" ]]; then
+        gui_wrapper="${UI_DIR}/gui/select-setup-mode-gui.sh"
+    else
+        local here
+        here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        gui_wrapper="$(cd "$here/../gui" && pwd)/select-setup-mode-gui.sh"
+    fi
+    if [[ ! -x "$gui_wrapper" && -f "$gui_wrapper" ]]; then
+        chmod +x "$gui_wrapper" 2>/dev/null || true
+    fi
+    if [[ ! -f "$gui_wrapper" ]]; then
+        return 2
+    fi
+    ncc_gui_ensure_answers_file
+    "$gui_wrapper"
+}
+
 select_setup_mode() {
     local install_type_choice
     local final_selection=()
@@ -11,6 +39,27 @@ select_setup_mode() {
     # Get the directory of this script
     local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local PREVIEW_SCRIPT="$SCRIPT_DIR/formatting/preview.sh"
+
+    # --- GUI path (same stdout contract as fzf path below) ---
+    if ncc_install_ui_prefer_gui; then
+        ncc_gui_ensure_answers_file
+        local gui_selection="" gui_rc=0
+        set +e
+        gui_selection="$(select_setup_mode_gui)"
+        gui_rc=$?
+        set -e
+        if [[ $gui_rc -eq 0 && -n "$gui_selection" ]]; then
+            echo "$gui_selection"
+            return 0
+        elif [[ $gui_rc -eq 1 ]]; then
+            log_error "Installation cancelled."
+            return 1
+        else
+            # 2 = GUI unavailable → fall back to fzf TUI
+            log_info "GUI unavailable — falling back to terminal UI (fzf)."
+            log_info "Force GUI: NCC_INSTALL_UI=gui   | force TUI: NCC_INSTALL_UI=tui"
+        fi
+    fi
 
     # 1. Auswahl des Installationstyps
     install_type_choice=$(printf "%s\n" "${INSTALL_TYPE_OPTIONS[@]}" | fzf \
@@ -59,7 +108,59 @@ select_setup_mode() {
         fi
         
         [ -z "$preset_choice" ] && { log_error "No preset selected."; return 1; }
-        final_selection=("$preset_choice")
+
+        ncc_gui_ensure_answers_file 2>/dev/null || true
+
+        # From Scratch → old custom path (type + DE + packages)
+        if [[ "$preset_choice" == "From Scratch" ]]; then
+            log_info "From Scratch: select system type"
+            local system_type_choice
+            system_type_choice=$(printf "%s\n" "Desktop" "Server" | fzf \
+                --header="Select system type" \
+                --bind 'space:accept' \
+                --preview "$PREVIEW_SCRIPT {}" \
+                --preview-window="right:50%:wrap" \
+                --pointer="▶" \
+                --marker="✓") || { log_error "System type selection cancelled."; return 1; }
+            local system_type="${system_type_choice,,}"
+            local desktop_env=""
+            if [[ "$system_type" == "desktop" ]]; then
+                local de_choice
+                de_choice=$(printf "%s\n" "Plasma (KDE)" "GNOME" "XFCE" "None" | fzf \
+                    --header="Select desktop environment" \
+                    --bind 'space:accept' \
+                    --preview "$PREVIEW_SCRIPT {}" \
+                    --preview-window="right:50%:wrap" \
+                    --pointer="▶" \
+                    --marker="✓") || { log_error "Desktop environment selection cancelled."; return 1; }
+                case "$de_choice" in
+                    "Plasma (KDE)") desktop_env="plasma" ;;
+                    "GNOME") desktop_env="gnome" ;;
+                    "XFCE") desktop_env="xfce" ;;
+                    "None") desktop_env="" ;;
+                esac
+            fi
+            local selected_features
+            selected_features=($(ncc_tui_select_packages "")) || return 1
+            if declare -F ncc_gui_write_answer >/dev/null 2>&1; then
+                ncc_gui_write_answer PACKAGE_MODULES "${selected_features[*]}"
+            fi
+            if [[ -n "$desktop_env" ]]; then
+                final_selection=("$system_type" "$desktop_env" "${selected_features[@]}")
+            else
+                final_selection=("$system_type" "${selected_features[@]}")
+            fi
+        else
+            # Preset + optional package extras (defaults pre-merged in helper)
+            local defaults="${PRESET_DEFAULT_PACKAGES[$preset_choice]:-}"
+            log_info "Package extras for $preset_choice (defaults: ${defaults:-none})"
+            local selected_features
+            selected_features=($(ncc_tui_select_packages "$defaults")) || return 1
+            if declare -F ncc_gui_write_answer >/dev/null 2>&1; then
+                ncc_gui_write_answer PACKAGE_MODULES "${selected_features[*]}"
+            fi
+            final_selection=("$preset_choice")
+        fi
 
     elif [[ "$install_type_choice" == "⚙️ Advanced Options" ]]; then
         # 2b. Advanced Option auswählen
@@ -157,105 +258,59 @@ select_setup_mode() {
             final_selection=("IMPORT_CONFIG:$existing_config")
         fi
 
-    elif [[ "$install_type_choice" == "🔧 Custom Setup" ]]; then
-        # STEP 1: System Type Selection
-        log_info "Step 1/3: Select system type"
-        local system_type_choice
-        system_type_choice=$(printf "%s\n" "Desktop" "Server" | fzf \
-            --header="Select system type" \
-            --bind 'space:accept' \
-            --preview "$PREVIEW_SCRIPT {}" \
-            --preview-window="right:50%:wrap" \
-            --pointer="▶" \
-            --marker="✓") || { log_error "System type selection cancelled."; return 1; }
-        
-        # Convert to lowercase
-        local system_type="${system_type_choice,,}"
-        log_info "Selected system type: $system_type"
-        
-        # STEP 2: Desktop Environment Selection (nur bei Desktop)
-        local desktop_env=""
-        if [[ "$system_type" == "desktop" ]]; then
-            log_info "Step 2/3: Select desktop environment"
-            local de_choice
-            de_choice=$(printf "%s\n" "Plasma (KDE)" "GNOME" "XFCE" "None" | fzf \
-                --header="Select desktop environment" \
-                --bind 'space:accept' \
-                --preview "$PREVIEW_SCRIPT {}" \
-                --preview-window="right:50%:wrap" \
-                --pointer="▶" \
-                --marker="✓") || { log_error "Desktop environment selection cancelled."; return 1; }
-            
-            # Convert to internal name
-            case "$de_choice" in
-                "Plasma (KDE)") desktop_env="plasma" ;;
-                "GNOME") desktop_env="gnome" ;;
-                "XFCE") desktop_env="xfce" ;;
-                "None") desktop_env="" ;;
-            esac
-            log_info "Selected desktop environment: ${desktop_env:-None}"
-        fi
-        
-        # STEP 3: Feature Selection (OHNE Desktop Environment)
-        log_info "Step ${desktop_env:+3/3:}${desktop_env:-2/2:} Select features"
-        local feature_list=""
-        for group in "${FEATURE_GROUPS[@]}"; do
-            group_name="${group%%:*}"
-            group_features="${group#*:}"
-            
-            # Skip Desktop Environment group (bereits in Schritt 2 gewählt)
-            if [[ "$group_name" == "Desktop Environment" ]]; then
-                continue
-            fi
-            
-            # Emoji entfernen aus group_name (falls noch vorhanden)
-            clean_group_name=$(echo "$group_name" | sed 's/^[🖥️📦🎮🐳💾] *//')
-            
-            IFS='|' read -ra features <<< "$group_features"
-            for feature in "${features[@]}"; do
-                feature_list+="$(format_item_with_prefix "$clean_group_name" "$feature")\n"
-            done
-        done
-        
-        # Feature-Auswahl mit fzf
-        local feature_choices_string=""
-        feature_choices_string=$(printf "%b" "$feature_list" | fzf \
-            --multi \
-            --header="Select features (Space to select, Enter to confirm)" \
-            --bind 'tab:toggle,space:toggle,ctrl-a:toggle-all' \
-            --preview "$PREVIEW_SCRIPT {}" \
-            --preview-window="right:50%:wrap" \
-            --pointer="▶" \
-            --marker="✓") || { log_error "Feature selection cancelled."; return 1; }
-
-        # Filtere Features und entferne Präfixe
-        local selected_features=()
-        while IFS= read -r choice; do
-            # Präfix entfernen
-            clean_choice=$(remove_prefix "$choice")
-            [[ -n "$clean_choice" ]] && selected_features+=("$clean_choice")
-        done <<< "$feature_choices_string"
-        
-        # Auto Conflict Resolution (nur für Containerization)
-        selected_features=($(resolve_conflicts "${selected_features[@]}"))
-        
-        # Auto Dependency Resolution
-        selected_features=($(resolve_dependencies "${selected_features[@]}"))
-        
-        # Desktop Environment hinzufügen (wenn gewählt)
-        if [[ -n "$desktop_env" ]]; then
-            selected_features=("$desktop_env" "${selected_features[@]}")
-        fi
-        
-        # Finale Auswahl: System-Typ + Features
-        final_selection=("$system_type" "${selected_features[@]}")
     else
         log_error "Invalid installation type: $install_type_choice"
+        log_info "Use Presets (incl. From Scratch) or Advanced Options."
         return 1
     fi
 
     echo "${final_selection[*]}"
     return 0
+}
+
+# Multi-select package modules. $1 = space-separated defaults (always included + shown in header).
+ncc_tui_select_packages() {
+    local defaults_str="${1:-}"
+    local -a defaults=()
+    read -ra defaults <<< "$defaults_str"
+
+    local feature_list=""
+    local group group_name group_features clean_group_name feature
+    for group in "${FEATURE_GROUPS[@]}"; do
+        group_name="${group%%:*}"
+        group_features="${group#*:}"
+        [[ "$group_name" == "Desktop Environment" ]] && continue
+        clean_group_name=$(echo "$group_name" | sed 's/^[🖥️📦🎮🐳💾] *//')
+        IFS='|' read -ra features <<< "$group_features"
+        for feature in "${features[@]}"; do
+            feature_list+="$(format_item_with_prefix "$clean_group_name" "$feature")\n"
+        done
+    done
+
+    local header="Packages: select full set (Enter with none = keep defaults: ${defaults_str:-none})"
+    local feature_choices_string=""
+    feature_choices_string=$(printf "%b" "$feature_list" | fzf \
+        --multi \
+        --header="$header" \
+        --bind 'tab:toggle,space:toggle,ctrl-a:toggle-all' \
+        --pointer="▶" \
+        --marker="✓") || { log_error "Package selection cancelled."; return 1; }
+
+    local selected_features=()
+    local choice clean_choice
+    while IFS= read -r choice; do
+        clean_choice=$(remove_prefix "$choice")
+        [[ -n "$clean_choice" ]] && selected_features+=("$clean_choice")
+    done <<< "$feature_choices_string"
+
+    # Empty selection → keep preset defaults
+    if [[ ${#selected_features[@]} -eq 0 ]]; then
+        selected_features=("${defaults[@]}")
+    fi
+
+    selected_features=($(resolve_conflicts "${selected_features[@]}"))
+    selected_features=($(resolve_dependencies "${selected_features[@]}"))
+    printf '%s\n' "${selected_features[@]}"
 }
 
 # System-Typ automatisch erkennen
@@ -337,7 +392,9 @@ resolve_dependencies() {
 }
 
 # Export functions and variables
+export -f select_setup_mode_gui
 export -f select_setup_mode
+export -f ncc_tui_select_packages
 export -f detect_system_type
 export -f resolve_conflicts
 export -f resolve_dependencies

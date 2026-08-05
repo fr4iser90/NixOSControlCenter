@@ -21,8 +21,18 @@ check_users() {
            [[ ! "$username" =~ ^nix$ ]]; then
             
             # Spezifische Rollen-Prüfung
+            # Primary interactive user (install operator) → full admin.
+            # Only treat other wheel users as restricted-admin.
+            local primary="${SUDO_USER:-${LOGNAME:-}}"
+            if [[ -z "$primary" || "$primary" == "root" ]]; then
+                primary="$current_user"
+            fi
+            if [[ "$primary" == "root" ]]; then
+                primary="$(logname 2>/dev/null || true)"
+            fi
+
             if groups "$username" 2>/dev/null | grep -q "wheel"; then
-                if [[ "$username" == "admin" ]]; then
+                if [[ "$username" == "$primary" || "$username" == "admin" ]]; then
                     user_role="admin"
                 else
                     user_role="restricted-admin"

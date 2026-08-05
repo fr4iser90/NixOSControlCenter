@@ -7,20 +7,31 @@ declare -g -A MODULE_OPTIONS
 # Neue Struktur für die Auswahl
 INSTALL_TYPE_OPTIONS=(
     "📦 Presets"
-    "🔧 Custom Setup"
     "⚙️ Advanced Options"
 )
 
 # System Presets (öffentliche, wiederverwendbare Konfigurationen)
+# Each preset is customizable: after pick → optional extra packages (defaults below).
 SYSTEM_PRESETS=(
     "Desktop"
     "Server"
     "Homelab Server"
+    "From Scratch"
 )
 
 # Device Presets (geräte-spezifische Konfigurationen)
 DEVICE_PRESETS=(
     "Jetson Nano"
+)
+
+# Default package modules per preset (space-separated). Applied unless user removes them in GUI.
+# From Scratch / empty = no defaults (user picks everything).
+declare -A -g PRESET_DEFAULT_PACKAGES=(
+    ["Desktop"]=""
+    ["Server"]=""
+    ["Homelab Server"]="docker database web-server"
+    ["From Scratch"]=""
+    ["Jetson Nano"]=""
 )
 
 # Advanced Options
@@ -171,6 +182,7 @@ export -A MODULE_OPTIONS
 export -A EXCLUSIVE_GROUPS
 export -A FEATURE_DEPENDENCIES
 export -A FEATURE_CONFLICTS
+export -A PRESET_DEFAULT_PACKAGES
 export -f get_internal_name
 export -f get_display_name
 export -f is_profile_disabled

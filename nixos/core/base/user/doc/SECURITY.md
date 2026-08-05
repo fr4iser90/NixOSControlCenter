@@ -26,26 +26,24 @@
 
 ```nix
 {
-  users = {
-    # Admin: Full access, no password sudo (use sparingly)
-    admin = {
-      role = "admin";
-    };
-    
-    # Restricted Admin: Full access, password sudo (recommended)
-    user = {
-      role = "restricted-admin";
-    };
-    
-    # Virtualization: Docker/Podman access only
-    docker = {
-      role = "virtualization";
-    };
-    
-    # Guest: Basic access, no sudo
-    guest = {
-      role = "guest";
-    };
+  # Admin: Full access, no password sudo (use sparingly)
+  admin = {
+    role = "admin";
+  };
+
+  # Restricted Admin: Full access, password sudo (recommended)
+  user = {
+    role = "restricted-admin";
+  };
+
+  # Virtualization: Docker/Podman access only
+  docker = {
+    role = "virtualization";
+  };
+
+  # Guest: Basic access, no sudo
+  guest = {
+    role = "guest";
   };
 }
 ```

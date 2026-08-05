@@ -8,25 +8,23 @@ Users are configured centrally in the system config:
 
 ```nix
 {
-  users = {
-    alice = {
-      role = "admin";
-      defaultShell = "zsh";
-      autoLogin = false;
-    };
-    bob = {
-      role = "restricted-admin";
-      defaultShell = "fish";
-      autoLogin = true;  # Enables TTY auto-login
-    };
-    charlie = {
-      role = "virtualization";
-      defaultShell = "bash";
-    };
-    guest = {
-      role = "guest";
-      defaultShell = "bash";
-    };
+  alice = {
+    role = "admin";
+    defaultShell = "zsh";
+    autoLogin = false;
+  };
+  bob = {
+    role = "restricted-admin";
+    defaultShell = "fish";
+    autoLogin = true;  # Enables TTY auto-login
+  };
+  charlie = {
+    role = "virtualization";
+    defaultShell = "bash";
+  };
+  guest = {
+    role = "guest";
+    defaultShell = "bash";
   };
 }
 ```
@@ -39,12 +37,10 @@ Users are configured centrally in the system config:
 **Configuration**:
 ```nix
 {
-  users = {
-    admin = {
-      role = "admin";
-      defaultShell = "zsh";
-      autoLogin = false;
-    };
+  admin = {
+    role = "admin";
+    defaultShell = "zsh";
+    autoLogin = false;
   };
 }
 ```
@@ -56,12 +52,10 @@ Users are configured centrally in the system config:
 **Configuration**:
 ```nix
 {
-  users = {
-    user = {
-      role = "restricted-admin";
-      defaultShell = "bash";
-      autoLogin = true;  # TTY auto-login enabled
-    };
+  user = {
+    role = "restricted-admin";
+    defaultShell = "bash";
+    autoLogin = true;  # TTY auto-login enabled
   };
 }
 ```
@@ -73,11 +67,9 @@ Users are configured centrally in the system config:
 **Configuration**:
 ```nix
 {
-  users = {
-    docker = {
-      role = "virtualization";
-      defaultShell = "bash";
-    };
+  docker = {
+    role = "virtualization";
+    defaultShell = "bash";
   };
 }
 ```
@@ -89,11 +81,9 @@ Users are configured centrally in the system config:
 **Configuration**:
 ```nix
 {
-  users = {
-    guest = {
-      role = "guest";
-      defaultShell = "bash";
-    };
+  guest = {
+    role = "guest";
+    defaultShell = "bash";
   };
 }
 ```
@@ -168,11 +158,9 @@ Configurable automatic login:
 The user module works with password management:
 ```nix
 {
-  users = {
-    alice = {
-      role = "admin";
-      # Password managed via password-manager
-    };
+  alice = {
+    role = "admin";
+    # Password managed via password-manager
   };
 }
 ```

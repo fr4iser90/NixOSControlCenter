@@ -31,6 +31,9 @@ let
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
   autoBuild = lib.attrByPath ["autoBuild"] false (getModuleConfig "system-manager");
   systemChecks = lib.attrByPath ["enable"] false (getModuleConfig "system-checks");
+  configLayout = lib.attrByPath [ "layout" ] "monolith" (getModuleConfig "system-manager");
+  isSplitLayout = configLayout == "split";
+  configFacade = import ../lib/config-facade.nix { inherit pkgs; };
   # Function to prompt for build - with conditional build command and better error handling
   prompt_build = ''
     while true; do
@@ -95,6 +98,7 @@ let
     AUTO_CONFIRM=false
     AUTO_SOURCE=""
     AUTO_BUILD=false
+    WITH_CHANNELS=false
     for arg in "$@"; do
       case "$arg" in
         --verbose|--debug|-v)
@@ -121,6 +125,9 @@ let
         --channels)
           AUTO_SOURCE="channels"
           ;;
+        --with-channels)
+          WITH_CHANNELS=true
+          ;;
         --auto-build)
           AUTO_BUILD=true
           ;;
@@ -137,6 +144,9 @@ let
     # Configuration
     NIXOS_DIR="/etc/nixos"
     BACKUP_ROOT="${backupSettings.directory}"
+
+    # Layout/paths SSOT — never hardcode monolith vs split elsewhere in this script
+    ${configFacade.sourcePreamble { nixosRoot = "/etc/nixos"; }}
     
     # Show dangerous warning unless auto-confirm is enabled
     if [ "$AUTO_CONFIRM" != "true" ]; then
@@ -197,8 +207,27 @@ let
       echo "2) Update Configuration (Local Directory)"
       echo "3) Update Channels (flake inputs)"
       
-      printf "Select option (1-3): "
-      read source_choice
+      source_choice=""
+      while true; do
+        printf "Select option (1-3): "
+        # -r: no backslash escapes; empty/EOF → cancel
+        if ! read -r source_choice; then
+          ${ui.messages.info "Update cancelled"}
+          exit 0
+        fi
+        # Trim whitespace
+        source_choice="''${source_choice#"''${source_choice%%[![:space:]]*}"}"
+        source_choice="''${source_choice%"''${source_choice##*[![:space:]]}"}"
+        case "$source_choice" in
+          1|2|3) break ;;
+          "")
+            ${ui.messages.warning "Empty input — please choose 1, 2, or 3"}
+            ;;
+          *)
+            ${ui.messages.warning "Option '$source_choice' is not available — please choose 1, 2, or 3"}
+            ;;
+        esac
+      done
     fi
     
     while true; do
@@ -218,7 +247,12 @@ let
           
           while true; do
             printf "Select branch (1-4): "
-            read choice
+            if ! read -r choice; then
+              ${ui.messages.info "Update cancelled"}
+              exit 0
+            fi
+            choice="''${choice#"''${choice%%[![:space:]]*}"}"
+            choice="''${choice%"''${choice##*[![:space:]]}"}"
             case $choice in
               1) 
                 SELECTED_BRANCH="main"
@@ -234,11 +268,14 @@ let
                 ;;
               4)
                 printf "Enter custom branch name: "
-                read SELECTED_BRANCH
+                read -r SELECTED_BRANCH
                 break
                 ;;
+              "")
+                ${ui.messages.warning "Empty input — please choose 1-4"}
+                ;;
               *)
-                ${ui.messages.error "Invalid selection"}
+                ${ui.messages.warning "Option '$choice' is not available — please choose 1-4"}
                 ;;
             esac
           done
@@ -274,7 +311,12 @@ let
               echo "3) Enter path manually"
               echo "4) Cancel"
               printf "Select option (1-4): "
-              read local_choice
+              if ! read -r local_choice; then
+                ${ui.messages.info "Update cancelled"}
+                exit 0
+              fi
+              local_choice="''${local_choice#"''${local_choice%%[![:space:]]*}"}"
+              local_choice="''${local_choice%"''${local_choice##*[![:space:]]}"}"
               
               case $local_choice in
                 1)
@@ -309,7 +351,7 @@ let
                   ;;
                 3)
                   printf "Enter path to NixOS source directory: "
-                  read raw_path
+                  read -r raw_path
                   SOURCE_DIR=$(eval echo "$raw_path")
                   if [ -d "$SOURCE_DIR" ]; then
                     break
@@ -321,8 +363,11 @@ let
                   ${ui.messages.info "Update cancelled"}
                   exit 0
                   ;;
+                "")
+                  ${ui.messages.warning "Empty input — please choose 1-4"}
+                  ;;
                 *)
-                  ${ui.messages.error "Invalid selection"}
+                  ${ui.messages.warning "Option '$local_choice' is not available — please choose 1-4"}
                   ;;
               esac
             done
@@ -344,7 +389,9 @@ let
           exit 0 # Exit after channel update is done
           ;;
         *)
-          ${ui.messages.error "Invalid selection"}
+          # Should not happen — source_choice already validated
+          ${ui.messages.error "Unexpected source choice: $source_choice"}
+          exit 1
           ;;
       esac
     done
@@ -791,7 +838,16 @@ EOF
       fi
     done
      
-      # Sync template-config.nix files to systemConfig/config.nix
+      # Template sync / per-user leaf migration — SPLIT only (via facade layout).
+      # Monolith SSOT is $MONOLITH_FILE; scrub leftover split leaves instead of recreating them.
+      if [ "$(ncc_detect_layout)" = "monolith" ]; then
+        SCRUBBED=$(ncc_scrub_split_leaves_if_monolith || true)
+        if [ -n "''${SCRUBBED:-}" ]; then
+          ${ui.messages.info "Monolith layout: removed $SCRUBBED leftover split config.nix leaf/leaves under $CONFIGS_BASE"}
+        elif [ "$VERBOSE" = "true" ]; then
+          ${ui.messages.info "Monolith layout: skipping split template sync (SSOT: $MONOLITH_FILE)"}
+        fi
+      else
       if [ "$VERBOSE" = "true" ]; then
         echo "=== Syncing config templates ==="
       fi
@@ -885,7 +941,7 @@ NIXEOF
         echo "  No template sync needed"
       fi
       
-      # === Per-User Config Migration ===
+      # === Per-User Config Migration (split only) ===
       # Creates users/<name>/config.nix from central core/base/user/config.nix
       # Per-user config contains ONLY overrides (packages, home-manager, system)
       # User definition (role, shell, autoLogin) stays in core/base/user/config.nix
@@ -904,9 +960,8 @@ NIXEOF
 { configFile }:
 let
   cfg = import configFile;
-  raw = cfg.users or {};
 in
-  builtins.filter (n: builtins.isAttrs (raw.''${n})) (builtins.attrNames raw)
+  builtins.filter (n: builtins.isAttrs (cfg.''${n})) (builtins.attrNames cfg)
 NIXEOF
 
         USER_JSON=""
@@ -995,6 +1050,7 @@ EOF
       if [ "$ADJUSTED" -gt 0 ]; then
         echo "  Fixed $ADJUSTED placeholder(s)"
       fi
+      fi  # end split-only template sync / per-user migration
      
      # ADDITIONAL PROTECTION: Ensure protected directories are not overwritten
      # Even if they were accidentally in COPY_ITEMS or copied through another directory
@@ -1062,6 +1118,67 @@ EOF
       ${ui.badges.warning "$pw_issues user(s) have password issues - they will be prompted during prebuild checks"}
     else
       ${ui.badges.success "Password files OK"}
+    fi
+
+    # After config update (opt 1/2): offer channel bump when a newer stable pin exists
+    CHANNELS_UPDATED=false
+    if command -v ncc-check-release >/dev/null 2>&1; then
+      set +e
+      CHECK_JSON=$(ncc-check-release --json --flake "$NIXOS_DIR/flake.nix" 2>/dev/null)
+      CHECK_RC=$?
+      set -e
+      if [ "$CHECK_RC" -eq 10 ]; then
+        CURRENT_PIN=$(echo "$CHECK_JSON" | ${pkgs.jq}/bin/jq -r '.current // empty' 2>/dev/null || true)
+        LATEST_PIN=$(echo "$CHECK_JSON" | ${pkgs.jq}/bin/jq -r '.latest // empty' 2>/dev/null || true)
+        ${ui.text.header "Channel Update Available"}
+        ${ui.messages.warning "Newer NixOS stable pin available"}
+        echo "  nixos-''${CURRENT_PIN:-unknown} → nixos-''${LATEST_PIN:-unknown}"
+        ${ui.messages.info "This bumps flake input URLs and runs nix flake update (stateVersion unchanged)."}
+        do_channels=false
+        if [ "$WITH_CHANNELS" = "true" ]; then
+          do_channels=true
+          ${ui.messages.info "--with-channels: including channel update"}
+        elif [ "$AUTO_CONFIRM" = "true" ]; then
+          ${ui.messages.info "Skipping channel update (use --with-channels to include)"}
+        else
+          while true; do
+            printf "Also perform channel update? (y/n): "
+            if ! read -r channel_choice; then
+              channel_choice=n
+            fi
+            case "$channel_choice" in
+              y|Y) do_channels=true; break ;;
+              n|N) do_channels=false; break ;;
+              *) ${ui.messages.warning "Please answer y or n"} ;;
+            esac
+          done
+        fi
+        if [ "$do_channels" = "true" ]; then
+          if command -v ncc-update-channels >/dev/null 2>&1; then
+            BUMP_ARGS=(--skip-rebuild --flake "$NIXOS_DIR")
+            if [ -n "''${LATEST_PIN:-}" ]; then
+              BUMP_ARGS+=(--bump-to "$LATEST_PIN")
+            fi
+            if ncc-update-channels "''${BUMP_ARGS[@]}"; then
+              CHANNELS_UPDATED=true
+              ${ui.messages.success "Channel/flake inputs updated (rebuild follows next)"}
+            else
+              ${ui.messages.error "Channel update failed — continuing with config-only rebuild"}
+            fi
+          else
+            ${ui.messages.warning "ncc-update-channels not found — skip channel update"}
+          fi
+        fi
+      elif [ "$CHECK_RC" -eq 0 ]; then
+        ${ui.messages.info "Channel pin is up to date"}
+      else
+        ${ui.messages.info "Channel check skipped or failed"}
+        echo "  exit code: $CHECK_RC"
+      fi
+    fi
+
+    if [ "$CHANNELS_UPDATED" = "true" ]; then
+      ${ui.messages.info "Config + channel updates ready — one rebuild applies both"}
     fi
     
     # Check if auto-build or --auto-build flag is enabled
@@ -1140,11 +1257,8 @@ in lib.mkMerge [
       chown root:root ${backupSettings.directory}/system-updates
     '';
 
-    # Self-healing per-user config migration.
-    # Runs on every `nixos-rebuild switch`. For each user declared in
-    # systemConfig.core.base.user.<name> (the canonical location resolved by the
-    # config-loader), ensure /etc/nixos/systemConfig/users/<name>/config.nix exists.
-    # Idempotent: only writes files that don't exist yet, never overwrites user edits.
+    # Self-healing per-user config migration (SPLIT layout only).
+    # Monolith keeps per-user overrides in systemConfig.nix under users.<name>.
     system.activationScripts.migratePerUserConfigs =
       let
         userAttrs = lib.attrByPath [ "core" "base" "user" ] {} systemConfig;
@@ -1152,7 +1266,7 @@ in lib.mkMerge [
           if builtins.isAttrs userAttrs
           then builtins.filter (n: builtins.isAttrs (userAttrs.${n})) (builtins.attrNames userAttrs)
           else [];
-      in lib.optionalString (usernames != []) ''
+      in lib.optionalString (isSplitLayout && usernames != []) ''
         for USERNAME in ${lib.concatStringsSep " " usernames}; do
           USER_DIR="/etc/nixos/systemConfig/users/$USERNAME"
           USER_CFG="$USER_DIR/config.nix"

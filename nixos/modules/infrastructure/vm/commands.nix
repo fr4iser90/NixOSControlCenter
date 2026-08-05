@@ -102,7 +102,7 @@ let
       
       # Use the system package script if available
       if command -v vm-test-${distro}-run >/dev/null 2>&1; then
-        exec vm-test-${distro}-run
+        exec vm-test-${distro}-run "$@"
       else
         ${ui.badges.error "VM test script not found"}
         ${ui.messages.info "Make sure the VM module is enabled in systemConfig/ and rebuilt"}
@@ -139,20 +139,19 @@ let
       description = "Start ${distro} test VM";
       category = "infrastructure";
       script = "${runScript}/bin/ncc-vm-test-${distro}-run";
-      arguments = [];
+      arguments = [ "--disk" "--iso" "--auto" "--installed" "--help" ];
       dependencies = [ "qemu" "libvirt" ];
-      shortHelp = "test-${distro}-run - Start ${distro} test VM";
+      shortHelp = "test-${distro}-run - Start ${distro} test VM (auto disk/ISO)";
       longHelp = ''
         Start a test VM with ${distro}.
-        
-        This will:
-        - Download the ISO if needed
-        - Create a disk image if needed
-        - Start the VM with QEMU/KVM
-        
-        Requirements:
-        - libvirtd must be running
-        - KVM support enabled
+
+          ncc vm test-${distro}-run           # Auto: empty disk → ISO, installed → disk
+          ncc vm test-${distro}-run --disk    # Force boot installed OS
+          ncc vm test-${distro}-run --iso     # Force installer ISO
+
+        Detection uses qcow2 allocated size (fresh image is tiny; install writes data).
+
+        Reset wipe: ncc vm test-${distro}-reset
       '';
     }
     {
@@ -202,7 +201,8 @@ let
         Examples:
           ncc vm status
           ncc vm list
-          ncc vm test-nixos-run
+          ncc vm test-nixos-run           # auto: installer or installed disk
+          ncc vm test-nixos-run --iso     # force installer
           ncc vm test-ubuntu-reset
       '';
     }

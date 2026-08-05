@@ -5,7 +5,13 @@ with lib;
 
 let
   # Helper für ISO-URLs
-  mkNixosUrl = { version, variant }: "https://channels.nixos.org/nixos-${version}/latest-nixos-${variant}-x86_64-linux.iso";
+  # NixOS 26.05+ ships only unified graphical/minimal ISOs (no per-DE images).
+  # Legacy variant names (gnome/plasma*/xfce) map to the graphical channel image.
+  nixosChannelVariant = variant:
+    if builtins.elem variant [ "graphical" "minimal" ] then variant else "graphical";
+
+  mkNixosUrl = { version, variant }:
+    "https://channels.nixos.org/nixos-${version}/latest-nixos-${nixosChannelVariant variant}-x86_64-linux.iso";
   mkUbuntuUrl = { version }: "https://releases.ubuntu.com/${version}/ubuntu-${version}-desktop-amd64.iso";
   mkFedoraUrl = { version }: let
     # Build numbers für bekannte Versionen
@@ -27,21 +33,38 @@ let
     nixos = {
       name = "NixOS";
       osFamily = "linux";
+      preferredVariant = "graphical";
       variants = {
-        plasma5 = {
-          name = "KDE Plasma";
+        graphical = {
+          name = "Graphical Installer";
           getUrl = mkNixosUrl;
-          defaultVersion = "25.11";
+          defaultVersion = "26.05";
         };
-        gnome = {
-          name = "GNOME";
+        minimal = {
+          name = "Minimal Installer";
           getUrl = mkNixosUrl;
-          defaultVersion = "25.11";
+          defaultVersion = "26.05";
+        };
+        # Legacy aliases → same channel image as graphical (26.05+ has no per-DE ISOs)
+        gnome = {
+          name = "GNOME (alias → graphical ISO)";
+          getUrl = mkNixosUrl;
+          defaultVersion = "26.05";
+        };
+        plasma5 = {
+          name = "KDE Plasma (alias → graphical ISO)";
+          getUrl = mkNixosUrl;
+          defaultVersion = "26.05";
+        };
+        plasma6 = {
+          name = "KDE Plasma 6 (alias → graphical ISO)";
+          getUrl = mkNixosUrl;
+          defaultVersion = "26.05";
         };
         xfce = {
-          name = "XFCE";
+          name = "XFCE (alias → graphical ISO)";
           getUrl = mkNixosUrl;
-          defaultVersion = "25.11";
+          defaultVersion = "26.05";
         };
       };
     };

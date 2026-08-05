@@ -1,42 +1,28 @@
 #!/usr/bin/env bash
 
 # =============================================================
-# Config Writer Library - v1 Modular Config System
+# Config Writer Library - v2 Dual Layout Config System
 # =============================================================
-# Writes NixOSControlCenter configs to the v1 modular structure:
+# Default layout: monolith (/etc/nixos/systemConfig.nix)
+# Optional layout: split (/etc/nixos/systemConfig/**/config.nix)
 #
-# /etc/nixos/system-config.nix              ← minimal entry point
-# /etc/nixos/systemConfig/
-#   ├── core/management/system-manager/config.nix
-#   ├── core/base/desktop/config.nix
-#   ├── core/base/hardware/config.nix
-#   ├── core/base/packages/config.nix
-#   ├── core/base/localization/config.nix
-#   ├── core/base/network/config.nix
-#   ├── core/base/user/config.nix
-#   └── modules/.../.../config.nix
+# Set NCC_LAYOUT=split before writing to force split leaf files.
 # =============================================================
 
-# Common path constants (see config-paths.sh for full list)
+# Common path constants + facade (see config-paths.sh / config-facade.sh)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=config-paths.sh
 source "${SCRIPT_DIR}/config-paths.sh"
+# shellcheck source=config-facade.sh
+source "${SCRIPT_DIR}/config-facade.sh"
+
+# Default new installs to monolith unless caller already chose a layout
+if [[ -z "${NCC_LAYOUT:-}" ]]; then
+  export NCC_LAYOUT="${NCC_DEFAULT_LAYOUT:-monolith}"
+fi
 
 # ---------- General helper ----------
-
-# Write any config file to a path
-# Usage: write_module_config "core/base/desktop" "{ ... }"
-write_module_config() {
-    local module_path="$1"
-    local content="$2"
-    local config_file="${CONFIGS_BASE}/${module_path}/config.nix"
-    
-    ensure_dir "$(dirname "$config_file")"
-    cat > "$config_file" <<EOF
-${content}
-EOF
-    log_debug "Created config: ${module_path}/config.nix"
-}
+# write_module_config is provided by config-facade.sh (layout-aware)
 
 # ---------- System Manager (core/management/system-manager) ----------
 
@@ -49,7 +35,8 @@ write_system_manager_config() {
     
     write_module_config "core/management/system-manager" "{
   # System Manager Configuration
-  configVersion = \"1.0\";
+  configVersion = \"2.0\";
+  layout = \"${NCC_LAYOUT:-monolith}\";
   systemType = \"${system_type}\";
   allowUnfree = ${allow_unfree};
   system = {
@@ -60,7 +47,7 @@ write_system_manager_config() {
 }"
 }
 
-# ---------- System Config (monolithic entry, minimal) ----------
+# ---------- System Config (v2: no legacy system-config.nix) ----------
 
 write_system_config() {
     local system_type="${1:-desktop}"
@@ -81,24 +68,20 @@ write_system_config() {
       autoLogin = false;
     };"
     fi
-    
-    ensure_dir "$(dirname "$SYSTEM_CONFIG_FILE")"
-    cat > "$SYSTEM_CONFIG_FILE" <<EOF
-{
-  systemType = "${system_type}";
-  hostName = "${host_name}";
-  system = {
-    channel = "${channel:-stable}";
-    bootloader = "${bootloader}";
-  };
-  allowUnfree = ${allow_unfree:-false};
-  users = {
-${users_block}
-  };
-  timeZone = "${timezone}";
-}
-EOF
-    log_debug "Created system-config.nix (entry point)"
+
+    # Ensure layout target exists; do NOT write deprecated system-config.nix
+    if declare -F ncc_dry_run >/dev/null 2>&1 && ncc_dry_run; then
+        ncc_dry_skip "ensure config dirs" "${CONFIGS_BASE:-/etc/nixos/systemConfig}"
+    else
+        mkdir -p "$CONFIGS_BASE"
+    fi
+    if [[ -f "${SYSTEM_CONFIG_FILE:-}" ]]; then
+        log_debug "Leaving legacy system-config.nix in place until config-check migrates it"
+    fi
+
+    # Users belong in core/base/user (split leaf or monolith nested path)
+    write_user_config "$users_block"
+    log_debug "Wrote user config via facade (layout=$(ncc_detect_layout))"
 }
 
 # ---------- Desktop (core/base/desktop) ----------
@@ -161,11 +144,10 @@ write_hardware_config() {
 # ---------- Packages (core/base/packages) ----------
 
 write_packages_config() {
-    local module_args=("$@")
-    local preset="${module_args[0]:-}"
-    shift || true
+    # All args are package module / set names → packageModules.
+    # (Do not treat argv[0] as packages.preset — callers pass only module lists.)
     local modules=("$@")
-    
+
     local modules_section=""
     if [[ ${#modules[@]} -gt 0 ]]; then
         modules_section="  packageModules = [
@@ -176,16 +158,13 @@ write_packages_config() {
         done
         modules_section+="  ];
 "
-    fi
-    
-    local preset_section=""
-    if [[ -n "$preset" ]]; then
-        preset_section="  preset = \"${preset}\";
+    else
+        modules_section="  packageModules = [];
 "
     fi
-    
+
     write_module_config "core/base/packages" "{
-${preset_section}${modules_section}systemPackages = [];
+${modules_section}  systemPackages = [];
   userPackages = {};
   docker.enable = false;
   docker.root = null;
@@ -237,11 +216,10 @@ write_network_config() {
 
 write_user_config() {
     local users_block="$1"
-    
+
+    # Module config is flat: username → { role, ... } (same shape as getModuleConfig "user")
     write_module_config "core/base/user" "{
-  users = {
 ${users_block}
-  };
 }"
 }
 
@@ -294,25 +272,26 @@ write_homelab_config() {
     local homelab_type="${1:-single}"  # single | swarm
     local enable_email="${2:-false}"
     local enable_vm="${3:-false}"
-    
+    local swarm_role_arg="${4:-${swarm_role:-manager}}"
+
     local content="{"
     content+="
   homelab.enable = ${enable_email};"
-    
+
     if [[ "$homelab_type" == "swarm" ]]; then
         content+="
   homelab.type = \"swarm\";"
         content+="
-  homelab.role = \"manager\";"
+  homelab.role = \"${swarm_role_arg}\";"
     else
         content+="
   homelab.type = \"single\";"
     fi
-    
+
     content+="
   homelab.virtualization = ${enable_vm};
 }"
-    
+
     write_module_config "modules/infrastructure/homelab-manager" "$content"
 }
 
@@ -414,6 +393,12 @@ clean_old_configs() {
 # ---------- Export ----------
 
 export -f write_module_config
+export -f ncc_detect_layout
+export -f ncc_write_module_config
+export -f ncc_read_module_config
+export -f ncc_set_module_enable
+export -f ncc_ensure_layout
+export -f ncc_module_config_path
 export -f write_system_manager_config
 export -f write_system_config
 export -f write_desktop_config

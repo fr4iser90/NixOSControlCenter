@@ -8,7 +8,7 @@ services:
       - PORT=8080
       - HOST=0.0.0.0
       - DATA_DIR=/var/lib/nixify
-      - MAPPING_DB_PATH=/app/mapping/mapping-database.json
+      # Mapping DBs are embedded at image build (from Nix SSOT) — no MAPPING_DB_PATH mount
       - MODULES_BASE_PATH=/app/nixos
       - GITHUB_REPO_URL=https://github.com/fr4iser90/NixOSControlCenter
       - GITHUB_BRANCH=main
@@ -16,7 +16,6 @@ services:
     volumes:
       - nixify-data:/var/lib/nixify
       - ../../snapshot:/app/snapshot:ro
-      - ../../mapping:/app/mapping:ro
       - ../config-generator:/app/config-generator:ro
       - ../../iso-builder:/app/iso-builder:ro
     restart: unless-stopped

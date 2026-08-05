@@ -57,6 +57,7 @@ in {
         [ checkVersions.checkVersionsScript
           updateModules.updateModulesScript
           configMigration.migration.migrateSystemConfig
+          configMigration.configLayout
           configValidator.validateSystemConfig
           enableDesktopScript
           updateDesktopConfig
@@ -131,28 +132,23 @@ in {
         name = "migrate-config";
         domain = "system";
         parent = "system";
-        description = "Migrate system-config.nix from monolithic to modular structure";
+        description = "Migrate configuration schema version (v0→v2)";
         category = "system";
         script = "${configMigration.migration.migrateSystemConfig}/bin/ncc-migrate-config";
         arguments = [];
         dependencies = [ "nix" ];
-        shortHelp = "migrate-config - Migrate system-config.nix";
+        shortHelp = "migrate-config - Migrate config schema version (v0→v2)";
         longHelp = ''
-          Migrates the system configuration from monolithic to modular structure:
+          Migrates system configuration across schema versions (v0 → v1 → v2).
 
-          Migration Process:
-          - Creates backup of current system-config.nix
-          - Extracts config sections to modular files in systemConfig/:
-            * desktop → core/base/desktop/config.nix
-            * hardware → core/base/hardware/config.nix
-            * packages → core/base/packages/config.nix
-            * localization → core/base/localization/config.nix
-            * network → core/base/network/config.nix
-            * users → core/base/user/config.nix
-            * system → core/management/system-manager/config.nix
-          - Preserves all existing configuration values
+          v2 layouts (after migration):
+            monolith  /etc/nixos/systemConfig.nix   (default)
+            split     /etc/nixos/systemConfig/**/config.nix
 
-          This migration is safe and creates backups automatically.
+          For layout switches use:
+            ncc system config-layout convert --to monolith|split
+
+          Creates backups under /var/backup/nixos/ automatically.
         '';
       }
       # Subcommand: migrate (Kurzform für v0→v1 Migration)
@@ -160,16 +156,42 @@ in {
         name = "migrate";
         domain = "system";
         parent = "system";
-        description = "Migrate system-config.nix from monolithic (v0) to modular (v1) structure";
+        description = "Migrate configuration schema version (alias for migrate-config)";
         category = "system";
         script = "${configMigration.migration.migrateSystemConfig}/bin/ncc-migrate-config";
         arguments = [];
         dependencies = [ "nix" ];
-        shortHelp = "migrate - Migrate v0→v1 system-config.nix";
+        shortHelp = "migrate - Alias for migrate-config (schema versions)";
         longHelp = ''
           Shortcut for ncc system migrate-config.
-          Migrates the system configuration from monolithic (v0) to modular (v1) structure.
-          Creates backups automatically.
+          Migrates schema versions (v0→v1→v2). For monolith↔split use config-layout.
+        '';
+      }
+      # Subcommand: config-layout (v2 dual layout)
+      {
+        name = "config-layout";
+        domain = "system";
+        parent = "system";
+        description = "Detect or convert systemConfig layout (monolith ↔ split)";
+        category = "system";
+        script = "${configMigration.configLayout}/bin/ncc-config-layout";
+        arguments = [ "detect" "convert" "--to" "--force" ];
+        dependencies = [ "nix" "jq" ];
+        requiresSudo = true;
+        shortHelp = "config-layout - Detect/convert monolith ↔ split";
+        longHelp = ''
+          Dual-layout management for systemConfig (schema v2):
+
+            ncc system config-layout detect
+            ncc system config-layout convert --to monolith
+            ncc system config-layout convert --to split [--force]
+
+          Layouts:
+            monolith  /etc/nixos/systemConfig.nix (nested attrset, default)
+            split     /etc/nixos/systemConfig/**/config.nix
+
+          Convert backs up under /var/backup/nixos/, then keeps only the target layout.
+          Also available as: ncc-config-layout
         '';
       }
       # Subcommand: validate-config
@@ -177,26 +199,29 @@ in {
         name = "validate-config";
         domain = "system";
         parent = "system";
-        description = "Validate system-config.nix structure and configuration";
+        description = "Validate systemConfig (monolith or split)";
         category = "system";
         script = "${configValidator.validateSystemConfig}/bin/ncc-validate-config";
         arguments = [];
         dependencies = [ "nix" ];
-        shortHelp = "validate-config - Validate system-config.nix";
+        shortHelp = "validate-config - Validate systemConfig (monolith|split)";
         longHelp = ''
-          Validates the system configuration structure and checks:
+          Validates the active layout SSOT (via config-facade):
 
-          Validation Checks:
-          - Nix syntax validity
-          - Required critical values presence:
-            * systemType, hostName, system.channel
-            * system.bootloader, allowUnfree, users, timeZone
-          - Modular structure check (configs/ directory)
-          - Detects old monolithic structure
+            monolith  /etc/nixos/systemConfig.nix
+            split     /etc/nixos/systemConfig/**/config.nix
+
+          Checks:
+          - Config present and Nix syntax
+          - Detected schema version vs current
+          - Required fields (e.g. configVersion)
+          - No leftover legacy /etc/nixos/configs/
 
           Exit codes:
           - 0: All checks passed
           - 1: Errors or warnings found
+
+          Tip: ncc system config-layout detect
         '';
       }
       ])
@@ -269,6 +294,7 @@ in {
             --local              Automatically select local directory update (option 2)
             --remote             Automatically select remote repository update (option 1)
             --channels           Automatically select channel update (option 3)
+            --with-channels      After config update, auto-include channel bump if newer pin exists
             --auto-build         Automatically build and switch after update
             --verbose, -v        Show verbose output during update
             --force-migration    Force migration even if versions match
@@ -277,10 +303,14 @@ in {
 
           Examples:
             # Interactive update (default)
+            # After config copy: prompts y/n if a newer nixos-YY.MM pin is available
             ncc system-update
 
             # Fully automated local update with rebuild
             ncc system-update --yes --local --auto-build
+
+            # Local update + channel bump (when available) + rebuild
+            ncc system-update --yes --local --with-channels --auto-build
 
             # Local update without rebuild
             ncc system-update -y --local
@@ -288,7 +318,7 @@ in {
             # Remote update with auto-confirm
             ncc system-update --auto --remote --auto-build
 
-            # Channel update
+            # Channel update only
             ncc system-update --yes --channels
 
           Note: This command requires root privileges. The script will check for root and prompt for sudo if needed.

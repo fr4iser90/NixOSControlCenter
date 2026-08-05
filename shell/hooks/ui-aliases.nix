@@ -1,7 +1,12 @@
 { pkgs }:
 ''
-  # Hauptinstallation
+  # Hauptinstallation (GUI when DISPLAY/WAYLAND set, else fzf TUI)
   alias install="$CORE_DIR/init.sh"
+  # Force UI mode for install
+  install-gui() { NCC_INSTALL_UI=gui "$CORE_DIR/init.sh" "$@"; }
+  install-tui() { NCC_INSTALL_UI=tui "$CORE_DIR/init.sh" "$@"; }
+  # Dry-run: full wizard, no disk writes / deploy / rebuild
+  install-dry() { NCC_DRY_RUN=1 "$CORE_DIR/init.sh" --dry-run "$@"; }
   
   # Quick-Install Befehle
   install-quick-gaming() {

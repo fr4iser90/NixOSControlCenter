@@ -26,18 +26,18 @@ in
       description = "Enable version checking (always available in Core)";
     };
 
-    # Deprecation-Warnungen sind immer verfügbar (Core)
+    # Release-Notify / Deprecation-Warnungen (Core)
     enableDeprecationWarnings = lib.mkOption {
       type = lib.types.bool;
-      default = true;  # Immer an
-      description = "Enable deprecation warnings (e.g., NixOS version deprecation)";
+      default = true;
+      description = "Enable NixOS release warnings (gates channel-manager notify timer when enableNotify is true)";
     };
 
-    # Update-Funktionalität ist optional
+    # Legacy flag — update tools (update-channels / system update) are always registered
     enableUpdates = lib.mkOption {
       type = lib.types.bool;
-      default = false;  # Optional
-      description = "Enable automatic updates (optional)";
+      default = false;
+      description = "Legacy option (unused). Channel/update tools are always available via ncc system update-channels / check-release";
     };
 
     # System Checks Component (converted from submodule)
@@ -68,6 +68,20 @@ in
         type = lib.types.bool;
         default = false;  # Optional component, rarely needed after v0→v1 migration
         description = "Enable config migration tools (schema-based migration from v0 to v1)";
+      };
+    };
+
+    # Channel / release awareness
+    components.channelManager = {
+      enableNotify = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Periodic systemd timer that notifies when a newer NixOS stable release is available (also requires enableDeprecationWarnings)";
+      };
+      checkInterval = lib.mkOption {
+        type = lib.types.str;
+        default = "weekly";
+        description = "systemd OnCalendar expression for ncc-release-check (e.g. weekly, daily, *-*-01 10:00:00)";
       };
     };
   };

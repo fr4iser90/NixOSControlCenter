@@ -76,8 +76,12 @@ let
   in
     "${configDir}/config.nix";
 
+  # Active layout from loaded systemConfig (monolith skips leaf auto-create)
+  activeLayout = systemConfig.core.management.system-manager.layout or "split";
+
   # Create activation scripts for ALL discovered modules to auto-create default configs
-  automaticConfigCreation = lib.mkMerge (
+  # Only for split layout — monolith stores everything in systemConfig.nix
+  automaticConfigCreation = lib.mkIf (activeLayout != "monolith") (lib.mkMerge (
     map (module: let
       defaultConfig = getDefaultConfigForModule module;
       configFilePath = buildConfigFilePath module;
@@ -101,7 +105,8 @@ EOF
         };
       }
     ) discoveredModules
-  );
+  ));
+
 
   # Set enable options for all modules based on central config
   # Note: Modules are imported statically in flake.nix, not dynamically here

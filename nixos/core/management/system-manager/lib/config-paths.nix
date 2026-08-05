@@ -1,25 +1,32 @@
-# v1 modular systemConfig paths (single source of truth)
+# systemConfig paths (single source of truth)
+# v2 dual layout: monolith (/etc/nixos/systemConfig.nix) or split (systemConfig/**/config.nix)
+let
+  layout = import ./config-layout.nix {};
+in
 {
-  root = "/etc/nixos/systemConfig";
+  root = layout.absolute.split;
+  monolith = layout.absolute.monolith;
+  layout = layout;
 
   # Pre-v1 leftover — must never remain after config-check / system-update
   legacy = {
     configsDir = "/etc/nixos/configs";
+    systemConfigNix = "/etc/nixos/system-config.nix"; # v0 flat monolith
   };
 
   core = {
     base = {
-      desktop = "/etc/nixos/systemConfig/core/base/desktop/config.nix";
-      hardware = "/etc/nixos/systemConfig/core/base/hardware/config.nix";
-      packages = "/etc/nixos/systemConfig/core/base/packages/config.nix";
-      localization = "/etc/nixos/systemConfig/core/base/localization/config.nix";
-      network = "/etc/nixos/systemConfig/core/base/network/config.nix";
-      user = "/etc/nixos/systemConfig/core/base/user/config.nix";
-      audio = "/etc/nixos/systemConfig/core/base/audio/config.nix";
+      desktop = layout.splitConfigFile "core/base/desktop";
+      hardware = layout.splitConfigFile "core/base/hardware";
+      packages = layout.splitConfigFile "core/base/packages";
+      localization = layout.splitConfigFile "core/base/localization";
+      network = layout.splitConfigFile "core/base/network";
+      user = layout.splitConfigFile "core/base/user";
+      audio = layout.splitConfigFile "core/base/audio";
     };
     management = {
-      moduleManager = "/etc/nixos/systemConfig/core/management/module-manager/config.nix";
-      systemManager = "/etc/nixos/systemConfig/core/management/system-manager/config.nix";
+      moduleManager = layout.splitConfigFile "core/management/module-manager";
+      systemManager = layout.splitConfigFile "core/management/system-manager";
     };
   };
 }

@@ -709,37 +709,8 @@ func (s *Server) handleMappings(w http.ResponseWriter, r *http.Request) {
 	s.setSecurityHeadersWithNonce(w, nonce)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	
-	// Load mapping database
-	// Priority: 1. Environment variable, 2. File path, 3. Embedded database
-	var mappingData []byte
-	mappingPath := os.Getenv("MAPPING_DB_PATH")
-	
-	// Try to load from file first (for development/custom mappings)
-	if mappingPath != "" {
-		if _, err := os.Stat(mappingPath); err == nil {
-			mappingData, _ = os.ReadFile(mappingPath)
-		}
-	}
-	
-	// Try Docker path
-	if len(mappingData) == 0 {
-		if _, err := os.Stat("/app/mapping/mapping-database.json"); err == nil {
-			mappingData, _ = os.ReadFile("/app/mapping/mapping-database.json")
-		}
-	}
-	
-	// Try default dataDir path
-	if len(mappingData) == 0 {
-		defaultPath := filepath.Join(s.dataDir, "mapping-database.json")
-		if _, err := os.Stat(defaultPath); err == nil {
-			mappingData, _ = os.ReadFile(defaultPath)
-		}
-	}
-	
-	// Fallback to embedded database
-	if len(mappingData) == 0 {
-		mappingData = []byte(mappingDatabaseJSON)
-	}
+	// Mapping DB = flake-built embed only (Nix SSOT → writeText → go:embed). No path env / no /etc.
+	mappingData := []byte(mappingDatabaseJSON)
 	
 	var mapping map[string]interface{}
 	if err := json.Unmarshal(mappingData, &mapping); err != nil {
@@ -801,38 +772,8 @@ func (s *Server) handleGames(w http.ResponseWriter, r *http.Request) {
 	s.setSecurityHeadersWithNonce(w, nonce)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	
-	// Load games database
-	// Priority: 1. Environment variable, 2. File path, 3. Embedded database
-	var gamesData []byte
-	gamesPath := os.Getenv("GAMES_DB_PATH")
-	
-	// Try to load from file first (for development/custom games)
-	if gamesPath != "" {
-		if _, err := os.Stat(gamesPath); err == nil {
-			gamesData, _ = os.ReadFile(gamesPath)
-		}
-	}
-	
-	// Try default dataDir path
-	if len(gamesData) == 0 {
-		defaultPath := filepath.Join(s.dataDir, "games-database.json")
-		if _, err := os.Stat(defaultPath); err == nil {
-			gamesData, _ = os.ReadFile(defaultPath)
-		}
-	}
-	
-	// Try static/data path
-	if len(gamesData) == 0 {
-		staticPath := filepath.Join(s.dataDir, "..", "web-service", "api", "static", "data", "games-database.json")
-		if _, err := os.Stat(staticPath); err == nil {
-			gamesData, _ = os.ReadFile(staticPath)
-		}
-	}
-	
-	// Fallback to embedded database
-	if len(gamesData) == 0 {
-		gamesData = []byte(gamesDatabaseJSON)
-	}
+	// Games DB = flake-built embed only (same as mapping)
+	gamesData := []byte(gamesDatabaseJSON)
 	
 	var gamesDB map[string]interface{}
 	if err := json.Unmarshal(gamesData, &gamesDB); err != nil {
@@ -1801,9 +1742,11 @@ func collectModuleConfigFiles(configsDir string) (map[string]string, error) {
 func (s *Server) generateConfig(sessionID, outputPath string) error {
 	// Generate configs/*.nix files using Nix generator
 	reportPath := filepath.Join(s.dataDir, fmt.Sprintf("session-%s-report.json", sessionID))
-	mappingPath := os.Getenv("MAPPING_DB_PATH")
-	if mappingPath == "" {
-		mappingPath = filepath.Join(s.dataDir, "mapping-database.json")
+	// Mapping from flake embed (same bytes as build), never a systemConfig path
+	mappingPath := filepath.Join(s.dataDir, "mapping-database.json")
+	if err := os.WriteFile(mappingPath, []byte(mappingDatabaseJSON), 0644); err != nil {
+		log.Printf("Failed to materialise embedded mapping DB: %v", err)
+		return s.generateBasicConfigs(sessionID, outputPath)
 	}
 
 	// Call Nix generator to get configs structure

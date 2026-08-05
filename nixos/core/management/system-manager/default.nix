@@ -45,8 +45,8 @@ in {
     # moduleConfig kommt automatisch vom module-manager (zentral definiert)
 
     # System-Manager ist Core - immer geladen
-    # Version-Info und Deprecation-Warnungen sind immer verfügbar
-    # Updates sind optional (enableUpdates = false by default)
+    # Version-Info + channel-manager (check-release / update-channels) immer verfügbar
+    # Release-Notify: enableDeprecationWarnings && components.channelManager.enableNotify
 
     # USE loaded config values
     users.users = lib.mapAttrs (name: userCfg: {

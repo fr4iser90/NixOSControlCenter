@@ -31,6 +31,11 @@
   export CONFIG_DIR="$SETUP_DIR/config"
   # System Paths
   export SYSTEM_CONFIG_DIR="/etc/nixos"
-  export SYSTEM_CONFIG_FILE="$NIXOS_CONFIG_DIR/system-config.nix"
+  # Legacy v0 path (migration source only)
+  export SYSTEM_CONFIG_FILE="$SYSTEM_CONFIG_DIR/system-config.nix"
+  # v2 dual layout
+  export MONOLITH_FILE="$SYSTEM_CONFIG_DIR/systemConfig.nix"
+  export CONFIGS_BASE="$SYSTEM_CONFIG_DIR/systemConfig"
+  export NCC_DEFAULT_LAYOUT="monolith"
   export SYSTEM_CONFIG_TEMPLATE="$CONFIG_DIR/system-config.template.nix"
 ''

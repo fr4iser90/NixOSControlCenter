@@ -37,9 +37,13 @@ in
             - --system targets systemPackages (global, all users)
             - --user <name> overrides the target user
 
-          Module/preset operations always edit
-          /etc/nixos/systemConfig/core/base/packages/config.nix.
+          Module/preset operations edit core.base.packages via config-facade
+          (monolith: /etc/nixos/systemConfig.nix | split: .../packages/config.nix).
           Preset names are auto-expanded to their set list.
+
+          Layout:
+            ncc system config-layout detect
+            ncc system config-layout convert --to monolith|split
 
           Examples:
             ncc packages add vscode                          # User package

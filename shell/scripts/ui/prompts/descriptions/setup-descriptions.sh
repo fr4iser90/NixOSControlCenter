@@ -3,18 +3,19 @@
 # Definiere die Beschreibungen
 declare -g -A SETUP_DESCRIPTIONS=(
     # Installation Types
-    ["presets"]="Ready-to-use system configurations. Choose from system presets (Desktop, Server, Homelab) or device-specific presets (Jetson Nano, etc.)."
-    ["custom setup"]="Select a base system (Desktop or Server) and then add specific features to customize your installation step-by-step."
-    ["advanced options"]="Advanced configuration options including loading profiles from files, viewing available profiles, and importing existing configurations."
+    ["presets"]="Pick a starting preset, then optionally add or remove package modules."
+    ["custom setup"]="Deprecated — use From Scratch preset."
+    ["advanced options"]="Load a profile file or import an existing configuration."
     
     # Legacy (for backward compatibility)
     ["install-a-predefined-profile"]="Choose from a list of ready-to-go system configurations tailored for specific use cases or hardware."
     ["configure-a-custom-setup"]="Select a base system (Desktop or Server) and then add specific features to customize your installation."
 
     # System Presets (aktuell verwendete Presets)
-    ["desktop"]="Base desktop environment with GUI (Plasma). Includes basic desktop tools. No services (Docker, databases, etc.). Perfect for workstation, gaming PC, or development machine."
-    ["server"]="Minimal server system with CLI only. Includes SSH server and base server tools. No services (Docker, databases, etc.). Perfect for minimal server or custom setup."
-    ["homelab server"]="Server system with CLI. Pre-configured with Docker (rootless), databases, and web servers. Ready for self-hosted services and home automation."
+    ["desktop"]="Base desktop (Plasma). Empty package set — add extras on the next screen."
+    ["server"]="Minimal CLI server + SSH. Empty package set — add extras on the next screen."
+    ["homelab server"]="Homelab defaults: docker, database, web-server. Adjust on the next screen, then hosting/users."
+    ["from scratch"]="No preset defaults. Pick system type, desktop environment, and packages yourself."
     
     # Device Presets
     ["jetson nano"]="Specialized setup for NVIDIA Jetson Nano, configured for AI/ML development, robotics, and GPU optimization."
@@ -39,7 +40,7 @@ declare -g -A SETUP_DESCRIPTIONS=(
     ["system-dev"]="System development tools (cmake, ninja, gcc, clang)"
 
     # Server Features (neue Struktur)
-    ["docker"]="Docker containerization. Automatically uses rootless (safer, default). Uses root only if Docker Swarm or AI-Workspace is active."
+    ["docker"]="Docker (rootless by default; root only for Swarm / AI-Workspace). Safer for a normal desktop admin account."
     ["database"]="Database services (PostgreSQL, MySQL, etc.)"
     ["web-server"]="Web server (nginx, apache)"
     ["mail-server"]="Mail server"

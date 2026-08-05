@@ -5,7 +5,6 @@ let
 in
 {
   options.systemConfig.modules.specialized.nixify = {
-    # Version metadata (REQUIRED)
     _version = lib.mkOption {
       type = lib.types.str;
       default = moduleVersion;
@@ -13,14 +12,12 @@ in
       description = "Module version";
     };
 
-    # Enable option for optional modules
     enable = lib.mkOption {
       type = lib.types.bool;
       default = false;
       description = "Enable Nixify - Windows/macOS/Linux → NixOS System-DNA-Extractor";
     };
 
-    # Web-Service configuration
     webService = lib.mkOption {
       type = lib.types.submodule {
         options = {
@@ -29,25 +26,25 @@ in
             default = false;
             description = "Enable web service for receiving snapshot reports";
           };
-          
+
           port = lib.mkOption {
             type = lib.types.port;
             default = 8080;
             description = "Web service port";
           };
-          
+
           host = lib.mkOption {
             type = lib.types.str;
             default = "127.0.0.1";
             description = "Web service host (0.0.0.0 for all interfaces, 127.0.0.1 for localhost only)";
           };
-          
+
           autoStart = lib.mkOption {
             type = lib.types.bool;
             default = false;
             description = "Automatically start web service on boot";
           };
-          
+
           showStatusBadge = lib.mkOption {
             type = lib.types.bool;
             default = true;
@@ -59,7 +56,6 @@ in
       description = "Web service configuration";
     };
 
-    # Snapshot configuration
     snapshot = lib.mkOption {
       type = lib.types.submodule {
         options = {
@@ -74,22 +70,8 @@ in
       description = "Snapshot scripts configuration";
     };
 
-    # Mapping database configuration
-    mapping = lib.mkOption {
-      type = lib.types.submodule {
-        options = {
-          databasePath = lib.mkOption {
-            type = lib.types.path;
-            default = ./web-service/api/static/data/mapping-database.json;
-            description = "Path to mapping database JSON file";
-          };
-        };
-      };
-      default = {};
-      description = "Mapping database configuration";
-    };
+    # Mapping DB lives as Nix under ./data/*.nix — not a user-facing path option
 
-    # ISO builder configuration
     isoBuilder = lib.mkOption {
       type = lib.types.submodule {
         options = {
@@ -98,11 +80,11 @@ in
             default = false;
             description = "Enable ISO builder for custom NixOS ISOs";
           };
-          
+
           outputDir = lib.mkOption {
             type = lib.types.str;
             default = "/var/lib/nixify/isos";
-            description = "Directory where built ISOs are stored";
+            description = "Directory for generated ISO images";
           };
         };
       };

@@ -7,59 +7,66 @@
 # Uses config-writer.sh for all config file creation
 # =============================================================
 
-# Parse a value from a Nix config file
-# Usage: parse_nix_value "file" "key"
+# Parse a scalar from the SAME line: key = value;
+# Handles: "str", null, true/false, bare words
 parse_nix_value() {
     local file="$1"
     local key="$2"
-    local value
-    
-    value=$(grep -A1 "^  ${key} = " "$file" 2>/dev/null | head -2 | tail -1 | sed 's/;//' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+    local line value
+    line=$(grep -E "^[[:space:]]*${key}[[:space:]]*=" "$file" 2>/dev/null | head -1) || true
+    [[ -n "$line" ]] || { echo ""; return 0; }
+    value="${line#*=}"
+    value="${value%%;*}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    # Strip surrounding quotes
+    if [[ "$value" =~ ^\".*\"$ ]]; then
+        value="${value:1:-1}"
+    fi
     echo "$value"
 }
 
-# Parse package modules from a Nix config file
-# Returns: space-separated quoted list like: "gaming" "streaming" "emulation"
+# Parse packageModules = [ ... ]; — only quoted "module" names (never comments)
 parse_package_modules() {
     local file="$1"
-    local in_modules=0
-    local modules=""
-    
-    while IFS= read -r line; do
-        if echo "$line" | grep -q "^  packageModules = \["; then
-            in_modules=1
-            continue
-        fi
-        if [[ $in_modules -eq 1 ]]; then
-            if echo "$line" | grep -q "\]"; then
-                break
-            fi
-            local mod
-            mod=$(echo "$line" | sed 's/^[[:space:]]*//' | sed 's/[$,]//g' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
-            if [[ -n "$mod" && "$mod" != "packageModules" ]]; then
-                if [[ -n "$modules" ]]; then
-                    modules="$modules $mod"
-                else
-                    modules="$mod"
-                fi
-            fi
-        fi
-    done < "$file"
-    
-    echo "$modules"
+    # Empty one-liner
+    if grep -qE '^[[:space:]]*packageModules[[:space:]]*=[[:space:]]*\[[[:space:]]*\][[:space:]]*;' "$file"; then
+        echo ""
+        return 0
+    fi
+    local block
+    block=$(awk '
+      /^[[:space:]]*packageModules[[:space:]]*=[[:space:]]*\[/ {grab=1}
+      grab {print}
+      grab && /\][[:space:]]*;/ {exit}
+    ' "$file")
+    # Extract only "quoted" identifiers
+    echo "$block" | grep -oE '"[^"]+"' | tr -d '"' | tr '\n' ' ' | sed 's/[[:space:]]*$//'
 }
 
 # Parse users block from a Nix config file
-# Returns: users block content
 parse_users_block() {
     local file="$1"
     local in_users=0
     local brace_count=0
     local users_block=""
-    
+
+    # Empty users = {};
+    if grep -qE '^[[:space:]]*users[[:space:]]*=[[:space:]]*\{[[:space:]]*\}[[:space:]]*;' "$file"; then
+        echo ""
+        return 0
+    fi
+
     while IFS= read -r line; do
-        if echo "$line" | grep -q "^  users = {"; then
+        if [[ "$line" =~ ^[[:space:]]*users[[:space:]]*=[[:space:]]*\{ ]]; then
             in_users=1
+            # count braces on opening line after =
+            local rest="${line#*=}"
+            brace_count=$(echo "$rest" | tr -cd '{' | wc -c)
+            brace_count=$((brace_count - $(echo "$rest" | tr -cd '}' | wc -c)))
+            if [[ $brace_count -le 0 ]]; then
+                break
+            fi
             continue
         fi
         if [[ $in_users -eq 1 ]]; then
@@ -71,35 +78,64 @@ parse_users_block() {
             fi
         fi
     done < "$file"
-    
+
     echo "$users_block"
 }
 
-# Parse desktop config from a Nix config file
-# Returns: desktop environment name or empty
+# First desktop.environment = "..." inside desktop = { }
 parse_desktop_env() {
     local file="$1"
     local env
-    env=$(grep -A5 "^  desktop = {" "$file" 2>/dev/null | grep "environment = " | head -1 | sed 's/.*="//' | sed 's/".*//')
+    env=$(awk '
+      /^[[:space:]]*desktop[[:space:]]*=[[:space:]]*\{/ {in_de=1}
+      in_de && /^[[:space:]]*environment[[:space:]]*=/ {
+        if (match($0, /"[^"]+"/)) {
+          print substr($0, RSTART+1, RLENGTH-2)
+          exit
+        }
+        if (match($0, /=[[:space:]]*null/)) { print ""; exit }
+      }
+      in_de && /^[[:space:]]*\};[[:space:]]*$/ { exit }
+    ' "$file")
     echo "$env"
 }
 
-# Parse hardware info from a Nix config file
 parse_hardware_cpu() {
-    local file="$1"
-    parse_nix_value "$file" "cpu"
+    parse_nix_value "$1" "cpu"
 }
 
 parse_hardware_gpu() {
-    local file="$1"
-    parse_nix_value "$file" "gpu"
+    parse_nix_value "$1" "gpu"
 }
 
 parse_hardware_ram() {
     local file="$1"
     local ram
-    ram=$(grep -A2 "ram = {" "$file" 2>/dev/null | grep "sizeGB = " | head -1 | sed 's/.*sizeGB = //' | sed 's/;//' | sed 's/[[:space:]]//g')
+    ram=$(grep -E '^[[:space:]]*sizeGB[[:space:]]*=' "$file" 2>/dev/null | head -1 \
+        | sed -E 's/^[^=]+=[[:space:]]*//; s/;[[:space:]]*$//; s/[[:space:]]//g')
     echo "$ram"
+}
+
+parse_locales_first() {
+    local file="$1"
+    # locales = [ "en_US.UTF-8" ];
+    local line
+    line=$(grep -E '^[[:space:]]*locales[[:space:]]*=' "$file" 2>/dev/null | head -1) || true
+    echo "$line" | grep -oE '"[^"]+"' | head -1 | tr -d '"'
+}
+
+ncc_primary_install_user() {
+    local u="${SUDO_USER:-}"
+    if [[ -z "$u" || "$u" == "root" ]]; then
+        u="$(logname 2>/dev/null || true)"
+    fi
+    if [[ -z "$u" || "$u" == "root" ]]; then
+        u="$(whoami 2>/dev/null || echo user)"
+    fi
+    if [[ "$u" == "root" ]]; then
+        u="user"
+    fi
+    echo "$u"
 }
 
 # =============================================================
@@ -107,15 +143,15 @@ parse_hardware_ram() {
 # =============================================================
 setup_predefined_profile() {
     local profile_file="$1"
-    
+
     log_section "Setting up Presdefined Profile"
     log_info "Loading profile from: $profile_file"
-    
+
     if [[ ! -f "$profile_file" ]]; then
         log_error "Profile file not found: $profile_file"
         return 1
     fi
-    
+
     # Backup existing configs
     if [[ -f "$SYSTEM_CONFIG_FILE" ]]; then
         backup_file "$SYSTEM_CONFIG_FILE" || {
@@ -126,54 +162,50 @@ setup_predefined_profile() {
     if [[ -d "$(dirname "$SYSTEM_CONFIG_FILE")/systemConfig" ]]; then
         clean_old_configs 2>/dev/null || true
     fi
-    
-    # Parse profile values
-    local system_type
-    system_type=$(parse_nix_value "$profile_file" "systemType" | tr -d '"')
+
+    local system_type host_name timezone allow_unfree bootloader channel
+    local desktop_env cpu gpu ram users_block package_modules
+
+    system_type=$(parse_nix_value "$profile_file" "systemType")
     system_type="${system_type:-desktop}"
-    
-    local host_name
-    host_name=$(parse_nix_value "$profile_file" "hostName" | tr -d '"')
+    [[ "$system_type" == "null" ]] && system_type="desktop"
+
+    host_name=$(parse_nix_value "$profile_file" "hostName")
     if [[ -z "$host_name" || "$host_name" == "null" ]]; then
         host_name="$(hostname)"
     fi
-    
-    local timezone
-    timezone=$(parse_nix_value "$profile_file" "timeZone" | tr -d '"')
+
+    timezone=$(parse_nix_value "$profile_file" "timeZone")
     timezone="${timezone:-Europe/Berlin}"
-    
-    local allow_unfree
-    allow_unfree=$(parse_nix_value "$profile_file" "allowUnfree" | tr -d ' ')
+    [[ "$timezone" == "null" ]] && timezone="Europe/Berlin"
+
+    allow_unfree=$(parse_nix_value "$profile_file" "allowUnfree")
     allow_unfree="${allow_unfree:-false}"
-    
-    local bootloader
-    bootloader=$(parse_nix_value "$profile_file" "bootloader" | tr -d '"')
+
+    bootloader=$(parse_nix_value "$profile_file" "bootloader")
     bootloader="${bootloader:-systemd-boot}"
-    
-    local channel
-    channel=$(parse_nix_value "$profile_file" "channel" | tr -d '"')
+    [[ "$bootloader" == "null" ]] && bootloader="systemd-boot"
+
+    channel=$(parse_nix_value "$profile_file" "channel")
     channel="${channel:-stable}"
-    
-    local desktop_env
+    [[ "$channel" == "null" ]] && channel="stable"
+
     desktop_env=$(parse_desktop_env "$profile_file")
-    
-    local cpu
+    [[ "$desktop_env" == "null" ]] && desktop_env=""
+
     cpu=$(parse_hardware_cpu "$profile_file")
-    cpu="${cpu:-none}"
-    
-    local gpu
+    [[ -z "$cpu" || "$cpu" == "null" ]] && cpu="none"
+
     gpu=$(parse_hardware_gpu "$profile_file")
-    gpu="${gpu:-none}"
-    
-    local ram
+    [[ -z "$gpu" || "$gpu" == "null" ]] && gpu="none"
+
     ram=$(parse_hardware_ram "$profile_file")
-    
-    local users_block
+    [[ "$ram" == "null" ]] && ram=""
+
     users_block=$(parse_users_block "$profile_file")
     if [[ -z "$users_block" ]]; then
-        local current_user
-        current_user=$(whoami 2>/dev/null || echo "user")
-        local current_shell
+        local current_user current_shell
+        current_user=$(ncc_primary_install_user)
         current_shell=$(basename "$(getent passwd "$current_user" 2>/dev/null | cut -d: -f7)" 2>/dev/null || echo "bash")
         users_block="    \"$current_user\" = {
       role = \"admin\";
@@ -181,59 +213,59 @@ setup_predefined_profile() {
       autoLogin = false;
     };"
     fi
-    
-    local package_modules
+
     package_modules=$(parse_package_modules "$profile_file")
-    
+
+    log_info "Parsed preset: type=$system_type host=$host_name de=${desktop_env:-none} packages=[${package_modules}]"
+
     # ---- Write v1 modular configs ----
-    
-    # 1. System config (entry point)
+
     write_system_config "$system_type" "$host_name" "$timezone" "$users_block" "$bootloader"
-    
-    # 2. System manager
     write_system_manager_config "$system_type" "$allow_unfree" "$channel" "$bootloader"
-    
-    # 3. Network
     write_network_config "$host_name"
-    
-    # 4. Localization
-    local locale
-    locale=$(parse_nix_value "$profile_file" "locales" 2>/dev/null | tr -d '[]"' | sed 's/,/ /g' | head -1)
+
+    local locale keyboard_layout keyboard_options
+    locale=$(parse_locales_first "$profile_file")
     locale="${locale:-en_US.UTF-8}"
-    local keyboard_layout
-    keyboard_layout=$(parse_nix_value "$profile_file" "keyboardLayout" | tr -d '"')
+    keyboard_layout=$(parse_nix_value "$profile_file" "keyboardLayout")
     keyboard_layout="${keyboard_layout:-us}"
-    local keyboard_options
-    keyboard_options=$(parse_nix_value "$profile_file" "keyboardOptions" | tr -d '"')
+    [[ "$keyboard_layout" == "null" ]] && keyboard_layout="us"
+    keyboard_options=$(parse_nix_value "$profile_file" "keyboardOptions")
+    [[ "$keyboard_options" == "null" ]] && keyboard_options=""
     write_localization_config "$locale" "$keyboard_layout" "$keyboard_options" "$timezone"
-    
-    # 5. Hardware
+
     write_hardware_config "$cpu" "$gpu" "$ram"
-    
-    # 6. Desktop
+
     if [[ -n "$desktop_env" ]]; then
         write_desktop_config "$desktop_env" "sddm" "wayland" "$desktop_env" "true" "pipewire"
         write_audio_config "pipewire"
     else
         write_desktop_disabled
     fi
-    
-    # 7. Packages
-    if [[ -n "$package_modules" ]]; then
-        read -ra mod_array <<< "$package_modules"
-        write_packages_config "${mod_array[@]}"
+
+    # Packages — GUI extras override profile defaults when present
+    if declare -F ncc_gui_answer >/dev/null 2>&1 && ncc_gui_answer PACKAGE_MODULES >/dev/null 2>&1; then
+        ncc_apply_gui_package_modules || return 1
+    elif [[ -n "$package_modules" ]]; then
+        # shellcheck disable=SC2206
+        local mod_array=($package_modules)
+        write_packages_config "${mod_array[@]}" || return 1
     else
-        write_packages_config
+        write_packages_config || return 1
     fi
-    
+
+    if declare -F ncc_apply_gui_admin_user >/dev/null 2>&1; then
+        ncc_apply_gui_admin_user || true
+    fi
+
     log_success "Predefined profile applied successfully (v1 modular)"
-    
-    # Export system type for deployment
+
     export SYSTEM_TYPE="$system_type"
-    
-    # Deploy config
     deploy_config
 }
 
-# Export function
+export -f parse_nix_value
+export -f parse_package_modules
+export -f parse_users_block
+export -f parse_desktop_env
 export -f setup_predefined_profile

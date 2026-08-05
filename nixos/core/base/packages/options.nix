@@ -53,7 +53,11 @@ in {
       root = lib.mkOption {
         type = lib.types.nullOr lib.types.bool;
         default = null;
-        description = "Force root Docker (auto-detected for Swarm/AI-Workspace)";
+        description = ''
+          Docker privilege mode override.
+          null = smart (rootless by default; root when Homelab Swarm or AI-Workspace is active).
+          true = force root Docker; false = force rootless.
+        '';
       };
     };
   };

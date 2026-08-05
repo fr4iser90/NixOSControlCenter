@@ -32,7 +32,8 @@ let
               configPath = "${domain}.${currentCategory}";
               enablePath = "${domain}.${currentCategory}.enable";
               apiPath = "${domain}.${currentCategory}";
-              configFile = "/etc/nixos/systemConfig/${domain}/${category}/${moduleName}/config.nix";
+              # category is dotted (core.base.hardware) → slash path under systemConfig/
+              configFile = "/etc/nixos/systemConfig/${lib.replaceStrings ["."] ["/"] "${domain}.${currentCategory}"}/config.nix";
               description = "${domain} ${currentCategory} module";
               dependencies = [];
               version = "1.0";
