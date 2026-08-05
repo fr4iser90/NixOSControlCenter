@@ -3,8 +3,13 @@ let
   cfg = getModuleConfig moduleName;
   systemManagerCfg = getModuleConfig "system-manager";
 
-  # Import package module metadata for validation
+  # Import package module metadata for validation (feature sets: gaming, docker, …)
   packageMetadata = import ./lib/metadata.nix;
+
+  # Individual package names (firefox, git, …) resolve via nixpkgs or optional metadata.package
+  isResolvablePkg = pkg:
+    let meta = packageMetadata.modules.${pkg} or {};
+    in (meta ? package) || (builtins.hasAttr pkg pkgs);
 in {
   # Packages module - no direct NixOS configuration needed
   # All configuration is handled through packageModules in default.nix
@@ -26,19 +31,19 @@ in {
       ) cfg.packageModules)}";
     }
   ] ++
-  # Validate systemPackages (only if defined)
+  # Validate systemPackages as nixpkgs attr names (not packageModules)
   (let systemPkgs = cfg.systemPackages or []; in
    if systemPkgs != [] then [
      {
-       assertion = lib.all (pkg: packageMetadata.modules.${pkg} or null != null) systemPkgs;
-       message = "Unknown system package(s): ${lib.concatStringsSep ", " (lib.filter (pkg: !(packageMetadata.modules.${pkg} or null != null)) systemPkgs)}";
+       assertion = lib.all isResolvablePkg systemPkgs;
+       message = "Unknown system package(s): ${lib.concatStringsSep ", " (lib.filter (pkg: !(isResolvablePkg pkg)) systemPkgs)}";
      }
    ] else []) ++
-  # Validate userPackages (only if defined)
+  # Validate userPackages the same way
   lib.concatLists (lib.mapAttrsToList (user: packages: [
     {
-      assertion = lib.all (pkg: packageMetadata.modules.${pkg} or null != null) packages;
-      message = "Unknown user package(s) for ${user}: ${lib.concatStringsSep ", " (lib.filter (pkg: !(packageMetadata.modules.${pkg} or null != null)) packages)}";
+      assertion = lib.all isResolvablePkg packages;
+      message = "Unknown user package(s) for ${user}: ${lib.concatStringsSep ", " (lib.filter (pkg: !(isResolvablePkg pkg)) packages)}";
     }
   ]) (cfg.userPackages or {}));
 }

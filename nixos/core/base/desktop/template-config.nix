@@ -5,4 +5,7 @@
   display.server = "wayland";
   display.session = "plasma";
   theme.dark = true;
+  pinnedApps = [];
+  pinnedAppsAuto = true;
+  pinnedAppsForce = false;
 }

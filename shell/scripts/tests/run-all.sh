@@ -14,4 +14,7 @@ echo
 echo ">>> test-docker-mode.sh"
 bash "$DIR/test-docker-mode.sh"
 echo
+echo ">>> test-resolve-pins.sh"
+bash "$DIR/test-resolve-pins.sh"
+echo
 echo "All installer tests passed."

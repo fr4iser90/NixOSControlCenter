@@ -52,6 +52,32 @@ in {
         description = "Use dark theme";
       };
     };
+
+    # Taskbar / favorites pins (once per user unless force)
+    pinnedApps = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [];
+      example = [ "firefox.desktop" "steam.desktop" ];
+      description = ''
+        .desktop IDs to pin on first login (taskbar/favorites).
+        Empty + pinnedAppsAuto → derive from packages/modules via lib/pin-map.nix.
+      '';
+    };
+
+    pinnedAppsAuto = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "When pinnedApps is empty, derive pins from packageModules/systemPackages.";
+    };
+
+    pinnedAppsForce = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Re-apply pins even if ~/.config/ncc/pinned-apps-applied exists.
+        Leave false so user taskbar customizations survive rebuilds.
+      '';
+    };
   };
 }
 

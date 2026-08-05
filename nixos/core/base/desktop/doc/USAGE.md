@@ -17,6 +17,11 @@ As a core module, the desktop system can be enabled/disabled:
   theme = {
     dark = true;              # Use dark theme (default: true)
   };
+
+  # Taskbar pins (Plasma): auto from packages/modules, once per user
+  # pinnedApps = [ "firefox.desktop" "steam.desktop" ];  # explicit (optional)
+  # pinnedAppsAuto = true;   # default — derive via lib/pin-map.nix
+  # pinnedAppsForce = false; # true = re-apply ignoring ~/.config/ncc/pinned-apps-applied
 }
 ```
 

@@ -91,16 +91,7 @@ let
       
       ${ui.badges.info "🚀 Starting ${distro} test VM"}
       
-      # Check if VM already exists and is running
-      if virsh dominfo ${vmName} >/dev/null 2>&1; then
-        if virsh dominfo ${vmName} | grep -q "State:.*running"; then
-          ${ui.badges.warning "VM ${vmName} is already running"}
-          ${ui.messages.info "Use 'virsh console ${vmName}' to connect"}
-          exit 0
-        fi
-      fi
-      
-      # Use the system package script if available
+      # Running-VM detection is in vm-test-*-run (bare QEMU, not libvirt)
       if command -v vm-test-${distro}-run >/dev/null 2>&1; then
         exec vm-test-${distro}-run "$@"
       else
@@ -139,17 +130,23 @@ let
       description = "Start ${distro} test VM";
       category = "infrastructure";
       script = "${runScript}/bin/ncc-vm-test-${distro}-run";
-      arguments = [ "--disk" "--iso" "--auto" "--installed" "--help" ];
+      arguments = [ "--disk" "--iso" "--auto" "--installed" "--replace" "--help" ];
       dependencies = [ "qemu" "libvirt" ];
       shortHelp = "test-${distro}-run - Start ${distro} test VM (auto disk/ISO)";
       longHelp = ''
         Start a test VM with ${distro}.
 
-          ncc vm test-${distro}-run           # Auto: empty disk → ISO, installed → disk
-          ncc vm test-${distro}-run --disk    # Force boot installed OS
-          ncc vm test-${distro}-run --iso     # Force installer ISO
+          ncc vm test-${distro}-run              # Auto: empty disk → ISO, installed → disk
+          ncc vm test-${distro}-run --disk       # Force boot installed OS
+          ncc vm test-${distro}-run --iso        # Force installer ISO
+          ncc vm test-${distro}-run --replace    # Kill existing QEMU, then start
+          ncc vm test-${distro}-run --iso --replace
 
-        Detection uses qcow2 allocated size (fresh image is tiny; install writes data).
+        Installer mode: after the guest finishes install and reboots, the ISO is
+        detached automatically so the same QEMU session boots the installed OS.
+
+        If already running: prints PID, SPICE port, remote-viewer + kill hints.
+        Connect with: remote-viewer spice://localhost:<port>
 
         Reset wipe: ncc vm test-${distro}-reset
       '';
@@ -201,8 +198,9 @@ let
         Examples:
           ncc vm status
           ncc vm list
-          ncc vm test-nixos-run           # auto: installer or installed disk
-          ncc vm test-nixos-run --iso     # force installer
+          ncc vm test-nixos-run                  # auto: installer or installed disk
+          ncc vm test-nixos-run --iso            # force installer
+          ncc vm test-nixos-run --iso --replace  # kill existing, boot installer
           ncc vm test-ubuntu-reset
       '';
     }

@@ -126,6 +126,110 @@ in
       fi
     }
 
+    # Live QEMU detection (these VMs are NOT libvirt domains)
+    function qemu_pids_for_vm() {
+      local pid cmdline
+      for pid in $(${pkgs.procps}/bin/pgrep -f 'qemu-system-x86_64' 2>/dev/null || true); do
+        cmdline=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)
+        case " $cmdline " in
+          *" -name ${name} "*|*" -name ${name}"*)
+            echo "$pid"
+            ;;
+        esac
+      done
+    }
+
+    function spice_port_of_pid() {
+      local pid="$1"
+      local cmdline
+      cmdline=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)
+      # -spice port=5900,...
+      if [[ "$cmdline" =~ -spice[[:space:]]+port=([0-9]+) ]]; then
+        echo "''${BASH_REMATCH[1]}"
+        return 0
+      fi
+      echo "$cmdline" | ${pkgs.gnused}/bin/sed -n 's/.*-spice port=\([0-9][0-9]*\).*/\1/p' | head -1
+    }
+
+    function print_running_vm_help() {
+      local pid="$1"
+      local port="$2"
+      echo "⚠️  VM ${name} is already running"
+      echo "  PID:   $pid"
+      if [ -n "''${port:-}" ]; then
+        echo "  SPICE: spice://localhost:$port"
+        echo ""
+        echo "  Reconnect:  remote-viewer spice://localhost:$port"
+        echo "              spicy -h localhost -p $port"
+      else
+        echo "  SPICE: (could not detect port from QEMU cmdline)"
+      fi
+      echo "  Stop:       kill $pid"
+      echo "  Restart:    ncc vm test-${distro}-run --replace"
+      echo "  + installer: ncc vm test-${distro}-run --iso --replace"
+      echo ""
+      echo "  (Blank 'Connected to graphic server' = hung guest — kill/replace)"
+    }
+
+    function stop_running_vm() {
+      local pids pid port
+      pids=$(qemu_pids_for_vm)
+      if [ -z "''${pids:-}" ]; then
+        return 0
+      fi
+      for pid in $pids; do
+        port=$(spice_port_of_pid "$pid" || true)
+        echo "🛑 Stopping ${name} (PID $pid''${port:+, SPICE :$port})..."
+        kill "$pid" 2>/dev/null || true
+      done
+      # Wait for disk lock to release
+      local i
+      for i in 1 2 3 4 5 6 7 8 9 10; do
+        pids=$(qemu_pids_for_vm)
+        [ -z "''${pids:-}" ] && break
+        sleep 0.3
+      done
+      pids=$(qemu_pids_for_vm)
+      if [ -n "''${pids:-}" ]; then
+        echo "  Force killing: $pids"
+        kill -9 $pids 2>/dev/null || true
+        sleep 0.3
+      fi
+    }
+
+    function ensure_no_conflicting_vm() {
+      local pids pid port
+      pids=$(qemu_pids_for_vm)
+      if [ -z "''${pids:-}" ]; then
+        return 0
+      fi
+      # Take first PID (usually one instance)
+      pid=$(echo "$pids" | head -1)
+      port=$(spice_port_of_pid "$pid" || true)
+      if [ "''${REPLACE_EXISTING:-0}" = "1" ]; then
+        stop_running_vm
+        return 0
+      fi
+      print_running_vm_help "$pid" "$port"
+      exit 0
+    }
+
+    function report_disk_lock_failure() {
+      local pids pid port
+      echo "❌ Disk is locked: ${image.path}" >&2
+      pids=$(qemu_pids_for_vm)
+      if [ -n "''${pids:-}" ]; then
+        pid=$(echo "$pids" | head -1)
+        port=$(spice_port_of_pid "$pid" || true)
+        print_running_vm_help "$pid" "$port" >&2
+      else
+        echo "  No QEMU with -name ${name} found, but the qcow2 is locked." >&2
+        echo "  Find holder:  lsof ${image.path}" >&2
+        echo "  Or:           pgrep -af qemu-system" >&2
+      fi
+      exit 1
+    }
+
     ${lib.optionalString isWindows ''
     function prepare_tpm() {
       echo "🔐 Preparing software TPM (required for Windows)..."
@@ -153,6 +257,88 @@ in
     }
     ''}
 
+    # After installer reboot: if disk looks installed, detach CD so UEFI boots disk
+    # (same QEMU session — no need to quit and re-run ncc).
+    function start_iso_eject_on_reset() {
+      local qmp_sock="$1"
+      local disk_path="$2"
+      ${pkgs.python3}/bin/python3 - "$qmp_sock" "$disk_path" ${pkgs.qemu}/bin/qemu-img <<'PY'
+import json, os, socket, subprocess, sys, time
+
+qmp_sock, disk_path, qemu_img = sys.argv[1:4]
+threshold = 67108864  # 64 MiB allocated
+
+def disk_installed() -> bool:
+    if not os.path.isfile(disk_path):
+        return False
+    try:
+        raw = subprocess.check_output(
+            [qemu_img, "info", "--output=json", disk_path],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        info = json.loads(raw)
+        return int(info.get("actual-size") or 0) > threshold
+    except Exception:
+        return False
+
+def connect():
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        if os.path.exists(qmp_sock):
+            try:
+                s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                s.connect(qmp_sock)
+                return s
+            except OSError:
+                pass
+        time.sleep(0.1)
+    return None
+
+sock = connect()
+if sock is None:
+    sys.exit(0)
+sock.settimeout(None)
+buf = b""
+
+def recv_msg():
+    global buf
+    while True:
+        if b"\n" in buf:
+            line, buf = buf.split(b"\n", 1)
+            line = line.strip()
+            if line:
+                return json.loads(line)
+        chunk = sock.recv(4096)
+        if not chunk:
+            return None
+        buf += chunk
+
+def send(cmd):
+    sock.sendall((json.dumps(cmd) + "\n").encode())
+    return recv_msg()
+
+# Greeting + negotiate
+if recv_msg() is None:
+    sys.exit(0)
+send({"execute": "qmp_capabilities"})
+
+while True:
+    msg = recv_msg()
+    if msg is None:
+        break
+    if msg.get("event") != "RESET":
+        continue
+    if not disk_installed():
+        continue
+    # Drop CD from the machine so the next boot uses the disk
+    send({"execute": "device_del", "arguments": {"id": "cdrom0"}})
+    print("💿 Installer reboot detected — ISO detached, next boot from disk", flush=True)
+    break
+sock.close()
+PY
+    }
+
     function start_vm() {
       local iso_path="''${1:-}"
       local boot_mode="''${2:-iso}"  # iso | disk
@@ -160,6 +346,10 @@ in
       # Get free port and store it
       local spice_port
       spice_port=$(${portManager.vmPortManager name})
+      local runtime_dir="''${XDG_RUNTIME_DIR:-/tmp}/ncc-vm/${name}"
+      mkdir -p "$runtime_dir"
+      local qmp_sock="$runtime_dir/qmp.sock"
+      local eject_helper_pid=""
       
       echo "🚀 Starting VM..."
       echo "  Name: ${name}"
@@ -169,8 +359,10 @@ in
       echo "  Cores: ${toString cores}"
       echo "  SPICE Display: spice://localhost:$spice_port"
       echo ""
-      echo "💡 To connect: virt-viewer --connect spice://localhost:$spice_port"
+      echo "💡 To connect: remote-viewer spice://localhost:$spice_port"
+      echo "              (or: spicy -h localhost -p $spice_port)"
       if [ "$boot_mode" = "iso" ]; then
+        echo "💡 After install: reboot in the guest → boots installed OS (same session)"
         echo "💡 Force installer anytime: ncc vm test-${distro}-run --iso"
         echo "💡 Force disk boot:         ncc vm test-${distro}-run --disk"
       fi
@@ -199,7 +391,9 @@ in
       fi
 
       # Drive args: ISO boot prefers CD (bootindex=1); disk boot boots installed system only.
+      # cdrom0 id is required so QMP can detach the ISO after post-install RESET.
       local drive_args
+      local qmp_args=()
       if [ "$boot_mode" = "disk" ]; then
         ${if isWindows then ''
         drive_args=(
@@ -220,7 +414,7 @@ in
           -drive if=none,id=disk0,file="${image.path}",format=qcow2
           -device ide-hd,bus=ahci0.0,drive=disk0,bootindex=2
           -drive if=none,id=cd0,media=cdrom,readonly=on,file="$iso_path"
-          -device ide-cd,bus=ahci0.1,drive=cd0,bootindex=1
+          -device ide-cd,id=cdrom0,bus=ahci0.1,drive=cd0,bootindex=1
         )
         '' else ''
         drive_args=(
@@ -228,13 +422,19 @@ in
           -device virtio-blk-pci,drive=disk0,bootindex=2
           -device ahci,id=ahci0
           -drive if=none,id=cd0,media=cdrom,readonly=on,file="$iso_path"
-          -device ide-cd,bus=ahci0.0,drive=cd0,bootindex=1
+          -device ide-cd,id=cdrom0,bus=ahci0.0,drive=cd0,bootindex=1
         )
         ''}
+        rm -f "$qmp_sock"
+        qmp_args=( -qmp "unix:$qmp_sock,server,nowait" )
+        start_iso_eject_on_reset "$qmp_sock" "${image.path}" &
+        eject_helper_pid=$!
       fi
 
       # q35 IDE buses only allow 1 unit each — use a dedicated AHCI controller
       # for disk+ISO with bootindex (OVMF ignores classic -boot order= / -cdrom).
+      set +e
+      qemu_err=$(mktemp /tmp/ncc-qemu-XXXXXX.err)
       ${pkgs.qemu}/bin/qemu-system-x86_64 \
         -name "${name}" \
         -enable-kvm \
@@ -255,6 +455,7 @@ in
         -device tpm-tis,tpmdev=tpm0 \
         '' else ""} \
         "''${drive_args[@]}" \
+        "''${qmp_args[@]}" \
         -vga qxl \
         -spice port="$spice_port",disable-ticketing=on \
         -device virtio-tablet-pci \
@@ -266,7 +467,24 @@ in
         -device virtio-net-pci,netdev=net0 \
         ''} \
         -netdev user,id=net0 \
-        -boot menu=on
+        -boot menu=on 2>"$qemu_err"
+      qemu_rc=$?
+      set -e
+      if [ -n "$eject_helper_pid" ]; then
+        kill "$eject_helper_pid" 2>/dev/null || true
+        wait "$eject_helper_pid" 2>/dev/null || true
+      fi
+      rm -f "$qmp_sock"
+      if [ "$qemu_rc" -ne 0 ]; then
+        cat "$qemu_err" >&2 || true
+        if grep -qiE 'Failed to get "write" lock|Is another process using the image' "$qemu_err" 2>/dev/null; then
+          rm -f "$qemu_err"
+          report_disk_lock_failure
+        fi
+        rm -f "$qemu_err"
+        exit "$qemu_rc"
+      fi
+      rm -f "$qemu_err"
     }
 
 
@@ -274,22 +492,29 @@ in
     # Boot mode: auto (default) | iso | disk
     # Auto: empty/fresh qcow2 → installer ISO; disk with real data → boot installed OS
     # Override: --disk / --iso  or  VM_BOOT=disk|iso
+    # --replace / --restart: kill existing QEMU for this VM first
     boot_mode="''${VM_BOOT:-auto}"
+    REPLACE_EXISTING=0
     for arg in "$@"; do
       case "$arg" in
         --disk|--installed|--from-disk) boot_mode=disk ;;
         --iso|--installer) boot_mode=iso ;;
         --auto) boot_mode=auto ;;
+        --replace|--restart|--force-restart) REPLACE_EXISTING=1 ;;
         -h|--help)
-          echo "Usage: ncc vm test-${distro}-run [--auto|--disk|--iso]"
+          echo "Usage: ncc vm test-${distro}-run [--auto|--disk|--iso] [--replace]"
           echo "  (default)  Auto: installer if disk empty, else boot installed OS"
           echo "  --disk     Force boot from disk (no ISO)"
-          echo "  --iso      Force installer ISO boot"
+          echo "  --iso      Force installer ISO boot (after install, guest reboot → disk)"
           echo "  --auto     Same as default"
+          echo "  --replace  Kill existing QEMU for this VM, then start"
           exit 0
           ;;
       esac
     done
+
+    # Bare-QEMU VMs are not libvirt domains — detect by -name before allocating ports
+    ensure_no_conflicting_vm
 
     echo "🖥️  ${distroName} Test VM Setup"
     echo "========================"

@@ -24,5 +24,6 @@ in {
     ./components/display-servers
     ./components/environments
     ./components/themes
+    ./components/pinned-apps
   ];
 }

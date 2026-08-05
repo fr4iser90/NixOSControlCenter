@@ -108,6 +108,17 @@ let
           #!${pkgs.bash}/bin/bash
           set -euo pipefail
           echo "Stopping VM if running..."
+          # Bare-QEMU test VMs (primary)
+          for pid in $(${pkgs.procps}/bin/pgrep -f 'qemu-system-x86_64' 2>/dev/null || true); do
+            cmdline=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)
+            case " $cmdline " in
+              *" -name ${vmName} "*|*" -name ${vmName}"*)
+                echo "  Killing QEMU PID $pid"
+                kill "$pid" 2>/dev/null || true
+                ;;
+            esac
+          done
+          sleep 0.5
           sudo virsh destroy ${vmName} 2>/dev/null || true
           sudo virsh undefine ${vmName} --remove-all-storage 2>/dev/null || true
           sudo rm -f ${vmCfg.image.path}
