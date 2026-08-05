@@ -105,15 +105,21 @@ collect_system_data() {
         write_desktop_disabled
     fi
     
-    # 7. Packages config
+    # 7. Packages config (modules + optional browsers / system packages)
     local package_modules="${PACKAGE_MODULES:-}"
+    local browsers="${BROWSERS:-${PACKAGE_SYSTEM_PACKAGES:-}}"
+    # Desktop without explicit browsers → Firefox
+    if [[ "$sys_type" == "desktop" && -z "$browsers" ]]; then
+        browsers="firefox"
+    fi
+    export PACKAGE_SYSTEM_PACKAGES="$browsers"
     if [[ -n "$package_modules" ]]; then
-        # Convert space-separated to individual args
         read -ra mod_array <<< "$package_modules"
         write_packages_config "${mod_array[@]}"
     else
         write_packages_config
     fi
+    unset PACKAGE_SYSTEM_PACKAGES
     
     # 8. Hosting config (email/domain if provided)
     local host_email="${HOST_EMAIL:-}"

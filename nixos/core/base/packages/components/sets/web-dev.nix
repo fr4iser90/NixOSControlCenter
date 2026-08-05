@@ -10,8 +10,8 @@
     deno                   # Alternative runtime for modern JavaScript/TypeScript
     pnpm                   # Faster alternative to npm
     maven
-    xorg.libX11
-    xorg.libXtst
+    libx11
+    libxtst
     gtk3  
 
     # Web Servers

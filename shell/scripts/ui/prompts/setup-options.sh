@@ -103,6 +103,16 @@ declare -A -g FEATURE_CONFLICTS=(
     ["xfce"]="plasma|gnome"
 )
 
+# Desktop browser picker (SSOT) — format: "nixpkgsAttr|UI label"
+# First entry is the default checked browser. Add more lines as needed.
+DESKTOP_BROWSERS=(
+    "firefox|Firefox — default, free"
+    "chromium|Chromium — open-source Chrome"
+    "brave|Brave — privacy Chromium (unfree)"
+    "librewolf|LibreWolf — privacy Firefox fork"
+)
+DESKTOP_BROWSER_DEFAULT="firefox"
+
 # Legacy: Für Backward Compatibility (wird nicht mehr in UI angezeigt)
 declare -A -g SUB_OPTIONS=(
     ["Desktop"]="None|streaming|emulation|web-dev|game-dev|python-dev|system-dev|docker|database|web-server"

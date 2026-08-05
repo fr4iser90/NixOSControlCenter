@@ -33,7 +33,7 @@
     environment.systemPackages = with pkgs; [
       spice-vdagent  # Better mouse integration
       virtio-win     # Virtio drivers
-      xorg.xrandr    # For resolution management
+      xrandr    # For resolution management
     ];
   };
 }

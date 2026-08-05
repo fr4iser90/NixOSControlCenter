@@ -6,10 +6,10 @@
     mesa            # OpenGL implementation
     libvdpau        # Video acceleration
     libva           # Video acceleration API
-    xorg.xrdb       # X resources database
-    xorg.xrandr     # Screen management
-    xorg.xsetroot   # Root window settings
-    xorg.xmodmap    # Keyboard mapping
-    xorg.xset       # User preferences
+    xrdb       # X resources database
+    xrandr     # Screen management
+    xsetroot   # Root window settings
+    xmodmap    # Keyboard mapping
+    xset       # User preferences
   ];
 }

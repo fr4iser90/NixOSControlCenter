@@ -103,6 +103,29 @@ class WizardLogicTests(unittest.TestCase):
             )
             self.assertEqual(out, "alice|docker database|p@ss 'quote")
 
+    def test_browser_choices_include_firefox_default(self) -> None:
+        opts = wiz.load_options()
+        names = [n for n, _ in opts.browser_choices]
+        self.assertEqual(opts.browser_default, "firefox")
+        self.assertEqual(names[0], "firefox")
+        self.assertIn("chromium", names)
+        self.assertIn("brave", names)
+        self.assertIn("librewolf", names)
+
+    def test_write_answers_includes_browsers(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "answers"
+            wiz.write_answers(path, {"BROWSERS": "firefox chromium", "PACKAGE_MODULES": ""})
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("BROWSERS=", text)
+            import subprocess
+
+            out = subprocess.check_output(
+                ["bash", "-c", f'source "{path}"; printf "%s" "$BROWSERS"'],
+                text=True,
+            )
+            self.assertEqual(out, "firefox chromium")
+
     def test_default_admin_prefers_sudo_user(self) -> None:
         with mock.patch.dict(
             os.environ,

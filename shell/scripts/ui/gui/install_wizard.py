@@ -37,6 +37,9 @@ class InstallOptions:
         self.dependencies: Dict[str, set] = {}
         self.descriptions: Dict[str, str] = {}
         self.preset_defaults: Dict[str, List[str]] = {}
+        # (nixpkgs attr, UI label) — SSOT: setup-options.sh DESKTOP_BROWSERS
+        self.browser_choices: List[Tuple[str, str]] = []
+        self.browser_default: str = "firefox"
 
     def desc(self, name: str, fallback: str = "") -> str:
         key = name.strip().lower()
@@ -116,9 +119,25 @@ def load_options() -> InstallOptions:
         elif section == "PRESET_DEFAULT_PACKAGES":
             k, _, v = line.partition("=")
             opts.preset_defaults[k] = [x for x in v.split() if x]
+        elif section == "DESKTOP_BROWSERS":
+            pkg, _, label = line.partition("|")
+            pkg = pkg.strip()
+            if pkg:
+                opts.browser_choices.append((pkg, label.strip() or pkg))
+        elif section == "DESKTOP_BROWSER_DEFAULT":
+            if line.strip():
+                opts.browser_default = line.strip()
         elif section == "DESCRIPTIONS":
             k, _, v = line.partition("=")
             opts.descriptions[k.lower()] = v
+    if not opts.browser_choices:
+        # Fallback if export is incomplete
+        opts.browser_choices = [
+            ("firefox", "Firefox — default, free"),
+            ("chromium", "Chromium — open-source Chrome"),
+            ("brave", "Brave — privacy Chromium (unfree)"),
+            ("librewolf", "LibreWolf — privacy Firefox fork"),
+        ]
     return opts
 
 
@@ -354,6 +373,7 @@ class InstallWizard(tk.Tk):
             "welcome": self._screen_welcome,
             "presets": self._screen_presets,
             "packages": self._screen_packages,
+            "browsers": self._screen_browsers,
             "account": self._screen_account,
             "custom_type": self._screen_custom_type,
             "custom_de": self._screen_custom_de,
@@ -397,6 +417,47 @@ class InstallWizard(tk.Tk):
         mods = self._answers.get("PACKAGE_MODULES", "").split()
         return "docker" in mods
 
+    def _is_desktop_install(self) -> bool:
+        """True when this path should require at least one browser."""
+        if self._needs_homelab():
+            return self._answers.get("ENABLE_DESKTOP") == "true"
+        if self._needs_from_scratch():
+            st = self._vars.get("system_type", tk.StringVar(value="desktop")).get()
+            de = self._vars.get("desktop_env", tk.StringVar(value="")).get()
+            return st == "desktop" and bool(de)
+        preset = self._vars.get("pending_selection") or ""
+        if preset in ("Server",):
+            return False
+        if preset == "Homelab Server":
+            return False
+        return True
+
+    def _needs_browsers_after_packages(self) -> bool:
+        """Browser screen right after packages (not Homelab — that waits for hl_desktop)."""
+        if self._needs_homelab():
+            return False
+        return self._is_desktop_install()
+
+    def _continue_after_packages(self) -> None:
+        if self._needs_homelab():
+            self._navigate("hl_basics")
+        elif self._needs_browsers_after_packages():
+            self._navigate("browsers")
+        elif self._packages_include_docker():
+            self._answers.setdefault("ADMIN_USER", default_admin())
+            self._navigate("hl_docker_user")
+        else:
+            self._navigate("account")
+
+    def _continue_after_browsers(self) -> None:
+        if self._needs_homelab():
+            self._navigate("confirm")
+        elif self._packages_include_docker():
+            self._answers.setdefault("ADMIN_USER", default_admin())
+            self._navigate("hl_docker_user")
+        else:
+            self._navigate("account")
+
     def _next(self) -> None:
         step = self._path[-1]
         if step == "welcome":
@@ -430,15 +491,12 @@ class InstallWizard(tk.Tk):
             if not self._capture_packages():
                 return
             if self._needs_from_scratch():
-                # Encode like legacy custom: desktop|server + de + packages
                 self._vars["pending_selection"] = self._build_from_scratch_selection()
-            if self._needs_homelab():
-                self._navigate("hl_basics")
-            elif self._packages_include_docker():
-                self._answers.setdefault("ADMIN_USER", default_admin())
-                self._navigate("hl_docker_user")
-            else:
-                self._navigate("account")
+            self._continue_after_packages()
+        elif step == "browsers":
+            if not self._capture_browsers():
+                return
+            self._continue_after_browsers()
         elif step == "account":
             if not self._capture_account():
                 return
@@ -491,7 +549,11 @@ class InstallWizard(tk.Tk):
         elif step == "hl_desktop":
             if not self._capture_hl_desktop():
                 return
-            self._navigate("confirm")
+            if self._answers.get("ENABLE_DESKTOP") == "true":
+                self._navigate("browsers")
+            else:
+                self._answers.pop("BROWSERS", None)
+                self._navigate("confirm")
         elif step == "advanced":
             self._clear_answers()
             sel = self._build_advanced_selection()
@@ -540,6 +602,18 @@ class InstallWizard(tk.Tk):
                 selected.append(name)
         selected = resolve_features(selected, self.opts.conflicts, self.opts.dependencies)
         self._answers["PACKAGE_MODULES"] = " ".join(selected)
+        return True
+
+    def _capture_browsers(self) -> bool:
+        checks = self._vars.get("browser_vars", {})
+        selected = [name for name, var in checks.items() if var.get()]
+        if not selected:
+            messagebox.showinfo(
+                "Select a browser",
+                "Pick at least one browser for the desktop install.",
+            )
+            return False
+        self._answers["BROWSERS"] = " ".join(selected)
         return True
 
     def _build_from_scratch_selection(self) -> str:
@@ -717,6 +791,21 @@ class InstallWizard(tk.Tk):
                 d = self.opts.desc(feat, "")
                 label = f"{feat} — {d}" if d else feat
                 ttk.Checkbutton(box, text=label, variable=checks[feat]).pack(anchor="w")
+
+    def _screen_browsers(self) -> None:
+        self.header.configure(text="Web browsers")
+        self.subheader.configure(
+            text="Desktop installs need at least one browser. Firefox is pre-selected."
+        )
+        self.btn_next.configure(text="Next")
+        checks = self._vars.setdefault("browser_vars", {})
+        default = self.opts.browser_default or "firefox"
+        for name, label in self.opts.browser_choices:
+            if name not in checks:
+                checks[name] = tk.BooleanVar(value=(name == default))
+            ttk.Checkbutton(self.body, text=label, variable=checks[name]).pack(
+                anchor="w", pady=4
+            )
 
     def _screen_account(self) -> None:
         self.header.configure(text="Main user")

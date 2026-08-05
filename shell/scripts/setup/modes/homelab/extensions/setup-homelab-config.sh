@@ -407,6 +407,16 @@ update_homelab_config() {
     
     # Package modules: GUI selection, else Homelab defaults
     local hl_defaults="${PRESET_DEFAULT_PACKAGES[Homelab Server]:-docker database web-server}"
+    if [[ "$enable_desktop" != "false" ]]; then
+        # Ensure a browser when desktop is on and GUI did not set BROWSERS
+        if declare -F ncc_gui_answer >/dev/null 2>&1; then
+            if ! ncc_gui_answer BROWSERS >/dev/null 2>&1; then
+                export PACKAGE_SYSTEM_PACKAGES="${PACKAGE_SYSTEM_PACKAGES:-firefox}"
+            fi
+        else
+            export PACKAGE_SYSTEM_PACKAGES="${PACKAGE_SYSTEM_PACKAGES:-firefox}"
+        fi
+    fi
     if declare -F ncc_apply_gui_package_modules >/dev/null 2>&1; then
         ncc_apply_gui_package_modules "$hl_defaults" || return 1
     else
@@ -414,6 +424,7 @@ update_homelab_config() {
         local arr=($hl_defaults)
         write_packages_config "${arr[@]}" || return 1
     fi
+    unset PACKAGE_SYSTEM_PACKAGES 2>/dev/null || true
 
     # Update desktop config if desktop setting is needed
     if [[ "$enable_desktop" == "false" ]]; then

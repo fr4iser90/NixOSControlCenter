@@ -246,12 +246,23 @@ setup_predefined_profile() {
     # Packages — GUI extras override profile defaults when present
     if declare -F ncc_gui_answer >/dev/null 2>&1 && ncc_gui_answer PACKAGE_MODULES >/dev/null 2>&1; then
         ncc_apply_gui_package_modules || return 1
-    elif [[ -n "$package_modules" ]]; then
-        # shellcheck disable=SC2206
-        local mod_array=($package_modules)
-        write_packages_config "${mod_array[@]}" || return 1
     else
-        write_packages_config || return 1
+        local browsers=""
+        if declare -F ncc_gui_answer >/dev/null 2>&1; then
+            browsers=$(ncc_gui_answer BROWSERS 2>/dev/null || true)
+        fi
+        if [[ -z "$browsers" && -n "$desktop_env" ]]; then
+            browsers="firefox"
+        fi
+        export PACKAGE_SYSTEM_PACKAGES="$browsers"
+        if [[ -n "$package_modules" ]]; then
+            # shellcheck disable=SC2206
+            local mod_array=($package_modules)
+            write_packages_config "${mod_array[@]}" || return 1
+        else
+            write_packages_config || return 1
+        fi
+        PACKAGE_SYSTEM_PACKAGES=""
     fi
 
     if declare -F ncc_apply_gui_admin_user >/dev/null 2>&1; then

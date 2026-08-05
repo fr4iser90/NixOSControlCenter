@@ -43,7 +43,7 @@
     # Monitor mouse clicks (X11)
     monitor_mouse_clicks_x11() {
       # Use xinput to track mouse events
-      ${pkgs.xorg.xinput}/bin/xinput test-xi2 --root 2>/dev/null | \
+      ${pkgs.xinput}/bin/xinput test-xi2 --root 2>/dev/null | \
       while read -r line; do
         if echo "$line" | grep -q "ButtonPress"; then
           # Extract button number
@@ -68,7 +68,7 @@
     
     # Monitor right-clicks specifically
     monitor_right_clicks() {
-      ${pkgs.xorg.xinput}/bin/xinput test-xi2 --root 2>/dev/null | \
+      ${pkgs.xinput}/bin/xinput test-xi2 --root 2>/dev/null | \
       while read -r line; do
         if echo "$line" | grep -q "ButtonPress.*detail: 3"; then
           eval $(${pkgs.xdotool}/bin/xdotool getmouselocation --shell)
@@ -156,7 +156,7 @@
   scrollDetection = ''
     # Detect scroll events (X11)
     monitor_scroll_events() {
-      ${pkgs.xorg.xinput}/bin/xinput test-xi2 --root 2>/dev/null | \
+      ${pkgs.xinput}/bin/xinput test-xi2 --root 2>/dev/null | \
       while read -r line; do
         # Button 4 = scroll up, Button 5 = scroll down
         if echo "$line" | grep -qE "ButtonPress.*(detail: 4|detail: 5)"; then
@@ -183,7 +183,7 @@
       local drag_start_x=0
       local drag_start_y=0
       
-      ${pkgs.xorg.xinput}/bin/xinput test-xi2 --root 2>/dev/null | \
+      ${pkgs.xinput}/bin/xinput test-xi2 --root 2>/dev/null | \
       while read -r line; do
         if echo "$line" | grep -q "ButtonPress.*detail: 1"; then
           dragging=true

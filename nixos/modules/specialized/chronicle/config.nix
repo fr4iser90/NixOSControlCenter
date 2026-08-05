@@ -21,9 +21,9 @@ let
     bc  # Math calculations for mouse tracking
 
     # X11 backend tools
-    xorg.xinput
-    xorg.xprop
-    xorg.xrandr  # Multi-monitor detection
+    xinput
+    xprop
+    xrandr  # Multi-monitor detection
     xdotool
     maim
     imagemagick
@@ -61,7 +61,7 @@ let
     alsa-utils  # ALSA fallback
   ] ++ lib.optionals (cfg.recording.enableKeyboard or false) [
     # Keyboard recording (X11 only for now)
-    xorg.xmodmap  # Key name mapping
+    xmodmap  # Key name mapping
     
     # GUI dependencies (if enabled)
   ] ++ lib.optionals (cfg.gui.enableGtk or false) [

@@ -10,11 +10,26 @@ fi
 # Helper function to update packages
 update_packages_config() {
     local module_args=("$@")
+    local browsers=""
+    if declare -F ncc_gui_answer >/dev/null 2>&1; then
+        browsers=$(ncc_gui_answer BROWSERS 2>/dev/null || true)
+    fi
+    # From-scratch desktop: default Firefox when GUI skipped browsers
+    if [[ -z "$browsers" ]]; then
+        for a in "${module_args[@]}"; do
+            if [[ "$a" == "plasma" || "$a" == "gnome" || "$a" == "xfce" ]]; then
+                browsers="firefox"
+                break
+            fi
+        done
+    fi
+    export PACKAGE_SYSTEM_PACKAGES="${browsers:-}"
     if [[ ${#module_args[@]} -gt 0 ]]; then
         write_packages_config "${module_args[@]}" || return 1
     else
         write_packages_config || return 1
     fi
+    unset PACKAGE_SYSTEM_PACKAGES
 }
 
 # Backup configuration including systemConfig directory

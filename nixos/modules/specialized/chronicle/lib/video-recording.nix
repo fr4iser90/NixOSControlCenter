@@ -25,7 +25,7 @@
         # X11 video recording with ffmpeg
         DISPLAY=''${DISPLAY:-:0} ${pkgs.ffmpeg}/bin/ffmpeg \
           -f x11grab \
-          -video_size $(${pkgs.xorg.xrandr}/bin/xrandr | ${pkgs.gnugrep}/bin/grep '*' | ${pkgs.gawk}/bin/awk '{print $1}' | head -n1) \
+          -video_size $(${pkgs.xrandr}/bin/xrandr | ${pkgs.gnugrep}/bin/grep '*' | ${pkgs.gawk}/bin/awk '{print $1}' | head -n1) \
           -framerate 30 \
           -i $DISPLAY \
           -c:v libx264 \

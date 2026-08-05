@@ -145,7 +145,8 @@ write_hardware_config() {
 
 write_packages_config() {
     # All args are package module / set names → packageModules.
-    # (Do not treat argv[0] as packages.preset — callers pass only module lists.)
+    # Optional system packages (e.g. browsers) via PACKAGE_SYSTEM_PACKAGES
+    # (space-separated nixpkgs attribute names).
     local modules=("$@")
 
     local modules_section=""
@@ -163,9 +164,25 @@ write_packages_config() {
 "
     fi
 
+    local sys_section="  systemPackages = [];
+"
+    if [[ -n "${PACKAGE_SYSTEM_PACKAGES:-}" ]]; then
+        # shellcheck disable=SC2206
+        local sys_pkgs=(${PACKAGE_SYSTEM_PACKAGES})
+        if [[ ${#sys_pkgs[@]} -gt 0 ]]; then
+            sys_section="  systemPackages = [
+"
+            for pkg in "${sys_pkgs[@]}"; do
+                [[ -n "$pkg" ]] && sys_section+="    \"${pkg}\"
+"
+            done
+            sys_section+="  ];
+"
+        fi
+    fi
+
     write_module_config "core/base/packages" "{
-${modules_section}  systemPackages = [];
-  userPackages = {};
+${modules_section}${sys_section}  userPackages = {};
   docker.enable = false;
   docker.root = null;
 }"

@@ -38,10 +38,10 @@
   # Get active window info
   getWindowInfo = ''
     get_window_info_x11() {
-      local window_id=$(${pkgs.xorg.xprop}/bin/xprop -root _NET_ACTIVE_WINDOW | awk '{print $5}')
+      local window_id=$(${pkgs.xprop}/bin/xprop -root _NET_ACTIVE_WINDOW | awk '{print $5}')
       if [ "$window_id" != "0x0" ]; then
-        local window_title=$(${pkgs.xorg.xprop}/bin/xprop -id "$window_id" _NET_WM_NAME | sed -e 's/_NET_WM_NAME(UTF8_STRING) = //' -e 's/"//g')
-        local app_name=$(${pkgs.xorg.xprop}/bin/xprop -id "$window_id" WM_CLASS | awk -F'"' '{print $2}')
+        local window_title=$(${pkgs.xprop}/bin/xprop -id "$window_id" _NET_WM_NAME | sed -e 's/_NET_WM_NAME(UTF8_STRING) = //' -e 's/"//g')
+        local app_name=$(${pkgs.xprop}/bin/xprop -id "$window_id" WM_CLASS | awk -F'"' '{print $2}')
         echo "$window_title|$app_name"
       else
         echo "Desktop|$DESKTOP_SESSION"

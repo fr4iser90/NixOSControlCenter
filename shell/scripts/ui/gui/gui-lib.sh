@@ -55,23 +55,45 @@ ncc_gui_answer() {
     return 0
 }
 
-# Apply PACKAGE_MODULES from GUI answers (or optional fallback string).
+# Apply PACKAGE_MODULES (+ optional BROWSERS → systemPackages) from GUI answers.
 ncc_apply_gui_package_modules() {
     local fallback="${1-}"
     local mods=""
+    local browsers=""
+    local have_mods=false
+
     if declare -F ncc_gui_answer >/dev/null 2>&1; then
         if mods=$(ncc_gui_answer PACKAGE_MODULES 2>/dev/null); then
-            :
+            have_mods=true
         elif [[ -n "$fallback" ]]; then
             mods="$fallback"
-        else
-            return 0
+            have_mods=true
         fi
+        browsers=$(ncc_gui_answer BROWSERS 2>/dev/null || true)
     elif [[ -n "$fallback" ]]; then
         mods="$fallback"
+        have_mods=true
     else
         return 0
     fi
+
+    # Desktop installs without an explicit browser answer still get Firefox
+    if [[ -z "$browsers" && -n "${PACKAGE_SYSTEM_PACKAGES:-}" ]]; then
+        browsers="$PACKAGE_SYSTEM_PACKAGES"
+    fi
+    if [[ -z "$browsers" ]]; then
+        local enable_de=""
+        enable_de=$(ncc_gui_answer ENABLE_DESKTOP 2>/dev/null || true)
+        if [[ "$enable_de" == "true" ]]; then
+            browsers="firefox"
+        fi
+    fi
+
+    if ! $have_mods && [[ -z "$browsers" ]]; then
+        return 0
+    fi
+
+    export PACKAGE_SYSTEM_PACKAGES="${browsers:-}"
 
     if [[ -z "$mods" ]]; then
         write_packages_config || return 1
@@ -80,6 +102,7 @@ ncc_apply_gui_package_modules() {
         local arr=($mods)
         write_packages_config "${arr[@]}" || return 1
     fi
+    unset PACKAGE_SYSTEM_PACKAGES 2>/dev/null || true
     return 0
 }
 

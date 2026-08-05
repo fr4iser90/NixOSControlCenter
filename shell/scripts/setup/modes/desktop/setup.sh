@@ -11,13 +11,20 @@ fi
 # Uses config-writer: write_packages_config()
 update_packages_config() {
     local package_modules="$1"
-    
+    local browsers=""
+    if declare -F ncc_gui_answer >/dev/null 2>&1; then
+        browsers=$(ncc_gui_answer BROWSERS 2>/dev/null || true)
+    fi
+    [[ -z "$browsers" ]] && browsers="firefox"
+    export PACKAGE_SYSTEM_PACKAGES="$browsers"
+
     if [[ -n "$package_modules" ]]; then
         read -ra mod_array <<< "$package_modules"
         write_packages_config "${mod_array[@]}" || return 1
     else
         write_packages_config || return 1
     fi
+    unset PACKAGE_SYSTEM_PACKAGES
 }
 
 # Backup configuration including systemConfig directory

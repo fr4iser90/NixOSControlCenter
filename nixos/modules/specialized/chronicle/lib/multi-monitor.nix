@@ -10,7 +10,7 @@
       
       if [ "$backend" = "x11" ]; then
         # X11: Use xrandr to detect monitors
-        local monitors=$(${pkgs.xorg.xrandr}/bin/xrandr --query | grep " connected" | awk '{print $1}')
+        local monitors=$(${pkgs.xrandr}/bin/xrandr --query | grep " connected" | awk '{print $1}')
         local monitor_count=$(echo "$monitors" | wc -l)
         
         log "Detected $monitor_count monitor(s) via xrandr"
@@ -23,7 +23,7 @@
           [ -z "$monitor" ] && continue
           
           # Get monitor geometry
-          local geometry=$(${pkgs.xorg.xrandr}/bin/xrandr --query | grep "^$monitor" | sed 's/.*\([0-9]*x[0-9]*+[0-9]*+[0-9]*\).*/\1/')
+          local geometry=$(${pkgs.xrandr}/bin/xrandr --query | grep "^$monitor" | sed 's/.*\([0-9]*x[0-9]*+[0-9]*+[0-9]*\).*/\1/')
           
           if [ -n "$geometry" ]; then
             # Parse geometry: WxH+X+Y
@@ -43,7 +43,7 @@
     "offset_x": $offset_x,
     "offset_y": $offset_y,
     "geometry": "$geometry",
-    "primary": $(${pkgs.xorg.xrandr}/bin/xrandr --query | grep "^$monitor" | grep -q "primary" && echo "true" || echo "false")
+    "primary": $(${pkgs.xrandr}/bin/xrandr --query | grep "^$monitor" | grep -q "primary" && echo "true" || echo "false")
   }
 EOF
           fi
