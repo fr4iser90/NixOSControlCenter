@@ -15,6 +15,7 @@
       "steam.desktop"
       "vesktop.desktop"
       "com.heroicgameslauncher.hgl.desktop"
+      "net.lutris.Lutris.desktop"
     ];
     streaming = [ "com.obsproject.Studio.desktop" ];
     web-dev = [ "code.desktop" ];

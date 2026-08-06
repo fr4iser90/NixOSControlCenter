@@ -32,6 +32,7 @@ declare -g -A SETUP_DESCRIPTIONS=(
     ["none"]="No desktop environment. Server-like setup with CLI only. Perfect for headless servers or minimal installations."
 
     # Desktop Features (neue Struktur)
+    ["gaming"]="Steam, Heroic, Lutris, Discord (vesktop), MangoHud — main gaming launchers"
     ["streaming"]="Gaming streaming tools (OBS Studio, etc.)"
     ["emulation"]="Retro gaming emulation (RetroArch, Dolphin, etc.)"
     ["web-dev"]="Web development tools (Node.js, npm, IDEs, etc.)"
@@ -70,6 +71,7 @@ declare -g -A SETUP_TYPES=(
     ["server"]="Base System"
     
     # Desktop Features
+    ["gaming"]="Desktop Feature"
     ["streaming"]="Desktop Feature"
     ["emulation"]="Desktop Feature"
     ["web-dev"]="Desktop Feature"
@@ -109,6 +111,7 @@ declare -g -A SETUP_FEATURES=(
     ["server"]="Server system with command-line interface only. No graphical interface. Includes SSH server, system monitoring tools, and backup tools. No services (add via features)."
     
     # Desktop Features
+    ["gaming"]="Steam|Heroic (Epic/GOG)|Lutris|Vesktop (Discord)|MangoHud"
     ["streaming"]="OBS Studio|Streaming Tools|Performance Tweaks"
     ["emulation"]="Multiple Emulators|Frontend Interface|Controller Support|Shader Caching"
     ["web-dev"]="Multiple Runtimes|IDEs & Editors|Debug Tools|Database Clients"

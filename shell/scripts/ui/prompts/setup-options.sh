@@ -57,14 +57,14 @@ PREDEFINED_PROFILE_OPTIONS=(
     "${PREDEFINED_DESKTOP_PROFILES[@]}"
 )
 
-# Alle Features (16 Features: 3 Desktop-Envs + 13 Package Features)
+# Alle Features (17 Features: 3 Desktop-Envs + 14 Package Features)
 ALL_FEATURES=(
     # Desktop Environments
     "plasma" "gnome" "xfce"
     # Development
     "web-dev" "game-dev" "python-dev" "system-dev"
     # Gaming & Media
-    "streaming" "emulation"
+    "gaming" "streaming" "emulation"
     # Containerization
     "docker" "podman"
     # Services
@@ -77,7 +77,7 @@ ALL_FEATURES=(
 FEATURE_GROUPS=(
     "Desktop Environment:plasma|gnome|xfce"
     "Development:web-dev|game-dev|python-dev|system-dev"
-    "Gaming & Media:streaming|emulation"
+    "Gaming & Media:gaming|streaming|emulation"
     "Containerization:docker|podman"
     "Services:database|web-server|mail-server"
     "Virtualization:qemu-vm|virt-manager"
@@ -115,7 +115,7 @@ DESKTOP_BROWSER_DEFAULT="firefox"
 
 # Legacy: Für Backward Compatibility (wird nicht mehr in UI angezeigt)
 declare -A -g SUB_OPTIONS=(
-    ["Desktop"]="None|streaming|emulation|web-dev|game-dev|python-dev|system-dev|docker|database|web-server"
+    ["Desktop"]="None|gaming|streaming|emulation|web-dev|game-dev|python-dev|system-dev|docker|database|web-server"
     ["Server"]="None|docker|database|web-server|mail-server"
 )
 

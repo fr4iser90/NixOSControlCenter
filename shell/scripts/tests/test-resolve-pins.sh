@@ -53,7 +53,7 @@ assert_pins "auto: firefox + gaming + plasma defaults" \
     systemPackages = [ \"firefox\" ];
     environment = \"plasma\";
   }" \
-  "firefox.desktop steam.desktop vesktop.desktop com.heroicgameslauncher.hgl.desktop org.kde.dolphin.desktop org.kde.konsole.desktop"
+  "firefox.desktop steam.desktop vesktop.desktop com.heroicgameslauncher.hgl.desktop net.lutris.Lutris.desktop org.kde.dolphin.desktop org.kde.konsole.desktop"
 
 assert_pins "auto off + empty explicit → nothing" \
   "$RP {
