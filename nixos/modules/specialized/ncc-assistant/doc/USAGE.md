@@ -3,6 +3,9 @@
 Chat with an LLM about your NixOS Control Center config, or expose the same
 tools to Cursor / Claude Code via MCP.
 
+**Forward-looking design (agent, tools registry, cron, UI sections):**
+see [ROADMAP.md](./ROADMAP.md) and [plans/](./plans/).
+
 ## Enable
 
 Minimal config for an OpenAI-compatible gateway (llama.cpp, OpenWebUI, Ollama, …):
