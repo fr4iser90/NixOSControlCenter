@@ -1,0 +1,107 @@
+{
+  "_schema": "ncc-skill/search-strategy/1.0",
+  "_version": "1.0.0",
+  "rules": [
+    {
+      "priority": 1,
+      "when": "question is about architecture, flow, config system, update process",
+      "read": ["context/architecture.json"],
+      "alsoRead": ["AI_KNOWLEDGE.md"],
+      "searchCodebase": false
+    },
+    {
+      "priority": 2,
+      "when": "question is about Nix escaping, string handling, prebuild checks, password mgmt, backup system",
+      "read": ["skills/common-patterns.json"],
+      "alsoRead": [],
+      "searchCodebase": false
+    },
+    {
+      "priority": 3,
+      "when": "question is about building/adding/modifying a module",
+      "read": ["skills/module-structure.json"],
+      "alsoRead": ["docs/AI/example-module/MODULE_TEMPLATE.md"],
+      "searchCodebase": true,
+      "searchPath": "nixos/modules"
+    },
+    {
+      "priority": 4,
+      "when": "question is about v0→v1 migration, config version, system-config.nix",
+      "read": ["skills/migration-guide.json"],
+      "alsoRead": [],
+      "searchCodebase": true,
+      "searchPath": "nixos/core/management/system-manager"
+    },
+    {
+      "priority": 5,
+      "when": "question is about 'where is file X' or 'what does file Y do'",
+      "read": ["context/file-map.json"],
+      "alsoRead": [],
+      "searchCodebase": true,
+      "searchPath": "auto"
+    },
+    {
+      "priority": 6,
+      "when": "question is about nixos/ tree structure or module organization",
+      "read": ["domains/nixos.json"],
+      "alsoRead": [],
+      "searchCodebase": false
+    },
+    {
+      "priority": 7,
+      "when": "question is about shell/ scripts, CLI commands, prompts",
+      "read": ["domains/shell.json"],
+      "alsoRead": [],
+      "searchCodebase": true,
+      "searchPath": "shell/"
+    },
+    {
+      "priority": 8,
+      "when": "question is about tui/ system, bubbletea, menus, templates",
+      "read": ["domains/tui.json"],
+      "alsoRead": [],
+      "searchCodebase": true,
+      "searchPath": "nixos/core/management/tui-engine"
+    },
+    {
+      "priority": 9,
+      "when": "question is about custom/ user modules",
+      "read": ["domains/custom.json"],
+      "alsoRead": [],
+      "searchCodebase": true,
+      "searchPath": "nixos/custom/"
+    },
+    {
+      "priority": 10,
+      "when": "question is about docs/ — which docs are active vs legacy",
+      "read": ["domains/docs.json"],
+      "alsoRead": [],
+      "searchCodebase": false
+    },
+    {
+      "priority": 11,
+      "when": "modifying code in a specific module (any domain)",
+      "read": ["modules/core-registry.json", "modules/optional-registry.json"],
+      "alsoRead": [],
+      "searchCodebase": true,
+      "searchPath": "auto"
+    },
+    {
+      "priority": 12,
+      "when": "unsure where to look / multi-domain question",
+      "read": [],
+      "alsoRead": [],
+      "searchCodebase": true,
+      "searchPath": "auto",
+      "note": "Search codebase directly. Use glob + grep. Read knowledge files only after seeing results."
+    }
+  ],
+  "goldenRules": [
+    "Docs (AI_KNOWLEDGE.md, MODULE_TEMPLATE.md) define the WHAT and WHY",
+    "Codebase (nixos/) is the ground truth for the actual current state",
+    "Knowledge JSON files are compact summaries — verify against code when in doubt",
+    "If knowledge JSON says a file exists but glob returns nothing → it's stale, regenerate with sync hooks",
+    "For code changes: always read the existing file first, then modify",
+    "For Nix files: always check AI_KNOWLEDGE.md for escaping rules before generating code"
+  ]
+}

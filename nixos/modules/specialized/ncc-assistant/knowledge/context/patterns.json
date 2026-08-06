@@ -1,0 +1,34 @@
+{
+  "_schema": "ncc-context/patterns/1.0",
+  "_version": "1.0.0",
+  "prebuildChecks": {
+    "pattern": "Each prebuild check has INLINE bash functions (_update_cpu, _update_gpu, _update_memory) that write hardware-config directly",
+    "why": "update-hardware-config script only exists AFTER nixos-rebuild switch. Prebuild runs BEFORE the build.",
+    "location": "nixos/core/management/system-manager/components/system-checks/prebuild/checks/"
+  },
+  "passwordManagement": {
+    "store": "/etc/nixos/secrets/passwords/<user>/.hashedPassword",
+    "hash": "openssl passwd -6 -stdin (SHA-512)",
+    "apply": "chpasswd -e (expects pre-hashed password)",
+    "location": "nixos/core/management/system-manager/components/system-checks/prebuild/checks/system/users.nix",
+    "why": "More reliable than passwd + grep /etc/shadow pattern"
+  },
+  "backupSystem": {
+    "location": "/var/backup/nixos/",
+    "retention": 5,
+    "backupBeforeDelete": "system-config.nix backed up before deletion during migration"
+  },
+  "platformNotes": {
+    "shell": "bash",
+    "scriptGeneration": "pkgs.writeShellScriptBin / pkgs.writeScriptBin",
+    "jqVersion": "1.6+ (recursive functions required)",
+    "opensslPath": "${pkgs.openssl}/bin/openssl",
+    "pciutilsPath": "${pkgs.pciutils}/bin/lspci",
+    "nixEval": "nix-instantiate for eval; nix eval also available"
+  },
+  "commonErrors": [
+    { "symptom": "build failed: syntax error, unexpected '='", "cause": "Unescaped ${VAR%pattern} in Nix '' string", "fix": "Use ''${VAR%pattern}" },
+    { "symptom": "update-hardware-config: command not found", "cause": "External cmd called in prebuild check", "fix": "Use inline _update_* function" },
+    { "symptom": "jq: error: formatValue/0 is not defined", "cause": "jq function called via pipe instead of direct arg", "fix": "Use formatValue($x) not $x | formatValue" }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "_schema": "ncc-context/file-map/1.0",
+  "_version": "1.0.0",
+  "root": {
+    "flake.nix": "nixos/flake.nix — Flake entry point, imports config-loader",
+    "shell.nix": "shell.nix — Dev shell entry point",
+    "AI_KNOWLEDGE.md": "AI_KNOWLEDGE.md — Source AI knowledge (302 lines, keep as reference)",
+    ".gitignore": ".gitignore — Git ignore rules"
+  },
+  "systemManager": {
+    "handlers/system-update.nix": "nixos/core/management/system-manager/handlers/system-update.nix — MAIN update orchestrator",
+    "migration/migration.nix": "nixos/core/management/system-manager/components/config-migration/migration.nix — v0→v1 migration (600+ lines)",
+    "migration/validator.nix": "nixos/core/management/system-manager/components/config-migration/validator.nix — ncc-validate-config",
+    "migration/detection.nix": "nixos/core/management/system-manager/components/config-migration/detection.nix — ncc-detect-version",
+    "migration/check.nix": "nixos/core/management/system-manager/components/config-migration/check.nix — wraps validator + migration",
+    "migration/commands.nix": "nixos/core/management/system-manager/components/config-migration/commands.nix — registers config-check/detect/migrate/validate",
+    "lib/config-loader.nix": "nixos/core/management/system-manager/lib/config-loader.nix — recursive config discovery",
+    "lib/backup-helpers.nix": "nixos/core/management/system-manager/lib/backup-helpers.nix — backup functions",
+    "lib/utils-config-migration.nix": "nixos/core/management/system-manager/lib/utils-config-migration.nix — migration chain helpers"
+  },
+  "cliRegistry": {
+    "lib/types.nix": "nixos/core/management/cli-registry/lib/types.nix — command option types",
+    "lib/registration.nix": "nixos/core/management/cli-registry/lib/registration.nix — how commands register",
+    "lib/validation.nix": "nixos/core/management/cli-registry/lib/validation.nix — command validation",
+    "lib/execution.nix": "nixos/core/management/cli-registry/lib/execution.nix — command execution logic"
+  },
+  "prebuildChecks": {
+    "hardware/cpu.nix": "nixos/core/management/system-manager/components/system-checks/prebuild/checks/hardware/cpu.nix — CPU detection + hardware-config write",
+    "hardware/gpu.nix": "nixos/core/management/system-manager/components/system-checks/prebuild/checks/hardware/gpu.nix — GPU detection (nvidia/amd/intel/hybrid)",
+    "hardware/memory.nix": "nixos/core/management/system-manager/components/system-checks/prebuild/checks/hardware/memory.nix — RAM size detection (rounded to 4/8/16/32/64/128)",
+    "system/users.nix": "nixos/core/management/system-manager/components/system-checks/prebuild/checks/system/users.nix — user check, password mgmt"
+  },
+  "cliFormatter": {
+    "colors.nix": "nixos/core/management/cli-formatter/colors.nix — color definitions",
+    "core/text.nix": "nixos/core/management/cli-formatter/core/text.nix — text formatting",
+    "core/layout.nix": "nixos/core/management/cli-formatter/core/layout.nix — layout components",
+    "components/tables.nix": "nixos/core/management/cli-formatter/components/tables.nix — table formatter",
+    "components/lists.nix": "nixos/core/management/cli-formatter/components/lists.nix — list formatter",
+    "components/boxes.nix": "nixos/core/management/cli-formatter/components/boxes.nix — box formatter",
+    "components/progress.nix": "nixos/core/management/cli-formatter/components/progress.nix — progress indicator",
+    "api.nix": "nixos/core/management/cli-formatter/api.nix — public API export"
+  },
+  "tuiEngine": "nixos/core/management/tui-engine/ — Terminal UI framework for interactive commands",
+  "moduleManager": "nixos/core/management/module-manager/ — Module loading, config merging with template defaults"
+}

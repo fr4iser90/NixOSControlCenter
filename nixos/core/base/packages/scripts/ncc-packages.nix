@@ -311,9 +311,9 @@ pkgs.writeShellScriptBin "ncc-packages" ''
 
       _ncc_packages_flush
 
-      # Steam / Brave / gaming need allowUnfree in system-manager
+      # Steam / Brave / gaming / common unfree need allowUnfree in system-manager
       local check_tokens="$reason $PACKAGE ''${NAMES[*]:-}"
-      if echo "$check_tokens" | grep -Eqi '(^|[[:space:]])(gaming|brave|steam)([[:space:]]|$)'; then
+      if echo "$check_tokens" | grep -Eqi '(^|[[:space:]/])(gaming|brave|steam|zoom|zoom-us|discord|spotify|vscode|google-chrome|chrome|nvidia|cuda|unrar|slack)([[:space:]/]|$)'; then
           local sm
           if sm=$(ncc_read_module_config "core/management/system-manager" 2>/dev/null); then
               if ! echo "$sm" | grep -qE 'allowUnfree[[:space:]]*=[[:space:]]*true'; then

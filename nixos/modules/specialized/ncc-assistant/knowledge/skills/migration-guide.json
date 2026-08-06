@@ -1,0 +1,59 @@
+{
+  "_schema": "ncc-skill/migration-guide/1.0",
+  "_version": "1.0.0",
+  "configVersions": {
+    "v0": {
+      "location": "/etc/nixos/system-config.nix",
+      "entryPoint": "flake.nix → imports system-config.nix",
+      "status": "DEPRECATED",
+      "migrationTrigger": "ncc system-update detects v0 → triggers migration"
+    },
+    "v1": {
+      "location": "/etc/nixos/systemConfig/**/config.nix",
+      "entryPoint": "flake.nix → config-loader.nix → recursive discovery",
+      "versionFlag": "configVersion = \"1.0\" in systemConfig/core/management/system-manager/config.nix",
+      "status": "ACTIVE",
+      "aggregatorConfigs": "DELETED after migration (intermediate dir config.nix files)"
+    }
+  },
+  "migrationSteps": [
+    { "step": 1, "action": "Validation", "tool": "ncc-validate-config", "file": "nixos/core/management/system-manager/components/config-migration/validator.nix", "checks": ["systemConfig/ structure", "version detection", "recursive config.nix validation"] },
+    { "step": 2, "action": "Migration", "tool": "ncc-migrate-config", "file": "nixos/core/management/system-manager/components/config-migration/migration.nix", "details": "jq-based field extraction from system-config.nix → write config files → delete system-config.nix" },
+    { "step": 3, "action": "Backup", "details": "system-config.nix backed up to /var/backup/nixos/ before deletion" },
+    { "step": 4, "action": "Cleanup", "details": "Delete aggregator config.nix files in intermediate directories" },
+    { "step": 5, "action": "Inject version", "details": "configVersion = \"1.0\" in system-manager/config.nix" },
+    { "step": 6, "action": "Template sync", "details": "Template-config.nix files copied to systemConfig/ on first install" }
+  ],
+  "migrationFiles": {
+    "entryPoint": "nixos/core/management/system-manager/components/config-migration/default.nix",
+    "migrationScript": "nixos/core/management/system-manager/components/config-migration/migration.nix",
+    "validator": "nixos/core/management/system-manager/components/config-migration/validator.nix",
+    "detection": "nixos/core/management/system-manager/components/config-migration/detection.nix",
+    "check": "nixos/core/management/system-manager/components/config-migration/check.nix",
+    "commands": "nixos/core/management/system-manager/components/config-migration/commands.nix",
+    "schema": "nixos/core/management/system-manager/components/config-migration/schema.nix",
+    "fieldSchemas": ["v0.nix", "v1.nix"],
+    "migrationPlan": "nixos/core/management/system-manager/components/config-migration/schema/migrations/v0-to-v1.nix"
+  },
+  "v1ConfigStructure": {
+    "root": "/etc/nixos/systemConfig/",
+    "core": {
+      "base": "audio, boot, network, hardware, user, desktop, packages, localization",
+      "management": "system-manager, cli-registry, cli-formatter, module-manager, tui-engine"
+    },
+    "modules": {
+      "infrastructure": "VM management, homelab, bootentry-manager, docker",
+      "security": "Security policies, firewall",
+      "specialized": "chronicle, AI workspace, SSH management",
+      "system": "System-level tools, cleanup"
+    }
+  },
+  "keyRules": [
+    "configVersion = \"1.0\" lives in systemConfig/core/management/system-manager/config.nix",
+    "No system-config.nix on v1 — deleted after migration",
+    "Aggregator config.nix files (depth < 3) are DELETED after migration",
+    "Leaf config.nix files (depth 3+) are the real configs",
+    "template-config.nix serves as default template, copied on first install",
+    "template-config.nix MUST be FLAT — no nesting"
+  ]
+}

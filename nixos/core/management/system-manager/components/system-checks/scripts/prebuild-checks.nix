@@ -1,83 +1,110 @@
 { config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 let
-  cfg = getModuleConfig "system-checks";
-  prebuildCfg = cfg.prebuild or {};
   ui = getModuleApi "cli-formatter";
 in
   pkgs.writeScriptBin "build" ''
     #!${pkgs.bash}/bin/bash
 
-    # Trap for CTRL+C
     trap '${ui.messages.error "Operation cancelled"}; exit 0' INT
 
-    # Show usage if no arguments
     if [ $# -eq 0 ]; then
       ${ui.messages.info "Usage: build <command> [options]"}
       ${ui.messages.info "Commands: switch, boot, test, build"}
-      ${ui.messages.info "Options: --force (Skip checks)"}
+      ${ui.messages.info "Options: --force (skip checks)  --verbose (preflight details)"}
       exit 1
     fi
 
-    # Check for --force flag
-    if [[ " $* " =~ " --force " ]]; then
-      ${ui.messages.warning "Bypassing preflight checks!"}
-      args=$(echo "$@" | sed 's/--force//')
-      exec ${pkgs.nixos-rebuild}/bin/nixos-rebuild $args
+    FORCE=false
+    VERBOSE=false
+    REBUILD_ARGS=()
+    for arg in "$@"; do
+      case "$arg" in
+        --force) FORCE=true ;;
+        --verbose|-v) VERBOSE=true ;;
+        *) REBUILD_ARGS+=("$arg") ;;
+      esac
+    done
+
+    if [ "$FORCE" = true ]; then
+      ${ui.badges.warning "Bypassing preflight checks"}
+      exec ${pkgs.nixos-rebuild}/bin/nixos-rebuild "''${REBUILD_ARGS[@]}"
     fi
 
-    ${ui.messages.loading "Running system checks..."}
+    if [ "$VERBOSE" = true ]; then
+      export NCC_PREFLIGHT_VERBOSE=1
+    else
+      export NCC_PREFLIGHT_VERBOSE=0
+    fi
 
-    # Initialize check status
+    ${ui.text.header "Preflight"}
+
     checks_failed=0
 
-    # Run CPU check
-    ${ui.badges.info "Running CPU check..."}
+    ${ui.badges.info "CPU"}
     if ! prebuild-check-cpu; then
-      ${ui.badges.error "CPU check failed!"}
+      ${ui.badges.error "CPU: check failed"}
       checks_failed=1
     fi
 
-    # Run GPU check
-    ${ui.badges.info "Running GPU check..."}
+    ${ui.badges.info "GPU"}
     if ! prebuild-check-gpu; then
-      ${ui.badges.error "GPU check failed!"}
+      ${ui.badges.error "GPU: check failed"}
       checks_failed=1
     fi
 
-    # Run Memory check
-    ${ui.badges.info "Running Memory check..."}
+    ${ui.badges.info "Memory"}
     if ! prebuild-check-memory; then
-      ${ui.badges.error "Memory check failed!"}
+      ${ui.badges.error "Memory: check failed"}
       checks_failed=1
     fi
 
-    # Run User check
-    ${ui.badges.info "Running User check..."}
+    ${ui.badges.info "Users"}
     if ! prebuild-check-users; then
-      ${ui.badges.error "User check failed!"}
+      ${ui.badges.error "Users: check failed"}
       checks_failed=1
     fi
 
-    # If any checks failed, ask for confirmation
-    if [ $checks_failed -eq 1 ]; then
-      ${ui.badges.warning "Some checks failed! Continue anyway?"}
-      read -p "Continue with build? [y/N] " response
+    if [ "$checks_failed" -eq 1 ]; then
+      ${ui.badges.error "Preflight failed"}
+      printf "Continue with build anyway? [y/N] "
+      read -r response || response=""
       if [[ ! "$response" =~ ^[Yy]$ ]]; then
-        ${ui.badges.error "Build aborted."}
+        ${ui.badges.error "Build aborted"}
         exit 1
       fi
+      ${ui.badges.warning "Continuing despite preflight failures"}
     else
-      ${ui.badges.success "All checks passed!"}
+      ${ui.badges.success "Preflight passed"}
     fi
 
-    ${ui.badges.info "Running nixos-rebuild..."}
+    ${ui.text.header "Build"}
+    ${ui.badges.info "nixos-rebuild"}
+    if [ "''${#REBUILD_ARGS[@]}" -gt 0 ]; then
+      echo "  args: ''${REBUILD_ARGS[*]}"
+    fi
 
-    if ${pkgs.nixos-rebuild}/bin/nixos-rebuild "$@"; then
-      ${ui.badges.success "Build successful!"}
+    build_log=$(mktemp)
+    trap 'rm -f "$build_log"' EXIT
+
+    set +e
+    ${pkgs.nixos-rebuild}/bin/nixos-rebuild "''${REBUILD_ARGS[@]}" 2>&1 | tee "$build_log"
+    rebuild_rc=''${PIPESTATUS[0]}
+    set -e
+
+    if [ "$rebuild_rc" -eq 0 ]; then
+      ${ui.badges.success "Build successful"}
       exit 0
-    else
-      ${ui.badges.error "Build failed!"}
-      exit 1
     fi
+
+    ${ui.badges.error "Build failed"}
+
+    if grep -qiE 'unfree license|allowUnfree|NIXPKGS_ALLOW_UNFREE' "$build_log"; then
+      ${ui.badges.warning "Unfree package blocked the build (e.g. zoom, steam)"}
+      ${ui.messages.info "Flag: systemConfig.core.management.system-manager.allowUnfree"}
+      ${ui.messages.info "Fix:  sudo ncc system allow-unfree"}
+      ${ui.messages.info "Or:   sudo ncc system allow-unfree --rebuild"}
+    fi
+
+    exit "$rebuild_rc"
   ''

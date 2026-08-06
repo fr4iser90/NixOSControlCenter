@@ -22,6 +22,7 @@ let
   # Import scripts (template-compliant)
   enableDesktopScript = import ./scripts/enable-desktop.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   updateDesktopConfig = import ./scripts/update-desktop-config.nix { inherit config lib pkgs systemConfig; };
+  allowUnfreeScript = import ./scripts/allow-unfree.nix { inherit pkgs getModuleApi; };
   
   # Import config migration and validation
   # CLI APIs - elegant registration
@@ -61,6 +62,7 @@ in {
           configValidator.validateSystemConfig
           enableDesktopScript
           updateDesktopConfig
+          allowUnfreeScript
         ] ++ lib.optionals (cfg.components.configMigration.enable or false) [
           configMigration.check.configCheck
           configMigration.validator.validateSystemConfig
@@ -79,6 +81,27 @@ in {
         shortHelp = "system - System Manager (TUI)";
         longHelp = ''
           Interactive system manager TUI.
+        '';
+      }
+      {
+        name = "allow-unfree";
+        domain = "system";
+        parent = "system";
+        description = "Enable allowUnfree in systemConfig (needed for zoom, steam, …)";
+        category = "system";
+        script = "${allowUnfreeScript}/bin/ncc-allow-unfree";
+        arguments = [ "--rebuild" ];
+        shortHelp = "allow-unfree - Enable nixpkgs allowUnfree";
+        longHelp = ''
+          Set core.management.system-manager.allowUnfree = true via the config facade.
+
+          New NCC installs default to true. If an older config has false (or the
+          flag is missing while unfree packages are installed), builds fail with
+          "unfree license". Use this command instead of editing by hand.
+
+          Examples:
+            sudo ncc system allow-unfree
+            sudo ncc system allow-unfree --rebuild
         '';
       }
       # Subcommand: check-versions
@@ -249,7 +272,8 @@ in {
               build     Build only
 
             Options:
-              --force   Skip safety checks
+              --force     Skip safety checks
+              --verbose   Show preflight details (detected vs configured)
           '';
         }
       ]))

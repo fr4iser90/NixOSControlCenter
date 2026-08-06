@@ -50,7 +50,7 @@
   #
   # Nix Configuration
   #
-  allowUnfree = false;
+  allowUnfree = true;
   buildLogLevel = "minimal";
 
   #

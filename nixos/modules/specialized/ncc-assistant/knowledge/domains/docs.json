@@ -1,0 +1,60 @@
+{
+  "_schema": "ncc-domain/docs/1.0",
+  "_version": "1.0.0",
+  "path": "docs/",
+  "description": "LEGACY docs — NOT maintained, exists for historical reference only",
+  "status": "LEGACY",
+  "tree": {
+    "docs/README.md": "Root docs README",
+    "docs/INSTALL.md": "Installation guide (legacy)",
+    "docs/FEATURES.md": "Features list (legacy)",
+    "docs/DOMAINS.md": "Domains documentation (legacy)",
+    "docs/MIGRATION.md": "Migration documentation (legacy)",
+    "docs/GUI.md": "GUI documentation (legacy)",
+    "docs/UI_MATRIX.md": "UI matrix documentation (legacy)",
+    "docs/CLI-PATTERN.md": "CLI pattern documentation (legacy)",
+    "docs/AI/": {
+      "description": "AI-specific documentation — mostly EMPTY files",
+      "ARCHITECTURE.md": "AI architecture doc (EMPTY)",
+      "README.md": "AI README (EMPTY)",
+      "CONTEXT_MAP.md": "Context map (EMPTY)",
+      "RULES.md": "AI rules (EMPTY)",
+      "CHECKS/": {
+        "pre-change.md": "Pre-change checks (EMPTY)",
+        "post-change.md": "Post-change checks (EMPTY)"
+      },
+      "PATTERNS/": {
+        "cli-pattern.md": "CLI pattern reference",
+        "module-structure.md": "Module structure reference",
+        "ui-pattern.md": "UI pattern reference",
+        "systemd-service.md": "Systemd service pattern reference"
+      },
+      "SKILLS/": {
+        "add-module.md": "Add module skill (EMPTY)",
+        "add-service.md": "Add service skill (EMPTY)",
+        "add-test.md": "Add test skill (EMPTY)",
+        "extend-ui.md": "Extend UI skill (EMPTY)",
+        "refactor-module.md": "Refactor module skill (EMPTY)"
+      },
+      "TESTING/": {
+        "strategy.md": "Testing strategy",
+        "validation-flow.md": "Validation flow",
+        "nixos-tests.md": "NixOS tests documentation"
+      },
+      "example-module/": "Complete example module with full structure"
+    },
+    "docs/tui/": {
+      "description": "TUI-specific documentation",
+      "menu-specification.md": "TUI menu specification",
+      "bubbletea-patterns-guide.md": "Bubble Tea patterns",
+      "template-api.md": "TUI template API",
+      "module-integration-guide.md": "Module integration guide",
+      "migration-guide.md": "TUI migration guide"
+    }
+  },
+  "rules": [
+    "docs/ is LEGACY — do not maintain",
+    "knowledge/ is the living documentation system",
+    "MODULE_TEMPLATE.md in docs/AI/example-module/ is the authoritative module template reference"
+  ]
+}

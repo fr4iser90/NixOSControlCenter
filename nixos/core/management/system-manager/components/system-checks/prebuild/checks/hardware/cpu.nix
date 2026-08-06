@@ -10,6 +10,8 @@ let
 
     ${hw.preamble}
 
+    VERBOSE="''${NCC_PREFLIGHT_VERBOSE:-0}"
+
     _update_cpu() {
       local new_value="$1"
       local current existing_gpu existing_memory
@@ -38,7 +40,7 @@ let
     }
 
     if ! CPU_INFO=$(${pkgs.util-linux}/bin/lscpu); then
-      ${ui.messages.error "Could not detect CPU information"}
+      ${ui.badges.error "CPU: could not detect"}
       exit 1
     fi
 
@@ -52,23 +54,25 @@ let
 
     CURRENT=$(ncc_read_module_config "core/base/hardware" 2>/dev/null || echo "{}")
     if ! echo "$CURRENT" | grep -q 'cpu ='; then
-      ${ui.messages.info "hardware config missing cpu, creating..."}
       _update_cpu "$DETECTED"
-      ${ui.badges.success "hardware config created with detected CPU."}
+      ${ui.badges.warning "CPU: was unset → set to $DETECTED"}
+      ${ui.badges.success "CPU: $DETECTED"}
       exit 0
     fi
 
     CONFIGURED=$(echo "$CURRENT" | grep 'cpu =' | head -1 | cut -d'"' -f2 || echo "")
-    ${ui.messages.info "Detected CPU: $DETECTED"}
-    ${ui.messages.info "Configured CPU: $CONFIGURED"}
+
+    if [ "$VERBOSE" = "1" ]; then
+      echo "  detected:   $DETECTED"
+      echo "  configured: $CONFIGURED"
+    fi
 
     if [ "$DETECTED" != "$CONFIGURED" ]; then
-      ${ui.messages.warning "CPU configuration mismatch!"}
-      ${ui.messages.warning "System configured for $CONFIGURED but detected $DETECTED"}
+      ${ui.badges.warning "CPU: was $CONFIGURED → set to $DETECTED"}
       _update_cpu "$DETECTED"
-      ${ui.badges.success "Configuration updated."}
+      ${ui.badges.success "CPU: $DETECTED"}
     else
-      ${ui.badges.success "CPU configuration matches hardware."}
+      ${ui.badges.success "CPU: $DETECTED"}
     fi
 
     exit 0

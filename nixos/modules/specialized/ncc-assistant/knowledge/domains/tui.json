@@ -1,0 +1,39 @@
+{
+  "_schema": "ncc-domain/tui/1.0",
+  "_version": "1.0.0",
+  "path": "nixos/core/management/tui-engine/",
+  "description": "Terminal UI framework for interactive commands (bubbletea-based)",
+  "docs": "docs/tui/",
+  "tree": {
+    "tui-engine/": {
+      "description": "Terminal UI engine (bubbletea-based)",
+      "location": "nixos/core/management/tui-engine/"
+    },
+    "docs/tui/": {
+      "menu-specification.md": "TUI menu specification and design",
+      "bubbletea-patterns-guide.md": "Bubble Tea patterns and best practices",
+      "template-api.md": "TUI template API documentation",
+      "module-integration-guide.md": "How modules integrate with TUI engine",
+      "migration-guide.md": "TUI migration guide"
+    }
+  },
+  "uiIntegration": {
+    "description": "Modules integrate TUI via tui-engine API",
+    "pattern": "getModuleApi \"tui-engine\" → tuiEngine.templates.<template>.createTUI(...)",
+    "templateTypes": ["5panel", "form", "list", "details", "actions"]
+  },
+  "moduleUiPattern": {
+    "description": "Each module can have ui/ directory with tui/ subdirectory",
+    "structure": "module/ui/tui/{menu.nix, actions.nix, helpers.nix, default.nix}",
+    "menuNix": "TUI menu definition using tui-engine templates",
+    "actionsNix": "TUI action handlers",
+    "helpersNix": "TUI-specific utilities",
+    "defaultNix": "TUI module entry point"
+  },
+  "keyFiles": [
+    "nixos/core/management/tui-engine/",
+    "docs/tui/bubbletea-patterns-guide.md",
+    "docs/tui/template-api.md",
+    "docs/tui/module-integration-guide.md"
+  ]
+}

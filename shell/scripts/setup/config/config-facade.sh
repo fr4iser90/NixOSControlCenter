@@ -201,6 +201,34 @@ ncc_read_module_config() {
   esac
 }
 
+# True if this module path already has a config leaf (split file or monolith attr).
+# Missing path → false (seed). Present even as { enable = false; … } → true (keep).
+ncc_module_config_exists() {
+  local module_path="$1"
+  local layout
+  layout=$(ncc_detect_layout)
+  module_path="${module_path#/}"
+  module_path="${module_path%.nix}"
+  module_path="${module_path%/config}"
+  case "$layout" in
+    split)
+      [[ -f "$(ncc_module_config_path "$module_path")" ]]
+      ;;
+    monolith)
+      [[ -f "$MONOLITH_FILE" ]] || return 1
+      local path_json json
+      path_json=$(_ncc_path_to_jq_array "$module_path")
+      json=$("$NIX_INSTANTIATE_BIN" --eval --strict --json -E "import $MONOLITH_FILE" 2>/dev/null) || return 1
+      echo "$json" | "$JQ_BIN" -e --argjson path "$path_json" '
+        try (getpath($path) | type == "object") catch false
+      ' >/dev/null 2>&1
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 ncc_set_module_enable() {
   local module_path="$1"
   local enable_value="$2"

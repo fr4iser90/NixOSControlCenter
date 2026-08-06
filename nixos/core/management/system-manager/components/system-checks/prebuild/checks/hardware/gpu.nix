@@ -11,6 +11,8 @@ let
 
     ${hw.preamble}
 
+    VERBOSE="''${NCC_PREFLIGHT_VERBOSE:-0}"
+
     _update_gpu() {
       local new_value="$1"
       local current existing_cpu existing_memory size
@@ -37,12 +39,10 @@ let
       ncc_write_module_config "core/base/hardware" "$content"
     }
 
-    ${ui.text.header "GPU Configuration Check"}
-
     DETECTED="none"
-
     declare -A gpu_types
     amd_count=0
+    DEVICE_SUMMARY=""
 
     while IFS= read -r line; do
         bus_id=$(echo "$line" | cut -d' ' -f1)
@@ -60,19 +60,14 @@ let
                         ;;
                     "8086") gpu_types["intel"]=1 ;;
                 esac
-
-                ${ui.messages.info "Found GPU:"}
-                ${ui.tables.keyValue "Device" "$device"}
-                ${ui.tables.keyValue "Bus ID" "$bus_id"}
-                ${ui.tables.keyValue "Vendor ID" "$vendor_id"}
-                ${ui.tables.keyValue "Class Code" "$class_code"}
+                DEVICE_SUMMARY="''${DEVICE_SUMMARY}''${DEVICE_SUMMARY:+; }$device"
+                if [ "$VERBOSE" = "1" ]; then
+                  echo "  device: $device"
+                  echo "  bus:    $bus_id  vendor: $vendor_id  class: $class_code"
+                fi
                 ;;
         esac
-    done < <(${pkgs.pciutils}/bin/lspci -nn | grep -E "\[0300\]|\[0302\]|\[0380\]")
-
-    if [ "$amd_count" -gt 0 ]; then
-      echo "AMD GPU count: $amd_count"
-    fi
+    done < <(${pkgs.pciutils}/bin/lspci -nn | grep -E "\[0300\]|\[0302\]|\[0380\]" || true)
 
     if [[ ''${gpu_types["nvidia"]-0} -eq 1 && ''${gpu_types["intel"]-0} -eq 1 ]]; then
         DETECTED="nvidia-intel"
@@ -91,35 +86,36 @@ let
     if [ "$DETECTED" = "none" ]; then
         if command -v ${pkgs.systemd}/bin/systemd-detect-virt &> /dev/null; then
             virt_type=$(${pkgs.systemd}/bin/systemd-detect-virt || echo "none")
-
             if [ "$virt_type" != "none" ]; then
                 DETECTED="vm-gpu"
-                ${ui.messages.info "Virtual Machine: $virt_type"}
-                ${ui.messages.info "Virtual Display: $DETECTED"}
+                if [ "$VERBOSE" = "1" ]; then
+                  echo "  virt: $virt_type"
+                fi
             fi
         fi
     fi
 
     CURRENT=$(ncc_read_module_config "core/base/hardware" 2>/dev/null || echo "{}")
     if ! echo "$CURRENT" | grep -q 'gpu ='; then
-      ${ui.messages.info "hardware config missing gpu, creating..."}
       _update_gpu "$DETECTED"
-      ${ui.badges.success "hardware config created with detected GPU."}
+      ${ui.badges.warning "GPU: was unset → set to $DETECTED"}
+      ${ui.badges.success "GPU: $DETECTED"}
       exit 0
     fi
 
     CONFIGURED=$(echo "$CURRENT" | grep 'gpu =' | head -1 | cut -d'"' -f2 || echo "")
-    ${ui.text.subHeader "GPU Configuration:"}
-    ${ui.tables.keyValue "Detected" "$DETECTED"}
-    ${ui.tables.keyValue "Configured" "$CONFIGURED"}
+
+    if [ "$VERBOSE" = "1" ]; then
+      echo "  detected:   $DETECTED"
+      echo "  configured: $CONFIGURED"
+    fi
 
     if [ "$DETECTED" != "$CONFIGURED" ]; then
-      ${ui.messages.warning "GPU configuration mismatch! Auto-updating..."}
-      ${ui.messages.warning "System configured for $CONFIGURED but detected $DETECTED"}
+      ${ui.badges.warning "GPU: was $CONFIGURED → set to $DETECTED"}
       _update_gpu "$DETECTED"
-      ${ui.badges.success "GPU configuration updated to $DETECTED."}
+      ${ui.badges.success "GPU: $DETECTED"}
     else
-      ${ui.badges.success "GPU configuration matches hardware."}
+      ${ui.badges.success "GPU: $DETECTED"}
     fi
 
     exit 0
@@ -140,13 +136,12 @@ in {
         script = "${prebuildScript}/bin/prebuild-check-gpu";
         shortHelp = "check-gpu - Verify GPU configuration";
         longHelp = ''
-          Check GPU configuration before system rebuild
-
-          Layout-aware: updates monolith (systemConfig.nix) or split leaf.
+          Check GPU configuration before system rebuild.
+          Quiet by default; details with NCC_PREFLIGHT_VERBOSE=1.
         '';
         interactive = false;
         dependencies = [ "system-checks" ];
       }
-      ])
+    ])
   ];
 }

@@ -2,7 +2,6 @@
 
 let
   cliRegistry = getModuleApi "cli-registry";
-  # GENERISCH: CLI Formatter API über getModuleApi beziehen
   ui = getModuleApi "cli-formatter";
   hw = import ../../../../../lib/hardware-config-writer.nix { inherit pkgs lib systemConfig; };
 
@@ -12,16 +11,16 @@ let
 
     ${hw.preamble}
 
-    ${ui.text.header "User Configuration Check"}
-    
-    # Get current and configured users (mit Filter für echte User)
-    CURRENT_USERS=`getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 && $1 !~ /^nixbld/ {print $1}'`
-    CONFIGURED_USERS="${builtins.concatStringsSep " " (builtins.attrNames (lib.filterAttrs (n: v: builtins.isAttrs v) (getModuleConfig "user")))}"
-    ${ui.tables.keyValue "Current users" "$CURRENT_USERS"}
-    ${ui.tables.keyValue "Configured users" "$CONFIGURED_USERS"}
+    VERBOSE="''${NCC_PREFLIGHT_VERBOSE:-0}"
 
-    # CRITICAL: Runtime check — layout-aware (monolith OR split leaf)
-    # CONFIGURED_USERS above is baked at Nix eval; verify live config still has users.
+    CURRENT_USERS=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 && $1 !~ /^nixbld/ {print $1}')
+    CONFIGURED_USERS="${builtins.concatStringsSep " " (builtins.attrNames (lib.filterAttrs (n: v: builtins.isAttrs v) (getModuleConfig "user")))}"
+
+    if [ "$VERBOSE" = "1" ]; then
+      echo "  current:    $CURRENT_USERS"
+      echo "  configured: $CONFIGURED_USERS"
+    fi
+
     _user_config_present() {
       local layout
       layout=$(ncc_detect_layout 2>/dev/null || echo "split")
@@ -45,66 +44,55 @@ let
     }
 
     if ! _user_config_present; then
-      layout_now=$(ncc_detect_layout 2>/dev/null || echo unknown)
-      ${ui.badges.error "CRITICAL: User configuration missing or empty"}
-      echo "layout=$layout_now monolith=$MONOLITH_FILE split=''${CONFIG_PATH_USER:-/etc/nixos/systemConfig/core/base/user/config.nix}" >&2
-      ${ui.badges.error "Aborting - the system would delete ALL users without a config."}
+      ${ui.badges.error "Users: config missing or empty (would remove all users)"}
+      if [ "$VERBOSE" = "1" ]; then
+        echo "  layout=$(ncc_detect_layout 2>/dev/null || echo unknown)"
+        echo "  monolith=$MONOLITH_FILE"
+      fi
       exit 1
     fi
 
-    # Initialize tracking
     changes_detected=0
     removed_users=""
     added_users=""
     users_without_password=""
 
-    # Check for users that will be removed
     for user in $CURRENT_USERS; do
       if ! echo "$CONFIGURED_USERS" | grep -q "$user"; then
-        ${ui.badges.warning "User '$user' will be removed"}
         removed_users="$removed_users $user"
         changes_detected=1
       fi
     done
 
-    # Check for new users
     for user in $CONFIGURED_USERS; do
       if ! echo "$CURRENT_USERS" | grep -q "$user"; then
-        ${ui.badges.info "User '$user' will be added"}
         added_users="$added_users $user"
         changes_detected=1
       fi
     done
 
-    # Show summary if changes detected
     if [ $changes_detected -eq 1 ]; then
-      ${ui.badges.warning "User changes detected!"}
-      
-      if [ ! -z "$removed_users" ]; then
-        ${ui.tables.keyValue "Users to remove" "$removed_users"}
+      ${ui.badges.warning "Users: changes detected"}
+      if [ -n "$removed_users" ]; then
+        echo "  remove:$removed_users"
       fi
-      
-      if [ ! -z "$added_users" ]; then
-        ${ui.tables.keyValue "Users to add" "$added_users"}
+      if [ -n "$added_users" ]; then
+        echo "  add:$added_users"
       fi
 
-      # HARTE ABBRECHEN wenn ALLE User entfernt würden
-      if [ -z "$CONFIGURED_USERS" ] && [ ! -z "$CURRENT_USERS" ]; then
-        ${ui.badges.error "CRITICAL: All existing system users would be removed!"}
-        ${ui.badges.error "At least one admin/restricted-admin user is required."}
-        ${ui.badges.error "Aborting. Configure a user or use --force to override."}
+      if [ -z "$CONFIGURED_USERS" ] && [ -n "$CURRENT_USERS" ]; then
+        ${ui.badges.error "Users: all users would be removed — aborting"}
         exit 1
       fi
 
-      # Ask for confirmation
-      read -p "Continue with these changes? [y/N] " response
+      printf "Continue with these user changes? [y/N] "
+      read -r response || response=""
       if [[ ! "$response" =~ ^[Yy]$ ]]; then
-        ${ui.badges.error "Aborting."}
+        ${ui.badges.error "Users: aborted"}
         exit 1
       fi
     fi
 
-    # PASSWORT-CHECK: Prüfe ob alle konfigurierten User ein Passwort haben
     PASSWORD_DIR="/etc/nixos/secrets/passwords"
     for user in $CONFIGURED_USERS; do
       if [ ! -f "$PASSWORD_DIR/$user/.hashedPassword" ]; then
@@ -113,25 +101,18 @@ let
     done
 
     if [ -n "$users_without_password" ]; then
-      echo ""
-      ${ui.badges.warning "Password Check:"}
-      for user in $users_without_password; do
-        echo "  - $user: no declarative password found"
-      done
-      echo ""
-      echo "Without a saved password, this user won't be able to login after rebuild."
-      echo "Passwords are stored declaratively in $PASSWORD_DIR/<user>/.hashedPassword"
-      read -p "Set missing passwords now? [Y/n] " pw_response
+      ${ui.badges.warning "Users: missing passwords:$users_without_password"}
+      printf "Set missing passwords now? [Y/n] "
+      read -r pw_response || pw_response=""
       if [[ ! "$pw_response" =~ ^[Nn]$ ]]; then
         for user in $users_without_password; do
-          echo ""
           echo "Setting password for '$user'..."
           read -s -p "New password: " PASSWORD
           echo
           read -s -p "Retype new password: " PASSWORD_CONFIRM
           echo
           if [ "$PASSWORD" != "$PASSWORD_CONFIRM" ]; then
-            ${ui.badges.error "Passwords do not match"}
+            ${ui.badges.error "Users: passwords do not match ($user)"}
             continue
           fi
           HASH=$(echo "$PASSWORD" | ${pkgs.openssl}/bin/openssl passwd -6 -stdin)
@@ -141,24 +122,19 @@ let
             printf '%s' "$HASH" > "$PASSWORD_DIR/$user/.hashedPassword"
             chmod 600 "$PASSWORD_DIR/$user/.hashedPassword"
             chown root:root "$PASSWORD_DIR/$user/.hashedPassword"
-            SHADOW_BEFORE=$(getent shadow "$user" 2>/dev/null)
             if echo "$user:$HASH" | ${pkgs.shadow}/bin/chpasswd -e; then
-              SHADOW_AFTER=$(getent shadow "$user" 2>/dev/null)
-              if echo "$SHADOW_AFTER" | grep -q "^$user:$HASH"; then
-                ${ui.badges.success "Password set and saved for $user"}
-              else
-                ${ui.badges.error "chpasswd OK but shadow hash mismatch! File saved, rebuild required to apply password declaratively."}
-              fi
+              ${ui.badges.success "Users: password set for $user"}
             else
-              ${ui.badges.warning "Hash saved but chpasswd failed (login may not work until rebuild)"}
+              ${ui.badges.warning "Users: hash saved for $user (chpasswd failed until rebuild)"}
             fi
           else
-            ${ui.badges.error "Failed to generate password hash"}
+            ${ui.badges.error "Users: failed to hash password for $user"}
           fi
         done
       fi
     fi
-    ${ui.badges.success "User check complete"}
+
+    ${ui.badges.success "Users: $CONFIGURED_USERS"}
     exit 0
   '';
 
@@ -172,25 +148,17 @@ in {
         name = "check-users";
         domain = "system";
         category = "system-checks";
-        internal = true;  # Don't show in main help - called by ncc system build
+        internal = true;
         description = "Check user configuration before system rebuild";
         script = "${prebuildScript}/bin/prebuild-check-users";
         shortHelp = "check-users - Verify user configuration";
         longHelp = ''
-          Check user configuration before system rebuild
-          
-          Checks:
-          - Current vs configured users
-          - User passwords
-          - Password directories
-          - System cleanup for removed users
-          
-          Interactive: Yes (for password management)
+          Check user configuration before system rebuild.
+          Quiet by default; details with NCC_PREFLIGHT_VERBOSE=1.
         '';
         interactive = true;
         dependencies = [ "system-checks" ];
       }
-      # Weitere Befehle können hier hinzugefügt werden
-      ])
+    ])
   ];
 }

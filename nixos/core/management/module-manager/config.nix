@@ -57,55 +57,53 @@ let
     templateFile = "${modulePath}/template-config.nix";
   in
     if builtins.pathExists templateFile then
-      # Template exists - use it as-is (should be flat, but we trust the template)
       builtins.readFile templateFile
     else
-      # Create minimal FLAT config with enable = false
-      # The file path will automatically nest it correctly via config-loader
       ''
 {
   enable = false;
 }
 '';
 
-  # Helper: Build config file path from module category
-  # category is like "modules.infrastructure.homelab" -> /etc/nixos/systemConfig/modules/infrastructure/homelab/config.nix
-  buildConfigFilePath = module: let
-    categoryParts = lib.splitString "." module.category;
-    configDir = lib.concatStringsSep "/" (["/etc/nixos/systemConfig"] ++ categoryParts);
-  in
-    "${configDir}/config.nix";
+  facade = import ../system-manager/lib/config-facade.nix { inherit pkgs; };
 
-  # Active layout from loaded systemConfig (monolith skips leaf auto-create)
-  activeLayout = systemConfig.core.management.system-manager.layout or "split";
+  # Seed missing module configs for ALL discovered modules (enable=false defaults OK).
+  # Split: create leaf files. Monolith: merge template into systemConfig.nix if attr missing.
+  # Never overwrites an existing module entry.
+  seedModuleEntries = lib.concatMapStringsSep "\n" (module: let
+    moduleSlashPath = lib.replaceStrings [ "." ] [ "/" ] module.configPath;
+    defaultConfig = getDefaultConfigForModule module;
+    templateFile = pkgs.writeText "ncc-seed-${module.domain}-${module.name}.nix" defaultConfig;
+  in ''
+    _ncc_seed_one "${moduleSlashPath}" "${templateFile}" "${module.name}"
+  '') discoveredModules;
 
-  # Create activation scripts for ALL discovered modules to auto-create default configs
-  # Only for split layout — monolith stores everything in systemConfig.nix
-  automaticConfigCreation = lib.mkIf (activeLayout != "monolith") (lib.mkMerge (
-    map (module: let
-      defaultConfig = getDefaultConfigForModule module;
-      configFilePath = buildConfigFilePath module;
-      categoryParts = lib.splitString "." module.category;
-      configDir = lib.concatStringsSep "/" (["/etc/nixos/systemConfig"] ++ categoryParts);
-      scriptName = "${module.domain}-${lib.replaceStrings ["."] ["-"] module.category}-config-setup";
-    in
-      {
-        system.activationScripts.${scriptName} = {
-          text = ''
-            mkdir -p "${configDir}"
-            if [ ! -f "${configFilePath}" ]; then
-              cat << 'EOF' > "${configFilePath}"
-${defaultConfig}
-EOF
-              chmod 644 "${configFilePath}"
-              echo "Created default config for ${module.name} at ${configFilePath}"
-            fi
-          '';
-          deps = [];
-        };
-      }
-    ) discoveredModules
-  ));
+  automaticConfigCreation = {
+    system.activationScripts.ncc-seed-module-configs = {
+      deps = [ "etc" ];
+      text = ''
+        # Seed discovered module templates into systemConfig (split or monolith)
+        ${facade.sourcePreamble { nixosRoot = "/etc/nixos"; }}
+
+        _ncc_seed_one() {
+          local module_path="$1"
+          local template_file="$2"
+          local module_name="$3"
+          if ncc_module_config_exists "$module_path"; then
+            return 0
+          fi
+          if ncc_write_module_config "$module_path" "$(cat "$template_file")"; then
+            echo "ncc: seeded module config for $module_name ($module_path)"
+          else
+            echo "ncc: failed to seed $module_name ($module_path)" >&2
+          fi
+        }
+
+        echo "ncc: seeding missing module configs (layout=$(ncc_detect_layout))..."
+        ${seedModuleEntries}
+      '';
+    };
+  };
 
 
   # Set enable options for all modules based on central config

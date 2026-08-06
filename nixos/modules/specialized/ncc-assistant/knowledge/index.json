@@ -1,0 +1,127 @@
+{
+  "_schema": "ncc-knowledge/1.0",
+  "_version": "1.0.0",
+  "_lastSyncedWithGit": "2026-05-11T10:13:29Z",
+  "_gitHash": "b899cc6",
+  "_scope": "all",
+  "tokenBudget": {
+    "total": "~2500 tokens",
+    "perQuery": "~200-600 tokens",
+    "strategy": "load-skill-on-demand"
+  },
+  "skills": [
+    {
+      "id": "common-patterns",
+      "file": "skills/common-patterns.json",
+      "tokens": "~549 tokens",
+      "loaded": false
+    },
+    {
+      "id": "migration-guide",
+      "file": "skills/migration-guide.json",
+      "tokens": "~721 tokens",
+      "loaded": false
+    },
+    {
+      "id": "module-structure",
+      "file": "skills/module-structure.json",
+      "tokens": "~795 tokens",
+      "loaded": false
+    },
+    {
+      "id": "search-strategy",
+      "file": "skills/search-strategy.json",
+      "tokens": "~712 tokens",
+      "loaded": false
+    },
+    {
+      "id": "testing",
+      "file": "skills/testing.json",
+      "tokens": "~175 tokens",
+      "loaded": false
+    }
+  ],
+  "contexts": [
+    {
+      "id": "architecture",
+      "file": "context/architecture.json",
+      "tokens": "~518 tokens",
+      "loaded": false
+    },
+    {
+      "id": "file-map",
+      "file": "context/file-map.json",
+      "tokens": "~761 tokens",
+      "loaded": false
+    },
+    {
+      "id": "patterns",
+      "file": "context/patterns.json",
+      "tokens": "~371 tokens",
+      "loaded": false
+    }
+  ],
+  "domains": [
+    {
+      "id": "custom",
+      "file": "domains/custom.json",
+      "tokens": "~232 tokens",
+      "loaded": false
+    },
+    {
+      "id": "docs",
+      "file": "domains/docs.json",
+      "tokens": "~486 tokens",
+      "loaded": false
+    },
+    {
+      "id": "nixos",
+      "file": "domains/nixos.json",
+      "tokens": "~443 tokens",
+      "loaded": false
+    },
+    {
+      "id": "shell",
+      "file": "domains/shell.json",
+      "tokens": "~348 tokens",
+      "loaded": false
+    },
+    {
+      "id": "tui",
+      "file": "domains/tui.json",
+      "tokens": "~311 tokens",
+      "loaded": false
+    }
+  ],
+  "modules": [
+    {
+      "id": "core-registry",
+      "file": "modules/core-registry.json",
+      "tokens": "~1205 tokens",
+      "loaded": false
+    },
+    {
+      "id": "optional-registry",
+      "file": "modules/optional-registry.json",
+      "tokens": "~1370 tokens",
+      "loaded": false
+    }
+  ],
+  "sourceFiles": {
+    "aiKnowledge": "AI_KNOWLEDGE.md",
+    "moduleTemplate": "docs/AI/example-module/MODULE_TEMPLATE.md"
+  },
+  "sync": {
+    "hook": "sync/hooks/post-commit.sh",
+    "scanners": [
+      "sync/scanner/nixos-scanner.sh",
+      "sync/scanner/shell-scanner.sh",
+      "sync/scanner/tui-scanner.sh",
+      "sync/scanner/custom-scanner.sh"
+    ],
+    "generators": [
+      "sync/generator/module-registry-gen.sh",
+      "sync/generator/knowledge-index-gen.sh"
+    ]
+  }
+}

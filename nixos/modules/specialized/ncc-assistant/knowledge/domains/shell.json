@@ -1,0 +1,52 @@
+{
+  "_schema": "ncc-domain/shell/1.0",
+  "_version": "1.0.0",
+  "path": "shell/",
+  "description": "Dev shell entry point and runtime scripts",
+  "tree": {
+    "shell.nix": { "type": "file", "description": "Dev shell entry point" },
+    "scripts/": {
+      "description": "Runtime shell scripts organized by category",
+      "core/": {
+        "description": "Core system scripts",
+        "imports.sh": "Script import utilities",
+        "deploy-build.sh": "Deploy and build scripts",
+        "init.sh": "Initialization scripts"
+      },
+      "ui/": {
+        "description": "UI-related scripts",
+        "prompts/": {
+          "description": "Prompt setup and validation scripts",
+          "setup-rules.sh": "Setup rules prompts",
+          "setup-mode.sh": "Setup mode prompts",
+          "setup-options.sh": "Setup options prompts",
+          "state-machine.sh": "State machine prompts",
+          "validate-mode.sh": "Mode validation prompts",
+          "common.sh": "Common prompt utilities",
+          "formatting/": {
+            "setup-formatting.sh": "Formatting setup",
+            "preview.sh": "Preview functionality",
+            "list-formatter.sh": "List formatting",
+            "setup-tree.sh": "Tree display setup",
+            "setup-preview.sh": "Preview setup"
+          },
+          "descriptions/": {
+            "setup-descriptions.sh": "Description setup"
+          }
+        }
+      },
+      "checks/": {
+        "description": "Pre-build check scripts",
+        "hardware/": {
+          "storage.sh": "Storage hardware checks"
+        }
+      }
+    }
+  },
+  "keyFiles": [
+    "shell.nix",
+    "shell/scripts/core/init.sh",
+    "shell/scripts/core/deploy-build.sh",
+    "shell/scripts/ui/prompts/common.sh"
+  ]
+}

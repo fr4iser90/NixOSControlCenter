@@ -3,8 +3,8 @@
 let
   cliRegistry = getModuleApi "cli-registry";
   tuiEngine = config.core.management.tui-engine;
-  # Get module path (go up from ui/tui/domain.nix to module root)
-  modulePath = ../../..;
+  # Get module path (go up from ui/tui/domain.nix → system-manager root)
+  modulePath = ../..;
   
   systemTui = tuiEngine.domainTui.buildDomainTui {
     name = "system";

@@ -11,6 +11,8 @@ let
 
     ${hw.preamble}
 
+    VERBOSE="''${NCC_PREFLIGHT_VERBOSE:-0}"
+
     _update_memory() {
       local new_value="$1"
       local current existing_cpu existing_gpu
@@ -27,8 +29,6 @@ let
   };
 }"
     }
-
-    ${ui.text.header "Memory Configuration Check"}
 
     TOTAL_MEM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
     DETECTED_RAW_GB=$(( (TOTAL_MEM_KB + 524288) / 1048576 ))
@@ -49,29 +49,27 @@ let
       DETECTED_GB=$DETECTED_RAW_GB
     fi
 
-    ${ui.messages.info "System Memory:"}
-    ${ui.tables.keyValue "Total RAM" "$DETECTED_GB GB"}
-
     CURRENT=$(ncc_read_module_config "core/base/hardware" 2>/dev/null || echo "{}")
     if ! echo "$CURRENT" | grep -qE 'sizeGB\s*='; then
-      ${ui.messages.info "hardware config missing memory, creating..."}
       _update_memory "$DETECTED_GB"
-      ${ui.badges.success "hardware config created with detected memory."}
+      ${ui.badges.warning "Memory: was unset → set to $DETECTED_GB GB"}
+      ${ui.badges.success "Memory: $DETECTED_GB GB"}
       exit 0
     fi
 
     CONFIGURED_GB=$(echo "$CURRENT" | grep -E 'sizeGB\s*=' | grep -oE '[0-9]+' | head -1 || echo "")
-    ${ui.text.subHeader "Memory Configuration:"}
-    ${ui.tables.keyValue "Detected" "$DETECTED_GB GB"}
-    ${ui.tables.keyValue "Configured" "$CONFIGURED_GB GB"}
+
+    if [ "$VERBOSE" = "1" ]; then
+      echo "  detected:   $DETECTED_GB GB"
+      echo "  configured: $CONFIGURED_GB GB"
+    fi
 
     if [ "$DETECTED_GB" != "$CONFIGURED_GB" ]; then
-      ${ui.messages.warning "Memory configuration mismatch! Auto-updating..."}
-      ${ui.messages.warning "System configured for $CONFIGURED_GB GB but detected $DETECTED_GB GB"}
+      ${ui.badges.warning "Memory: was \${CONFIGURED_GB:-?} GB → set to $DETECTED_GB GB"}
       _update_memory "$DETECTED_GB"
-      ${ui.badges.success "Memory configuration updated to $DETECTED_GB GB."}
+      ${ui.badges.success "Memory: $DETECTED_GB GB"}
     else
-      ${ui.badges.success "Memory configuration matches hardware."}
+      ${ui.badges.success "Memory: $DETECTED_GB GB"}
     fi
 
     exit 0
@@ -92,11 +90,12 @@ in {
         script = "${prebuildScript}/bin/prebuild-check-memory";
         shortHelp = "check-memory - Verify RAM configuration";
         longHelp = ''
-          Check system memory configuration before system rebuild (layout-aware).
+          Check system memory configuration before system rebuild.
+          Quiet by default; details with NCC_PREFLIGHT_VERBOSE=1.
         '';
         interactive = false;
         dependencies = [ "system-checks" ];
       }
-      ])
+    ])
   ];
 }

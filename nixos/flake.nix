@@ -65,7 +65,10 @@
 
     pkgs = import nixpkgs {
       inherit system;
-      config.allowUnfree = systemConfig.core.management.system-manager.allowUnfree or false;
+      # Match system-manager template-config default (true). Raw systemConfig
+      # is not template-merged here — `or false` wrongly blocked unfree pkgs
+      # (zoom, steam, …) when the attr was simply missing from live config.
+      config.allowUnfree = systemConfig.core.management.system-manager.allowUnfree or true;
     };
     lib = pkgs.lib;
 
@@ -106,9 +109,9 @@
           system.stateVersion = stateVersion;
           nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
-          # Unfree Konfiguration
+          # Unfree — same default as template-config / pkgs import above
           nixpkgs.config = {
-            allowUnfree = systemConfig.core.management.system-manager.allowUnfree or false;
+            allowUnfree = systemConfig.core.management.system-manager.allowUnfree or true;
           };
         }
 

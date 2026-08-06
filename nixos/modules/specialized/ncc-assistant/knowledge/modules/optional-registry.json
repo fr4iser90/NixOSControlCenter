@@ -1,0 +1,186 @@
+{
+  "_schema": "ncc-modules/optional-registry/1.0",
+  "_version": "1.0.0",
+  "_lastScan": "2026-05-11T10:13:01Z",
+  "infrastructure": {
+    "bootentry-manager": {
+      "path": "nixos/modules/infrastructure/bootentry-manager",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/modules/infrastructure//bootentry-manager/handlers",
+        "/workspace/NixOSControlCenter/nixos/modules/infrastructure//bootentry-manager/lib"
+      ],
+      "description": "bootentry-manager"
+    },
+    "homelab-manager": {
+      "path": "nixos/modules/infrastructure/homelab-manager",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/modules/infrastructure//homelab-manager/handlers",
+        "/workspace/NixOSControlCenter/nixos/modules/infrastructure//homelab-manager/lib"
+      ],
+      "description": "homelab-manager"
+    },
+    "vm": {
+      "path": "nixos/modules/infrastructure/vm",
+      "files": [
+        "commands.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/modules/infrastructure//vm/containers",
+        "/workspace/NixOSControlCenter/nixos/modules/infrastructure//vm/core",
+        "/workspace/NixOSControlCenter/nixos/modules/infrastructure//vm/iso-manager",
+        "/workspace/NixOSControlCenter/nixos/modules/infrastructure//vm/lib",
+        "/workspace/NixOSControlCenter/nixos/modules/infrastructure//vm/testing"
+      ],
+      "description": "vm"
+    }
+  },
+  "security": {
+    "ssh-client-manager": {
+      "path": "nixos/modules/security/ssh-client-manager",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/modules/security//ssh-client-manager/handlers",
+        "/workspace/NixOSControlCenter/nixos/modules/security//ssh-client-manager/lib",
+        "/workspace/NixOSControlCenter/nixos/modules/security//ssh-client-manager/scripts"
+      ],
+      "description": "ssh-client-manager"
+    },
+    "ssh-server-manager": {
+      "path": "nixos/modules/security/ssh-server-manager",
+      "files": [
+        "auth.nix",
+        "commands.nix",
+        "default.nix",
+        "monitoring.nix",
+        "notifications.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/modules/security//ssh-server-manager/scripts"
+      ],
+      "description": "ssh-server-manager"
+    }
+  },
+  "specialized": {
+    "ai-workspace": {
+      "path": "nixos/modules/specialized/ai-workspace",
+      "files": [
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//ai-workspace/containers",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//ai-workspace/llm",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//ai-workspace/schemas",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//ai-workspace/services"
+      ],
+      "description": "ai-workspace"
+    },
+    "chronicle": {
+      "path": "nixos/modules/specialized/chronicle",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "systemd.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/ai",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/analysis",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/api",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/cloud",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/collaboration",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/compliance",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/email",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/enterprise",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/formatters",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/handlers",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/integrations",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/lib",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/mobile",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/platforms",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/plugins",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/privacy",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/scripts",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/search",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/security",
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//chronicle/visualization"
+      ],
+      "description": "chronicle"
+    },
+    "hackathon": {
+      "path": "nixos/modules/specialized/hackathon",
+      "files": [
+        "default.nix",
+        "hackathon-cleanup.nix",
+        "hackathon-create.nix",
+        "hackathon-fetch.nix",
+        "hackathon-status.nix",
+        "hackathon-update.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [],
+      "description": "hackathon"
+    },
+    "nixify": {
+      "path": "nixos/modules/specialized/nixify",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/modules/specialized//nixify/iso-builder"
+      ],
+      "description": "nixify"
+    }
+  },
+  "system": {
+    "lock-manager": {
+      "path": "nixos/modules/system/lock-manager",
+      "files": [
+        "commands.nix",
+        "config.nix",
+        "default.nix",
+        "options.nix",
+        "template-config.nix"
+      ],
+      "subdirs": [
+        "/workspace/NixOSControlCenter/nixos/modules/system//lock-manager/collectors",
+        "/workspace/NixOSControlCenter/nixos/modules/system//lock-manager/handlers",
+        "/workspace/NixOSControlCenter/nixos/modules/system//lock-manager/lib"
+      ],
+      "description": "lock-manager"
+    }
+  }
+}

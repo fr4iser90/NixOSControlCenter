@@ -47,8 +47,8 @@ let
     unzip
 
     # X11 backend tools
-    xorg.xinput
-    xorg.xprop
+    xinput
+    xprop
     xdotool
     maim
     imagemagick
