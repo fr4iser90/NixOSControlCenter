@@ -63,3 +63,24 @@ emit_assoc DESCRIPTIONS SETUP_DESCRIPTIONS
 
 emit_list DESKTOP_BROWSERS "${DESKTOP_BROWSERS[@]}"
 printf '[DESKTOP_BROWSER_DEFAULT]\n%s\n\n' "${DESKTOP_BROWSER_DEFAULT:-firefox}"
+
+# systemTypes from packages metadata (SSOT) — GUI/TUI filter by desktop|server
+META_NIX="$(cd "$PROMPTS_DIR/../../../../nixos/core/base/packages/lib" && pwd)/metadata.nix"
+if [[ ! -f "$META_NIX" ]]; then
+  # Fallback: repo-relative from GUI dir (…/shell/scripts/ui/gui → repo root)
+  META_NIX="$(cd "$GUI_DIR/../../../.." && pwd)/nixos/core/base/packages/lib/metadata.nix"
+fi
+printf '[FEATURE_SYSTEM_TYPES]\n'
+if [[ -f "$META_NIX" ]] && command -v nix-instantiate >/dev/null 2>&1; then
+  TYPES_JSON=$(nix-instantiate --eval --strict --json -E "
+    let
+      lib = (import <nixpkgs> {}).lib;
+      m = import $META_NIX;
+    in
+      lib.mapAttrs (n: v: v.systemTypes or []) m.modules
+  " 2>/dev/null || echo '{}')
+  if command -v jq >/dev/null 2>&1; then
+    echo "$TYPES_JSON" | jq -r 'to_entries[] | "\(.key)=\(.value|join("|"))"' 2>/dev/null || true
+  fi
+fi
+printf '\n'

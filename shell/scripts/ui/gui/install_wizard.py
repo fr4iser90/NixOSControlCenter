@@ -40,6 +40,8 @@ class InstallOptions:
         # (nixpkgs attr, UI label) — SSOT: setup-options.sh DESKTOP_BROWSERS
         self.browser_choices: List[Tuple[str, str]] = []
         self.browser_default: str = "firefox"
+        # feature → allowed systemTypes (from metadata.nix); empty set = unrestricted
+        self.feature_system_types: Dict[str, set] = {}
 
     def desc(self, name: str, fallback: str = "") -> str:
         key = name.strip().lower()
@@ -127,6 +129,9 @@ def load_options() -> InstallOptions:
         elif section == "DESKTOP_BROWSER_DEFAULT":
             if line.strip():
                 opts.browser_default = line.strip()
+        elif section == "FEATURE_SYSTEM_TYPES":
+            k, _, v = line.partition("=")
+            opts.feature_system_types[k.strip()] = {x for x in v.split("|") if x}
         elif section == "DESCRIPTIONS":
             k, _, v = line.partition("=")
             opts.descriptions[k.lower()] = v
@@ -160,6 +165,35 @@ def resolve_features(
             if dep not in resolved:
                 resolved.append(dep)
     return resolved
+
+
+def feature_allowed_for_system(feat: str, system_type: str, type_map: Dict[str, set]) -> bool:
+    """True if metadata allows feat for system_type (missing entry = allow)."""
+    allowed = type_map.get(feat)
+    if not allowed:
+        return True
+    return system_type in allowed
+
+
+def filter_features_for_system(
+    features: List[str],
+    system_type: str,
+    type_map: Dict[str, set],
+) -> List[str]:
+    return [f for f in features if feature_allowed_for_system(f, system_type, type_map)]
+
+
+def filter_feature_groups_for_system(
+    groups: List[Tuple[str, List[str]]],
+    system_type: str,
+    type_map: Dict[str, set],
+) -> List[Tuple[str, List[str]]]:
+    out: List[Tuple[str, List[str]]] = []
+    for name, feats in groups:
+        allowed = filter_features_for_system(feats, system_type, type_map)
+        if allowed:
+            out.append((name, allowed))
+    return out
 
 
 def profiles_dir() -> Path:
@@ -417,6 +451,22 @@ class InstallWizard(tk.Tk):
         mods = self._answers.get("PACKAGE_MODULES", "").split()
         return "docker" in mods
 
+    def _package_system_type(self) -> str:
+        """systemType used to filter package modules (matches packages assertion)."""
+        preset = self._vars.get("pending_selection") or ""
+        if preset == "From Scratch":
+            return self._vars.get("system_type", tk.StringVar(value="desktop")).get() or "desktop"
+        if preset in ("Server", "Homelab Server"):
+            return "server"
+        return "desktop"
+
+    def _feature_groups_for_current_type(self) -> List[Tuple[str, List[str]]]:
+        return filter_feature_groups_for_system(
+            self.opts.feature_groups,
+            self._package_system_type(),
+            self.opts.feature_system_types,
+        )
+
     def _is_desktop_install(self) -> bool:
         """True when this path should require at least one browser."""
         if self._needs_homelab():
@@ -600,7 +650,15 @@ class InstallWizard(tk.Tk):
         for name, var in self._vars.get("feature_vars", {}).items():
             if var.get():
                 selected.append(name)
+        st = self._package_system_type()
+        selected = filter_features_for_system(
+            selected, st, self.opts.feature_system_types
+        )
         selected = resolve_features(selected, self.opts.conflicts, self.opts.dependencies)
+        # Drop deps that aren't allowed for this system type
+        selected = filter_features_for_system(
+            selected, st, self.opts.feature_system_types
+        )
         self._answers["PACKAGE_MODULES"] = " ".join(selected)
         return True
 
@@ -754,22 +812,32 @@ class InstallWizard(tk.Tk):
 
     def _screen_packages(self) -> None:
         preset = self._vars.get("pending_selection", "")
+        st = self._package_system_type()
         self.header.configure(text="Packages / features")
         defaults = self.opts.preset_defaults.get(preset, [])
+        defaults = filter_features_for_system(
+            defaults, st, self.opts.feature_system_types
+        )
         if preset == "From Scratch":
-            self.subheader.configure(text="Select package modules for your from-scratch install.")
+            self.subheader.configure(
+                text=f"Select package modules for this {st} install "
+                f"(server-only / desktop-only sets are hidden)."
+            )
             defaults = []
         else:
             self.subheader.configure(
-                text=f"Preset “{preset}” defaults are pre-checked. Uncheck or add more as you like."
+                text=f"Preset “{preset}” ({st}): defaults pre-checked. "
+                f"Incompatible modules for this type are hidden."
             )
         self.btn_next.configure(text="Next")
 
-        # Reset feature vars when entering from a different preset
+        # Reset feature vars when entering from a different preset or system type
         prev = self._vars.get("_packages_for_preset")
-        if prev != preset:
+        prev_st = self._vars.get("_packages_for_system_type")
+        if prev != preset or prev_st != st:
             self._vars["feature_vars"] = {}
             self._vars["_packages_for_preset"] = preset
+            self._vars["_packages_for_system_type"] = st
 
         checks = self._vars.setdefault("feature_vars", {})
         canvas = tk.Canvas(self.body, bg=BG, highlightthickness=0)
@@ -782,7 +850,14 @@ class InstallWizard(tk.Tk):
         scroll.pack(side="right", fill="y")
 
         default_set = set(defaults)
-        for group_name, features in self.opts.feature_groups:
+        groups = self._feature_groups_for_current_type()
+        if not groups:
+            ttk.Label(
+                inner,
+                text="No package modules available for this system type.",
+            ).pack(anchor="w", padx=4, pady=8)
+            return
+        for group_name, features in groups:
             box = ttk.LabelFrame(inner, text=group_name, padding=8)
             box.pack(fill="x", pady=6, padx=4)
             for feat in features:

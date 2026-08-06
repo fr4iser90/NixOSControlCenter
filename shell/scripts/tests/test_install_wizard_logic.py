@@ -112,6 +112,31 @@ class WizardLogicTests(unittest.TestCase):
         self.assertIn("brave", names)
         self.assertIn("librewolf", names)
 
+    def test_feature_system_types_from_metadata(self) -> None:
+        opts = wiz.load_options()
+        self.assertIn("server", opts.feature_system_types.get("database", set()))
+        self.assertNotIn("desktop", opts.feature_system_types.get("database", set()))
+        self.assertIn("server", opts.feature_system_types.get("mail-server", set()))
+        self.assertIn("desktop", opts.feature_system_types.get("gaming", set()))
+        self.assertNotIn("server", opts.feature_system_types.get("gaming", set()))
+        self.assertIn("desktop", opts.feature_system_types.get("docker", set()))
+        self.assertIn("server", opts.feature_system_types.get("docker", set()))
+
+    def test_filter_features_hides_server_only_on_desktop(self) -> None:
+        opts = wiz.load_options()
+        feats = ["gaming", "database", "mail-server", "docker", "web-server"]
+        desktop = wiz.filter_features_for_system(feats, "desktop", opts.feature_system_types)
+        server = wiz.filter_features_for_system(feats, "server", opts.feature_system_types)
+        self.assertEqual(desktop, ["gaming", "docker"])
+        self.assertEqual(server, ["database", "mail-server", "docker", "web-server"])
+        groups = wiz.filter_feature_groups_for_system(
+            opts.feature_groups, "desktop", opts.feature_system_types
+        )
+        flat = [f for _, fs in groups for f in fs]
+        self.assertIn("gaming", flat)
+        self.assertNotIn("database", flat)
+        self.assertNotIn("mail-server", flat)
+
     def test_write_answers_includes_browsers(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "answers"

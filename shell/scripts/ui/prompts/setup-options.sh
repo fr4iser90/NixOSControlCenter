@@ -177,6 +177,42 @@ is_profile_disabled() {
     [[ "$profile" == *"(disabled)"* ]]
 }
 
+# Populate FEATURE_SYSTEM_TYPES from packages metadata (SSOT for desktop|server filter)
+load_feature_system_types() {
+    declare -gA FEATURE_SYSTEM_TYPES=()
+    local repo_root meta json line key val
+    repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+    meta="$repo_root/nixos/core/base/packages/lib/metadata.nix"
+    [[ -f "$meta" ]] || return 0
+    command -v nix-instantiate >/dev/null 2>&1 || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    json=$(nix-instantiate --eval --strict --json -E "
+      let
+        lib = (import <nixpkgs> {}).lib;
+        m = import $meta;
+      in
+        lib.mapAttrs (n: v: v.systemTypes or []) m.modules
+    " 2>/dev/null) || return 0
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      key="${line%%=*}"
+      val="${line#*=}"
+      FEATURE_SYSTEM_TYPES["$key"]="$val"
+    done < <(echo "$json" | jq -r 'to_entries[] | "\(.key)=\(.value|join("|"))"')
+}
+
+feature_allowed_for_system() {
+    local feat="$1" st="$2"
+    local types="${FEATURE_SYSTEM_TYPES[$feat]:-}"
+    [[ -z "$types" ]] && return 0
+    local t
+    IFS='|' read -ra _types <<< "$types"
+    for t in "${_types[@]}"; do
+        [[ "$t" == "$st" ]] && return 0
+    done
+    return 1
+}
+
 export -a INSTALL_TYPE_OPTIONS
 export -a SYSTEM_PRESETS
 export -a DEVICE_PRESETS
@@ -193,6 +229,9 @@ export -A EXCLUSIVE_GROUPS
 export -A FEATURE_DEPENDENCIES
 export -A FEATURE_CONFLICTS
 export -A PRESET_DEFAULT_PACKAGES
+export -A FEATURE_SYSTEM_TYPES
 export -f get_internal_name
 export -f get_display_name
 export -f is_profile_disabled
+export -f load_feature_system_types
+export -f feature_allowed_for_system

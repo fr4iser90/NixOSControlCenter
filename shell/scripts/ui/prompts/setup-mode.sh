@@ -141,7 +141,7 @@ select_setup_mode() {
                 esac
             fi
             local selected_features
-            selected_features=($(ncc_tui_select_packages "")) || return 1
+            selected_features=($(ncc_tui_select_packages "" "$system_type")) || return 1
             if declare -F ncc_gui_write_answer >/dev/null 2>&1; then
                 ncc_gui_write_answer PACKAGE_MODULES "${selected_features[*]}"
             fi
@@ -153,9 +153,13 @@ select_setup_mode() {
         else
             # Preset + optional package extras (defaults pre-merged in helper)
             local defaults="${PRESET_DEFAULT_PACKAGES[$preset_choice]:-}"
-            log_info "Package extras for $preset_choice (defaults: ${defaults:-none})"
+            local preset_st="desktop"
+            case "$preset_choice" in
+                Server|"Homelab Server") preset_st="server" ;;
+            esac
+            log_info "Package extras for $preset_choice (defaults: ${defaults:-none}, type=$preset_st)"
             local selected_features
-            selected_features=($(ncc_tui_select_packages "$defaults")) || return 1
+            selected_features=($(ncc_tui_select_packages "$defaults" "$preset_st")) || return 1
             if declare -F ncc_gui_write_answer >/dev/null 2>&1; then
                 ncc_gui_write_answer PACKAGE_MODULES "${selected_features[*]}"
             fi
@@ -268,11 +272,15 @@ select_setup_mode() {
     return 0
 }
 
-# Multi-select package modules. $1 = space-separated defaults (always included + shown in header).
+# Multi-select package modules.
+# $1 = space-separated defaults; $2 = system type (desktop|server) for metadata filter
 ncc_tui_select_packages() {
     local defaults_str="${1:-}"
+    local system_type="${2:-desktop}"
     local -a defaults=()
     read -ra defaults <<< "$defaults_str"
+
+    load_feature_system_types || true
 
     local feature_list=""
     local group group_name group_features clean_group_name feature
@@ -283,11 +291,22 @@ ncc_tui_select_packages() {
         clean_group_name=$(echo "$group_name" | sed 's/^[🖥️📦🎮🐳💾] *//')
         IFS='|' read -ra features <<< "$group_features"
         for feature in "${features[@]}"; do
+            feature_allowed_for_system "$feature" "$system_type" || continue
             feature_list+="$(format_item_with_prefix "$clean_group_name" "$feature")\n"
         done
     done
 
-    local header="Packages: select full set (Enter with none = keep defaults: ${defaults_str:-none})"
+    # Filter defaults to allowed modules for this type
+    local -a filtered_defaults=()
+    local d
+    for d in "${defaults[@]}"; do
+        [[ -z "$d" ]] && continue
+        feature_allowed_for_system "$d" "$system_type" && filtered_defaults+=("$d")
+    done
+    defaults=("${filtered_defaults[@]}")
+    defaults_str="${defaults[*]}"
+
+    local header="Packages ($system_type): Enter with none = keep defaults: ${defaults_str:-none}"
     local feature_choices_string=""
     feature_choices_string=$(printf "%b" "$feature_list" | fzf \
         --multi \
@@ -308,8 +327,21 @@ ncc_tui_select_packages() {
         selected_features=("${defaults[@]}")
     fi
 
+    # Drop anything that slipped through and isn't allowed
+    local -a allowed_selected=()
+    for choice in "${selected_features[@]}"; do
+        feature_allowed_for_system "$choice" "$system_type" && allowed_selected+=("$choice")
+    done
+    selected_features=("${allowed_selected[@]}")
+
     selected_features=($(resolve_conflicts "${selected_features[@]}"))
     selected_features=($(resolve_dependencies "${selected_features[@]}"))
+    # Re-filter after deps (e.g. don't pull server-only via a weird edge case)
+    allowed_selected=()
+    for choice in "${selected_features[@]}"; do
+        feature_allowed_for_system "$choice" "$system_type" && allowed_selected+=("$choice")
+    done
+    selected_features=("${allowed_selected[@]}")
     printf '%s\n' "${selected_features[@]}"
 }
 
