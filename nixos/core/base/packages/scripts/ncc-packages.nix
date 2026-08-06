@@ -37,6 +37,10 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   TARGET_USER=""
   TARGET_SYSTEM=false
   NAMES=()
+  # Rebuild prompt after mutating config (like system-update)
+  SKIP_BUILD_PROMPT=false
+  AUTO_BUILD=false
+  CONFIG_CHANGED=false
 
   usage() {
       cat << EOF
@@ -55,9 +59,11 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       $SCRIPT_NAME module remove <name>...     Remove set(s)
       $SCRIPT_NAME module info <name>          Show details for a set or preset
 
-  Flags (single packages):
+  Flags:
     --system       Target systemPackages (global, all users)
     --user <name>  Target a specific user's userPackages
+    -y, --yes      After changes, build+switch without asking
+    --no-build     After changes, skip rebuild prompt
     -h, --help     Show this help message
     -v, --version  Show version
 
@@ -65,6 +71,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
     Without flags, single-package operations target the current user's userPackages.
     Module operations edit core.base.packages via config-facade
     (monolith: systemConfig.nix | split: systemConfig/core/base/packages/config.nix).
+    After add/remove, you are prompted to rebuild so packages become active.
 
   Layout:
     ncc-config-layout detect
@@ -81,6 +88,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
     $SCRIPT_NAME module add gaming streaming         Add multiple sets at once
     $SCRIPT_NAME module remove emulation             Remove a single set
     $SCRIPT_NAME module info gaming-desktop          Show what a preset contains
+    $SCRIPT_NAME module add gaming -y                Add gaming and rebuild immediately
 
   EOF
       exit 0
@@ -120,6 +128,21 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       esac
   }
 
+  parse_build_flag() {
+      case "$1" in
+          -y|--yes)
+              AUTO_BUILD=true
+              ;;
+          --no-build)
+              SKIP_BUILD_PROMPT=true
+              ;;
+          *)
+              return 1
+              ;;
+      esac
+      return 0
+  }
+
   parse_package_args() {
       while [[ $# -gt 0 ]]; do
           case "$1" in
@@ -134,6 +157,10 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                   fi
                   TARGET_USER="$2"
                   shift 2
+                  ;;
+              -y|--yes|--no-build)
+                  parse_build_flag "$1"
+                  shift
                   ;;
               -h|--help) usage ;;
               -v|--version) version ;;
@@ -170,14 +197,28 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       shift
 
       case "$SUBCOMMAND" in
-          list|available) ;;
-          add|remove|info)
-              if [[ $# -eq 0 ]]; then
-                  log_error "Missing name argument for: module $SUBCOMMAND"
-                  exit 1
-              fi
+          list|available)
               while [[ $# -gt 0 ]]; do
                   case "$1" in
+                      -h|--help) usage ;;
+                      -*)
+                          log_error "Unknown flag: $1"
+                          exit 1
+                          ;;
+                      *)
+                          log_error "Unexpected argument: $1"
+                          exit 1
+                          ;;
+                  esac
+              done
+              ;;
+          add|remove|info)
+              while [[ $# -gt 0 ]]; do
+                  case "$1" in
+                      -y|--yes|--no-build)
+                          parse_build_flag "$1"
+                          shift
+                          ;;
                       -h|--help) usage ;;
                       -*)
                           log_error "Unknown flag: $1"
@@ -189,6 +230,10 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                           ;;
                   esac
               done
+              if [[ ''${#NAMES[@]} -eq 0 ]]; then
+                  log_error "Missing name argument for: module $SUBCOMMAND"
+                  exit 1
+              fi
               if [[ "$SUBCOMMAND" == "info" ]] && [[ ''${#NAMES[@]} -ne 1 ]]; then
                   log_error "module info accepts exactly one name"
                   exit 1
@@ -229,6 +274,94 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       _NCC_USER_TMPS=()
   }
   trap '_ncc_packages_flush' EXIT
+
+  # Human-readable destination (monolith stages edits in /tmp until flush)
+  config_display_path() {
+      local path="$1"
+      if [[ "$(ncc_detect_layout)" != "monolith" ]]; then
+          echo "$path"
+          return
+      fi
+      if [[ -n "''${_NCC_PKG_TMP:-}" && "$path" == "$_NCC_PKG_TMP" ]]; then
+          echo "$MONOLITH_FILE (core.base.packages)"
+          return
+      fi
+      local entry
+      for entry in "''${_NCC_USER_TMPS[@]:-}"; do
+          [[ -z "$entry" ]] && continue
+          local user="''${entry%%:*}"
+          local tmp="''${entry#*:}"
+          if [[ "$path" == "$tmp" ]]; then
+              echo "$MONOLITH_FILE (users.$user)"
+              return
+          fi
+      done
+      echo "$path"
+  }
+
+  resolve_hostname() {
+      local h
+      h=$(hostname -s 2>/dev/null || hostname 2>/dev/null || true)
+      [[ -n "$h" ]] && echo "$h" || echo "nixos"
+  }
+
+  # Flush staged config, warn that a rebuild is needed, then prompt like system-update
+  prompt_rebuild_after_change() {
+      local reason="$1"
+
+      _ncc_packages_flush
+
+      log_warn "New build required to use package '$reason'"
+
+      local hostname build_cmd
+      hostname=$(resolve_hostname)
+      build_cmd="sudo ncc system build switch --flake $NIXOS_DIR#$hostname"
+
+      if [[ "$SKIP_BUILD_PROMPT" == true ]]; then
+          log_info "Skipping build. You can manually run: $build_cmd"
+          return 0
+      fi
+
+      if [[ "$AUTO_BUILD" == true ]]; then
+          log_info "Building system configuration..."
+          if sh -c "$build_cmd" 2>&1; then
+              log_success "System successfully updated and rebuilt!"
+          else
+              log_error "Build/switch failed (exit $?). Retry: $build_cmd"
+          fi
+          return 0
+      fi
+
+      if [[ ! -t 0 ]]; then
+          log_info "Non-interactive session — skipping build prompt."
+          log_info "You can manually run: $build_cmd"
+          return 0
+      fi
+
+      while true; do
+          printf "Do you want to build and switch to the new configuration? (y/n): "
+          read -r build_choice
+          case "$build_choice" in
+              y|Y)
+                  log_info "Building system configuration..."
+                  if sh -c "$build_cmd" 2>&1; then
+                      log_success "System successfully updated and rebuilt!"
+                  else
+                      log_warn "Build/switch exited with code $?"
+                      log_info "You can retry with: $build_cmd"
+                  fi
+                  break
+                  ;;
+              n|N)
+                  log_info "Skipping build. You can manually run: $build_cmd"
+                  break
+                  ;;
+              *)
+                  log_error "Invalid choice, please enter y or n"
+                  ;;
+          esac
+      done
+  }
 
   get_user_config_path() {
       local user="$1"
@@ -310,7 +443,8 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       if ! config_exists "$config_path"; then
           ensure_dir "$config_path"
           printf '{\n  %s = [ "%s" ];\n}\n' "$option_name" "$package" > "$config_path"
-          log_success "Created $config_path with $option_name = [ \"$package\" ]"
+          log_success "Created $(config_display_path "$config_path") with $option_name = [ \"$package\" ]"
+          CONFIG_CHANGED=true
           return 0
       fi
 
@@ -355,7 +489,8 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           fi
       fi
 
-      log_success "Added '$package' to $option_name in $config_path"
+      log_success "Added '$package' to $option_name in $(config_display_path "$config_path")"
+      CONFIG_CHANGED=true
   }
 
   remove_package() {
@@ -406,7 +541,8 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       done < "$config_path"
 
       mv "$temp_file" "$config_path"
-      log_success "Removed '$package' from $option_name in $config_path"
+      log_success "Removed '$package' from $option_name in $(config_display_path "$config_path")"
+      CONFIG_CHANGED=true
   }
 
   list_packages_from_config() {
@@ -753,6 +889,22 @@ pkgs.writeShellScriptBin "ncc-packages" ''
               esac
               ;;
       esac
+
+      if [[ "$CONFIG_CHANGED" == true ]]; then
+          local reason
+          case "$COMMAND" in
+              add|remove)
+                  reason="$PACKAGE"
+                  ;;
+              module)
+                  reason="''${NAMES[*]}"
+                  ;;
+              *)
+                  reason="the updated packages"
+                  ;;
+          esac
+          prompt_rebuild_after_change "$reason"
+      fi
   }
 
   main "$@"
