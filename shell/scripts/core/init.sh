@@ -32,6 +32,12 @@ main() {
     
     # Get user's setup mode selection
     log_section "Setup Mode"
+
+    # Answers file MUST be created in this shell before $(select_setup_mode):
+    # command substitution runs the wizard in a subshell — exports there are lost.
+    if declare -F ncc_gui_ensure_answers_file >/dev/null 2>&1; then
+        ncc_gui_ensure_answers_file
+    fi
     
     if ! selected_modules_raw=$(select_setup_mode); then
         log_error "Setup mode selection failed"

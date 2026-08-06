@@ -39,11 +39,12 @@
   };
 
   #
-  # Hardware Configuration - Will be detected
+  # Hardware Configuration — placeholders only.
+  # Installer keeps live detection (CPU_VENDOR / GPU_CONFIG) when these are null/none.
   #
   hardware = {
-    cpu = null;  # Will be detected
-    gpu = null;  # Will be detected
+    cpu = null;
+    gpu = null;
   };
 
   #

@@ -8,11 +8,11 @@
       displayManager.sessionCommands = ''
         ${pkgs.spice-vdagent}/bin/spice-vdagent
       '';
-      # Set appropriate video driver based on detection
+      # qxl = SPICE/QXL Xorg driver; virtio-gpu uses kernel DRM + modesetting
+      # (there is no xf86 "virtio" videoDrivers entry — NixOS asserts on unknown names)
       videoDrivers = [
         "qxl"
-        "virtio"
-        "modesetting"  # Fallback
+        "modesetting"
       ];
     };
 

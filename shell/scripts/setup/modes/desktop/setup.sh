@@ -15,8 +15,7 @@ update_packages_config() {
     if declare -F ncc_gui_answer >/dev/null 2>&1; then
         browsers=$(ncc_gui_answer BROWSERS 2>/dev/null || true)
     fi
-    [[ -z "$browsers" ]] && browsers="firefox"
-    export PACKAGE_SYSTEM_PACKAGES="$browsers"
+    export PACKAGE_SYSTEM_PACKAGES="${browsers:-}"
 
     if [[ -n "$package_modules" ]]; then
         read -ra mod_array <<< "$package_modules"

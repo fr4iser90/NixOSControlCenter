@@ -32,6 +32,11 @@ source "$DOCKER_SCRIPTS_DIR/ui/prompts/validation/validate-mode.sh"
 # --- Main Prompt Function --- #
 show_prompts() {
     log_section "Setup Configuration"
+
+    # Parent shell must own the answers path (select_setup_mode runs in $() subshell)
+    if declare -F ncc_gui_ensure_answers_file >/dev/null 2>&1; then
+        ncc_gui_ensure_answers_file
+    fi
     
     local selected_config
     selected_config=$(select_setup_mode)

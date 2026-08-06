@@ -518,16 +518,45 @@ export NCC_DRY_RUN=0
 rm -rf "$SB"
 
 # ============================================================================
-# 8) GUI package override on Desktop
+# 8) GUI package override on Desktop (+ browsers, keep detected hardware)
 # ============================================================================
 echo "== GUI PACKAGE_MODULES override =="
 new_sandbox; SB="$SANDBOX_ROOT"
 stub_checks
-write_answers "$NCC_GUI_ANSWERS_FILE" "PACKAGE_MODULES=streaming emulation" "ADMIN_USER=guiuser"
+export CPU_VENDOR=intel GPU_CONFIG=qxl-virtual MEMORY_GB=8
+write_answers "$NCC_GUI_ANSWERS_FILE" \
+    "PACKAGE_MODULES=gaming" \
+    "BROWSERS=firefox brave chromium" \
+    "ADMIN_USER=guiuser"
 stub_deploy
 setup_predefined_profile "$SETUP_DIR/modes/presets/desktop.nix" >/dev/null 2>&1 || fail "gui override setup"
-assert_eq "gui override packages" "$(pkg_modules "$CONFIGS_BASE/core/base/packages/config.nix")" "streaming emulation"
+assert_eq "gui override packages" "$(pkg_modules "$CONFIGS_BASE/core/base/packages/config.nix")" "gaming"
+PKG_ALL=$(cat "$CONFIGS_BASE/core/base/packages/config.nix")
+assert_contains "gui browsers brave" "$PKG_ALL" '"brave"'
+assert_contains "gui browsers chromium" "$PKG_ALL" '"chromium"'
+assert_contains "gui browsers firefox" "$PKG_ALL" '"firefox"'
+HW=$(cat "$CONFIGS_BASE/core/base/hardware/config.nix")
+assert_contains "gui keep cpu detection" "$HW" 'cpu = "intel"'
+assert_contains "gui keep gpu detection" "$HW" 'gpu = "qxl-virtual"'
 assert_contains "gui admin user" "$(cat "$CONFIGS_BASE/core/base/user/config.nix")" '"guiuser"'
+rm -rf "$SB"
+
+# ============================================================================
+# 8b) Answers path survives $(select_setup_mode)-style subshell
+# ============================================================================
+echo "== NCC_GUI_ANSWERS_FILE parent ownership =="
+new_sandbox; SB="$SANDBOX_ROOT"
+ncc_gui_ensure_answers_file
+PARENT_ANS="$NCC_GUI_ANSWERS_FILE"
+(
+    # simulate command-substitution child
+    ncc_gui_ensure_answers_file
+    [[ "$NCC_GUI_ANSWERS_FILE" == "$PARENT_ANS" ]] || exit 1
+    write_answers "$NCC_GUI_ANSWERS_FILE" "PACKAGE_MODULES=gaming" "BROWSERS=firefox"
+)
+[[ "$NCC_GUI_ANSWERS_FILE" == "$PARENT_ANS" ]] && pass "parent answers path stable" || fail "parent answers path lost"
+got=$(ncc_gui_answer PACKAGE_MODULES) || fail "parent cannot read child-written answers"
+assert_eq "parent reads PACKAGE_MODULES" "$got" "gaming"
 rm -rf "$SB"
 
 # ============================================================================

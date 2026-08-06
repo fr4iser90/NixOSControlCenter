@@ -405,18 +405,8 @@ update_homelab_config() {
     # Update hosting config (email and domain)
     update_hosting_config "$email" "$domain" || return 1
     
-    # Package modules: GUI selection, else Homelab defaults
+    # Package modules: GUI selection, else Homelab defaults (no invented browser)
     local hl_defaults="${PRESET_DEFAULT_PACKAGES[Homelab Server]:-docker database web-server}"
-    if [[ "$enable_desktop" != "false" ]]; then
-        # Ensure a browser when desktop is on and GUI did not set BROWSERS
-        if declare -F ncc_gui_answer >/dev/null 2>&1; then
-            if ! ncc_gui_answer BROWSERS >/dev/null 2>&1; then
-                export PACKAGE_SYSTEM_PACKAGES="${PACKAGE_SYSTEM_PACKAGES:-firefox}"
-            fi
-        else
-            export PACKAGE_SYSTEM_PACKAGES="${PACKAGE_SYSTEM_PACKAGES:-firefox}"
-        fi
-    fi
     if declare -F ncc_apply_gui_package_modules >/dev/null 2>&1; then
         ncc_apply_gui_package_modules "$hl_defaults" || return 1
     else

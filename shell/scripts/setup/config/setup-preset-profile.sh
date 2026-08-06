@@ -193,14 +193,30 @@ setup_predefined_profile() {
     desktop_env=$(parse_desktop_env "$profile_file")
     [[ "$desktop_env" == "null" ]] && desktop_env=""
 
+    # Hardware: keep live detection when preset only has placeholders (null/none/empty).
+    # Explicit profile values (e.g. jetson) still win.
+    if [[ -z "${CPU_VENDOR:-}" ]] && declare -F check_cpu_info >/dev/null 2>&1; then
+        check_cpu_info || true
+    fi
+    if [[ -z "${GPU_CONFIG:-}" ]] && declare -F check_gpu_info >/dev/null 2>&1; then
+        check_gpu_info || true
+    fi
+
     cpu=$(parse_hardware_cpu "$profile_file")
-    [[ -z "$cpu" || "$cpu" == "null" ]] && cpu="none"
+    if [[ -z "$cpu" || "$cpu" == "null" || "$cpu" == "none" ]]; then
+        cpu="${CPU_VENDOR:-none}"
+    fi
 
     gpu=$(parse_hardware_gpu "$profile_file")
-    [[ -z "$gpu" || "$gpu" == "null" ]] && gpu="none"
+    if [[ -z "$gpu" || "$gpu" == "null" || "$gpu" == "none" ]]; then
+        gpu="${GPU_CONFIG:-none}"
+    fi
 
     ram=$(parse_hardware_ram "$profile_file")
     [[ "$ram" == "null" ]] && ram=""
+    if [[ -z "$ram" && -n "${MEMORY_GB:-}" ]]; then
+        ram="$MEMORY_GB"
+    fi
 
     users_block=$(parse_users_block "$profile_file")
     if [[ -z "$users_block" ]]; then
@@ -217,6 +233,7 @@ setup_predefined_profile() {
     package_modules=$(parse_package_modules "$profile_file")
 
     log_info "Parsed preset: type=$system_type host=$host_name de=${desktop_env:-none} packages=[${package_modules}]"
+    log_info "Hardware: cpu=$cpu gpu=$gpu ram=${ram:-null}"
 
     # ---- Write v1 modular configs ----
 
@@ -243,18 +260,20 @@ setup_predefined_profile() {
         write_desktop_disabled
     fi
 
-    # Packages — GUI extras override profile defaults when present
-    if declare -F ncc_gui_answer >/dev/null 2>&1 && ncc_gui_answer PACKAGE_MODULES >/dev/null 2>&1; then
-        ncc_apply_gui_package_modules || return 1
+    # Packages: GUI/TUI answers are authoritative when PACKAGE_MODULES or BROWSERS
+    # is present (empty touched answers file must not skip the profile write).
+    local answers_file="${NCC_GUI_ANSWERS_FILE:-}"
+    local have_gui_pkg=false
+    if [[ -n "$answers_file" && -f "$answers_file" ]] && declare -F ncc_gui_answer >/dev/null 2>&1; then
+        if ncc_gui_answer PACKAGE_MODULES >/dev/null 2>&1 || ncc_gui_answer BROWSERS >/dev/null 2>&1; then
+            have_gui_pkg=true
+        fi
+    fi
+    if $have_gui_pkg && declare -F ncc_apply_gui_package_modules >/dev/null 2>&1; then
+        log_info "Applying package selection from answers: $answers_file"
+        ncc_apply_gui_package_modules "$package_modules" || return 1
     else
-        local browsers=""
-        if declare -F ncc_gui_answer >/dev/null 2>&1; then
-            browsers=$(ncc_gui_answer BROWSERS 2>/dev/null || true)
-        fi
-        if [[ -z "$browsers" && -n "$desktop_env" ]]; then
-            browsers="firefox"
-        fi
-        export PACKAGE_SYSTEM_PACKAGES="$browsers"
+        export PACKAGE_SYSTEM_PACKAGES=""
         if [[ -n "$package_modules" ]]; then
             # shellcheck disable=SC2206
             local mod_array=($package_modules)
@@ -262,7 +281,7 @@ setup_predefined_profile() {
         else
             write_packages_config || return 1
         fi
-        PACKAGE_SYSTEM_PACKAGES=""
+        unset PACKAGE_SYSTEM_PACKAGES 2>/dev/null || true
     fi
 
     if declare -F ncc_apply_gui_admin_user >/dev/null 2>&1; then

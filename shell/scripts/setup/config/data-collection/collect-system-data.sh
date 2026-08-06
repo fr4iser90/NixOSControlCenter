@@ -106,12 +106,9 @@ collect_system_data() {
     fi
     
     # 7. Packages config (modules + optional browsers / system packages)
+    # No invented browser defaults — wizard / preset steps write the real selection later.
     local package_modules="${PACKAGE_MODULES:-}"
     local browsers="${BROWSERS:-${PACKAGE_SYSTEM_PACKAGES:-}}"
-    # Desktop without explicit browsers → Firefox
-    if [[ "$sys_type" == "desktop" && -z "$browsers" ]]; then
-        browsers="firefox"
-    fi
     export PACKAGE_SYSTEM_PACKAGES="$browsers"
     if [[ -n "$package_modules" ]]; then
         read -ra mod_array <<< "$package_modules"

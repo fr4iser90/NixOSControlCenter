@@ -56,6 +56,7 @@ ncc_gui_answer() {
 }
 
 # Apply PACKAGE_MODULES (+ optional BROWSERS → systemPackages) from GUI answers.
+# No invented defaults: only what the user selected (or explicit fallback arg for modules).
 ncc_apply_gui_package_modules() {
     local fallback="${1-}"
     local mods=""
@@ -75,18 +76,6 @@ ncc_apply_gui_package_modules() {
         have_mods=true
     else
         return 0
-    fi
-
-    # Desktop installs without an explicit browser answer still get Firefox
-    if [[ -z "$browsers" && -n "${PACKAGE_SYSTEM_PACKAGES:-}" ]]; then
-        browsers="$PACKAGE_SYSTEM_PACKAGES"
-    fi
-    if [[ -z "$browsers" ]]; then
-        local enable_de=""
-        enable_de=$(ncc_gui_answer ENABLE_DESKTOP 2>/dev/null || true)
-        if [[ "$enable_de" == "true" ]]; then
-            browsers="firefox"
-        fi
     fi
 
     if ! $have_mods && [[ -z "$browsers" ]]; then
