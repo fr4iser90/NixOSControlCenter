@@ -27,6 +27,7 @@
       description = "Gaming launchers and communication (Steam, Epic, GOG, Discord)";
       dependencies = [];
       conflicts = [];
+      requiresUnfree = true;
     };
     
     # Development Features

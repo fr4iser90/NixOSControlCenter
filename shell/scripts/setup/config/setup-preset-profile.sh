@@ -284,6 +284,22 @@ setup_predefined_profile() {
         unset PACKAGE_SYSTEM_PACKAGES 2>/dev/null || true
     fi
 
+    # Steam / Brave / etc. need allowUnfree — set automatically from selection
+    local unfree_tokens=()
+    if $have_gui_pkg; then
+        local gui_mods gui_browsers
+        gui_mods=$(ncc_gui_answer PACKAGE_MODULES 2>/dev/null || true)
+        gui_browsers=$(ncc_gui_answer BROWSERS 2>/dev/null || true)
+        # shellcheck disable=SC2206
+        unfree_tokens=($gui_mods $gui_browsers)
+    else
+        # shellcheck disable=SC2206
+        unfree_tokens=($package_modules)
+    fi
+    if declare -F ncc_allow_unfree_for_tokens >/dev/null 2>&1; then
+        ncc_allow_unfree_for_tokens "${unfree_tokens[@]}" || true
+    fi
+
     if declare -F ncc_apply_gui_admin_user >/dev/null 2>&1; then
         ncc_apply_gui_admin_user || true
     fi
@@ -291,7 +307,7 @@ setup_predefined_profile() {
     log_success "Predefined profile applied successfully (v1 modular)"
 
     export SYSTEM_TYPE="$system_type"
-    deploy_config
+    deploy_config || return 1
 }
 
 export -f parse_nix_value

@@ -25,15 +25,13 @@
     # Enable QXL and Virtio GPU support
     hardware.graphics = {
       enable = true;
-      # Basic 3D acceleration
-      package = pkgs.mesa.drivers;
+      package = pkgs.mesa;
     };
 
     # VM-specific optimizations
     environment.systemPackages = with pkgs; [
       spice-vdagent  # Better mouse integration
-      virtio-win     # Virtio drivers
-      xrandr    # For resolution management
+      xrandr         # For resolution management
     ];
   };
 }

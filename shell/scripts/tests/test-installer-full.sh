@@ -538,6 +538,8 @@ assert_contains "gui browsers firefox" "$PKG_ALL" '"firefox"'
 HW=$(cat "$CONFIGS_BASE/core/base/hardware/config.nix")
 assert_contains "gui keep cpu detection" "$HW" 'cpu = "intel"'
 assert_contains "gui keep gpu detection" "$HW" 'gpu = "qxl-virtual"'
+SM=$(cat "$CONFIGS_BASE/core/management/system-manager/config.nix")
+assert_contains "gui allowUnfree for gaming" "$SM" 'allowUnfree = true'
 assert_contains "gui admin user" "$(cat "$CONFIGS_BASE/core/base/user/config.nix")" '"guiuser"'
 rm -rf "$SB"
 

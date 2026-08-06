@@ -116,11 +116,19 @@ deploy_base_config() {
     if [[ "${NCC_DEPLOY_SKIP_REBUILD:-0}" == "1" ]]; then
         log_info "Skipping nixos-rebuild (NCC_DEPLOY_SKIP_REBUILD=1) host=$config_hostname"
     else
-        log_success "Build system..."
+        log_info "Building system..."
+        local rebuild_rc=0
         if [ "$EUID" -eq 0 ]; then
-            HOME=/root nixos-rebuild switch --flake "${target}#${config_hostname}"
+            HOME=/root nixos-rebuild switch --flake "${target}#${config_hostname}" || rebuild_rc=$?
         else
-            nixos-rebuild switch --flake "${target}#${config_hostname}"
+            nixos-rebuild switch --flake "${target}#${config_hostname}" || rebuild_rc=$?
+        fi
+        if [[ "$rebuild_rc" -ne 0 ]]; then
+            log_error "nixos-rebuild failed (exit $rebuild_rc)"
+            log_info "Config was copied to $target — fix the error, then: sudo nixos-rebuild switch --flake ${target}#${config_hostname}"
+            log_info "Cleaning up staging..."
+            rm -rf "$nixos_dir"
+            return "$rebuild_rc"
         fi
     fi
 

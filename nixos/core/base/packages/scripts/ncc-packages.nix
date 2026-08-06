@@ -311,6 +311,22 @@ pkgs.writeShellScriptBin "ncc-packages" ''
 
       _ncc_packages_flush
 
+      # Steam / Brave / gaming need allowUnfree in system-manager
+      local check_tokens="$reason $PACKAGE ''${NAMES[*]:-}"
+      if echo "$check_tokens" | grep -Eqi '(^|[[:space:]])(gaming|brave|steam)([[:space:]]|$)'; then
+          local sm
+          if sm=$(ncc_read_module_config "core/management/system-manager" 2>/dev/null); then
+              if ! echo "$sm" | grep -qE 'allowUnfree[[:space:]]*=[[:space:]]*true'; then
+                  sm=$(echo "$sm" | sed -E 's/allowUnfree[[:space:]]*=[[:space:]]*false[[:space:]]*;/allowUnfree = true;/')
+                  if ! echo "$sm" | grep -qE 'allowUnfree[[:space:]]*=[[:space:]]*true'; then
+                      sm=$(echo "$sm" | sed -E 's/(systemType[[:space:]]*=[[:space:]]*"[^"]*"[[:space:]]*;)/\1\n  allowUnfree = true;/')
+                  fi
+                  ncc_write_module_config "core/management/system-manager" "$sm"
+                  log_info "Enabled allowUnfree (required by selected unfree packages)"
+              fi
+          fi
+      fi
+
       log_warn "New build required to use package '$reason'"
 
       local hostname build_cmd

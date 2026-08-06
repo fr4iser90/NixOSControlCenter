@@ -47,6 +47,49 @@ write_system_manager_config() {
 }"
 }
 
+# Tokens (packageModules / systemPackages names) that need nixpkgs allowUnfree
+ncc_tokens_need_unfree() {
+    local t
+    for t in "$@"; do
+        [[ -z "$t" ]] && continue
+        case "$t" in
+            gaming|brave|steam|nvidia|nvidia-intel|nvidia-amd|cuda)
+                return 0
+                ;;
+        esac
+    done
+    return 1
+}
+
+# Flip allowUnfree = true in system-manager leaf (monolith or split)
+ncc_ensure_allow_unfree() {
+    local content
+    if ! content=$(ncc_read_module_config "core/management/system-manager" 2>/dev/null); then
+        return 1
+    fi
+    if echo "$content" | grep -qE 'allowUnfree[[:space:]]*=[[:space:]]*true[[:space:]]*;'; then
+        return 0
+    fi
+    if echo "$content" | grep -qE 'allowUnfree[[:space:]]*='; then
+        content=$(echo "$content" | sed -E 's/allowUnfree[[:space:]]*=[[:space:]]*false[[:space:]]*;/allowUnfree = true;/')
+    else
+        content=$(echo "$content" | sed -E 's/(systemType[[:space:]]*=[[:space:]]*"[^"]*"[[:space:]]*;)/\1\n  allowUnfree = true;/')
+    fi
+    ncc_write_module_config "core/management/system-manager" "$content" || return 1
+    if declare -F log_info >/dev/null 2>&1; then
+        log_info "Enabled allowUnfree (required by selected unfree packages)"
+    fi
+    return 0
+}
+
+# If any of the given tokens need unfree, ensure allowUnfree=true
+ncc_allow_unfree_for_tokens() {
+    if ncc_tokens_need_unfree "$@"; then
+        ncc_ensure_allow_unfree || return 1
+    fi
+    return 0
+}
+
 # ---------- System Config (v2: no legacy system-config.nix) ----------
 
 write_system_config() {
@@ -417,6 +460,9 @@ export -f ncc_set_module_enable
 export -f ncc_ensure_layout
 export -f ncc_module_config_path
 export -f write_system_manager_config
+export -f ncc_tokens_need_unfree
+export -f ncc_ensure_allow_unfree
+export -f ncc_allow_unfree_for_tokens
 export -f write_system_config
 export -f write_desktop_config
 export -f write_desktop_disabled
