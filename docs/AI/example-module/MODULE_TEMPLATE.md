@@ -13,6 +13,11 @@ lib.attrByPath [ "core" "base" "…" ] {} systemConfig
 import ../../../core/management/…/something.nix
 getModuleNixConfig config "tui-engine"
 { getModuleApi ? null, moduleName ? "desktop", ... }:
+
+# ❌ NEVER read module cfg this way (throws if attr missing)
+cfg = systemConfig.${metadata.configPath};
+cfg = systemConfig.${moduleConfig.configPath};
+cfg = systemConfig.${configPath};
 ```
 
 ```nix
@@ -23,7 +28,18 @@ api = getModuleApi "cli-registry";
 tui = (getModuleApi "tui-engine").fromConfig config;
 meta = getCurrentModuleMetadata ./.;
 options.${meta.configPath} = { … };
+# or: options.systemConfig.${meta.configPath} = { … };
 ```
+
+### `systemConfig.${configPath}` — read vs write
+
+| Use | OK? |
+|-----|-----|
+| `options.systemConfig.${configPath} = { … };` | ✅ define options |
+| `config.systemConfig.${configPath}.enable = mkDefault …;` | ✅ write option |
+| `cfg = systemConfig.${configPath};` | ❌ **FORBIDDEN** — use `getModuleConfig` |
+
+`configPath` is a dotted string (`"modules.infrastructure.homelab-manager"`). As a single Nix attr it **does not** walk nested `systemConfig.modules.…`. Missing → rebuild death. `getModuleConfig` splits the path and merges `template-config.nix`.
 
 Modules are discovered generically, merged into systemConfig via `configPath`, and enabled/disabled through that merge — never via hand-written path strings.
 

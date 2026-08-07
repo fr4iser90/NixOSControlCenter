@@ -40,6 +40,8 @@ def main() -> int:
         print("Usage: ncc-domain-gui <domain>", file=sys.stderr)
         return 2
     name = sys.argv[1]
+    # QApplication MUST exist before any QWidget (SshPage, etc.)
+    ensure_app(sys.argv)
     info = _info_for(name)
     return run_page(create_page_for(info), f"ncc {name}")
 

@@ -1,6 +1,7 @@
 { config, lib, pkgs, systemConfig, configPath, ... }:
 let
-  cfg = systemConfig.${configPath};
+  # Nested read from discovery configPath — never systemConfig.${configPath}
+  cfg = lib.attrByPath (lib.splitString "." configPath) {} systemConfig;
   # Import config-migration module to get the commands
   configMigrationModule = import ./. { inherit pkgs lib config; };
   checkScript = configMigrationModule.check.configCheck;

@@ -12,16 +12,46 @@ let
     else null;
   wifiCli = import ./scripts/wifi/default.nix { inherit pkgs; };
   domainGui = (getModuleApi "gui-engine").domainGui pkgs;
+  guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
+  guiOff = (getModuleApi "gui-engine").disabledHint;
 
   entry = pkgs.writeShellScriptBin "ncc-network-entry" ''
     set -euo pipefail
+    _ui=""
+    _args=()
+    for _a in "$@"; do
+      case "$_a" in
+        --gui) _ui=gui ;;
+        --tui) _ui=tui ;;
+        gui|tui) echo "Use: ncc network --$_a" >&2; exit 2 ;;
+        *) _args+=("$_a") ;;
+      esac
+    done
+    set -- "''${_args[@]}"
+
     case "''${1:-}" in
-      ""|gui) exec ${domainGui}/bin/ncc-domain-gui network ;;
-      tui)
-        ${if tuiOn then ''exec ${networkTui}/bin/ncc-network-tui'' else tuiOff}
+      "")
+        case "$_ui" in
+          gui) ${if guiOn then ''exec ${domainGui}/bin/ncc-domain-gui network'' else guiOff} ;;
+          tui)
+            ${if tuiOn then ''exec ${networkTui}/bin/ncc-network-tui'' else tuiOff}
+            ;;
+          *)
+            cat <<EOF
+ncc network — Network (CLI)
+
+Usage:
+  ncc network                 Help
+  ncc network --gui           Domain GUI
+  ncc network --tui           TUI (if enabled)
+  ncc network wifi scan|list|status|connect|disconnect|forget
+EOF
+            ;;
+        esac
         ;;
+      help|-h|--help) exec "$0" ;;
       *)
-        echo "Usage: ncc network | ncc network tui | ncc network wifi …" >&2
+        echo "Usage: ncc network [--gui|--tui] | ncc network wifi …" >&2
         exit 1
         ;;
     esac
@@ -34,15 +64,15 @@ in
         {
           name = "network";
           domain = "network";
-          description = "Network manager (GUI)";
+          description = "Network manager";
           category = "base";
           script = "${entry}/bin/ncc-network-entry";
           type = "manager";
-          shortHelp = "network - Network Manager (GUI)";
+          shortHelp = "network - Network Manager";
           longHelp = ''
-            ncc network
-            ncc network tui
-            ncc network wifi scan|list|status|connect|disconnect|forget
+            ncc network                 CLI help
+            ncc network --gui|--tui
+            ncc network wifi …
           '';
         }
         {
@@ -53,7 +83,7 @@ in
           category = "base";
           script = "${wifiCli.wifiRouter}/bin/ncc-wifi-router";
           type = "manager";
-          shortHelp = "wifi - WiFi scan/list/status/connect";
+          shortHelp = "wifi - WiFi management";
           longHelp = "ncc network wifi scan|list|status|connect|disconnect|forget";
         }
       ]
@@ -66,8 +96,8 @@ in
           category = "base";
           script = "${networkTui}/bin/ncc-network-tui";
           type = "manager";
-          shortHelp = "tui - Network TUI";
-          longHelp = "ncc network tui";
+          shortHelp = "tui - Network TUI (prefer: ncc network --tui)";
+          longHelp = "ncc network --tui";
         }
       ]
     )

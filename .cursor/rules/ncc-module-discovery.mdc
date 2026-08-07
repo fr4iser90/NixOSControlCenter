@@ -40,6 +40,11 @@ config.core.management.cli-registry.commandSets
 systemConfig.core.base.desktop
 lib.attrByPath [ "core" "base" "packages" ] {} systemConfig
 
+# ❌ READ config via dotted key (THROWS if missing — never do this)
+cfg = systemConfig.${metadata.configPath};
+cfg = systemConfig.${moduleConfig.configPath};
+cfg = systemConfig.${configPath};
+
 # ❌ third global helper
 getModuleNixConfig config "tui-engine"
 
@@ -50,11 +55,18 @@ import ../../../modules/specialized/ncc-assistant/package.nix
 { getModuleApi ? null, moduleName ? "desktop", ... }:
 ```
 
+**Why `systemConfig.${configPath}` is banned for reads:** `configPath` is a dotted string like `"modules.infrastructure.homelab-manager"`. Nix treats that as **one** attribute name. If absent → hard eval error. Correct reads go through `getModuleConfig` (nested path + `template-config.nix` defaults).
+
+OK: `options.systemConfig.${configPath} = { … };` (defining options).  
+OK: `config.systemConfig.${configPath}.enable = …` (writing that option).  
+NOT OK: `cfg = systemConfig.${configPath};` (reading).
+
 ## Why Nix did not error
 
 - `attrByPath … {}` / `or {}` **swallows** missing paths → empty cfg, wrong enable/disable
 - `? null` args **silently** skip helpers → TUIs/APIs half-built
 - Hardcoded `config.core.…` only fails if that attr is absent; wrong path can still “work” until a move/rename
+- `systemConfig.${dotted}` **does** error — but only at rebuild, after the agent already shipped broken code
 - Template docs said “generic” but **nothing enforced** it (stub tests always pass)
 
 ## Validate
@@ -65,3 +77,5 @@ Never: `(import ./commands.nix { inherit … })` — drops helpers and breaks re
 ```bash
 bash shell/scripts/checks/modules/run-all.sh
 ```
+
+Agents **must** run this (or at least `validate-no-hardcoded-paths.sh`) before claiming a Nix change works.

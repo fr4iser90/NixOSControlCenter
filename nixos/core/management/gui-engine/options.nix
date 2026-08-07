@@ -12,7 +12,20 @@ in {
       description = "GUI engine module version";
     };
 
-    # Core module — always on; no user enable toggle.
+    enable = lib.mkOption {
+      type = lib.types.nullOr lib.types.bool;
+      default = null;
+      description = ''
+        Build and allow NCC Qt/PySide6 GUIs (`ncc`, `ncc <domain> --gui`).
+
+        - null (default): auto — enabled when desktop is enabled, disabled on headless
+        - true / false: explicit override in systemConfig
+
+        Example (systemConfig):
+          core.management.gui-engine.enable = false;
+      '';
+    };
+
     api = lib.mkOption {
       type = lib.types.attrs;
       default = {};

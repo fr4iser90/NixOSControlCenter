@@ -1,7 +1,8 @@
 { config, lib, pkgs, systemConfig, getModuleApi, configPath, ... }:
 
 let
-  cfg = systemConfig.${configPath};
+  # Nested read from discovery configPath — never systemConfig.${configPath}
+  cfg = lib.attrByPath (lib.splitString "." configPath) {} systemConfig;
   backupHelpers = import ../../lib/backup-helpers.nix { inherit pkgs lib; };
   formatter = getModuleApi "cli-formatter";
   migration = import ./migration.nix { inherit pkgs lib getModuleApi backupHelpers; };

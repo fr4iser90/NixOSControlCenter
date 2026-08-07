@@ -6,13 +6,38 @@ let
 
   packagesCli = import ./scripts/ncc-packages.nix { inherit pkgs getModuleMetadata; };
   packagesGui = import ./gui/default.nix { inherit pkgs packagesCli getModuleApi; };
+  guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
+  guiOff = (getModuleApi "gui-engine").disabledHint;
 
-  # Bare `ncc packages` → GUI; any subcommand/flags → CLI
+  # Variant 1: bare = CLI; UI only via --gui
   packagesEntry = pkgs.writeShellScriptBin "ncc-packages-entry" ''
     set -euo pipefail
-    if [[ $# -eq 0 ]] || [[ "''${1:-}" == "gui" ]]; then
-      exec ${packagesGui.nccPackagesGui}/bin/ncc-packages-gui
+    _ui=""
+    _args=()
+    for _a in "$@"; do
+      case "$_a" in
+        --gui) _ui=gui ;;
+        --tui)
+          echo "packages has no TUI; use: ncc packages --gui" >&2
+          exit 2
+          ;;
+        gui)
+          echo "Use: ncc packages --gui" >&2
+          exit 2
+          ;;
+        *) _args+=("$_a") ;;
+      esac
+    done
+    set -- "''${_args[@]}"
+
+    if [[ "$_ui" == "gui" ]]; then
+      ${if guiOn then ''exec ${packagesGui.nccPackagesGui}/bin/ncc-packages-gui'' else guiOff}
     fi
+
+    if [[ $# -eq 0 ]]; then
+      exec ${packagesCli}/bin/ncc-packages --help
+    fi
+
     case "''${1:-}" in
       -h|--help|help)
         exec ${packagesCli}/bin/ncc-packages --help
@@ -28,37 +53,21 @@ in
         {
           name = "packages";
           domain = "packages";
-          description = "Package management (GUI + CLI)";
+          description = "Package management";
           category = "base";
           script = "${packagesEntry}/bin/ncc-packages-entry";
           arguments = [];
           type = "manager";
-          shortHelp = "packages - Package Management (GUI)";
+          shortHelp = "packages - Package Management";
           longHelp = ''
-            Package management GUI (default) and CLI.
-
-            GUI (default):
-              ncc packages
-              ncc packages gui
+            ncc packages                 CLI help
+            ncc packages --gui           Packages GUI
 
             CLI — single packages (nixpkgs):
-              ncc packages add <package> [--user <name>] [--system]
-              ncc packages remove <package> [--user <name>] [--system]
-              ncc packages list [--system]
+              ncc packages add|remove|list …
 
-            CLI — module sets and presets (packageModules):
-              ncc packages module list
-              ncc packages module available
-              ncc packages module add <name>...
-              ncc packages module remove <name>...
-              ncc packages module info <name>
-
-            Catalog SSOT: core/base/packages/lib/catalog.nix (+ metadata.nix).
-            Mutations via config-facade (monolith or split layout).
-
-            Layout:
-              ncc system config-layout detect
-              ncc system config-layout convert --to monolith|split
+            CLI — module sets:
+              ncc packages module list|available|add|remove|info …
           '';
         }
       ])

@@ -1,11 +1,10 @@
-{ config, lib, pkgs, systemConfig, moduleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, moduleConfig, getModuleApi, getModuleConfig, ... }:
 
 with lib;
 
 let
   ui = getModuleApi "cli-formatter";
-  # Feature configuration via discovery metadata
-  cfg = systemConfig.${moduleConfig.configPath};
+  cfg = getModuleConfig (baseNameOf ./.);
 
 in
   lib.mkIf (cfg.enable or false) (let

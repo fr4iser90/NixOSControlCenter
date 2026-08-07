@@ -11,8 +11,9 @@ let
   # Core modules use config.* (chicken-egg problem with systemConfig)
   cfg = config.${configPath};
 
-  # For components: provide configPath for consistent access
-  # This allows components to use systemConfig.${configPath} instead of hardcoded paths
+  # For components: pass configPath; they MUST read via
+  # lib.attrByPath (lib.splitString "." configPath) {} systemConfig
+  # or getModuleConfig — NEVER systemConfig.${configPath}
   versionChecker = import ./handlers/module-version-check.nix { inherit config lib; };
   checkVersions = import ./scripts/check-versions.nix { inherit config lib pkgs getModuleApi; };
   updateModules = import ./scripts/update-modules.nix { inherit config lib pkgs getModuleApi; };
@@ -35,19 +36,46 @@ let
     then (import ./ui/tui/domain.nix { inherit config lib pkgs getModuleApi; }).tuiScript
     else null;
   systemGui = (import ./gui/default.nix { inherit pkgs getModuleApi; }).nccSystemGui;
+  guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
+  guiOff = (getModuleApi "gui-engine").disabledHint;
 
   systemEntry = pkgs.writeShellScriptBin "ncc-system-entry" ''
     set -euo pipefail
+    _ui=""
+    _args=()
+    for _a in "$@"; do
+      case "$_a" in
+        --gui) _ui=gui ;;
+        --tui) _ui=tui ;;
+        gui|tui) echo "Use: ncc system --$_a" >&2; exit 2 ;;
+        *) _args+=("$_a") ;;
+      esac
+    done
+    set -- "''${_args[@]}"
+
     case "''${1:-}" in
-      ""|gui)
-        exec ${systemGui}/bin/ncc-system-gui
+      "")
+        case "$_ui" in
+          gui) ${if guiOn then ''exec ${systemGui}/bin/ncc-system-gui'' else guiOff} ;;
+          tui)
+            ${if tuiOn then ''exec ${systemTui}/bin/ncc-system-tui'' else tuiOff}
+            ;;
+          *)
+            cat <<EOF
+ncc system — System management (CLI)
+
+Usage:
+  ncc system                 Help
+  ncc system --gui           System GUI
+  ncc system --tui           TUI (if enabled)
+  ncc system <verb> …
+EOF
+            ;;
+        esac
         ;;
-      tui)
-        ${if tuiOn then ''exec ${systemTui}/bin/ncc-system-tui'' else tuiOff}
-        ;;
+      help|-h|--help) exec "$0" ;;
       *)
-        # Hierarchical children handled by ncc dispatcher (system-update, …)
-        echo "Use: ncc system | ncc system tui | ncc system <verb>" >&2
+        echo "Use: ncc system [--gui|--tui] | ncc system <verb>" >&2
         exit 1
         ;;
     esac

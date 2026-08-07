@@ -1,10 +1,10 @@
-{ config, lib, pkgs, getModuleApi, systemConfig, moduleConfig }:
+{ config, lib, pkgs, getModuleApi, systemConfig, moduleConfig, getModuleConfig }:
 
 let
   ui = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
   tuiEngine = (getModuleApi "tui-engine").fromConfig config;
-  cfg = systemConfig.${moduleConfig.configPath};
+  cfg = getModuleConfig "lock-manager";
   # Get module path (go up from ui/tui/default.nix to module root)
   # ui/tui/default.nix -> ../.. -> lock-manager/
   modulePath = ../..;

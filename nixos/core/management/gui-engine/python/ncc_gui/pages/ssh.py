@@ -1,4 +1,4 @@
-"""SSH domain page — saved servers list and client actions."""
+"""SSH domain — client servers, embedded PTY, optional server actions."""
 
 from __future__ import annotations
 
@@ -19,12 +19,14 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QPushButton,
     QSplitter,
+    QTabWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
 from ncc_gui.dialogs import confirm, error, info
+from ncc_gui.pty_terminal import PtyTerminal
 from ncc_gui.theme import APP_STYLE
 
 
@@ -41,6 +43,15 @@ class ServerEntry:
 def _run_client(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["ncc", "ssh", "client", *args],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _run_ssh(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["ncc", "ssh", *args],
         check=False,
         capture_output=True,
         text=True,
@@ -64,23 +75,20 @@ def load_servers() -> list[ServerEntry]:
 
 
 def _open_external_ssh(host: str, user: str) -> None:
-    """Temporary: open an external terminal until embedded PTY lands."""
     target = f"{user}@{host}"
-    candidates: list[list[str]] = []
     for term in ("konsole", "kitty", "alacritty", "gnome-terminal", "xterm"):
         path = shutil.which(term)
         if not path:
             continue
         if term == "konsole":
-            candidates.append([path, "-e", "ssh", target])
+            argv = [path, "-e", "ssh", target]
         elif term == "gnome-terminal":
-            candidates.append([path, "--", "ssh", target])
+            argv = [path, "--", "ssh", target]
         else:
-            candidates.append([path, "-e", "ssh", target])
-    if not candidates:
-        # Last resort: background ssh won't work well; raise for caller
-        raise RuntimeError("No terminal emulator found (konsole/kitty/alacritty/…)")
-    subprocess.Popen(candidates[0], start_new_session=True)
+            argv = [path, "-e", "ssh", target]
+        subprocess.Popen(argv, start_new_session=True)
+        return
+    raise RuntimeError("No terminal emulator found (konsole/kitty/alacritty/…)")
 
 
 class _ServerDialog(QDialog):
@@ -118,6 +126,7 @@ class SshPage(QWidget):
         super().__init__(parent)
         self.setStyleSheet(APP_STYLE)
         self.setObjectName("nccShellRoot")
+        self._selected: ServerEntry | None = None
 
         root = QVBoxLayout(self)
         root.setContentsMargins(20, 16, 20, 16)
@@ -125,13 +134,19 @@ class SshPage(QWidget):
         title = QLabel("SSH")
         title.setObjectName("nccPageTitle")
         root.addWidget(title)
-        sub = QLabel("Saved servers. Connect opens an external terminal for now.")
+        sub = QLabel("Saved clients, embedded session, and local server controls when enabled.")
         sub.setObjectName("nccPageSubtitle")
         sub.setWordWrap(True)
         root.addWidget(sub)
 
+        tabs = QTabWidget()
+        root.addWidget(tabs, stretch=1)
+
+        # --- Clients tab ---
+        clients = QWidget()
+        c_l = QVBoxLayout(clients)
         split = QSplitter(Qt.Orientation.Horizontal)
-        root.addWidget(split, stretch=1)
+        c_l.addWidget(split, stretch=1)
 
         left = QWidget()
         left_l = QVBoxLayout(left)
@@ -140,7 +155,6 @@ class SshPage(QWidget):
         self.list = QListWidget()
         self.list.currentItemChanged.connect(self._on_select)
         left_l.addWidget(self.list, stretch=1)
-
         btn_row = QHBoxLayout()
         refresh = QPushButton("Refresh")
         refresh.clicked.connect(self.reload)
@@ -152,7 +166,7 @@ class SshPage(QWidget):
         left_l.addLayout(btn_row)
         split.addWidget(left)
 
-        right = QGroupBox("Details")
+        right = QWidget()
         right_l = QVBoxLayout(right)
         self.detail = QLabel("Select a server")
         self.detail.setObjectName("nccPageSubtitle")
@@ -160,33 +174,77 @@ class SshPage(QWidget):
         right_l.addWidget(self.detail)
 
         actions = QHBoxLayout()
-        self.connect_btn = QPushButton("Connect")
-        self.connect_btn.clicked.connect(self._connect)
+        self.connect_btn = QPushButton("Connect (embedded)")
+        self.connect_btn.clicked.connect(self._connect_embedded)
+        self.ext_btn = QPushButton("External terminal")
+        self.ext_btn.clicked.connect(self._connect_external)
         self.edit_btn = QPushButton("Edit…")
         self.edit_btn.clicked.connect(self._edit)
         self.delete_btn = QPushButton("Delete")
         self.delete_btn.clicked.connect(self._delete)
-        for b in (self.connect_btn, self.edit_btn, self.delete_btn):
+        for b in (self.connect_btn, self.ext_btn, self.edit_btn, self.delete_btn):
             b.setEnabled(False)
             actions.addWidget(b)
         actions.addStretch(1)
         right_l.addLayout(actions)
+
+        term_box = QGroupBox("Session")
+        term_l = QVBoxLayout(term_box)
+        self.term = PtyTerminal()
+        self.term.setMinimumHeight(220)
+        self.term.exited.connect(lambda code: self._append(f"• Session ended ({code})"))
+        term_l.addWidget(self.term)
+        right_l.addWidget(term_box, stretch=1)
 
         log_box = QGroupBox("Activity")
         log_l = QVBoxLayout(log_box)
         self.log = QTextEdit()
         self.log.setObjectName("nccActivityLog")
         self.log.setReadOnly(True)
-        self.log.setMaximumHeight(160)
+        self.log.setMaximumHeight(120)
         log_l.addWidget(self.log)
         right_l.addWidget(log_box)
-        right_l.addStretch(1)
         split.addWidget(right)
         split.setStretchFactor(0, 1)
-        split.setStretchFactor(1, 2)
+        split.setStretchFactor(1, 3)
+        tabs.addTab(clients, "Clients")
 
-        self._selected: ServerEntry | None = None
+        # --- Server tab ---
+        server = QWidget()
+        s_l = QVBoxLayout(server)
+        self.server_hint = QLabel()
+        self.server_hint.setObjectName("nccPageSubtitle")
+        self.server_hint.setWordWrap(True)
+        s_l.addWidget(self.server_hint)
+        self.server_status = QTextEdit()
+        self.server_status.setReadOnly(True)
+        self.server_status.setObjectName("nccActivityLog")
+        s_l.addWidget(self.server_status, stretch=1)
+
+        form = QFormLayout()
+        self.server_user = QLineEdit()
+        self.server_user.setPlaceholderText("username")
+        form.addRow("Username", self.server_user)
+        s_l.addLayout(form)
+
+        s_actions = QHBoxLayout()
+        for label, args, needs_user in (
+            ("Refresh status", ("status",), False),
+            ("Temp-open (60s)", ("temp-open",), True),
+            ("Force-open", ("force-open",), True),
+            ("List requests", ("list-requests", "pending"), False),
+        ):
+            btn = QPushButton(label)
+            btn.clicked.connect(
+                lambda _=False, a=args, nu=needs_user, lab=label: self._server_action(a, nu, lab)
+            )
+            s_actions.addWidget(btn)
+        s_actions.addStretch(1)
+        s_l.addLayout(s_actions)
+        tabs.addTab(server, "This host (server)")
+
         self.reload()
+        self._refresh_server_status()
 
     def _append(self, msg: str) -> None:
         self.log.append(msg)
@@ -209,14 +267,14 @@ class SshPage(QWidget):
         else:
             self._selected = None
             self.detail.setText("No servers yet. Click Add…")
-            for b in (self.connect_btn, self.edit_btn, self.delete_btn):
+            for b in (self.connect_btn, self.ext_btn, self.edit_btn, self.delete_btn):
                 b.setEnabled(False)
 
     def _on_select(self, current: QListWidgetItem | None, _prev: QListWidgetItem | None) -> None:
         if current is None:
             self._selected = None
             self.detail.setText("Select a server")
-            for b in (self.connect_btn, self.edit_btn, self.delete_btn):
+            for b in (self.connect_btn, self.ext_btn, self.edit_btn, self.delete_btn):
                 b.setEnabled(False)
             return
         entry = current.data(Qt.ItemDataRole.UserRole)
@@ -224,7 +282,7 @@ class SshPage(QWidget):
             return
         self._selected = entry
         self.detail.setText(f"Host: {entry.host}\nUser: {entry.user}")
-        for b in (self.connect_btn, self.edit_btn, self.delete_btn):
+        for b in (self.connect_btn, self.ext_btn, self.edit_btn, self.delete_btn):
             b.setEnabled(True)
 
     def _add(self) -> None:
@@ -282,15 +340,55 @@ class SshPage(QWidget):
         self._selected = None
         self.reload()
 
-    def _connect(self) -> None:
+    def _connect_embedded(self) -> None:
+        if not self._selected:
+            return
+        entry = self._selected
+        target = f"{entry.user}@{entry.host}"
+        self.term.start(["ssh", "-tt", target])
+        self._append(f"• Embedded connect {target}")
+
+    def _connect_external(self) -> None:
         if not self._selected:
             return
         entry = self._selected
         try:
             _open_external_ssh(entry.host, entry.user)
-            self._append(f"• Connect {entry.user}@{entry.host} (external terminal)")
+            self._append(f"• External terminal {entry.user}@{entry.host}")
         except RuntimeError as exc:
             error(self, "Connect", str(exc))
+
+    def _refresh_server_status(self) -> None:
+        proc = _run_ssh("status")
+        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+        if proc.returncode != 0 and ("Unknown" in out or "unknown" in out.lower()):
+            self.server_hint.setText(
+                "SSH server module is not enabled on this machine. "
+                "Enable ssh-server-manager in systemConfig to use temp-open / status here."
+            )
+            self.server_status.setPlainText(out or "(not available)")
+            return
+        self.server_hint.setText("Controls for the OpenSSH service on this host.")
+        self.server_status.setPlainText(out or "(empty)")
+
+    def _server_action(self, args: tuple[str, ...], needs_user: bool, label: str) -> None:
+        argv = list(args)
+        if needs_user:
+            user = self.server_user.text().strip()
+            if not user:
+                info(self, label, "Enter a username.")
+                return
+            if not confirm(self, label, f"Run “{label}” for user {user}?"):
+                return
+            argv.append(user)
+        proc = _run_ssh(*argv)
+        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+        self.server_status.setPlainText(out or ("Done." if proc.returncode == 0 else "Failed."))
+        if proc.returncode != 0:
+            error(self, label, out or "Command failed.")
+        if args[:1] == ("status",) or args[:1] == ("list-requests",):
+            return
+        self._refresh_server_status()
 
 
 def create_page() -> QWidget:

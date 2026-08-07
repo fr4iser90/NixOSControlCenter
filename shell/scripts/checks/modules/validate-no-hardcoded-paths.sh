@@ -81,6 +81,12 @@ scan 'metadata\s*\?\s*null' \
 scan 'moduleName\s*\?\s*"' \
   'moduleName ? \"…\"'
 
+# READ via systemConfig.${configPath} — dotted string is ONE attr; throws if missing.
+# Allowed: options.systemConfig.${…} / config.systemConfig.${…}.enable = …
+# Banned:  cfg = systemConfig.${…};  or any bare RHS ending at };
+scan '=\s*systemConfig\.\$\{[^}]+\}[[:space:]]*;' \
+  'systemConfig.\${…} READ (use getModuleConfig moduleName)'
+
 # Relative imports that jump into another top-level module tree
 scan 'import\s+\.\./(\.\./)+(modules|core)/' \
   'relative cross-module import'
@@ -88,6 +94,7 @@ scan 'import\s+\.\./(\.\./)+(modules|core)/' \
 if [[ "$FAIL" -ne 0 ]]; then
   echo "=== FAILED: $HITS hardcoded-path hit(s) ==="
   echo "Use getModuleConfig / getModuleApi / metadata.configPath."
+  echo "NEVER: cfg = systemConfig.\${configPath};  →  cfg = getModuleConfig moduleName;"
   echo "Peer NixOS attrs: (getModuleApi \"…\").fromConfig config"
   echo "See .cursor/rules/ncc-module-discovery.mdc and docs/AI/RULES.md"
   exit 1

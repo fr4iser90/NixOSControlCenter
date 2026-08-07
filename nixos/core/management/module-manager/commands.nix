@@ -11,20 +11,47 @@ let
     then ((getModuleApi "tui-engine").fromConfig config).moduleManagerTuiScript
     else null;
   modulesGui = (import ./gui/default.nix { inherit pkgs getModuleApi; }).nccModulesGui;
+  guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
+  guiOff = (getModuleApi "gui-engine").disabledHint;
 
   discovery = (import ./lib/runtime_discovery.nix { inherit lib pkgs; }).runtimeDiscovery;
 
   modulesEntry = pkgs.writeShellScriptBin "ncc-modules-entry" ''
     set -euo pipefail
+    _ui=""
+    _args=()
+    for _a in "$@"; do
+      case "$_a" in
+        --gui) _ui=gui ;;
+        --tui) _ui=tui ;;
+        gui|tui) echo "Use: ncc modules --$_a" >&2; exit 2 ;;
+        *) _args+=("$_a") ;;
+      esac
+    done
+    set -- "''${_args[@]}"
+
     case "''${1:-}" in
-      ""|gui)
-        exec ${modulesGui}/bin/ncc-modules-gui
+      "")
+        case "$_ui" in
+          gui) ${if guiOn then ''exec ${modulesGui}/bin/ncc-modules-gui'' else guiOff} ;;
+          tui)
+            ${if tuiOn then ''exec ${bubbleTeaTui}/bin/ncc-module-manager-tui'' else tuiOff}
+            ;;
+          *)
+            cat <<EOF
+ncc modules — Module management (CLI)
+
+Usage:
+  ncc modules                 Help
+  ncc modules --gui           Modules GUI
+  ncc modules --tui           TUI (if enabled)
+EOF
+            ;;
+        esac
         ;;
-      tui)
-        ${if tuiOn then ''exec ${bubbleTeaTui}/bin/ncc-module-manager-tui'' else tuiOff}
-        ;;
+      help|-h|--help) exec "$0" ;;
       *)
-        echo "Usage: ncc modules | ncc modules tui" >&2
+        echo "Usage: ncc modules [--gui|--tui]" >&2
         exit 1
         ;;
     esac

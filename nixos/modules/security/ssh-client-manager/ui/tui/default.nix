@@ -100,7 +100,7 @@ PY
   filterScript = pkgs.writeScript "ncc-ssh-client-tui-filter" ''
     #!${pkgs.bash}/bin/bash
     cat << 'EOF'
-Domain: ssh-client-manager
+Domain: ssh
 Actions: add, connect, edit, delete
 EOF
   '';
@@ -145,7 +145,7 @@ EOF
     getActions = actionsScript;
     getStats = statsScript;
     footer = "enter connect • ctrl-x delete • ctrl-e edit • ctrl-n new • q quit";
-    actionCmd = "ncc ssh-client-manager {action} {arg:ip} {arg:user}";
+    actionCmd = "ncc ssh client {action} {arg:ip} {arg:user}";
     layout = "fzf";
     staticMenu = true;
     modulePath = modulePath;  # Pass as path, not string

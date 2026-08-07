@@ -6,6 +6,8 @@ let
   ccLib = import ../lib { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   tuiOn = (getModuleApi "tui-engine").isEnabled getModuleConfig;
   tuiOff = (getModuleApi "tui-engine").disabledHint;
+  guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
+  guiOff = (getModuleApi "gui-engine").disabledHint;
   rootTui =
     if tuiOn
     then (import ../ui/tui/default.nix { inherit config lib pkgs getModuleApi; }).tuiScript
@@ -104,7 +106,8 @@ let
   guiCatalogJson = builtins.toJSON (lib.attrValues catalogById);
   guiCatalog = pkgs.writeText "ncc-gui-catalog.json" guiCatalogJson;
 
-  launchGui = ''
+  launchGui =
+    if guiOn then ''
     export NCC_GUI_CATALOG="$(cat ${guiCatalog})"
     ${lib.optionalString assistantOn ''
       # Embed AI with the same env as `ncc ai` (endpoint, prompts, knowledge, …)
@@ -113,7 +116,7 @@ let
       export PYTHONPATH="${assistantPkg.appRoot}''${PYTHONPATH:+:$PYTHONPATH}"
     ''}
     exec ${rootGui}/bin/ncc-gui
-  '';
+  '' else guiOff;
 
 in
   pkgs.writeScriptBin "ncc" ''

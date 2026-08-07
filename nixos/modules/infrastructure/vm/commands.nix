@@ -14,18 +14,99 @@ let
     then (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi; }).tuiScript
     else null;
   domainGui = (getModuleApi "gui-engine").domainGui pkgs;
+  guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
+  guiOff = (getModuleApi "gui-engine").disabledHint;
   libVM = import ./lib { inherit lib pkgs; };
   availableDistros = attrNames libVM.distros;
 
   vmEntry = pkgs.writeShellScriptBin "ncc-vm-entry" ''
     set -euo pipefail
+    _ui=""
+    _args=()
+    for _a in "$@"; do
+      case "$_a" in
+        --gui) _ui=gui ;;
+        --tui) _ui=tui ;;
+        gui|tui) echo "Use: ncc vm --$_a" >&2; exit 2 ;;
+        *) _args+=("$_a") ;;
+      esac
+    done
+    set -- "''${_args[@]}"
+
     case "''${1:-}" in
-      ""|gui) exec ${domainGui}/bin/ncc-domain-gui vm ;;
-      tui)
-        ${if tuiOn then ''exec ${vmTui}/bin/ncc-vm-tui'' else tuiOff}
+      "")
+        case "$_ui" in
+          gui) ${if guiOn then ''exec ${domainGui}/bin/ncc-domain-gui vm'' else guiOff} ;;
+          tui)
+            ${if tuiOn then ''exec ${vmTui}/bin/ncc-vm-tui'' else tuiOff}
+            ;;
+          *)
+            cat <<EOF
+ncc vm — VM manager (CLI)
+
+Usage:
+  ncc vm                 Help
+  ncc vm --gui           Domain GUI
+  ncc vm --tui           TUI (if enabled)
+  ncc vm status|list|domains|start|stop|destroy|test …
+EOF
+            ;;
+        esac
         ;;
-      *) echo "Usage: ncc vm | ncc vm tui | ncc vm status|list|test …" >&2; exit 1 ;;
+      help|-h|--help) exec "$0" ;;
+      *)
+        echo "Usage: ncc vm [--gui|--tui] | ncc vm status|list|domains|start|stop|destroy|test …" >&2
+        exit 1
+        ;;
     esac
+  '';
+
+  # Machine-readable: name=state (one per line)
+  vmDomains = pkgs.writeShellScriptBin "ncc-vm-domains" ''
+    #!${pkgs.bash}/bin/bash
+    set -euo pipefail
+    if ! command -v virsh >/dev/null 2>&1; then
+      echo "virsh not found" >&2
+      exit 1
+    fi
+    while IFS= read -r name; do
+      [[ -z "$name" ]] && continue
+      state="$(virsh domstate "$name" 2>/dev/null || echo unknown)"
+      printf '%s=%s\n' "$name" "$state"
+    done < <(virsh list --all --name 2>/dev/null)
+  '';
+
+  vmStart = pkgs.writeShellScriptBin "ncc-vm-start" ''
+    #!${pkgs.bash}/bin/bash
+    set -euo pipefail
+    name="''${1:-}"
+    if [[ -z "$name" ]]; then
+      echo "Usage: ncc vm start NAME" >&2
+      exit 2
+    fi
+    virsh start "$name"
+  '';
+
+  vmStop = pkgs.writeShellScriptBin "ncc-vm-stop" ''
+    #!${pkgs.bash}/bin/bash
+    set -euo pipefail
+    name="''${1:-}"
+    if [[ -z "$name" ]]; then
+      echo "Usage: ncc vm stop NAME" >&2
+      exit 2
+    fi
+    virsh shutdown "$name"
+  '';
+
+  vmDestroy = pkgs.writeShellScriptBin "ncc-vm-destroy" ''
+    #!${pkgs.bash}/bin/bash
+    set -euo pipefail
+    name="''${1:-}"
+    if [[ -z "$name" ]]; then
+      echo "Usage: ncc vm destroy NAME" >&2
+      exit 2
+    fi
+    virsh destroy "$name"
   '';
 
   vmStatus = pkgs.writeShellScriptBin "ncc-vm-status" ''
@@ -145,8 +226,8 @@ EOF
       shortHelp = "vm - VM Manager (GUI)";
       longHelp = ''
         ncc vm
-        ncc vm tui
-        ncc vm status|list
+        ncc vm --gui|--tui
+        ncc vm status|list|domains
         ncc vm test run|reset <distro>
       '';
     }
@@ -186,6 +267,47 @@ EOF
       longHelp = "ncc vm list";
     }
     {
+      name = "domains";
+      domain = "vm";
+      parent = "vm";
+      description = "List libvirt domains (name=state)";
+      category = "infrastructure";
+      script = "${vmDomains}/bin/ncc-vm-domains";
+      shortHelp = "domains - List libvirt domains";
+      longHelp = "ncc vm domains";
+    }
+    {
+      name = "start";
+      domain = "vm";
+      parent = "vm";
+      description = "Start a libvirt domain";
+      category = "infrastructure";
+      script = "${vmStart}/bin/ncc-vm-start";
+      shortHelp = "start NAME - Start domain";
+      longHelp = "ncc vm start NAME";
+    }
+    {
+      name = "stop";
+      domain = "vm";
+      parent = "vm";
+      description = "ACPI shutdown a libvirt domain";
+      category = "infrastructure";
+      script = "${vmStop}/bin/ncc-vm-stop";
+      shortHelp = "stop NAME - Shutdown domain";
+      longHelp = "ncc vm stop NAME";
+    }
+    {
+      name = "destroy";
+      domain = "vm";
+      parent = "vm";
+      description = "Force-off a libvirt domain";
+      category = "infrastructure";
+      script = "${vmDestroy}/bin/ncc-vm-destroy";
+      shortHelp = "destroy NAME - Force off domain";
+      longHelp = "ncc vm destroy NAME";
+      dangerous = true;
+    }
+    {
       name = "test";
       domain = "vm";
       parent = "vm";
@@ -204,6 +326,11 @@ EOF
 in
 {
   config = lib.mkMerge [
+    (cliRegistry.registerGuiDomain "vm" {
+      label = "VMs";
+      description = "Libvirt domains and test VMs";
+      enabled = cfg.enable or false;
+    })
     (cliRegistry.registerCommandsFor "vm" allCommands)
   ];
 }

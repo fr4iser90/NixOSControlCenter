@@ -17,10 +17,12 @@ Never show internal store binaries (`ncc-packages`, `ncc-config-layout`, …) in
 
 | Form | Meaning |
 |------|---------|
-| `ncc` | Root UI (TUI today; shared Qt shell later) |
+| `ncc` | Root GUI shell (desktop) / TUI if no display |
 | `ncc help [<domain>]` | Help |
-| `ncc <domain>` | Domain home: **GUI** if the domain has one, else short help / TUI |
-| `ncc <domain> <verb> …` | Action |
+| `ncc <domain>` | **CLI** (help or interactive manager) — never Qt by default |
+| `ncc <domain> --gui` | Domain GUI |
+| `ncc <domain> --tui` | Domain TUI (if enabled) |
+| `ncc <domain> <verb> …` | CLI action |
 
 Flat top-level verbs (`ncc discover`, `ncc ssh-status`) are **not allowed**. Nest under a domain.
 
@@ -75,19 +77,19 @@ Only for **legacy aliases** that already shipped (see §4). New public domains m
 
 | Domain | Default (`ncc <domain>`) | Notes |
 |--------|--------------------------|-------|
-| `packages` | GUI (Qt/PySide6) | CLI verbs already good |
-| `system` | GUI later / TUI now | children stay under `system` |
-| `modules` | GUI/TUI | one canonical name |
-| `network` | GUI/TUI | wifi lives under `network` (alias `wifi` OK) |
-| `desktop` | GUI/TUI | fill when ready |
-| `user` | GUI/TUI | fill when ready |
-| `lock` | GUI/TUI | move discover/restore/fetch here |
-| `vm` | GUI/TUI | simplify `test-<distro>-*` → verbs |
-| `ai` | GUI | PySide6 reference implementation |
-| `nixify` | help or GUI | |
-| `chronicle` | help or GUI | migrate UI to PySide6 |
-| `ssh` | GUI/TUI | unify client + server |
-| `homelab` | GUI/TUI | re-register; fix broken registration |
+| `packages` | CLI help; `--gui` for Qt | |
+| `system` | CLI help; `--gui` / `--tui` | children under `system` |
+| `modules` | CLI help; `--gui` / `--tui` | |
+| `network` | CLI help; `--gui` / `--tui` | wifi under `network` |
+| `desktop` | CLI help; `--gui` / `--tui` | |
+| `user` | CLI help; `--gui` / `--tui` | |
+| `lock` | CLI help; `--gui` / `--tui` | |
+| `vm` | CLI help; `--gui` / `--tui` | |
+| `ai` | domain CLI / `--gui` | |
+| `nixify` | help or CLI | |
+| `chronicle` | help or CLI | |
+| `ssh` | CLI (`client` = manager); `--gui` / `--tui` | unify client + server |
+| `homelab` | CLI help; `--gui` | |
 
 ---
 
@@ -144,17 +146,18 @@ Historical aliases (if any remain in old generations) are unsupported after rebu
 
 | Layer | Choice |
 |-------|--------|
-| Desktop GUI | **Primary for desktop users** — Qt / PySide6; configure modules here |
-| CLI | **Primary for scripting / automation** — always available |
-| TUI | **Optional** — servers without a desktop, or terminal enthusiasts (`ncc <domain> tui`) |
-| Domain default | If a domain has a GUI, `ncc <domain>` opens it (not the TUI) |
+| Desktop GUI | Qt / PySide6 — root `ncc`, or `ncc <domain> --gui` (gated by `gui-engine.enable`) |
+| CLI | **Default for every domain** — scripting / interactive managers |
+| TUI | Optional — `ncc <domain> --tui` when `tui-engine.enable` |
+| Domain default | **`ncc <domain>` is never Qt** — use `--gui` |
+| GUI toggle | `core.management.gui-engine.enable` — `null` = auto (on with desktop), `true`/`false` override |
+| TUI toggle | `core.management.tui-engine.enable` — `null` = auto (off with desktop), `true`/`false` override |
 | Toolkit debt | Chronicle GTK → migrate to PySide6 |
-| Data | Nix libraries shared by CLI + GUI — not JSON-CLI as the contract |
+| Data | Nix libraries shared by CLI + GUI |
 
-Do **not** put “Open TUI” / “Open GUI” as primary buttons inside the root shell — the shell already *is* the GUI. Filter launcher verbs (`tui`, `gui`, `manager`) out of GUI catalog actions.
+Do **not** register bare verbs `gui` / `tui` as primary actions (flags only). Filter legacy launcher names out of GUI catalog actions if they still exist.
 
 **TUI packaging:** `(getModuleApi "tui-engine").isEnabled getModuleConfig` — reads `systemConfig` for `tui-engine` (move-safe). `enable = null` (default) → off when desktop is on, on when headless. Override in systemConfig, e.g. `core.management.tui-engine.enable = true;`.
-
 
 ### GUI catalog (no hardwired domain list)
 

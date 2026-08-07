@@ -10,6 +10,8 @@ let
   tuiOn = (getModuleApi "tui-engine").isEnabled getModuleConfig;
   tuiOff = (getModuleApi "tui-engine").disabledHint;
   domainGui = (getModuleApi "gui-engine").domainGui pkgs;
+  guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
+  guiOff = (getModuleApi "gui-engine").disabledHint;
   scriptModule = import ./scripts/ssh-client-manager.nix {
     inherit config lib pkgs systemConfig getModuleConfig getModuleApi;
   };
@@ -19,28 +21,48 @@ let
     then (import ./ui/tui/default.nix { inherit config lib pkgs systemConfig scriptPath getModuleApi; sshClientCfg = cfg; }).tuiScript
     else null;
 
+  # Variant 1: bare = CLI manager; UI only via --gui / --tui
   clientRouter = pkgs.writeShellScriptBin "ncc-ssh-client" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
+    _ui=""
+    _args=()
+    for _a in "$@"; do
+      case "$_a" in
+        --gui) _ui=gui ;;
+        --tui) _ui=tui ;;
+        gui|tui)
+          echo "Use: ncc ssh client --$_a   (not bare '$_a')" >&2
+          exit 2
+          ;;
+        *) _args+=("$_a") ;;
+      esac
+    done
+    set -- "''${_args[@]}"
+
     cmd="''${1:-}"
     case "$cmd" in
-      ""|gui)
-        exec ${domainGui}/bin/ncc-domain-gui ssh
-        ;;
-      tui)
-        ${if tuiOn then ''exec ${sshClientTui}/bin/ncc-ssh-client-tui'' else tuiOff}
+      "")
+        case "$_ui" in
+          gui) ${if guiOn then ''exec ${domainGui}/bin/ncc-domain-gui ssh'' else guiOff} ;;
+          tui)
+            ${if tuiOn then ''exec ${sshClientTui}/bin/ncc-ssh-client-tui'' else tuiOff}
+            ;;
+          *) exec ${scriptPath}/bin/ncc-ssh-client-manager-main ;;
+        esac
         ;;
       list|add|edit|delete|connect)
         exec ${scriptPath}/bin/ncc-ssh-client-manager-main "$cmd" "''${@:2}"
         ;;
       help|-h|--help)
         cat <<EOF
-ncc ssh client — SSH client connections
+ncc ssh client — SSH client connections (CLI)
 
 Usage:
-  ncc ssh client                 GUI
-  ncc ssh client tui             TUI (if enabled)
-  ncc ssh client list|add|edit|delete|connect
+  ncc ssh client                 Interactive CLI manager
+  ncc ssh client --gui           Domain GUI
+  ncc ssh client --tui           TUI (if enabled)
+  ncc ssh client list|add|edit|delete|connect …
 EOF
         ;;
       *)
@@ -60,10 +82,13 @@ EOF
       category = "security";
       script = "${clientRouter}/bin/ncc-ssh-client";
       shortHelp = "client - SSH client connections";
-      longHelp = "ncc ssh client list|add|edit|delete|connect";
+      longHelp = ''
+        ncc ssh client                 CLI manager
+        ncc ssh client --gui|--tui
+        ncc ssh client list|add|edit|delete|connect
+      '';
     }
   ] ++ optional (!serverOn) {
-    # Client-only: provide top-level `ncc ssh` (server-manager owns it when enabled).
     name = "ssh";
     domain = "ssh";
     type = "manager";
@@ -72,7 +97,8 @@ EOF
     script = "${clientRouter}/bin/ncc-ssh-client";
     shortHelp = "ssh - SSH connections";
     longHelp = ''
-      ncc ssh                 GUI
+      ncc ssh                 CLI manager
+      ncc ssh --gui|--tui
       ncc ssh client …
     '';
   };
