@@ -76,6 +76,20 @@ class Settings:
     allow_rebuild: bool
     client_mode: str  # "chat" | "mcp"
     nixos_dir: str
+    # Agent settings
+    allow_shell: bool
+    agent_max_steps: int
+    agent_allow_write: bool
+    agent_allow_rebuild: bool
+    agent_confirm: str  # "writes" | "always" | "never"
+    agent_dry_run: bool
+    agent_profile: str | None
+    # Notification settings
+    notify_enable: bool
+    notify_timeout_sec: int
+    notify_on_timeout: str  # "block" | "queue" | "pause"
+    # MCP settings
+    mcp_servers_json: str | None
 
     @property
     def provider(self) -> str:
@@ -152,6 +166,20 @@ class Settings:
             allow_rebuild=_env_bool("NCC_ASSISTANT_ALLOW_REBUILD", False),
             client_mode=client_mode,
             nixos_dir=os.environ.get("NIXOS_DIR", "/etc/nixos"),
+            # Agent settings
+            allow_shell=_env_bool("NCC_ASSISTANT_ALLOW_SHELL", False),
+            agent_max_steps=int(os.environ.get("NCC_ASSISTANT_AGENT_MAX_STEPS", "50")),
+            agent_allow_write=_env_bool("NCC_ASSISTANT_AGENT_ALLOW_WRITE", False),
+            agent_allow_rebuild=_env_bool("NCC_ASSISTANT_AGENT_ALLOW_REBUILD", False),
+            agent_confirm=os.environ.get("NCC_ASSISTANT_AGENT_CONFIRM", "writes"),
+            agent_dry_run=_env_bool("NCC_ASSISTANT_AGENT_DRY_RUN", False),
+            agent_profile=_env_optional_str("NCC_ASSISTANT_AGENT_PROFILE"),
+            # Notification settings
+            notify_enable=_env_bool("NCC_ASSISTANT_NOTIFY_ENABLE", True),
+            notify_timeout_sec=int(os.environ.get("NCC_ASSISTANT_NOTIFY_TIMEOUT_SEC", "300")),
+            notify_on_timeout=os.environ.get("NCC_ASSISTANT_NOTIFY_ON_TIMEOUT", "block"),
+            # MCP settings
+            mcp_servers_json=_env_optional_str("NCC_ASSISTANT_MCP_SERVERS_JSON"),
         )
 
     def load_system_prompt(self) -> str:

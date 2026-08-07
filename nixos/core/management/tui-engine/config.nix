@@ -1,9 +1,8 @@
-{ config, lib, pkgs, buildGoApplication, gomod2nix, ... }:
+{ config, lib, pkgs, buildGoApplication, gomod2nix, getCurrentModuleMetadata, getModuleConfig, getModuleApi, getModuleMetadata, ... }:
 
 let
-  # Import module discovery to find all modules with TUI files
-  discoveryLib = import ../module-manager/lib/discovery.nix { inherit lib; };
-  allModules = discoveryLib.discoverAllModules;
+  metadata = getCurrentModuleMetadata ./.;
+  configPath = metadata.configPath;
   
   # TUI Engine is a BUILDER/API provider - modules keep their own TUI files!
   # Modules build their own binaries using TUI Engine APIs
@@ -170,7 +169,7 @@ let
   # Generic TUI runner: builds module-specific binary + 4 panel scripts + title
   # Each module gets its own isolated TUI binary with its own TUI files
   # modulePath is REQUIRED - no fallbacks, every module MUST have its own TUI files
-  createTuiScript = { name, title, getList, getFilter, getDetails, getActions, footer ? null, actionCmd ? null, getStats ? null, layout ? null, staticMenu ? false, modulePath }:
+  createTuiScript = { name, title, getList, getFilter, getDetails, getActions, footer, actionCmd, getStats, layout, staticMenu, modulePath }:
     let
       # Build module-specific binary - modulePath is REQUIRED
       # Every module MUST have its own TUI files - no exceptions, no fallbacks
@@ -232,21 +231,23 @@ let
       '';
 
   # API wie cli-registry - kein cfg Build-Time dependency
-  apiValue = import ./api.nix { inherit lib config; } // {
+  # Pass createTuiScript into domain-tui — do not let domain-tui call fromConfig on self
+  apiValue = import ./api.nix { inherit lib getModuleMetadata; metadata = metadata; } // {
     createTuiScript = createTuiScript;
     createTuiBinary = createTuiBinary;
-    tuiEngineSrc = tuiEngineSrc;  # Expose src for modules to build their own binaries
-    domainTui = import ./lib/domain-tui.nix { inherit config lib pkgs; };
+    tuiEngineSrc = tuiEngineSrc;
+    domainTui = import ./lib/domain-tui.nix {
+      inherit config lib pkgs createTuiScript getModuleApi;
+    };
   };
 in {
-  # Config setzen (hardcoded path wie cli-registry)
-  config.core.management.tui-engine = {
+  config.${configPath} = {
     api = apiValue;
     buildGoApplication = buildGoApplication;
     gomod2nix = gomod2nix;
     writeScriptBin = pkgs.writeScriptBin;
     installShellFiles = pkgs.installShellFiles;
-    tuiEngineSrc = tuiEngineSrc;  # Expose src for modules to build their own binaries
+    tuiEngineSrc = tuiEngineSrc;
     createTuiScript = createTuiScript;
     createTuiBinary = createTuiBinary;
     domainTui = apiValue.domainTui;

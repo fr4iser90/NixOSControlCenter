@@ -1,13 +1,13 @@
 # Bubble Tea TUI Build Integration
-{ lib, pkgs, bubbletea-src ? "github.com/charmbracelet/bubbletea" }:
+{ lib, pkgs }:
 
 let
   # Import all templates
-  templates = import ./components/templates.nix { inherit lib bubbletea-src; };
-  listTemplate = import ./components/list.nix { inherit lib bubbletea-src; };
-  formTemplate = import ./components/form.nix { inherit lib bubbletea-src; };
-  statusTemplate = import ./components/status.nix { inherit lib bubbletea-src; };
-  mainEntry = import ./main.nix { inherit lib bubbletea-src; };
+  templates = import ./components/templates.nix { inherit lib; };
+  listTemplate = import ./components/list.nix { inherit lib; };
+  formTemplate = import ./components/form.nix { inherit lib; };
+  statusTemplate = import ./components/status.nix { inherit lib; };
+  mainEntry = import ./main.nix { inherit lib; };
 
   # Generate go.mod and go.sum from Nix
   goMod = ''

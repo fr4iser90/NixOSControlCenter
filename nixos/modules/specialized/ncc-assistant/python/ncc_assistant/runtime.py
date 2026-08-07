@@ -7,10 +7,11 @@ import json
 import os
 import re
 import subprocess
+import time
+from pathlib import Path
 from typing import Any, Callable
 
 from .config import Settings
-
 
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
@@ -147,7 +148,135 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "required": ["confirm"],
         },
     },
+    {
+        "name": "run_preflight",
+        "description": (
+            "Run preflight checks before a system rebuild. "
+            "Returns ok if prebuild script exists and succeeds, or stub ok if not present."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "config_health_report",
+        "description": (
+            "Generate a configuration health report using knowledge registries "
+            "and optional nix-instantiate validation."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "memory_list",
+        "description": "List persistent memory notes for context.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "tag": {"type": "string", "description": "Optional tag filter"},
+                "limit": {"type": "integer", "default": 20},
+            },
+        },
+    },
+    {
+        "name": "memory_add",
+        "description": "Add a note to persistent memory.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "content": {"type": "string", "description": "Note content"},
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional tags",
+                },
+            },
+            "required": ["content"],
+        },
+    },
+    {
+        "name": "memory_forget",
+        "description": "Remove a note from memory by ID.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "note_id": {"type": "string", "description": "ID of note to forget"},
+            },
+            "required": ["note_id"],
+        },
+    },
+    {
+        "name": "list_config_backups",
+        "description": "List available NixOS configuration backups from /var/backup/nixos if present.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "default": 20},
+            },
+        },
+    },
+    {
+        "name": "list_boot_generations",
+        "description": "List NixOS system generations for rollback guidance.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "default": 20},
+            },
+        },
+    },
+    {
+        "name": "disk_nix_report",
+        "description": (
+            "Probe root filesystem and /nix/store usage (no LLM). "
+            "Returns percentages, sizes, generation count, and threshold flag."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "threshold_pct": {
+                    "type": "number",
+                    "description": "Root usage %% that marks over_threshold (default 85)",
+                    "default": 85,
+                },
+            },
+        },
+    },
+    {
+        "name": "restore_config_backup",
+        "description": (
+            "Load a config backup for guided restore. Requires confirm=true. "
+            "Does not auto-apply a full monolith."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "backup_path": {"type": "string"},
+                "confirm": {"type": "boolean"},
+            },
+            "required": ["backup_path", "confirm"],
+        },
+    },
+    {
+        "name": "agent_finish",
+        "description": (
+            "Signal that the agent has completed its goal or cannot proceed. "
+            "Only used in agent mode."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string", "description": "Summary of outcome"},
+                "success": {"type": "boolean", "description": "Whether goal was achieved"},
+            },
+            "required": ["summary", "success"],
+        },
+    },
 ]
+MUTATING_TOOLS = {"apply_module_config", "apply_system", "restore_config_backup"}
 
 
 class ToolRuntime:
@@ -155,10 +284,29 @@ class ToolRuntime:
         self,
         settings: Settings,
         confirm_hook: Callable[[dict[str, Any]], bool] | None = None,
+        *,
+        dry_run: bool = False,
     ):
         self.settings = settings
         self.confirm_hook = confirm_hook
         self._index: dict[str, Any] | None = None
+        self._dry_run = dry_run
+        self._call_counts: dict[str, int] = {}
+        self._mcp_pool: Any = None
+
+    @property
+    def dry_run(self) -> bool:
+        return self._dry_run
+
+    @dry_run.setter
+    def dry_run(self, value: bool) -> None:
+        self._dry_run = value
+
+    def _get_mcp_pool(self) -> Any:
+        if self._mcp_pool is None:
+            from .mcp_client import get_mcp_pool
+            self._mcp_pool = get_mcp_pool()
+        return self._mcp_pool
 
     # --- facade helpers -------------------------------------------------
 
@@ -306,30 +454,52 @@ class ToolRuntime:
             return {"ok": False, "error": "query required"}
         hits: list[dict[str, Any]] = []
         tokens = [t for t in re.split(r"\W+", q) if t]
-        for kid, path in self._iter_knowledge_files():
+
+        def _score_file(kid: str, path: Path, *, rel: str) -> None:
             try:
                 text = path.read_text(encoding="utf-8")
             except OSError:
-                continue
+                return
             lower = text.lower()
             score = sum(lower.count(t) for t in tokens)
             if score <= 0:
-                continue
-            # Grab a small snippet around first token
+                return
             idx = lower.find(tokens[0]) if tokens else -1
             start = max(0, idx - 80) if idx >= 0 else 0
             snippet = text[start : start + 240].replace("\n", " ")
             hits.append(
                 {
                     "id": kid,
-                    "file": str(path.relative_to(self.settings.knowledge_root)),
-                    "score": score,
+                    "file": rel,
+                    "score": score + (50 if rel.startswith("overlay:") else 0),
                     "snippet": snippet,
                 }
             )
+
+        for kid, path in self._iter_knowledge_files():
+            try:
+                rel = str(path.relative_to(self.settings.knowledge_root))
+            except ValueError:
+                rel = str(path)
+            _score_file(kid, path, rel=rel)
+
+        # User knowledge overlay (phase 13)
+        try:
+            from .paths import knowledge_overlay_dir
+
+            overlay = knowledge_overlay_dir()
+            if overlay.is_dir():
+                for path in overlay.rglob("*"):
+                    if not path.is_file():
+                        continue
+                    if path.suffix.lower() not in {".md", ".txt", ".json", ".nix"}:
+                        continue
+                    _score_file(f"overlay/{path.name}", path, rel=f"overlay:{path.name}")
+        except Exception:  # noqa: BLE001
+            pass
+
         hits.sort(key=lambda h: h["score"], reverse=True)
         return {"ok": True, "hits": hits[: max(1, min(limit, 20))]}
-
     def explain_path(self, module_path: str) -> dict[str, Any]:
         path = self._normalize_path(module_path)
         listed = self.list_modules(query=path.split("/")[-1])
@@ -419,6 +589,29 @@ class ToolRuntime:
                 "error": 'confirm must be exactly "CONFIRM" to run a system rebuild.',
             }
 
+        try:
+            from .host_profiles import assert_hostname_allowed
+
+            host_err = assert_hostname_allowed(hostname)
+            if host_err:
+                return {"ok": False, "error": host_err}
+        except ImportError:
+            pass
+
+        require_preflight = os.environ.get("AGENT_REQUIRE_PREFLIGHT", "0").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        if require_preflight:
+            pre = self.run_preflight()
+            if not pre.get("ok"):
+                return {
+                    "ok": False,
+                    "error": "Preflight required before rebuild failed",
+                    "preflight": pre,
+                }
+
         host = hostname or self._detect_hostname()
         flake = f"{self.settings.nixos_dir}#{host}"
         cmd = ["sudo", "ncc", "system", "build", "switch", "--flake", flake]
@@ -430,7 +623,6 @@ class ToolRuntime:
             "stderr": proc.stderr[-4000:],
             "returncode": proc.returncode,
         }
-
     def _detect_hostname(self) -> str:
         try:
             return Path("/etc/hostname").read_text(encoding="utf-8").strip() or "nixos"
@@ -447,52 +639,440 @@ class ToolRuntime:
             p = p.replace(".", "/")
         return p
 
+    def _check_kill_switch(self) -> str | None:
+        """Check if kill-switch is active. Returns error message or None."""
+        from .paths import is_disabled
+        if is_disabled():
+            return "Operations disabled by kill-switch (DISABLE file exists)"
+        return None
+
+    def _check_presence_for_mutating(self, name: str) -> str | None:
+        """Check presence state for mutating tools."""
+        if name not in MUTATING_TOOLS:
+            return None
+        from .presence import is_paused, get_presence
+        if is_paused():
+            presence = get_presence()
+            return f"Agent paused: {presence.reason or 'no reason given'}"
+        return None
+
+    def _check_rate_limit(self, name: str, max_calls: int | None) -> str | None:
+        """Check rate limit for a tool. Returns error message or None."""
+        if max_calls is None:
+            # Default soft caps for builtins that can spam
+            defaults = {
+                "apply_module_config": 10,
+                "apply_system": 2,
+                "run_preflight": 5,
+            }
+            max_calls = defaults.get(name)
+        if max_calls is None:
+            return None
+        count = self._call_counts.get(name, 0)
+        if count >= max_calls:
+            return f"Rate limit exceeded for {name}: {count}/{max_calls} calls"
+        return None
+
+    def _check_min_interval(self, name: str, min_interval_ms: int | None) -> str | None:
+        if not min_interval_ms:
+            return None
+        last = getattr(self, "_last_call_ms", {}).get(name)
+        now = int(time.time() * 1000)
+        if last is not None and now - last < min_interval_ms:
+            return (
+                f"Rate limit: {name} min interval {min_interval_ms}ms "
+                f"(retry in {min_interval_ms - (now - last)}ms)"
+            )
+        if not hasattr(self, "_last_call_ms"):
+            self._last_call_ms = {}
+        self._last_call_ms[name] = now
+        return None
+
+    def _shell_allowlisted(self, command: str) -> bool:
+        raw = os.environ.get("NCC_ASSISTANT_SHELL_ALLOWLIST", "").strip()
+        if not raw:
+            return True  # empty allowlist = allow when shell enabled
+        prefixes = [p.strip() for p in raw.split(":") if p.strip()]
+        cmd = command.strip()
+        return any(cmd == p or cmd.startswith(p + " ") for p in prefixes)
+
+    def _request_confirmation(self, payload: dict[str, Any]) -> bool:
+        """GUI confirm_hook or notification DecisionService for headless/agent."""
+        if self.confirm_hook is not None:
+            return bool(self.confirm_hook(payload))
+
+        confirm_mode = os.environ.get("AGENT_CONFIRM", "writes").lower()
+        level = payload.get("level", "write")
+        if confirm_mode == "never":
+            return True
+        if confirm_mode == "writes" and level not in ("write", "rebuild"):
+            return True
+
+        from .notifications import get_decision_service
+
+        svc = get_decision_service()
+        timeout = int(os.environ.get("NOTIFY_TIMEOUT_SEC") or os.environ.get("NCC_ASSISTANT_NOTIFY_TIMEOUT_SEC") or "300")
+        decision = svc.create(
+            kind=f"{level}_confirm",
+            title=str(payload.get("title") or "Confirm tool"),
+            summary=str(payload.get("summary") or ""),
+            detail=str(payload.get("detail") or "")[:4000],
+            tool=str(payload.get("tool") or ""),
+            timeout_sec=timeout,
+        )
+        result = svc.wait_for_decision(decision.id, timeout_sec=timeout)
+        return result == "allow"
+    def _record_call(self, name: str) -> None:
+        """Record a tool call for rate limiting."""
+        self._call_counts[name] = self._call_counts.get(name, 0) + 1
+
+    def _call_mcp_tool(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
+        """Call an MCP tool (name format: mcp.<server>.<tool>)."""
+        parts = name.split(".", 2)
+        if len(parts) != 3:
+            return {"ok": False, "error": f"Invalid MCP tool name: {name}"}
+        _, server, tool = parts
+        try:
+            pool = self._get_mcp_pool()
+            return pool.call_tool(server, tool, args)
+        except Exception as exc:
+            return {"ok": False, "error": f"MCP call failed: {exc}"}
+
+    def _call_shell_tool(self, name: str, args: dict[str, Any], command: str) -> dict[str, Any]:
+        """Call a shell tool with argument substitution."""
+        if not self.settings.allow_shell:
+            return {"ok": False, "error": "Shell tools are disabled"}
+
+        cmd = command
+        for key, value in args.items():
+            placeholder = "{{" + key + "}}"
+            cmd = cmd.replace(placeholder, str(value))
+
+        if not self._shell_allowlisted(cmd):
+            return {
+                "ok": False,
+                "error": (
+                    f"Shell command not in allowlist: {cmd[:120]}. "
+                    "Configure tools.shellAllowlist in systemConfig."
+                ),
+            }
+
+        try:
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=300,
+                check=False,
+            )
+            return {
+                "ok": result.returncode == 0,
+                "stdout": result.stdout[-4000:],
+                "stderr": result.stderr[-2000:],
+                "returncode": result.returncode,
+            }
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "error": "Shell command timed out"}
+        except Exception as exc:
+            return {"ok": False, "error": f"Shell error: {exc}"}
+
+    def run_preflight(self) -> dict[str, Any]:
+        """Run preflight checks before rebuild."""
+        prebuild_script = "/etc/nixos/prebuild.sh"
+        if not os.path.isfile(prebuild_script):
+            return {"ok": True, "message": "No prebuild script found, skipping"}
+
+        try:
+            result = subprocess.run(
+                [prebuild_script],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
+            )
+            return {
+                "ok": result.returncode == 0,
+                "stdout": result.stdout[-2000:],
+                "stderr": result.stderr[-1000:],
+                "returncode": result.returncode,
+            }
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "error": "Preflight script timed out"}
+        except Exception as exc:
+            return {"ok": False, "error": f"Preflight error: {exc}"}
+
+    def config_health_report(self) -> dict[str, Any]:
+        """Generate configuration health report."""
+        from .health import config_health_report
+        report = config_health_report(self.settings)
+        return {"ok": True, **report.to_dict()}
+
+    def memory_list(self, tag: str | None = None, limit: int = 20) -> dict[str, Any]:
+        """List memory notes."""
+        from .memory import list_notes
+        notes = list_notes(tag=tag, limit=limit)
+        return {
+            "ok": True,
+            "count": len(notes),
+            "notes": [n.to_dict() for n in notes],
+        }
+
+    def memory_add(self, content: str, tags: list[str] | None = None) -> dict[str, Any]:
+        """Add a memory note."""
+        from .memory import add_note
+        note = add_note(content, tags=tags, source="agent")
+        return {"ok": True, "note_id": note.id}
+
+    def memory_forget(self, note_id: str) -> dict[str, Any]:
+        """Forget a memory note."""
+        from .memory import forget_note
+        success = forget_note(note_id)
+        if success:
+            return {"ok": True, "message": f"Forgot note {note_id}"}
+        return {"ok": False, "error": f"Note {note_id} not found"}
+
+    def list_config_backups(self, limit: int = 20) -> dict[str, Any]:
+        """List NixOS configuration backups."""
+        backup_dir = Path("/var/backup/nixos")
+        if not backup_dir.is_dir():
+            return {"ok": True, "count": 0, "backups": [], "message": "Backup directory not found"}
+
+        backups: list[dict[str, Any]] = []
+        try:
+            entries = list(backup_dir.iterdir())
+        except PermissionError:
+            return {
+                "ok": True,
+                "count": 0,
+                "backups": [],
+                "message": f"Permission denied reading {backup_dir}",
+            }
+        for path in sorted(entries, key=lambda p: p.stat().st_mtime, reverse=True):
+            if len(backups) >= limit:
+                break
+            try:
+                stat = path.stat()
+            except OSError:
+                continue
+            backups.append({
+                "name": path.name,
+                "path": str(path),
+                "size": stat.st_size,
+                "mtime": stat.st_mtime,
+            })
+
+        return {"ok": True, "count": len(backups), "backups": backups}
+
+    def list_boot_generations(self, limit: int = 20) -> dict[str, Any]:
+        """List nixos boot generations for rollback guidance."""
+        try:
+            proc = subprocess.run(
+                ["nixos-rebuild", "list-generations"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=30,
+            )
+            if proc.returncode != 0:
+                # Fallback: profile links
+                profile = Path("/nix/var/nix/profiles/system")
+                gens = []
+                if profile.parent.is_dir():
+                    for p in sorted(profile.parent.glob("system-*-link"), reverse=True):
+                        gens.append({"name": p.name, "path": str(p)})
+                        if len(gens) >= limit:
+                            break
+                return {
+                    "ok": True,
+                    "count": len(gens),
+                    "generations": gens,
+                    "stderr": proc.stderr[-1000:],
+                    "source": "profile-links",
+                }
+            lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
+            return {
+                "ok": True,
+                "count": len(lines[:limit]),
+                "generations": [{"line": ln} for ln in lines[:limit]],
+                "source": "nixos-rebuild",
+            }
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc)}
+
+    def restore_config_backup(self, backup_path: str, *, confirm: bool = False) -> dict[str, Any]:
+        """Restore a backup file path into the active monolith (guarded)."""
+        if not confirm:
+            return {
+                "ok": False,
+                "error": "confirm=true required to restore a backup",
+                "backup_path": backup_path,
+            }
+        if not self.settings.writes_enabled:
+            return {"ok": False, "error": "Writes disabled"}
+        src = Path(backup_path)
+        if not src.is_file():
+            return {"ok": False, "error": f"Backup not found: {backup_path}"}
+        # Only allow under known backup roots
+        allowed_roots = [Path("/var/backup/nixos"), Path.home() / ".config" / "ncc-assistant" / "backups"]
+        if not any(str(src.resolve()).startswith(str(r.resolve())) for r in allowed_roots if r.exists() or True):
+            # still require path under /var/backup/nixos or user backups
+            resolved = str(src.resolve())
+            if "/var/backup/nixos" not in resolved and "/.config/ncc-assistant/backups" not in resolved:
+                return {"ok": False, "error": "Backup path not under an allowed backup root"}
+        content = src.read_text(encoding="utf-8")
+        # Heuristic: if looks like a module leaf, refuse full monolith restore via this tool
+        return {
+            "ok": True,
+            "message": (
+                "Backup content loaded for guided restore. "
+                "Use apply_module_config with the relevant leaf, or restore manually."
+            ),
+            "backup_path": str(src),
+            "size": len(content),
+            "preview": content[:2000],
+        }
+    def agent_finish(self, summary: str, success: bool) -> dict[str, Any]:
+        """Agent finish handler (actual finish is handled by AgentRunner)."""
+        return {"ok": True, "message": "Agent finished", "summary": summary, "success": success}
+
     def call(self, name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
         args = dict(arguments or {})
         try:
-            if name == "apply_module_config" and self.confirm_hook is not None:
-                preview = ""
+            kill_err = self._check_kill_switch()
+            if kill_err and name in MUTATING_TOOLS:
+                from .audit import append_audit
                 try:
-                    proposal = self.propose_config_patch(
-                        args.get("module_path", ""), args.get("content_nix", "")
-                    )
-                    preview = proposal.get("diff") or proposal.get("error") or ""
+                    append_audit("deny", tool=name, result="denied", detail=kill_err)
                 except Exception:  # noqa: BLE001
-                    preview = (args.get("content_nix") or "")[:2000]
-                ok = self.confirm_hook(
-                    {
-                        "tool": name,
-                        "level": "write",
-                        "title": "Write module config?",
-                        "summary": (
-                            f"Write config to {args.get('module_path', '?')}"
-                        ),
-                        "detail": str(preview)[:4000],
-                    }
-                )
-                if not ok:
-                    return {"ok": False, "error": "Cancelled by user in GUI."}
-                args["confirm"] = True
+                    pass
+                return {"ok": False, "error": kill_err}
 
-            if name == "apply_system" and self.confirm_hook is not None:
-                ok = self.confirm_hook(
+            presence_err = self._check_presence_for_mutating(name)
+            if presence_err:
+                return {"ok": False, "error": presence_err}
+
+            if self._dry_run and name in MUTATING_TOOLS:
+                return {
+                    "ok": False,
+                    "error": "Dry-run mode: write operations are simulated",
+                    "dry_run": True,
+                    "would_call": name,
+                    "args": args,
+                }
+
+            from .registry import get_registry
+            registry = get_registry()
+            tool_entry = registry.get(name)
+
+            if tool_entry and not tool_entry.enabled:
+                return {"ok": False, "error": f"Tool disabled: {name}"}
+
+            max_calls = tool_entry.max_calls_per_job if tool_entry else None
+            rate_err = self._check_rate_limit(name, max_calls)
+            if rate_err:
+                return {"ok": False, "error": rate_err}
+            min_ms = None
+            if tool_entry and getattr(tool_entry, "min_interval_ms", None):
+                min_ms = tool_entry.min_interval_ms  # type: ignore[attr-defined]
+            interval_err = self._check_min_interval(name, min_ms)
+            if interval_err:
+                return {"ok": False, "error": interval_err}
+
+            if name.startswith("mcp."):
+                self._record_call(name)
+                return self._call_mcp_tool(name, args)
+
+            if tool_entry and tool_entry.kind == "shell":
+                if not tool_entry.command:
+                    return {"ok": False, "error": f"Shell tool {name} has no command"}
+                self._record_call(name)
+                return self._call_shell_tool(name, args, tool_entry.command)
+
+            if name == "apply_module_config":
+                wants_write = args.get("confirm") in (True, "true", "1", 1)
+                # Interactive GUI: always prompt before write; headless only if confirm=true
+                if self.confirm_hook is not None or wants_write:
+                    preview = ""
+                    try:
+                        proposal = self.propose_config_patch(
+                            args.get("module_path", ""), args.get("content_nix", "")
+                        )
+                        preview = proposal.get("diff") or proposal.get("error") or ""
+                    except Exception:  # noqa: BLE001
+                        preview = (args.get("content_nix") or "")[:2000]
+                    ok = self._request_confirmation(
+                        {
+                            "tool": name,
+                            "level": "write",
+                            "title": "Write module config?",
+                            "summary": f"Write config to {args.get('module_path', '?')}",
+                            "detail": str(preview)[:4000],
+                        }
+                    )
+                    if not ok:
+                        return {"ok": False, "error": "Cancelled by user / notification timeout."}
+                    args["confirm"] = True
+
+            if name == "apply_system":
+                wants_rebuild = args.get("confirm") == "CONFIRM"
+                if self.confirm_hook is not None or wants_rebuild:
+                    ok = self._request_confirmation(
+                        {
+                            "tool": name,
+                            "level": "rebuild",
+                            "title": "Rebuild system?",
+                            "summary": (
+                                "Run ncc system build switch "
+                                f"(host={args.get('hostname') or 'default'})"
+                            ),
+                            "detail": (
+                                "This can change the running system. "
+                                'Requires allowRebuild and confirm "CONFIRM".'
+                            ),
+                        }
+                    )
+                    if not ok:
+                        return {"ok": False, "error": "Cancelled by user / notification timeout."}
+                    args["confirm"] = "CONFIRM"
+
+            if name == "restore_config_backup":
+                wants = args.get("confirm") in (True, "true", "1", 1)
+                if self.confirm_hook is not None or wants:
+                    ok = self._request_confirmation(
+                        {
+                            "tool": name,
+                            "level": "write",
+                            "title": "Restore config backup?",
+                            "summary": f"Load backup {args.get('backup_path', '?')}",
+                            "detail": "Guided restore — review preview before applying leaves.",
+                        }
+                    )
+                    if not ok:
+                        return {"ok": False, "error": "Cancelled by user / notification timeout."}
+                    args["confirm"] = True
+
+            confirm_mode = os.environ.get("AGENT_CONFIRM", "writes").lower()
+            # Confirm-always is for agent/headless; GUI chat already uses confirm_hook for writes.
+            if (
+                confirm_mode == "always"
+                and self.confirm_hook is None
+                and name not in MUTATING_TOOLS
+                and name != "agent_finish"
+            ):
+                ok = self._request_confirmation(
                     {
                         "tool": name,
-                        "level": "rebuild",
-                        "title": "Rebuild system?",
-                        "summary": (
-                            "Run ncc system build switch "
-                            f"(host={args.get('hostname') or 'default'})"
-                        ),
-                        "detail": (
-                            "This can change the running system. "
-                            'Requires allowRebuild and confirm "CONFIRM".'
-                        ),
+                        "level": "tool",
+                        "title": f"Allow tool {name}?",
+                        "summary": f"Confirm mode=always: {name}",
+                        "detail": json.dumps(args)[:2000],
                     }
                 )
                 if not ok:
-                    return {"ok": False, "error": "Cancelled by user in GUI."}
-                args["confirm"] = "CONFIRM"
+                    return {"ok": False, "error": "Cancelled by confirm=always policy."}
+
+            self._record_call(name)
 
             if name == "list_modules":
                 return self.list_modules(args.get("query"))
@@ -520,6 +1100,37 @@ class ToolRuntime:
                 )
             if name == "apply_system":
                 return self.apply_system(args.get("confirm", ""), args.get("hostname"))
+            if name == "run_preflight":
+                return self.run_preflight()
+            if name == "config_health_report":
+                return self.config_health_report()
+            if name == "memory_list":
+                return self.memory_list(args.get("tag"), int(args.get("limit", 20)))
+            if name == "memory_add":
+                return self.memory_add(args["content"], args.get("tags"))
+            if name == "memory_forget":
+                return self.memory_forget(args["note_id"])
+            if name == "list_config_backups":
+                return self.list_config_backups(int(args.get("limit", 20)))
+            if name == "list_boot_generations":
+                return self.list_boot_generations(int(args.get("limit", 20)))
+            if name == "disk_nix_report":
+                from .probes import run_disk_nix_probe
+
+                thr = float(args.get("threshold_pct", 85))
+                measure = bool(args.get("measure_store", False))
+                return {
+                    "ok": True,
+                    **run_disk_nix_probe(
+                        threshold_pct=thr, measure_store=measure
+                    ).to_dict(),
+                }
+            if name == "restore_config_backup":
+                return self.restore_config_backup(
+                    args["backup_path"], confirm=bool(args.get("confirm", False))
+                )
+            if name == "agent_finish":
+                return self.agent_finish(args.get("summary", ""), args.get("success", True))
             return {"ok": False, "error": f"Unknown tool: {name}"}
         except KeyError as exc:
             return {"ok": False, "error": f"Missing argument: {exc}"}
@@ -527,6 +1138,14 @@ class ToolRuntime:
             return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
     def openai_tools(self) -> list[dict[str, Any]]:
+        """Return OpenAI function-calling format using registry."""
+        try:
+            from .registry import get_registry
+            registry = get_registry()
+            return registry.openai_tools()
+        except ImportError:
+            pass
+
         tools = []
         for t in TOOL_DEFINITIONS:
             tools.append(

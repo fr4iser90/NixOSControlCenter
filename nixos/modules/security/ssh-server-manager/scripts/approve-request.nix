@@ -251,13 +251,15 @@ in {
     config = lib.mkMerge [
       cliRegistry.registerCommandsFor "ssh-server-approve-request" [
       {
-        name = "ssh-approve-request";
+        name = "approve-request";
+        parent = "ssh";
+        domain = "ssh";
         description = "Approve SSH access request";
         category = "security";
         script = "${approveRequestScript}/bin/ssh-approve-request";
         arguments = [ "REQUEST_ID" "[DURATION]" ];
         dependencies = [ "jq" "mailutils" "libnotify" "curl" ];
-        shortHelp = "ssh-approve-request REQUEST_ID [DURATION] - Approve access request";
+        shortHelp = "approve-request REQUEST_ID [DURATION] - Approve access request";
         longHelp = ''
           Approves an SSH access request and enables password authentication.
           
@@ -266,18 +268,20 @@ in {
             DURATION    - Custom duration in seconds (optional)
           
           Examples:
-            ssh-approve-request 20250126_101530_fr4iser
-            ssh-approve-request 20250126_101530_fr4iser 600
+            ncc ssh approve-request 20250126_101530_fr4iser
+            ncc ssh approve-request 20250126_101530_fr4iser 600
         '';
       }
       {
-        name = "ssh-deny-request";
+        name = "deny-request";
+        parent = "ssh";
+        domain = "ssh";
         description = "Deny SSH access request";
         category = "security";
         script = "${denyRequestScript}/bin/ssh-deny-request";
         arguments = [ "REQUEST_ID" "REASON" ];
         dependencies = [ "jq" "mailutils" "libnotify" "curl" ];
-        shortHelp = "ssh-deny-request REQUEST_ID REASON - Deny access request";
+        shortHelp = "deny-request REQUEST_ID REASON - Deny access request";
         longHelp = ''
           Denies an SSH access request with a reason.
           
@@ -286,8 +290,8 @@ in {
             REASON      - Reason for denial (required)
           
           Examples:
-            ssh-deny-request 20250126_101530_fr4iser "Use VPN instead"
-            ssh-deny-request 20250126_101530_fr4iser "Security policy violation"
+            ncc ssh deny-request 20250126_101530_fr4iser "Use VPN instead"
+            ncc ssh deny-request 20250126_101530_fr4iser "Security policy violation"
         '';
       }
       ])

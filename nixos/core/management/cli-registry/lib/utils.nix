@@ -17,13 +17,12 @@ in
     # Verwende userAttrs aus der bestehenden user config (wie in user/config.nix)
     userAttrs = lib.filterAttrs (n: v: builtins.isAttrs v) userModuleCfg;
     
-    # Hierarchical command support: if command has parent, also match "parent-name"
+    # Hierarchical only: with parent, match `parent-name` exclusively (no bare-name aliases).
+    # Example: parent=lock name=discover → only `lock-discover` (`ncc lock discover`).
     parentName = cmd.parent or null;
     hierarchicalName = if parentName != null then "${parentName}-${cmd.name}" else null;
-    
-    # Generate case pattern: "name|parent-name)" if hierarchical, else just "name)"
-    casePattern = if hierarchicalName != null 
-      then "${cmd.name}|${hierarchicalName})"
+    casePattern = if hierarchicalName != null
+      then "${hierarchicalName})"
       else "${cmd.name})";
   in ''
       ${casePattern}

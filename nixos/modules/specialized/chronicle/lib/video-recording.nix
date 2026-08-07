@@ -4,7 +4,7 @@
   # Video recording functionality using ffmpeg
   
   # Start video recording
-  startVideoRecording = { sessionDir, backend ? "x11" }: ''
+  startVideoRecording = { sessionDir, backend }: ''
     start_video_recording() {
       local session_dir="${sessionDir}"
       local video_file="$session_dir/recording.mp4"

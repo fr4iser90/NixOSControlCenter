@@ -1,15 +1,15 @@
-{ config, lib, pkgs }:
+{ config, lib, pkgs, getModuleApi }:
 
 let
-  tuiEngine = config.core.management.tui-engine;
-  # Get module path (go up from ui/tui/default.nix to module root)
+  tuiEngine = (getModuleApi "tui-engine").fromConfig config;
   modulePath = ../../..;
-  
+
   rootTui = tuiEngine.domainTui.buildRootTui {
     name = "ncc";
     title = "🧭 NixOS Control Center";
     footer = "Enter domain: ncc <domain> • help: ncc help <command>";
-    modulePath = modulePath;  # REQUIRED - no fallbacks
+    layout = null;
+    inherit modulePath;
   };
 in
 {

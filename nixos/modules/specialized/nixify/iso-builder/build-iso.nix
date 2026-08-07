@@ -6,7 +6,7 @@
 # Dann dieses pkgs an eval-config.nix übergeben
 # Das verhindert zwei nixpkgs-Instanzen → keine doppelte calamares-nixos-extensions
 
-{ forceRebuild ? false }:
+{ forceRebuild }:
 
 let
   # Path to Calamares modules (relative to this file)

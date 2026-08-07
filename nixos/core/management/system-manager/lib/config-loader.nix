@@ -5,10 +5,11 @@
 # Layouts:
 #   monolith → single nested file (systemConfig.nix)
 #   split    → systemConfig/**/config.nix (v1)
-{ lib ? null }:
+{ }:
 
 let
-  layoutLib = import ./config-layout.nix { inherit lib; };
+  lib = null;
+  layoutLib = import ./config-layout.nix { };
 
   # Fallback lib functions if lib is not provided
   filterAttrs = if lib != null then lib.filterAttrs else (f: set: 
@@ -353,12 +354,12 @@ let
     in
       recursiveUpdate baseConfig mono;
 
-  # Core loader from attrset: { flakeRoot, configsPath, monolithPath ?, layout ? }
+  # Core loader from attrset: { flakeRoot, configsPath, monolithPath, layout }
   loadSystemConfigAttrs = {
     flakeRoot,
-    configsPath ? null,
-    monolithPath ? null,
-    layout ? "auto",
+    configsPath,
+    monolithPath,
+    layout,
   }:
     let
       resolvedMonolith =
@@ -408,11 +409,18 @@ let
   #   loadSystemConfig ./. configs   # legacy curried form
   loadSystemConfig = arg1:
     if builtins.isAttrs arg1 && (arg1 ? flakeRoot || arg1 ? configsPath) then
-      loadSystemConfigAttrs ({ flakeRoot = arg1.flakeRoot or ./.; } // arg1)
+      loadSystemConfigAttrs ({
+        flakeRoot = arg1.flakeRoot or ./.;
+        configsPath = null;
+        monolithPath = null;
+        layout = "auto";
+      } // arg1)
     else
       (configsPath: loadSystemConfigAttrs {
         flakeRoot = arg1;
         inherit configsPath;
+        monolithPath = null;
+        layout = "auto";
       });
 
   # Get list of discovered configs (for reference/debugging)

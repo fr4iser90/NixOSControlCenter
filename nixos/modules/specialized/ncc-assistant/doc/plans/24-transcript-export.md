@@ -1,5 +1,7 @@
 # Phase 24 — Transcript export
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned (backlog)  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** phase 0 sessions, phase 3 jobs  

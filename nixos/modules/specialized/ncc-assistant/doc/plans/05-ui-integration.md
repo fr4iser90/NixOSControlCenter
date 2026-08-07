@@ -1,5 +1,7 @@
 # Phase 5 — UI integration
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** phases 1–4 for full IA; **can stub navigation early**  

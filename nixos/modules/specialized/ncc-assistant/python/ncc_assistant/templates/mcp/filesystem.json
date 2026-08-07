@@ -1,0 +1,9 @@
+{
+  "name": "filesystem",
+  "description": "Filesystem MCP server with a constrained root directory",
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp/ncc-mcp-fs"],
+  "env": {},
+  "risk": "write",
+  "install_hint": "Requires npx / node. Prefer a dedicated allowed root dir."
+}

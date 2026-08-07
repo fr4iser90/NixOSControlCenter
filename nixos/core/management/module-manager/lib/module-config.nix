@@ -88,31 +88,26 @@ let
         category = "modules.${moduleName}";
       } else builtins.head matchingModules;
 
-  # 4. getModuleApi: Holt API-Pfad für ein Modul
-  # getModuleApi "cli-formatter" → "core.management.system-manager.submodules.cli-formatter.api"
-  # getModuleApi "system-manager" → "core.management.system-manager.api"
-  # Usage: config.${getModuleApi "module"}
-  # Automatische Übersetzung: Runtime = config path, Build-Time = direkter API import
+  # 4. getModuleApi: discovery → import api.nix with metadata + getModuleMetadata
   getModuleApi = moduleName:
     let
-      metadata = getModuleMetadata moduleName;
-      apiPath = if metadata == {} then "" else metadata.apiPath;
+      modules = discovery.discoverAllModules;
+      targetModule = lib.findFirst (m: m.name == moduleName) null modules;
     in
-    # Magische Übersetzung: Zur Build-Time automatisch resolve
-    if (builtins.tryEval builtins.derivation).success then
-      # Build-Time: Discovery neu laufen und API direkt importieren
-      let
-        modules = discovery.discoverAllModules;
-        targetModule = lib.findFirst (m: m.name == moduleName) null modules;
-      in
       if targetModule == null then
-        throw "Module ${moduleName} not found"
+        throw "getModuleApi: module '${moduleName}' not found in discovery"
       else
-        # Direktes API import zur Build-Time
-        import "${targetModule.path}/api.nix" { inherit lib; }
-    else
-      # Runtime: Normales config access
-      apiPath + ".api";
+        let
+          raw = import "${targetModule.path}/api.nix" {
+            inherit lib getModuleMetadata;
+            metadata = targetModule;
+          };
+          injected = {
+            metadata = targetModule;
+            fromConfig = config: config.${targetModule.configPath};
+          };
+        in
+          raw // injected;
 
 in
 moduleConfigAttrs // {

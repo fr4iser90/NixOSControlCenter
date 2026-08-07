@@ -16,7 +16,7 @@ with lib;
   '';
 
   # Split-Screen Layout mit Sidebar
-  mainContainer = {title, content, sidebar ? null}: let
+  mainContainer = {title, content, sidebar}: let
     titleLen = stringLength title;
     sidebarTitle = if sidebar != null then sidebar.title or "" else "";
     sidebarTitleLen = stringLength sidebarTitle;
@@ -56,7 +56,7 @@ with lib;
   '';
 
   # Info-Box für Previews/Details
-  infoBox = {title, content, width ? 40}: let
+  infoBox = {title, content, width}: let
     titleLen = stringLength title;
     contentLines = if isList content then content else [content];
     boxWidth = max width (titleLen + 6);
@@ -70,7 +70,7 @@ with lib;
   '';
 
   # Suchfeld-Darstellung
-  searchField = {query ? "", placeholder ? "Search..."}: let
+  searchField = {query, placeholder}: let
     safeQuery = if query == null then "" else query;
     displayQuery = if safeQuery == "" then concatStrings (replicate 11 "_") else safeQuery;
   in ''
@@ -78,7 +78,7 @@ with lib;
   '';
 
   # Action-Buttons
-  actionBar = {primary ? [], secondary ? []}: let
+  actionBar = {primary, secondary}: let
     primaryLine = concatStringsSep "    " primary;
     secondaryLine = concatStringsSep "    " secondary;
   in ''
@@ -103,5 +103,6 @@ with lib;
       "Version: ${version}"
       "Path: ${path}"
     ];
+    width = 40;
   };
 }

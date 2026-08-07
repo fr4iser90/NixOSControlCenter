@@ -1,5 +1,34 @@
 # Module Template
 
+> **ENFORCEMENT:** See `docs/AI/RULES.md` and `.cursor/rules/ncc-module-discovery.mdc`.  
+> After module changes run: `bash shell/scripts/checks/modules/validate-no-hardcoded-paths.sh`
+
+## Forbidden (will fail validation)
+
+```nix
+# ❌ NEVER
+config.core.management.tui-engine
+systemConfig.core.base.desktop
+lib.attrByPath [ "core" "base" "…" ] {} systemConfig
+import ../../../core/management/…/something.nix
+getModuleNixConfig config "tui-engine"
+{ getModuleApi ? null, moduleName ? "desktop", ... }:
+```
+
+```nix
+# ✅ ALWAYS
+moduleName = baseNameOf ./.;
+cfg = getModuleConfig moduleName;
+api = getModuleApi "cli-registry";
+tui = (getModuleApi "tui-engine").fromConfig config;
+meta = getCurrentModuleMetadata ./.;
+options.${meta.configPath} = { … };
+```
+
+Modules are discovered generically, merged into systemConfig via `configPath`, and enabled/disabled through that merge — never via hand-written path strings.
+
+---
+
 This template defines the recommended structure for **all** NixOS Control Center modules in our unified architecture:
 
 - **Core System modules** (`systemConfig.core.base.*`) - Core OS functionality (always enabled)

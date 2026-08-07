@@ -16,7 +16,7 @@ in {
   imports = [
     ./options.nix
     (import ./config.nix { inherit config lib pkgs getModuleConfig moduleName systemConfig; })
-    (import ./commands.nix { inherit config lib pkgs systemConfig getModuleApi; })
+    ./commands.nix
     ./password-manager.nix
   ];
 }

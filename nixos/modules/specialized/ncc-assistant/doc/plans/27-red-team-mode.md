@@ -1,5 +1,7 @@
 # Phase 27 — Red-team mode
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned (backlog)  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** phase 2, 6, 18; pairs with [26-eval-harness.md](./26-eval-harness.md)

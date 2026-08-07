@@ -1,16 +1,16 @@
-{ lib, pinMap ? import ./pin-map.nix }:
+{ lib, pinMap }:
 
 {
   # pinnedApps: explicit list (wins when non-empty)
   # pinnedAppsAuto: derive from packages/modules when pinnedApps == []
   # packageModules / systemPackages: from packages module
   # environment: plasma | gnome | xfce
-  pinnedApps ? [],
-  pinnedAppsAuto ? true,
-  packageModules ? [],
-  systemPackages ? [],
-  userPackagesFlat ? [],  # optional flat list of all user package names
-  environment ? "plasma",
+  pinnedApps,
+  pinnedAppsAuto,
+  packageModules,
+  systemPackages,
+  userPackagesFlat,
+  environment,
 }:
 let
   fromPackages = lib.concatMap (pkg: pinMap.packages.${pkg} or []) (

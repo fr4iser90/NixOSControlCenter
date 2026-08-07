@@ -1,0 +1,9 @@
+{
+  "name": "git",
+  "description": "Git repository MCP server (status, log, diff)",
+  "command": "uvx",
+  "args": ["mcp-server-git", "--repository", "."],
+  "env": {},
+  "risk": "write",
+  "install_hint": "Install via: uvx mcp-server-git — review repo path before enable."
+}

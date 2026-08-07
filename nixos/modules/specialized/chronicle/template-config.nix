@@ -42,7 +42,8 @@
   
   gui = {
     enableTray = true;
-    enableGtk = true;
+    enableQt = true;
+    enableGtk = false;
   };
   
   theme = {

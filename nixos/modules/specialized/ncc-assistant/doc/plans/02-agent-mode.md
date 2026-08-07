@@ -1,5 +1,7 @@
 # Phase 2 — Agent mode
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** phase 1 (registry) strongly recommended; can prototype on builtins only  

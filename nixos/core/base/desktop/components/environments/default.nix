@@ -5,7 +5,7 @@ let
   environment = cfg.environment or "plasma";
 in {
   # Only import desktop environment if desktop is enabled
-  # Uses the environment specified in systemConfig.core.base.desktop.environment
+  # Uses desktop.environment from getModuleConfig
   imports = lib.optionals (cfg.enable or true) [
     (./. + "/${environment}")  # Automatically loads the correct desktop environment
   ];

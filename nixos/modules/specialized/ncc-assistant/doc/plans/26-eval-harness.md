@@ -1,5 +1,7 @@
 # Phase 26 — Eval harness
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned (backlog)  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** knowledge + tools stable; helpful after phase 13  

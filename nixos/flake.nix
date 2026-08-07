@@ -42,6 +42,7 @@
       flakeRoot = ./.;
       configsPath = configs;
       monolithPath = if builtins.pathExists ./systemConfig.nix then ./systemConfig.nix else null;
+      layout = "auto";
     };
 
     # Import module discovery for automatic config paths (after systemConfig is loaded)

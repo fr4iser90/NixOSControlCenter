@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, configPath ? "management.system-manager", ... }:
+{ config, lib, pkgs, systemConfig, configPath, ... }:
 let
   cfg = systemConfig.${configPath};
   # Import config-migration module to get the commands

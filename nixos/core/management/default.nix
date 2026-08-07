@@ -4,9 +4,10 @@
   imports = [
     ./system-manager
     ./module-manager
-    ./nixos-control-center 
+    ./nixos-control-center
     ./cli-registry
-    ./cli-formatter   
+    ./cli-formatter
     ./tui-engine
+    ./gui-engine
   ];
 }

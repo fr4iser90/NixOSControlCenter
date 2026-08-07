@@ -10,7 +10,7 @@ let
 
 in {
   # Basis-Template für alle Menus
-  baseTemplate = {title, content, actions, navigation ? []}: let
+  baseTemplate = {title, content, actions, navigation}: let
     # Action-Keys als String für case-statement
     actionKeys = lib.concatStringsSep " " (builtins.attrNames actions);
     actionCase = lib.concatStringsSep "\n" (lib.mapAttrsToList (key: action: ''
@@ -44,7 +44,7 @@ in {
   '';
 
   # Hauptmenü Template - GENERISCH für alle Anwendungen
-  mainMenuTemplate = {title ? "Menu", items ? [], searchEnabled ? false}: let
+  mainMenuTemplate = {title, items, searchEnabled}: let
     # Generische Menu-Anzeige
     menuContent = lib.concatStringsSep "\n" (map (item: let
       key = item.key or "?";
@@ -98,7 +98,7 @@ in {
   '';
 
   # fzf-Interface Template
-  fzfInterfaceTemplate = {title, items, multi ? true, preview ? null}: let
+  fzfInterfaceTemplate = {title, items, multi, preview}: let
     content = fzf.multiSelect {
       title = title;
       items = items;
@@ -158,7 +158,7 @@ in {
   '';
 
   # Navigation-Bar Template
-  navigationBar = {back ? null, actions ? []}: let
+  navigationBar = {back, actions}: let
     navItems = (if back != null then ["[←] Back"] else []) ++ actions;
   in ''
     ${text.newline}

@@ -1,6 +1,6 @@
 # Pure-Nix layout convert helpers (no JSON config artifacts)
 # Used by ncc-config-layout via `nix eval --impure --raw`
-{ lib ? (import <nixpkgs> { }).lib }:
+{ lib }:
 
 rec {
   findConfigs = currentDir: relative:
@@ -89,7 +89,7 @@ rec {
     lib.generators.toPretty { multiline = true; } (scrub attrs) + "\n";
 
   splitToMonolith =
-    { configsDir, monolithPath ? null }:
+    { configsDir, monolithPath }:
     let
       fromSplit = loadSplit configsDir;
       fromMono =

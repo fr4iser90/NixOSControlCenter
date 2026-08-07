@@ -11,7 +11,7 @@ let
 
     # Function to display usage
     usage() {
-        echo "Usage: ncc-log-system-report [OPTIONS]"
+        echo "Usage: ncc system report [OPTIONS]"
         echo ""
         echo "Generate system report with configured collectors"
         echo ""

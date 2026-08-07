@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, moduleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, moduleConfig, getModuleApi, getModuleConfig, ... }:
 
 with lib;
 
@@ -6,13 +6,36 @@ let
   # CLI formatter API - Vollständig API-basiert, kein hardcoded Pfad!
   ui = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
-  lockTui = (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi systemConfig moduleConfig; }).tuiScript;
+  tuiOn = (getModuleApi "tui-engine").isEnabled getModuleConfig;
+  tuiOff = (getModuleApi "tui-engine").disabledHint;
+  lockTui =
+    if tuiOn
+    then (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi systemConfig moduleConfig; }).tuiScript
+    else null;
+  domainGui = (getModuleApi "gui-engine").domainGui pkgs;
+
+  lockEntry = pkgs.writeShellScriptBin "ncc-lock-entry" ''
+    set -euo pipefail
+    case "''${1:-}" in
+      ""|gui) exec ${domainGui}/bin/ncc-domain-gui lock ;;
+      tui)
+        ${if tuiOn then ''exec ${lockTui}/bin/ncc-lock-tui'' else tuiOff}
+        ;;
+      *) echo "Usage: ncc lock | ncc lock tui | ncc lock <verb>" >&2; exit 1 ;;
+    esac
+  '';
 
   # Feature configuration - API-basiert, kein hardcoded Pfad!
   cfg = systemConfig.${moduleConfig.configPath};
 
 in
-  lib.mkIf (cfg.enable or false) (let
+  lib.mkMerge [
+    (cliRegistry.registerGuiDomain "lock" {
+      label = "Lock";
+      description = "Snapshots and restore";
+      enabled = cfg.enable or false;
+    })
+    (lib.mkIf (cfg.enable or false) (let
     # Import collector modules (only those that don't use cfg can be in outer let)
     desktopScanner = import ./collectors/desktop.nix { inherit pkgs; };
     steamScanner = import ./collectors/steam.nix { inherit pkgs; };
@@ -112,7 +135,7 @@ in
       set -euo pipefail
 
       if [ $# -eq 0 ]; then
-        echo "Usage: ncc-restore --snapshot <file> [options]"
+        echo "Usage: ncc lock restore --snapshot <file> [options]"
         echo ""
         echo "Options:"
         echo "  --snapshot <file>    Snapshot file to restore from (required)"
@@ -136,7 +159,7 @@ in
       set -euo pipefail
 
       if [ $# -eq 0 ]; then
-        echo "Usage: ncc-fetch [options]"
+        echo "Usage: ncc lock fetch [options]"
         echo ""
         echo "Options:"
         echo "  --repository <owner/repo>  GitHub repository (default: from config)"
@@ -213,24 +236,44 @@ in
         exit 1
       fi
     '';
-  in {
+  in
     # Command registration via CLI registry API - KEINE HARDCODED PFADE!
-    (cliRegistry.registerCommandsFor "lock-manager" [
+    (cliRegistry.registerCommandsFor "lock-manager" (
+      [
       {
         name = "lock";
         domain = "lock";
-        description = "Lock manager TUI";
+        description = "Lock manager (GUI)";
         category = "system";
-        script = "${lockTui}/bin/ncc-lock-tui";
+        script = "${lockEntry}/bin/ncc-lock-entry";
         arguments = [];
         type = "manager";
-        shortHelp = "lock - Lock Manager (TUI)";
+        shortHelp = "lock - Lock Manager (GUI)";
         longHelp = ''
-          Lock manager TUI placeholder.
+          ncc lock
+          ncc lock tui
+          ncc lock discover|restore|fetch|restore-from-github
         '';
       }
+    ]
+    ++ optionals tuiOn [
+      {
+        name = "tui";
+        parent = "lock";
+        domain = "lock";
+        description = "Lock TUI";
+        category = "system";
+        script = "${lockTui}/bin/ncc-lock-tui";
+        type = "manager";
+        shortHelp = "tui - Lock TUI";
+        longHelp = "ncc lock tui";
+      }
+    ]
+    ++ [
       {
         name = "discover";
+        parent = "lock";
+        domain = "lock";
         description = "Scan system and create encrypted snapshot";
         category = "system";
         script = "${discoverScript}/bin/ncc-discover-main";
@@ -247,16 +290,19 @@ in
           - Credential metadata
 
           The snapshot is automatically encrypted and optionally uploaded to GitHub.
+
         '';
       }
       {
         name = "restore";
+        parent = "lock";
+        domain = "lock";
         description = "Restore system state from snapshot";
         category = "system";
         script = "${restoreScript}/bin/ncc-restore-main";
         arguments = [ "--snapshot" "--browsers" "--ides" "--desktop" "--all" "--dry-run" ];
         dependencies = [];
-        shortHelp = "restore --snapshot <file> [--browsers|--ides|--desktop|--all] - Restore from snapshot";
+        shortHelp = "restore --snapshot <file> […] - Restore from snapshot";
         longHelp = ''
           Restore system state from an encrypted or unencrypted snapshot.
 
@@ -269,12 +315,15 @@ in
             --dry-run            Show what would be restored without actually restoring
 
           Examples:
-            ncc restore --snapshot snapshot.json.encrypted --all
-            ncc restore --snapshot snapshot.json --browsers --ides
+            ncc lock restore --snapshot snapshot.json.encrypted --all
+            ncc lock restore --snapshot snapshot.json --browsers --ides
+
         '';
       }
       {
         name = "fetch";
+        parent = "lock";
+        domain = "lock";
         description = "Download snapshots from GitHub";
         category = "system";
         script = "${fetchScript}/bin/ncc-fetch-main";
@@ -293,18 +342,21 @@ in
             --token-file <file>   GitHub token file (default: from config)
 
           Examples:
-            ncc fetch --list
-            ncc fetch --snapshot system-snapshot_20240101_120000.json.encrypted
+            ncc lock fetch --list
+            ncc lock fetch --snapshot system-snapshot_20240101_120000.json.encrypted
+
         '';
       }
       {
         name = "restore-from-github";
+        parent = "lock";
+        domain = "lock";
         description = "Download and restore snapshot from GitHub";
         category = "system";
         script = "${restoreFromGitHubScript}/bin/ncc-restore-from-github-main";
         arguments = [ "--snapshot" "--browsers" "--ides" "--desktop" "--all" ];
         dependencies = [];
-        shortHelp = "restore-from-github [--snapshot <name>] [--all] - Fetch and restore from GitHub";
+        shortHelp = "restore-from-github […] - Fetch and restore from GitHub";
         longHelp = ''
           Download the latest (or specific) snapshot from GitHub and restore it.
           This is a convenience command that combines fetch and restore.
@@ -317,9 +369,11 @@ in
             --all                Restore everything (default)
 
           Examples:
-            ncc restore-from-github --all
-            ncc restore-from-github --snapshot system-snapshot_20240101_120000.json.encrypted --browsers
+            ncc lock restore-from-github --all
+            ncc lock restore-from-github --snapshot system-snapshot_20240101_120000.json.encrypted --browsers
+
         '';
       }
-    ])
-  })
+    ]))
+  ))
+  ]

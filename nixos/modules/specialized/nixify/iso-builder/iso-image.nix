@@ -31,8 +31,8 @@ let
   # Builds all menu entries
   buildMenuGrub2 =
     {
-      cfg ? config,
-      params ? [ ],
+      cfg,
+      params,
     }:
     let
       menuConfig = {
@@ -145,9 +145,9 @@ let
 
   menuBuilderIsolinux =
     {
-      cfg ? config,
+      cfg,
       label,
-      params ? [ ],
+      params,
     }:
     ''
       ${lib.optionalString cfg.isoImage.showConfiguration ''
@@ -182,7 +182,7 @@ let
 
     DEFAULT boot
 
-    ${menuBuilderIsolinux { label = "boot"; }}
+    ${menuBuilderIsolinux { cfg = config; label = "boot"; params = [ ]; }}
 
     MENU BEGIN Options
 
@@ -195,6 +195,7 @@ let
       ''
         MENU BEGIN ${title}
         ${menuBuilderIsolinux {
+          cfg = config;
           label = "boot-${class}";
           inherit params;
         }}
@@ -429,7 +430,7 @@ let
         # Menu entries
         #
 
-        ${buildMenuGrub2 { }}
+        ${buildMenuGrub2 { cfg = config; params = [ ]; }}
         submenu "Options" --class submenu --class hidpi {
           ${grubMenuCfg}
 
@@ -442,7 +443,7 @@ let
             ''
               submenu "${title}" --class ${class} {
                 ${grubMenuCfg}
-                ${buildMenuGrub2 { inherit params; }}
+                ${buildMenuGrub2 { cfg = config; inherit params; }}
               }
             ''
           ) optionsSubMenus}

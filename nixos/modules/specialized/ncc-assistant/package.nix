@@ -1,15 +1,15 @@
-# Builds ncc-assistant binaries (GUI chat + MCP) and config facade helper.
-{ pkgs, lib, cfg }:
+# Builds ncc-assistant binaries (GUI chat + MCP + agent + tray) and config facade helper.
+{ pkgs, lib, cfg, getModuleApi, getModuleMetadata }:
 
 let
-  facade = import ../../../core/management/system-manager/lib/config-facade.nix {
+  facade = import "${(getModuleMetadata "system-manager").path}/lib/config-facade.nix" {
     inherit pkgs;
   };
 
-  # Knowledge must live inside the flake root (nixos/). Repo-root ../../../../knowledge
-  # escapes to /nix/store/knowledge under pure eval and breaks the build.
   knowledgeSrc = ./knowledge;
   aiKnowledgeSrc = ./AI_KNOWLEDGE.md;
+
+  guiEngine = (getModuleApi "gui-engine").package pkgs;
 
   appRoot = pkgs.runCommand "ncc-assistant-src" { } ''
     mkdir -p $out
@@ -17,6 +17,7 @@ let
     cp -r ${./prompts} $out/prompts
     cp -r ${knowledgeSrc} $out/knowledge
     cp ${aiKnowledgeSrc} $out/AI_KNOWLEDGE.md
+    cp -r ${guiEngine.src}/ncc_gui $out/ncc_gui
   '';
 
   pythonEnv = pkgs.python3.withPackages (ps: with ps; [
@@ -34,7 +35,7 @@ let
     export MONOLITH_FILE="$NIXOS_DIR/systemConfig.nix"
 
     usage() {
-      echo "Usage: ncc-assistant-config read <module_path>" >&2
+      echo "Usage: ncc ai config-helper read <module_path>" >&2
       echo "       ncc-assistant-config write <module_path>   # content on stdin" >&2
       echo "       ncc-assistant-config validate               # Nix fragment on stdin" >&2
       exit 2
@@ -82,6 +83,14 @@ let
       if pick == "ollama" || pick == "openai" then "openai-compatible"
       else pick;
 
+  mcpServersJson = builtins.toJSON (cfg.tools.mcpServers or { });
+
+  mcpServersFile = pkgs.writeText "mcp-servers.json" mcpServersJson;
+
+  schedulesJson = builtins.toJSON (cfg.agent.schedules or { });
+
+  hostProfilesJson = builtins.toJSON (cfg.profiles or { });
+
   envExports = ''
     export NCC_ASSISTANT_ROOT="${appRoot}"
     export NCC_KNOWLEDGE_ROOT="${appRoot}/knowledge"
@@ -107,11 +116,50 @@ let
     ${lib.optionalString ((cfg.apiHeaderName or null) != null) ''
       export NCC_ASSISTANT_API_HEADER_NAME="${cfg.apiHeaderName}"
     ''}
+
+    # Tools configuration
+    export NCC_ASSISTANT_ALLOW_SHELL="${if (cfg.tools.allowShell or false) then "1" else "0"}"
+    export NCC_ASSISTANT_SHELL_ALLOWLIST="${lib.concatStringsSep ":" (cfg.tools.shellAllowlist or [])}"
+    export NCC_ASSISTANT_MCP_SERVERS_JSON='${mcpServersJson}'
+    export NCC_ASSISTANT_MCP_SERVERS_FILE="${mcpServersFile}"
+
+    # Agent configuration
+    export AGENT_ENABLE="${if (cfg.agent.enable or true) then "1" else "0"}"
+    export AGENT_MAX_STEPS="${toString (cfg.agent.maxSteps or 24)}"
+    export AGENT_TIMEOUT_SEC="${toString (cfg.agent.timeoutSec or 1800)}"
+    export AGENT_ALLOW_WRITE="${if (cfg.agent.allowWrite or false) then "1" else "0"}"
+    export AGENT_ALLOW_REBUILD="${if (cfg.agent.allowRebuild or false) then "1" else "0"}"
+    export AGENT_CONFIRM="${cfg.agent.confirm or "writes"}"
+    export AGENT_DRY_RUN="${if (cfg.agent.dryRun or false) then "1" else "0"}"
+    ${lib.optionalString ((cfg.agent.profile or null) != null) ''
+      export AGENT_PROFILE="${cfg.agent.profile}"
+    ''}
+    export AGENT_REQUIRE_PREFLIGHT="${if (cfg.agent.requirePreflightBeforeRebuild or false) then "1" else "0"}"
+
+    # Agent notifications (both naming conventions)
+    export NOTIFY_ENABLE="${if (cfg.agent.notifications.enable or true) then "1" else "0"}"
+    export NCC_ASSISTANT_NOTIFY_ENABLE="${if (cfg.agent.notifications.enable or true) then "1" else "0"}"
+    export NOTIFY_TIMEOUT_SEC="${toString (cfg.agent.notifications.timeoutSec or 300)}"
+    export NCC_ASSISTANT_NOTIFY_TIMEOUT_SEC="${toString (cfg.agent.notifications.timeoutSec or 300)}"
+    export NOTIFY_ON_TIMEOUT="${cfg.agent.notifications.onTimeout or "block"}"
+    export NCC_ASSISTANT_NOTIFY_ON_TIMEOUT="${cfg.agent.notifications.onTimeout or "block"}"
+    export NOTIFY_ON_SCHEDULE_START="${if (cfg.agent.notifications.notifyOnScheduleStart or false) then "1" else "0"}"
+    export NOTIFY_ON_JOB_END="${if (cfg.agent.notifications.notifyOnJobEnd or true) then "1" else "0"}"
+
+    # Agent tray
+    export AGENT_TRAY_ENABLE="${if (cfg.agent.tray.enable or false) then "1" else "0"}"
+
+    # Schedules + host profiles (for UI / rebuild guards)
+    export NCC_ASSISTANT_SCHEDULES_JSON='${schedulesJson}'
+    export NCC_ASSISTANT_HOST_PROFILES_JSON='${hostProfilesJson}'
+
     export PYTHONPATH="${appRoot}''${PYTHONPATH:+:$PYTHONPATH}"
     export PATH="${configHelper}/bin:${pkgs.jq}/bin:${pkgs.nix}/bin:$PATH"
     # Qt/Plasma: use system platform theme when available
     export QT_QPA_PLATFORM="''${QT_QPA_PLATFORM:-xcb}"
   '';
+
+  envFile = pkgs.writeText "ncc-assistant-env.sh" envExports;
 
   nccAssistant = pkgs.writeShellScriptBin "ncc-assistant" ''
     set -euo pipefail
@@ -125,6 +173,12 @@ let
     exec ${pythonEnv}/bin/python -m ncc_assistant mcp
   '';
 
+  nccAssistantTray = pkgs.writeShellScriptBin "ncc-assistant-tray" ''
+    set -euo pipefail
+    ${envExports}
+    exec ${pythonEnv}/bin/python -m ncc_assistant tray
+  '';
+
   desktopItem = pkgs.makeDesktopItem {
     name = "ncc-assistant";
     desktopName = "NCC AI";
@@ -133,9 +187,27 @@ let
     icon = "help-about";
     categories = [ "System" "Utility" ];
     terminal = false;
+    actions = {
+      PauseAgent = {
+        name = "Pause agent";
+        exec = "${nccAssistant}/bin/ncc-assistant presence pause";
+      };
+      ResumeAgent = {
+        name = "Resume agent";
+        exec = "${nccAssistant}/bin/ncc-assistant presence resume";
+      };
+      Approvals = {
+        name = "List pending approvals";
+        exec = "${nccAssistant}/bin/ncc-assistant approve list";
+      };
+      Tray = {
+        name = "Start tray";
+        exec = "${nccAssistantTray}/bin/ncc-assistant-tray";
+      };
+    };
   };
 in
 {
-  inherit appRoot configHelper nccAssistant nccAssistantMcp pythonEnv desktopItem;
-  packages = [ nccAssistant nccAssistantMcp configHelper desktopItem ];
+  inherit appRoot configHelper nccAssistant nccAssistantMcp nccAssistantTray pythonEnv desktopItem envExports envFile;
+  packages = [ nccAssistant nccAssistantMcp nccAssistantTray configHelper desktopItem ];
 }

@@ -16,51 +16,44 @@ api = getModuleApi "cli-registry";
 
 ## API Functions
 
-### `getCommandsByCategory category`
+### `registerCommandsFor moduleName commands`
 
-**Description**: Get all commands in a category
-**Parameters**:
-- `category` (String): Category name
-**Returns**: List of commands
-**Example**:
+Register CLI commands for a module. Top-level commands (no `parent`) automatically appear in the root GUI catalog.
+
 ```nix
-api.getCommandsByCategory "system-management"
+cliRegistry.registerCommandsFor "homelab" [
+  { name = "homelab"; domain = "homelab"; type = "manager"; ... }
+  { name = "status"; parent = "homelab"; domain = "homelab"; ... }
+]
 ```
 
-### `getCommandByName name`
+### `registerGuiDomain id attrs`
 
-**Description**: Get command by name
-**Parameters**:
-- `name` (String): Command name
-**Returns**: Command or null
-**Example**:
+Optional sidebar stub (useful when the module is disabled and has no commands yet).
+
 ```nix
-api.getCommandByName "system-update"
+cliRegistry.registerGuiDomain "homelab" {
+  label = "Homelab";
+  description = "Docker Swarm and stacks";
+  enabled = cfg.enable or false;
+}
 ```
 
-### `getCategories`
+### `getRegisteredCommands config`
 
-**Description**: Get all available categories
-**Returns**: List of category names
-**Example**:
-```nix
-api.getCategories
-```
+Flattened list of all registered commands.
 
-### `executeCommand name args`
+### `getSubcommands config parentName`
 
-**Description**: Execute a registered command
-**Parameters**:
-- `name` (String): Command name
-- `args` (List): Command arguments
-**Returns**: Command execution result
-**Example**:
-```nix
-api.executeCommand "system-update" []
-```
+Commands with `parent = parentName`.
+
+### `getCommandsByDomain` / `getDomains` / `getTopLevelCommands` / `getPublicCommands`
+
+Helpers for filtering the registry.
 
 ## See Also
 
 - [Architecture](./ARCHITECTURE.md) - System architecture
 - [Usage Guide](./USAGE.md) - Usage examples
 - [README.md](../README.md) - Module overview
+- [CLI Schema](../../nixos-control-center/doc/CLI-SCHEMA.md) - Naming + GUI catalog rules

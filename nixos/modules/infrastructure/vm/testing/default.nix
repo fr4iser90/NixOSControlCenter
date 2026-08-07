@@ -101,6 +101,7 @@ let
             inherit (vmCfg) memory cores image variant version;
             distro = distro;
             stateDir = cfg.stateDir;
+            ovmf = pkgs.OVMF;
           }}
         '')
 

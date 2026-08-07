@@ -1,5 +1,7 @@
 # Phase 3 — Jobs & history
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** phase 2  

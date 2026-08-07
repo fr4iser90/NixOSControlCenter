@@ -95,13 +95,15 @@ in {
     }
     cliRegistry.registerCommandsFor "ssh-server-grant-access" [
       {
-        name = "ssh-grant-access";
+        name = "grant-access";
+        parent = "ssh";
+        domain = "ssh";
         description = "Grant temporary SSH password authentication";
         category = "security";
         script = "${grantAccessScript}/bin/ssh-grant-access";
         arguments = [ "USERNAME" "[DURATION]" "[REASON]" ];
         dependencies = [ "openssh" ];
-        shortHelp = "ssh-grant-access USERNAME [DURATION] [REASON] - Grant password auth directly";
+        shortHelp = "grant-access USERNAME [DURATION] [REASON] - Grant password auth directly";
         longHelp = ''
           Directly grants temporary SSH password authentication for a specified user.
           This bypasses the request/approval workflow for emergency situations.
@@ -112,9 +114,9 @@ in {
             REASON    - Reason for granting access (optional)
           
           Examples:
-            ssh-grant-access fr4iser
-            ssh-grant-access fr4iser 600 "Emergency server maintenance"
-            ssh-grant-access john 120 "Quick key setup"
+            ncc ssh grant-access fr4iser
+            ncc ssh grant-access fr4iser 600 "Emergency server maintenance"
+            ncc ssh grant-access john 120 "Quick key setup"
         '';
       }
       ])

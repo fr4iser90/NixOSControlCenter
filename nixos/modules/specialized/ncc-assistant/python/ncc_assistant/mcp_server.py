@@ -62,6 +62,36 @@ def build_mcp(settings: Settings | None = None) -> FastMCP:
         """Run ncc system build switch. confirm must be CONFIRM; allowRebuild required."""
         return _dump(runtime.apply_system(confirm, hostname))
 
+    @mcp.tool()
+    def run_preflight() -> str:
+        """Run preflight checks before a system rebuild."""
+        return _dump(runtime.run_preflight())
+
+    @mcp.tool()
+    def config_health_report() -> str:
+        """Generate a configuration health report."""
+        return _dump(runtime.config_health_report())
+
+    @mcp.tool()
+    def memory_list(tag: str | None = None, limit: int = 20) -> str:
+        """List persistent memory notes."""
+        return _dump(runtime.memory_list(tag, limit))
+
+    @mcp.tool()
+    def memory_add(content: str, tags: list[str] | None = None) -> str:
+        """Add a note to persistent memory."""
+        return _dump(runtime.memory_add(content, tags))
+
+    @mcp.tool()
+    def memory_forget(note_id: str) -> str:
+        """Forget a memory note by ID."""
+        return _dump(runtime.memory_forget(note_id))
+
+    @mcp.tool()
+    def list_config_backups(limit: int = 20) -> str:
+        """List NixOS configuration backups."""
+        return _dump(runtime.list_config_backups(limit))
+
     return mcp
 
 

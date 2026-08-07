@@ -2,7 +2,7 @@
 # Layouts:
 #   monolith → /etc/nixos/systemConfig.nix  (nested attrset, same shape as in-memory)
 #   split    → /etc/nixos/systemConfig/**/config.nix
-{ lib ? null }:
+{ }:
 
 let
   pathExists = path:
@@ -56,7 +56,7 @@ let
 
   # Detect layout from paths (flake-relative or absolute)
   # Prefer explicit layout field when loading monolith/split content separately
-  detectLayoutFromPaths = { monolithPath ? null, configsPath ? null, defaultLayout ? "monolith" }:
+  detectLayoutFromPaths = { monolithPath, configsPath, defaultLayout }:
     let
       hasMonolith = monolithPath != null && pathExists monolithPath;
       hasSplit = configsPath != null && hasSplitConfigs configsPath;

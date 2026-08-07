@@ -1,5 +1,7 @@
 # Phase 11 — Preflight as tool
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned (backlog)  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** phase 1–2; existing `prebuild-checks` / system-checks  

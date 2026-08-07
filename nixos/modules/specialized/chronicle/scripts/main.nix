@@ -241,11 +241,20 @@ in pkgs.writeShellScriptBin "chronicle" ''
       fi
       ;;
       
+    "gui")
+      if command -v chronicle-gui >/dev/null 2>&1; then
+        exec chronicle-gui
+      else
+        error "chronicle-gui not installed (enable modules.specialized.chronicle.gui.enableQt)"
+        exit 1
+      fi
+      ;;
+
     "help"|*)
       cat << EOF
 📝 Step Recorder - NixOS Problem Steps Recorder
 
-Usage: chronicle <command> [options]
+Usage: ncc chronicle <command> [options]
 
 Commands:
   start [options]   - Start a new recording session
@@ -257,6 +266,7 @@ Commands:
   list              - List all available recordings
   cleanup           - Clean up recordings older than 30 days
   test              - Run system tests
+  gui               - Open PySide6 control window
   help              - Show this help message
 
 Configuration:
@@ -267,19 +277,22 @@ Configuration:
 
 Examples:
   # Start recording (foreground)
-  chronicle start
+  ncc chronicle start
 
   # Start in background
-  chronicle start --daemon
+  ncc chronicle start --daemon
 
   # Check status
-  chronicle status
+  ncc chronicle status
 
   # Stop and export
-  chronicle stop
+  ncc chronicle stop
 
   # Manual capture
-  chronicle capture
+  ncc chronicle capture
+
+  # GUI
+  ncc chronicle gui
 
 For more information, see the module documentation.
 EOF

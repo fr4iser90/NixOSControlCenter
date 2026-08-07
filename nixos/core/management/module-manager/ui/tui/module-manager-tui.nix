@@ -1,37 +1,31 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, getModuleApi, getModuleConfig, getModuleMetadata, ... }:
 
 with lib;
 
 let
-  # Use hardcoded path for core module
-  runtimeDiscovery = (import ../../lib/runtime_discovery.nix { inherit lib pkgs; }).runtimeDiscovery;
+  tuiOn = (getModuleApi "tui-engine").isEnabled getModuleConfig;
+  tuiNix = (getModuleApi "tui-engine").fromConfig config;
+  tuiMeta = getModuleMetadata "tui-engine";
 
-  # Get module-manager path (relative to this file: ui/tui/module-manager-tui.nix)
-  # Go up to module-manager root
+  runtimeDiscovery = (import ../../lib/runtime_discovery.nix { inherit lib pkgs; }).runtimeDiscovery;
   moduleManagerPath = ../..;
 
-  # Build module-specific binary with its own TUI files
-  # Each module builds its own isolated binary
-  bubbleTeaBinary = config.core.management.tui-engine.createTuiBinary {
+  bubbleTeaBinary = tuiNix.createTuiBinary {
     modulePath = moduleManagerPath;
     moduleName = "module-manager";
   };
 
-  # Separate Runtime Discovery Script
   runtimeDiscoveryScript = pkgs.writeScript "runtime-discovery" ''
     #!${pkgs.bash}/bin/bash
     ${runtimeDiscovery}
   '';
 
-  # Create action scripts
   actionScripts = {
-  getModuleList = pkgs.writeScript "get-module-list" ''
-    #!${pkgs.bash}/bin/bash
-    set -euo pipefail
-    
-   # echo "DEBUG: Starting runtime discovery..." >&2
-    ${runtimeDiscoveryScript}
-  '';
+    getModuleList = pkgs.writeScript "get-module-list" ''
+      #!${pkgs.bash}/bin/bash
+      set -euo pipefail
+      ${runtimeDiscoveryScript}
+    '';
 
     getFilterPanel = pkgs.writeScript "get-filter-panel" ''
       #!${pkgs.bash}/bin/bash
@@ -55,17 +49,9 @@ let
     '';
   };
 
-  # Main TUI script
   moduleManagerTuiScript = pkgs.writeScriptBin "ncc-module-manager-tui" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
-    # echo "DEBUG: TUI script starting" >&2
-    # echo "DEBUG: Checking if binary exists: ${bubbleTeaBinary}/bin/module-manager-tui" >&2
-    # ls -la ${bubbleTeaBinary}/bin/ >&2 || # echo "DEBUG: Binary directory listing failed" >&2
-    
-    # Call the Go binary with the action script paths as arguments
-    # echo "DEBUG: Executing Go binary..." >&2
-    # Call the module-specific binary (module-manager-tui, not generic tui-engine)
     exec ${bubbleTeaBinary}/bin/module-manager-tui \
       "${actionScripts.getModuleList}" \
       "${actionScripts.getFilterPanel}" \
@@ -73,10 +59,8 @@ let
       "${actionScripts.getActionsPanel}"
   '';
 
-in {
-  # Add the script to system packages like SSH manager
+in
+mkIf tuiOn {
   environment.systemPackages = [ moduleManagerTuiScript ];
-
-  # Store the script reference for core module
-  core.management.tui-engine.moduleManagerTuiScript = moduleManagerTuiScript;
+  ${tuiMeta.configPath}.moduleManagerTuiScript = moduleManagerTuiScript;
 }

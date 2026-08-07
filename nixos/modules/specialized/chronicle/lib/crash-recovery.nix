@@ -1,4 +1,4 @@
-{ lib, pkgs, cfg ? {} }:
+{ lib, pkgs, cfg }:
 
 {
   # Crash recovery and session integrity management

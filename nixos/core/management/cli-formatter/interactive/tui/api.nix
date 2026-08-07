@@ -5,19 +5,16 @@ let
   # Import individual template components (not the build-time templates.nix)
   listTemplate = import ./components/list.nix {
     inherit lib;
-    bubbletea-src = "github.com/charmbracelet/bubbletea";
     inherit (builtins) toJSON;
   };
 
   formTemplate = import ./components/form.nix {
     inherit lib;
-    bubbletea-src = "github.com/charmbracelet/bubbletea";
     inherit (builtins) toJSON;
   };
 
   statusTemplate = import ./components/status.nix {
     inherit lib;
-    bubbletea-src = "github.com/charmbracelet/bubbletea";
     inherit (builtins) toJSON;
   };
 

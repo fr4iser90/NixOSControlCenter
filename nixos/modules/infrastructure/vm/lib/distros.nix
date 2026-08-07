@@ -22,7 +22,7 @@ let
     };
     buildNumber = buildNumbers.${version} or "1.4"; # Fallback to latest known
   in "https://download.fedoraproject.org/pub/fedora/linux/releases/${version}/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-${version}-${buildNumber}.iso";
-  mkArchUrl = { version ? null }: "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso";
+  mkArchUrl = { version }: "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso";
   mkKaliUrl = { version }: "https://cdimage.kali.org/kali-${version}/kali-linux-${version}-installer-amd64.iso";
   mkPopUrl = { version }: "https://iso.pop-os.org//${version}/amd64/intel/pop-os_${version}_amd64_intel.iso";
   mkMintUrl = { version }: "https://mirrors.edge.kernel.org/linuxmint/stable/${version}/linuxmint-${version}-cinnamon-64bit.iso";

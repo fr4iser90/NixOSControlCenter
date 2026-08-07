@@ -1,4 +1,4 @@
-{ lib, pkgs, cfg ? {} }:
+{ lib, pkgs, cfg }:
 
 let
   # Helper to import modules with cfg parameter

@@ -2,6 +2,15 @@
 # Run all installer shell tests.
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$DIR/../../.." && pwd)"
+
+echo ">>> checks/modules/validate-no-hardcoded-paths.sh"
+bash "$ROOT/shell/scripts/checks/modules/validate-no-hardcoded-paths.sh"
+echo
+echo ">>> checks/modules/validate-module-imports.sh"
+bash "$ROOT/shell/scripts/checks/modules/validate-module-imports.sh"
+echo
+
 echo ">>> test-presets-dry-run.sh"
 bash "$DIR/test-presets-dry-run.sh"
 echo

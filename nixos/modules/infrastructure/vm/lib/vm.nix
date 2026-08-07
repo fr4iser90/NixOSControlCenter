@@ -13,11 +13,11 @@ in
     memory,
     cores,
     image,
-    distro ? "nixos",
-    variant ? "graphical",
-    version ? null,
-    stateDir ? "/var/lib/virt",
-    ovmf ? pkgs.OVMF,
+    distro,
+    variant,
+    version,
+    stateDir,
+    ovmf,
   }: let
     validVersion = distros.validateDistro distro variant version;
     localOnly = distros.isLocalIso distro variant;

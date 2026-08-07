@@ -1,10 +1,12 @@
-{ pkgs }:
+{ pkgs, getModuleMetadata }:
 
 let
-  facade = import ../../../management/system-manager/lib/config-facade.nix { inherit pkgs; };
+  smRoot = (getModuleMetadata "system-manager").path;
+  facade = import "${smRoot}/lib/config-facade.nix" { inherit pkgs; };
 in
 pkgs.writeShellScriptBin "ncc-packages" ''
-  SCRIPT_NAME="ncc-packages"
+  # User-facing name only — never show the internal binary (ncc-packages)
+  SCRIPT_NAME="ncc packages"
   VERSION="2.0.0"
 
   set -euo pipefail
@@ -74,7 +76,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
     After add/remove, you are prompted to rebuild so packages become active.
 
   Layout:
-    ncc-config-layout detect
+    ncc system config-layout detect
     ncc system config-layout convert --to monolith|split
 
   Examples:
@@ -118,11 +120,16 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           module)
               parse_module_args "$@"
               ;;
-          -h|--help) usage ;;
+          -h|--help|help) usage ;;
           -v|--version) version ;;
+          gui)
+              log_error "Open the GUI with: ncc packages"
+              exit 1
+              ;;
           *)
               log_error "Unknown command: $COMMAND"
               echo "Valid commands: add, remove, list, module"
+              echo "GUI: ncc packages"
               exit 1
               ;;
       esac

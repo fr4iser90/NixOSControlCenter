@@ -1,5 +1,5 @@
 # System Logging API - Direkter Import für Build-Time
-{ lib }:
+{ lib, metadata, getModuleMetadata }:
 
 let
   # Report Level Definition (gleiche wie in options.nix)

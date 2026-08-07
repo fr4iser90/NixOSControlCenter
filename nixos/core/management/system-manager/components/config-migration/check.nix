@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleApi, configPath ? "management.system-manager", ... }:
+{ config, lib, pkgs, systemConfig, getModuleApi, configPath, ... }:
 
 let
   cfg = systemConfig.${configPath};

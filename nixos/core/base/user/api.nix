@@ -1,5 +1,5 @@
 # User Module API - Permission System Functions
-{ lib }:
+{ lib, metadata, getModuleMetadata }:
 
 let
   # Capabilities basierend auf Rolle (für NCC Permission System)

@@ -6,7 +6,7 @@ let
 in
 {
   # Multi-Select für mehrere Module
-  multiSelect = {title, items, prompt ? "Select items:", preview ? null}: ''
+  multiSelect = {title, items, prompt, preview}: ''
     ${../status/badges.nix {inherit lib colors;}}.info "${title}"
     ${../status/messages.nix {inherit lib colors;}}.info "${prompt}"
 
@@ -22,7 +22,7 @@ in
   '';
 
   # Single-Select für ein Modul
-  singleSelect = {title, items, prompt ? "Select item:", preview ? null}: ''
+  singleSelect = {title, items, prompt, preview}: ''
     ${../status/badges.nix {inherit lib colors;}}.info "${title}"
 
     selected=$(${fzfBin} \
@@ -36,14 +36,14 @@ in
   '';
 
   # Mit Info-Box
-  withPreview = {mainContent, previewContent, layout ? "right:40%"}: ''
+  withPreview = {mainContent, previewContent, layout}: ''
     ${mainContent} | ${fzfBin} \
       --preview="${previewContent}" \
       --preview-window="${layout}:border-rounded"
   '';
 
   # Such-Interface
-  searchInterface = {placeholder ? "Search...", items, preview ? null}: ''
+  searchInterface = {placeholder, items, preview}: ''
     ${fzfBin} \
       --prompt="${placeholder} " \
       --height=50% \

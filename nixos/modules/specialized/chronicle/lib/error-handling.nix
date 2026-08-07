@@ -1,4 +1,4 @@
-{ lib, pkgs, cfg ? {} }:
+{ lib, pkgs, cfg }:
 
 {
   # Comprehensive error handling and logging

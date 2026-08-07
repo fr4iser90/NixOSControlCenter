@@ -14,7 +14,7 @@ in {
     ./options.nix
   ] ++ optionals (cfg.enable or false) [
     ./config.nix
-    (import ./commands.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; moduleName = moduleName; })
+    ./commands.nix
   ];
 
   # Removed: Redundant enable setting (already defined in options.nix)

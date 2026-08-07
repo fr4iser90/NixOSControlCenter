@@ -30,7 +30,7 @@ let
       assert types.name.check name || throw types.name.message;
       true;
       
-    updateEntryFile = { generation, title, sortKey ? "nixos" }: ''
+    updateEntryFile = { generation, title, sortKey }: ''
       ${pkgs.gnused}/bin/sed -i.bak \
         -e "s/^title.*$/title ${title}/" \
         -e "s/^sort-key.*$/sort-key ${sortKey}/" \
@@ -91,6 +91,7 @@ let
       ${utils.updateEntryFile {
         generation = "$gen";
         title = "$new_name";
+        sortKey = "nixos";
       }}
       
       if [ -f "${entriesFile}" ]; then

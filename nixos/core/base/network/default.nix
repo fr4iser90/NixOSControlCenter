@@ -28,7 +28,9 @@ in {
     version = "1.0.0";
   };
 
-  imports = networkingModules ++ [ (import ./commands.nix { inherit config lib pkgs getModuleApi moduleName systemConfig; }) ];
+  imports = networkingModules ++ [
+    ./commands.nix
+  ];
 
   # Basic networking configuration
   networking = {

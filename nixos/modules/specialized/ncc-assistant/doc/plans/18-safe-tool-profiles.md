@@ -1,5 +1,7 @@
 # Phase 18 — Safe tool profiles
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned (backlog)  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** phase 1 (registry), phase 2 (agent)  

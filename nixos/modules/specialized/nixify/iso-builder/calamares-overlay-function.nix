@@ -2,7 +2,7 @@
 # Pure overlay function (not a NixOS module)
 # WORKING VERSION - Attempt 13 with default branding
 
-{ calamaresModulePath, calamaresJobModulePath, buildTimestamp ? "cached" }:
+{ calamaresModulePath, calamaresJobModulePath, buildTimestamp }:
 
 final: prev: let
   # PackageChooser configs directory

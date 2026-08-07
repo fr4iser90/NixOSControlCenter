@@ -1,0 +1,67 @@
+---
+description: NCC modules — discovery/systemConfig only; never hardcode module paths
+alwaysApply: true
+---
+
+# NCC: Discovery + systemConfig only
+
+## Law
+
+Module identity, config, and cross-module access come **only** from:
+
+1. **Discovery** (`getModuleMetadata` / `getCurrentModuleMetadata` / `baseNameOf ./.`)
+2. **Helpers** (`getModuleConfig`, `getModuleApi`) — nothing else
+3. **systemConfig** (user values merged with `template-config.nix` via `getModuleConfig`)
+
+Never hardcode filesystem or NixOS option paths like `core.management.tui-engine` or `core.base.desktop`.
+Never invent a third global helper (`getModuleNixConfig`, `moduleConfig` as peer accessor, …).
+
+## Required
+
+```nix
+moduleName = baseNameOf ./.;                 # or baseNameOf <moduleRoot>
+cfg = getModuleConfig moduleName;            # own systemConfig (+ template)
+other = getModuleConfig "network";           # cross-module by short name
+api = getModuleApi "cli-registry";
+# Evaluated NixOS options for a peer → only via that module's API:
+tui = (getModuleApi "tui-engine").fromConfig config;
+```
+
+- Options: `options.${metadata.configPath}` — never hand-written `options.core.management.…`
+- Config write: `config.${metadata.configPath}` — same
+- Args: no `getModuleApi ? null`, no `moduleName ? "desktop"`
+
+## Forbidden
+
+```nix
+# ❌ path hardcoding
+config.core.management.tui-engine
+config.core.management.cli-registry.commandSets
+systemConfig.core.base.desktop
+lib.attrByPath [ "core" "base" "packages" ] {} systemConfig
+
+# ❌ third global helper
+getModuleNixConfig config "tui-engine"
+
+# ❌ relative imports of other modules
+import ../../../modules/specialized/ncc-assistant/package.nix
+
+# ❌ soft module wiring
+{ getModuleApi ? null, moduleName ? "desktop", ... }:
+```
+
+## Why Nix did not error
+
+- `attrByPath … {}` / `or {}` **swallows** missing paths → empty cfg, wrong enable/disable
+- `? null` args **silently** skip helpers → TUIs/APIs half-built
+- Hardcoded `config.core.…` only fails if that attr is absent; wrong path can still “work” until a move/rename
+- Template docs said “generic” but **nothing enforced** it (stub tests always pass)
+
+## Validate
+
+Prefer: `imports = [ ./commands.nix ];` (flake specialArgs inject helpers).
+Never: `(import ./commands.nix { inherit … })` — drops helpers and breaks rebuild.
+
+```bash
+bash shell/scripts/checks/modules/run-all.sh
+```

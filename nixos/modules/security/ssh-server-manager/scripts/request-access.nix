@@ -121,13 +121,15 @@ in {
     }
     cliRegistry.registerCommandsFor "ssh-server-request-access" [
       {
-        name = "ssh-request-access";
+        name = "request-access";
+        parent = "ssh";
+        domain = "ssh";
         description = "Request temporary SSH password access";
         category = "security";
         script = "${requestAccessScript}/bin/ssh-request-access";
         arguments = [ "USERNAME" "REASON" "[DURATION]" ];
         dependencies = [ "mailutils" "libnotify" "curl" ];
-        shortHelp = "ssh-request-access USERNAME REASON [DURATION] - Request password access";
+        shortHelp = "request-access USERNAME REASON [DURATION] - Request password access";
         longHelp = ''
           Requests temporary SSH password access, notifying administrators.
           
@@ -137,8 +139,8 @@ in {
             DURATION    - Duration in seconds (optional, default: 300)
           
           Examples:
-            ssh-request-access fr4iser "Need to copy SSH keys"
-            ssh-request-access john "Emergency server maintenance" 600
+            ncc ssh request-access fr4iser "Need to copy SSH keys"
+            ncc ssh request-access john "Emergency server maintenance" 600
         '';
       }
       ])

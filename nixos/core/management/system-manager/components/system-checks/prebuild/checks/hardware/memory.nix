@@ -1,9 +1,9 @@
-{ config, lib, pkgs, systemConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 let
   ui = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
-  hw = import ../../../../../lib/hardware-config-writer.nix { inherit pkgs lib systemConfig; };
+  hw = import ../../../../../lib/hardware-config-writer.nix { inherit pkgs lib systemConfig getModuleConfig; };
 
   prebuildScript = pkgs.writeScriptBin "prebuild-check-memory" ''
     #!${pkgs.bash}/bin/bash

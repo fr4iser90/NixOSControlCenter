@@ -1,7 +1,7 @@
-{ config, lib, pkgs, buildGoApplication, gomod2nix, ... }:
+{ config, lib, pkgs, buildGoApplication, gomod2nix, getCurrentModuleMetadata, getModuleConfig, getModuleApi, getModuleMetadata, ... }:
 
 let
-  moduleName = baseNameOf ./. ;
+  moduleName = baseNameOf ./.;
 in {
   _module.metadata = {
     role = "core";
@@ -15,6 +15,8 @@ in {
 
   imports = [
     ./options.nix
-    (import ./config.nix { inherit config lib pkgs buildGoApplication gomod2nix; })
+    (import ./config.nix {
+      inherit config lib pkgs buildGoApplication gomod2nix getCurrentModuleMetadata getModuleConfig getModuleApi getModuleMetadata;
+    })
   ];
 }

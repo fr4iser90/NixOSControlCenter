@@ -1,7 +1,12 @@
-{ lib, ... }:
+{ lib, getCurrentModuleMetadata, ... }:
 
-{
-  options.core.management.tui-engine = {
+let
+  metadata = getCurrentModuleMetadata ./.;
+  configPath = metadata.configPath;
+in {
+  # User-facing options — live under systemConfig.${configPath}
+  # (e.g. systemConfig.core.management.tui-engine). Move-safe via discovery.
+  options.${configPath} = {
     _version = lib.mkOption {
       type = lib.types.str;
       default = "1.0.0";
@@ -9,8 +14,21 @@
       description = "TUI engine module version";
     };
 
-    enable = lib.mkEnableOption "TUI engine";
+    enable = lib.mkOption {
+      type = lib.types.nullOr lib.types.bool;
+      default = null;
+      description = ''
+        Build and register NCC Bubble Tea TUIs.
 
+        - null (default): auto — disabled when desktop is enabled, enabled on headless
+        - true / false: explicit override in systemConfig
+
+        Example (systemConfig):
+          core.management.tui-engine.enable = true;
+      '';
+    };
+
+    # Internal builder plumbing (not for hand-editing in systemConfig)
     buildGoApplication = lib.mkOption {
       type = lib.types.anything;
       internal = true;
@@ -20,67 +38,76 @@
     gomod2nix = lib.mkOption {
       type = lib.types.anything;
       internal = true;
-      description = "gomod2nix package for Go module management";
+      description = "gomod2nix package";
     };
 
     pkgs = lib.mkOption {
       type = lib.types.anything;
       internal = true;
-      description = "pkgs for accessing Nix packages";
+      description = "pkgs";
     };
 
     tuiBinary = lib.mkOption {
       type = lib.types.anything;
       internal = true;
+      default = null;
       description = "Built tui-engine binary";
     };
 
     tuiEngineSrc = lib.mkOption {
       type = lib.types.anything;
       internal = true;
-      description = "TUI engine source with merged TUI files from all modules";
+      default = null;
+      description = "TUI engine source";
     };
 
     createTuiScript = lib.mkOption {
       type = lib.types.anything;
       internal = true;
+      default = null;
       description = "Generic TUI script builder";
     };
 
     createTuiBinary = lib.mkOption {
       type = lib.types.anything;
       internal = true;
-      description = "Function to build module-specific TUI binaries";
+      default = null;
+      description = "Module-specific TUI binary builder";
     };
 
     domainTui = lib.mkOption {
       type = lib.types.anything;
       internal = true;
+      default = null;
       description = "Domain TUI helpers";
     };
 
     writeScriptBin = lib.mkOption {
       type = lib.types.anything;
       internal = true;
-      description = "writeScriptBin function for creating scripts";
+      default = null;
+      description = "writeScriptBin";
     };
 
     installShellFiles = lib.mkOption {
       type = lib.types.anything;
       internal = true;
-      description = "installShellFiles package";
+      default = null;
+      description = "installShellFiles";
     };
 
     api = lib.mkOption {
       type = lib.types.attrs;
       internal = true;
-      description = "TUI engine API for other modules";
+      default = {};
+      description = "TUI engine API";
     };
 
     moduleManagerTuiScript = lib.mkOption {
-      type = lib.types.anything;
+      type = lib.types.nullOr lib.types.package;
+      default = null;
       internal = true;
-      description = "Module manager TUI script";
+      description = "Module manager TUI script (null when TUI disabled)";
     };
   };
 }

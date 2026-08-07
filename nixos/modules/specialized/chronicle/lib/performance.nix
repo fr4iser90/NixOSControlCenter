@@ -2,7 +2,7 @@
 
 {
   # Screenshot compression and optimization
-  optimizeScreenshot = { quality ? 85 }: ''
+  optimizeScreenshot = { quality }: ''
     optimize_screenshot() {
       local input_file="$1"
       local quality="${toString quality}"
@@ -49,7 +49,7 @@
   '';
 
   # Memory management - cleanup old sessions
-  cleanupOldSessions = { maxSessions ? 50, maxAgeDays ? 30 }: ''
+  cleanupOldSessions = { maxSessions, maxAgeDays }: ''
     cleanup_old_sessions() {
       local output_dir="$1"
       local max_sessions=${toString maxSessions}
@@ -120,7 +120,7 @@
   '';
 
   # Lazy loading support - generate thumbnail index
-  generateThumbnails = { thumbnailSize ? 300 }: ''
+  generateThumbnails = { thumbnailSize }: ''
     generate_thumbnails() {
       local session_dir="$1"
       local steps_dir="$session_dir/steps"

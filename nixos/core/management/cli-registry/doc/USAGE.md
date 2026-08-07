@@ -1,5 +1,20 @@
 # CLI Registry - Usage Guide
 
+## Command schema (required)
+
+Before registering commands, follow the canonical schema:
+
+→ [`nixos-control-center/doc/CLI-SCHEMA.md`](../../nixos-control-center/doc/CLI-SCHEMA.md)
+
+Checklist:
+
+- [ ] User path is `ncc <domain> [<verb> …]` (domain ≤ 12 chars, **no hyphen**)
+- [ ] With `parent`, dispatcher matches only `parent-name` (no bare-name aliases)
+- [ ] Help / usage never mention store binaries (`ncc-foo`)
+- [ ] `domain` field equals the domain token
+- [ ] No legacy alias commands
+- [ ] GUI domains: bare `ncc <domain>` opens Qt/PySide6 when available
+
 ## Basic Usage
 
 ### Registering Commands

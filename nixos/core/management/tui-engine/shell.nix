@@ -1,19 +1,15 @@
-{
-  pkgs ? (
-    let
-      inherit (builtins) fetchTree fromJSON readFile;
-      inherit ((fromJSON (readFile ./flake.lock)) or ((fromJSON ../flake.lock).nodes) or {}) nixpkgs gomod2nix;
-    in
-      import (fetchTree nixpkgs.locked) {
-        overlays = [
-          (import "${fetchTree gomod2nix.locked}/overlay.nix")
-        ];
-      }
-  ),
-  mkGoEnv ? pkgs.mkGoEnv,
-  gomod2nix ? pkgs.gomod2nix,
-}:
-
+let
+  inherit (builtins) fetchTree fromJSON readFile;
+  lock = fromJSON (readFile ./flake.lock);
+  nodes = lock.nodes or {};
+  nixpkgs = nodes.nixpkgs or (fromJSON (readFile ../flake.lock)).nodes.nixpkgs;
+  gomod2nixNode = nodes.gomod2nix or (fromJSON (readFile ../flake.lock)).nodes.gomod2nix;
+  pkgs = import (fetchTree nixpkgs.locked) {
+    overlays = [
+      (import "${fetchTree gomod2nixNode.locked}/overlay.nix")
+    ];
+  };
+in
 pkgs.mkShell {
   packages = with pkgs; [
     go_1_25

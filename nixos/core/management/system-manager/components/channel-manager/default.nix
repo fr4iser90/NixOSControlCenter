@@ -1,4 +1,4 @@
-{ pkgs, lib, getModuleApi, hostname, systemChecks, channel ? "stable", onCalendar ? "weekly" }:
+{ pkgs, lib, getModuleApi, hostname, systemChecks, channel, onCalendar }:
 
 let
   updateModule = import ./update-channels.nix {

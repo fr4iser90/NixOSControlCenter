@@ -1,17 +1,16 @@
 # Module Manager Utility Functions
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getModuleMetadata, ... }:
 
 let
   ui = getModuleApi "cli-formatter";
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
 
-  # Import discovery functions
+  # Own discovery — same module, OK
   discovery = import ./discovery.nix { inherit lib; };
-
-  # ALL modules discovered automatically
   allModules = discovery.discoverAllModules;
 
-  facade = import ../../system-manager/lib/config-facade.nix { inherit pkgs; };
+  smRoot = (getModuleMetadata "system-manager").path;
+  facade = import "${smRoot}/lib/config-facade.nix" { inherit pkgs; };
 
   # Helper: Generate config file for a module (PRESERVES EXISTING CONFIG!)
   # Layout-aware via generated config-facade (monolith ↔ split)

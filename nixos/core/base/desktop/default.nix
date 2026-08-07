@@ -18,7 +18,7 @@ in {
   imports = [
     ./options.nix
     (import ./config.nix { inherit lib getModuleConfig moduleName; })
-    (import ./commands.nix { inherit config lib pkgs getModuleApi getModuleConfig moduleName getCurrentModuleMetadata; })
+    ./commands.nix
   ] ++ lib.optionals desktopEnabled [
     ./components/display-managers
     ./components/display-servers

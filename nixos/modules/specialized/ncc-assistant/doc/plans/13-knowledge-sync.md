@@ -1,5 +1,7 @@
 # Phase 13 — Knowledge sync (GUI)
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned (backlog)  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** packaged knowledge under module; optional repo generators  

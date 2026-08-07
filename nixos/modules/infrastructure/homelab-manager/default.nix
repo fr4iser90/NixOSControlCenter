@@ -51,6 +51,7 @@ in {
     ./config.nix
     ./handlers/homelab-create.nix
     ./handlers/homelab-fetch.nix
+    ./commands.nix
   ];
 
   # Put config attributes at top level, not in config =

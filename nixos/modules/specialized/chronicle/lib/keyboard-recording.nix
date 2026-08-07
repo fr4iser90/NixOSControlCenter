@@ -4,7 +4,7 @@
   # Keyboard input recording with privacy protection
   
   # Start keyboard monitoring
-  startKeyboardMonitoring = { sessionDir, backend ? "x11" }: ''
+  startKeyboardMonitoring = { sessionDir, backend }: ''
     start_keyboard_monitoring() {
       local session_dir="${sessionDir}"
       local key_log_file="$session_dir/keyboard.log"

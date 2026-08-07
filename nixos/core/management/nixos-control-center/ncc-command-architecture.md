@@ -1,5 +1,8 @@
 # NCC Command Architecture - Design Document
 
+> **Normative CLI rules live in [doc/CLI-SCHEMA.md](./doc/CLI-SCHEMA.md).**  
+> This file is historical design notes; on naming/domains/aliases, CLI-SCHEMA wins.
+
 ## Übersicht
 
 Dieses Dokument beschreibt die Architektur für das `ncc` Command-System in einer modularen NixOS-Konfiguration. Es adressiert:

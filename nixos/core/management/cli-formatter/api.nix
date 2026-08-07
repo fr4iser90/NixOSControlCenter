@@ -1,5 +1,5 @@
 # CLI Formatter API - Direkter Import für Build-Time
-{ lib }:
+{ lib, metadata, getModuleMetadata }:
 
 let
   colors = import ./colors.nix;

@@ -142,15 +142,15 @@ EOF
     #!${pkgs.bash}/bin/bash
     ${commonShell}
     cat <<'HELP'
-ncc wifi — WiFi management (NetworkManager)
+ncc network wifi — WiFi management (NetworkManager)
 
 Usage:
-  ncc wifi scan                  Scan for networks
-  ncc wifi list                  List saved WiFi profiles
-  ncc wifi status                Show WiFi / connection status
-  ncc wifi connect <SSID>        Connect and save password (system-only)
-  ncc wifi disconnect            Disconnect WiFi
-  ncc wifi forget <name|SSID>    Remove profile + system secret
+  ncc network wifi scan                  Scan for networks
+  ncc network wifi list                  List saved WiFi profiles
+  ncc network wifi status                Show WiFi / connection status
+  ncc network wifi connect <SSID>        Connect and save password (system-only)
+  ncc network wifi disconnect            Disconnect WiFi
+  ncc network wifi forget <name|SSID>    Remove profile + system secret
 
 Connect options:
   --psk <password>               Password on command line (avoid in shared history)
@@ -160,6 +160,28 @@ Secrets are stored only on this system:
   /etc/nixos/secrets/wifi/<name>.psk
 HELP
   '';
+
+  wifiRouter = pkgs.writeShellScriptBin "ncc-wifi-router" ''
+    #!${pkgs.bash}/bin/bash
+    set -euo pipefail
+    cmd="''${1:-}"
+    shift || true
+    case "$cmd" in
+      ""|help|-h|--help) exec ${wifiHelp}/bin/ncc-wifi ;;
+      scan) exec ${wifiScan}/bin/ncc-wifi-scan "$@" ;;
+      list) exec ${wifiList}/bin/ncc-wifi-list "$@" ;;
+      status) exec ${wifiStatus}/bin/ncc-wifi-status "$@" ;;
+      connect) exec ${wifiConnect}/bin/ncc-wifi-connect "$@" ;;
+      disconnect) exec ${wifiDisconnect}/bin/ncc-wifi-disconnect "$@" ;;
+      forget) exec ${wifiForget}/bin/ncc-wifi-forget "$@" ;;
+      *)
+        echo "Unknown: ncc network wifi $cmd" >&2
+        echo "Try: ncc network wifi help" >&2
+        exit 1
+        ;;
+    esac
+  '';
+
 
   wifiScan = pkgs.writeShellScriptBin "ncc-wifi-scan" ''
     #!${pkgs.bash}/bin/bash
@@ -241,7 +263,7 @@ HELP
         --psk) psk="$2"; shift 2 ;;
         --psk-file) psk_file="$2"; shift 2 ;;
         -h|--help)
-          echo "usage: ncc wifi connect <SSID> [--psk PASS | --psk-file PATH]"
+          echo "usage: ncc network wifi connect <SSID> [--psk PASS | --psk-file PATH]"
           exit 0
           ;;
         *)
@@ -253,7 +275,7 @@ HELP
 
     if [ -z "$ssid" ]; then
       echo "error: SSID required" >&2
-      echo "usage: ncc wifi connect <SSID> [--psk PASS | --psk-file PATH]" >&2
+      echo "usage: ncc network wifi connect <SSID> [--psk PASS | --psk-file PATH]" >&2
       exit 1
     fi
 
@@ -430,5 +452,5 @@ HELP
   ];
 in
 {
-  inherit commands;
+  inherit commands wifiRouter wifiHelp;
 }

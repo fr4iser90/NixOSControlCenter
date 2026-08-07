@@ -1,12 +1,10 @@
-{ config, lib, pkgs, systemConfig, moduleConfig, ... }:
+{ config, lib, pkgs, systemConfig, moduleConfig, getModuleApi, ... }:
 
 with lib;
 
 let
-  # CLI formatter API - Vollständig API-basiert, kein hardcoded Pfad!
-  ui = config.${moduleConfig.apiPath}.formatter or (import ../../core/management/system-manager/submodules/cli-formatter/lib/colors.nix { inherit lib; });
-
-  # Feature configuration - API-basiert, kein hardcoded Pfad!
+  ui = getModuleApi "cli-formatter";
+  # Feature configuration via discovery metadata
   cfg = systemConfig.${moduleConfig.configPath};
 
 in

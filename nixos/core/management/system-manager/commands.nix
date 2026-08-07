@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getModuleMetadata, ... }:
 
 with lib;
 
@@ -28,7 +28,30 @@ let
   # CLI APIs - elegant registration
   formatter = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
-  systemTui = (import ./ui/tui/domain.nix { inherit config lib pkgs getModuleApi; }).tuiScript;
+  tuiOn = (getModuleApi "tui-engine").isEnabled getModuleConfig;
+  tuiOff = (getModuleApi "tui-engine").disabledHint;
+  systemTui =
+    if tuiOn
+    then (import ./ui/tui/domain.nix { inherit config lib pkgs getModuleApi; }).tuiScript
+    else null;
+  systemGui = (import ./gui/default.nix { inherit pkgs getModuleApi; }).nccSystemGui;
+
+  systemEntry = pkgs.writeShellScriptBin "ncc-system-entry" ''
+    set -euo pipefail
+    case "''${1:-}" in
+      ""|gui)
+        exec ${systemGui}/bin/ncc-system-gui
+        ;;
+      tui)
+        ${if tuiOn then ''exec ${systemTui}/bin/ncc-system-tui'' else tuiOff}
+        ;;
+      *)
+        # Hierarchical children handled by ncc dispatcher (system-update, …)
+        echo "Use: ncc system | ncc system tui | ncc system <verb>" >&2
+        exit 1
+        ;;
+    esac
+  '';
 
   # System Checks Scripts (converted from component)
   postbuildCheckScript = import ./components/system-checks/scripts/postbuild-checks.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
@@ -39,7 +62,7 @@ let
 
   # System Update Handler (converted from component)
   systemUpdateHandler = import ./handlers/system-update.nix {
-    inherit config lib pkgs systemConfig getModuleConfig getModuleApi cliRegistry;
+    inherit config lib pkgs systemConfig getModuleConfig getModuleApi getModuleMetadata cliRegistry;
   };
   systemUpdateMainScript = systemUpdateHandler.systemUpdateMainScript;
   # Handler returns real NixOS options (activationScripts, extra systemPackages) merged
@@ -48,7 +71,10 @@ let
   systemUpdateNixosConfig = lib.removeAttrs systemUpdateHandler [ "systemUpdateMainScript" ];
 
   backupHelpersForMigration = config.${configPath}.api.backupHelpers or (import ./lib/backup-helpers.nix { inherit pkgs lib; });
-  configMigration = import ./components/config-migration/default.nix { inherit config pkgs lib systemConfig getModuleApi configPath; backupHelpers = backupHelpersForMigration; };
+  configMigration = import ./components/config-migration/default.nix {
+    inherit config pkgs lib systemConfig getModuleApi getModuleMetadata configPath;
+    backupHelpers = backupHelpersForMigration;
+  };
   configValidator = import ./validators/config-validator.nix { inherit pkgs lib; };
 in {
   config = lib.mkMerge [
@@ -68,21 +94,39 @@ in {
           configMigration.validator.validateSystemConfig
         ];
     }
-    (cliRegistry.registerCommandsFor "system-manager" [
-      # Domain TUI launcher
+    (cliRegistry.registerCommandsFor "system-manager" (
+      [
+      # Domain launcher
       {
         name = "system";
         domain = "system";
-        description = "System management TUI";
+        description = "System management (GUI)";
         category = "system";
-        script = "${systemTui}/bin/ncc-system-tui";
+        script = "${systemEntry}/bin/ncc-system-entry";
         arguments = [];
         type = "manager";
-        shortHelp = "system - System Manager (TUI)";
+        shortHelp = "system - System Manager (GUI)";
         longHelp = ''
-          Interactive system manager TUI.
+          ncc system              GUI
+          ncc system tui          Terminal TUI (if enabled)
+          ncc system update|build|report|…
         '';
       }
+      ]
+      ++ lib.optionals tuiOn [
+      {
+        name = "tui";
+        domain = "system";
+        parent = "system";
+        description = "System manager TUI";
+        category = "system";
+        script = "${systemTui}/bin/ncc-system-tui";
+        type = "manager";
+        shortHelp = "tui - System TUI";
+        longHelp = "ncc system tui";
+      }
+      ]
+      ++ [
       {
         name = "allow-unfree";
         domain = "system";
@@ -247,7 +291,7 @@ in {
           Tip: ncc system config-layout detect
         '';
       }
-      ])
+      ]))
     # System Checks Commands (enabled by default in core, but configurable)
     (lib.mkIf (cfg.enableChecks or true)
       (cliRegistry.registerCommandsFor "system-checks" [

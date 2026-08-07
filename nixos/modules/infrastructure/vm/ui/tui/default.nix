@@ -1,26 +1,26 @@
-{ config, lib, pkgs, getModuleApi, systemConfig, moduleName ? "vm" }:
+{ config, lib, pkgs, getModuleApi }:
 
 let
+  moduleName = baseNameOf ../..; # modules/infrastructure/vm
   cliRegistry = getModuleApi "cli-registry";
-  tuiEngine = config.core.management.tui-engine;
+  tuiEngine = (getModuleApi "tui-engine").fromConfig config;
   availableDistros = builtins.attrNames (import ../../lib { inherit lib pkgs; }).distros;
-  # Get module path (go up from ui/tui/default.nix to module root)
-  # ui/tui/default.nix -> ../.. -> vm/
   modulePath = ../..;
-  
+
   vmTui = tuiEngine.domainTui.buildDomainTui {
-    name = "vm";
+    name = moduleName;
     title = "🖥️ VM Manager";
-    domain = "vm";
-    footer = "ncc vm <action> • q to quit";
+    domain = moduleName;
+    footer = "ncc ${moduleName} <action> • q to quit";
     extraInfo = "Commands: status, list, test-<distro>-run/reset.";
     statsContent = ''
 VM:
 - Distros: ${toString (builtins.length availableDistros)}
 - Commands: status, list, test-<distro>-run/reset
     '';
-    commands = lib.filter (cmd: !(cmd.internal or false)) (cliRegistry.getCommandsByDomain config "vm");
-    modulePath = modulePath;  # REQUIRED - no fallbacks
+    commands = lib.filter (cmd: !(cmd.internal or false)) (cliRegistry.getCommandsByDomain config moduleName);
+    layout = null;
+    modulePath = modulePath;
   };
 in
 {

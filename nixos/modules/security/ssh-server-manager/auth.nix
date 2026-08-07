@@ -81,29 +81,37 @@ in {
     config = lib.mkMerge [
       cliRegistry.registerCommandsFor "ssh-server-auth" [
       {
-        name = "ssh-temp-open";
+        name = "temp-open";
+        parent = "ssh";
+        domain = "ssh";
         description = "Temporarily enable SSH password authentication";
         category = "security";
         script = "${sshTempOpenScript}/bin/ssh-temp-open";
         arguments = [ "USERNAME" ];
         dependencies = [ "openssh" ];
-        shortHelp = "ssh-temp-open USERNAME - Enable password auth for 60 seconds";
+        shortHelp = "temp-open USERNAME - Enable password auth for 60 seconds";
         longHelp = ''
           Temporarily enables SSH password authentication for 60 seconds to allow
           a single login. Useful for emergency access or initial setup.
+
+          Usage: ncc ssh temp-open USERNAME
         '';
       }
       {
-        name = "ssh-force-open";
+        name = "force-open";
+        parent = "ssh";
+        domain = "ssh";
         description = "Enable SSH password auth until next login";
         category = "security";
         script = "${sshForceOpenScript}/bin/ssh-force-open";
         arguments = [ "USERNAME" ];
         dependencies = [ "openssh" ];
-        shortHelp = "ssh-force-open USERNAME - Enable password auth until next login";
+        shortHelp = "force-open USERNAME - Enable password auth until next login";
         longHelp = ''
           Enables SSH password authentication until the next successful login,
           then automatically disables it. Useful for one-time access.
+
+          Usage: ncc ssh force-open USERNAME
         '';
       }
       ])

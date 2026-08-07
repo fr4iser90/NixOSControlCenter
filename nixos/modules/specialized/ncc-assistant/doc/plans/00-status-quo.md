@@ -1,5 +1,7 @@
 # Phase 0 — Status quo
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** done (baseline for roadmap)  
 **Parent:** [ROADMAP.md](../ROADMAP.md)
 

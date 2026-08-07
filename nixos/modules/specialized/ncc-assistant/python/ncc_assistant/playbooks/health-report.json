@@ -1,0 +1,9 @@
+{
+  "name": "health-report",
+  "description": "Generate a comprehensive NCC configuration health report",
+  "goal": "Run config_health_report to check the NCC configuration health. Review findings and provide recommendations for any warnings or errors found. Check knowledge pack status and module registry completeness.",
+  "profile": "read-only",
+  "dry_run": false,
+  "max_steps": 15,
+  "tags": ["health", "diagnostics", "report"]
+}

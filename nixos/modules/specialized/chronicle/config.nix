@@ -1,10 +1,10 @@
-{ config, lib, pkgs, systemConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleApi, ... }:
 
 let
   cfg = systemConfig.modules.specialized.chronicle;
   
   # Import library
-  chronicleLib = import ./lib/default.nix { inherit lib pkgs; };
+  chronicleLib = import ./lib/default.nix { inherit lib pkgs cfg; };
   
   # Determine backend based on mode
   backend = if cfg.mode == "automatic" then "x11" else "wayland";
@@ -62,20 +62,6 @@ let
   ] ++ lib.optionals (cfg.recording.enableKeyboard or false) [
     # Keyboard recording (X11 only for now)
     xmodmap  # Key name mapping
-    
-    # GUI dependencies (if enabled)
-  ] ++ lib.optionals (cfg.gui.enableGtk or false) [
-    python3
-    python3Packages.pygobject3
-    python3Packages.pydbus
-    gtk4
-    libadwaita
-    gobject-introspection
-    graphene
-    pango
-    cairo
-    gdk-pixbuf
-    harfbuzz
   ] ++ lib.optionals (cfg.gui.enableTray or false) [
     yad
   ] ++ lib.optionals (cfg.privacy.enableOCR or false) [
@@ -94,13 +80,9 @@ let
     inherit lib pkgs cfg chronicleLib backend;
   };
 
-  # GUI script (if enabled)
-  guiScript = lib.optionalAttrs (cfg.gui.enableGtk or false) (
-    import ./ui/gui/gtk4-app.nix { inherit lib pkgs cfg; }
-  );
-  trayScript = lib.optionalAttrs (cfg.gui.enableTray or false) (
-    import ./ui/gui/tray.nix { inherit lib pkgs cfg; }
-  );
+  # GUI script — Qt/PySide6 only (GTK removed)
+  guiScript = import ./ui/gui/pyside-app.nix { inherit lib pkgs cfg getModuleApi; };
+  trayScript = import ./ui/gui/tray.nix { inherit lib pkgs cfg; };
 
   # API module (v2.0.0 - Phase 5)
   apiModule = lib.optionalAttrs (cfg.api.enable or false) (
@@ -131,7 +113,7 @@ in
     # Install packages
     environment.systemPackages = recorderPackages ++ [
       recorderScript
-    ] ++ lib.optional (cfg.gui.enableGtk or false) guiScript
+    ] ++ lib.optional (cfg.gui.enableQt or true) guiScript
       ++ lib.optional (cfg.gui.enableTray or false) trayScript
       ++ lib.optionals (cfg.api.enable or false) [
         apiModule.server

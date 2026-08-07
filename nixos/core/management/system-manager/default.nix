@@ -21,7 +21,7 @@ let
 in {
   imports = [
     ./options.nix
-    (import ./commands.nix { inherit config lib pkgs systemConfig moduleConfig getModuleConfig getModuleApi; })
+    ./commands.nix
     ./config.nix
     # Component Handler (converted from full modules)
     (import ./handlers/system-checks.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; })

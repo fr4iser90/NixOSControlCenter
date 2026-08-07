@@ -1,12 +1,9 @@
 { config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 let
-  # Discovery: Modulname aus Dateisystem ableiten
-  moduleName = baseNameOf ./. ;  # ← packages aus core/base/packages/
+  moduleName = baseNameOf ./.;
   cfg = getModuleConfig moduleName;
-  systemManagerCfg = getModuleConfig "system-manager";  # Anderes Modul, bleibt hardcoded
-  cfgRaw = lib.attrByPath ["core" "base" "packages"] {} systemConfig;
-  systemManagerCfgRaw = lib.attrByPath ["core" "management" "system-manager"] {} systemConfig;
+  systemManagerCfg = getModuleConfig "system-manager";
 
   # Import package module metadata for validation
   packageMetadata = import ./lib/metadata.nix;
@@ -19,14 +16,14 @@ let
 
 
   # Load package modules (V1 format)
-  allModules = cfgRaw.packageModules or [];
+  allModules = cfg.packageModules or [];
 
   # Smart Docker: rootless by default; root for Swarm / AI-Workspace; docker.root override
   dockerMode = import ./lib/docker-mode.nix {
     inherit systemConfig;
     packageModules = allModules;
-    dockerRoot = cfgRaw.docker.root or null;
-    dockerEnable = cfgRaw.docker.enable or false;
+    dockerRoot = (cfg.docker.root or null);
+    dockerEnable = (cfg.docker.enable or false);
   };
 
   dockerModules =

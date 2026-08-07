@@ -94,15 +94,19 @@ in {
     config = lib.mkMerge [
       cliRegistry.registerCommandsFor "ssh-server-monitor" [
       {
-        name = "ssh-monitor";
+        name = "monitor";
+        parent = "ssh";
+        domain = "ssh";
         description = "Monitor SSH connections in real-time";
         category = "monitoring";
         script = "${monitorScript}/bin/ssh-monitor";
         dependencies = [ "systemd" ];
-        shortHelp = "ssh-monitor - Monitor SSH connections";
+        shortHelp = "monitor - Monitor SSH connections";
         longHelp = ''
           Monitors SSH connections in real-time, tracking active connections,
           total connections, and failed attempts. Integrates with the terminal UI.
+
+          Usage: ncc ssh monitor
         '';
       }
       ])

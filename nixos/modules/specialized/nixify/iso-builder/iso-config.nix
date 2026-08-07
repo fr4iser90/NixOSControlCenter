@@ -1,7 +1,7 @@
 # NixOS ISO Configuration with Calamares and NixOS Control Center Module
 # CLEAN VERSION - Store-only, no hardcoded paths
 
-{ pkgs, lib, config, desktopEnv, buildTimestamp ? "cached", ... }:
+{ pkgs, lib, config, desktopEnv, buildTimestamp, ... }:
 
 let
   # NixOS Control Center repository (will be copied to ISO)

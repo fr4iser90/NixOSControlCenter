@@ -82,7 +82,9 @@ in {
     config = lib.mkMerge [
       cliRegistry.registerCommandsFor "ssh-server-notifications" [
       {
-        name = "ssh-notify-test";
+        name = "notify-test";
+        parent = "ssh";
+        domain = "ssh";
         description = "Test SSH notification system";
         category = "monitoring";
         script = ''
@@ -90,10 +92,12 @@ in {
           ${ui.messages.success "Test notification sent"}
         '';
         dependencies = [ "mailutils" "libnotify" "curl" ];
-        shortHelp = "ssh-notify-test - Test notification system";
+        shortHelp = "notify-test - Test notification system";
         longHelp = ''
           Sends a test notification through all enabled notification channels.
           Useful for verifying notification configuration.
+
+          Usage: ncc ssh notify-test
         '';
       }
       ])

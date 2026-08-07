@@ -1,53 +1,48 @@
-{ lib }:
+# CLI Registry API — behavior only. Prefer: getModuleApi "cli-registry"
+# Raw import (config.nix) must pass metadata + getModuleMetadata explicitly.
+{ lib, metadata, getModuleMetadata }:
 
-# CLI Registry API - Elegant command registration system
-# Each module registers under a unique key, then we collect all
-{
-  # Register commands for a specific module
-  registerCommandsFor = moduleName: commands: {
-    core.management.cli-registry.commandSets.${moduleName} = commands;
-  };
+let
+  selfPath = metadata.configPath;
+  fromConfig = config: config.${selfPath};
+in
+rec {
+  inherit fromConfig;
 
-  # Get all registered commands (flattened)
+  # Dotted option key (options.${configPath}), not nested core.management.…
+  registerCommandsFor = moduleName: commands:
+    lib.setAttrByPath [ selfPath "commandSets" moduleName ] commands;
+
+  registerGuiDomain = id: attrs:
+    lib.setAttrByPath [ selfPath "guiDomains" id ] {
+      label = attrs.label or id;
+      description = attrs.description or "";
+      enabled = attrs.enabled or false;
+    };
+
   getRegisteredCommands = config:
     let
-      commandSets = config.core.management.cli-registry.commandSets or {};
+      commandSets = (fromConfig config).commandSets or {};
     in
       builtins.concatLists (builtins.attrValues commandSets);
 
-  # Get commands by domain
   getCommandsByDomain = config: domain:
-    let
-      allCommands = config.core.management.cli-registry.api.getRegisteredCommands config;
-    in
-      lib.filter (cmd: cmd.domain or null == domain) allCommands;
+    lib.filter (cmd: cmd.domain or null == domain) (getRegisteredCommands config);
 
-  # Get all unique domains
   getDomains = config:
     let
-      allCommands = config.core.management.cli-registry.api.getRegisteredCommands config;
-      domains = lib.unique (map (cmd: cmd.domain or "unknown") allCommands);
+      domains = lib.unique (map (cmd: cmd.domain or "unknown") (getRegisteredCommands config));
     in
       lib.sort (a: b: a < b) (lib.filter (d: d != "unknown") domains);
 
-  # Get subcommands of a parent command
   getSubcommands = config: parentName:
-    let
-      allCommands = config.core.management.cli-registry.api.getRegisteredCommands config;
-    in
-      lib.filter (cmd: cmd.parent or null == parentName) allCommands;
+    lib.filter (cmd: cmd.parent or null == parentName) (getRegisteredCommands config);
 
-  # Get top-level commands (no parent) for a domain
   getTopLevelCommands = config: domain:
-    let
-      domainCommands = config.core.management.cli-registry.api.getCommandsByDomain config domain;
-    in
-      lib.filter (cmd: cmd.parent or null == null) domainCommands;
+    lib.filter (cmd: cmd.parent or null == null) (getCommandsByDomain config domain);
 
-  # Get public commands (exclude internal)
   getPublicCommands = config:
-    let
-      allCommands = config.core.management.cli-registry.api.getRegisteredCommands config;
-    in
-      lib.filter (cmd: !(cmd.internal or false)) allCommands;
+    lib.filter (cmd: !(cmd.internal or false)) (getRegisteredCommands config);
+
+  guiDomains = config: (fromConfig config).guiDomains or {};
 }

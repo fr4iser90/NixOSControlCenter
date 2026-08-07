@@ -9,7 +9,7 @@ let
     (builtins.attrNames userCfg);
 in {
   # Import selected display manager configuration
-  # Path is determined by systemConfig.core.base.desktop.display.manager
+  # Path is determined by desktop.display.manager (getModuleConfig)
   imports = lib.optionals (cfg.enable or true) [
     (./. + "/${cfg.display.manager or "sddm"}")
   ];

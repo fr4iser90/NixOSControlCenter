@@ -1,4 +1,4 @@
-{ pkgs, lib, getModuleApi, channel ? "stable" }:
+{ pkgs, lib, getModuleApi, channel }:
 
 let
   ui = getModuleApi "cli-formatter";
@@ -28,7 +28,7 @@ let
           shift 2
           ;;
         --help|-h)
-          echo "Usage: ncc-check-release [--quiet] [--json] [--flake PATH]"
+          echo "Usage: ncc system check-release [--quiet] [--json] [--flake PATH]"
           echo "Exit 0 = current, 10 = newer stable release available, 1 = error"
           exit 0
           ;;

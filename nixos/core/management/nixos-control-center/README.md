@@ -18,6 +18,9 @@ The NixOS Control Center (NCC) module is a **core module** that is always active
 ## Documentation
 
 For detailed documentation, see:
+- [Master TODO](./doc/TODO.md) - CLI schema rollout, GUIs, gui-engine merge plan
+- [CLI Schema](./doc/CLI-SCHEMA.md) - Canonical `ncc` naming, domains, aliases, UI policy
+- [GUI Architecture](./gui-architecture.md) - Desktop UI direction (Qt/PySide6)
 - [Architecture](./doc/ARCHITECTURE.md) - System architecture and design decisions
 - [Usage Guide](./doc/USAGE.md) - Detailed usage examples and best practices
 - [API Reference](./doc/API.md) - Complete API documentation

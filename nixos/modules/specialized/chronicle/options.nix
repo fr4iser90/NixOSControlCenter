@@ -224,10 +224,16 @@ in
             description = "Enable system tray icon";
           };
 
-          enableGtk = lib.mkOption {
+          enableQt = lib.mkOption {
             type = lib.types.bool;
             default = true;
-            description = "Enable GTK4 GUI application";
+            description = "Enable Qt/PySide6 GUI (canonical)";
+          };
+
+          enableGtk = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Deprecated unused; GTK GUI removed";
           };
         };
       };

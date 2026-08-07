@@ -18,9 +18,7 @@ in
 
   imports = [
     ./options.nix
-    (import ./commands.nix {
-      inherit config lib pkgs systemConfig getModuleConfig getModuleApi;
-      moduleName = moduleName;
-    })
+    ./commands.nix
+    ./schedules.nix
   ];
 }

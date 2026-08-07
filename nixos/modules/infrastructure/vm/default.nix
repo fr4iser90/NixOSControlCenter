@@ -10,8 +10,8 @@ let
 in {
   imports = [
     ./options.nix
-    # Import commands.nix as function to pass moduleName (prevents infinite recursion)
-    (import ./commands.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; moduleName = moduleName; })
+    # Path import so flake specialArgs (getModuleConfig, getModuleApi, …) are injected
+    ./commands.nix
   ] ++ optional (cfg.enable or false) (import ./testing { inherit config lib pkgs systemConfig getModuleConfig; });
 
   # Host KVM + libvirt stack (deterministic — no manual modprobe/chown)

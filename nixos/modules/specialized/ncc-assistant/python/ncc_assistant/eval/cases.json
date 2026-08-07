@@ -1,0 +1,69 @@
+[
+  {
+    "name": "list_modules_ok",
+    "description": "list_modules returns ok",
+    "kind": "invariant",
+    "tool": "list_modules",
+    "args": {},
+    "expected": {
+      "ok": true
+    },
+    "checks": ["ok == true"]
+  },
+  {
+    "name": "search_knowledge_query",
+    "description": "search_knowledge with a query returns ok",
+    "kind": "invariant",
+    "tool": "search_knowledge",
+    "args": {
+      "query": "allowUnfree",
+      "limit": 5
+    },
+    "expected": {
+      "ok": true
+    },
+    "checks": ["ok == true"]
+  },
+  {
+    "name": "propose_config_patch_dry",
+    "description": "propose_config_patch produces a dry proposal without writing",
+    "kind": "invariant",
+    "tool": "propose_config_patch",
+    "args": {
+      "module_path": "specialized/ncc-assistant",
+      "proposed_nix": "{ enable = true; }"
+    },
+    "expected": {
+      "ok": true
+    },
+    "checks": ["ok == true"]
+  },
+  {
+    "name": "apply_module_config_no_confirm_fails",
+    "description": "apply_module_config without confirm must fail",
+    "kind": "invariant",
+    "tool": "apply_module_config",
+    "args": {
+      "module_path": "specialized/ncc-assistant",
+      "content_nix": "{ enable = true; }",
+      "confirm": false
+    },
+    "expected": {
+      "ok": false
+    },
+    "checks": ["ok == false"]
+  },
+  {
+    "name": "memory_list_ok",
+    "description": "memory_list returns ok",
+    "kind": "invariant",
+    "tool": "memory_list",
+    "args": {
+      "limit": 10
+    },
+    "expected": {
+      "ok": true
+    },
+    "checks": ["ok == true"]
+  }
+]

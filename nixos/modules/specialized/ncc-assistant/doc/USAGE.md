@@ -1,74 +1,142 @@
 # NCC AI Assistant
 
 Chat with an LLM about your NixOS Control Center config, or expose the same
-tools to Cursor / Claude Code via MCP.
-
-**Forward-looking design (agent, tools registry, cron, UI sections):**
-see [ROADMAP.md](./ROADMAP.md) and [plans/](./plans/).
+tools to Cursor / Claude Code via MCP. Full feature map: [ROADMAP.md](./ROADMAP.md).
 
 ## Enable
-
-Minimal config for an OpenAI-compatible gateway (llama.cpp, OpenWebUI, Ollama, …):
 
 ```nix
 {
   enable = true;
-  endpoint = "https://llm.example.com/v1";  # host-only also gets /v1 appended
+  endpoint = "https://llm.example.com/v1";
   allowWrite = true;
   mcpAllowWrite = false;
   allowRebuild = false;
+
+  agent = {
+    profile = "read-only";
+    confirm = "writes";
+
+    # Opt-in schedules (uncomment / copy). Safe: playbook + dryRun + read-only.
+    # schedules.daily-health = {
+    #   enable = true;
+    #   onCalendar = "*-*-* 03:15:00";
+    #   playbook = "health-report";
+    #   profile = "read-only";
+    #   dryRun = true;
+    #   maxSteps = 15;
+    # };
+    # schedules.weekly-module-audit = {
+    #   enable = true;
+    #   onCalendar = "Sun *-*-* 04:00:00";
+    #   playbook = "unused-modules-dry-run";
+    #   profile = "read-only";
+    #   dryRun = true;
+    #   maxSteps = 30;
+    # };
+  };
 }
 ```
 
-**Auth:** no `apiKeyFile` needed for normal use. `ncc ai` probes the endpoint; on
-401/403 it asks for the key once, auto-detects Bearer vs `X-API-KEY`, and stores
-it in `~/.config/ncc-assistant/credentials.json` (0600). Optional
-`apiKeyFile` / `apiHeaderName` are only for declarative secrets (sops/agenix)
-or MCP without a prior interactive login.
+**Auth:** on 401/403 the GUI/CLI prompts once and caches
+`~/.config/ncc-assistant/credentials.json` (0600). Optional `apiKeyFile` for
+sops/agenix.
 
-**What you usually leave unset:** `model`, `maxTokens`, `temperature` — the
-gateway already knows its model and limits; the client only sends those fields
-when you override them.
+Rebuild after enabling so `ncc ai` / `ncc-assistant` packages are installed.
 
-`api = "openai-compatible"` is the default (Ollama, OpenAI, custom proxies).
-Only set `api = "anthropic"` for Anthropic’s native Messages API (then `model`
-is required).
+## Recommended schedules
 
-Then rebuild so packages and `ncc ai` are installed.
+| Name | When | Kind | Notes |
+|------|------|------|--------|
+| `daily-disk-probe` | 02:45 | **probe** | Tool-only; LLM only if root ≥ 85% |
+| `daily-health` | 03:15 | agent | LLM health narrative |
+| `weekly-module-audit` | Sun 04:00 | agent | unused modules (dry-run) |
 
-## NCC chat (GUI)
+Defaults are **off**. Load via **Schedules** tab or copy from `template-config.nix`.
 
 ```bash
-ncc ai          # graphical window (default)
-ncc ai gui
+# Probe only (no LLM)
+ncc-assistant probe disk --threshold 85
+ncc-assistant tool disk_nix_report --args '{"threshold_pct":85}'
+
+# Escalate to advisor if over threshold
+ncc-assistant probe disk --threshold 85 --escalate
+
+# Force advisor even when OK
+ncc-assistant probe disk --force --escalate
+ncc-assistant playbook run disk-nix-gc-advisor
 ```
 
-On start: pick **New chat** or **Continue** a saved session
-(`~/.config/ncc-assistant/sessions/`).
+## GUI
 
-Features:
-- Enter send / Shift+Enter newline / **Stop** to cancel
-- Streaming replies + markdown bubbles
-- Model picker from `GET /v1/models`
-- **Img** attach only when the selected model looks vision-capable
-- Confirm dialogs for config write / system rebuild tools
-- Sessions auto-save; **New** / **Sessions** in the toolbar
+```bash
+ncc ai          # Qt window (default)
+ncc ai gui
+ncc ai chat     # terminal fallback
+```
 
-Terminal fallback: `ncc ai chat` / `ncc ai cli`.
+Tabs: **Chat**, **Agent**, **Tools**, **Jobs**, **Schedules**, **Settings**.
 
-Keys: env → optional `apiKeyFile` → credentials cache → GUI prompt on 401/403.
+## Agent
 
-## MCP (Cursor / Claude Code)
+```bash
+ncc-assistant agent run --goal "Check system health" --dry-run
+ncc-assistant agent run --playbook health-report
+```
 
-Start server (stdio):
+Profiles: `read-only` (default), `config-writer`, `ops`  
+Aliases: `cautious` → config-writer, `autonomous` → ops
+
+## Jobs / playbooks / presence
+
+```bash
+ncc-assistant jobs list
+ncc-assistant jobs show <id>
+ncc-assistant jobs log <id>
+
+ncc-assistant playbook list
+ncc-assistant playbook run health-report --dry-run
+
+ncc-assistant presence status
+ncc-assistant presence pause --reason "gaming"
+ncc-assistant presence resume
+```
+
+## Approvals / tray / watchdogs / rollback
+
+Agent write/rebuild prompts show a desktop notification with **Allow / Block / Wait**
+buttons (`notify-send --action`). You can also decide via CLI or tray:
+
+```bash
+ncc-assistant approve list
+ncc-assistant approve allow <id>
+ncc-assistant approve block <id>
+
+ncc-assistant tray                 # or ncc-assistant-tray
+ncc-assistant watchdog list
+ncc-assistant watchdog fire rebuild-failed --force
+ncc-assistant rollback
+```
+
+## Knowledge / export / eval / red-team
+
+```bash
+ncc-assistant knowledge sync --note "my note"
+ncc-assistant export session <id> -o out.md
+ncc-assistant export job <id>
+ncc-assistant export latest --kind session
+ncc-assistant eval run
+ncc-assistant red-team
+ncc-assistant serve-openapi --port 8765
+```
+
+## MCP
 
 ```bash
 ncc ai mcp
 # or
 ncc-assistant-mcp
 ```
-
-### Claude Code / Cursor example
 
 ```json
 {
@@ -81,36 +149,37 @@ ncc-assistant-mcp
 }
 ```
 
-If the binary is only on the NixOS system profile after enable+rebuild, use the
-absolute store path from `which ncc-assistant-mcp` / `readlink -f $(which ncc-assistant-mcp)`.
-
-### Write safety over MCP
-
-`mcpAllowWrite` defaults to **false**. External clients can still
-`list_modules`, `read_module_config`, `search_knowledge`, `explain_path`,
-`propose_config_patch`, and `validate_config`. Set `mcpAllowWrite = true` only
-when you want `apply_module_config` from those clients.
-
-`apply_system` additionally requires `allowRebuild = true` and
+`mcpAllowWrite` defaults to **false**. `apply_system` needs `allowRebuild` and
 `confirm: "CONFIRM"`.
 
-## Tools
+## Built-in tools (selection)
 
 | Tool | Purpose |
 |------|---------|
 | `list_modules` | Registry listing |
 | `read_module_config` | Read via config facade |
-| `search_knowledge` | Knowledge pack search |
+| `search_knowledge` | Knowledge + user overlay |
 | `explain_path` | Path + registry + current config |
 | `propose_config_patch` | Diff only |
-| `apply_module_config` | Write via `ncc_write_module_config` |
+| `apply_module_config` | Write (confirm) |
 | `validate_config` | Parse-check Nix fragment |
-| `apply_system` | `ncc system build switch` (guarded) |
+| `apply_system` | Rebuild (guarded + optional preflight) |
+| `run_preflight` | Prebuild script |
+| `config_health_report` | Drift / health |
+| `list_config_backups` / `list_boot_generations` | Rollback guidance |
+| `memory_*` | Durable notes |
+
+## Safety
+
+- Kill-switch: `~/.config/ncc-assistant/DISABLE`
+- Presence `paused` blocks mutating tools; schedules skip when paused
+- Notification decisions timeout → `block` by default (`onTimeout`)
+- Shell tools need `tools.allowShell` + optional `shellAllowlist`
 
 ## Debug
 
 ```bash
 ncc-assistant tools
 ncc-assistant tool list_modules --args '{}'
-ncc-assistant tool read_module_config --args '{"module_path":"core/base/packages"}'
+ncc-assistant tool search_knowledge --args '{"query":"ncc","limit":3}'
 ```

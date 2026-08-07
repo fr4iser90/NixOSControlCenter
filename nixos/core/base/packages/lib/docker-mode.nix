@@ -9,10 +9,10 @@
 #
 # { systemConfig, packageModules, dockerRoot, dockerEnable } → null | "root" | "rootless"
 
-{ systemConfig ? { }
-, packageModules ? [ ]
-, dockerRoot ? null
-, dockerEnable ? false
+{ systemConfig
+, packageModules
+, dockerRoot
+, dockerEnable
 }:
 
 let

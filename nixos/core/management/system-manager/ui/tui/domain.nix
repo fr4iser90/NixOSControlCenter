@@ -2,7 +2,7 @@
 
 let
   cliRegistry = getModuleApi "cli-registry";
-  tuiEngine = config.core.management.tui-engine;
+  tuiEngine = (getModuleApi "tui-engine").fromConfig config;
   # Get module path (go up from ui/tui/domain.nix → system-manager root)
   modulePath = ../..;
   
@@ -18,7 +18,8 @@ System:
 - Config: migrate-config, validate-config
     '';
     commands = lib.filter (cmd: !(cmd.internal or false)) (cliRegistry.getCommandsByDomain config "system");
-    modulePath = modulePath;  # REQUIRED - no fallbacks
+    layout = null;
+    modulePath = modulePath;
   };
 in
 {

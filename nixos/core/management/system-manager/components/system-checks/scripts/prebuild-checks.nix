@@ -101,7 +101,7 @@ in
 
     if grep -qiE 'unfree license|allowUnfree|NIXPKGS_ALLOW_UNFREE' "$build_log"; then
       ${ui.badges.warning "Unfree package blocked the build (e.g. zoom, steam)"}
-      ${ui.messages.info "Flag: systemConfig.core.management.system-manager.allowUnfree"}
+      ${ui.messages.info "Flag: system-manager.allowUnfree (via getModuleConfig)"}
       ${ui.messages.info "Fix:  sudo ncc system allow-unfree"}
       ${ui.messages.info "Or:   sudo ncc system allow-unfree --rebuild"}
     fi

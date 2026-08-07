@@ -3,23 +3,22 @@
 with lib;
 
 let
-  # Get module config and metadata
-  metadata = getCurrentModuleMetadata ./.;  # ← Aus Dateipfad ableiten!
-  cfg = systemConfig.${metadata.configPath}; # Dynamisch aus metadata!
+  metadata = getCurrentModuleMetadata ./.;
+  cfg = systemConfig.${metadata.configPath};
 
-  # Get UI utilities
   ui = getModuleApi "cli-formatter";
+  cliRegistry = getModuleApi "cli-registry";
+  tuiOn = (getModuleApi "tui-engine").isEnabled getModuleConfig;
+  tuiOff = (getModuleApi "tui-engine").disabledHint;
 
-  # TUI Actions script
-  tuiActions = import ./ui/tui/actions.nix { inherit config lib pkgs; };
+  tuiActions = if tuiOn then import ./ui/tui/actions.nix { inherit config lib pkgs; } else null;
+  domainGui = (getModuleApi "gui-engine").domainGui pkgs;
 
-  # Basic CLI commands (placeholder implementations)
   homelabStatus = pkgs.writeShellScriptBin "ncc-homelab-status" ''
     #!${pkgs.bash}/bin/bash
-    echo "${ui.badges.info "🏠 Homelab Status"}"
+    echo "${ui.badges.info "Homelab Status"}"
     echo "${ui.messages.info "Homelab module is enabled"}"
 
-    # Check Docker status
     if command -v docker >/dev/null 2>&1; then
       echo "${ui.tables.keyValue "Docker Status" "Available"}"
       if docker info >/dev/null 2>&1; then
@@ -31,35 +30,27 @@ let
       echo "${ui.badges.error "Docker not installed"}"
     fi
 
-    # Check Swarm status
-    if docker info 2>/dev/null | grep -q "Swarm:"; then
-      if docker info 2>/dev/null | grep -q "Swarm: active"; then
-        echo "${ui.tables.keyValue "Swarm Status" "Active"}"
-        echo "${ui.tables.keyValue "Node Role" "$(docker info 2>/dev/null | grep "NodeID:" | head -1 | cut -d: -f2 | xargs)"}"
-      else
-        echo "${ui.tables.keyValue "Swarm Status" "Inactive"}"
-      fi
+    if docker info 2>/dev/null | grep -q "Swarm: active"; then
+      echo "${ui.tables.keyValue "Swarm Status" "Active"}"
+    elif docker info 2>/dev/null | grep -q "Swarm:"; then
+      echo "${ui.tables.keyValue "Swarm Status" "Inactive"}"
     fi
   '';
 
   homelabInitSwarm = pkgs.writeShellScriptBin "ncc-homelab-init-swarm" ''
     #!${pkgs.bash}/bin/bash
-    echo "${ui.badges.info "🚀 Initializing Docker Swarm"}"
-
+    echo "${ui.badges.info "Initializing Docker Swarm"}"
     if docker swarm init >/dev/null 2>&1; then
       echo "${ui.badges.success "Swarm initialized successfully"}"
-      echo "${ui.messages.info "This node is now the Swarm manager"}"
       docker swarm join-token worker
     else
       echo "${ui.badges.error "Failed to initialize Swarm"}"
-      echo "${ui.messages.info "Check if Docker is running and no existing Swarm exists"}"
     fi
   '';
 
   homelabListStacks = pkgs.writeShellScriptBin "ncc-homelab-list-stacks" ''
     #!${pkgs.bash}/bin/bash
-    echo "${ui.badges.info "📋 Docker Stacks"}"
-
+    echo "${ui.badges.info "Docker Stacks"}"
     if docker stack ls >/dev/null 2>&1; then
       docker stack ls --format "table {{.Name}}\t{{.Services}}"
     else
@@ -67,88 +58,106 @@ let
     fi
   '';
 
+  homelabEntry = pkgs.writeShellScriptBin "ncc-homelab" ''
+    #!${pkgs.bash}/bin/bash
+    set -euo pipefail
+    cmd="''${1:-}"
+    case "$cmd" in
+      ""|gui)
+        exec ${domainGui}/bin/ncc-domain-gui homelab
+        ;;
+      help|-h|--help)
+        cat <<EOF
+ncc homelab — Homelab management
+
+Usage:
+  ncc homelab                 GUI
+  ncc homelab status
+  ncc homelab init-swarm
+  ncc homelab list-stacks
+  ncc homelab manager
+EOF
+        ;;
+      status) exec ${homelabStatus}/bin/ncc-homelab-status ;;
+      init-swarm) exec ${homelabInitSwarm}/bin/ncc-homelab-init-swarm ;;
+      list-stacks) exec ${homelabListStacks}/bin/ncc-homelab-list-stacks ;;
+      manager)
+        ${if tuiOn then ''exec ${tuiActions}/bin/homelab-tui-actions menu'' else tuiOff}
+        ;;
+      *)
+        echo "Unknown: ncc homelab $cmd" >&2
+        exit 1
+        ;;
+    esac
+  '';
+
 in
-mkIf (cfg.enable or false) {
-  # Register CLI commands
-  core.management.system-manager.submodules.cli-registry.commands = [
+mkMerge [
+  (cliRegistry.registerGuiDomain "homelab" {
+    label = "Homelab";
+    description = "Docker Swarm and stacks";
+    enabled = cfg.enable or false;
+  })
+  (mkIf (cfg.enable or false) (cliRegistry.registerCommandsFor "homelab" (
+    [
     {
-      name = "homelab-status";
-      description = "Show homelab status and configuration";
+      name = "homelab";
+      domain = "homelab";
+      type = "manager";
+      description = "Homelab management";
+      category = "infrastructure";
+      script = "${homelabEntry}/bin/ncc-homelab";
+      shortHelp = "homelab - Homelab";
+      longHelp = ''
+        ncc homelab                 GUI
+        ncc homelab status|init-swarm|list-stacks|manager
+      '';
+    }
+    {
+      name = "status";
+      parent = "homelab";
+      domain = "homelab";
+      description = "Show homelab status";
       category = "infrastructure";
       script = "${homelabStatus}/bin/ncc-homelab-status";
-      arguments = [];
-      dependencies = [ "docker" ];
-      shortHelp = "homelab-status - Show homelab status";
-      longHelp = ''
-        Display current homelab status including:
-        - Docker daemon status
-        - Swarm status and role
-        - Basic system information
-      '';
+      shortHelp = "status - Show homelab status";
+      longHelp = "ncc homelab status";
     }
     {
-      name = "homelab-init-swarm";
-      description = "Initialize Docker Swarm as manager";
+      name = "init-swarm";
+      parent = "homelab";
+      domain = "homelab";
+      description = "Initialize Docker Swarm";
       category = "infrastructure";
       script = "${homelabInitSwarm}/bin/ncc-homelab-init-swarm";
-      arguments = [];
-      dependencies = [ "docker" ];
-      shortHelp = "homelab-init-swarm - Initialize Docker Swarm";
-      longHelp = ''
-        Initialize a new Docker Swarm on this node as the manager.
-
-        This will:
-        - Create a new Swarm
-        - Make this node the manager
-        - Generate join tokens for worker nodes
-
-        Requirements:
-        - Docker must be running
-        - No existing Swarm should be active
-      '';
-      dangerous = false; # Not dangerous, just setup
+      shortHelp = "init-swarm - Initialize Docker Swarm";
+      longHelp = "ncc homelab init-swarm";
     }
     {
-      name = "homelab-list-stacks";
-      description = "List all deployed Docker stacks";
+      name = "list-stacks";
+      parent = "homelab";
+      domain = "homelab";
+      description = "List Docker stacks";
       category = "infrastructure";
       script = "${homelabListStacks}/bin/ncc-homelab-list-stacks";
-      arguments = [];
-      dependencies = [ "docker" ];
-      shortHelp = "homelab-list-stacks - List Docker stacks";
-      longHelp = ''
-        Display all currently deployed Docker stacks and their status.
-
-        Shows:
-        - Stack name
-        - Number of services in each stack
-      '';
+      shortHelp = "list-stacks - List Docker stacks";
+      longHelp = "ncc homelab list-stacks";
     }
+  ]
+  ++ optionals tuiOn [
     {
-      name = "homelab-manager";
-      description = "Interactive homelab management TUI";
+      name = "manager";
+      parent = "homelab";
+      domain = "homelab";
+      type = "manager";
+      description = "Homelab TUI";
       category = "infrastructure";
-      script = "${tuiActions}/bin/homelab-tui-actions";
-      arguments = [ "menu" ]; # Start with main menu
-      dependencies = [ "fzf" "docker" ];
-      shortHelp = "homelab-manager - Interactive homelab TUI";
-      longHelp = ''
-        Launch the interactive Homelab Manager TUI using fzf.
-
-        Features:
-        - Initialize/join Docker Swarms
-        - Deploy and manage stacks
-        - Monitor services and logs
-        - Configure homelab settings
-
-        Requirements:
-        - fzf must be installed
-        - Docker must be available
-      '';
-      type = "manager"; # TUI command
+      script = "${pkgs.writeShellScriptBin "ncc-homelab-manager" ''
+        exec ${tuiActions}/bin/homelab-tui-actions menu
+      ''}/bin/ncc-homelab-manager";
+      shortHelp = "manager - Interactive homelab TUI";
+      longHelp = "ncc homelab manager";
     }
-  ];
-
-  # Expose TUI actions for internal use
-  ${metadata.configPath}.tuiActions = tuiActions;
-}
+  ]
+  )))
+]

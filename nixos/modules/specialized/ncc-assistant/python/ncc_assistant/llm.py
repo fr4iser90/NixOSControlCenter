@@ -35,13 +35,18 @@ def list_models(settings: Settings) -> list[dict[str, Any]]:
         return [{"id": mid, "owned_by": "anthropic", "vision": False}]
 
     url = f"{settings.endpoint}/models"
-    with httpx.Client(timeout=30.0) as client:
-        resp = client.get(url, headers=_auth_headers(settings))
-        if resp.status_code >= 400:
-            raise LLMError(
-                f"GET {url} → HTTP {resp.status_code}: {resp.text[:400]}"
-            )
-        data = resp.json()
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.get(url, headers=_auth_headers(settings))
+            if resp.status_code >= 400:
+                raise LLMError(
+                    f"GET {url} → HTTP {resp.status_code}: {resp.text[:400]}"
+                )
+            data = resp.json()
+    except LLMError:
+        raise
+    except httpx.HTTPError as exc:
+        raise LLMError(f"GET {url} failed: {exc}") from exc
     models = data.get("data") or data.get("models") or []
     out: list[dict[str, Any]] = []
     for m in models:
@@ -121,7 +126,13 @@ def resolve_model(settings: Settings, client: httpx.Client | None = None) -> str
     own = client is None
     http = client or httpx.Client(timeout=30.0)
     try:
-        resp = http.get(url, headers=headers)
+        try:
+            resp = http.get(url, headers=headers)
+        except httpx.HTTPError as exc:
+            raise LLMError(
+                f"model auto-detect failed (GET {url}): {exc}. "
+                "Set modules.specialized.ncc-assistant.model."
+            ) from exc
         if resp.status_code >= 400:
             raise LLMError(
                 f"model auto-detect failed (GET {url} → HTTP {resp.status_code}): "

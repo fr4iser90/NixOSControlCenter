@@ -1,5 +1,7 @@
 # Phase 23 — Global shortcuts
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned (backlog)  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** phase 7, phase 22 (tray) preferred  

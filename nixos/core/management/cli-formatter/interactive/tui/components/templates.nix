@@ -1,6 +1,7 @@
-{ lib, bubbletea-src ? "github.com/charmbracelet/bubbletea" }:
+{ lib }:
 
 let
+  bubbletea-src = "github.com/charmbracelet/bubbletea";
   # Base Template Interface
   templateInterface = ''
     // Template interface that all templates implement

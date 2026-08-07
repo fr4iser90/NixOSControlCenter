@@ -1,4 +1,4 @@
-{ lib, pkgs, cfg ? {} }:
+{ lib, pkgs, cfg }:
 
 {
   # Multi-monitor detection and management

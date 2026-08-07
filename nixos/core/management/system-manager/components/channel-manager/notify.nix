@@ -1,4 +1,4 @@
-{ pkgs, lib, checkReleaseScript, onCalendar ? "weekly" }:
+{ pkgs, lib, checkReleaseScript, onCalendar }:
 
 let
   notifyScript = pkgs.writeScriptBin "ncc-release-notify" ''

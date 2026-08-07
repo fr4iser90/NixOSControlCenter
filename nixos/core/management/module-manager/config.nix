@@ -1,5 +1,5 @@
 # Central Module Management System
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getModuleMetadata, ... }:
 
 with lib;
 
@@ -15,9 +15,9 @@ let
   # Use the template file as default config
   defaultConfig = builtins.readFile ./template-config.nix;
 
-  # Import module discovery and API generation
+  # Import module discovery and API generation (own lib — same module, OK)
   discovery = import ./lib/discovery.nix { inherit lib; };
-  moduleLib = import ./lib/default.nix { inherit config lib pkgs systemConfig getModuleApi; };
+  moduleLib = import ./lib/default.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi getModuleMetadata; };
 
   # Auto-discover modules and generate APIs
   discoveredModules = discovery.discoverAllModules;
@@ -42,8 +42,9 @@ let
 
   debugModuleConfigs = automaticModuleConfigs;
 
-  # Read central module configuration (v1 modular path)
-  configPaths = import ../system-manager/lib/config-paths.nix;
+  # Peer libs via discovery path — never ../system-manager/…
+  smRoot = (getModuleMetadata "system-manager").path;
+  configPaths = import "${smRoot}/lib/config-paths.nix";
   moduleManagerConfigPath = configPaths.core.management.moduleManager;
   moduleManagerConfig = if builtins.pathExists moduleManagerConfigPath
     then import moduleManagerConfigPath
@@ -65,7 +66,7 @@ let
 }
 '';
 
-  facade = import ../system-manager/lib/config-facade.nix { inherit pkgs; };
+  facade = import "${smRoot}/lib/config-facade.nix" { inherit pkgs; };
 
   # Seed missing module configs for ALL discovered modules (enable=false defaults OK).
   # Split: create leaf files. Monolith: merge template into systemConfig.nix if attr missing.
@@ -117,17 +118,18 @@ in {
     # This must be defined early so all modules can use it
     {
       _module.args = {
-        modulePaths = {
-          backupHelpers = ../system-manager/lib/backup-helpers.nix;
-          # CLI formatter API from submodules
-          cliApi = ../system-manager/submodules/cli-formatter/lib;
-          cliFormatterApi = config.core.management.system-manager.submodules.cli-formatter.api or {};
-        };
         # Automatic module configs for all discovered modules
         moduleConfig = debugModuleConfigs;
         
         # Config helpers for automatic config file creation
         configHelpers = import ./lib/config-helpers.nix { inherit pkgs lib; };
+        
+        # CLI formatter API via discovery (no hardcoded config.core… path)
+        modulePaths = {
+          backupHelpers = ../system-manager/lib/backup-helpers.nix;
+          cliApi = ../cli-formatter;
+          cliFormatterApi = getModuleApi "cli-formatter";
+        };
         
         # OVERRIDE getModuleConfig to use config (with defaults from options.nix)
         # instead of only systemConfig (without defaults)

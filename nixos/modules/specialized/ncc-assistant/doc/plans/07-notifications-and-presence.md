@@ -1,5 +1,7 @@
 # Phase 7 — System notifications, presence & interactive approvals
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** phase 2 (agent), phase 3 (jobs); pairs with phase 6 (approval queue)  

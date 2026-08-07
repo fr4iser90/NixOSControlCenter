@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, buildGoApplication ? null, gomod2nix ? null, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, buildGoApplication, gomod2nix, ... }:
 
 with lib;
 

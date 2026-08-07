@@ -1,5 +1,7 @@
 # Phase 25 — Compact UI for tool traces
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned (backlog)  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** phase 5 UI shell  

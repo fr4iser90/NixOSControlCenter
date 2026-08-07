@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getModuleMetadata, ... }:
 
 with lib;
 
@@ -9,8 +9,9 @@ let
   # User config (systemConfig + template): channel, etc.
   smCfg = getModuleConfig "system-manager";
   channel = lib.attrByPath [ "system" "channel" ] "stable" smCfg;
-  # NixOS module options (options.nix): notify flags live here, not only in systemConfig
-  nixosCfg = config.core.management.system-manager or {};
+  # NixOS options (options.nix) via discovery — dotted configPath key (not nested path)
+  smPath = (getModuleMetadata "system-manager").configPath;
+  nixosCfg = config.${smPath} or {};
   cmCfg = nixosCfg.components.channelManager or {};
   onCalendar = cmCfg.checkInterval or "weekly";
   enableNotify =

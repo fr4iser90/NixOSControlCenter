@@ -23,7 +23,7 @@ let
           shift 2
           ;;
         --help|-h)
-          echo "Usage: ncc-update-channels [--skip-rebuild] [--bump-to YY.MM] [--flake DIR]"
+          echo "Usage: ncc system update-channels [--skip-rebuild] [--bump-to YY.MM] [--flake DIR]"
           echo "  --skip-rebuild  Only update flake.lock / pins (no rebuild)"
           echo "  --bump-to       Rewrite nixos-/release- pins in flake.nix to YY.MM"
           exit 0

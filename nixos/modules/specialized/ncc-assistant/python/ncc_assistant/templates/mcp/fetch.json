@@ -1,0 +1,9 @@
+{
+  "name": "fetch",
+  "description": "HTTP fetch MCP server for retrieving remote content",
+  "command": "uvx",
+  "args": ["mcp-server-fetch"],
+  "env": {},
+  "risk": "network",
+  "install_hint": "Install via: uvx mcp-server-fetch"
+}

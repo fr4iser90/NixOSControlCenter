@@ -3,10 +3,8 @@
 with lib;
 
 let
-  moduleName = baseNameOf ./. ;
+  moduleName = baseNameOf ./.;
   cfg = getModuleConfig moduleName;
-  # ui = getModuleApi "cli-formatter";  # Removed: not used
-  # commandCenter = config.core.management.system-manager.submodules.cli-registry;  # Removed: doesn't exist
 in {
   _module.args.cfg = cfg;
 

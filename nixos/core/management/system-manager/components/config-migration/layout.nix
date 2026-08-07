@@ -1,11 +1,11 @@
-{ pkgs, lib, getModuleApi, ... }:
+{ pkgs, lib, getModuleApi, getModuleMetadata }:
 
 let
   formatter = getModuleApi "cli-formatter";
-  discovery = import ../../../module-manager/lib/discovery.nix { inherit lib; };
   convertLib = ../../lib/layout-convert.nix;
 
-  # Module paths as newline-separated list (no JSON)
+  # Discovery via module-manager path (no relative ../module-manager, no bare discovery arg)
+  discovery = import "${(getModuleMetadata "module-manager").path}/lib/discovery.nix" { inherit lib; };
   modulePaths = map (m: lib.replaceStrings [ "." ] [ "/" ] m.configPath) discovery.discoverAllModules;
   modulePathsText = lib.concatStringsSep "\n" modulePaths;
 
@@ -82,7 +82,7 @@ EOF
       local attr="$1"
       shift
       "$NIX_BIN" --extra-experimental-features 'nix-command' eval --impure --raw \
-        --expr "(import $CONVERT_LIB {}).$attr { $* }"
+        --expr "(import $CONVERT_LIB { lib = (import <nixpkgs> {}).lib; }).$attr { $* }"
     }
 
     convert_to_monolith() {

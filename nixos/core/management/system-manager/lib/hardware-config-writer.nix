@@ -1,9 +1,9 @@
 # Shared helpers for hardware prebuild checks (layout-aware)
 # Bash comes from config-facade.nix → nix store (no .sh under nixos/)
-{ pkgs, lib, systemConfig }:
+{ pkgs, lib, systemConfig, getModuleConfig }:
 
 let
-  layout = systemConfig.core.management.system-manager.layout or "monolith";
+  layout = (getModuleConfig "system-manager").layout or "monolith";
   facade = import ./config-facade.nix { inherit pkgs; };
 in
 {

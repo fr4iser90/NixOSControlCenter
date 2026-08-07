@@ -1,9 +1,9 @@
-{ config, lib, pkgs, systemConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 let
   cliRegistry = getModuleApi "cli-registry";
   ui = getModuleApi "cli-formatter";
-  hw = import ../../../../../lib/hardware-config-writer.nix { inherit pkgs lib systemConfig; };
+  hw = import ../../../../../lib/hardware-config-writer.nix { inherit pkgs lib systemConfig getModuleConfig; };
 
   prebuildScript = pkgs.writeScriptBin "prebuild-check-gpu" ''
     #!${pkgs.bash}/bin/bash

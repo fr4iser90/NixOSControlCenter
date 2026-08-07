@@ -1,7 +1,7 @@
-{ config, lib, pkgs, sshClientCfg, systemConfig, scriptPath }:
+{ config, lib, pkgs, sshClientCfg, systemConfig, scriptPath, getModuleApi }:
 
 let
-  tuiEngine = config.core.management.tui-engine;
+  tuiEngine = (getModuleApi "tui-engine").fromConfig config;
 
     previewScript = import ../../scripts/ssh-connection-preview.nix {
       inherit pkgs sshClientCfg;

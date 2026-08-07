@@ -1,25 +1,26 @@
-{ config, lib, pkgs, getModuleApi, systemConfig }:
+{ config, lib, pkgs, getModuleApi, getModuleConfig }:
 
 let
-  cfg = lib.attrByPath ["core" "base" "user"] {} systemConfig;
+  moduleName = baseNameOf ../../..; # core/base/user
+  cfg = getModuleConfig moduleName;
   cliRegistry = getModuleApi "cli-registry";
-  tuiEngine = config.core.management.tui-engine;
-  # Get module path (go up from ui/tui/default.nix to module root)
+  tuiEngine = (getModuleApi "tui-engine").fromConfig config;
   modulePath = ../../..;
-  
+
   userTui = tuiEngine.domainTui.buildDomainTui {
-    name = "user";
+    name = moduleName;
     title = "👤 User Manager";
-    domain = "user";
-    footer = "ncc user <action> • q to quit";
+    domain = moduleName;
+    footer = "ncc ${moduleName} <action> • q to quit";
     extraInfo = "User commands are not implemented yet.";
     statsContent = ''
 Users:
 - module enabled: ${toString (cfg.enable or true)}
 - TODO: list configured users
     '';
-    commands = lib.filter (cmd: !(cmd.internal or false)) (cliRegistry.getCommandsByDomain config "user");
-    modulePath = modulePath;  # REQUIRED - no fallbacks
+    commands = lib.filter (cmd: !(cmd.internal or false)) (cliRegistry.getCommandsByDomain config moduleName);
+    layout = null;
+    modulePath = modulePath;
   };
 in
 {

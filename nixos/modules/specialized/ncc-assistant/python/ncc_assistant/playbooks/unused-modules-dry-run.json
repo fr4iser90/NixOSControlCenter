@@ -1,0 +1,9 @@
+{
+  "name": "unused-modules-dry-run",
+  "description": "Find and report unused or unconfigured NixOS modules (dry run)",
+  "goal": "Search the NixOS configuration for modules that are enabled but appear to have no meaningful configuration, or modules that are imported but never used. List findings without making changes.",
+  "profile": "read-only",
+  "dry_run": true,
+  "max_steps": 30,
+  "tags": ["cleanup", "audit", "modules"]
+}

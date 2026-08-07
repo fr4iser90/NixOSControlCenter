@@ -3,100 +3,78 @@
 with lib;
 
 let
-  ui = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
+  tuiOn = (getModuleApi "tui-engine").isEnabled getModuleConfig;
+  tuiOff = (getModuleApi "tui-engine").disabledHint;
+  bubbleTeaTui =
+    if tuiOn
+    then ((getModuleApi "tui-engine").fromConfig config).moduleManagerTuiScript
+    else null;
+  modulesGui = (import ./gui/default.nix { inherit pkgs getModuleApi; }).nccModulesGui;
 
-  # Pass discovery script as string to avoid ncc permission issues
-  discoveryScript = (import ./lib/runtime_discovery.nix { inherit lib pkgs; }).runtimeDiscovery;
+  discovery = (import ./lib/runtime_discovery.nix { inherit lib pkgs; }).runtimeDiscovery;
 
-  # Bubble Tea TUI from tui-engine - use script from config like SSH manager
-  bubbleTeaTui = config.core.management.tui-engine.moduleManagerTuiScript;
-
-  # Gum Module Manager (SINGLE INTERFACE with subcommands)
-  moduleManagerTui = pkgs.writeScriptBin "ncc-module-manager" ''
-    # Handle subcommands
-    case "$1" in
-      "get-module-data")
-        # Execute the discovery script
-        ${(import ./lib/runtime_discovery.nix { inherit lib pkgs; }).runtimeDiscovery}
+  modulesEntry = pkgs.writeShellScriptBin "ncc-modules-entry" ''
+    set -euo pipefail
+    case "''${1:-}" in
+      ""|gui)
+        exec ${modulesGui}/bin/ncc-modules-gui
         ;;
-      "")
-        # No args = run TUI
-        ${bubbleTeaTui}/bin/ncc-module-manager-tui
+      tui)
+        ${if tuiOn then ''exec ${bubbleTeaTui}/bin/ncc-module-manager-tui'' else tuiOff}
         ;;
       *)
-        echo "Usage: ncc module-manager [get-module-data]"
+        echo "Usage: ncc modules | ncc modules tui" >&2
         exit 1
         ;;
     esac
   '';
 
-
+  getModuleData = pkgs.writeShellScriptBin "ncc-modules-get-data" ''
+    ${discovery}
+  '';
 in
-  lib.mkMerge [
-    # PRIMARY: Bubble Tea module manager (ONLY INTERFACE)
-    (cliRegistry.registerCommandsFor "module-manager" [
-    # Modules Domain Manager (TUI)
-    {
-      name = "modules";
-      domain = "modules";
-      description = "Interactive module management TUI";
-      category = "system";
-      script = "${moduleManagerTui}/bin/ncc-module-manager";
-      type = "manager";
-      permission = "system.manage";
-      requiresSudo = true;
-      dangerous = false;
-      arguments = [];
-      dependencies = [ "bubbletea" ];
-      shortHelp = "modules - Module management (TUI)";
-      longHelp = ''
-        Interactive module management with modern Bubble Tea TUI.
-        
-        Usage:
-          ncc modules           - Open TUI
-          ncc modules enable    - Enable module (future)
-          ncc modules disable   - Disable module (future)
-        
-        Features:
-        - Runtime discovery of all available modules
-        - Real-time status from config files
-        - Beautiful terminal interface with advanced features
-        - No rebuild required to see new modules
-      '';
-    }
-    # Alias: module-manager -> modules
-    {
-      name = "module-manager";
-      domain = "modules";
-      description = "Module management TUI (alias)";
-      category = "system";
-      script = "${moduleManagerTui}/bin/ncc-module-manager";
-      type = "manager";
-      permission = "system.manage";
-      requiresSudo = true;
-      dangerous = false;
-      arguments = [];
-      dependencies = [ "bubbletea" ];
-      shortHelp = "module-manager - Module management (TUI)";
-      longHelp = ''
-        Alias for:
-          ncc modules
-
-        Interactive module management with modern Bubble Tea TUI.
-      '';
-    }
-    # Internal helper command
-    {
-      name = "get-module-data";
-      domain = "modules";
-      parent = "modules";
-      internal = true;
-      description = "Internal: Get module discovery data";
-      category = "system";
-      script = "${moduleManagerTui}/bin/ncc-module-manager";
-      arguments = ["get-module-data"];
-      shortHelp = "get-module-data - Internal discovery helper";
-    }
-    ])
-  ]
+  cliRegistry.registerCommandsFor "modules" (
+    [
+      {
+        name = "modules";
+        domain = "modules";
+        description = "Module management (GUI)";
+        category = "system";
+        script = "${modulesEntry}/bin/ncc-modules-entry";
+        type = "manager";
+        permission = "system.manage";
+        requiresSudo = true;
+        shortHelp = "modules - Module management (GUI)";
+        longHelp = ''
+          ncc modules       GUI
+          ncc modules tui   Terminal TUI (if tui-engine.enable)
+        '';
+      }
+      {
+        name = "get-module-data";
+        domain = "modules";
+        parent = "modules";
+        internal = true;
+        description = "Internal discovery helper";
+        category = "system";
+        script = "${getModuleData}/bin/ncc-modules-get-data";
+        shortHelp = "get-module-data - Internal";
+      }
+    ]
+    ++ optionals tuiOn [
+      {
+        name = "tui";
+        domain = "modules";
+        parent = "modules";
+        description = "Modules TUI";
+        category = "system";
+        script = "${bubbleTeaTui}/bin/ncc-module-manager-tui";
+        type = "manager";
+        permission = "system.manage";
+        requiresSudo = true;
+        shortHelp = "tui - Modules TUI";
+        longHelp = "ncc modules tui";
+      }
+    ]
+  )

@@ -1,8 +1,9 @@
-{ config, lib, pkgs }:
+{ config, lib, pkgs, createTuiScript, getModuleApi }:
 
 let
-  cliRegistry = config.core.management.cli-registry.api;
-  tuiEngine = config.core.management.tui-engine.api;
+  # Peers only via getModuleApi — never import ../../other-module/api.nix
+  cliRegistry = getModuleApi "cli-registry";
+  tuiEngine = { inherit createTuiScript; };
 
   toItem = cmd: {
     name = cmd.name;
@@ -28,9 +29,8 @@ let
       EOF
     '';
 
-  buildDomainTui = { name, title, domain, footer ? null, extraInfo ? "", statsContent ? null, commands ? [], layout ? null, modulePath }:
+  buildDomainTui = { name, title, domain, footer, extraInfo, statsContent, commands, layout, modulePath }:
     let
-      # Check if module has TUI Go files
       hasTuiFiles = builtins.pathExists "${modulePath}/ui/tui/model.go" ||
                     builtins.pathExists "${modulePath}/ui/tui/view.go" ||
                     builtins.pathExists "${modulePath}/ui/tui/update.go";
@@ -50,29 +50,24 @@ ${extraInfo}
           statsScript = buildTextScript { name = "${name}-stats"; content = if statsContent != null then statsContent else ""; };
         in
           tuiEngine.createTuiScript {
-            name = name;
-            title = title;
+            inherit name title modulePath layout footer;
             getList = listScript;
             getFilter = filterScript;
             getDetails = detailsScript;
             getActions = actionsScript;
             getStats = statsScript;
-            footer = footer;
             actionCmd = "ncc ${domain} {name}";
-            layout = layout;
-            modulePath = modulePath;
+            staticMenu = false;
           }
       else
-        # Module has no TUI files - return empty/null script (no TUI for this module)
         pkgs.writeScriptBin "ncc-${name}-tui" ''
           #!${pkgs.bash}/bin/bash
           echo "This module has no TUI implementation."
           exit 1
         '';
 
-  buildRootTui = { name, title, footer ? null, layout ? null, modulePath }:
+  buildRootTui = { name, title, footer, layout, modulePath }:
     let
-      # Check if module has TUI Go files
       hasTuiFiles = builtins.pathExists "${modulePath}/ui/tui/model.go" ||
                     builtins.pathExists "${modulePath}/ui/tui/view.go" ||
                     builtins.pathExists "${modulePath}/ui/tui/update.go";
@@ -98,19 +93,16 @@ Select a domain in the menu to see available commands.
           actionsScript = buildTextScript { name = "${name}-actions"; content = "Enter: open ncc {name}"; };
         in
           tuiEngine.createTuiScript {
-            name = name;
-            title = title;
+            inherit name title modulePath layout footer;
             getList = listScript;
             getFilter = filterScript;
             getDetails = detailsScript;
             getActions = actionsScript;
-            footer = footer;
+            getStats = null;
             actionCmd = "ncc {name}";
-            layout = layout;
-            modulePath = modulePath;
+            staticMenu = false;
           }
       else
-        # Module has no TUI files - return empty/null script (no TUI for this module)
         pkgs.writeScriptBin "ncc-${name}-tui" ''
           #!${pkgs.bash}/bin/bash
           echo "This module has no TUI implementation."

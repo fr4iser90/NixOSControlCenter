@@ -1,17 +1,14 @@
 # Library exports - Template-konform: nur Imports, keine Logik
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getModuleMetadata, ... }:
 
 let
-  # Import discovery functions
+  # Own lib — same module, OK
   discovery = import ./discovery.nix { inherit lib; };
-
-  # Import utility functions
-  utils = import ./utils.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
+  utils = import ./utils.nix {
+    inherit config lib pkgs systemConfig getModuleConfig getModuleApi getModuleMetadata;
+  };
 
 in {
-  # Export discovery functions
   inherit (discovery) discoverAllModules discoverModulesInDir;
-
-  # Export utility functions
   inherit (utils) allModules updateModuleConfig getModuleStatus enableModule disableModule formatModuleList;
 }

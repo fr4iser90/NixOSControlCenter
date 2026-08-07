@@ -1,5 +1,7 @@
 # Phase 1 — Tool registry & MCP client
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** phase 0  

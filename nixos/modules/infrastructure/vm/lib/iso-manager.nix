@@ -33,7 +33,7 @@ let
 in {
   # Exportierte Funktionen
   # localOnly: skip download; require VM_ISO or ${stateDir}/testing/iso/<name>.iso
-  isoManager = { name, url, stateDir, distroName, variant ? null, version ? null, localOnly ? false, isoHint ? null }: ''
+  isoManager = { name, url, stateDir, distroName, variant, version, localOnly, isoHint }: ''
     function manage_iso() {
       local iso_dir="${stateDir}/testing/iso"
       local iso_name="${name}.iso"

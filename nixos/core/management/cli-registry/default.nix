@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getCurrentModuleMetadata, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getModuleMetadata, getCurrentModuleMetadata, ... }:
 
 let
   moduleName = baseNameOf ./. ;  # ← cli-registry aus submodules/cli-registry/
@@ -14,9 +14,11 @@ in {
     version = "1.0.0";
   };
 
-  # CLI registry is always active (Core module, no enable option)
+  # Explicit inherit: config.nix needs moduleName (not in flake specialArgs)
   imports = [
-    ./options.nix      # Always import options first
-    (import ./config.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi getCurrentModuleMetadata moduleName; })
+    ./options.nix
+    (import ./config.nix {
+      inherit config lib pkgs systemConfig getModuleConfig getModuleApi getModuleMetadata getCurrentModuleMetadata moduleName;
+    })
   ];
 }

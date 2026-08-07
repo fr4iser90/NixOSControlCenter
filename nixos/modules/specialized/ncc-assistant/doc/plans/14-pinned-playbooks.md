@@ -1,5 +1,7 @@
 # Phase 14 — Pinned prompts / playbooks
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned (backlog)  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** phase 2 (agent), phase 3 (jobs)  

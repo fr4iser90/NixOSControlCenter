@@ -3,7 +3,7 @@
 let
   ui = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
-  tuiEngine = config.core.management.tui-engine;
+  tuiEngine = (getModuleApi "tui-engine").fromConfig config;
   cfg = systemConfig.${moduleConfig.configPath};
   # Get module path (go up from ui/tui/default.nix to module root)
   # ui/tui/default.nix -> ../.. -> lock-manager/
@@ -21,7 +21,8 @@ Lock Manager:
 - scanners: desktop, packages, browser
     '';
     commands = lib.filter (cmd: !(cmd.internal or false)) (cliRegistry.getCommandsByDomain config "lock");
-    modulePath = modulePath;  # REQUIRED - no fallbacks
+    layout = null;
+    modulePath = modulePath;
   };
 in
 {

@@ -206,13 +206,15 @@ in {
     }
     cliRegistry.registerCommandsFor "ssh-server-list-requests" [
       {
-        name = "ssh-list-requests";
+        name = "list-requests";
+        parent = "ssh";
+        domain = "ssh";
         description = "List SSH access requests";
         category = "security";
         script = "${listRequestsScript}/bin/ssh-list-requests";
         arguments = [ "[STATUS]" ];
         dependencies = [ "jq" ];
-        shortHelp = "ssh-list-requests [STATUS] - List access requests";
+        shortHelp = "list-requests [STATUS] - List access requests";
         longHelp = ''
           Lists SSH access requests with optional status filtering.
           
@@ -220,19 +222,21 @@ in {
             STATUS  - Filter by status: all, pending, approved, denied, expired (optional)
           
           Examples:
-            ssh-list-requests           # Show all requests
-            ssh-list-requests pending   # Show only pending requests
-            ssh-list-requests approved  # Show only approved requests
+            ncc ssh list-requests           # Show all requests
+            ncc ssh list-requests pending   # Show only pending requests
+            ncc ssh list-requests approved  # Show only approved requests
         '';
       }
       {
-        name = "ssh-cleanup-requests";
+        name = "cleanup-requests";
+        parent = "ssh";
+        domain = "ssh";
         description = "Clean up old SSH access requests";
         category = "security";
         script = "${cleanupRequestsScript}/bin/ssh-cleanup-requests";
         arguments = [ "[DAYS]" ];
         dependencies = [ ];
-        shortHelp = "ssh-cleanup-requests [DAYS] - Clean up old requests";
+        shortHelp = "cleanup-requests [DAYS] - Clean up old requests";
         longHelp = ''
           Removes SSH access request files older than specified days.
           
@@ -240,8 +244,8 @@ in {
             DAYS  - Number of days (optional, default: 7)
           
           Examples:
-            ssh-cleanup-requests     # Clean up requests older than 7 days
-            ssh-cleanup-requests 30  # Clean up requests older than 30 days
+            ncc ssh cleanup-requests     # Clean up requests older than 7 days
+            ncc ssh cleanup-requests 30  # Clean up requests older than 30 days
         '';
       }
       ])

@@ -36,7 +36,7 @@ let
           ;;
         *)
           ${ui.messages.error "Unknown option: $1"}
-          echo "Usage: ncc-update-modules [--module=name] [--dry-run] [--auto]"
+          echo "Usage: ncc system update-modules [--module=name] [--dry-run] [--auto]"
           exit 1
           ;;
       esac

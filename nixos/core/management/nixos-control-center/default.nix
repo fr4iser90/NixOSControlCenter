@@ -18,9 +18,5 @@ in {
     ./options.nix
     ./config.nix
     ./commands.nix
-    ./api.nix
-    # NCC importiert components
-    # ./components/cli-formatter    # VERSCHOBEN von system-manager
-    # ./components/cli-registry     # VERSCHOBEN von system-manager
   ];
 }

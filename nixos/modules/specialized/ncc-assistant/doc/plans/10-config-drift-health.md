@@ -1,5 +1,7 @@
 # Phase 10 — Config drift / health report
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned (backlog)  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** phase 1 (tools), phase 3–4 (jobs/schedules), knowledge registries  

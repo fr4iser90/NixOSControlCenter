@@ -5,7 +5,6 @@ with lib;
 let
   ui = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
-  commandCenter = config.core.management.system-manager.submodules.cli-registry;
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
 
   # Homelab Minimization Script

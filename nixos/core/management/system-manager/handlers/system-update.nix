@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, cliRegistry, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getModuleMetadata, cliRegistry, ... }:
 
 with lib;
 
@@ -80,7 +80,11 @@ let
   
   # Import config management (single import, clean API)
   # CLI Formatter wird von config-migration selbst geholt
-  configModule = import ./../components/config-migration { inherit config pkgs lib systemConfig getModuleApi; backupHelpers = import ../lib/backup-helpers.nix { inherit pkgs lib; }; };
+  configPath = (getModuleMetadata "system-manager").configPath;
+  configModule = import ./../components/config-migration {
+    inherit config pkgs lib systemConfig getModuleApi getModuleMetadata configPath;
+    backupHelpers = import ../lib/backup-helpers.nix { inherit pkgs lib; };
+  };
   
   # Create script with runtime dependencies (only available for this script, not system-wide)
   systemUpdateMainScript = pkgs.symlinkJoin {
@@ -1261,7 +1265,7 @@ in lib.mkMerge [
     # Monolith keeps per-user overrides in systemConfig.nix under users.<name>.
     system.activationScripts.migratePerUserConfigs =
       let
-        userAttrs = lib.attrByPath [ "core" "base" "user" ] {} systemConfig;
+        userAttrs = getModuleConfig "user";
         usernames =
           if builtins.isAttrs userAttrs
           then builtins.filter (n: builtins.isAttrs (userAttrs.${n})) (builtins.attrNames userAttrs)

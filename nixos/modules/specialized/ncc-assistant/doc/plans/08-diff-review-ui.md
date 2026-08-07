@@ -1,5 +1,7 @@
 # Phase 8 — Diff-Review UI
 
+Status: **done** (see ROADMAP.md)
+
 **Status:** planned (backlog)  
 **Parent:** [ROADMAP.md](../ROADMAP.md)  
 **Depends on:** phase 1–2 (propose/apply tools), phase 5 (GUI shell)  

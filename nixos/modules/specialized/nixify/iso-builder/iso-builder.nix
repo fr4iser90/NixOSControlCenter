@@ -2,7 +2,7 @@
 # Erstellt Custom NixOS ISO mit kompletten NixOSControlCenter Repository + generierten configs/*.nix
 # NOTE: This file is used by the web service at runtime, not during system build
 
-{ pkgs, lib, systemConfig ? null, sessionConfigs, nixosControlCenterRepo ? null, nixpkgs ? null, ... }:
+{ pkgs, lib, systemConfig, sessionConfigs, nixosControlCenterRepo, nixpkgs, ... }:
 
 let
   # Generierte configs/*.nix Dateien
@@ -112,7 +112,7 @@ in
   # NOTE: This is a placeholder - actual ISO building requires nixos-generate-config
   # and should be done via nix-build at runtime, not during system evaluation
   # variant wird aus core/base/desktop/config.nix gelesen, KEIN Default!
-  buildISO = { sessionId, repoPath ? null }:
+  buildISO = { sessionId, repoPath }:
     throw "ISO building must be done at runtime via nix-build, not during system evaluation";
   
   # Helper: Extract configs from session

@@ -76,7 +76,7 @@ let
         ;;
       build-iso|iso)
         DESKTOP_ENV=''${2:-plasma6}  # Default: Plasma 6
-        FORCE_REBUILD_FLAG=""
+        FORCE_REBUILD_FLAG="--arg forceRebuild false"
         
         # Check for --force-rebuild or -f flag (can be 2nd or 3rd argument)
         if [ "''${2}" = "--force-rebuild" ] || [ "''${2}" = "-f" ]; then

@@ -1,7 +1,6 @@
-{ config, lib, pkgs, systemConfig, getModuleConfigFromPath, getCurrentModuleMetadata, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfigFromPath, getCurrentModuleMetadata, configHelpers, ... }:
 
 let
-  configHelpers = import ../../../core/management/module-manager/lib/config-helpers.nix { inherit pkgs lib; };
   moduleConfig = getCurrentModuleMetadata ./.;
   # Generic: Use getModuleConfigFromPath to get config with defaults from options.nix
   cfg = getModuleConfigFromPath moduleConfig.configPath;

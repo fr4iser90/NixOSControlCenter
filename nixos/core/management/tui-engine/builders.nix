@@ -2,7 +2,7 @@
 
 let
   # Build function using gomod2nix (from OptiNix pattern)
-  buildTUIApp = { pname, version, src, go ? null }:
+  buildTUIApp = { pname, version, src, go }:
     buildGoApplication {
       inherit pname version src go;
       modules = ./gomod2nix.toml;

@@ -1,0 +1,9 @@
+{
+  "name": "disk-nix-gc-advisor",
+  "description": "Advise on disk / Nix store cleanup when usage is high (read-only, never GC)",
+  "goal": "Disk or Nix store usage appears high. Call disk_nix_report and list_boot_generations. Summarize what is using space and list SAFE cleanup options the user could run manually (e.g. review old generations, nix-collect-garbage after understanding impact). Do NOT run destructive commands, do NOT delete files, do NOT execute GC. End with a short prioritized checklist.",
+  "profile": "read-only",
+  "dry_run": true,
+  "max_steps": 16,
+  "tags": ["disk", "nix", "gc", "ops"]
+}
