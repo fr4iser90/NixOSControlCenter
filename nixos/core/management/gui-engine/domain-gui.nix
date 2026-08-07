@@ -1,6 +1,7 @@
 # Shared domain GUI binary: `ncc-domain-gui <page>` (+ AI embed sources)
 # Peer roots come from getModuleMetadata (via gui-engine api) — no relative cross-module imports.
-{ pkgs, getModuleMetadata, packagesRoot, assistantRoot }:
+# Domain pages come from cli-registry guiPages (each module’s ui/gui/).
+{ pkgs, lib, getModuleMetadata, packagesRoot, assistantRoot, guiPages ? {} }:
 
 let
   eng = import ./package.nix { inherit pkgs; };
@@ -9,6 +10,7 @@ let
     inherit pkgs getModuleMetadata;
   };
   assistantSrc = "${assistantRoot}/python/ncc_assistant";
+  pagesPkg = import ./lib/mk-domain-pages.nix { inherit lib pkgs guiPages; };
 
   pythonEnv = pkgs.python3.withPackages (ps: with ps; [
     pyside6
@@ -20,6 +22,7 @@ let
     mkdir -p $out
     cp -r ${eng.src}/ncc_gui $out/ncc_gui
     cp -r ${assistantSrc} $out/ncc_assistant
+    cp -r ${pagesPkg}/ncc_domain_page $out/ncc_domain_page
   '';
 
   nccDomainGui = pkgs.writeShellScriptBin "ncc-domain-gui" ''
@@ -33,5 +36,5 @@ let
   '';
 in
 {
-  inherit nccDomainGui src pythonEnv;
+  inherit nccDomainGui src pythonEnv pagesPkg;
 }

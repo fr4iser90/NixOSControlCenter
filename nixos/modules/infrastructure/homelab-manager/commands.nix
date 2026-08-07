@@ -12,7 +12,7 @@ let
   tuiOff = (getModuleApi "tui-engine").disabledHint;
 
   tuiActions = if tuiOn then import ./ui/tui/actions.nix { inherit config lib pkgs; } else null;
-  domainGui = (getModuleApi "gui-engine").domainGui pkgs;
+  domainGui = (getModuleApi "gui-engine").domainGui pkgs config;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
 
@@ -120,6 +120,7 @@ mkMerge [
     description = "Docker Swarm and stacks";
     enabled = cfg.enable or false;
   })
+  (cliRegistry.registerGuiPage "homelab" ./ui/gui)
   (mkIf (cfg.enable or false) (cliRegistry.registerCommandsFor "homelab" (
     [
     {

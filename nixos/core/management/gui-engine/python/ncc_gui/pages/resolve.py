@@ -1,4 +1,9 @@
-"""Resolve a domain page: optional ncc_gui.pages.<id>, else generic."""
+"""Resolve a domain page: module ui/gui via ncc_domain_page, else generic.
+
+Discovery order:
+  1. ncc_domain_page.<id>  — registered by modules (registerGuiPage)
+  2. GenericDomainPage(info) — zero custom GUI code
+"""
 
 from __future__ import annotations
 
@@ -11,25 +16,22 @@ from ncc_gui.catalog import DomainInfo
 from ncc_gui.pages.generic import GenericDomainPage
 
 
-def create_page_for(info: DomainInfo) -> QWidget:
-    """
-    Discovery order:
-      1. ncc_gui.pages.<id>.create_page()
-      2. ncc_gui.pages.<id>.Page
-      3. GenericDomainPage(info)  — works for any new module with zero GUI code
-    """
-    mod_name = f"ncc_gui.pages.{info.id.replace('-', '_')}"
-    try:
-        mod = importlib.import_module(mod_name)
-    except ImportError:
-        return GenericDomainPage(info)
-
+def _try_page(mod) -> QWidget | None:
     create: Callable[..., QWidget] | None = getattr(mod, "create_page", None)
     if callable(create):
         return create()
-
     page_cls = getattr(mod, "Page", None)
     if page_cls is not None:
         return page_cls()
+    return None
 
-    return GenericDomainPage(info)
+
+def create_page_for(info: DomainInfo) -> QWidget:
+    sid = info.id.replace("-", "_")
+    try:
+        mod = importlib.import_module(f"ncc_domain_page.{sid}")
+    except ImportError:
+        return GenericDomainPage(info)
+
+    page = _try_page(mod)
+    return page if page is not None else GenericDomainPage(info)

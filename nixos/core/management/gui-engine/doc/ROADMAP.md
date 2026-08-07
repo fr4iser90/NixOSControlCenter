@@ -1,36 +1,48 @@
 # NCC GUI Engine — domain pages roadmap
 
+## Architecture
+
+Rich pages live **in each module** (`ui/gui/page.py` + `registerGuiPage`).  
+`gui-engine` only provides shell / Target / theme / generic fallback.
+
 ## Done
 
-| Domain | Page | Notes |
-|--------|------|--------|
-| packages | custom | catalog + modules |
-| system | custom | update / rebuild actions |
-| network | custom | wifi form |
-| lock | custom | snapshot / restore |
-| ai | custom (+ assistant app) | chat / tools / jobs |
+| Domain | Page location | Notes |
+|--------|---------------|--------|
+| packages | `core/base/packages/ui/gui` | catalog + modules |
+| system | `system-manager/ui/gui` | local/remote/channels sync + rebuild |
+| network | `core/base/network/ui/gui` | wifi form |
+| lock | `lock-manager/ui/gui` | snapshot / restore |
+| ai | `ncc-assistant/ui/gui` | chat / tools / jobs |
 | modules | `ncc-modules-gui` | separate binary |
-| **ssh** | custom | client list, **embedded PTY**, server tab |
-| **homelab** | custom | status / stacks + **remote Target** |
-| **vm** | custom | domains list + start/stop/destroy + Target |
-| **desktop** | custom | settings view (`ncc desktop status`) + Target |
-| **user** | custom | user list (`ncc user list`) + Target |
+| ssh | `ssh-client-manager/ui/gui` | client list, embedded PTY |
+| hosts | `hosts/ui/gui` | fleet targets |
+| homelab | `homelab-manager/ui/gui` | status / stacks |
+| vm | `vm/ui/gui` | domains + start/stop |
+| desktop | `desktop/ui/gui` | follows Target |
+| user | `user/ui/gui` | follows Target |
 | chronicle | own app GUI | catalog stub |
 
-## Remote target
+## Global Target (fleet)
 
-Homelab / VM / Desktop / User pages share `TargetBar` + `ncc_gui.remote`:
+Root NCC GUI has a **Target** bar = *which machine’s NCC you are using*
+(This machine + hosts from `ncc ssh client` / `~/.creds`).
 
-- **This machine** → `ncc …`
-- **Remote SSH…** → `ssh user@host -- ncc …` (BatchMode)
+- Persists to `~/.config/ncc/active-target` and `NCC_TARGET_HOST`
+- Most domains follow Target (`ssh user@host -- ncc …`)
+- **Always local:** `hosts`, `ssh` (manage connections from this PC)
+- **Sidebar:** only domains **enabled on the active target** (disabled = hidden)
+- No custom sidebar editor — enable/disable via **Modules** on that host
 
-Use case: Gaming laptop GUI → server with same modules, other `systemConfig`.
-Also: `NCC_TARGET_HOST=user@host`.
+CLI: `ncc hosts list|show|use|add|remove` and `ncc hosts --gui`.
 
 ## Next (optional)
 
+- [ ] Remote access policy (view vs edit)
+- [ ] Dedicated SystemConfig / Hardware browser (read-only)
 - [ ] Desktop / User: in-GUI edit of systemConfig + rebuild confirm
 - [ ] Homelab: deploy/remove stack verbs (today TUI-only)
 - [ ] SSH: richer VT100 (QTermWidget) if we package bindings
 - [ ] Chronicle: embed or deep-link from catalog page
 - [ ] VM: run/reset test distro from GUI
+- [ ] Richer remote catalog JSON (`ncc domains --json`) instead of parsing `ncc help`

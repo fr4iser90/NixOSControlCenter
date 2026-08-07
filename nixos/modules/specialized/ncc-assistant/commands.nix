@@ -14,6 +14,7 @@ in
       description = "Chat, agent, and tools";
       enabled = cfg.enable or false;
     })
+    (cliRegistry.registerGuiPage "ai" ./ui/gui)
     (mkIf (cfg.enable or false) (
       let
         pkg = import ./package.nix { inherit pkgs lib cfg getModuleApi getModuleMetadata; };

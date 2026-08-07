@@ -1,4 +1,4 @@
-"""Homelab domain — Docker/Swarm status & stacks; optional remote NCC target."""
+"""Homelab domain — Docker/Swarm status & stacks via global Target."""
 
 from __future__ import annotations
 
@@ -16,8 +16,8 @@ from PySide6.QtWidgets import (
 )
 
 from ncc_gui.dialogs import confirm, error
-from ncc_gui.remote import run_ncc
-from ncc_gui.target_bar import TargetBar
+from ncc_gui.remote import run_ncc, target_from_env
+from ncc_gui.target_bus import bus as target_bus
 from ncc_gui.theme import APP_STYLE
 
 
@@ -32,16 +32,12 @@ class HomelabPage(QWidget):
         title.setObjectName("nccPageTitle")
         root.addWidget(title)
         sub = QLabel(
-            "Docker Swarm and stacks. Point Target at your server (user@host) to run "
-            "the same `ncc homelab` there — shared modules, different systemConfig."
+            "Docker Swarm and stacks. Use the top Target bar to run "
+            "`ncc homelab` on your server (shared modules, different systemConfig)."
         )
         sub.setObjectName("nccPageSubtitle")
         sub.setWordWrap(True)
         root.addWidget(sub)
-
-        self.target = TargetBar(hint="")
-        self.target.targetChanged.connect(lambda _t: self.reload())
-        root.addWidget(self.target)
 
         row = QHBoxLayout()
         for label, args, need_confirm in (
@@ -69,13 +65,11 @@ class HomelabPage(QWidget):
         bl.addWidget(self.stacks)
         root.addWidget(box, stretch=1)
 
+        target_bus().changed.connect(lambda _t: self.reload())
         self.reload()
 
-    def _target(self) -> str | None:
-        return self.target.current_target()
-
     def reload(self) -> None:
-        t = self._target()
+        t = target_from_env()
         st = run_ncc("homelab", "status", target=t)
         self.status.setPlainText(((st.stdout or "") + (st.stderr or "")).strip() or "(no status)")
         ls = run_ncc("homelab", "list-stacks", target=t)
@@ -85,7 +79,6 @@ class HomelabPage(QWidget):
             line = line.strip()
             if not line or line.lower().startswith("name") or "docker stacks" in line.lower():
                 continue
-            # table: Name\tServices or spaced
             name = line.split()[0] if line.split() else line
             if name.startswith("[") or name.startswith("==="):
                 continue
@@ -98,7 +91,7 @@ class HomelabPage(QWidget):
     def _run(self, args: tuple[str, ...], need_confirm: bool, label: str) -> None:
         if need_confirm and not confirm(self, label, f"Run “{label}” on target?"):
             return
-        proc = run_ncc("homelab", *args, target=self._target())
+        proc = run_ncc("homelab", *args, target=target_from_env())
         out = ((proc.stdout or "") + (proc.stderr or "")).strip()
         self.status.setPlainText(out or ("Done." if proc.returncode == 0 else "Failed."))
         if proc.returncode != 0:

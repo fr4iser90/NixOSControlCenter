@@ -1,8 +1,8 @@
-# Packages GUI — thin wrapper around shared gui-engine page
-{ pkgs, packagesCli, getModuleApi }:
+# Packages GUI — thin wrapper around shared gui-engine + this module's page
+{ pkgs, packagesCli, getModuleApi, config }:
 
 let
-  shared = (getModuleApi "gui-engine").domainGuiBundle pkgs;
+  shared = (getModuleApi "gui-engine").domainGuiBundle pkgs config;
   catalogFile = import ../lib/mk-catalog-json.nix { inherit pkgs; };
 
   nccPackagesGui = pkgs.writeShellScriptBin "ncc-packages-gui" ''

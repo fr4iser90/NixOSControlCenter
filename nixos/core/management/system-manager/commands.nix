@@ -35,7 +35,7 @@ let
     if tuiOn
     then (import ./ui/tui/domain.nix { inherit config lib pkgs getModuleApi; }).tuiScript
     else null;
-  systemGui = (import ./gui/default.nix { inherit pkgs getModuleApi; }).nccSystemGui;
+  systemGui = (import ./gui/default.nix { inherit pkgs getModuleApi config; }).nccSystemGui;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
 
@@ -107,6 +107,7 @@ EOF
 in {
   config = lib.mkMerge [
     systemUpdateNixosConfig
+    (cliRegistry.registerGuiPage "system" ./ui/gui)
     {
       environment.systemPackages =
         [ checkVersions.checkVersionsScript
@@ -390,6 +391,8 @@ in {
             --local              Automatically select local directory update (option 2)
             --remote             Automatically select remote repository update (option 1)
             --channels           Automatically select channel update (option 3)
+            --source-dir PATH    Local tree to copy from (with --local; GUI / scripts)
+            --branch NAME        Git branch for --remote (default: main when --yes)
             --with-channels      After config update, auto-include channel bump if newer pin exists
             --auto-build         Automatically build and switch after update
             --verbose, -v        Show verbose output during update
@@ -399,25 +402,24 @@ in {
 
           Examples:
             # Interactive update (default)
-            # After config copy: prompts y/n if a newer nixos-YY.MM pin is available
-            ncc system-update
+            ncc system update
 
             # Fully automated local update with rebuild
-            ncc system-update --yes --local --auto-build
+            sudo ncc system update --yes --local --auto-build
+
+            # Local update from a specific checkout
+            sudo ncc system update -y --local --source-dir /home/fr4iser/Documents/Git/NixOSControlCenter/nixos --auto-build
 
             # Local update + channel bump (when available) + rebuild
-            ncc system-update --yes --local --with-channels --auto-build
+            sudo ncc system update --yes --local --with-channels --auto-build
 
-            # Local update without rebuild
-            ncc system-update -y --local
-
-            # Remote update with auto-confirm
-            ncc system-update --auto --remote --auto-build
+            # Remote update (branch defaults to main with --yes)
+            sudo ncc system update --yes --remote --branch main --auto-build
 
             # Channel update only
-            ncc system-update --yes --channels
+            sudo ncc system update --yes --channels
 
-          Note: This command requires root privileges. The script will check for root and prompt for sudo if needed.
+          Note: Requires root (sudo / pkexec). Canonical path is `ncc system update` (not bare system-update).
         '';
         requiresSudo = true;
       }

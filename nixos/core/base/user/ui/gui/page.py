@@ -1,4 +1,4 @@
-"""User domain — list configured users / roles."""
+"""User domain — list configured users / roles (this machine only)."""
 
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (
 )
 
 from ncc_gui.remote import run_ncc
-from ncc_gui.target_bar import TargetBar
 from ncc_gui.theme import APP_STYLE
 
 
@@ -29,8 +28,8 @@ class UserRow:
     auto_login: str
 
 
-def load_users(target: str | None) -> list[UserRow]:
-    proc = run_ncc("user", "list", target=target)
+def load_users() -> list[UserRow]:
+    proc = run_ncc("user", "list")
     rows: list[UserRow] = []
     for line in (proc.stdout or "").splitlines():
         line = line.strip()
@@ -58,16 +57,12 @@ class UserPage(QWidget):
         title.setObjectName("nccPageTitle")
         root.addWidget(title)
         sub = QLabel(
-            "Users from systemConfig (roles / shell / autologin). "
+            "Users on this machine (systemConfig). "
             "Add or change users in systemConfig/users/ — GUI editing later."
         )
         sub.setObjectName("nccPageSubtitle")
         sub.setWordWrap(True)
         root.addWidget(sub)
-
-        self.target = TargetBar()
-        self.target.targetChanged.connect(lambda _t: self.reload())
-        root.addWidget(self.target)
 
         row = QHBoxLayout()
         refresh = QPushButton("Refresh")
@@ -89,14 +84,14 @@ class UserPage(QWidget):
 
     def reload(self) -> None:
         self.list.clear()
-        for u in load_users(self.target.current_target()):
+        for u in load_users():
             item = QListWidgetItem(f"{u.name}  ·  {u.role}")
             item.setData(Qt.ItemDataRole.UserRole, u)
             self.list.addItem(item)
         if self.list.count():
             self.list.setCurrentRow(0)
         else:
-            self.detail.setPlainText("No users found (check systemConfig.users on target).")
+            self.detail.setPlainText("No users found (check systemConfig.users).")
 
     def _on_select(self, current: QListWidgetItem | None, _prev) -> None:
         if current is None:

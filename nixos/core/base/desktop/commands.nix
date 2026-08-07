@@ -10,7 +10,7 @@ let
     if tuiOn
     then (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi getModuleConfig; }).tuiScript
     else null;
-  domainGui = (getModuleApi "gui-engine").domainGui pkgs;
+  domainGui = (getModuleApi "gui-engine").domainGui pkgs config;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
 
@@ -75,6 +75,7 @@ in
       description = "Desktop environment settings";
       enabled = cfg.enable or true;
     })
+    (cliRegistry.registerGuiPage "desktop" ./ui/gui)
     (lib.mkIf (cfg.enable or true)
       (cliRegistry.registerCommandsFor "desktop" (
         [

@@ -9,7 +9,7 @@ let
   cliRegistry = getModuleApi "cli-registry";
   tuiOn = (getModuleApi "tui-engine").isEnabled getModuleConfig;
   tuiOff = (getModuleApi "tui-engine").disabledHint;
-  domainGui = (getModuleApi "gui-engine").domainGui pkgs;
+  domainGui = (getModuleApi "gui-engine").domainGui pkgs config;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
   scriptModule = import ./scripts/ssh-client-manager.nix {
@@ -109,6 +109,7 @@ in {
       description = "SSH client connections";
       enabled = cfg.enable or false;
     })
+    (cliRegistry.registerGuiPage "ssh" ./ui/gui)
     (mkIf (cfg.enable or false) (
       cliRegistry.registerCommandsFor "ssh-client" clientCommands
     ))

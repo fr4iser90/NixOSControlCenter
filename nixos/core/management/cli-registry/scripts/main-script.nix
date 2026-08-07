@@ -12,7 +12,7 @@ let
     if tuiOn
     then (import ../ui/tui/default.nix { inherit config lib pkgs getModuleApi; }).tuiScript
     else null;
-  rootGui = (getModuleApi "gui-engine").rootGui pkgs;
+  rootGui = (getModuleApi "gui-engine").rootGui pkgs config;
 
   assistantCfg = getModuleConfig "ncc-assistant";
   assistantOn = assistantCfg.enable or false;

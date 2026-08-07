@@ -9,7 +9,7 @@ let
     if tuiOn
     then (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi getModuleConfig; }).tuiScript
     else null;
-  domainGui = (getModuleApi "gui-engine").domainGui pkgs;
+  domainGui = (getModuleApi "gui-engine").domainGui pkgs config;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
 
@@ -79,6 +79,7 @@ in
       description = "User accounts and roles";
       enabled = true;
     })
+    (cliRegistry.registerGuiPage "user" ./ui/gui)
     (lib.mkIf (cfg.enable or true)
       (cliRegistry.registerCommandsFor "user" (
         [

@@ -9,7 +9,18 @@ from collections.abc import Sequence
 
 def target_from_env() -> str | None:
     raw = (os.environ.get("NCC_TARGET_HOST") or "").strip()
-    return raw or None
+    if raw:
+        return raw
+    # Persisted path without importing target_state (avoids cycles at import).
+    path = os.path.expanduser("~/.config/ncc/active-target")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            value = fh.read().strip()
+    except OSError:
+        return None
+    if not value or value.lower() == "local":
+        return None
+    return value
 
 
 def build_ncc_argv(args: Sequence[str], *, target: str | None = None) -> list[str]:

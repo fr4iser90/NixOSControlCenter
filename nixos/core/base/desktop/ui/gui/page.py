@@ -1,4 +1,4 @@
-"""Desktop domain — show current desktop module settings."""
+"""Desktop domain — show current desktop module settings (this machine only)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,6 @@ from PySide6.QtWidgets import (
 )
 
 from ncc_gui.remote import run_ncc
-from ncc_gui.target_bar import TargetBar
 from ncc_gui.theme import APP_STYLE
 
 
@@ -40,16 +39,12 @@ class DesktopPage(QWidget):
         title.setObjectName("nccPageTitle")
         root.addWidget(title)
         sub = QLabel(
-            "Current desktop module settings from systemConfig. "
+            "Desktop settings on this machine (systemConfig). "
             "Change them in systemConfig and rebuild — editing in-GUI comes later."
         )
         sub.setObjectName("nccPageSubtitle")
         sub.setWordWrap(True)
         root.addWidget(sub)
-
-        self.target = TargetBar()
-        self.target.targetChanged.connect(lambda _t: self.reload())
-        root.addWidget(self.target)
 
         row = QHBoxLayout()
         refresh = QPushButton("Refresh")
@@ -85,7 +80,7 @@ class DesktopPage(QWidget):
         self.reload()
 
     def reload(self) -> None:
-        proc = run_ncc("desktop", "status", target=self.target.current_target())
+        proc = run_ncc("desktop", "status")
         text = ((proc.stdout or "") + (proc.stderr or "")).strip()
         self.raw.setPlainText(text or "(empty)")
         kv = _parse_kv(proc.stdout or "")

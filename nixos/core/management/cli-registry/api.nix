@@ -20,6 +20,13 @@ rec {
       enabled = attrs.enabled or false;
     };
 
+  # Rich Qt page lives in the module (`ui/gui/page.py`). Engine only aggregates.
+  # `pageDir` must contain page.py exporting create_page() and/or Page.
+  registerGuiPage = id: pageDir:
+    lib.setAttrByPath [ selfPath "guiPages" id ] {
+      path = pageDir;
+    };
+
   getRegisteredCommands = config:
     let
       commandSets = (fromConfig config).commandSets or {};
@@ -45,4 +52,6 @@ rec {
     lib.filter (cmd: !(cmd.internal or false)) (getRegisteredCommands config);
 
   guiDomains = config: (fromConfig config).guiDomains or {};
+
+  guiPages = config: (fromConfig config).guiPages or {};
 }

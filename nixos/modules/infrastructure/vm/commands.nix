@@ -13,7 +13,7 @@ let
     if tuiOn
     then (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi; }).tuiScript
     else null;
-  domainGui = (getModuleApi "gui-engine").domainGui pkgs;
+  domainGui = (getModuleApi "gui-engine").domainGui pkgs config;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
   libVM = import ./lib { inherit lib pkgs; };
@@ -331,6 +331,7 @@ in
       description = "Libvirt domains and test VMs";
       enabled = cfg.enable or false;
     })
+    (cliRegistry.registerGuiPage "vm" ./ui/gui)
     (cliRegistry.registerCommandsFor "vm" allCommands)
   ];
 }

@@ -1,7 +1,7 @@
-{ pkgs, getModuleApi }:
+{ pkgs, getModuleApi, config }:
 
 let
-  shared = (getModuleApi "gui-engine").domainGuiBundle pkgs;
+  shared = (getModuleApi "gui-engine").domainGuiBundle pkgs config;
   nccSystemGui = pkgs.writeShellScriptBin "ncc-system-gui" ''
     set -euo pipefail
     export PYTHONPATH="${shared.src}''${PYTHONPATH:+:$PYTHONPATH}"

@@ -11,7 +11,7 @@ let
     then (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi getModuleConfig; }).tuiScript
     else null;
   wifiCli = import ./scripts/wifi/default.nix { inherit pkgs; };
-  domainGui = (getModuleApi "gui-engine").domainGui pkgs;
+  domainGui = (getModuleApi "gui-engine").domainGui pkgs config;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
 
@@ -58,7 +58,9 @@ EOF
   '';
 in
 {
-  config = lib.mkIf (cfg.enable or true) (
+  config = lib.mkMerge [
+    (cliRegistry.registerGuiPage "network" ./ui/gui)
+    (lib.mkIf (cfg.enable or true) (
     cliRegistry.registerCommandsFor "network" (
       [
         {
@@ -101,5 +103,6 @@ in
         }
       ]
     )
-  );
+    ))
+  ];
 }

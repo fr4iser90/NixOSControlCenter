@@ -12,7 +12,7 @@ let
     if tuiOn
     then (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi getModuleConfig systemConfig moduleConfig; }).tuiScript
     else null;
-  domainGui = (getModuleApi "gui-engine").domainGui pkgs;
+  domainGui = (getModuleApi "gui-engine").domainGui pkgs config;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
 
@@ -65,6 +65,7 @@ in
       description = "Snapshots and restore";
       enabled = cfg.enable or false;
     })
+    (cliRegistry.registerGuiPage "lock" ./ui/gui)
     (lib.mkIf (cfg.enable or false) (let
     # Import collector modules (only those that don't use cfg can be in outer let)
     desktopScanner = import ./collectors/desktop.nix { inherit pkgs; };

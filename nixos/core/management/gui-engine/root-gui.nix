@@ -1,9 +1,9 @@
 # Root NCC GUI launcher (includes AI assistant sources for embed)
-{ pkgs, getModuleMetadata, packagesRoot }:
+{ pkgs, lib, getModuleMetadata, packagesRoot, guiPages ? {} }:
 
 let
   shared = import ./domain-gui.nix {
-    inherit pkgs getModuleMetadata packagesRoot;
+    inherit pkgs lib getModuleMetadata packagesRoot guiPages;
     assistantRoot = (getModuleMetadata "ncc-assistant").path;
   };
   catalogFile = import "${packagesRoot}/lib/mk-catalog-json.nix" { inherit pkgs; };

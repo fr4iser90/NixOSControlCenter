@@ -59,13 +59,27 @@ in {
           enabled = lib.mkOption {
             type = lib.types.bool;
             default = false;
-            description = "Whether the domain is usable (false → greyed stub)";
+            description = "Whether the domain is usable (false → hidden when inactive)";
           };
         };
       });
       default = {};
       internal = true;
       description = "GUI catalog stubs registered by modules";
+    };
+
+    guiPages = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.submodule {
+        options = {
+          path = lib.mkOption {
+            type = lib.types.path;
+            description = "Module ui/gui directory containing page.py";
+          };
+        };
+      });
+      default = {};
+      internal = true;
+      description = "Rich domain pages contributed by modules (not in gui-engine)";
     };
   };
 }

@@ -5,7 +5,7 @@ let
   cliRegistry = getModuleApi "cli-registry";
 
   packagesCli = import ./scripts/ncc-packages.nix { inherit pkgs getModuleMetadata; };
-  packagesGui = import ./gui/default.nix { inherit pkgs packagesCli getModuleApi; };
+  packagesGui = import ./gui/default.nix { inherit pkgs packagesCli getModuleApi config; };
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
 
@@ -49,6 +49,7 @@ in
 {
   config = lib.mkIf (cfg.enable or true)
     (lib.mkMerge [
+      (cliRegistry.registerGuiPage "packages" ./ui/gui)
       (cliRegistry.registerCommandsFor "packages" [
         {
           name = "packages";

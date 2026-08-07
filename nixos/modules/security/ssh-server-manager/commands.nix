@@ -7,7 +7,7 @@ let
   cfg = getModuleConfig moduleName;
   ui = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
-  domainGui = (getModuleApi "gui-engine").domainGui pkgs;
+  domainGui = (getModuleApi "gui-engine").domainGui pkgs config;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
 

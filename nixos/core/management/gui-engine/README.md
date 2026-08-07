@@ -1,23 +1,29 @@
 # NCC GUI Engine (Qt / PySide6)
 
-Shared chrome for domain GUIs (`ncc_gui`). Mirror of `tui-engine` for desktop.
+Shared chrome for domain GUIs (`ncc_gui`): shell, theme, catalog, remote/target,
+generic page. **Domain pages are not here** — each module owns `ui/gui/page.py`.
 
 ## Access (module guidelines)
 
 ```nix
 gui = getModuleApi "gui-engine";
+cli = getModuleApi "cli-registry";
 
-# Shared Python tree
-pkg = gui.package pkgs;          # { src, pythonEnv, pythonPath }
+# Launchers (always pass config so registered pages are aggregated)
+domainGui = gui.domainGui pkgs config;  # ncc-domain-gui
+rootGui = gui.rootGui pkgs config;      # ncc-gui (root shell)
 
-# Launchers
-domainGui = gui.domainGui pkgs;  # ncc-domain-gui
-rootGui = gui.rootGui pkgs;      # ncc-gui (root shell)
+# Register this module’s rich page (directory must contain page.py)
+cli.registerGuiPage "homelab" ./ui/gui
 ```
 
-**Do not** `import …/gui-engine/package.nix` via relative paths from other modules.
+**Do not** put domain pages under `gui-engine/python/ncc_gui/pages/`.
+**Do not** `import …/gui-engine/…` via relative paths from other modules.
 
-## Status
+## Layout
 
-Packages, Network, Lock, AI have richer pages under `ncc_gui.pages.<id>`;
-other domains use the generic page until a custom page exists.
+| Location | Responsibility |
+|----------|----------------|
+| `gui-engine` | Shell, Target bar, theme, dialogs, `remote`, generic fallback |
+| `<module>/ui/gui/page.py` | Domain-specific Qt page (`create_page` / `Page`) |
+| `cli-registry.registerGuiPage` | Discovery hook so the engine can aggregate pages |

@@ -103,8 +103,10 @@ let
     AUTO_SOURCE=""
     AUTO_BUILD=false
     WITH_CHANNELS=false
-    for arg in "$@"; do
-      case "$arg" in
+    AUTO_BRANCH=""
+    SOURCE_DIR_OVERRIDE=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
         --verbose|--debug|-v)
           VERBOSE=true
           ;;
@@ -135,7 +137,22 @@ let
         --auto-build)
           AUTO_BUILD=true
           ;;
+        --branch=*)
+          AUTO_BRANCH="''${1#--branch=}"
+          ;;
+        --branch)
+          shift
+          AUTO_BRANCH="''${1:-}"
+          ;;
+        --source-dir=*)
+          SOURCE_DIR_OVERRIDE="''${1#--source-dir=}"
+          ;;
+        --source-dir)
+          shift
+          SOURCE_DIR_OVERRIDE="''${1:-}"
+          ;;
       esac
+      shift || true
     done
 
     # Sudo-Check
@@ -244,46 +261,52 @@ let
           ${ui.text.header "NixOS System Update - Remote"}
           ${ui.messages.info "Available branches:"}
           
-          echo "1) main"
-          echo "2) develop"
-          echo "3) experimental"
-          echo "4) custom"
-          
-          while true; do
-            printf "Select branch (1-4): "
-            if ! read -r choice; then
-              ${ui.messages.info "Update cancelled"}
-              exit 0
-            fi
-            choice="''${choice#"''${choice%%[![:space:]]*}"}"
-            choice="''${choice%"''${choice##*[![:space:]]}"}"
-            case $choice in
-              1) 
-                SELECTED_BRANCH="main"
-                break
-                ;;
-              2)
-                SELECTED_BRANCH="develop"
-                break
-                ;;
-              3)
-                SELECTED_BRANCH="experimental"
-                break
-                ;;
-              4)
-                printf "Enter custom branch name: "
-                read -r SELECTED_BRANCH
-                break
-                ;;
-              "")
-                ${ui.messages.warning "Empty input — please choose 1-4"}
-                ;;
-              *)
-                ${ui.messages.warning "Option '$choice' is not available — please choose 1-4"}
-                ;;
-            esac
-          done
-          
+          if [ -n "$AUTO_BRANCH" ]; then
+            SELECTED_BRANCH="$AUTO_BRANCH"
+          elif [ "$AUTO_CONFIRM" = "true" ]; then
+            SELECTED_BRANCH="main"
+          else
+            echo "1) main"
+            echo "2) develop"
+            echo "3) experimental"
+            echo "4) custom"
+
+            while true; do
+              printf "Select branch (1-4): "
+              if ! read -r choice; then
+                ${ui.messages.info "Update cancelled"}
+                exit 0
+              fi
+              choice="''${choice#"''${choice%%[![:space:]]*}"}"
+              choice="''${choice%"''${choice##*[![:space:]]}"}"
+              case $choice in
+                1)
+                  SELECTED_BRANCH="main"
+                  break
+                  ;;
+                2)
+                  SELECTED_BRANCH="develop"
+                  break
+                  ;;
+                3)
+                  SELECTED_BRANCH="experimental"
+                  break
+                  ;;
+                4)
+                  printf "Enter custom branch name: "
+                  read -r SELECTED_BRANCH
+                  break
+                  ;;
+                "")
+                  ${ui.messages.warning "Empty input — please choose 1-4"}
+                  ;;
+                *)
+                  ${ui.messages.warning "Option '$choice' is not available — please choose 1-4"}
+                  ;;
+              esac
+            done
+          fi
+
           ${ui.tables.keyValue "Selected branch" "$SELECTED_BRANCH"}
           
           # Create temporary directory and clone repository
@@ -302,9 +325,17 @@ let
         2)
           # Local update configuration
           ${ui.text.header "NixOS System Update - Local"}
-          SOURCE_DIR="/home/${username}/Documents/Git/NixOSControlCenter/nixos"
-          
+          if [ -n "$SOURCE_DIR_OVERRIDE" ]; then
+            SOURCE_DIR="$SOURCE_DIR_OVERRIDE"
+          else
+            SOURCE_DIR="/home/${username}/Documents/Git/NixOSControlCenter/nixos"
+          fi
+
           if [ ! -d "$SOURCE_DIR" ]; then
+            if [ -n "$SOURCE_DIR_OVERRIDE" ] || [ "$AUTO_CONFIRM" = "true" ]; then
+              ${ui.messages.error "Local source directory not found: $SOURCE_DIR"}
+              exit 1
+            fi
             ${ui.messages.warning "Default directory not found: $SOURCE_DIR"}
             ${ui.messages.info "Looking for NixOS flakes in common locations..."}
             

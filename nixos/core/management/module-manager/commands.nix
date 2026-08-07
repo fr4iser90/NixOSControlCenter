@@ -10,7 +10,7 @@ let
     if tuiOn
     then ((getModuleApi "tui-engine").fromConfig config).moduleManagerTuiScript
     else null;
-  modulesGui = (import ./gui/default.nix { inherit pkgs getModuleApi; }).nccModulesGui;
+  modulesGui = (import ./gui/default.nix { inherit pkgs getModuleApi config; }).nccModulesGui;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
 
