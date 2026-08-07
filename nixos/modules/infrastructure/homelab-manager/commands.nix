@@ -119,6 +119,7 @@ mkMerge [
     label = "Homelab";
     description = "Docker Swarm and stacks";
     enabled = cfg.enable or false;
+    group = "features";
   })
   (cliRegistry.registerGuiPage "homelab" ./ui/gui)
   (mkIf (cfg.enable or false) (cliRegistry.registerCommandsFor "homelab" (

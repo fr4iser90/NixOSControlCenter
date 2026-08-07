@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="NixOS Control Center">
+  <defs>
+    <linearGradient id="bg" x1="16" y1="8" x2="112" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0B3D4A"/>
+      <stop offset="100%" stop-color="#1A6B7A"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="40" y1="36" x2="96" y2="96" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7EE0D6"/>
+      <stop offset="100%" stop-color="#E8F7F5"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#bg)"/>
+  <!-- hub + nodes -->
+  <circle cx="64" cy="58" r="10" fill="url(#accent)"/>
+  <circle cx="40" cy="42" r="5.5" fill="#9BE8E0"/>
+  <circle cx="88" cy="42" r="5.5" fill="#9BE8E0"/>
+  <circle cx="36" cy="72" r="5" fill="#6BCFC4"/>
+  <circle cx="92" cy="72" r="5" fill="#6BCFC4"/>
+  <path d="M40 42 L64 58 L88 42 M36 72 L64 58 L92 72" stroke="#9BE8E0" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.85"/>
+  <!-- NCC wordmark -->
+  <text x="64" y="102" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="750" fill="#F4FFFD" letter-spacing="1.5">NCC</text>
+</svg>

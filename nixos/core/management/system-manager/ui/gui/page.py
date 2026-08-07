@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ncc_gui.ansi import strip_ansi
 from ncc_gui.dialogs import confirm, error, info
 from ncc_gui.remote import run_ncc, target_from_env
 from ncc_gui.target_bus import bus as target_bus
@@ -228,8 +229,10 @@ class SystemPage(QWidget):
             return
         data = bytes(self._proc.readAllStandardOutput()).decode("utf-8", errors="replace")
         if data:
+            # QTextEdit is not a terminal — strip CLI-formatter ANSI codes
+            plain = strip_ansi(data)
             self.log.moveCursor(self.log.textCursor().MoveOperation.End)
-            self.log.insertPlainText(data)
+            self.log.insertPlainText(plain)
             self.log.moveCursor(self.log.textCursor().MoveOperation.End)
 
     def _on_proc_done(self, code: int, label: str) -> None:
@@ -267,7 +270,7 @@ class SystemPage(QWidget):
             error(self, label, str(exc))
             self.log.append(f"• {label}\n{exc}\n")
             return
-        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+        out = strip_ansi(((proc.stdout or "") + (proc.stderr or "")).strip())
         pretty = out or ("Done." if proc.returncode == 0 else "Failed.")
         self.log.append(f"• {label} ({where})\n{pretty}\n")
         if proc.returncode != 0:

@@ -19,7 +19,12 @@ class DomainInfo:
     label: str
     description: str
     enabled: bool
+    group: str = "features"  # "core" | "features"
     actions: list[DomainAction] = field(default_factory=list)
+
+
+def _group_rank(group: str) -> int:
+    return 0 if group == "core" else 1
 
 
 def load_domains() -> list[DomainInfo]:
@@ -32,6 +37,7 @@ def load_domains() -> list[DomainInfo]:
           "label": "Packages",
           "description": "...",
           "enabled": true,
+          "group": "core",
           "actions": [{"label": "List", "args": ["list"]}]
         }
       ]
@@ -65,15 +71,19 @@ def load_domains() -> list[DomainInfo]:
                             args=[str(x) for x in a["args"]],
                         )
                     )
+        group = str(item.get("group") or "features")
+        if group not in ("core", "features"):
+            group = "features"
         out.append(
             DomainInfo(
                 id=str(item["id"]),
                 label=str(item.get("label") or item["id"]),
                 description=str(item.get("description") or ""),
                 enabled=bool(item.get("enabled", True)),
+                group=group,
                 actions=actions,
             )
         )
-    # Stable order by label
-    out.sort(key=lambda d: d.label.lower())
+    # Core first, then features; stable by label within group
+    out.sort(key=lambda d: (_group_rank(d.group), d.label.lower()))
     return out

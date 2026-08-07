@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ncc_gui.ansi import strip_ansi
 from ncc_gui.dialogs import confirm, error
 from ncc_gui.theme import APP_STYLE
 
@@ -76,7 +77,7 @@ class DomainActionsPage(QWidget):
                 return
         cmd = ["ncc", self.domain, *args]
         proc = subprocess.run(cmd, capture_output=True, text=True)
-        out = (proc.stdout or "") + (proc.stderr or "")
+        out = strip_ansi((proc.stdout or "") + (proc.stderr or ""))
         pretty = out.strip() or ("Done." if proc.returncode == 0 else "Something went wrong.")
         self.log.append(f"• {label}\n{pretty}\n")
         if proc.returncode != 0:

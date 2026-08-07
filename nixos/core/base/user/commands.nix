@@ -78,6 +78,7 @@ in
       label = "Users";
       description = "User accounts and roles";
       enabled = true;
+      group = "core";
     })
     (cliRegistry.registerGuiPage "user" ./ui/gui)
     (lib.mkIf (cfg.enable or true)

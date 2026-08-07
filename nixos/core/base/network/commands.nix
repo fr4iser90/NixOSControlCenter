@@ -59,6 +59,12 @@ EOF
 in
 {
   config = lib.mkMerge [
+    (cliRegistry.registerGuiDomain "network" {
+      label = "Network";
+      description = "Network and WiFi";
+      enabled = cfg.enable or true;
+      group = "core";
+    })
     (cliRegistry.registerGuiPage "network" ./ui/gui)
     (lib.mkIf (cfg.enable or true) (
     cliRegistry.registerCommandsFor "network" (

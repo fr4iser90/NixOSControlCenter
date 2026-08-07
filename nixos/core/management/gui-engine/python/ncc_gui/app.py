@@ -8,12 +8,20 @@ import sys
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
+from ncc_gui.branding import app_icon
+
 
 def ensure_app(argv: list[str] | None = None) -> QApplication:
     existing = QApplication.instance()
     if existing is not None:
         return existing  # type: ignore[return-value]
-    return QApplication(argv if argv is not None else sys.argv)
+    app = QApplication(argv if argv is not None else sys.argv)
+    app.setApplicationName("NixOS Control Center")
+    app.setDesktopFileName("ncc")
+    icon = app_icon()
+    if not icon.isNull():
+        app.setWindowIcon(icon)
+    return app
 
 
 def run_window(window_factory, argv: list[str] | None = None) -> int:
@@ -27,5 +35,8 @@ def run_window(window_factory, argv: list[str] | None = None) -> int:
     _keepalive.timeout.connect(lambda: None)
 
     win = window_factory()
+    icon = app.windowIcon()
+    if not icon.isNull():
+        win.setWindowIcon(icon)
     win.show()
     return app.exec()

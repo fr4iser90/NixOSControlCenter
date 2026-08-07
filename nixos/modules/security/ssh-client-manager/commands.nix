@@ -108,6 +108,7 @@ in {
       label = "SSH";
       description = "SSH client connections";
       enabled = cfg.enable or false;
+      group = "features";
     })
     (cliRegistry.registerGuiPage "ssh" ./ui/gui)
     (mkIf (cfg.enable or false) (

@@ -313,21 +313,11 @@ module-name/               # Module name
 │   │   │   └── helpers.nix # fzf-spezifische Utilities
 │   │   └── interactive/   # Andere CLI-Interfaces (gum, etc.)
 │   │       └── ...
-│   ├── tui/               # TUI Engine Integration
-│   │   ├── menu.nix       # TUI Menu-Definition (verwendet tui-engine)
-│   │   ├── actions.nix    # TUI Action-Handler
-│   │   └── helpers.nix    # TUI-spezifische Utilities
-│   ├── gui/               # GUI für verschiedene DEs (optional)
-│   │   ├── plasma/        # KDE Plasma GUI
-│   │   │   ├── main.qml   # QML Interface
-│   │   │   └── components/# QML Components
-│   │   ├── gnome/         # GNOME GUI
-│   │   │   ├── main.py    # GTK4/Python Interface
-│   │   │   └── widgets/   # GTK Widgets
-│   │   ├── generic/       # Generic GUI (Qt/GTK)
-│   │   │   └── ...
-│   │   └── shared/        # Shared GUI Components
-│   │       └── ...
+│   ├── tui/               # TUI Engine Integration (Bubble Tea / Go)
+│   │   ├── default.nix    # Build via getModuleApi "tui-engine"
+│   │   └── *.go           # TUI sources (when needed)
+│   ├── gui/               # Desktop GUI page for NCC root shell (PySide6)
+│   │   └── page.py        # create_page() / Page — uses ncc_gui.* from gui-engine
 │   └── web/               # Web-Interface (optional, wie nixify)
 │       ├── api/           # REST API
 │       │   ├── main.go    # Go API Server
@@ -935,16 +925,20 @@ in
 
 ### UI-Architektur (Multi-Interface Support)
 
+**Philosophie:** Nix bleibt Wiring (options, config, commands, discovery, packaging).  
+Runtime-UI darf `.py` / `.go` sein — aber **nur im Modul**, nie Domain-Pages in `gui-engine`.
+
 Module können mehrere UI-Formen unterstützen:
-- **CLI**: fzf-basierte Menus (aus Scripts extrahiert)
-- **TUI**: Bubble Tea-basierte Interfaces (via tui-engine)
-- **GUI**: Desktop-Environment-spezifische GUIs (Plasma, GNOME, etc.)
-- **Web**: Optionaler Web-Service mit REST API
+- **CLI**: Default für `ncc <domain>` (help / interactive manager); fzf in `ui/cli/` wenn nötig
+- **TUI**: Optional via `tui-engine` (`ncc <domain> --tui`)
+- **GUI**: Optional PySide6 page in `ui/gui/page.py` (`ncc <domain> --gui` + root shell)
+- **Web**: Optionaler Web-Service mit REST API (selten)
 
 **Wichtig:**
 - **fzf aus Scripts extrahieren**: Scripts enthalten nur reine Commands, UI-Logik in `ui/cli/fzf/`
-- **TUI via Engine**: Nutze `tui-engine` API für Bubble Tea Interfaces
-- **GUI optional**: Nur wenn Modul GUI benötigt
+- **TUI via Engine**: `getModuleApi "tui-engine"`
+- **GUI via Engine**: `getModuleApi "gui-engine"` + `registerGuiPage` — **kein** Page-Code unter `gui-engine/python/ncc_gui/pages/`
+- **Sidebar-Gruppe**: `registerGuiDomain … group = "core" | "features"` (Core = immer-an Base/Management; Features = optionale Module)
 - **Web optional**: Nur wenn Modul Web-Service benötigt (wie nixify)
 - **Docker einsortieren**: `docker/` oder `ui/web/docker/` statt Root
 
@@ -979,41 +973,55 @@ in
 
 **Purpose**: Bubble Tea-basierte TUI via tui-engine
 
-**Pattern**:
-```nix
-# ui/tui/menu.nix
-{ lib, pkgs, getModuleApi, cfg, ... }:
+**Pattern**: Wire from `commands.nix` with `(getModuleApi "tui-engine").isEnabled getModuleConfig`; sources live under `ui/tui/`.
 
-let
-  tuiEngine = getModuleApi "tui-engine";
-  
-  # TUI Menu-Definition (verwendet tui-engine Templates)
-  tui = tuiEngine.templates."5panel".createTUI
-    "📦 Example Module"
-    [ "📋 List" "🔍 Search" "⚙️ Settings" "❌ Quit" ]
-    actions.getList
-    actions.getSearch
-    actions.getDetails
-    actions.getActions;
-in
-  tui
+#### `ui/gui/` - NCC Desktop page (optional, PySide6)
+
+**Purpose**: Rich domain page in the shared NCC Qt shell (not a separate DE app).
+
+**Layout:**
+```
+ui/gui/
+└── page.py    # must export create_page() and/or Page
 ```
 
-#### `ui/gui/` - Desktop GUI (optional)
+**page.py** (uses core helpers only):
+```python
+from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from ncc_gui.theme import APP_STYLE  # from gui-engine
 
-**Purpose**: DE-spezifische GUIs (Plasma, GNOME, etc.)
+class ExamplePage(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet(APP_STYLE)
+        lay = QVBoxLayout(self)
+        lay.addWidget(QLabel("Example"))
 
-**Pattern**:
-```nix
-# ui/gui/plasma/main.qml (QML für Plasma)
-import QtQuick 2.15
-import QtQuick.Controls 2.15
+def create_page():
+    return ExamplePage()
 
-ApplicationWindow {
-    title: "Example Module"
-    // GUI Implementation
-}
+Page = ExamplePage
 ```
+
+**commands.nix wiring:**
+```nix
+cliRegistry = getModuleApi "cli-registry";
+domainGui = (getModuleApi "gui-engine").domainGui pkgs config;
+
+# Catalog + sidebar section (features = optional module)
+(cliRegistry.registerGuiDomain "example" {
+  label = "Example";
+  description = "…";
+  enabled = cfg.enable or false;
+  group = "features";  # use "core" only for core/base modules
+})
+# Aggregates ui/gui/page.py into ncc_domain_page.example
+(cliRegistry.registerGuiPage "example" ./ui/gui)
+
+# Launch: ncc example --gui → domainGui
+```
+
+Without `registerGuiPage`, the root shell shows a **generic** action page from registered child commands.
 
 #### `ui/web/` - Web-Interface (optional, wie nixify)
 

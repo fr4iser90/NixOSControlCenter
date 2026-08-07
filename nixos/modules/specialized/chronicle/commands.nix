@@ -59,6 +59,7 @@ in
       label = "Chronicle";
       description = "Record and review workflows";
       enabled = cfg.enable or true;
+      group = "features";
     })
     registrationResult
   ];

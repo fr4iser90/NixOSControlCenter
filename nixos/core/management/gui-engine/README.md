@@ -15,6 +15,14 @@ rootGui = gui.rootGui pkgs config;      # ncc-gui (root shell)
 
 # Register this module’s rich page (directory must contain page.py)
 cli.registerGuiPage "homelab" ./ui/gui
+
+# Sidebar section (root shell: Core / Features)
+cli.registerGuiDomain "homelab" {
+  label = "Homelab";
+  description = "…";
+  enabled = cfg.enable or false;
+  group = "features";  # or "core" for base/management
+};
 ```
 
 **Do not** put domain pages under `gui-engine/python/ncc_gui/pages/`.
@@ -27,3 +35,5 @@ cli.registerGuiPage "homelab" ./ui/gui
 | `gui-engine` | Shell, Target bar, theme, dialogs, `remote`, generic fallback |
 | `<module>/ui/gui/page.py` | Domain-specific Qt page (`create_page` / `Page`) |
 | `cli-registry.registerGuiPage` | Discovery hook so the engine can aggregate pages |
+| `registerGuiDomain.group` | Sidebar section: `core` \| `features` |
+| `assets/ncc-icon.{svg,png}` | App icon (window, sidebar, desktop entry `ncc`) |

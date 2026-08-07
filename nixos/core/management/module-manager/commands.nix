@@ -61,47 +61,57 @@ EOF
     ${discovery}
   '';
 in
-  cliRegistry.registerCommandsFor "modules" (
-    [
-      {
-        name = "modules";
-        domain = "modules";
-        description = "Module management (GUI)";
-        category = "system";
-        script = "${modulesEntry}/bin/ncc-modules-entry";
-        type = "manager";
-        permission = "system.manage";
-        requiresSudo = true;
-        shortHelp = "modules - Module management (GUI)";
-        longHelp = ''
-          ncc modules       GUI
-          ncc modules tui   Terminal TUI (if tui-engine.enable)
-        '';
-      }
-      {
-        name = "get-module-data";
-        domain = "modules";
-        parent = "modules";
-        internal = true;
-        description = "Internal discovery helper";
-        category = "system";
-        script = "${getModuleData}/bin/ncc-modules-get-data";
-        shortHelp = "get-module-data - Internal";
-      }
-    ]
-    ++ optionals tuiOn [
-      {
-        name = "tui";
-        domain = "modules";
-        parent = "modules";
-        description = "Modules TUI";
-        category = "system";
-        script = "${bubbleTeaTui}/bin/ncc-module-manager-tui";
-        type = "manager";
-        permission = "system.manage";
-        requiresSudo = true;
-        shortHelp = "tui - Modules TUI";
-        longHelp = "ncc modules tui";
-      }
-    ]
-  )
+{
+  config = mkMerge [
+    (cliRegistry.registerGuiDomain "modules" {
+      label = "Modules";
+      description = "Enable and configure NCC modules";
+      enabled = true;
+      group = "core";
+    })
+    (cliRegistry.registerCommandsFor "modules" (
+      [
+        {
+          name = "modules";
+          domain = "modules";
+          description = "Module management (GUI)";
+          category = "system";
+          script = "${modulesEntry}/bin/ncc-modules-entry";
+          type = "manager";
+          permission = "system.manage";
+          requiresSudo = true;
+          shortHelp = "modules - Module management (GUI)";
+          longHelp = ''
+            ncc modules       GUI
+            ncc modules tui   Terminal TUI (if tui-engine.enable)
+          '';
+        }
+        {
+          name = "get-module-data";
+          domain = "modules";
+          parent = "modules";
+          internal = true;
+          description = "Internal discovery helper";
+          category = "system";
+          script = "${getModuleData}/bin/ncc-modules-get-data";
+          shortHelp = "get-module-data - Internal";
+        }
+      ]
+      ++ optionals tuiOn [
+        {
+          name = "tui";
+          domain = "modules";
+          parent = "modules";
+          description = "Modules TUI";
+          category = "system";
+          script = "${bubbleTeaTui}/bin/ncc-module-manager-tui";
+          type = "manager";
+          permission = "system.manage";
+          requiresSudo = true;
+          shortHelp = "tui - Modules TUI";
+          longHelp = "ncc modules tui";
+        }
+      ]
+    ))
+  ];
+}

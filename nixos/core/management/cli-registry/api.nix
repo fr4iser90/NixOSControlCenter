@@ -18,6 +18,8 @@ rec {
       label = attrs.label or id;
       description = attrs.description or "";
       enabled = attrs.enabled or false;
+      # Sidebar section: "core" | "features" (default features)
+      group = attrs.group or "features";
     };
 
   # Rich Qt page lives in the module (`ui/gui/page.py`). Engine only aggregates.

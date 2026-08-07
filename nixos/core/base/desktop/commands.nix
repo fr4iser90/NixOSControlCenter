@@ -74,6 +74,7 @@ in
       label = "Desktop";
       description = "Desktop environment settings";
       enabled = cfg.enable or true;
+      group = "core";
     })
     (cliRegistry.registerGuiPage "desktop" ./ui/gui)
     (lib.mkIf (cfg.enable or true)

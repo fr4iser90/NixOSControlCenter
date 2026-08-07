@@ -330,6 +330,7 @@ in
       label = "VMs";
       description = "Libvirt domains and test VMs";
       enabled = cfg.enable or false;
+      group = "features";
     })
     (cliRegistry.registerGuiPage "vm" ./ui/gui)
     (cliRegistry.registerCommandsFor "vm" allCommands)

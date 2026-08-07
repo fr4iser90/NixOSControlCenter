@@ -30,6 +30,7 @@ let
     export PYTHONPATH="${src}''${PYTHONPATH:+:$PYTHONPATH}"
     export NCC_PACKAGES_BIN="${packagesCli}/bin/ncc-packages"
     export NCC_PACKAGES_CATALOG="${catalogFile}"
+    export NCC_GUI_ICON="''${NCC_GUI_ICON:-${eng.iconPng}}"
     export QT_QPA_PLATFORM="''${QT_QPA_PLATFORM:-xcb}"
     export PATH="${packagesCli}/bin:${pkgs.nix}/bin:$PATH"
     exec ${pythonEnv}/bin/python -m ncc_gui.domain_gui "$@"

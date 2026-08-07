@@ -176,11 +176,12 @@ Without a registered page → **generic** page (actions from child commands).
   label = "Homelab";
   description = "Docker Swarm and stacks";
   enabled = cfg.enable or false;
+  group = "features";  # sidebar: "core" | "features"
 })
 (cliRegistry.registerGuiPage "homelab" ./ui/gui)
 ```
 
-Adding a module = register a top-level command (+ optional GUI page). **Do not** edit `gui-engine` for new domains.
+Adding a module = register a top-level command (+ optional GUI page). **Do not** edit `gui-engine` for new domains. Root sidebar sections: **Core** / **Features** from `group`.
 ---
 
 ## 6. Registry checklist (for `commands.nix`)

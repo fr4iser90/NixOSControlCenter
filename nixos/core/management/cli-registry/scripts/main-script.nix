@@ -90,6 +90,7 @@ let
     description = cmd.description or "";
     enabled = true;
     actions = childActions cmd.name;
+    # group comes from registerGuiDomain stub when present (merged below)
   }) topLevel;
 
   guiDomainAttrs = cliRegistry.guiDomains config;
@@ -98,11 +99,30 @@ let
     label = cleanUiLabel (g.label or id);
     description = g.description or "";
     enabled = g.enabled or false;
+    group = g.group or "features";
     actions = [];
   }) guiDomainAttrs;
 
-  # Stubs first, then commands overwrite (enabled domains always win)
-  catalogById = lib.foldl' (acc: item: acc // { ${item.id} = item; }) {} (fromGuiStubs ++ fromCommands);
+  # Stubs first, then commands overwrite (enabled domains win); preserve stub group
+  catalogById = lib.foldl' (acc: item:
+    let
+      prev = acc.${item.id} or {};
+      group = item.group or prev.group or "features";
+      actions =
+        if (item.actions or []) != []
+        then item.actions
+        else (prev.actions or []);
+    in
+      acc // {
+        ${item.id} = {
+          inherit (item) id;
+          label = item.label or prev.label or item.id;
+          description = item.description or prev.description or "";
+          enabled = if item ? enabled then item.enabled else (prev.enabled or false);
+          inherit group actions;
+        };
+      }
+  ) {} (fromGuiStubs ++ fromCommands);
   guiCatalogJson = builtins.toJSON (lib.attrValues catalogById);
   guiCatalog = pkgs.writeText "ncc-gui-catalog.json" guiCatalogJson;
 

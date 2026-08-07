@@ -109,6 +109,7 @@ in
       label = "Hosts";
       description = "Fleet targets (SSH hosts)";
       enabled = true;
+      group = "core";
     })
     (cliRegistry.registerGuiPage "hosts" ./ui/gui)
     (cliRegistry.registerCommandsFor "hosts" [

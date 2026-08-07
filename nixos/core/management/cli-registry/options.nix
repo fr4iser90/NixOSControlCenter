@@ -61,6 +61,11 @@ in {
             default = false;
             description = "Whether the domain is usable (false → hidden when inactive)";
           };
+          group = lib.mkOption {
+            type = lib.types.enum [ "core" "features" ];
+            default = "features";
+            description = "Sidebar section: Core (always-on engines/base) vs Features (optional modules)";
+          };
         };
       });
       default = {};

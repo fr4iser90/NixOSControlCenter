@@ -107,6 +107,12 @@ EOF
 in {
   config = lib.mkMerge [
     systemUpdateNixosConfig
+    (cliRegistry.registerGuiDomain "system" {
+      label = "System";
+      description = "Update, rebuild, and system health";
+      enabled = true;
+      group = "core";
+    })
     (cliRegistry.registerGuiPage "system" ./ui/gui)
     {
       environment.systemPackages =

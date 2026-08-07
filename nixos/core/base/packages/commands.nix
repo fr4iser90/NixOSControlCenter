@@ -49,6 +49,12 @@ in
 {
   config = lib.mkIf (cfg.enable or true)
     (lib.mkMerge [
+      (cliRegistry.registerGuiDomain "packages" {
+        label = "Packages";
+        description = "Package and module package sets";
+        enabled = true;
+        group = "core";
+      })
       (cliRegistry.registerGuiPage "packages" ./ui/gui)
       (cliRegistry.registerCommandsFor "packages" [
         {

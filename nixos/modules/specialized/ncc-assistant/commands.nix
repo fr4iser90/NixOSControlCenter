@@ -13,6 +13,7 @@ in
       label = "AI Assistant";
       description = "Chat, agent, and tools";
       enabled = cfg.enable or false;
+      group = "features";
     })
     (cliRegistry.registerGuiPage "ai" ./ui/gui)
     (mkIf (cfg.enable or false) (

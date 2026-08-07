@@ -64,6 +64,7 @@ in
       label = "Lock";
       description = "Snapshots and restore";
       enabled = cfg.enable or false;
+      group = "features";
     })
     (cliRegistry.registerGuiPage "lock" ./ui/gui)
     (lib.mkIf (cfg.enable or false) (let
