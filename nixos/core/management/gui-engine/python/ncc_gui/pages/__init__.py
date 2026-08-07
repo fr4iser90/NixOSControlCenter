@@ -6,6 +6,7 @@ from ncc_gui.pages.lock import LockPage
 from ncc_gui.pages.network import NetworkPage
 from ncc_gui.pages.packages import PackagesPage
 from ncc_gui.pages.resolve import create_page_for
+from ncc_gui.pages.ssh import SshPage
 
 __all__ = [
     "DomainActionsPage",
@@ -13,5 +14,6 @@ __all__ = [
     "PackagesPage",
     "NetworkPage",
     "LockPage",
+    "SshPage",
     "create_page_for",
 ]

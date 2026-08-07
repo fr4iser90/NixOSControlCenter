@@ -169,27 +169,104 @@ in {
           esac
       }
 
-      # Main function - entry point of the script
-      main() {
-          # Get both selection and action from select_server
+      # Interactive fzf flow (no CLI verb)
+      main_interactive() {
           local servers_list="$(load_saved_servers)"
           local selection
           local action
-          
-          # Read both lines from select_server (selection and action)
+
           { read -r selection; read -r action; } < <(select_server "$servers_list")
-          
-          # Don't show error if user just pressed enter on Add new server
+
           if [[ -z "$selection" && "$action" != "new" ]]; then
               ${ui.messages.error "No server selected"}
               exit 0
           fi
-          
-          # Handle the selected action
+
           handle_action "$selection" "$action"
       }
 
-      # Start the main function
-      main
+      # Non-interactive verbs for GUI / scripts: list|add|edit|delete|connect
+      main_cli() {
+          local verb="$1"
+          shift || true
+          case "$verb" in
+              list)
+                  load_saved_servers | while IFS='=' read -r ip user; do
+                      [[ -n "$ip" && -n "$user" ]] || continue
+                      printf '%s=%s\n' "$ip" "$user"
+                  done
+                  ;;
+              add)
+                  local server_ip="''${1:-}"
+                  local username="''${2:-}"
+                  if [[ -z "$server_ip" || -z "$username" ]]; then
+                      echo "Usage: ncc ssh client add HOST USER" >&2
+                      exit 2
+                  fi
+                  load_saved_servers >/dev/null
+                  if grep -q "^''${server_ip}=" "$CREDS_FILE" 2>/dev/null; then
+                      ${ui.messages.error "Server already exists: $server_ip"}
+                      exit 1
+                  fi
+                  save_new_server "$server_ip" "$username"
+                  ;;
+              edit)
+                  local server_ip="''${1:-}"
+                  local new_user="''${2:-}"
+                  if [[ -z "$server_ip" || -z "$new_user" ]]; then
+                      echo "Usage: ncc ssh client edit HOST USER" >&2
+                      exit 2
+                  fi
+                  load_saved_servers >/dev/null
+                  if ! grep -q "^''${server_ip}=" "$CREDS_FILE" 2>/dev/null; then
+                      ${ui.messages.error "Server not found: $server_ip"}
+                      exit 1
+                  fi
+                  sed -i "s/^''${server_ip}=.*/''${server_ip}=''${new_user}/" "$CREDS_FILE"
+                  ${ui.messages.success "Server updated successfully."}
+                  ;;
+              delete)
+                  local server_ip="''${1:-}"
+                  if [[ -z "$server_ip" ]]; then
+                      echo "Usage: ncc ssh client delete HOST" >&2
+                      exit 2
+                  fi
+                  load_saved_servers >/dev/null
+                  if ! grep -q "^''${server_ip}=" "$CREDS_FILE" 2>/dev/null; then
+                      ${ui.messages.error "Server not found: $server_ip"}
+                      exit 1
+                  fi
+                  sed -i "/^''${server_ip}=/d" "$CREDS_FILE"
+                  ${ui.messages.success "Server deleted successfully."}
+                  ;;
+              connect)
+                  local server_ip="''${1:-}"
+                  local username="''${2:-}"
+                  if [[ -z "$server_ip" ]]; then
+                      echo "Usage: ncc ssh client connect HOST [USER]" >&2
+                      exit 2
+                  fi
+                  load_saved_servers >/dev/null
+                  if [[ -z "$username" ]]; then
+                      username="$(grep "^''${server_ip}=" "$CREDS_FILE" 2>/dev/null | head -1 | cut -d= -f2-)"
+                  fi
+                  if [[ -z "$username" ]]; then
+                      ${ui.messages.error "No username for $server_ip (pass USER or add the server first)"}
+                      exit 1
+                  fi
+                  connect_to_server "$username@$server_ip"
+                  ;;
+              *)
+                  ${ui.messages.error "Unknown action: $verb"}
+                  exit 1
+                  ;;
+          esac
+      }
+
+      if [[ $# -gt 0 ]]; then
+          main_cli "$@"
+      else
+          main_interactive
+      fi
     '';
 }

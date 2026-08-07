@@ -1,10 +1,12 @@
-{ config, lib, pkgs, systemConfig, getModuleConfigFromPath, getCurrentModuleMetadata, configHelpers, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getCurrentModuleMetadata, ... }:
 
 let
   moduleConfig = getCurrentModuleMetadata ./.;
-  # Generic: Use getModuleConfigFromPath to get config with defaults from options.nix
-  cfg = getModuleConfigFromPath moduleConfig.configPath;
-  # Default SSH config
+  cfg = getModuleConfig moduleConfig.name;
+  # Discovery: systemConfig/<configPath with . → />
+  configDir = "/etc/nixos/systemConfig/${lib.replaceStrings [ "." ] [ "/" ] moduleConfig.configPath}";
+  configFile = "${configDir}/config.nix";
+
   defaultConfig = ''
     # SSH Client Manager Configuration
     # This file contains SSH connection configurations
@@ -30,18 +32,30 @@ let
       };
     }
   '';
+
+  # Do not use configHelpers from _module.args (infinite recursion).
+  # Path comes from discovery metadata.configPath — never hardcode category dirs.
+  activation = {
+    system.activationScripts."${moduleConfig.name}-config-setup" = {
+      text = ''
+        mkdir -p "${configDir}"
+
+        if [ ! -f "${configFile}" ]; then
+          cat << 'EOF' > "${configFile}"
+${defaultConfig}
+EOF
+          chmod 644 "${configFile}"
+          echo "Created default config for ${moduleConfig.name}"
+        fi
+      '';
+      deps = [];
+    };
+  };
 in
 {
-  config = lib.mkMerge [
-    (lib.mkIf (cfg.enable or false) (
-      (configHelpers.createModuleConfig {
-        moduleName = "ssh-client-manager";
-        defaultConfig = defaultConfig;
-      }) // {
-        # Enable module by default if config has it
-        systemConfig.${moduleConfig.configPath}.enable = lib.mkDefault (cfg.enable or false);
-      }
-    ))
-    # Implementation is handled in default.nix
-  ];
+  config = lib.mkIf (cfg.enable or false) (
+    activation // {
+      systemConfig.${moduleConfig.configPath}.enable = lib.mkDefault (cfg.enable or false);
+    }
+  );
 }
