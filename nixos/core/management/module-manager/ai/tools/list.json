@@ -1,0 +1,12 @@
+{
+  "name": "domain.modules.list",
+  "description": "List NCC modules with status/category/version (JSON array).",
+  "risk": "read",
+  "permission": "module.read",
+  "confirm": false,
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "argv": ["ncc", "modules", "list", "--json"]
+}

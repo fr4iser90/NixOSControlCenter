@@ -1,0 +1,12 @@
+{
+  "name": "domain.packages.module_list",
+  "description": "List active packageModules (enabled sets) for the packages module.",
+  "risk": "read",
+  "permission": "package.user.self",
+  "confirm": false,
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "argv": ["ncc", "packages", "module", "list"]
+}

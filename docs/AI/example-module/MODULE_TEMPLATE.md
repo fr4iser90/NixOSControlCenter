@@ -305,6 +305,12 @@ module-name/               # Module name
 ├── components/            # Small utilities (separate from submodules)
 │   ├── ui-helpers.nix     # Small utility functions
 │   ├── validation.nix     # Helper functions
+├── ai/                    # Domain AI pack for ncc-assistant (optional)
+│   ├── manifest.nix       # domain id, enable, description
+│   ├── tools/             # Deterministic tools (JSON → function-calling)
+│   │   └── *.json         # name, description, inputSchema, argv, risk, permission
+│   └── docs/              # Short AI/operator guidance (markdown)
+│       └── *.md
 ├── ui/                    # Multi-Interface UI Support (optional)
 │   ├── cli/               # CLI-Interfaces (fzf, gum, etc.)
 │   │   ├── fzf/           # fzf-basierte Menus (aus Scripts extrahiert!)
@@ -975,6 +981,30 @@ in
 **Purpose**: Bubble Tea-basierte TUI via tui-engine
 
 **Pattern**: Wire from `commands.nix` with `(getModuleApi "tui-engine").isEnabled getModuleConfig`; sources live under `ui/tui/`.
+
+#### `ai/` — Domain AI pack (optional, ncc-assistant)
+
+**Purpose:** Deterministic tools + short docs for the NCC AI assistant.  
+**SSOT detail:** `nixos/modules/specialized/ncc-assistant/doc/DOMAIN-AI-PACKS.md`  
+**Reference packs:** `core/base/user/ai/`, `core/base/desktop/ai/`, `core/base/packages/ai/`, `core/management/module-manager/ai/`
+
+```
+ai/
+├── manifest.nix      # { domain = "example"; enable = true; description = "…"; }
+├── tools/
+│   └── status.json   # argv wraps `ncc <domain> …` — no free shell
+└── docs/
+    └── overview.md   # when to use which tool + permission limits
+```
+
+**Tool JSON (minimum):** `name`, `description`, `inputSchema`, `argv` (string list with `{{arg}}` / `{{arg?}}`), `risk` (`read`|`write`|`rebuild`), `permission` (NCC capability, e.g. `user.create`, `desktop.set`, `module.enable`).
+
+**Guardrails (defense in depth):**
+1. Tool omitted from LLM list unless invoker role has `permission` (`user/api.nix` capabilities).
+2. Assistant `allowWrite` / agent profile blocks `risk=write|rebuild`.
+3. Real mutations still go through `ncc …` / `ncc-priv`.
+
+Do **not** put business logic in the assistant — only argv templates to existing CLI verbs.
 
 #### `ui/gui/` - NCC Desktop page (optional, PySide6)
 

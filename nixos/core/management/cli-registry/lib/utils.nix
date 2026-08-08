@@ -62,14 +62,14 @@ in
             ;;
           "restricted-admin")
             case "${permission}" in
-              system.update|system.build|system.check.*|user.*|package.*|module.*|network.read)
+              system.update|system.build|system.check.*|user.*|package.*|module.*|network.read|desktop.*)
                 permission_granted=true
                 ;;
             esac
             ;;
           "virtualization")
             case "${permission}" in
-              system.check.self|user.read.self|package.docker|package.podman|package.user.self)
+              system.check.self|user.read.self|package.docker|package.podman|package.user.self|desktop.read)
                 permission_granted=true
                 ;;
             esac
@@ -77,7 +77,7 @@ in
           *)
             # Guest users
             case "${permission}" in
-              system.check.self|user.read.self|package.user.self)
+              system.check.self|user.read.self|package.user.self|desktop.read)
                 permission_granted=true
                 ;;
             esac

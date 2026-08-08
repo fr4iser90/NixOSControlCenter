@@ -1,0 +1,12 @@
+{
+  "name": "domain.user.list",
+  "description": "List configured user accounts (JSON). Guests only see themselves; admins see all.",
+  "risk": "read",
+  "permission": "user.read.self",
+  "confirm": false,
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "argv": ["ncc", "user", "list", "--json"]
+}

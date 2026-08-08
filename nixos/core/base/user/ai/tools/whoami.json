@@ -1,0 +1,12 @@
+{
+  "name": "domain.user.whoami",
+  "description": "Return the current login name, NCC role, and whether they can manage accounts.",
+  "risk": "read",
+  "permission": "user.read.self",
+  "confirm": false,
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "argv": ["ncc", "user", "whoami", "--json"]
+}

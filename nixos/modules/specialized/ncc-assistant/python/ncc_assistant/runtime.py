@@ -279,6 +279,17 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
 MUTATING_TOOLS = {"apply_module_config", "apply_system", "restore_config_backup"}
 
 
+def _tool_is_mutating(name: str, entry: Any | None = None) -> bool:
+    if name in MUTATING_TOOLS:
+        return True
+    if entry is not None and getattr(entry, "risk", "read") in ("write", "rebuild"):
+        return True
+    return name.startswith("domain.") and any(
+        name.endswith(s)
+        for s in (".create", ".set", ".delete", ".add", ".remove", ".enable", ".disable")
+    )
+
+
 class ToolRuntime:
     def __init__(
         self,
@@ -648,8 +659,6 @@ class ToolRuntime:
 
     def _check_presence_for_mutating(self, name: str) -> str | None:
         """Check presence state for mutating tools."""
-        if name not in MUTATING_TOOLS:
-            return None
         from .presence import is_paused, get_presence
         if is_paused():
             presence = get_presence()
@@ -776,6 +785,88 @@ class ToolRuntime:
             return {"ok": False, "error": "Shell command timed out"}
         except Exception as exc:
             return {"ok": False, "error": f"Shell error: {exc}"}
+
+    def _call_domain_tool(self, entry: Any, args: dict[str, Any]) -> dict[str, Any]:
+        """Run a module ``ai/tools`` argv template (no shell)."""
+        from .argv_template import apply_schema_defaults, expand_argv
+        from .permissions import invoker_role, role_has_permission
+
+        risk = getattr(entry, "risk", "read") or "read"
+        if risk in ("write", "rebuild") and not self.settings.writes_enabled:
+            return {
+                "ok": False,
+                "error": (
+                    "Writes disabled for this client "
+                    f"(mode={self.settings.client_mode}). "
+                    "Enable allowWrite / mcpAllowWrite in module config."
+                ),
+            }
+        if risk == "rebuild" and not self.settings.allow_rebuild:
+            return {"ok": False, "error": "Rebuilds disabled (allowRebuild=false)."}
+
+        perm = getattr(entry, "permission", None)
+        role = invoker_role()
+        if perm and not role_has_permission(role, perm):
+            return {
+                "ok": False,
+                "error": (
+                    f"Permission denied for role '{role}' "
+                    f"(need '{perm}')."
+                ),
+            }
+
+        filled = apply_schema_defaults(entry.input_schema, args)
+        try:
+            argv = expand_argv(list(entry.argv or []), filled)
+        except ValueError as exc:
+            return {"ok": False, "error": str(exc)}
+
+        if getattr(entry, "confirm", False) or risk in ("write", "rebuild"):
+            ok = self._request_confirmation(
+                {
+                    "tool": entry.name,
+                    "level": risk,
+                    "title": f"Run {entry.name}?",
+                    "summary": " ".join(argv),
+                    "detail": json.dumps(filled, indent=2)[:4000],
+                }
+            )
+            if not ok:
+                return {"ok": False, "error": "Cancelled by user / notification timeout."}
+
+        try:
+            result = subprocess.run(
+                argv,
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=300,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "error": "Domain tool timed out"}
+        except Exception as exc:
+            return {"ok": False, "error": f"Domain tool error: {exc}"}
+
+        stdout = (result.stdout or "")[-4000:]
+        stderr = (result.stderr or "")[-2000:]
+        payload: dict[str, Any] = {
+            "ok": result.returncode == 0,
+            "argv": argv,
+            "stdout": stdout,
+            "stderr": stderr,
+            "returncode": result.returncode,
+        }
+        # Prefer structured JSON stdout when present
+        text = (result.stdout or "").strip()
+        if text.startswith("{") or text.startswith("["):
+            try:
+                payload["data"] = json.loads(text)
+            except json.JSONDecodeError:
+                pass
+        if result.returncode != 0 and not payload.get("error"):
+            payload["error"] = stderr.strip() or stdout.strip() or "command failed"
+        return payload
 
     def run_preflight(self) -> dict[str, Any]:
         """Run preflight checks before rebuild."""
@@ -939,8 +1030,13 @@ class ToolRuntime:
     def call(self, name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
         args = dict(arguments or {})
         try:
+            from .registry import get_registry
+            registry = get_registry()
+            tool_entry = registry.get(name)
+            mutating = _tool_is_mutating(name, tool_entry)
+
             kill_err = self._check_kill_switch()
-            if kill_err and name in MUTATING_TOOLS:
+            if kill_err and mutating:
                 from .audit import append_audit
                 try:
                     append_audit("deny", tool=name, result="denied", detail=kill_err)
@@ -948,11 +1044,11 @@ class ToolRuntime:
                     pass
                 return {"ok": False, "error": kill_err}
 
-            presence_err = self._check_presence_for_mutating(name)
+            presence_err = self._check_presence_for_mutating(name) if mutating else None
             if presence_err:
                 return {"ok": False, "error": presence_err}
 
-            if self._dry_run and name in MUTATING_TOOLS:
+            if self._dry_run and mutating:
                 return {
                     "ok": False,
                     "error": "Dry-run mode: write operations are simulated",
@@ -960,10 +1056,6 @@ class ToolRuntime:
                     "would_call": name,
                     "args": args,
                 }
-
-            from .registry import get_registry
-            registry = get_registry()
-            tool_entry = registry.get(name)
 
             if tool_entry and not tool_entry.enabled:
                 return {"ok": False, "error": f"Tool disabled: {name}"}
@@ -982,6 +1074,10 @@ class ToolRuntime:
             if name.startswith("mcp."):
                 self._record_call(name)
                 return self._call_mcp_tool(name, args)
+
+            if tool_entry and tool_entry.kind == "domain":
+                self._record_call(name)
+                return self._call_domain_tool(tool_entry, args)
 
             if tool_entry and tool_entry.kind == "shell":
                 if not tool_entry.command:
@@ -1138,11 +1234,15 @@ class ToolRuntime:
             return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
     def openai_tools(self) -> list[dict[str, Any]]:
-        """Return OpenAI function-calling format using registry."""
+        """Return OpenAI tools filtered by invoker role + write policy."""
         try:
             from .registry import get_registry
+
             registry = get_registry()
-            return registry.openai_tools()
+            return registry.openai_tools(
+                allow_write=self.settings.writes_enabled,
+                allow_rebuild=bool(self.settings.allow_rebuild),
+            )
         except ImportError:
             pass
 

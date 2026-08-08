@@ -1,0 +1,36 @@
+{
+  "name": "domain.packages.add",
+  "description": "Add a nixpkgs package to userPackages (default) or systemPackages (system=true). Writes config only (--no-build).",
+  "risk": "write",
+  "permission": "package.user.self",
+  "confirm": true,
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "package": {
+        "type": "string",
+        "description": "nixpkgs attribute name (e.g. firefox, htop)"
+      },
+      "system": {
+        "type": "boolean",
+        "default": false,
+        "description": "Install into systemPackages (needs admin/restricted-admin)"
+      },
+      "user": {
+        "type": "string",
+        "description": "Target username for userPackages (default: current user)"
+      }
+    },
+    "required": ["package"]
+  },
+  "argv": [
+    "ncc",
+    "packages",
+    "add",
+    "{{package}}",
+    "--no-build",
+    "{{flag:system}}",
+    "--user",
+    "{{user?}}"
+  ]
+}

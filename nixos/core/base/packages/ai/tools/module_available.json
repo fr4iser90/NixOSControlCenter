@@ -1,0 +1,12 @@
+{
+  "name": "domain.packages.module_available",
+  "description": "Show available package sets and presets (system + user scopes).",
+  "risk": "read",
+  "permission": "package.user.self",
+  "confirm": false,
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "argv": ["ncc", "packages", "module", "available"]
+}

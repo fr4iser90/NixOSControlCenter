@@ -9,14 +9,15 @@ let
       "network.*" "hardware.*" "boot.*" "desktop.*" "audio.*" "localization.*"
     ];
     guest = [
-      "system.check.self" "user.read.self" "package.user.self"
+      "system.check.self" "user.read.self" "package.user.self" "desktop.read"
     ];
     restricted-admin = [
       "system.update" "system.build" "system.check.*" "module.*" "user.*" "network.read"
-      "package.user.*" "package.system"
+      "package.user.*" "package.system" "desktop.*"
     ];
     virtualization = [
       "system.check.self" "user.read.self" "package.user.self" "package.docker" "package.podman"
+      "desktop.read"
     ];
   };
 

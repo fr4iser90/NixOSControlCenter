@@ -1,0 +1,35 @@
+{
+  "name": "domain.packages.remove",
+  "description": "Remove a nixpkgs package from userPackages (default) or systemPackages (system=true). Writes config only (--no-build).",
+  "risk": "write",
+  "permission": "package.user.self",
+  "confirm": true,
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "package": {
+        "type": "string",
+        "description": "nixpkgs attribute name to remove"
+      },
+      "system": {
+        "type": "boolean",
+        "default": false
+      },
+      "user": {
+        "type": "string",
+        "description": "Target username for userPackages (default: current user)"
+      }
+    },
+    "required": ["package"]
+  },
+  "argv": [
+    "ncc",
+    "packages",
+    "remove",
+    "{{package}}",
+    "--no-build",
+    "{{flag:system}}",
+    "--user",
+    "{{user?}}"
+  ]
+}

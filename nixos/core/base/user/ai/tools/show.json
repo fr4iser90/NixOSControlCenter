@@ -1,0 +1,18 @@
+{
+  "name": "domain.user.show",
+  "description": "Show one configured user account by name (JSON). Guests may only view themselves.",
+  "risk": "read",
+  "permission": "user.read.self",
+  "confirm": false,
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Username (lowercase)"
+      }
+    },
+    "required": ["name"]
+  },
+  "argv": ["ncc", "user", "show", "{{name}}", "--json"]
+}

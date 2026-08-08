@@ -1,0 +1,12 @@
+{
+  "name": "domain.example.status",
+  "description": "TEMPLATE — replace with a real read-only status tool for this domain.",
+  "risk": "read",
+  "permission": "system.check.self",
+  "confirm": false,
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "argv": ["ncc", "example", "status"]
+}

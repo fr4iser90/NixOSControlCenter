@@ -1,0 +1,12 @@
+{
+  "name": "domain.desktop.status",
+  "description": "Show current desktop module settings (environment, display manager/server, theme).",
+  "risk": "read",
+  "permission": "desktop.read",
+  "confirm": false,
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "argv": ["ncc", "desktop", "status"]
+}

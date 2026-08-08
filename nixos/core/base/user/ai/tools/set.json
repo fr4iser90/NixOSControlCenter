@@ -1,0 +1,40 @@
+{
+  "name": "domain.user.set",
+  "description": "Update an existing user account in systemConfig (role/shell/auto-login). No rebuild. Requires admin or restricted-admin. Pass only fields to change.",
+  "risk": "write",
+  "permission": "user.set",
+  "confirm": true,
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Username to update"
+      },
+      "role": {
+        "type": "string",
+        "enum": ["guest", "virtualization", "restricted-admin", "admin"]
+      },
+      "shell": {
+        "type": "string",
+        "enum": ["bash", "zsh", "fish"]
+      },
+      "auto_login": {
+        "type": "boolean"
+      }
+    },
+    "required": ["name"]
+  },
+  "argv": [
+    "ncc",
+    "user",
+    "set",
+    "{{name}}",
+    "--role",
+    "{{role?}}",
+    "--shell",
+    "{{shell?}}",
+    "--auto-login",
+    "{{auto_login?}}"
+  ]
+}

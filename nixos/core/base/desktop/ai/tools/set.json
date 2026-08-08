@@ -1,0 +1,48 @@
+{
+  "name": "domain.desktop.set",
+  "description": "Write desktop settings to systemConfig (no rebuild). Pass only keys to change.",
+  "risk": "write",
+  "permission": "desktop.set",
+  "confirm": true,
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "environment": {
+        "type": "string",
+        "enum": ["plasma", "gnome", "xfce"]
+      },
+      "manager": {
+        "type": "string",
+        "enum": ["sddm", "gdm", "lightdm"],
+        "description": "Display manager"
+      },
+      "server": {
+        "type": "string",
+        "enum": ["wayland", "x11", "hybrid"]
+      },
+      "session": {
+        "type": "string",
+        "description": "Session name (defaults follow environment if omitted)"
+      },
+      "dark": {
+        "type": "boolean",
+        "description": "Dark theme"
+      },
+      "enable": {
+        "type": "boolean",
+        "description": "Enable desktop module"
+      }
+    }
+  },
+  "argv": [
+    "ncc",
+    "desktop",
+    "set",
+    "environment={{environment?}}",
+    "manager={{manager?}}",
+    "server={{server?}}",
+    "session={{session?}}",
+    "dark={{dark?}}",
+    "enable={{enable?}}"
+  ]
+}

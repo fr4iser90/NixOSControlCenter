@@ -1,0 +1,18 @@
+{
+  "name": "domain.packages.module_remove",
+  "description": "Disable a package set or remove a user-preset’s packages. Config only (--no-build).",
+  "risk": "write",
+  "permission": "package.user.self",
+  "confirm": true,
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Set or preset name to remove"
+      }
+    },
+    "required": ["name"]
+  },
+  "argv": ["ncc", "packages", "module", "remove", "{{name}}", "--no-build"]
+}

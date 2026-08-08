@@ -31,6 +31,7 @@ BUILTIN_PROFILES: dict[str, Profile] = {
             "apply_module_config",
             "apply_system",
             "agent_finish",
+            # Domain write tools still gated by allow_write=False in list_for_invoker
         ],
         max_steps=20,
         require_confirm="always",
@@ -146,7 +147,17 @@ def is_mutating_tool(tool_name: str) -> bool:
         "apply_system",
         "restore_config_backup",
     }
-    return tool_name in mutating
+    if tool_name in mutating:
+        return True
+    try:
+        from .registry import get_registry
+
+        entry = get_registry().get(tool_name)
+        if entry is not None and entry.risk in ("write", "rebuild"):
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def requires_confirmation(tool_name: str, profile: Profile) -> bool:
@@ -183,6 +194,18 @@ class ProfileContext:
 
         if tool_name.startswith("shell.") and not self.profile.allow_shell:
             return False, "Shell tools not allowed by profile"
+
+        try:
+            from .registry import get_registry
+
+            entry = get_registry().get(tool_name)
+            if entry is not None:
+                if entry.risk in ("write", "rebuild") and not self.profile.allow_write:
+                    return False, "Writes not allowed by profile"
+                if entry.risk == "rebuild" and not self.profile.allow_rebuild:
+                    return False, "Rebuild not allowed by profile"
+        except Exception:
+            pass
 
         return True, ""
 

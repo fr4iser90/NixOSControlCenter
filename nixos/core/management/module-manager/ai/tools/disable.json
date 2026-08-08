@@ -1,0 +1,18 @@
+{
+  "name": "domain.modules.disable",
+  "description": "Disable an optional NCC module in systemConfig (no rebuild). Protected core modules cannot be disabled.",
+  "risk": "write",
+  "permission": "module.disable",
+  "confirm": true,
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Module name to disable"
+      }
+    },
+    "required": ["name"]
+  },
+  "argv": ["ncc", "modules", "disable", "{{name}}"]
+}

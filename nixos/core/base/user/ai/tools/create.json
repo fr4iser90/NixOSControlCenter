@@ -1,0 +1,44 @@
+{
+  "name": "domain.user.create",
+  "description": "Create a user account in systemConfig (no rebuild). Requires admin or restricted-admin. restricted-admin cannot assign role admin.",
+  "risk": "write",
+  "permission": "user.create",
+  "confirm": true,
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "New username (lowercase letters/digits)"
+      },
+      "role": {
+        "type": "string",
+        "enum": ["guest", "virtualization", "restricted-admin", "admin"],
+        "description": "NCC role for the account"
+      },
+      "shell": {
+        "type": "string",
+        "enum": ["bash", "zsh", "fish"],
+        "default": "bash"
+      },
+      "auto_login": {
+        "type": "boolean",
+        "default": false,
+        "description": "Enable auto-login for this user"
+      }
+    },
+    "required": ["name", "role"]
+  },
+  "argv": [
+    "ncc",
+    "user",
+    "create",
+    "{{name}}",
+    "--role",
+    "{{role}}",
+    "--shell",
+    "{{shell}}",
+    "--auto-login",
+    "{{auto_login}}"
+  ]
+}

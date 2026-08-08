@@ -11,11 +11,18 @@ let
 
   guiEngine = (getModuleApi "gui-engine").package pkgs;
 
+  domainAi = import ./lib/discover-domain-ai.nix {
+    inherit lib pkgs getModuleMetadata;
+  };
+
   appRoot = pkgs.runCommand "ncc-assistant-src" { } ''
     mkdir -p $out
     cp -r ${./python/ncc_assistant} $out/ncc_assistant
     cp -r ${./prompts} $out/prompts
     cp -r ${knowledgeSrc} $out/knowledge
+    # Domain ai/docs fragments (e.g. ai-user-accounts.md)
+    mkdir -p $out/knowledge/domains
+    cp -r ${domainAi.docsRoot}/domains/. $out/knowledge/domains/ || true
     cp ${aiKnowledgeSrc} $out/AI_KNOWLEDGE.md
     cp -r ${guiEngine.src}/ncc_gui $out/ncc_gui
   '';
@@ -122,6 +129,9 @@ let
     export NCC_ASSISTANT_SHELL_ALLOWLIST="${lib.concatStringsSep ":" (cfg.tools.shellAllowlist or [])}"
     export NCC_ASSISTANT_MCP_SERVERS_JSON='${mcpServersJson}'
     export NCC_ASSISTANT_MCP_SERVERS_FILE="${mcpServersFile}"
+
+    # Per-module ai/ tools (build-time discovery)
+    export NCC_ASSISTANT_DOMAIN_TOOLS_FILE="${domainAi.indexFile}"
 
     # Agent configuration
     export AGENT_ENABLE="${if (cfg.agent.enable or true) then "1" else "0"}"

@@ -14,7 +14,14 @@ from .jobs import get_job_store, JobEvent, JobMeta, AgentLock
 from .llm import iter_chat_completion, LLMError, CancelledError
 from .paths import is_disabled
 from .presence import is_paused, get_presence
-from .profiles import Profile, resolve_profile, is_tool_allowed, requires_confirmation, ProfileContext
+from .profiles import (
+    Profile,
+    ProfileContext,
+    is_mutating_tool,
+    is_tool_allowed,
+    requires_confirmation,
+    resolve_profile,
+)
 
 
 def _now_iso() -> str:
@@ -213,9 +220,11 @@ You are running in agent mode to accomplish a specific goal.
             append_audit("agent_error", actor="agent", job_id=self._job.id, detail=str(exc))
 
     def _get_tools(self) -> list[dict[str, Any]]:
-        """Get tools available for this agent run."""
+        """Get tools available for this agent run (role + profile filtered)."""
         from .registry import get_registry
+
         registry = get_registry()
+        profile = self._profile
 
         agent_finish_tool = {
             "type": "function",
@@ -239,7 +248,12 @@ You are running in agent mode to accomplish a specific goal.
             },
         }
 
-        tools = registry.openai_tools()
+        tools = registry.openai_tools(
+            allow_write=profile.allow_write,
+            allow_rebuild=profile.allow_rebuild,
+            allowlist=profile.allowlist or None,
+            denylist=profile.denylist or None,
+        )
         tools.append(agent_finish_tool)
 
         return tools
@@ -341,7 +355,10 @@ You are running in agent mode to accomplish a specific goal.
         if not allowed:
             return {"ok": False, "error": reason}
 
-        if self.agent_settings.dry_run and name in ("apply_module_config", "apply_system"):
+        if self.agent_settings.dry_run and (
+            name in ("apply_module_config", "apply_system")
+            or is_mutating_tool(name)
+        ):
             return {
                 "ok": False,
                 "error": "Dry-run mode: write operations are simulated",
