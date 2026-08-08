@@ -406,7 +406,7 @@ update_homelab_config() {
     update_hosting_config "$email" "$domain" || return 1
     
     # Package modules: GUI selection, else Homelab defaults (no invented browser)
-    local hl_defaults="${PRESET_DEFAULT_PACKAGES[Homelab Server]:-docker database web-server}"
+    local hl_defaults="${INSTALL_BASE_DEFAULT_PACKAGES[Homelab Server]:-docker database web-server}"
     if declare -F ncc_apply_gui_package_modules >/dev/null 2>&1; then
         ncc_apply_gui_package_modules "$hl_defaults" || return 1
     else

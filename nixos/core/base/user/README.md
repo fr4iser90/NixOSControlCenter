@@ -53,8 +53,8 @@ systemConfig/
 # User packages (per-user, not global)
 userPackages = [ "vscode" "firefox" ];
 
-# System packages for this user only
-environment.systemPackages = [ "git" "neovim" ];
+# Prefer userPackages. (Legacy: environment.systemPackages on this leaf
+# was also mapped to users.users.<name>.packages — avoid for new configs.)
 
 # Home Manager config
 programs.git = {

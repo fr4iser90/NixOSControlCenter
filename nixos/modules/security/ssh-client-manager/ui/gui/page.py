@@ -1,4 +1,4 @@
-"""SSH — DomainPage kit (clients, PTY, optional server)."""
+"""SSH — DomainPage kit (clients draft CRUD, PTY, optional server)."""
 
 from __future__ import annotations
 
@@ -23,10 +23,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ncc_gui.commit_bar import PendingChange
 from ncc_gui.dialogs import confirm, error, info
 from ncc_gui.pty_terminal import PtyTerminal
 from ncc_gui.scaffold import DomainPage
 from ncc_gui.theme import APP_STYLE
+
+_OP = "ssh-client"
 
 
 @dataclass(frozen=True)
@@ -124,12 +127,14 @@ class SshPage(DomainPage):
     def __init__(self, parent=None) -> None:
         super().__init__(
             "SSH",
-            "Saved clients, embedded session, and local server controls when enabled.",
+            "Saved clients (draft Add/Edit/Delete → Apply), embedded session, "
+            "and local server controls when enabled. Connect runs immediately.",
             activity_max_height=120,
             parent=parent,
         )
         self.setObjectName("nccShellRoot")
         self._selected: ServerEntry | None = None
+        self._live: list[ServerEntry] = []
 
         tabs = QTabWidget()
         self.add_content_widget(tabs, stretch=1)
@@ -184,7 +189,11 @@ class SshPage(DomainPage):
         s_l.addLayout(form)
         tabs.addTab(server, "This host (server)")
 
-        self.add_action("Connect (embedded)", self._connect_embedded, primary=True)
+        self.add_actions_hint(
+            "Add/Edit/Delete stage drafts (Apply writes the SSH client list). "
+            "Connect and server controls run immediately."
+        )
+        self.add_action("Connect (embedded)", self._connect_embedded)
         self.add_action("External terminal", self._connect_external)
         self.add_action("Add…", self._add)
         self.add_action("Edit…", self._edit)
@@ -204,20 +213,76 @@ class SshPage(DomainPage):
             lambda: self._server_action(("list-requests", "pending"), False, "List requests"),
         )
 
+        assert self.commit is not None
+        self.commit.set_flush_handler(self._flush_pending)
+        self.commit.set_pending_changed(self._render_list)
+
         self.reload()
         self._refresh_server_status()
 
+    def _pending_by_host(self) -> dict[str, PendingChange]:
+        assert self.commit is not None
+        out: dict[str, PendingChange] = {}
+        for ch in self.commit.pending:
+            if ch.meta.get("op") != _OP:
+                continue
+            host = str(ch.meta.get("host") or "")
+            if host:
+                out[host] = ch
+        return out
+
+    def _entry_from_meta(self, ch: PendingChange) -> ServerEntry | None:
+        host = str(ch.meta.get("host") or "")
+        user = str(ch.meta.get("user") or "")
+        if not host or not user:
+            return None
+        return ServerEntry(host=host, user=user)
+
     def reload(self) -> None:
+        self._live = load_servers()
+        self._render_list()
+
+    def _render_list(self) -> None:
         current = self._selected.host if self._selected else None
         self.list.clear()
-        servers = load_servers()
+        pending = self._pending_by_host()
+        live_hosts = {e.host for e in self._live}
         pick: QListWidgetItem | None = None
-        for entry in servers:
-            item = QListWidgetItem(entry.label)
-            item.setData(Qt.ItemDataRole.UserRole, entry)
+
+        for entry in self._live:
+            ch = pending.get(entry.host)
+            if ch is not None and ch.meta.get("action") == "delete":
+                text = f"{entry.label}  · pending delete"
+                shown = entry
+            elif ch is not None and ch.meta.get("action") == "edit":
+                draft = self._entry_from_meta(ch) or entry
+                text = f"{draft.label}  · pending edit"
+                shown = draft
+            else:
+                text = entry.label
+                shown = entry
+            item = QListWidgetItem(text)
+            item.setData(Qt.ItemDataRole.UserRole, shown)
+            item.setData(Qt.ItemDataRole.UserRole + 1, ch.meta.get("action") if ch else "live")
             self.list.addItem(item)
-            if current and entry.host == current:
+            if current and shown.host == current:
                 pick = item
+
+        for host, ch in pending.items():
+            if host in live_hosts:
+                continue
+            if ch.meta.get("action") != "add":
+                continue
+            draft = self._entry_from_meta(ch)
+            if draft is None:
+                continue
+            item = QListWidgetItem(f"{draft.label}  · pending add")
+            item.setData(Qt.ItemDataRole.UserRole, draft)
+            item.setData(Qt.ItemDataRole.UserRole + 1, "add")
+            self.list.addItem(item)
+            if current and draft.host == current:
+                pick = item
+
         if pick is not None:
             self.list.setCurrentItem(pick)
         elif self.list.count():
@@ -235,7 +300,22 @@ class SshPage(DomainPage):
         if not isinstance(entry, ServerEntry):
             return
         self._selected = entry
-        self.detail.setText(f"Host: {entry.host}\nUser: {entry.user}")
+        kind = current.data(Qt.ItemDataRole.UserRole + 1) or "live"
+        extra = ""
+        if kind in ("add", "edit", "delete"):
+            extra = f"\nDraft: pending {kind} — Apply to write; Connect needs a saved entry."
+        self.detail.setText(f"Host: {entry.host}\nUser: {entry.user}{extra}")
+
+    @staticmethod
+    def _same_host(a: PendingChange, b: PendingChange) -> bool:
+        return (
+            a.meta.get("op") == b.meta.get("op") == _OP
+            and a.meta.get("host") == b.meta.get("host")
+        )
+
+    def _stage_replace(self, change: PendingChange) -> None:
+        assert self.commit is not None
+        self.commit.stage_replace(change, same=self._same_host)
 
     def _add(self) -> None:
         dlg = _ServerDialog(self, title="Add SSH server")
@@ -245,17 +325,25 @@ class SshPage(DomainPage):
         if not host or not user:
             info(self, "Add", "Host and username are required.")
             return
-        proc = _run_client("add", host, user)
-        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
-        if proc.returncode != 0:
-            error(self, "Add failed", out or "Could not add server.")
+        if any(e.host == host for e in self._live) or host in self._pending_by_host():
+            error(self, "Add", f"Host already listed (live or draft): {host}")
             return
-        self.log_append(f"• Added {host} ({user})")
-        self.reload()
+        self._stage_replace(
+            PendingChange(
+                summary=f"ssh client add {host} ({user})",
+                argv=["ssh", "client", "add", host, user],
+                elevated=False,
+                meta={"op": _OP, "action": "add", "host": host, "user": user},
+            )
+        )
 
     def _edit(self) -> None:
         if not self._selected:
             info(self, "Edit", "Select a server first.")
+            return
+        pending = self._pending_by_host().get(self._selected.host)
+        if pending is not None and pending.meta.get("action") == "delete":
+            error(self, "Edit", "Marked for delete — Undo first.")
             return
         dlg = _ServerDialog(
             self,
@@ -266,39 +354,90 @@ class SshPage(DomainPage):
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
-        _host, user = dlg.values()
+        host, user = dlg.values()
         if not user:
             info(self, "Edit", "Username is required.")
             return
-        proc = _run_client("edit", self._selected.host, user)
-        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
-        if proc.returncode != 0:
-            error(self, "Edit failed", out or "Could not update server.")
-            return
-        self.log_append(f"• Updated {self._selected.host} → {user}")
-        self.reload()
+        action = "add" if pending is not None and pending.meta.get("action") == "add" else "edit"
+        argv = (
+            ["ssh", "client", "add", host, user]
+            if action == "add"
+            else ["ssh", "client", "edit", host, user]
+        )
+        self._stage_replace(
+            PendingChange(
+                summary=f"ssh client {action} {host} ({user})",
+                argv=argv,
+                elevated=False,
+                meta={"op": _OP, "action": action, "host": host, "user": user},
+            )
+        )
 
     def _delete(self) -> None:
         if not self._selected:
             info(self, "Delete", "Select a server first.")
             return
         host = self._selected.host
-        if not confirm(self, "Delete", f"Remove saved server “{host}”?"):
+        user = self._selected.user
+        pending = self._pending_by_host().get(host)
+        if pending is not None and pending.meta.get("action") == "add":
+            if not confirm(
+                self,
+                "Discard draft?",
+                f"Remove pending add for {host}?",
+            ):
+                return
+            assert self.commit is not None
+            self.commit.discard_where(
+                lambda c: c.meta.get("op") == _OP and c.meta.get("host") == host,
+                log=f"• discarded draft add: {host}\n",
+            )
             return
-        proc = _run_client("delete", host)
-        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
-        if proc.returncode != 0:
-            error(self, "Delete failed", out or "Could not delete server.")
+        if not confirm(
+            self,
+            "Delete",
+            f"Mark “{host}” for delete (written on Apply)?",
+        ):
             return
-        self.log_append(f"• Deleted {host}")
-        self._selected = None
+        self._stage_replace(
+            PendingChange(
+                summary=f"ssh client delete {host}",
+                argv=["ssh", "client", "delete", host],
+                elevated=False,
+                meta={"op": _OP, "action": "delete", "host": host, "user": user},
+            )
+        )
+
+    def _flush_pending(self, changes: list[PendingChange]) -> None:
+        assert self.commit is not None
+        summary = "; ".join(c.summary for c in changes)
+        for ch in changes:
+            proc = self.run_ncc(*ch.argv, log=True, show_error=True)
+            if proc.returncode != 0:
+                return
+        self.commit.notify_apply_finished(True, summary, offer_rebuild=False)
         self.reload()
 
     def _connect_embedded(self) -> None:
         if not self._selected:
             info(self, "Connect", "Select a server first.")
             return
+        pending = self._pending_by_host().get(self._selected.host)
+        if pending is not None and pending.meta.get("action") == "add":
+            info(self, "Connect", "Apply the pending add before connecting.")
+            return
+        if pending is not None and pending.meta.get("action") == "delete":
+            info(self, "Connect", "This host is marked for delete.")
+            return
         entry = self._selected
+        # Prefer live user if only edit is pending (edit not written yet)
+        if pending is not None and pending.meta.get("action") == "edit":
+            info(
+                self,
+                "Connect",
+                "Pending edit is not written yet — connecting with the draft username. "
+                "Apply to save.",
+            )
         target = f"{entry.user}@{entry.host}"
         self.term.start(["ssh", "-tt", target])
         self.log_append(f"• Embedded connect {target}")
@@ -306,6 +445,10 @@ class SshPage(DomainPage):
     def _connect_external(self) -> None:
         if not self._selected:
             info(self, "Connect", "Select a server first.")
+            return
+        pending = self._pending_by_host().get(self._selected.host)
+        if pending is not None and pending.meta.get("action") == "add":
+            info(self, "Connect", "Apply the pending add before connecting.")
             return
         entry = self._selected
         try:

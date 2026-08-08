@@ -168,6 +168,96 @@ let
 
     # Layout/paths SSOT — never hardcode monolith vs split elsewhere in this script
     ${configFacade.sourcePreamble { nixosRoot = "/etc/nixos"; }}
+
+    # Legacy: core.base.packages.userPackages = { alice = […]; }
+    # → users.<name>.userPackages = […]; then delete packages.userPackages.
+    # Idempotent: no-op when the key is absent.
+    migrate_legacy_packages_user_packages() {
+      local layout root pkg_json up user pkgs_json leaf_nix leaf_json merged_json tmp_json nix_out moved=0
+      layout=$(ncc_detect_layout 2>/dev/null || echo "")
+      [[ -n "$layout" ]] || return 0
+
+      case "$layout" in
+        monolith)
+          [[ -f "$MONOLITH_FILE" ]] || return 0
+          root=$("$NIX_INSTANTIATE_BIN" --eval --strict --json -E "import $MONOLITH_FILE" 2>/dev/null) || return 0
+          echo "$root" | "$JQ_BIN" -e '.core.base.packages | type == "object" and has("userPackages")' >/dev/null 2>&1 || return 0
+          up=$(echo "$root" | "$JQ_BIN" -c '.core.base.packages.userPackages')
+          ;;
+        split)
+          local pkg_file
+          pkg_file=$(ncc_module_config_path "core/base/packages")
+          [[ -f "$pkg_file" ]] || return 0
+          pkg_json=$("$NIX_INSTANTIATE_BIN" --eval --strict --json -E "import $pkg_file" 2>/dev/null) || return 0
+          echo "$pkg_json" | "$JQ_BIN" -e 'type == "object" and has("userPackages")' >/dev/null 2>&1 || return 0
+          up=$(echo "$pkg_json" | "$JQ_BIN" -c '.userPackages')
+          root=""
+          ;;
+        *)
+          return 0
+          ;;
+      esac
+
+      ${ui.messages.loading "Migrating legacy packages.userPackages → users.<name>.userPackages…"}
+
+      # Move non-empty list entries onto user leaves
+      if echo "$up" | "$JQ_BIN" -e 'type == "object"' >/dev/null 2>&1; then
+        while IFS= read -r user; do
+          [[ -n "$user" ]] || continue
+          pkgs_json=$(echo "$up" | "$JQ_BIN" -c --arg u "$user" '.[$u] // []')
+          if ! echo "$pkgs_json" | "$JQ_BIN" -e 'type == "array" and length > 0' >/dev/null 2>&1; then
+            continue
+          fi
+          leaf_nix=$(ncc_read_module_config "users/$user" 2>/dev/null || echo "{ }")
+          leaf_json=$(_ncc_eval_nix_to_json "$leaf_nix") || leaf_json="{}"
+          merged_json=$(echo "$leaf_json" | "$JQ_BIN" -c --argjson add "$pkgs_json" '
+            .userPackages = (((.userPackages // []) + $add) | unique)
+          ') || continue
+          tmp_json=$(mktemp --suffix=.json)
+          printf '%s\n' "$merged_json" > "$tmp_json"
+          nix_out=$(_ncc_json_to_nix "$tmp_json") || { rm -f "$tmp_json"; continue; }
+          rm -f "$tmp_json"
+          if ncc_write_module_config "users/$user" "$nix_out"; then
+            moved=$((moved + 1))
+            _pkg_list=$(echo "$pkgs_json" | "$JQ_BIN" -r 'join(", ")')
+            echo "  → users.$user.userPackages ← $_pkg_list"
+          fi
+        done < <(echo "$up" | "$JQ_BIN" -r 'keys[]' 2>/dev/null)
+      else
+        ${ui.messages.warning "packages.userPackages is not an attrset — dropping key only"}
+      fi
+
+      # Strip key from packages leaf
+      case "$layout" in
+        monolith)
+          root=$("$NIX_INSTANTIATE_BIN" --eval --strict --json -E "import $MONOLITH_FILE" 2>/dev/null) || return 0
+          root=$(echo "$root" | "$JQ_BIN" -c 'del(.core.base.packages.userPackages)')
+          tmp_json=$(mktemp --suffix=.json)
+          printf '%s\n' "$root" > "$tmp_json"
+          if _ncc_write_monolith_json "$tmp_json"; then
+            echo "Removed core.base.packages.userPackages (migrated $moved user leaf/leaves)"
+          else
+            ${ui.messages.error "Failed to rewrite monolith after packages.userPackages migration"}
+          fi
+          rm -f "$tmp_json"
+          ;;
+        split)
+          local pkg_file_strip
+          pkg_file_strip=$(ncc_module_config_path "core/base/packages")
+          pkg_json=$("$NIX_INSTANTIATE_BIN" --eval --strict --json -E "import $pkg_file_strip" 2>/dev/null) || return 0
+          pkg_json=$(echo "$pkg_json" | "$JQ_BIN" -c 'del(.userPackages)')
+          tmp_json=$(mktemp --suffix=.json)
+          printf '%s\n' "$pkg_json" > "$tmp_json"
+          nix_out=$(_ncc_json_to_nix "$tmp_json") || { rm -f "$tmp_json"; return 1; }
+          rm -f "$tmp_json"
+          if ncc_write_module_config "core/base/packages" "$nix_out"; then
+            echo "Removed packages.userPackages (migrated $moved user leaf/leaves)"
+          else
+            ${ui.messages.error "Failed to rewrite packages config after userPackages migration"}
+          fi
+          ;;
+      esac
+    }
     
     # Show dangerous warning unless auto-confirm is enabled
     if [ "$AUTO_CONFIRM" != "true" ]; then
@@ -203,6 +293,9 @@ let
         ${ui.messages.info "You may want to review the configuration before proceeding"}
       fi
     fi
+
+    # Drop legacy packages.userPackages (attrs) → users.<name>.userPackages
+    migrate_legacy_packages_user_packages || true
     
     # Auto-select source if specified
     if [ -n "$AUTO_SOURCE" ]; then
@@ -1086,6 +1179,9 @@ EOF
         echo "  Fixed $ADJUSTED placeholder(s)"
       fi
       fi  # end split-only template sync / per-user migration
+
+     # Re-run after tree sync (idempotent) in case packages leaf still has the key
+     migrate_legacy_packages_user_packages || true
      
      # ADDITIONAL PROTECTION: Ensure protected directories are not overwritten
      # Even if they were accidentally in COPY_ITEMS or copied through another directory

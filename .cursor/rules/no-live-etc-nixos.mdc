@@ -1,0 +1,19 @@
+---
+description: NEVER edit live /etc/nixos system config — repo and guidance only
+alwaysApply: true
+---
+
+# Live NixOS config is off-limits
+
+**NEVER** read, write, patch, migrate, or "fix" the user's **live** machine config under:
+
+- `/etc/nixos/`
+- `/etc/nixos/systemConfig.nix`
+- `/etc/nixos/systemConfig/**`
+- any other live deployment path outside this git repo
+
+**Allowed:** edit files only inside the **repository** (e.g. `NixOSControlCenter/`).  
+**Allowed:** tell the user *what* to change in their live config and *why*.  
+**Forbidden:** `sudo`, `sed`, `ncc` writes, helpers, or tools that mutate live `/etc/nixos` unless the user **explicitly** asks for that exact live path change in the same message.
+
+If a build fails because of live config contents (wrong package names, etc.), explain the cause and the exact edit **they** should make — do not apply it.

@@ -8,21 +8,17 @@ As a core module, the packages system is configured through the system config:
 
 ```nix
 {
+  # Global (core.base.packages)
   packages = {
-    # Legacy format (V1)
-    packageModules = [ "gaming" "docker" "web-dev" ];
-
-    # New format (V2)
-    systemPackages = [ "firefox" "vscode" ];  # System-wide packages
-    userPackages = {
-      alice = [ "discord" "spotify" ];        # User-specific packages
-    };
-
-    # Preset configuration
+    packageModules = [ "gaming" "docker" "web-dev" ];  # sets / presets expand to sets
+    systemPackages = [ "firefox" "vscode" ];           # for all users
     preset = {
       modules = [ "gaming-desktop" ];
     };
   };
+
+  # Per-user (users.<name>.userPackages) — not under packages
+  users.alice.userPackages = [ "discord" "spotify" ];
 }
 ```
 
@@ -77,28 +73,28 @@ As a core module, the packages system is configured through the system config:
 {
   packages = {
     systemPackages = [ "firefox" "vscode" ];
-    userPackages = {
-      alice = [ "discord" "spotify" ];
-      bob = [ "slack" "zoom" ];
-    };
+  };
+  users = {
+    alice.userPackages = [ "discord" "spotify" ];
+    bob.userPackages = [ "slack" "zoom" ];
   };
 }
 ```
-**Result**: System-wide packages for all users, user-specific packages per user
+**Result**: System-wide packages for all users, user-specific packages per user leaf
 
 ## Configuration Options
 
-### `packageModules` (V1 - Legacy)
+### `packageModules` (sets)
 
 **Type**: `listOf str`
 **Default**: `[]`
-**Description**: List of package modules to enable (legacy format)
+**Description**: List of package sets to enable
 **Example**:
 ```nix
 packageModules = [ "gaming" "docker" ];
 ```
 
-### `systemPackages` (V2)
+### `systemPackages`
 
 **Type**: `listOf str`
 **Default**: `[]`
@@ -108,23 +104,27 @@ packageModules = [ "gaming" "docker" ];
 systemPackages = [ "firefox" "vscode" ];
 ```
 
-### `userPackages` (V2)
+### Per-user packages (`users.<name>.userPackages`)
 
-**Type**: `attrsOf (listOf str)`
-**Default**: `{}`
-**Description**: User-specific packages (installed via home-manager per user)
-**Example**:
+**Not** under `core.base.packages`. Live on the user leaf:
+
 ```nix
-userPackages = {
-  alice = [ "discord" "spotify" ];
-};
+users.alice.userPackages = [ "discord" "spotify" ];
 ```
+
+Installed via `users.users.<name>.packages`. CLI/GUI (`ncc packages add`) write here.
+
+### User presets (`components/user-presets/`)
+
+Files with `packages = [ … ]` add those attrs to the current user's `userPackages` (via `ncc-priv`), **not** `packageModules`.
+
+System recipes live in `components/recipes/` (`modules = [ set… ]`) and expand to `packageModules` (needs root).
 
 ### `preset.modules`
 
 **Type**: `listOf str`
 **Default**: `[]`
-**Description**: Preset configurations
+**Description**: Legacy/system preset list on the packages config (machine-role shortcuts)
 **Example**:
 ```nix
 preset.modules = [ "gaming-desktop" ];
@@ -169,12 +169,10 @@ Selecting `docker` in packageModules enables Docker with smart mode (`lib/docker
 - **Root**: when Homelab Swarm or AI-Workspace is active
 - **Manual Override**: `docker.root = true|false`
 
-### Legacy Support
+### User packages
 
-The module maintains backward compatibility:
-- **packageModules**: Old format still supported
-- **Automatic Conversion**: Old format converted to new feature system
-- **Migration Path**: Clear migration from V1 to V2 format
+User-specific packages live only under `users.<name>.userPackages` (not under `core.base.packages`).
+`ncc system-update` migrates legacy `packages.userPackages = { user = […]; }` onto those leaves and removes the old key.
 
 ## Integration with Other Modules
 

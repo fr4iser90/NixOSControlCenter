@@ -72,18 +72,18 @@ select_setup_mode() {
 
     [ -z "$install_type_choice" ] && { log_error "No installation type selected."; return 1; }
 
-    if [[ "$install_type_choice" == "📦 Presets" ]]; then
+    if [[ "$install_type_choice" == "📦 Install bases" ]]; then
         # Build preset list with prefixes (no headers, no emojis)
         local preset_list=""
         
         # System Presets mit Präfix
-        for preset in "${SYSTEM_PRESETS[@]}"; do
+        for preset in "${INSTALL_BASES[@]}"; do
             preset_list+="$(format_item_with_prefix "System" "$preset")\n"
         done
         
         # Device Presets mit Präfix
-        if [[ ${#DEVICE_PRESETS[@]} -gt 0 ]]; then
-            for preset in "${DEVICE_PRESETS[@]}"; do
+        if [[ ${#DEVICE_TARGETS[@]} -gt 0 ]]; then
+            for preset in "${DEVICE_TARGETS[@]}"; do
                 preset_list+="$(format_item_with_prefix "Device" "$preset")\n"
             done
         fi
@@ -91,23 +91,23 @@ select_setup_mode() {
         # Show presets with fzf
         local preset_choice
         preset_choice=$(printf "%b" "$preset_list" | fzf \
-            --header="Select preset" \
+            --header="Select install base" \
             --bind 'space:accept' \
             --preview "$PREVIEW_SCRIPT {}" \
             --preview-window="right:50%:wrap" \
             --pointer="▶" \
-            --marker="✓") || { log_error "Preset selection cancelled."; return 1; }
+            --marker="✓") || { log_error "Install-base selection cancelled."; return 1; }
         
         # Remove prefix from selection
         preset_choice=$(remove_prefix "$preset_choice")
         
         # Validate it's a real preset
-        if ! printf "%s\n" "${SYSTEM_PRESETS[@]}" "${DEVICE_PRESETS[@]}" | grep -q "^${preset_choice}$"; then
-            log_error "Invalid preset selected: $preset_choice"
+        if ! printf "%s\n" "${INSTALL_BASES[@]}" "${DEVICE_TARGETS[@]}" | grep -q "^${preset_choice}$"; then
+            log_error "Invalid install base selected: $preset_choice"
             return 1
         fi
         
-        [ -z "$preset_choice" ] && { log_error "No preset selected."; return 1; }
+        [ -z "$preset_choice" ] && { log_error "No install base selected."; return 1; }
 
         ncc_gui_ensure_answers_file 2>/dev/null || true
 
@@ -152,7 +152,7 @@ select_setup_mode() {
             fi
         else
             # Preset + optional package extras (defaults pre-merged in helper)
-            local defaults="${PRESET_DEFAULT_PACKAGES[$preset_choice]:-}"
+            local defaults="${INSTALL_BASE_DEFAULT_PACKAGES[$preset_choice]:-}"
             local preset_st="desktop"
             case "$preset_choice" in
                 Server|"Homelab Server") preset_st="server" ;;
@@ -179,45 +179,45 @@ select_setup_mode() {
 
         [ -z "$advanced_choice" ] && { log_error "No advanced option selected."; return 1; }
         
-        if [[ "$advanced_choice" == "📁 Load Profile from File" ]]; then
+        if [[ "$advanced_choice" == "📁 Load host blueprint from file" ]]; then
             # Prompt für Dateipfad
             local profile_path
             echo ""
             log_info "Enter path to profile file:"
             echo "  Examples:"
-            echo "  • profiles/fr4iser-home"
-            echo "  • /absolute/path/to/profile.nix"
+            echo "  • host-blueprints/fr4iser-home"
+            echo "  • /absolute/path/to/blueprint.nix"
             echo "  • ~/my-config.nix"
             echo ""
-            read -p "Profile path: " profile_path
+            read -p "Blueprint path: " profile_path
             
             if [[ -z "$profile_path" ]]; then
-                log_error "No profile path provided"
+                log_error "No blueprint path provided"
                 return 1
             fi
             
             # Resolve path (handle relative paths)
             if [[ ! "$profile_path" =~ ^/ ]]; then
-                # Relative path - assume it's in profiles directory
-                if [[ "$profile_path" != profiles/* ]]; then
-                    profile_path="$SETUP_DIR/modes/profiles/$profile_path"
+                # Relative path — default under host-blueprints/
+                if [[ "$profile_path" != host-blueprints/* ]]; then
+                    profile_path="$SETUP_DIR/modes/host-blueprints/$profile_path"
                 else
                     profile_path="$SETUP_DIR/modes/$profile_path"
                 fi
             fi
-            
+
             if [[ ! -f "$profile_path" ]]; then
-                log_error "Profile file not found: $profile_path"
+                log_error "Host blueprint not found: $profile_path"
                 return 1
             fi
+
+            final_selection=("LOAD_BLUEPRINT:$profile_path")
             
-            final_selection=("LOAD_PROFILE:$profile_path")
-            
-        elif [[ "$advanced_choice" == "📋 Show Available Profiles" ]]; then
+        elif [[ "$advanced_choice" == "📋 Show available host blueprints" ]]; then
             # Liste alle Profile im profiles/ Verzeichnis
-            local profiles_dir="$SETUP_DIR/modes/profiles"
+            local profiles_dir="$SETUP_DIR/modes/host-blueprints"
             if [[ ! -d "$profiles_dir" ]]; then
-                log_error "Profiles directory not found: $profiles_dir"
+                log_error "Host-blueprints directory not found: $profiles_dir"
                 return 1
             fi
             
@@ -230,21 +230,21 @@ select_setup_mode() {
             done < <(find "$profiles_dir" -type f -print0 2>/dev/null)
             
             if [[ -z "$profile_list" ]]; then
-                log_warn "No profiles found in $profiles_dir"
+                log_warn "No host blueprints found in $profiles_dir"
                 return 1
             fi
             
             local selected_profile
             selected_profile=$(printf "%b" "$profile_list" | fzf \
-                --header="Available Profiles (Select one to load)" \
+                --header="Available host blueprints (Select one to load)" \
                 --bind 'space:accept' \
                 --preview "cat $profiles_dir/{} 2>/dev/null || echo 'Preview not available'" \
             --preview-window="right:50%:wrap" \
             --pointer="▶" \
-            --marker="✓") || { log_error "Profile selection cancelled."; return 1; }
+            --marker="✓") || { log_error "Blueprint selection cancelled."; return 1; }
 
             if [[ -n "$selected_profile" ]]; then
-                final_selection=("LOAD_PROFILE:$profiles_dir/$selected_profile")
+                final_selection=("LOAD_BLUEPRINT:$profiles_dir/$selected_profile")
             else
                 return 1
             fi
@@ -254,7 +254,7 @@ select_setup_mode() {
             local existing_config="$SYSTEM_CONFIG_FILE"
             if [[ ! -f "$existing_config" ]]; then
                 log_error "No existing configuration found at: $existing_config"
-                log_info "Create a configuration first using Presets or Custom Setup"
+                log_info "Create a configuration first using Install bases or Custom Setup"
                 return 1
             fi
             
@@ -264,7 +264,7 @@ select_setup_mode() {
 
     else
         log_error "Invalid installation type: $install_type_choice"
-        log_info "Use Presets (incl. From Scratch) or Advanced Options."
+        log_info "Use Install bases (incl. From Scratch) or Advanced Options."
         return 1
     fi
 

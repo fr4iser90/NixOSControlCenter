@@ -6,6 +6,7 @@ generic fallback must follow it. Do not invent a second layout per module.
 Related code (the **kit** — use this, don’t reinvent layout):
 
 - **Page kit:** `python/ncc_gui/scaffold.py` → `DomainPage` / `PageScaffold`
+- **Commit bar:** `python/ncc_gui/commit_bar.py` → `CommitController` / `PendingChange` (on every `DomainPage`)
 - Theme: `python/ncc_gui/theme.py` (`APP_STYLE`)
 - Dialogs: `python/ncc_gui/dialogs.py`
 - ANSI strip: `python/ncc_gui/ansi.py`
@@ -13,6 +14,7 @@ Related code (the **kit** — use this, don’t reinvent layout):
 - Root shell: `python/ncc_gui/shell.py`
 - Domain window: `python/ncc_gui/domain_gui.py`
 - Icons: `assets/ncc-icon.{svg,png}` + `python/ncc_gui/branding.py`
+- Page stub: `doc/PAGE-TEMPLATE.md`
 - Pages live in **each module** (`ui/gui/page.py` + `registerGuiPage`) — never in `gui-engine/pages/` for domains
 
 ---
@@ -22,8 +24,9 @@ Related code (the **kit** — use this, don’t reinvent layout):
 Every rich page should subclass or compose **`DomainPage`**:
 
 ```python
+from ncc_gui.commit_bar import PendingChange
 from ncc_gui.scaffold import DomainPage
-from PySide6.QtWidgets import QComboBox, QCheckBox
+from PySide6.QtWidgets import QComboBox
 
 class ExamplePage(DomainPage):
     def __init__(self, parent=None):
@@ -31,17 +34,28 @@ class ExamplePage(DomainPage):
         form = self.add_form_block("Settings")
         self.mode = QComboBox()
         form.addRow("Mode", self.mode)
-        self.add_actions_hint("Apply needs admin rights.")
-        self.add_actions_widget(QCheckBox("Rebuild after apply"))
-        self.add_action("Apply", self._apply, primary=True)
-        # Example: prefer run_ncc_async when CLI self-elevates; else run_ncc_root (§10)
         self.add_action("Reload", self.reload)
+        assert self.commit is not None
+        self.commit.set_flush_handler(self._flush)
 
     def reload(self):
         ...  # fill widgets — do not dump raw status into Activity
 
-    def _apply(self):
-        self.run_ncc_root(["example", "set", "..."], label="Apply", on_done=...)
+    def _on_mode_changed(self):
+        # Stage — do not write config here
+        self.commit.stage(PendingChange(
+            summary=f"set mode {self.mode.currentText()}",
+            argv=["example", "set", self.mode.currentText(), "--no-build"],
+            elevated=True,
+        ))
+
+    def _flush(self, changes):
+        # Write all pending; then tell the kit
+        def done(code):
+            self.commit.notify_apply_finished(code == 0, changes[0].summary)
+            if code == 0:
+                self.reload()
+        self.run_ncc_root(changes[0].argv, label="Apply", on_done=done)
 ```
 
 | Method | Purpose |
@@ -51,13 +65,15 @@ class ExamplePage(DomainPage):
 | `add_list_block(title)` | Block + `QListWidget` |
 | `add_content_widget` / `add_content_layout` | Splitters, lists, custom |
 | `add_actions_hint` / `add_actions_widget` | Text / checkboxes in Actions |
-| `add_action(label, slot, primary=False)` | Bordered button in Actions |
+| `add_action(label, slot, primary=False)` | Domain button (left of CommitBar) |
+| `self.commit` | CommitBar: Undo / Save / Apply (§2.1) |
 | `log_append` / `log_write` / `log_clear` | Activity (ANSI stripped) |
 | `run_ncc(*args, follow_target=, need_confirm=…)` | Sync `ncc` (+ Target) + log |
 | `run_ncc_async(args, label=, on_done=, env=)` | Async **as current user** (CLI may self-elevate via `ncc-priv-run`) |
 | `run_ncc_root(args, label=, on_done=)` | Async **elevated** `ncc` — see §10 elevation order |
 | `set_busy()` | Guard while a process runs |
 | `activity_max_height=None` | Tall Activity (e.g. System update) |
+| `commit_bar=False` | Rare opt-out (read-only tools) |
 
 Order is **fixed inside the kit**. Do not hand-roll a second vertical layout.
 
@@ -104,8 +120,9 @@ Every domain page stacks **top → bottom** in this order. No reordering.
 ├─────────────────────────────────────────────┤
 │ 3. ACTIONS                                  │
 │    Exactly one QGroupBox titled "Actions"   │
-│    Primary + secondary buttons (bordered)   │
-│    Confirms / rebuild checkboxes live HERE  │
+│    Left: domain buttons (Add, Refresh, …)   │
+│    Right (always): CommitBar                │
+│         Undo · Save · Apply                 │
 ├─────────────────────────────────────────────┤
 │ 4. ACTIVITY (optional)                      │
 │    QGroupBox "Activity" + #nccActivityLog   │
@@ -114,6 +131,71 @@ Every domain page stacks **top → bottom** in this order. No reordering.
 └─────────────────────────────────────────────┘
 ```
 
+### 2.1 Commit bar (binding — every page)
+
+**Default for config mutations:** draft in the UI first, write only on Apply.
+Implemented in `ncc_gui.commit_bar`, attached by `DomainPage` as `self.commit`.
+
+```text
+Browse / change UI  →  stage (Add, Create…, toggles, …)
+                    →  appears in the page UI as draft (list row / field)
+                    →  Save (draft)  ·  Undo
+                    →  Apply (≥1 pending)  →  write config (--no-build)
+                    →  modal “Build required — Rebuild && switch?”
+                         + Don’t show again
+```
+
+| Control | When enabled | Role |
+|---------|--------------|------|
+| **Undo** | pending or saved draft | Restore last save, or drop last staged item |
+| **Save** | pending and not yet saved | Checkpoint draft (does **not** write disk) |
+| **Apply** | ≥1 pending | Flush via domain `set_flush_handler` → disk |
+
+#### Draft-first (default — nail this)
+
+Anything that changes **Nix/NCC configuration** (users, packages, desktop,
+network, modules, hosts records, …) must:
+
+1. Open modal / collect input if needed (Create user, Add package, …).
+2. **Stage** into `self.commit` **and** show the result in the page UI
+   (e.g. new user row marked draft / “pending”, toggled set with pending mark).
+3. **Not** call `ncc … create/add/set` and **not** rebuild until **Apply**.
+4. On Apply: write with `--no-build`, then the shared rebuild modal.
+
+The user must never feel that Create/Add already “built the system”. Create
+only means “add to the draft list”.
+
+Migrated: Packages; Users; Desktop; Module Manager; SSH Client; Hosts.  
+New domain: **Hardware** (`core/base/hardware`) — inventory + autoDetect badge/toggle.  
+(SSH/Hosts: `notify_apply_finished(..., offer_rebuild=False)` — no Nix rebuild.)
+
+#### Immediate actions (small allowlist — exceptions)
+
+These may run **now** (confirm + Activity), without CommitBar staging.
+They are **not** config drafts — the verb *is* the effect:
+
+| Allowed immediate | Examples | Why |
+|-------------------|----------|-----|
+| **System lifecycle** | System update, rebuild/switch/boot/test, channel sync | The page’s job *is* to build/sync |
+| **Runtime control** | VM start/stop, stack up/down, service restart | Live process, not config draft |
+| **Read-only / refresh** | Reload lists, status, report | No mutation |
+| **Session / target** | Connect SSH, change Target host | Chrome / connection, not module config |
+
+If unsure: **stage**. New exception = document it here first (do not invent
+silently on a page).
+
+`commit_bar=False` only for pure read-only tool pages. System Manager keeps
+the CommitBar visible but unused for update/rebuild buttons (those stay
+immediate on the left).
+
+#### Rules (short)
+
+- Domain config actions **stage**; they must **not** write config immediately.
+- Writes use `--no-build`. Rebuild is **only** via the post-Apply modal (or rare manual “Rebuild…”).
+- Do **not** invent per-page “Rebuild after changes” checkboxes.
+- After Apply + successful flush, call `commit.notify_apply_finished(ok, summary)`.
+  Use `offer_rebuild=False` for non-Nix config (SSH client list, etc.).
+
 ### Forbidden
 
 - Raw CLI / `key=value` / Nix dumps as the **main** content
@@ -121,6 +203,10 @@ Every domain page stacks **top → bottom** in this order. No reordering.
 - Pre-filling Activity with `ncc … status` on page load
 - Cards inside cards, pill soup, emoji decoration, purple glow themes
 - Putting domain-specific pages under `gui-engine`
+- Immediate config writes from Create/Add/Remove/Edit/toggles (bypass CommitBar)
+- Per-page rebuild checkboxes instead of the shared rebuild modal
+- Create/Add that already runs `ncc …` + rebuild before Apply
+- Undocumented “exception” immediate config writes
 
 ---
 
@@ -130,8 +216,8 @@ Every domain page stacks **top → bottom** in this order. No reordering.
 |---------|-----|------|
 | **Block** | `QGroupBox` | Framed section with title (`Settings`, `Actions`, `Activity`, `Stacks`, …) |
 | **Form row** | `QFormLayout` + `QLabel` / `QComboBox` / `QLineEdit` / `QCheckBox` | Editable or read-only fields with **human** labels |
-| **Primary button** | `QPushButton` (default / first in Actions) | Apply, Save, Connect — needs confirm if destructive/rebuild |
-| **Secondary button** | `QPushButton` | Reload, Refresh list, Cancel-adjacent |
+| **Primary button** | `QPushButton#nccPrimaryButton` | CommitBar **Apply** (config); or allowlisted immediate (e.g. System update) |
+| **Secondary button** | `QPushButton` | Create… / Refresh / domain ops that **stage**, or Undo/Save |
 | **List** | `QListWidget` | Pick one of many (hosts, VMs, stacks) |
 | **Activity log** | `QTextEdit#nccActivityLog` | Command output only |
 | **Dialogs** | `ncc_gui.dialogs` | `confirm` / `error` / `info` — never invent custom modal chrome |
@@ -147,7 +233,7 @@ Every domain page stacks **top → bottom** in this order. No reordering.
 
 - Always inside the **Actions** block (or a tight toolbar *inside* a Content block for list-row ops like Start/Stop next to a selection — then still framed by that block).
 - Must look like buttons: **border + padding** (see theme). Plain text-looking actions = bug.
-- Primary left, secondary right of it, then stretch.
+- Domain buttons left, stretch, then **CommitBar** (Undo / Save / Apply). Apply is `#nccPrimaryButton`.
 
 ---
 
@@ -156,8 +242,8 @@ Every domain page stacks **top → bottom** in this order. No reordering.
 ### A. Settings editor (Desktop, future User, …)
 
 1. Header  
-2. Block **Settings** — combos/toggles  
-3. Block **Actions** — Apply (+ optional “Rebuild after apply”), Reload  
+2. Block **Settings** — combos/toggles (stage into `self.commit` on change)  
+3. Block **Actions** — Reload (left) + CommitBar Undo/Save/Apply (right)  
 4. Activity — only after Apply/Reload commands  
 
 Reload = refresh **widgets** from `ncc <domain> status` (parse into fields). Do **not** dump status text into Activity on load.
@@ -170,12 +256,12 @@ Reload = refresh **widgets** from `ncc <domain> status` (parse into fields). Do 
 4. Actions  
 5. Activity for command output  
 
-### C. List + CRUD (Users, SSH servers, …)
+### C. List + CRUD (Users, SSH servers, …) / dual-scope Packages
 
 1. Header  
-2. Block **List** — pick one row  
-3. Actions — **Create…** / **Edit…** / **Delete…** / Refresh (+ rebuild checkbox if config write)  
-4. Activity for command output  
+2. Block **List** — live rows + **draft/pending** rows from staged Create/Edit/Delete  
+3. Actions — **Create…** / **Edit…** / **Delete…** / Refresh (left) + CommitBar (right)  
+4. Activity for command output (after Apply / refresh — not on Create click)
 
 **Create and Edit use the same modal shape** (one dialog class, `mode=create|edit`).  
 Do **not** mix: Create in a dialog + Edit as inline form on the page.
@@ -186,12 +272,33 @@ Do **not** mix: Create in a dialog + Edit as inline form on the page.
 | Password (if any) | optional / required per domain | optional (“leave empty to keep”) |
 | Other settings | editable | editable |
 
-Confirm destructive actions with `confirm()`. Prefer `run_ncc_async` when the CLI self-elevates (`ncc-priv-run`); use `run_ncc_root` only when the GUI must elevate a plain `ncc` that does not.
+**Draft-first CRUD (binding):**
 
-### D. Generic fallback (`GenericDomainPage`)
+| User click | What happens |
+|------------|----------------|
+| Create… | Modal → OK → **pending row in list** + `commit.stage` — no `ncc` yet |
+| Edit… | Modal → OK → row shows pending edits + stage — no write yet |
+| Delete… | Row marked pending-delete (or confirm → stage) — no delete yet |
+| Apply | Flush all pending `ncc … --no-build` → rebuild modal |
+
+Do **not**: Create → immediate `ncc user create` (+ rebuild checkbox). That pattern is retired.
+
+**Packages** (special dual-scope page): tabs **My packages** | **Recipes && sets** | **System packages** (admins).  
+Multi-select by marking rows (`MultiSelection` — click toggles; no checkboxes). Batch Add/Remove **stages** into CommitBar; Apply writes.  
+**System packages** lists explicit `systemPackages` **and** packages from active sets (source labeled). Removing a set-sourced row disables that set. See `PERMISSIONS.md`.
+
+Prefer `run_ncc_async` when the CLI self-elevates (`ncc-priv-run`); use `run_ncc_root` only when the GUI must elevate a plain `ncc` that does not.
+
+### D. Immediate tool pages (System update, VM runtime, …)
+
+Same vertical layout, but primary buttons are **allowlisted immediate** actions
+(§2.1). CommitBar stays (unused unless the page also has config drafts).
+Confirm destructive/build actions; stream output into Activity.
+
+### E. Generic fallback (`GenericDomainPage`)
 
 1. Header from catalog  
-2. Actions from registry verbs  
+2. Actions from registry verbs (prefer staging config verbs; immediate only if allowlisted)  
 3. Activity  
 
 ---
@@ -242,13 +349,17 @@ Desktop entry: `ncc.desktop`, exec `ncc`, icon name `ncc` (hicolor from gui-engi
 
 - [ ] `DomainPage` kit; Header → Content → Actions → Activity; no raw dump as main UI
 - [ ] Settings/status are human-readable (no raw dump as main UI)
+- [ ] Config writes draft-first: UI shows pending + CommitBar (`stage` → Apply → `notify_apply_finished`)
+- [ ] No Create/Add that already runs `ncc` before Apply; no ad-hoc rebuild checkbox
+- [ ] Immediate actions only if on §2.1 allowlist (else document new exception there first)
 - [ ] Actions via `add_action` / `add_actions_*`; Activity via `log_*` / `run_ncc*`
-- [ ] Activity empty until an action runs
-- [ ] List+CRUD: Create/Edit same modal pattern (§4.C) if applicable
+- [ ] Activity empty until an action runs (Apply / allowed immediate / Refresh)
+- [ ] List+CRUD: Create/Edit same modal + pending rows (§4.C) if applicable
 - [ ] Elevation via kit (§10); no pkexec-first; no pkexec in copy
 - [ ] `registerGuiPage` + optional `registerGuiDomain` with `group`
 - [ ] Works in root shell **and** `ncc <domain> --gui`
 - [ ] No imports of other modules’ pages; only `ncc_gui.*` kit
+- [ ] Started from `doc/PAGE-TEMPLATE.md` stub when greenfield
 
 ---
 
@@ -297,4 +408,4 @@ Run `ncc` as the logged-in user. Prefer this when the CLI already elevates via *
 
 ---
 
-*Last updated: elevation sudo-n-first, Users CRUD modals, consistency §10–11.*
+*Last updated: SSH + Hosts draft-first; offer_rebuild=False for non-Nix writes.*

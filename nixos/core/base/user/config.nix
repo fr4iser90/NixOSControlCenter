@@ -71,31 +71,18 @@ let
     if perUserConfigs ? ${username} then perUserConfigs.${username}
     else userAttrs.${username};
 
-  # Get system-wide packages from per-user config
-  # Per-user config can define: environment.systemPackages = [...]
-  getUserSystemPackages = username:
-    let
-      userCfg = resolveUserConfig username;
-      envPkgs = userCfg.environment.systemPackages or [];
-    in
-      if lib.isList envPkgs then envPkgs else [];
-
-  # Get user-specific packages from per-user config
-  # Per-user config can define: userPackages = ["vscode" "firefox"]
-  # Falls nicht definiert: zentrale Config (userConfig.userPackages)
+  # Get user-specific packages from per-user leaf (users.<name>.userPackages).
+  # Also accept legacy users.<name>.environment.systemPackages (same install path).
   getUserPackages = username:
     let
       userCfg = resolveUserConfig username;
-      perUserPkgs = userCfg.userPackages or [];
-      centralPkgs = if userCfg ? userPackages && builtins.isList userCfg.userPackages
-                    then userCfg.userPackages
-                    else [];
-      # Per-user packages override central packages
-      packages = if perUserPkgs != [] then perUserPkgs else centralPkgs;
+      up = if lib.isList (userCfg.userPackages or null) then userCfg.userPackages else [];
+      ep = if lib.isList (userCfg.environment.systemPackages or null)
+        then userCfg.environment.systemPackages else [];
     in
-      packages;
+      up ++ ep;
 
-  # Resolve all user packages to derivations
+  # Resolve all user packages to derivations (nixpkgs attr names only)
   resolvedUserPackages = lib.mapAttrs (name: packages:
     map (pkgName:
       let
@@ -103,18 +90,9 @@ let
       in
         if meta ? package then meta.package
         else if builtins.hasAttr pkgName pkgs then pkgs.${pkgName}
-        else throw "Package '${pkgName}' not found in package metadata or nixpkgs"
+        else throw "Package '${pkgName}' not found in package metadata or nixpkgs (use a nixpkgs attribute name, e.g. ripgrep not rg)"
     ) packages
   ) (lib.mapAttrs (name: _: getUserPackages name) userAttrs);
-
-  # Resolve system packages from per-user configs
-  # These go into environment.systemPackages (user-scoped, not global)
-  resolvedUserSystemPackages = lib.mapAttrs (name: packages:
-    map (pkgName:
-      if builtins.hasAttr pkgName pkgs then pkgs.${pkgName}
-      else throw "Package '${pkgName}' not found in nixpkgs"
-    ) packages
-  ) (lib.mapAttrs (name: _: getUserSystemPackages name) userAttrs);
 
   # Automatisches Autologin für den ersten restricted-Admin-User
   autoLoginUser = lib.findFirst
@@ -216,7 +194,7 @@ in
     shell = pkgs.${userConfig.defaultShell};
     group = username;
     extraGroups = [ "users" ] ++ roleGroups.${userConfig.role};
-    # Combine central role packages + per-user system packages + resolved user packages
+    # Combine role packages + per-user userPackages (and legacy leaf environment.systemPackages)
     packages = (resolvedUserPackages.${username} or []);
 
     linger = roleLingering.${userConfig.role} or false;

@@ -1,16 +1,21 @@
-{ config, lib, pkgs, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
 
 let
   desktopCfg = getModuleConfig "desktop";
   packagesCfg = getModuleConfig "packages";
   userCfg = getModuleConfig "user";
+  usersLeaf = lib.attrByPath [ "users" ] { } systemConfig;
 
   pinMap = import ../../lib/pin-map.nix;
   resolvePins = import ../../lib/resolve-pins.nix { inherit lib pinMap; };
 
-  userPackagesFlat = lib.unique (lib.concatLists (
-    lib.attrValues (packagesCfg.userPackages or {})
-  ));
+  # SSOT: users.<name>.userPackages (+ legacy environment.systemPackages on the leaf)
+  userPackagesFlat = lib.unique (lib.concatLists (lib.mapAttrsToList (_: u:
+    let
+      up = if builtins.isList (u.userPackages or null) then u.userPackages else [];
+      ep = if builtins.isList (u.environment.systemPackages or null) then u.environment.systemPackages else [];
+    in up ++ ep
+  ) usersLeaf));
 
   pins = resolvePins {
     pinnedApps = desktopCfg.pinnedApps or [];

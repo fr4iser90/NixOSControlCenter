@@ -16,7 +16,7 @@
     emulation = {
       systemTypes = [ "desktop" ];
       group = "gaming";
-      description = "Retro gaming emulation";
+      description = "RetroArch emulation core (slim)";
       dependencies = [];
       conflicts = [];
     };
@@ -31,19 +31,31 @@
     };
     
     # Development Features
+    game-engines = {
+      systemTypes = [ "desktop" "server" ];
+      group = "development";
+      description = "Game engines (Godot, Unity Hub, …) — art tools → user-creative";
+      dependencies = [];
+      conflicts = [];
+      legacyPath = "development.game";
+    };
+
+    # Deprecated alias — configs with packageModules = [ "game-dev" ] still validate;
+    # default.nix remaps the import to game-engines.nix
     game-dev = {
       systemTypes = [ "desktop" "server" ];
       group = "development";
-      description = "Game development tools (engines, IDEs)";
+      description = "DEPRECATED alias for game-engines";
       dependencies = [];
       conflicts = [];
-      legacyPath = "development.game";  # Migration: development.game → game-dev
+      legacyPath = "development.game";
+      deprecatedAliasOf = "game-engines";
     };
     
     web-dev = {
       systemTypes = [ "desktop" "server" ];
       group = "development";
-      description = "Web development tools (Node, npm, IDEs)";
+      description = "Web/JS toolchain (Node, yarn/pnpm/deno, httpie, eslint) — not production nginx/pg";
       dependencies = [];
       conflicts = [];
       legacyPath = "development.web";  # Migration: development.web → web-dev
@@ -52,7 +64,7 @@
     python-dev = {
       systemTypes = [ "desktop" "server" ];
       group = "development";
-      description = "Python development environment";
+      description = "Python 3.12 env with common dev packages (systemPackages)";
       dependencies = [];
       conflicts = [];
       legacyPath = "development.python";  # Migration: development.python → python-dev
@@ -71,10 +83,18 @@
     docker = {
       systemTypes = [ "desktop" "server" ];
       group = "virtualization";
-      description = "Docker (rootless by default; root only for Swarm / AI-Workspace). Safer for a normal desktop admin account.";
+      description = "Root Docker (Swarm / AI-Workspace). Prefer rootless when possible.";
       dependencies = [];
-      conflicts = [ "podman" ];
+      conflicts = [ "podman" "docker-rootless" ];
       legacyPath = "server.docker";  # Migration: server.docker → docker (smart rootless/root)
+    };
+
+    docker-rootless = {
+      systemTypes = [ "desktop" "server" ];
+      group = "virtualization";
+      description = "Rootless Docker (per-user daemon)";
+      dependencies = [];
+      conflicts = [ "docker" "podman" ];
     };
     
     qemu-vm = {
@@ -99,7 +119,7 @@
     database = {
       systemTypes = [ "server" ];
       group = "server";
-      description = "Database services (PostgreSQL, MySQL)";
+      description = "PostgreSQL 16 + pgcli";
       dependencies = [];
       conflicts = [];
     };
@@ -107,7 +127,7 @@
     web-server = {
       systemTypes = [ "server" ];
       group = "server";
-      description = "Web server (nginx, apache)";
+      description = "nginx web server";
       dependencies = [];
       conflicts = [];
       legacyPath = "server.web";  # Migration: server.web → web-server
@@ -116,7 +136,7 @@
     mail-server = {
       systemTypes = [ "server" ];
       group = "server";
-      description = "Mail server";
+      description = "Postfix MTA + mailutils (minimal local mail)";
       dependencies = [];
       conflicts = [];
       legacyPath = "server.mail";  # Migration: server.mail → mail-server

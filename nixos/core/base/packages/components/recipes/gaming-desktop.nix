@@ -1,11 +1,10 @@
 {
-  description = "Gaming Desktop mit Streaming und Emulation";
+  description = "Gaming desktop (Steam + streaming + emulation)";
   systemTypes = [ "desktop" ];
+  scope = "system";
   modules = [
     "gaming"
     "streaming"
     "emulation"
-    "game-dev"
   ];
 }
-

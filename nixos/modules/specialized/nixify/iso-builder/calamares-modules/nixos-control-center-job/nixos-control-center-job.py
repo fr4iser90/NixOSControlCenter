@@ -142,7 +142,6 @@ def generate_configs_from_selection(target_root, packagechooser_data):
     {modules_list}
   ];
   systemPackages = [ ];
-  userPackages = {{ }};
 }}
 '''
             write_module_config(configs_dir, "core/base/packages", packages_config)

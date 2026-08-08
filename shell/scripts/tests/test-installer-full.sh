@@ -75,7 +75,7 @@ source "$LIB_DIR/dry-run.sh"
 # shellcheck source=/dev/null
 source "$LIB_DIR/utils.sh"
 # shellcheck source=/dev/null
-source "$SETUP_DIR/config/setup-preset-profile.sh"
+source "$SETUP_DIR/config/apply-install-template.sh"
 # shellcheck source=/dev/null
 source "$UI_DIR/gui/gui-lib.sh"
 # shellcheck source=/dev/null
@@ -132,7 +132,7 @@ get_predefined_profile_file() {
         "Fr4iser Jetson Nano") profile_file="fr4iser-jetson" ;;
         *) return 1 ;;
     esac
-    local profile_path="$SETUP_DIR/modes/profiles/$profile_file"
+    local profile_path="$SETUP_DIR/modes/host-blueprints/$profile_file"
     [[ -f "$profile_path" ]] || return 1
     echo "$profile_path"
 }
@@ -225,7 +225,7 @@ assert_eq "baseline empty packages" "$(pkg_modules "$CONFIGS_BASE/core/base/pack
 rm -rf "$SB"
 
 # ============================================================================
-# 2) Desktop / Server / Jetson via setup_predefined_profile + real deploy_base_config
+# 2) Desktop / Server / Jetson via apply_install_template + real deploy_base_config
 # ============================================================================
 run_preset_with_deploy() {
     local label="$1" profile="$2" want_type="$3" want_pkgs="$4" want_env="$5"
@@ -249,8 +249,8 @@ run_preset_with_deploy() {
 
     DEPLOYED=0
     # use real deploy_base_config; wrap deploy_config completion only
-    setup_predefined_profile "$profile" >/dev/null 2>&1 || {
-        fail "$label setup_predefined_profile"
+    apply_install_template "$profile" >/dev/null 2>&1 || {
+        fail "$label apply_install_template"
         rm -rf "$sb" "$fake_src"
         return
     }
@@ -291,9 +291,9 @@ run_preset_with_deploy() {
 }
 
 echo "== Presets + deploy copy =="
-run_preset_with_deploy "Desktop" "$SETUP_DIR/modes/presets/desktop.nix" "desktop" "" "plasma"
-run_preset_with_deploy "Server" "$SETUP_DIR/modes/presets/server.nix" "server" "" ""
-run_preset_with_deploy "Jetson" "$SETUP_DIR/modes/profiles/fr4iser-jetson" "desktop" "streaming emulation game-dev web-dev" "plasma"
+run_preset_with_deploy "Desktop" "$SETUP_DIR/modes/install-bases/desktop.nix" "desktop" "" "plasma"
+run_preset_with_deploy "Server" "$SETUP_DIR/modes/install-bases/server.nix" "server" "" ""
+run_preset_with_deploy "Jetson" "$SETUP_DIR/modes/host-blueprints/fr4iser-jetson" "desktop" "streaming emulation game-engines web-dev" "plasma"
 
 # ============================================================================
 # 3) Homelab single (GUI answers)
@@ -394,16 +394,16 @@ restore_deploy
 dispatch_selection() {
     local selection="$1"
     local selected_modules_raw="$selection"
-    if [[ "$selected_modules_raw" =~ ^LOAD_PROFILE: ]]; then
-        setup_predefined_profile "${selected_modules_raw#LOAD_PROFILE:}" || return 1
+    if [[ "$selected_modules_raw" =~ ^LOAD_BLUEPRINT: ]]; then
+        apply_install_template "${selected_modules_raw#LOAD_BLUEPRINT:}" || return 1
     elif [[ "$selected_modules_raw" == "Desktop" ]]; then
-        setup_predefined_profile "$SETUP_DIR/modes/presets/desktop.nix" || return 1
+        apply_install_template "$SETUP_DIR/modes/install-bases/desktop.nix" || return 1
     elif [[ "$selected_modules_raw" == "Server" ]]; then
-        setup_predefined_profile "$SETUP_DIR/modes/presets/server.nix" || return 1
+        apply_install_template "$SETUP_DIR/modes/install-bases/server.nix" || return 1
     elif [[ "$selected_modules_raw" == "Homelab Server" ]]; then
         setup_homelab || return 1
     elif [[ "$selected_modules_raw" == "Jetson Nano" ]]; then
-        setup_predefined_profile "$SETUP_DIR/modes/profiles/fr4iser-jetson" || return 1
+        apply_install_template "$SETUP_DIR/modes/host-blueprints/fr4iser-jetson" || return 1
     elif [[ "$selected_modules_raw" =~ ^IMPORT_CONFIG: ]]; then
         local config_path="${selected_modules_raw#IMPORT_CONFIG:}"
         if ncc_dry_run; then
@@ -469,15 +469,15 @@ else
 fi
 rm -rf "$SB"
 
-# LOAD_PROFILE
+# LOAD_BLUEPRINT
 new_sandbox; SB="$SANDBOX_ROOT"
 stub_checks
 fake_src=$(mktemp -d); echo 'f' > "$fake_src/flake.nix"; export NIXOS_CONFIG_DIR="$fake_src"
-if dispatch_selection "LOAD_PROFILE:$SETUP_DIR/modes/profiles/fr4iser-home" >/dev/null 2>&1; then
-    pass "dispatch LOAD_PROFILE"
-    assert_eq "LOAD_PROFILE packages" "$(pkg_modules "$CONFIGS_BASE/core/base/packages/config.nix")" "gaming streaming emulation game-dev web-dev"
+if dispatch_selection "LOAD_BLUEPRINT:$SETUP_DIR/modes/host-blueprints/fr4iser-home" >/dev/null 2>&1; then
+    pass "dispatch LOAD_BLUEPRINT"
+    assert_eq "LOAD_BLUEPRINT packages" "$(pkg_modules "$CONFIGS_BASE/core/base/packages/config.nix")" "gaming streaming emulation game-engines web-dev"
 else
-    fail "dispatch LOAD_PROFILE"
+    fail "dispatch LOAD_BLUEPRINT"
 fi
 rm -rf "$SB" "$fake_src"
 export NIXOS_CONFIG_DIR="$ROOT/nixos"
@@ -529,7 +529,7 @@ write_answers "$NCC_GUI_ANSWERS_FILE" \
     "BROWSERS=firefox brave chromium" \
     "ADMIN_USER=guiuser"
 stub_deploy
-setup_predefined_profile "$SETUP_DIR/modes/presets/desktop.nix" >/dev/null 2>&1 || fail "gui override setup"
+apply_install_template "$SETUP_DIR/modes/install-bases/desktop.nix" >/dev/null 2>&1 || fail "gui override setup"
 assert_eq "gui override packages" "$(pkg_modules "$CONFIGS_BASE/core/base/packages/config.nix")" "gaming"
 PKG_ALL=$(cat "$CONFIGS_BASE/core/base/packages/config.nix")
 assert_contains "gui browsers brave" "$PKG_ALL" '"brave"'

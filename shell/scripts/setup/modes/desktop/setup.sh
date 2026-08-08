@@ -82,7 +82,7 @@ setup_desktop() {
             "Gaming-Streaming"|"streaming") feature_name="streaming" ;;
             "Gaming-Emulation"|"emulation") feature_name="emulation" ;;
             "Development-Web"|"web-dev") feature_name="web-dev" ;;
-            "Development-Game"|"game-dev") feature_name="game-dev" ;;
+            "Development-Game"|"game-dev"|"game-engines") feature_name="game-engines" ;;
             "python-dev") feature_name="python-dev" ;;
             "system-dev") feature_name="system-dev" ;;
             "docker") feature_name="docker" ;;

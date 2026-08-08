@@ -13,13 +13,11 @@
 {
   # === User Packages (per-user, not global) ===
   # These are installed via NixOS users.users.<name>.packages
-  # (user-scoped, not environment.systemPackages which is global)
   #
   # userPackages = [ "vscode" "firefox" "discord" ];
 
-  # === System Packages (per-user) ===
-  # These go into users.users.<name>.packages
-  # environment.systemPackages = [ "git" ];
+  # Prefer userPackages above. Do not use environment.systemPackages here
+  # (that name is global in NixOS; NCC historically mapped it to user packages).
 
   # === Home Manager Config (optional) ===
   # Per-user home-manager overrides

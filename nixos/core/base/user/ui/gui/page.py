@@ -1,4 +1,4 @@
-"""Users — DomainPage kit (list + create/edit modals, role-gated)."""
+"""Users — DomainPage kit (list + create/edit modals, draft-first CommitBar)."""
 
 from __future__ import annotations
 
@@ -18,7 +18,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ncc_gui.dialogs import confirm, error, info
+from ncc_gui.commit_bar import PendingChange
+from ncc_gui.dialogs import confirm, error
 from ncc_gui.remote import run_ncc
 from ncc_gui.scaffold import DomainPage
 
@@ -37,6 +38,30 @@ class UserRow:
     role: str
     shell: str
     auto_login: bool
+
+
+def _row_from_meta(meta: dict) -> UserRow | None:
+    raw = meta.get("row")
+    if not isinstance(raw, dict):
+        return None
+    name = str(raw.get("name") or "")
+    if not name:
+        return None
+    return UserRow(
+        name=name,
+        role=str(raw.get("role") or "guest"),
+        shell=str(raw.get("shell") or "bash"),
+        auto_login=bool(raw.get("auto_login")),
+    )
+
+
+def _row_to_meta(row: UserRow) -> dict:
+    return {
+        "name": row.name,
+        "role": row.role,
+        "shell": row.shell,
+        "auto_login": row.auto_login,
+    }
 
 
 class UserAccountDialog(QDialog):
@@ -117,8 +142,6 @@ class UserAccountDialog(QDialog):
         pw2 = self.password2.text()
         if pw != pw2:
             return None
-        if self._mode == "create" and not name:
-            return None
         return (
             name,
             str(self.role.currentData()),
@@ -176,13 +199,18 @@ class UserPage(DomainPage):
     def __init__(self, parent=None) -> None:
         super().__init__(
             "Users",
-            "Create and edit accounts in a dialog. Guests only see themselves.",
+            "Create and edit accounts in a dialog — they appear as drafts in the list. "
+            "Save / Undo, then Apply to write config (rebuild is offered after Apply).",
             parent=parent,
         )
         self._me = ""
         self._role = "guest"
         self._can_manage = False
         self._selected: UserRow | None = None
+        self._live: list[UserRow] = []
+        self._flush_queue: list[PendingChange] = []
+        self._flush_summary = ""
+        self._reloading = False
 
         _, self.list = self.add_list_block("Accounts")
         self.list.currentItemChanged.connect(self._on_select)
@@ -191,11 +219,11 @@ class UserPage(DomainPage):
         self.you_are.setObjectName("nccPageSubtitle")
         self.add_content_widget(self.you_are)
 
-        self.do_rebuild = QCheckBox("Rebuild & switch after changes")
-        self.do_rebuild.setChecked(True)
-        self.add_actions_widget(self.do_rebuild)
+        assert self.commit is not None
+        self.commit.set_flush_handler(self._flush_pending)
+        self.commit.set_pending_changed(self._render_list)
 
-        self.btn_create = self.add_action("Create…", self._create, primary=True)
+        self.btn_create = self.add_action("Create…", self._create)
         self.btn_edit = self.add_action("Edit…", self._edit)
         self.btn_delete = self.add_action("Delete…", self._delete)
         self.add_action("Refresh", self.reload)
@@ -211,18 +239,80 @@ class UserPage(DomainPage):
     def reload(self) -> None:
         self._me, self._role, self._can_manage = _whoami()
         self._set_manage_ui()
-        self.list.clear()
         users, err = _load_users()
         if err:
             self.log_append(f"• List error\n{err}\n")
-        for u in users:
-            item = QListWidgetItem(f"{u.name}  ·  {u.role}")
-            item.setData(Qt.ItemDataRole.UserRole, u)
-            self.list.addItem(item)
-        if self.list.count():
+        self._live = users
+        self._render_list()
+
+    def _pending_by_name(self) -> dict[str, PendingChange]:
+        assert self.commit is not None
+        out: dict[str, PendingChange] = {}
+        for ch in self.commit.pending:
+            row = _row_from_meta(ch.meta)
+            if row is not None:
+                out[row.name] = ch
+        return out
+
+    def _render_list(self) -> None:
+        if self._reloading:
+            return
+        self._reloading = True
+        try:
+            prev = self._selected.name if self._selected else None
+            self.list.clear()
+            pending = self._pending_by_name()
+            live_names = {u.name for u in self._live}
+
+            for u in self._live:
+                ch = pending.get(u.name)
+                if ch is not None and ch.meta.get("op") == "delete":
+                    item = QListWidgetItem(f"{u.name}  ·  {u.role}  · pending delete")
+                    item.setData(Qt.ItemDataRole.UserRole, u)
+                    item.setData(Qt.ItemDataRole.UserRole + 1, "delete")
+                    self.list.addItem(item)
+                    continue
+                if ch is not None and ch.meta.get("op") == "set":
+                    draft = _row_from_meta(ch.meta) or u
+                    item = QListWidgetItem(
+                        f"{draft.name}  ·  {draft.role}  · pending edit"
+                    )
+                    item.setData(Qt.ItemDataRole.UserRole, draft)
+                    item.setData(Qt.ItemDataRole.UserRole + 1, "set")
+                    self.list.addItem(item)
+                    continue
+                item = QListWidgetItem(f"{u.name}  ·  {u.role}")
+                item.setData(Qt.ItemDataRole.UserRole, u)
+                item.setData(Qt.ItemDataRole.UserRole + 1, "live")
+                self.list.addItem(item)
+
+            for name, ch in pending.items():
+                if name in live_names:
+                    continue
+                if ch.meta.get("op") != "create":
+                    continue
+                draft = _row_from_meta(ch.meta)
+                if draft is None:
+                    continue
+                item = QListWidgetItem(
+                    f"{draft.name}  ·  {draft.role}  · pending create"
+                )
+                item.setData(Qt.ItemDataRole.UserRole, draft)
+                item.setData(Qt.ItemDataRole.UserRole + 1, "create")
+                self.list.addItem(item)
+
+            if self.list.count() == 0:
+                self._selected = None
+                return
+            if prev:
+                for i in range(self.list.count()):
+                    u = self.list.item(i).data(Qt.ItemDataRole.UserRole)
+                    if isinstance(u, UserRow) and u.name == prev:
+                        self.list.setCurrentRow(i)
+                        return
             self.list.setCurrentRow(0)
-        else:
-            self._selected = None
+        finally:
+            self._reloading = False
 
     def _on_select(self, current: QListWidgetItem | None, _prev) -> None:
         if current is None:
@@ -239,8 +329,15 @@ class UserPage(DomainPage):
             self.btn_delete.setEnabled(self._can_manage)
             self.btn_edit.setEnabled(self._can_manage)
 
-    def _rebuild_flag(self) -> list[str]:
-        return ["--rebuild"] if self.do_rebuild.isChecked() else []
+    @staticmethod
+    def _same_user(a: PendingChange, b: PendingChange) -> bool:
+        ra = _row_from_meta(a.meta)
+        rb = _row_from_meta(b.meta)
+        return ra is not None and rb is not None and ra.name == rb.name
+
+    def _stage_replace(self, change: PendingChange) -> None:
+        assert self.commit is not None
+        self.commit.stage_replace(change, same=self._same_user)
 
     def _create(self) -> None:
         if not self._can_manage:
@@ -255,33 +352,40 @@ class UserPage(DomainPage):
             error(self, "Users", "Username required; passwords must match.")
             return
         name, role_val, shell, auto, password = vals
-        if not confirm(self, "Create user?", f"Create {name} as {role_val}?"):
+        if any(u.name == name for u in self._live) or name in self._pending_by_name():
+            error(self, "Users", f"User already listed (live or draft): {name}")
             return
-        args = [
-            "user",
-            "create",
-            name,
-            "--role",
-            role_val,
-            "--shell",
-            shell,
-            "--auto-login",
-            "true" if auto else "false",
-            *self._rebuild_flag(),
-        ]
-        env = {"NCC_NEW_USER_PASSWORD": password} if password else None
-
-        def _done(code: int) -> None:
-            if code == 0:
-                info(self, "Users", f"Created {name}.")
-                self.reload()
-
-        self.run_ncc_async(args, label=f"create {name}", on_done=_done, env=env)
+        row = UserRow(name=name, role=role_val, shell=shell, auto_login=auto)
+        meta: dict = {"op": "create", "row": _row_to_meta(row)}
+        if password:
+            meta["env"] = {"NCC_NEW_USER_PASSWORD": password}
+        self._stage_replace(
+            PendingChange(
+                summary=f"create {name} ({role_val})",
+                argv=[
+                    "user",
+                    "create",
+                    name,
+                    "--role",
+                    role_val,
+                    "--shell",
+                    shell,
+                    "--auto-login",
+                    "true" if auto else "false",
+                ],
+                elevated=False,
+                meta=meta,
+            )
+        )
 
     def _edit(self) -> None:
         if not self._can_manage or self._selected is None:
             return
         u = self._selected
+        pending = self._pending_by_name().get(u.name)
+        if pending is not None and pending.meta.get("op") == "delete":
+            error(self, "Users", f"{u.name} is marked for delete — Undo first.")
+            return
         dlg = UserAccountDialog(
             self,
             mode="edit",
@@ -298,52 +402,118 @@ class UserPage(DomainPage):
         if self._role == "restricted-admin" and role_val == "admin":
             error(self, "Users", "Restricted admin cannot assign the admin role.")
             return
-        if not confirm(
-            self,
-            "Save user?",
-            f"Update {name}: role={role_val}, shell={shell}, auto-login={auto}",
-        ):
+        row = UserRow(name=name, role=role_val, shell=shell, auto_login=auto)
+        # Still a draft create? Keep create argv with updated fields.
+        if pending is not None and pending.meta.get("op") == "create":
+            meta: dict = {"op": "create", "row": _row_to_meta(row)}
+            if password:
+                meta["env"] = {"NCC_NEW_USER_PASSWORD": password}
+            elif isinstance(pending.meta.get("env"), dict):
+                meta["env"] = dict(pending.meta["env"])
+            self._stage_replace(
+                PendingChange(
+                    summary=f"create {name} ({role_val})",
+                    argv=[
+                        "user",
+                        "create",
+                        name,
+                        "--role",
+                        role_val,
+                        "--shell",
+                        shell,
+                        "--auto-login",
+                        "true" if auto else "false",
+                    ],
+                    elevated=False,
+                    meta=meta,
+                )
+            )
             return
-        args = [
-            "user",
-            "set",
-            name,
-            "--role",
-            role_val,
-            "--shell",
-            shell,
-            "--auto-login",
-            "true" if auto else "false",
-            *self._rebuild_flag(),
-        ]
-        env = {"NCC_NEW_USER_PASSWORD": password} if password else None
-
-        def _done(code: int) -> None:
-            if code == 0:
-                info(self, "Users", f"Updated {name}.")
-                self.reload()
-
-        self.run_ncc_async(args, label=f"set {name}", on_done=_done, env=env)
+        meta = {"op": "set", "row": _row_to_meta(row)}
+        if password:
+            meta["env"] = {"NCC_NEW_USER_PASSWORD": password}
+        self._stage_replace(
+            PendingChange(
+                summary=f"set {name} ({role_val})",
+                argv=[
+                    "user",
+                    "set",
+                    name,
+                    "--role",
+                    role_val,
+                    "--shell",
+                    shell,
+                    "--auto-login",
+                    "true" if auto else "false",
+                ],
+                elevated=False,
+                meta=meta,
+            )
+        )
 
     def _delete(self) -> None:
         if not self._can_manage or self._selected is None:
             return
         name = self._selected.name
+        pending = self._pending_by_name().get(name)
+        # Cancel a draft create instead of staging delete
+        if pending is not None and pending.meta.get("op") == "create":
+            if not confirm(
+                self,
+                "Discard draft?",
+                f"Remove pending create for {name} from the draft list?",
+            ):
+                return
+            assert self.commit is not None
+            self.commit.discard_where(
+                lambda c: (_row_from_meta(c.meta) or UserRow("", "", "", False)).name
+                == name,
+                log=f"• discarded draft create: {name}\n",
+            )
+            return
         if not confirm(
             self,
             "Delete user?",
-            f"Remove account {name} from NCC config?\n"
+            f"Mark {name} for delete (written on Apply).\n"
             "Home directory is not deleted.",
         ):
             return
-        args = ["user", "delete", name, *self._rebuild_flag()]
+        row = self._selected
+        self._stage_replace(
+            PendingChange(
+                summary=f"delete {name}",
+                argv=["user", "delete", name],
+                elevated=False,
+                meta={"op": "delete", "row": _row_to_meta(row)},
+            )
+        )
 
-        def _done(code: int) -> None:
-            if code == 0:
-                info(self, "Users", f"Deleted {name}.")
-                self.reload()
+    def _flush_pending(self, changes: list[PendingChange]) -> None:
+        self._flush_queue = list(changes)
+        self._flush_summary = "; ".join(c.summary for c in changes)
+        self._run_next_flush()
 
-        self.run_ncc_async(args, label=f"delete {name}", on_done=_done)
+    def _run_next_flush(self) -> None:
+        assert self.commit is not None
+        if not self._flush_queue:
+            self.commit.notify_apply_finished(True, self._flush_summary)
+            self.reload()
+            return
+        ch = self._flush_queue.pop(0)
+        env = ch.meta.get("env") if isinstance(ch.meta.get("env"), dict) else None
+
+        def done(code: int) -> None:
+            if code != 0:
+                self._flush_queue.clear()
+                return
+            self._run_next_flush()
+
+        self.run_ncc_async(
+            ch.argv,
+            label=ch.summary,
+            on_done=done,
+            env=env,
+        )
 
 
 def create_page() -> UserPage:

@@ -38,6 +38,8 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   PACKAGE=""
   TARGET_USER=""
   TARGET_SYSTEM=false
+  JSON_OUT=false
+  PACKAGES=()
   NAMES=()
   # Rebuild prompt after mutating config (like system-update)
   SKIP_BUILD_PROMPT=false
@@ -50,20 +52,24 @@ pkgs.writeShellScriptBin "ncc-packages" ''
 
   Usage:
     Single packages (nixpkgs):
-      $SCRIPT_NAME add <package> [--user <name>] [--system]
-      $SCRIPT_NAME remove <package> [--user <name>] [--system]
-      $SCRIPT_NAME list [--system]
+      $SCRIPT_NAME add <package>... [--user <name>] [--system]
+      $SCRIPT_NAME remove <package>... [--user <name>] [--system]
+      $SCRIPT_NAME list [--system] [--json]
 
-    Module sets and presets (packageModules):
+    Module sets and presets (packageModules / userPackages):
       $SCRIPT_NAME module list                 List active packageModules
-      $SCRIPT_NAME module available            Show all available sets and presets
+      $SCRIPT_NAME module available            Show sets and presets (system|user)
       $SCRIPT_NAME module add <name>...        Add set(s) and/or preset(s)
-      $SCRIPT_NAME module remove <name>...     Remove set(s)
+      $SCRIPT_NAME module remove <name>...     Remove set(s) or user-preset packages
       $SCRIPT_NAME module info <name>          Show details for a set or preset
+
+    User presets (scope = \"user\") write users.<you>.userPackages via ncc-priv.
+    System presets (default) write packageModules (needs root).
 
   Flags:
     --system       Target systemPackages (global, all users)
     --user <name>  Target a specific user's userPackages
+    --json         Machine-readable list output
     -y, --yes      After changes, build+switch without asking
     --no-build     After changes, skip rebuild prompt
     -h, --help     Show this help message
@@ -86,7 +92,8 @@ pkgs.writeShellScriptBin "ncc-packages" ''
 
     $SCRIPT_NAME module available                    Show what can be enabled
     $SCRIPT_NAME module add gaming                   Enable single set
-    $SCRIPT_NAME module add gaming-desktop           Apply preset (expands to 4 sets)
+    $SCRIPT_NAME module add gaming-desktop           Apply system preset (sets)
+    $SCRIPT_NAME module add user-web-tools           Apply user preset (userPackages)
     $SCRIPT_NAME module add gaming streaming         Add multiple sets at once
     $SCRIPT_NAME module remove emulation             Remove a single set
     $SCRIPT_NAME module info gaming-desktop          Show what a preset contains
@@ -165,6 +172,10 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                   TARGET_USER="$2"
                   shift 2
                   ;;
+              --json|-j)
+                  JSON_OUT=true
+                  shift
+                  ;;
               -y|--yes|--no-build)
                   parse_build_flag "$1"
                   shift
@@ -176,19 +187,17 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                   exit 1
                   ;;
               *)
+                  PACKAGES+=("$1")
                   if [[ -z "$PACKAGE" ]]; then
                       PACKAGE="$1"
-                  else
-                      log_error "Unexpected argument: $1"
-                      exit 1
                   fi
                   shift
                   ;;
           esac
       done
 
-      if [[ "$COMMAND" != "list" ]] && [[ -z "$PACKAGE" ]]; then
-          log_error "Missing package name. Usage: $SCRIPT_NAME $COMMAND <package> [flags]"
+      if [[ "$COMMAND" != "list" ]] && [[ ''${#PACKAGES[@]} -eq 0 ]]; then
+          log_error "Missing package name. Usage: $SCRIPT_NAME $COMMAND <package>... [flags]"
           exit 1
       fi
   }
@@ -419,8 +428,23 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       echo "$NIXOS_DIR/core/base/packages/components/sets"
   }
 
-  get_presets_dir() {
-      echo "$NIXOS_DIR/core/base/packages/components/presets"
+  get_recipes_dir() {
+      echo "$NIXOS_DIR/core/base/packages/components/recipes"
+  }
+
+  get_user_presets_dir() {
+      echo "$NIXOS_DIR/core/base/packages/components/user-presets"
+  }
+
+  # Resolve recipe or user-preset file (never mix folders)
+  resolve_preset_file() {
+      local name="$1"
+      local f
+      f="$(get_recipes_dir)/$name.nix"
+      [[ -f "$f" ]] && { echo "$f"; return 0; }
+      f="$(get_user_presets_dir)/$name.nix"
+      [[ -f "$f" ]] && { echo "$f"; return 0; }
+      return 1
   }
 
   get_metadata_path() {
@@ -608,13 +632,54 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       done < "$config_path"
   }
 
+  # Print package names one per line (for --json)
+  collect_package_names() {
+      local config_path="$1"
+      local option_name="$2"
+      [[ -n "$config_path" ]] || return 0
+      if ! config_exists "$config_path"; then
+          return 0
+      fi
+      local in_option=false
+      while IFS= read -r line; do
+          if echo "$line" | grep -qE "^[[:space:]]*$option_name[[:space:]]*=[[:space:]]*\[.*\][[:space:]]*;"; then
+              echo "$line" | grep -oE "\"[^\"]+\"" | tr -d '"' || true
+          elif echo "$line" | grep -qE "^[[:space:]]*$option_name[[:space:]]*="; then
+              in_option=true
+          elif [[ "$in_option" == true ]]; then
+              if echo "$line" | grep -qE "^[[:space:]]*\]"; then
+                  in_option=false
+              else
+                  local pkg
+                  pkg=$(echo "$line" | sed -E "s/.*[\"']([^\"']+)[\"'].*/\1/")
+                  if [[ -n "$pkg" ]] && [[ "$pkg" != "$option_name" ]]; then
+                      echo "$pkg"
+                  fi
+              fi
+          fi
+      done < "$config_path"
+  }
+
+  names_to_json_array() {
+      local tmp
+      tmp=$(mktemp)
+      cat > "$tmp"
+      if [[ ! -s "$tmp" ]]; then
+          echo '[]'
+          rm -f "$tmp"
+          return 0
+      fi
+      ${pkgs.jq}/bin/jq -R -s -c 'split("\n") | map(select(length > 0))' < "$tmp"
+      rm -f "$tmp"
+  }
+
   # ----------------------------------------------------------------------------
   # Module / Preset support
   # ----------------------------------------------------------------------------
 
   is_preset_name() {
       local name="$1"
-      [[ -f "$(get_presets_dir)/$name.nix" ]]
+      resolve_preset_file "$name" >/dev/null
   }
 
   is_set_name() {
@@ -631,23 +696,43 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       [[ "$result" == "yes" ]]
   }
 
-  # Echo (newline-separated) the modules a preset contains
+  # Echo (newline-separated) the modules a system recipe contains
   preset_modules() {
       local name="$1"
       local preset_file
-      preset_file="$(get_presets_dir)/$name.nix"
-      [[ -f "$preset_file" ]] || return 0
+      preset_file="$(resolve_preset_file "$name")" || return 0
       nix-instantiate --eval --strict --json -E "
         let p = import $preset_file; in p.modules or []
       " 2>/dev/null | jq -r '.[]' 2>/dev/null || true
   }
 
-  # Echo description for a preset
+  preset_packages() {
+      local name="$1"
+      local preset_file
+      preset_file="$(resolve_preset_file "$name")" || return 0
+      nix-instantiate --eval --strict --json -E "
+        let p = import $preset_file; in p.packages or []
+      " 2>/dev/null | jq -r '.[]' 2>/dev/null || true
+  }
+
+  # system (recipe) | user (user-preset) — derived from which folder / fields
+  preset_scope() {
+      local name="$1"
+      local preset_file recipes_dir
+      preset_file="$(resolve_preset_file "$name")" || { echo "system"; return 0; }
+      recipes_dir=$(get_recipes_dir)
+      if [[ "$preset_file" == "$recipes_dir"/* ]]; then
+          echo "system"
+          return 0
+      fi
+      echo "user"
+  }
+
+  # Echo description for a recipe / user-preset
   preset_description() {
       local name="$1"
       local preset_file
-      preset_file="$(get_presets_dir)/$name.nix"
-      [[ -f "$preset_file" ]] || return 0
+      preset_file="$(resolve_preset_file "$name")" || return 0
       nix-instantiate --eval --strict --json -E "
         let p = import $preset_file; in p.description or \"\"
       " 2>/dev/null | jq -r . 2>/dev/null || true
@@ -683,13 +768,17 @@ pkgs.writeShellScriptBin "ncc-packages" ''
 
   # Expand a name to one or more set names (one per line)
   # - If preset: emit its module list
-  # - Else if set: emit name as-is
+  # - Else if set: emit name as-is (remap deprecated aliases)
   # - Else: emit nothing and return 1
   expand_name() {
       local name="$1"
       if is_preset_name "$name"; then
           preset_modules "$name"
           return 0
+      fi
+      # Deprecated aliases
+      if [[ "$name" == "game-dev" ]]; then
+          name="game-engines"
       fi
       if is_set_name "$name"; then
           echo "$name"
@@ -712,9 +801,10 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   }
 
   module_available() {
-      local sets_dir presets_dir
+      local sets_dir recipes_dir user_presets_dir
       sets_dir=$(get_sets_dir)
-      presets_dir=$(get_presets_dir)
+      recipes_dir=$(get_recipes_dir)
+      user_presets_dir=$(get_user_presets_dir)
 
       echo "=== Available sets (individual modules) ==="
       if [[ -d "$sets_dir" ]]; then
@@ -735,44 +825,72 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       fi
 
       echo ""
-      echo "=== Available presets (bundles of sets) ==="
-      if [[ -d "$presets_dir" ]]; then
-          for f in "$presets_dir"/*.nix; do
+      echo "=== System recipes (→ packageModules) ==="
+      if [[ -d "$recipes_dir" ]]; then
+          for f in "$recipes_dir"/*.nix; do
               [[ -e "$f" ]] || continue
-              local name
+              local name desc
               name=$(basename "$f" .nix)
-              local desc
               desc=$(preset_description "$name" || true)
               if [[ -n "$desc" ]]; then
-                  printf "  %-22s %s\n" "$name" "$desc"
+                  printf "  %-22s [system] %s\n" "$name" "$desc"
               else
-                  printf "  %s\n" "$name"
+                  printf "  %-22s [system]\n" "$name"
               fi
           done
       else
-          echo "  (presets directory not found: $presets_dir)"
+          echo "  (recipes directory not found: $recipes_dir)"
+      fi
+
+      echo ""
+      echo "=== User presets (→ userPackages) ==="
+      if [[ -d "$user_presets_dir" ]]; then
+          for f in "$user_presets_dir"/*.nix; do
+              [[ -e "$f" ]] || continue
+              local name desc
+              name=$(basename "$f" .nix)
+              desc=$(preset_description "$name" || true)
+              if [[ -n "$desc" ]]; then
+                  printf "  %-22s [user] %s\n" "$name" "$desc"
+              else
+                  printf "  %-22s [user]\n" "$name"
+              fi
+          done
+      else
+          echo "  (user-presets directory not found: $user_presets_dir)"
       fi
   }
 
   module_info() {
       local name="$1"
       if is_preset_name "$name"; then
-          echo "$name (preset)"
+          local scope
+          scope=$(preset_scope "$name")
+          echo "$name (preset, scope=$scope)"
           local desc
           desc=$(preset_description "$name" || true)
           [[ -n "$desc" ]] && echo "  Description: $desc"
-          echo "  Modules:"
-          local m
-          while IFS= read -r m; do
-              [[ -z "$m" ]] && continue
-              local md
-              md=$(set_description "$m" || true)
-              if [[ -n "$md" ]]; then
-                  printf "    - %-20s %s\n" "$m" "$md"
-              else
-                  printf "    - %s\n" "$m"
-              fi
-          done < <(preset_modules "$name")
+          if [[ "$scope" == "user" ]]; then
+              echo "  Packages (→ users.<you>.userPackages):"
+              local pkg
+              while IFS= read -r pkg; do
+                  [[ -z "$pkg" ]] && continue
+                  printf "    - %s\n" "$pkg"
+              done < <(preset_packages "$name")
+          else
+              echo "  Modules (→ packageModules):"
+              local m
+              while IFS= read -r m; do
+                  [[ -z "$m" ]] && continue
+                  local md
+                  md=$(set_description "$m" || true)
+                  if [[ -n "$md" ]]; then
+                      printf "    - %-20s %s\n" "$m" "$md"
+                  else
+                      printf "    - %s\n" "$m"
+                  fi
+              done < <(preset_modules "$name")
+          fi
           return 0
       fi
       if is_set_name "$name"; then
@@ -789,21 +907,80 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       exit 1
   }
 
+  module_add_user_preset() {
+      local preset="$1"
+      local target_user pkg
+      target_user=$(resolve_target_user)
+      log_info "User preset '$preset' → users.$target_user.userPackages"
+      local count=0
+      while IFS= read -r pkg; do
+          [[ -z "$pkg" ]] && continue
+          PACKAGE="$pkg"
+          count=$((count + 1))
+          if command -v ncc-priv-run >/dev/null 2>&1; then
+              ncc-priv-run user-pkg add "$PACKAGE" --user "$target_user"
+              CONFIG_CHANGED=false
+          elif [[ "$(id -u)" -eq 0 ]]; then
+              add_package "$(get_user_config_path "$target_user")" "$PACKAGE" "userPackages"
+          else
+              log_error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"
+              exit 1
+          fi
+      done < <(preset_packages "$preset")
+      if [[ "$count" -eq 0 ]]; then
+          log_error "User preset '$preset' has no packages = [ … ]"
+          exit 1
+      fi
+      log_success "User preset '$preset' applied for $target_user ($count packages)"
+  }
+
+  module_remove_user_preset() {
+      local preset="$1"
+      local target_user pkg
+      target_user=$(resolve_target_user)
+      log_info "Removing user preset '$preset' from users.$target_user"
+      while IFS= read -r pkg; do
+          [[ -z "$pkg" ]] && continue
+          PACKAGE="$pkg"
+          if command -v ncc-priv-run >/dev/null 2>&1; then
+              ncc-priv-run user-pkg remove "$PACKAGE" --user "$target_user" || log_warn "skip $PACKAGE"
+              CONFIG_CHANGED=false
+          elif [[ "$(id -u)" -eq 0 ]]; then
+              remove_package "$(get_user_config_path "$target_user")" "$PACKAGE" "userPackages" || true
+          else
+              log_error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"
+              exit 1
+          fi
+      done < <(preset_packages "$preset")
+      log_success "User preset '$preset' packages removed for $target_user"
+  }
+
   module_add() {
+      local arg
+      local system_names=()
+      for arg in "$@"; do
+          if is_preset_name "$arg" && [[ "$(preset_scope "$arg")" == "user" ]]; then
+              module_add_user_preset "$arg"
+          else
+              system_names+=("$arg")
+          fi
+      done
+      if [[ ''${#system_names[@]} -eq 0 ]]; then
+          return 0
+      fi
+
       if [[ "$(id -u)" -ne 0 ]]; then
-          log_error "Changing package modules/sets requires administrator rights"
+          log_error "Changing system package modules/sets requires administrator rights"
           exit 1
       fi
       local cfg
       cfg=$(get_modules_config_path)
 
-      # First pass: validate everything and collect resolved sets
       local resolved=()
-      local arg
-      for arg in "$@"; do
+      for arg in "''${system_names[@]}"; do
           local expanded
           if ! expanded=$(expand_name "$arg"); then
-              log_error "Unknown name: '$arg' (not a known set or preset)"
+              log_error "Unknown name: '$arg' (not a known set or system preset)"
               echo "Hint: try '$SCRIPT_NAME module available' to see valid names" >&2
               exit 1
           fi
@@ -821,7 +998,6 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           fi
       done
 
-      # Second pass: add each resolved set (skipping duplicates)
       local set_name
       for set_name in "''${resolved[@]}"; do
           add_package "$cfg" "$set_name" "packageModules"
@@ -829,8 +1005,21 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   }
 
   module_remove() {
+      local arg
+      local system_names=()
+      for arg in "$@"; do
+          if is_preset_name "$arg" && [[ "$(preset_scope "$arg")" == "user" ]]; then
+              module_remove_user_preset "$arg"
+          else
+              system_names+=("$arg")
+          fi
+      done
+      if [[ ''${#system_names[@]} -eq 0 ]]; then
+          return 0
+      fi
+
       if [[ "$(id -u)" -ne 0 ]]; then
-          log_error "Changing package modules/sets requires administrator rights"
+          log_error "Changing system package modules/sets requires administrator rights"
           exit 1
       fi
       local cfg
@@ -839,10 +1028,8 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           log_error "Config file not found: $cfg"
           exit 1
       fi
-      local arg
-      for arg in "$@"; do
+      for arg in "''${system_names[@]}"; do
           if is_preset_name "$arg"; then
-              # Preset: remove every module it contains
               log_info "Preset '$arg' will remove sets: $(preset_modules "$arg" | tr '\n' ' ')"
               local m
               while IFS= read -r m; do
@@ -872,70 +1059,122 @@ pkgs.writeShellScriptBin "ncc-packages" ''
 
       case "$COMMAND" in
           add)
-              local target_user
+              local target_user pkg
               target_user=$(resolve_target_user)
-              if [[ "$TARGET_SYSTEM" == true ]]; then
-                  if [[ "$(id -u)" -ne 0 ]]; then
-                      log_error "System packages require administrator rights"
-                      exit 1
-                  fi
-                  add_package "$(get_system_config_path)" "$PACKAGE" "systemPackages"
-              else
-                  # Leaf write via ncc-priv (stays under systemConfig/users/<name>/)
-                  if command -v ncc-priv-run >/dev/null 2>&1; then
-                      local args=(user-pkg add "$PACKAGE" --user "$target_user")
-                      [[ "$AUTO_BUILD" == true ]] && args+=(--rebuild)
-                      ncc-priv-run "''${args[@]}"
-                      CONFIG_CHANGED=false
-                  elif [[ "$(id -u)" -eq 0 ]]; then
-                      add_package "$(get_user_config_path "$target_user")" "$PACKAGE" "userPackages"
+              for pkg in "''${PACKAGES[@]}"; do
+                  PACKAGE="$pkg"
+                  if [[ "$TARGET_SYSTEM" == true ]]; then
+                      if [[ "$(id -u)" -ne 0 ]]; then
+                          log_error "System packages require administrator rights"
+                          exit 1
+                      fi
+                      add_package "$(get_system_config_path)" "$PACKAGE" "systemPackages"
                   else
-                      log_error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"
-                      exit 1
+                          if command -v ncc-priv-run >/dev/null 2>&1; then
+                          local args=(user-pkg add "$PACKAGE" --user "$target_user")
+                          local last="''${PACKAGES[-1]}"
+                          [[ "$AUTO_BUILD" == true && "$pkg" == "$last" ]] && args+=(--rebuild)
+                          ncc-priv-run "''${args[@]}"
+                          CONFIG_CHANGED=false
+                      elif [[ "$(id -u)" -eq 0 ]]; then
+                          add_package "$(get_user_config_path "$target_user")" "$PACKAGE" "userPackages"
+                      else
+                          log_error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"
+                          exit 1
+                      fi
                   fi
-              fi
+              done
               ;;
 
           remove)
-              local target_user
+              local target_user pkg
               target_user=$(resolve_target_user)
-              if [[ "$TARGET_SYSTEM" == true ]]; then
-                  if [[ "$(id -u)" -ne 0 ]]; then
-                      log_error "System packages require administrator rights"
-                      exit 1
-                  fi
-                  remove_package "$(get_system_config_path)" "$PACKAGE" "systemPackages"
-              else
-                  if command -v ncc-priv-run >/dev/null 2>&1; then
-                      local args=(user-pkg remove "$PACKAGE" --user "$target_user")
-                      [[ "$AUTO_BUILD" == true ]] && args+=(--rebuild)
-                      ncc-priv-run "''${args[@]}"
-                      CONFIG_CHANGED=false
-                  elif [[ "$(id -u)" -eq 0 ]]; then
-                      remove_package "$(get_user_config_path "$target_user")" "$PACKAGE" "userPackages"
+              for pkg in "''${PACKAGES[@]}"; do
+                  PACKAGE="$pkg"
+                  if [[ "$TARGET_SYSTEM" == true ]]; then
+                      if [[ "$(id -u)" -ne 0 ]]; then
+                          log_error "System packages require administrator rights"
+                          exit 1
+                      fi
+                      remove_package "$(get_system_config_path)" "$PACKAGE" "systemPackages"
                   else
-                      log_error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"
-                      exit 1
+                      if command -v ncc-priv-run >/dev/null 2>&1; then
+                          local args=(user-pkg remove "$PACKAGE" --user "$target_user")
+                          local last="''${PACKAGES[-1]}"
+                          [[ "$AUTO_BUILD" == true && "$pkg" == "$last" ]] && args+=(--rebuild)
+                          ncc-priv-run "''${args[@]}"
+                          CONFIG_CHANGED=false
+                      elif [[ "$(id -u)" -eq 0 ]]; then
+                          remove_package "$(get_user_config_path "$target_user")" "$PACKAGE" "userPackages"
+                      else
+                          log_error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"
+                          exit 1
+                      fi
                   fi
-              fi
+              done
               ;;
 
           list)
-              echo "=== NCC Package Configuration ==="
-              echo ""
-              if [[ "$TARGET_SYSTEM" == true ]]; then
-                  list_packages_from_config "$(get_system_config_path)" "systemPackages" "System Packages"
-              else
-                  local target_user
+              if [[ "$JSON_OUT" == true ]]; then
+                  local target_user user_json system_json
                   target_user=$(resolve_target_user)
-                  local user_config_path
-                  user_config_path=$(get_user_config_path "$target_user")
-                  list_packages_from_config "$user_config_path" "userPackages" "User Packages ($target_user)"
-                  local central_user_config="$SYSTEM_CONFIG/core/base/user/config.nix"
-                  if config_exists "$central_user_config" && ! config_exists "$user_config_path"; then
-                      list_packages_from_config "$central_user_config" "userPackages" "User Packages (central, $target_user)"
+                  if [[ -f "$MONOLITH_FILE" ]]; then
+                      # Prefer monolith eval: mine = userPackages ++ environment.systemPackages
+                      local raw
+                      raw=$("$NIX_INSTANTIATE_BIN" --eval --strict --json -E "
+                        let
+                          c = import $MONOLITH_FILE;
+                          u = c.users.\"$target_user\" or {};
+                          up = if builtins.isList (u.userPackages or null) then u.userPackages else [];
+                          ep = if builtins.isList (u.environment.systemPackages or null) then u.environment.systemPackages else [];
+                          sys = if builtins.isList (c.core.base.packages.systemPackages or null) then c.core.base.packages.systemPackages else [];
+                        in {
+                          user = \"$target_user\";
+                          mine = up ++ ep;
+                          system = sys;
+                        }
+                      " 2>/dev/null) || raw=""
+                      if [[ -n "$raw" ]] && ${pkgs.jq}/bin/jq -e . >/dev/null 2>&1 <<<"$raw"; then
+                          if [[ "$TARGET_SYSTEM" == true ]]; then
+                              echo "$raw" | ${pkgs.jq}/bin/jq -c '{system}'
+                          else
+                              echo "$raw" | ${pkgs.jq}/bin/jq -c .
+                          fi
+                      else
+                          user_json='[]'
+                          system_json=$(collect_package_names "$(get_system_config_path)" "systemPackages" | names_to_json_array)
+                          ${pkgs.jq}/bin/jq -nc --arg user "$target_user" --argjson mine "$user_json" --argjson system "$system_json" \
+                            '{user:$user, mine:$mine, system:$system}'
+                      fi
+                  else
+                      if [[ "$TARGET_SYSTEM" == true ]]; then
+                          system_json=$(collect_package_names "$(get_system_config_path)" "systemPackages" | names_to_json_array)
+                          ${pkgs.jq}/bin/jq -nc --argjson system "$system_json" '{system:$system}'
+                      else
+                          user_json=$(collect_package_names "$(get_user_config_path "$target_user")" "userPackages" | names_to_json_array)
+                          # also leaf environment.systemPackages via facade read + grep is hard; try path
+                          local leaf_env
+                          leaf_env=$(collect_package_names "$(get_user_config_path "$target_user")" "systemPackages" | names_to_json_array)
+                          user_json=$(${pkgs.jq}/bin/jq -nc --argjson a "$user_json" --argjson b "$leaf_env" '$a + $b | unique')
+                          system_json=$(collect_package_names "$(get_system_config_path)" "systemPackages" | names_to_json_array)
+                          ${pkgs.jq}/bin/jq -nc --arg user "$target_user" --argjson mine "$user_json" --argjson system "$system_json" \
+                            '{user:$user, mine:$mine, system:$system}'
+                      fi
                   fi
-                  list_packages_from_config "$(get_system_config_path)" "systemPackages" "System Packages"
+              else
+                  echo "=== NCC Package Configuration ==="
+                  echo ""
+                  if [[ "$TARGET_SYSTEM" == true ]]; then
+                      list_packages_from_config "$(get_system_config_path)" "systemPackages" "System Packages"
+                  else
+                      local target_user
+                      target_user=$(resolve_target_user)
+                      local user_config_path
+                      user_config_path=$(get_user_config_path "$target_user")
+                      list_packages_from_config "$user_config_path" "userPackages" "User Packages ($target_user)"
+                      list_packages_from_config "$user_config_path" "systemPackages" "User environment.systemPackages ($target_user)"
+                      list_packages_from_config "$(get_system_config_path)" "systemPackages" "System Packages"
+                  fi
               fi
               ;;
 

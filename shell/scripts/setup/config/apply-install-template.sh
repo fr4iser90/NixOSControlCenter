@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 # =============================================================
-# Preset Profile Loader - v1 Modular Config System
+# Apply install template (install-base or host-blueprint) → v1 config
 # =============================================================
-# Reads preset profile files and converts them to v1 modular structure
+# Reads files under modes/install-bases/ or modes/host-blueprints/
 # Uses config-writer.sh for all config file creation
 # =============================================================
 
@@ -141,14 +141,14 @@ ncc_primary_install_user() {
 # =============================================================
 # Main preset loader function
 # =============================================================
-setup_predefined_profile() {
+apply_install_template() {
     local profile_file="$1"
 
-    log_section "Setting up Presdefined Profile"
-    log_info "Loading profile from: $profile_file"
+    log_section "Applying install template"
+    log_info "Loading template from: $profile_file"
 
     if [[ ! -f "$profile_file" ]]; then
-        log_error "Profile file not found: $profile_file"
+        log_error "Install template not found: $profile_file"
         return 1
     fi
 
@@ -314,4 +314,4 @@ export -f parse_nix_value
 export -f parse_package_modules
 export -f parse_users_block
 export -f parse_desktop_env
-export -f setup_predefined_profile
+export -f apply_install_template

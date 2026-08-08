@@ -1,22 +1,18 @@
-# Packages catalog — Nix SSOT for sets/presets.
-# Import from a tree that still has metadata.nix + components/ (not a lone store copy).
-# For GUIs prefer: import ./mk-catalog-json.nix { inherit pkgs; }
-{ metadata, setsDir, presetsDir }:
+# Packages catalog — Nix SSOT for sets / recipes / user-presets.
+# Prefer: import ./mk-catalog-json.nix { inherit pkgs; }
+{ metadata, setsDir, recipesDir, userPresetsDir }:
 
 let
-  setFiles =
-    if builtins.pathExists setsDir
-    then builtins.attrNames (builtins.readDir setsDir)
+  nixNames = dir:
+    if builtins.pathExists dir
+    then map (f: builtins.substring 0 (builtins.stringLength f - 4) f)
+      (builtins.filter (f: builtins.match ".*\\.nix" f != null)
+        (builtins.attrNames (builtins.readDir dir)))
     else [];
-  setNames = map (f: builtins.substring 0 (builtins.stringLength f - 4) f)
-    (builtins.filter (f: builtins.match ".*\\.nix" f != null) setFiles);
 
-  presetFiles =
-    if builtins.pathExists presetsDir
-    then builtins.attrNames (builtins.readDir presetsDir)
-    else [];
-  presetNames = map (f: builtins.substring 0 (builtins.stringLength f - 4) f)
-    (builtins.filter (f: builtins.match ".*\\.nix" f != null) presetFiles);
+  setNames = nixNames setsDir;
+  recipeNames = nixNames recipesDir;
+  userPresetNames = nixNames userPresetsDir;
 
   setEntry = name:
     let
@@ -30,22 +26,43 @@ let
       dependencies = meta.dependencies or [];
       conflicts = meta.conflicts or [];
       requiresUnfree = meta.requiresUnfree or false;
+      deprecatedAliasOf = meta.deprecatedAliasOf or null;
     };
 
-  presetEntry = name:
-    let
-      p = import (presetsDir + "/${name}.nix");
+  # System recipe: expands to packageModules (sets)
+  recipeEntry = name:
+    let p = import (recipesDir + "/${name}.nix");
     in {
       inherit name;
-      kind = "preset";
+      kind = "recipe";
+      scope = "system";
       description = p.description or "";
       systemTypes = p.systemTypes or [];
       modules = p.modules or [];
+      packages = [];
     };
+
+  # User preset: expands to users.<you>.userPackages
+  userPresetEntry = name:
+    let p = import (userPresetsDir + "/${name}.nix");
+    in {
+      inherit name;
+      kind = "user-preset";
+      scope = "user";
+      description = p.description or "";
+      systemTypes = p.systemTypes or [];
+      modules = [];
+      packages = p.packages or [];
+    };
+
+  # Combined list for GUIs that still iterate "presets"
+  presets = (map recipeEntry recipeNames) ++ (map userPresetEntry userPresetNames);
+  presetNames = recipeNames ++ userPresetNames;
 in
 {
   inherit metadata;
   sets = map setEntry setNames;
-  presets = map presetEntry presetNames;
-  inherit setNames presetNames;
+  recipes = map recipeEntry recipeNames;
+  userPresets = map userPresetEntry userPresetNames;
+  inherit setNames recipeNames userPresetNames presets presetNames;
 }

@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from ncc_gui.ansi import strip_ansi
+from ncc_gui.commit_bar import CommitController
 from ncc_gui.dialogs import confirm, error
 from ncc_gui.theme import APP_STYLE
 
@@ -34,8 +35,10 @@ class DomainPage(QWidget):
     Order is fixed:
       1. Header (title + subtitle)
       2. Content blocks (``add_block`` / ``add_form_block`` / ``add_widget``)
-      3. Actions block (hints, widgets, buttons)
+      3. Actions block (domain buttons + CommitBar: Undo / Save / Apply)
       4. Activity log (optional)
+
+    Config writes go through ``self.commit`` (stage → Save/Undo → Apply).
     """
 
     def __init__(
@@ -45,6 +48,7 @@ class DomainPage(QWidget):
         *,
         activity: bool = True,
         activity_max_height: int | None = 180,
+        commit_bar: bool = True,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -71,15 +75,21 @@ class DomainPage(QWidget):
         self._content.setSpacing(8)
         root.addLayout(self._content, stretch=1 if activity_max_height is None else 0)
 
-        # 3. Actions
+        # 3. Actions — domain buttons left, CommitBar (Undo/Save/Apply) right
         self._actions_box = QGroupBox("Actions")
         self._actions_col = QVBoxLayout(self._actions_box)
         self._button_row = QHBoxLayout()
         self._actions_col.addLayout(self._button_row)
         self._button_row.addStretch(1)
         self._has_action_button = False
+        self.commit: CommitController | None = None
+        if commit_bar:
+            self.commit = CommitController(self)
+            self._button_row.addWidget(self.commit.bar)
+            self._actions_box.setVisible(True)
         root.addWidget(self._actions_box)
-        self._actions_box.setVisible(False)
+        if not commit_bar:
+            self._actions_box.setVisible(False)
 
         # 4. Activity
         self._activity_box: QGroupBox | None = None

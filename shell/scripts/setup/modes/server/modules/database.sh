@@ -40,7 +40,6 @@ update_packages_config() {
 $modules_list
   ];
   systemPackages = [];
-  userPackages = {};
   docker.enable = false;
   docker.root = null;
 }

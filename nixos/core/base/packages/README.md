@@ -48,6 +48,7 @@ ncc packages list --system                 # Shows only systemPackages
 
 For detailed documentation, see:
 - [Architecture](./doc/ARCHITECTURE.md) - System architecture and design decisions
+- [Sets & scope](./doc/SETS-AND-SCOPE.md) - Set/preset review, overlaps, system vs user (Steam)
 - [Usage Guide](./doc/USAGE.md) - Detailed usage examples and best practices
 
 ## Related Components

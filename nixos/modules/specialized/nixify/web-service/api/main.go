@@ -1867,7 +1867,6 @@ func (s *Server) generateBasicConfigs(sessionID, outputPath string) error {
   systemPackages = [
     # TODO: Map programs from snapshot to NixOS packages
   ];
-  userPackages = { };
 }
 `
 	if err := writeModuleConfigFile(configsDir, "core/base/packages/config.nix", packagesConfig); err != nil {

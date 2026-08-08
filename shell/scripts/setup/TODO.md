@@ -10,12 +10,12 @@ Siehe Analyse: Preset-`features`/`overrides` oft ungenutzt, Memory/Storage-Check
 ## Phase 1 — Quick Wins (P0)
 
 ### [INST-01] Preset `features` / `overrides` wirklich anwenden
-- [ ] In `setup-preset-profile.sh` `features { ... }` parsen
+- [ ] In `apply-install-template.sh` `features { ... }` parsen
 - [ ] Mapping auf bestehende Writer (`write_ssh_config`, `write_homelab_config`, `write_vm_config`, `write_bootentry_config`, …)
 - [ ] `overrides` (z.B. `enableSSH`) anwenden
 - [ ] Optional: `email` / `domain` schreiben falls Writer existiert
 - [ ] Test: Preset mit Features → Config enthält erwartete Flags (dry-run)
-- **Files:** `setup/config/setup-preset-profile.sh`, `setup/config/config-writer.sh`, `tests/test-presets-dry-run.sh`
+- **Files:** `setup/config/apply-install-template.sh`, `setup/config/config-writer.sh`, `tests/test-presets-dry-run.sh`
 - **Done when:** Desktop/Server-Preset-Features landen in der generierten Config
 
 ### [INST-02] Memory-Detection + `MEMORY_GB`
@@ -23,7 +23,7 @@ Siehe Analyse: Preset-`features`/`overrides` oft ungenutzt, Memory/Storage-Check
 - [ ] In `imports.sh` / Collect-Pfad sourcen und `MEMORY_GB` exportieren
 - [ ] In Profile-Loader / Hardware-Writer nutzen (heute: Fallback auf unset)
 - [ ] Test: Collect setzt `MEMORY_GB`, Writer schreibt RAM
-- **Files:** `checks/hardware/memory.sh`, `setup/config/data-collection/collect-system-data.sh`, `setup-preset-profile.sh`
+- **Files:** `checks/hardware/memory.sh`, `setup/config/data-collection/collect-system-data.sh`, `apply-install-template.sh`
 - **Done when:** Installer schreibt echte RAM-Werte statt null/leer
 
 ### [INST-03] Dead Code / stale Aliases aufräumen
@@ -82,7 +82,7 @@ Siehe Analyse: Preset-`features`/`overrides` oft ungenutzt, Memory/Storage-Check
 - [ ] Option A: Presets mit `nix-instantiate` / `nix eval` validieren bevor Apply
 - [ ] Option B: schrittweise von grep/awk auf strukturierten Parser
 - [ ] Bestehende Parser-Edge-Case-Tests behalten / erweitern
-- **Files:** `setup-preset-profile.sh`, presets under `modes/presets/`, `modes/profiles/`
+- **Files:** `apply-install-template.sh`, presets under `modes/install-bases/`, `modes/host-blueprints/`
 - **Done when:** Kaputte Presets failen klar vor Writers
 
 ### [INST-10] State Machine / Wizard-Back (oder entfernen)
@@ -97,7 +97,7 @@ Siehe Analyse: Preset-`features`/`overrides` oft ungenutzt, Memory/Storage-Check
 - **Done when:** Ein klarer Primary-Path + dokumentierter Legacy-Exit
 
 ### [INST-12] Profiles als First-Class Presets
-- [ ] Entscheiden welche `modes/profiles/*` im Hauptmenü erscheinen (Jetson schon)
+- [ ] Entscheiden welche `modes/host-blueprints/*` im Hauptmenü erscheinen (Jetson schon)
 - [ ] Personal-Profile-Name-Map bereinigen oder Advanced-only dokumentieren
 - [ ] Device-Profile Template (Hardware pinned vs. null = live detect)
 - **Done when:** Menü und Profile-Ordner stimmen überein

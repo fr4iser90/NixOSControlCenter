@@ -13,6 +13,10 @@ The Hardware System module is a **core module** that manages hardware-specific c
 - **Memory Detection**: Automatic RAM size detection via system-checks
 - **Hardware Optimization**: Hardware-specific optimizations and packages
 - **System Integration**: Proper integration with NixOS hardware services
+- **CLI / GUI**: `ncc hardware status [--json]`, `ncc hardware set autoDetect=…`, `ncc hardware --gui`
+
+Auto-detect is `system-manager.enableChecks` (default on). The Hardware GUI shows
+configured vs detected values and stages the autoDetect toggle via the CommitBar.
 
 ## Documentation
 

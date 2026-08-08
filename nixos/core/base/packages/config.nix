@@ -38,12 +38,5 @@ in {
        assertion = lib.all isResolvablePkg systemPkgs;
        message = "Unknown system package(s): ${lib.concatStringsSep ", " (lib.filter (pkg: !(isResolvablePkg pkg)) systemPkgs)}";
      }
-   ] else []) ++
-  # Validate userPackages the same way
-  lib.concatLists (lib.mapAttrsToList (user: packages: [
-    {
-      assertion = lib.all isResolvablePkg packages;
-      message = "Unknown user package(s) for ${user}: ${lib.concatStringsSep ", " (lib.filter (pkg: !(isResolvablePkg pkg)) packages)}";
-    }
-  ]) (cfg.userPackages or {}));
+   ] else []);
 }

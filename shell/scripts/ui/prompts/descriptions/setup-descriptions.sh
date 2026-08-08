@@ -3,26 +3,27 @@
 # Definiere die Beschreibungen
 declare -g -A SETUP_DESCRIPTIONS=(
     # Installation Types
-    ["presets"]="Pick a starting preset, then optionally add or remove package modules."
-    ["custom setup"]="Deprecated — use From Scratch preset."
-    ["advanced options"]="Load a profile file or import an existing configuration."
+    ["install bases"]="Pick a starting install base, then optionally add or remove package sets."
+    ["presets"]="Pick a starting install base, then optionally add or remove package sets."
+    ["custom setup"]="Deprecated — use From Scratch install base."
+    ["advanced options"]="Load a host blueprint or import an existing configuration."
     
     # Legacy (for backward compatibility)
-    ["install-a-predefined-profile"]="Choose from a list of ready-to-go system configurations tailored for specific use cases or hardware."
+    ["install-a-predefined-profile"]="Choose from a list of ready-to-go host blueprints tailored for specific use cases or hardware."
     ["configure-a-custom-setup"]="Select a base system (Desktop or Server) and then add specific features to customize your installation."
 
-    # System Presets (aktuell verwendete Presets)
+    # Install bases
     ["desktop"]="Base desktop (Plasma). Empty package set — add extras on the next screen."
     ["server"]="Minimal CLI server + SSH. Empty package set — add extras on the next screen."
     ["homelab server"]="Homelab defaults: docker, database, web-server. Adjust on the next screen, then hosting/users."
-    ["from scratch"]="No preset defaults. Pick system type, desktop environment, and packages yourself."
+    ["from scratch"]="No install-base defaults. Pick system type, desktop environment, and packages yourself."
     
-    # Device Presets
+    # Device targets
     ["jetson nano"]="Specialized setup for NVIDIA Jetson Nano, configured for AI/ML development, robotics, and GPU optimization."
     
     # Advanced Options
-    ["load profile from file"]="Load a custom profile configuration from a file path. Supports relative paths (profiles/name) or absolute paths."
-    ["show available profiles"]="Browse and select from available profile files in the profiles directory."
+    ["load host blueprint from file"]="Load a host blueprint from a file path. Relative paths resolve under host-blueprints/."
+    ["show available host blueprints"]="Browse and select from files in modes/host-blueprints/."
     ["import from existing config"]="Import settings from an existing system-config.nix file."
     
     # Desktop Environments (for Custom Install Step 2)
@@ -34,9 +35,10 @@ declare -g -A SETUP_DESCRIPTIONS=(
     # Desktop Features (neue Struktur)
     ["gaming"]="Steam, Heroic, Lutris, Discord (vesktop), MangoHud — main gaming launchers"
     ["streaming"]="Gaming streaming tools (OBS Studio, etc.)"
-    ["emulation"]="Retro gaming emulation (RetroArch, Dolphin, etc.)"
+    ["emulation"]="RetroArch emulation core (slim)"
     ["web-dev"]="Web development tools (Node.js, npm, IDEs, etc.)"
-    ["game-dev"]="Game development tools (engines, 3D modeling, etc.)"
+    ["game-engines"]="Game engines (Godot, Unity Hub, …)"
+    ["game-dev"]="DEPRECATED — use game-engines"
     ["python-dev"]="Python development environment"
     ["system-dev"]="System development tools (cmake, ninja, gcc, clang)"
 
@@ -61,10 +63,10 @@ declare -g -A SETUP_TYPES=(
     ["configure-a-custom-setup"]="Meta Selection"
     
     # System Presets
-    ["homelab server"]="System Preset"
+    ["homelab server"]="Install base"
     
     # Device Presets
-    ["jetson nano"]="Device Preset"
+    ["jetson nano"]="Device target"
     
     # Base Modes (für Custom Setup)
     ["desktop"]="Base System"
@@ -75,6 +77,7 @@ declare -g -A SETUP_TYPES=(
     ["streaming"]="Desktop Feature"
     ["emulation"]="Desktop Feature"
     ["web-dev"]="Desktop Feature"
+    ["game-engines"]="Desktop Feature"
     ["game-dev"]="Desktop Feature"
     ["python-dev"]="Desktop Feature"
     ["system-dev"]="Desktop Feature"
@@ -113,9 +116,10 @@ declare -g -A SETUP_FEATURES=(
     # Desktop Features
     ["gaming"]="Steam|Heroic (Epic/GOG)|Lutris|Vesktop (Discord)|MangoHud"
     ["streaming"]="OBS Studio|Streaming Tools|Performance Tweaks"
-    ["emulation"]="Multiple Emulators|Frontend Interface|Controller Support|Shader Caching"
+    ["emulation"]="RetroArch|Cores via userPackages|Controller Support"
     ["web-dev"]="Multiple Runtimes|IDEs & Editors|Debug Tools|Database Clients"
-    ["game-dev"]="Game Engines|Asset Creation Tools|3D Modeling Support|Debug Tools"
+    ["game-engines"]="Godot|Unity Hub|Engine tooling"
+    ["game-dev"]="Godot|Unity Hub|Engine tooling"
     ["python-dev"]="Python Environment|Testing Tools|Development Libraries"
     ["system-dev"]="Build Tools|Compilers|Development Utilities"
     

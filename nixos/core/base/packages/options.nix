@@ -14,28 +14,18 @@ in {
       description = "Packages module version";
     };
 
-    # Package modules list (V1 format - LEGACY)
+    # Feature sets / package modules (gaming, docker, web-dev, …)
     packageModules = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [];
-      description = "List of package modules to enable (docker, docker-rootless, gaming, etc.) - LEGACY: Use systemPackages/userPackages instead";
+      description = "List of package sets to enable (docker, gaming, web-dev, etc.). User-specific packages live under users.<name>.userPackages — not here.";
     };
 
-    # NEW: System-wide packages
+    # System-wide individual packages
     systemPackages = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [];
       description = "System-wide packages (installed for all users)";
-    };
-
-    # NEW: User-specific packages
-    userPackages = lib.mkOption {
-      type = lib.types.attrsOf (lib.types.listOf lib.types.str);
-      default = {};
-      description = "User-specific packages (installed via home-manager per user)";
-      example = {
-        username = ["vscode" "firefox" "discord"];
-      };
     };
 
     # Preset configuration

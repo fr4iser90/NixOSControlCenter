@@ -97,9 +97,9 @@ def load_options() -> InstallOptions:
             continue
         if not line or section is None:
             continue
-        if section == "SYSTEM_PRESETS":
+        if section == "INSTALL_BASES":
             opts.system_presets.append(line)
-        elif section == "DEVICE_PRESETS":
+        elif section == "DEVICE_TARGETS":
             opts.device_presets.append(line)
         elif section == "FEATURE_GROUPS":
             name, _, feats = line.partition(":")
@@ -118,7 +118,7 @@ def load_options() -> InstallOptions:
         elif section == "FEATURE_DEPENDENCIES":
             k, _, v = line.partition("=")
             opts.dependencies[k] = {x for x in v.split("|") if x}
-        elif section == "PRESET_DEFAULT_PACKAGES":
+        elif section == "INSTALL_BASE_DEFAULT_PACKAGES":
             k, _, v = line.partition("=")
             opts.preset_defaults[k] = [x for x in v.split() if x]
         elif section == "DESKTOP_BROWSERS":
@@ -196,12 +196,16 @@ def filter_feature_groups_for_system(
     return out
 
 
-def profiles_dir() -> Path:
+def host_blueprints_dir() -> Path:
     setup = os.environ.get("SETUP_DIR", "")
     if setup:
-        return Path(setup) / "modes" / "profiles"
+        return Path(setup) / "modes" / "host-blueprints"
     here = Path(__file__).resolve()
-    return here.parents[2] / "setup" / "modes" / "profiles"
+    return here.parents[2] / "setup" / "modes" / "host-blueprints"
+
+
+# Back-compat alias
+profiles_dir = host_blueprints_dir
 
 
 def write_answers(path: Path, data: Dict[str, str]) -> None:
@@ -773,7 +777,8 @@ class InstallWizard(tk.Tk):
 
     def _install_type_value(self, label: str) -> str:
         low = label.lower()
-        if "preset" in low:
+        # "Install bases" (and legacy "Presets")
+        if "install base" in low or "preset" in low:
             return "presets"
         if "custom" in low:
             return "custom"
@@ -782,10 +787,10 @@ class InstallWizard(tk.Tk):
     def _screen_welcome(self) -> None:
         self.header.configure(text="Install NixOS Control Center")
         self.subheader.configure(
-            text="Pick a preset (then tweak packages), or Advanced to load a profile."
+            text="Pick an install base (then tweak packages), or Advanced to load a host blueprint."
         )
         self.btn_next.configure(text="Next")
-        types = self.opts.install_types or ["Presets", "Advanced Options"]
+        types = self.opts.install_types or ["Install bases", "Advanced Options"]
         default = self._install_type_value(types[0])
         var = self._vars.setdefault("install_type", tk.StringVar(value=default))
         for label in types:
@@ -795,9 +800,9 @@ class InstallWizard(tk.Tk):
             self._option_row(self.body, title, value, var, desc)
 
     def _screen_presets(self) -> None:
-        self.header.configure(text="Choose a preset")
+        self.header.configure(text="Choose an install base")
         self.subheader.configure(
-            text="Next step: add or remove package modules. Homelab starts with docker/database/web-server."
+            text="Next: add or remove package sets. Homelab starts with docker/database/web-server."
         )
         self.btn_next.configure(text="Next")
         presets = self.opts.system_presets + self.opts.device_presets
@@ -826,7 +831,7 @@ class InstallWizard(tk.Tk):
             defaults = []
         else:
             self.subheader.configure(
-                text=f"Preset “{preset}” ({st}): defaults pre-checked. "
+                text=f"Install base “{preset}” ({st}): defaults pre-checked. "
                 f"Incompatible modules for this type are hidden."
             )
         self.btn_next.configure(text="Next")
@@ -994,24 +999,24 @@ class InstallWizard(tk.Tk):
 
     def _screen_advanced(self) -> None:
         self.header.configure(text="Advanced options")
-        self.subheader.configure(text="Load a known profile or import an existing systemConfig.")
+        self.subheader.configure(text="Load a host blueprint or import an existing systemConfig.")
         self.btn_next.configure(text="Next")
         var = self._vars.setdefault("advanced_action", tk.StringVar(value="profiles"))
         ttk.Radiobutton(
-            self.body, text="Browse available profiles", value="profiles", variable=var
+            self.body, text="Browse available host blueprints", value="profiles", variable=var
         ).pack(anchor="w", pady=4)
         ttk.Radiobutton(
-            self.body, text="Load profile from file…", value="file", variable=var
+            self.body, text="Load host blueprint from file…", value="file", variable=var
         ).pack(anchor="w", pady=4)
         ttk.Radiobutton(
             self.body, text="Import existing system config", value="import", variable=var
         ).pack(anchor="w", pady=4)
 
         self._vars.setdefault("profile_pick", tk.StringVar(value=""))
-        plist = profiles_dir()
+        plist = host_blueprints_dir()
         names = sorted(p.name for p in plist.iterdir() if p.is_file()) if plist.is_dir() else []
         if names:
-            ttk.Label(self.body, text="Profiles:", style="Sub.TLabel").pack(anchor="w", pady=(12, 4))
+            ttk.Label(self.body, text="Host blueprints:", style="Sub.TLabel").pack(anchor="w", pady=(12, 4))
             lb = tk.Listbox(
                 self.body,
                 height=min(8, len(names)),
@@ -1031,7 +1036,7 @@ class InstallWizard(tk.Tk):
                 else None,
             )
         else:
-            ttk.Label(self.body, text=f"No profiles in {plist}", style="Sub.TLabel").pack(anchor="w")
+            ttk.Label(self.body, text=f"No host blueprints in {plist}", style="Sub.TLabel").pack(anchor="w")
 
     def _screen_confirm(self) -> None:
         dry = os.environ.get("NCC_DRY_RUN", "").lower() in ("1", "true", "yes", "on")
@@ -1062,21 +1067,21 @@ class InstallWizard(tk.Tk):
         if action == "profiles":
             name = self._vars.get("profile_pick", tk.StringVar()).get()
             if not name:
-                messagebox.showinfo("Pick a profile", "Select a profile from the list.")
+                messagebox.showinfo("Pick a blueprint", "Select a host blueprint from the list.")
                 return None
-            path = profiles_dir() / name
+            path = host_blueprints_dir() / name
             if not path.is_file():
-                messagebox.showerror("Missing", f"Profile not found:\n{path}")
+                messagebox.showerror("Missing", f"Host blueprint not found:\n{path}")
                 return None
-            return f"LOAD_PROFILE:{path}"
+            return f"LOAD_BLUEPRINT:{path}"
         if action == "file":
             path = filedialog.askopenfilename(
-                title="Select profile file",
-                filetypes=[("Nix / profile", "*.nix *"), ("All", "*")],
+                title="Select host blueprint",
+                filetypes=[("Nix / blueprint", "*.nix *"), ("All", "*")],
             )
             if not path:
                 return None
-            return f"LOAD_PROFILE:{path}"
+            return f"LOAD_BLUEPRINT:{path}"
         cfg = os.environ.get("SYSTEM_CONFIG_FILE", "/etc/nixos/system-config.nix")
         monolith = os.environ.get("MONOLITH_FILE", "/etc/nixos/systemConfig.nix")
         for candidate in (monolith, cfg):

@@ -20,9 +20,10 @@ packages/
 ├── lib/                         # Utility functions
 │   └── metadata.nix            # Package metadata and dependencies
 └── components/                  # Package components
-    ├── base/                    # Base packages
-    ├── presets/                 # Preset configurations
-    └── sets/                    # Feature-based package sets
+    ├── base/                    # core + profile (desktop|server)
+    ├── sets/                    # Optional system modules (atoms)
+    ├── recipes/                 # System recipes → list of sets
+    └── user-presets/            # User presets → userPackages
 ```
 
 ### Package Organization
@@ -32,26 +33,16 @@ packages/
 - **server**: Essential server packages
 
 #### Feature Sets
-- **gaming**: Gaming packages and launchers
-- **streaming**: Streaming software
-- **emulation**: Emulator packages
-- **web-dev**: Web development tools
-- **python-dev**: Python development tools
-- **system-dev**: System development tools
-- **game-dev**: Game development tools
-- **docker**: Docker (root mode)
-- **docker-rootless**: Docker (rootless mode)
-- **podman**: Podman container runtime
-- **qemu-vm**: QEMU/KVM virtualization
-- **virt-manager**: Virtual machine manager
-- **database**: Database servers
-- **web-server**: Web server packages
-- **mail-server**: Mail server packages
+- **gaming** / **streaming** / **emulation** (slim RetroArch)
+- **web-dev** / **python-dev** / **system-dev** / **game-engines**
+- **docker** / **docker-rootless** / **podman**
+- **qemu-vm** / **virt-manager** (separate; recipe: virt-desktop)
+- **database** / **web-server** / **mail-server**
 
 #### Presets
-- **gaming-desktop**: Complete gaming environment
-- **dev-workstation**: Full development environment
-- **homelab-server**: Home server configuration
+- **gaming-desktop**, **dev-lean**, **virt-desktop**, **homelab-server**
+- User: **user-web-tools**, **user-python-tools**, **user-creative**
+- Legacy: **dev-workstation** (prefer dev-lean); **game-dev** remaps → **game-engines**
 
 ## Design Decisions
 
@@ -72,9 +63,9 @@ packages/
 ### Decision 3: Legacy Support
 
 **Context**: Need backward compatibility with old format
-**Decision**: Support both V1 (packageModules) and V2 (systemPackages/userPackages)
-**Rationale**: Smooth migration path, no breaking changes
-**Trade-offs**: More complex code, but better user experience
+**Decision**: V1 sets (`packageModules`) + global `systemPackages` + per-user `users.<name>.userPackages`
+**Rationale**: Clear global vs user scope; one SSOT for user packages on the user leaf
+**Trade-offs**: Sets remain module-based (may enable services), individual lists are nixpkgs names only
 
 ## Data Flow
 
@@ -96,7 +87,7 @@ User Config → options.nix → config.nix → Feature Resolution → Package Lo
 
 How other modules can extend this module:
 - Custom features can be added to `components/sets/`
-- Custom presets can be added to `components/presets/`
+- Custom recipes → `components/recipes/`; user-presets → `components/user-presets/`
 - Package metadata can be extended via `lib/metadata.nix`
 
 ## Performance Considerations

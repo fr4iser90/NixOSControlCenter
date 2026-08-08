@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, getModuleMetadata, ... }:
 
 let
   # Single Source: Modulname nur einmal definieren
@@ -17,6 +17,7 @@ in {
   imports = [
     ./options.nix
     (import ./config.nix { inherit config lib getModuleConfig moduleName; })
+    ./commands.nix
     ./components/gpu
     ./components/cpu
     ./components/memory

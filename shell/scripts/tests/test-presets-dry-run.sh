@@ -5,10 +5,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 SHELL_SCRIPTS="${ROOT}/shell/scripts"
-PRESETS_DIR="${SHELL_SCRIPTS}/setup/modes/presets"
-PROFILES_DIR="${SHELL_SCRIPTS}/setup/modes/profiles"
+INSTALL_BASES_DIR="${SHELL_SCRIPTS}/setup/modes/install-bases"
+HOST_BLUEPRINTS_DIR="${SHELL_SCRIPTS}/setup/modes/host-blueprints"
 PACKAGE_SETS_DIR="${ROOT}/nixos/core/base/packages/components/sets"
-PACKAGE_PRESETS_DIR="${ROOT}/nixos/core/base/packages/components/presets"
+PACKAGE_RECIPES_DIR="${ROOT}/nixos/core/base/packages/components/recipes"
+PACKAGE_USER_PRESETS_DIR="${ROOT}/nixos/core/base/packages/components/user-presets"
+
 
 PASS=0
 FAIL=0
@@ -57,11 +59,11 @@ export -f log_debug log_info log_warn log_error log_section log_success log_fail
 # shellcheck source=/dev/null
 source "${SHELL_SCRIPTS}/lib/dry-run.sh"
 # shellcheck source=/dev/null
-source "${SHELL_SCRIPTS}/setup/config/setup-preset-profile.sh"
+source "${SHELL_SCRIPTS}/setup/config/apply-install-template.sh"
 
 # ---------- Unit: parsers ----------
 echo "== Parser: desktop.nix =="
-DESKTOP="${PRESETS_DIR}/desktop.nix"
+DESKTOP="${INSTALL_BASES_DIR}/desktop.nix"
 assert_eq "desktop systemType" "$(parse_nix_value "$DESKTOP" "systemType")" "desktop"
 assert_eq "desktop packages empty" "$(parse_package_modules "$DESKTOP")" ""
 assert_eq "desktop env" "$(parse_desktop_env "$DESKTOP")" "plasma"
@@ -71,20 +73,20 @@ assert_eq "desktop timezone" "$(parse_nix_value "$DESKTOP" "timeZone")" "Europe/
 assert_eq "desktop hostName null" "$(parse_nix_value "$DESKTOP" "hostName")" "null"
 
 echo "== Parser: server.nix =="
-SERVER="${PRESETS_DIR}/server.nix"
+SERVER="${INSTALL_BASES_DIR}/server.nix"
 assert_eq "server systemType" "$(parse_nix_value "$SERVER" "systemType")" "server"
 assert_eq "server packages empty" "$(parse_package_modules "$SERVER")" ""
 assert_eq "server env empty" "$(parse_desktop_env "$SERVER")" ""
 
 echo "== Parser: fr4iser-jetson (Jetson Nano) =="
-JETSON="${PROFILES_DIR}/fr4iser-jetson"
+JETSON="${HOST_BLUEPRINTS_DIR}/fr4iser-jetson"
 assert_eq "jetson systemType" "$(parse_nix_value "$JETSON" "systemType")" "desktop"
-assert_eq "jetson packages" "$(parse_package_modules "$JETSON")" "streaming emulation game-dev web-dev"
+assert_eq "jetson packages" "$(parse_package_modules "$JETSON")" "streaming emulation game-engines web-dev"
 assert_eq "jetson env" "$(parse_desktop_env "$JETSON")" "plasma"
 
 echo "== Parser: fr4iser-home =="
-HOME_P="${PROFILES_DIR}/fr4iser-home"
-assert_eq "home packages" "$(parse_package_modules "$HOME_P")" "gaming streaming emulation game-dev web-dev"
+HOME_P="${HOST_BLUEPRINTS_DIR}/fr4iser-home"
+assert_eq "home packages" "$(parse_package_modules "$HOME_P")" "gaming streaming emulation game-engines web-dev"
 assert_eq "home env" "$(parse_desktop_env "$HOME_P")" "plasma"
 
 echo "== Parser: regression (empty + comments must not become modules) =="
@@ -180,15 +182,15 @@ assert_contains "gui empty clears modules" "$PKG_CONTENT" 'packageModules = [];'
 rm -f "$ANSWERS"
 unset NCC_GUI_ANSWERS_FILE
 
-# ---------- PRESET_DEFAULT_PACKAGES SSOT ----------
-echo "== PRESET_DEFAULT_PACKAGES =="
+# ---------- INSTALL_BASE_DEFAULT_PACKAGES SSOT ----------
+echo "== INSTALL_BASE_DEFAULT_PACKAGES =="
 # shellcheck source=/dev/null
 source "${SHELL_SCRIPTS}/ui/prompts/setup-options.sh"
-assert_eq "Desktop defaults" "${PRESET_DEFAULT_PACKAGES[Desktop]:-}" ""
-assert_eq "Server defaults" "${PRESET_DEFAULT_PACKAGES[Server]:-}" ""
-assert_eq "Homelab defaults" "${PRESET_DEFAULT_PACKAGES[Homelab Server]:-}" "docker database web-server"
-assert_eq "From Scratch defaults" "${PRESET_DEFAULT_PACKAGES[From Scratch]:-}" ""
-assert_eq "Jetson defaults" "${PRESET_DEFAULT_PACKAGES[Jetson Nano]:-}" ""
+assert_eq "Desktop defaults" "${INSTALL_BASE_DEFAULT_PACKAGES[Desktop]:-}" ""
+assert_eq "Server defaults" "${INSTALL_BASE_DEFAULT_PACKAGES[Server]:-}" ""
+assert_eq "Homelab defaults" "${INSTALL_BASE_DEFAULT_PACKAGES[Homelab Server]:-}" "docker database web-server"
+assert_eq "From Scratch defaults" "${INSTALL_BASE_DEFAULT_PACKAGES[From Scratch]:-}" ""
+assert_eq "Jetson defaults" "${INSTALL_BASE_DEFAULT_PACKAGES[Jetson Nano]:-}" ""
 
 # ---------- Feature modules exist as package sets ----------
 echo "== ALL_FEATURES package sets exist =="
@@ -205,8 +207,8 @@ for feat in "${ALL_FEATURES[@]}"; do
 done
 
 # ---------- Package component presets parse ----------
-echo "== packages/components/presets/*.nix =="
-for pf in "${PACKAGE_PRESETS_DIR}"/*.nix; do
+echo "== packages/components/recipes/*.nix =="
+for pf in "${PACKAGE_RECIPES_DIR}"/*.nix; do
     [[ -f "$pf" ]] || continue
     name=$(basename "$pf" .nix)
     mods=$(nix-instantiate --eval --strict -E "let p = import $pf; in builtins.concatStringsSep \" \" p.modules" 2>/dev/null | tr -d '"')
@@ -224,8 +226,8 @@ for pf in "${PACKAGE_PRESETS_DIR}"/*.nix; do
     fi
 done
 
-# ---------- Full setup_predefined_profile (temp + dry-run deploy) ----------
-echo "== setup_predefined_profile dry writes =="
+# ---------- Full apply_install_template (temp + dry-run deploy) ----------
+echo "== apply_install_template dry writes =="
 apply_and_check() {
     local label="$1" profile="$2" want_type="$3" want_pkgs="$4" want_env="$5"
     local run_tmp
@@ -244,8 +246,8 @@ apply_and_check() {
     deploy_config() { return 0; }
     export -f backup_file clean_old_configs deploy_config
 
-    if ! setup_predefined_profile "$profile" >/dev/null 2>&1; then
-        fail "$label setup_predefined_profile failed"
+    if ! apply_install_template "$profile" >/dev/null 2>&1; then
+        fail "$label apply_install_template failed"
         rm -rf "$run_tmp"
         return
     fi
@@ -288,8 +290,8 @@ apply_and_check() {
 
 apply_and_check "Desktop preset" "$DESKTOP" "desktop" "" "plasma"
 apply_and_check "Server preset" "$SERVER" "server" "" ""
-apply_and_check "Jetson profile" "$JETSON" "desktop" "streaming emulation game-dev web-dev" "plasma"
-apply_and_check "fr4iser-home" "$HOME_P" "desktop" "gaming streaming emulation game-dev web-dev" "plasma"
+apply_and_check "Jetson profile" "$JETSON" "desktop" "streaming emulation game-engines web-dev" "plasma"
+apply_and_check "fr4iser-home" "$HOME_P" "desktop" "gaming streaming emulation game-engines web-dev" "plasma"
 
 # ---------- Dry-run mode (no files under /etc, validates nix fragments) ----------
 echo "== NCC_DRY_RUN=1 write_packages_config =="

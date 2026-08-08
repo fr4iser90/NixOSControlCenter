@@ -46,7 +46,7 @@ add_desktop_branch() {
     # Development Features
     tree_ref+=("$TREE_INDENT$TREE_BRANCH Development Features")
     tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH web-dev")
-    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH game-dev")
+    tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH game-engines")
     tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_BRANCH python-dev")
     tree_ref+=("$TREE_INDENT$TREE_VERTICAL  $TREE_LAST system-dev")
     

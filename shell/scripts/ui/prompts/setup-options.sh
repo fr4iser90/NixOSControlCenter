@@ -6,27 +6,25 @@ declare -g -A MODULE_OPTIONS
 
 # Neue Struktur für die Auswahl
 INSTALL_TYPE_OPTIONS=(
-    "📦 Presets"
+    "📦 Install bases"
     "⚙️ Advanced Options"
 )
 
-# System Presets (öffentliche, wiederverwendbare Konfigurationen)
-# Each preset is customizable: after pick → optional extra packages (defaults below).
-SYSTEM_PRESETS=(
+# Install bases (Desktop/Server starters) — NOT package recipes/sets
+INSTALL_BASES=(
     "Desktop"
     "Server"
     "Homelab Server"
     "From Scratch"
 )
 
-# Device Presets (geräte-spezifische Konfigurationen)
-DEVICE_PRESETS=(
+# Device targets (hardware-specific install starters)
+DEVICE_TARGETS=(
     "Jetson Nano"
 )
 
-# Default package modules per preset (space-separated). Applied unless user removes them in GUI.
-# From Scratch / empty = no defaults (user picks everything).
-declare -A -g PRESET_DEFAULT_PACKAGES=(
+# Default package modules per install base (space-separated).
+declare -A -g INSTALL_BASE_DEFAULT_PACKAGES=(
     ["Desktop"]=""
     ["Server"]=""
     ["Homelab Server"]="docker database web-server"
@@ -36,25 +34,23 @@ declare -A -g PRESET_DEFAULT_PACKAGES=(
 
 # Advanced Options
 ADVANCED_OPTIONS=(
-    "📁 Load Profile from File"
-    "📋 Show Available Profiles"
+    "📁 Load host blueprint from file"
+    "📋 Show available host blueprints"
     "🔄 Import from Existing Config"
 )
 
-# Legacy: Für Backward Compatibility (wird nicht mehr in UI angezeigt)
-PREDEFINED_SERVER_PROFILES=(
+# Legacy lists (compat)
+LEGACY_SERVER_BLUEPRINTS=(
     "Homelab Server"
     "Fr4iser Jetson Nano"
 )
 
-# Desktop Profile (persönliche Profile entfernt - jetzt in Advanced Options)
-PREDEFINED_DESKTOP_PROFILES=(
+LEGACY_DESKTOP_BLUEPRINTS=(
 )
 
-# Combined for backward compatibility
-PREDEFINED_PROFILE_OPTIONS=(
-    "${PREDEFINED_SERVER_PROFILES[@]}"
-    "${PREDEFINED_DESKTOP_PROFILES[@]}"
+LEGACY_BLUEPRINT_OPTIONS=(
+    "${LEGACY_SERVER_BLUEPRINTS[@]}"
+    "${LEGACY_DESKTOP_BLUEPRINTS[@]}"
 )
 
 # Alle Features (17 Features: 3 Desktop-Envs + 14 Package Features)
@@ -62,7 +58,7 @@ ALL_FEATURES=(
     # Desktop Environments
     "plasma" "gnome" "xfce"
     # Development
-    "web-dev" "game-dev" "python-dev" "system-dev"
+    "web-dev" "game-engines" "python-dev" "system-dev"
     # Gaming & Media
     "gaming" "streaming" "emulation"
     # Containerization
@@ -76,7 +72,7 @@ ALL_FEATURES=(
 # Feature-Gruppen für UI (ohne Emojis - werden als Präfix verwendet)
 FEATURE_GROUPS=(
     "Desktop Environment:plasma|gnome|xfce"
-    "Development:web-dev|game-dev|python-dev|system-dev"
+    "Development:web-dev|game-engines|python-dev|system-dev"
     "Gaming & Media:gaming|streaming|emulation"
     "Containerization:docker|podman"
     "Services:database|web-server|mail-server"
@@ -115,15 +111,17 @@ DESKTOP_BROWSER_DEFAULT="firefox"
 
 # Legacy: Für Backward Compatibility (wird nicht mehr in UI angezeigt)
 declare -A -g SUB_OPTIONS=(
-    ["Desktop"]="None|gaming|streaming|emulation|web-dev|game-dev|python-dev|system-dev|docker|database|web-server"
+    ["Desktop"]="None|gaming|streaming|emulation|web-dev|game-engines|python-dev|system-dev|docker|database|web-server"
     ["Server"]="None|docker|database|web-server|mail-server"
 )
 
-# Preset-Optionen (für Preset-Auswahl)
-declare -a PRESET_OPTIONS=(
+# Package recipes (packages/components/recipes/) — NOT install bases
+declare -a PACKAGE_RECIPE_OPTIONS=(
     "gaming-desktop"
-    "dev-workstation"
+    "dev-lean"
+    "virt-desktop"
     "homelab-server"
+    "dev-workstation"
 )
 
 # Moduloptionen (veraltet, wird nicht mehr verwendet)
@@ -214,21 +212,21 @@ feature_allowed_for_system() {
 }
 
 export -a INSTALL_TYPE_OPTIONS
-export -a SYSTEM_PRESETS
-export -a DEVICE_PRESETS
+export -a INSTALL_BASES
+export -a DEVICE_TARGETS
 export -a ADVANCED_OPTIONS
-export -a PREDEFINED_PROFILE_OPTIONS
-export -a PREDEFINED_SERVER_PROFILES
-export -a PREDEFINED_DESKTOP_PROFILES
+export -a LEGACY_BLUEPRINT_OPTIONS
+export -a LEGACY_SERVER_BLUEPRINTS
+export -a LEGACY_DESKTOP_BLUEPRINTS
 export -a ALL_FEATURES
 export -a FEATURE_GROUPS
-export -a PRESET_OPTIONS
+export -a PACKAGE_RECIPE_OPTIONS
 export -A SUB_OPTIONS
 export -A MODULE_OPTIONS
 export -A EXCLUSIVE_GROUPS
 export -A FEATURE_DEPENDENCIES
 export -A FEATURE_CONFLICTS
-export -A PRESET_DEFAULT_PACKAGES
+export -A INSTALL_BASE_DEFAULT_PACKAGES
 export -A FEATURE_SYSTEM_TYPES
 export -f get_internal_name
 export -f get_display_name

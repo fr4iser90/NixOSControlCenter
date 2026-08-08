@@ -506,7 +506,7 @@ Item {
                                                     // Map display names to internal names
                                                     var featureMap = {
                                                         "Web Development": "web-dev",
-                                                        "Game Development": "game-dev",
+                                                        "Game Engines": "game-engines",
                                                         "Python Development": "python-dev",
                                                         "System Development": "system-dev",
                                                         "Streaming": "streaming",

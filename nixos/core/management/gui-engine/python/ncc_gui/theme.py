@@ -74,6 +74,10 @@ QPushButton:hover {
 QPushButton:disabled {
   color: palette(placeholder-text);
 }
+QPushButton#nccPrimaryButton {
+  border-color: palette(highlight);
+  font-weight: 700;
+}
 QComboBox, QLineEdit {
   border: 1px solid palette(mid);
   border-radius: 6px;

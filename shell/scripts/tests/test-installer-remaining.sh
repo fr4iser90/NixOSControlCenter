@@ -66,7 +66,7 @@ source "$LIB_DIR/dry-run.sh"
 # shellcheck source=/dev/null
 source "$LIB_DIR/utils.sh"
 # shellcheck source=/dev/null
-source "$SETUP_DIR/config/setup-preset-profile.sh"
+source "$SETUP_DIR/config/apply-install-template.sh"
 # shellcheck source=/dev/null
 source "$UI_DIR/gui/gui-lib.sh"
 # shellcheck source=/dev/null
@@ -177,12 +177,12 @@ stub_checks() {
 # ============================================================================
 echo "== export-options.sh SSOT =="
 EXP_OUT=$(bash "$UI_DIR/gui/export-options.sh")
-assert_contains "export SYSTEM_PRESETS" "$EXP_OUT" "[SYSTEM_PRESETS]"
+assert_contains "export INSTALL_BASES" "$EXP_OUT" "[INSTALL_BASES]"
 assert_contains "export Desktop" "$EXP_OUT" $'Desktop\n'
 assert_contains "export Homelab" "$EXP_OUT" "Homelab Server"
 assert_contains "export Jetson" "$EXP_OUT" "Jetson Nano"
 assert_contains "export From Scratch" "$EXP_OUT" "From Scratch"
-assert_contains "export PRESET_DEFAULTS" "$EXP_OUT" "[PRESET_DEFAULT_PACKAGES]"
+assert_contains "export PRESET_DEFAULTS" "$EXP_OUT" "[INSTALL_BASE_DEFAULT_PACKAGES]"
 assert_contains "export Homelab defaults" "$EXP_OUT" "Homelab Server=docker database web-server"
 assert_contains "export conflicts" "$EXP_OUT" "[FEATURE_CONFLICTS]"
 assert_contains "export docker↔podman" "$EXP_OUT" "docker=podman"
@@ -213,7 +213,7 @@ source "$SETUP_DIR/config/config-facade.sh"
 # shellcheck source=/dev/null
 source "$SETUP_DIR/config/config-writer.sh"
 stub_deploy
-setup_predefined_profile "$SETUP_DIR/modes/presets/desktop.nix" >/dev/null 2>&1 || fail "monolith desktop setup"
+apply_install_template "$SETUP_DIR/modes/install-bases/desktop.nix" >/dev/null 2>&1 || fail "monolith desktop setup"
 assert_file "monolith file exists" "$MONOLITH_FILE"
 MONO=$(cat "$MONOLITH_FILE")
 assert_contains "monolith systemType" "$MONO" 'systemType = "desktop"'
@@ -379,7 +379,7 @@ get_predefined_profile_file() {
         "Fr4iser Jetson Nano") profile_file="fr4iser-jetson" ;;
         *) return 1 ;;
     esac
-    local p="$SETUP_DIR/modes/profiles/$profile_file"
+    local p="$SETUP_DIR/modes/host-blueprints/$profile_file"
     [[ -f "$p" ]] || return 1
     echo "$p"
 }

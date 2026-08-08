@@ -11,7 +11,6 @@
 
     # Networking Tools
     bridge-utils  # Tools for managing network bridges
-    wget          # Downloading ISO images or other resources
 
     # Debugging Tools
     socat         # Multipurpose relay for QEMU monitor access

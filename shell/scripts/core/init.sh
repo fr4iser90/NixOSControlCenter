@@ -51,11 +51,11 @@ main() {
     
     log_info "Selected modules: $selected_modules_raw"
     
-    # Check for Advanced Options first (LOAD_PROFILE: or IMPORT_CONFIG:)
-    if [[ "$selected_modules_raw" =~ ^LOAD_PROFILE: ]]; then
-        # Load profile from file
-        local profile_path="${selected_modules_raw#LOAD_PROFILE:}"
-        setup_predefined_profile "$profile_path" || exit 1
+    # Check for Advanced Options first (LOAD_BLUEPRINT: / legacy LOAD_PROFILE: / IMPORT_CONFIG:)
+    if [[ "$selected_modules_raw" =~ ^LOAD_BLUEPRINT: ]] || [[ "$selected_modules_raw" =~ ^LOAD_PROFILE: ]]; then
+        local profile_path="${selected_modules_raw#LOAD_BLUEPRINT:}"
+        profile_path="${profile_path#LOAD_PROFILE:}"
+        apply_install_template "$profile_path" || exit 1
         
     elif [[ "$selected_modules_raw" =~ ^IMPORT_CONFIG: ]]; then
         # Import from existing config
@@ -88,13 +88,13 @@ main() {
     # Check if this is a predefined profile (legacy support)
     elif profile_file=$(get_predefined_profile_file "$selected_modules_raw"); then
         # This is a predefined profile - load it directly
-        setup_predefined_profile "$profile_file" || exit 1
+        apply_install_template "$profile_file" || exit 1
         
     elif [[ "$selected_modules_raw" == "Desktop" ]]; then
         # Desktop preset - load desktop preset file
-        local desktop_preset="$SETUP_DIR/modes/presets/desktop.nix"
+        local desktop_preset="$SETUP_DIR/modes/install-bases/desktop.nix"
         if [[ -f "$desktop_preset" ]]; then
-            setup_predefined_profile "$desktop_preset" || exit 1
+            apply_install_template "$desktop_preset" || exit 1
         else
             log_error "Desktop preset not found: $desktop_preset"
             exit 1
@@ -102,9 +102,9 @@ main() {
         
     elif [[ "$selected_modules_raw" == "Server" ]]; then
         # Server preset - load server preset file
-        local server_preset="$SETUP_DIR/modes/presets/server.nix"
+        local server_preset="$SETUP_DIR/modes/install-bases/server.nix"
         if [[ -f "$server_preset" ]]; then
-            setup_predefined_profile "$server_preset" || exit 1
+            apply_install_template "$server_preset" || exit 1
         else
             log_error "Server preset not found: $server_preset"
             exit 1
@@ -116,9 +116,9 @@ main() {
         
     elif [[ "$selected_modules_raw" == "Jetson Nano" ]]; then
         # Jetson Nano preset - load fr4iser-jetson profile
-        local jetson_profile="$SETUP_DIR/modes/profiles/fr4iser-jetson"
+        local jetson_profile="$SETUP_DIR/modes/host-blueprints/fr4iser-jetson"
         if [[ -f "$jetson_profile" ]]; then
-            setup_predefined_profile "$jetson_profile" || exit 1
+            apply_install_template "$jetson_profile" || exit 1
         else
             log_error "Jetson Nano profile not found: $jetson_profile"
             exit 1
@@ -184,7 +184,7 @@ get_predefined_profile_file() {
             ;;
     esac
     
-    local profile_path="$SETUP_DIR/modes/profiles/$profile_file"
+    local profile_path="$SETUP_DIR/modes/host-blueprints/$profile_file"
     if [[ -f "$profile_path" ]]; then
         echo "$profile_path"
         return 0

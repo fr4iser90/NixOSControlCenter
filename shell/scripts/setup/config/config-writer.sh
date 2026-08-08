@@ -225,8 +225,7 @@ write_packages_config() {
     fi
 
     write_module_config "core/base/packages" "{
-${modules_section}${sys_section}  userPackages = {};
-  docker.enable = false;
+${modules_section}${sys_section}  docker.enable = false;
   docker.root = null;
 }"
 }

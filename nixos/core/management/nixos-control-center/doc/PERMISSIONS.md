@@ -35,5 +35,12 @@ After writes, optional `--rebuild`. Elevation via helper; UI must not talk about
 | restricted-admin | yes | yes | yes | no |
 | admin | yes | yes | yes | yes |
 
-CLI: `ncc user list|show|whoami|create|set|delete`  
-See also: `user/api.nix` capabilities.
+## Packages GUI
+
+| Area | guest / virt | admin / restricted-admin |
+|------|--------------|--------------------------|
+| My packages (leaf) | read + write self | read + write |
+| System sets (`packageModules`) | read only | read + write |
+| System packages | hidden | read + write |
+
+Multi-select + batch Add/Remove. Elevation: user leaf via `ncc-priv-run`; system via kit `run_ncc_root` (sudo -n first).

@@ -84,7 +84,6 @@ let
   systemPackages = [
     ${packagesList}
   ];
-  userPackages = { };
 }
 '';
   
