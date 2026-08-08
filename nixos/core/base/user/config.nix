@@ -13,13 +13,14 @@ let
       "network.*" "hardware.*" "boot.*" "desktop.*" "audio.*" "localization.*"
     ];
     guest = [
-      "system.check.self" "user.read.self"
+      "system.check.self" "user.read.self" "package.user.self"
     ];
     restricted-admin = [
-      "system.update" "system.build" "system.check.*" "user.read.self" "network.read"
+      "system.update" "system.build" "system.check.*" "module.*" "user.*" "network.read"
+      "package.user.*" "package.system"
     ];
     virtualization = [
-      "system.check.self" "user.read.self" "package.docker" "package.podman"
+      "system.check.self" "user.read.self" "package.user.self" "package.docker" "package.podman"
     ];
   };
 

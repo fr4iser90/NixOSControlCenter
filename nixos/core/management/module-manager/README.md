@@ -8,9 +8,13 @@ The Module Manager module is a **core module** that is always active and manages
 
 ## Quick Start
 
-```nix
-# Module Manager is always active, no configuration needed
-# It automatically discovers and manages all modules
+```bash
+ncc modules                 # help
+ncc modules list --json
+ncc modules show homelab-manager
+sudo ncc modules enable homelab-manager
+sudo ncc modules disable some-feature --rebuild
+ncc modules --gui
 ```
 
 ## Features

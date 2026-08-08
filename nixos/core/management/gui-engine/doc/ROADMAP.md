@@ -12,12 +12,12 @@ Rich pages live **in each module** (`ui/gui/page.py` + `registerGuiPage`).
 | Domain | Page location | Notes |
 |--------|---------------|--------|
 | **kit** | `gui-engine` → `ncc_gui.scaffold.DomainPage` | Header → Content → Actions → Activity |
+| modules | `module-manager/ui/gui` | list / show / enable / disable |
 | packages | `core/base/packages/ui/gui` | catalog + modules |
 | system | `system-manager/ui/gui` | local/remote/channels sync + rebuild |
 | network | `core/base/network/ui/gui` | wifi form |
 | lock | `lock-manager/ui/gui` | snapshot / restore |
 | ai | `ncc-assistant/ui/gui` | chat / tools / jobs (+ DomainPage fallback) |
-| modules | `ncc-modules-gui` | separate binary |
 | ssh | `ssh-client-manager/ui/gui` | client list, embedded PTY |
 | hosts | `hosts/ui/gui` | fleet targets |
 | homelab | `homelab-manager/ui/gui` | status / stacks |

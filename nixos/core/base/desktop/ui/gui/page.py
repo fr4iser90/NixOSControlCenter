@@ -68,7 +68,7 @@ class DesktopPage(DomainPage):
         self.enable.setChecked(True)
         form.addRow("", self.enable)
 
-        self.add_actions_hint("Apply needs administrator rights (pkexec / sudo).")
+        self.add_actions_hint("Apply writes system settings. You may be asked to confirm.")
         self.do_rebuild = QCheckBox("Rebuild & switch after apply")
         self.do_rebuild.setChecked(True)
         self.add_actions_widget(self.do_rebuild)

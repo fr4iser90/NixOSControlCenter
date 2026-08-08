@@ -9,14 +9,20 @@ from PySide6.QtWidgets import QMainWindow
 from ncc_gui.app import ensure_app
 from ncc_gui.catalog import DomainInfo, load_domains
 from ncc_gui.pages.resolve import create_page_for
+from ncc_gui.reload import domain_relaunch_argv, install_generation_watcher
 
 
-def run_page(widget, title: str, argv=None) -> int:
+def run_page(widget, title: str, argv=None, *, domain_id: str | None = None) -> int:
     app = ensure_app(argv)
     win = QMainWindow()
     win.setWindowTitle(title)
     win.resize(960, 640)
     win.setCentralWidget(widget)
+    if domain_id:
+        install_generation_watcher(
+            relaunch_argv=domain_relaunch_argv(domain_id),
+            parent=win,
+        )
     win.show()
     return app.exec()
 
@@ -43,7 +49,7 @@ def main() -> int:
     # QApplication MUST exist before any QWidget (SshPage, etc.)
     ensure_app(sys.argv)
     info = _info_for(name)
-    return run_page(create_page_for(info), f"ncc {name}")
+    return run_page(create_page_for(info), f"ncc {name}", domain_id=name)
 
 
 if __name__ == "__main__":

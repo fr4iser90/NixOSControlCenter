@@ -27,9 +27,15 @@ in
   in ''
       ${casePattern}
       ${if permission != null then ''
-        # Get current user securely via UID (not spoofable)
-        current_uid=$(id -ru)
-        current_user=$(getent passwd "$current_uid" | cut -d: -f1)
+        # Prefer elevating identity (pkexec/sudo) — root itself is not an NCC role
+        if [ -n "''${PKEXEC_UID:-}" ]; then
+          current_user=$(getent passwd "$PKEXEC_UID" | cut -d: -f1)
+        elif [ -n "''${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+          current_user="$SUDO_USER"
+        else
+          current_uid=$(id -ru)
+          current_user=$(getent passwd "$current_uid" | cut -d: -f1)
+        fi
 
         # Fallback if getent fails
         if [ -z "$current_user" ]; then
@@ -56,14 +62,14 @@ in
             ;;
           "restricted-admin")
             case "${permission}" in
-              "system.update"|"system.build"|"system.check.*")
+              system.update|system.build|system.check.*|user.*|package.*|module.*|network.read)
                 permission_granted=true
                 ;;
             esac
             ;;
           "virtualization")
             case "${permission}" in
-              "system.check.self"|"user.read.self"|"package.docker"|"package.podman")
+              system.check.self|user.read.self|package.docker|package.podman|package.user.self)
                 permission_granted=true
                 ;;
             esac
@@ -71,7 +77,7 @@ in
           *)
             # Guest users
             case "${permission}" in
-              "system.check.self"|"user.read.self")
+              system.check.self|user.read.self|package.user.self)
                 permission_granted=true
                 ;;
             esac

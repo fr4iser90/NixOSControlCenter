@@ -1,12 +1,11 @@
+# Legacy launcher — prefer `ncc modules --gui` via domainGui + registerGuiPage.
+# Kept so older references to ncc-modules-gui still resolve.
 { pkgs, getModuleApi, config }:
 
 let
-  shared = (getModuleApi "gui-engine").domainGuiBundle pkgs config;
+  domainGui = (getModuleApi "gui-engine").domainGui pkgs config;
   nccModulesGui = pkgs.writeShellScriptBin "ncc-modules-gui" ''
-    set -euo pipefail
-    export PYTHONPATH="${shared.src}''${PYTHONPATH:+:$PYTHONPATH}"
-    export QT_QPA_PLATFORM="''${QT_QPA_PLATFORM:-xcb}"
-    exec ${shared.pythonEnv}/bin/python -m ncc_gui.domain_gui modules
+    exec ${domainGui}/bin/ncc-domain-gui modules "$@"
   '';
 in
 { inherit nccModulesGui; }

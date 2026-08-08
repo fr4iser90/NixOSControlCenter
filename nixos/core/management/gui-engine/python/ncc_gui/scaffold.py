@@ -242,27 +242,72 @@ class DomainPage(QWidget):
         label: str = "Apply",
         on_done: Callable[[int], None] | None = None,
     ) -> None:
-        """Async ``pkexec ncc …`` (or ``sudo -n``). Streams into Activity."""
-        if self.set_busy():
-            return
+        """Async elevated ``ncc …``. Prefer passwordless sudo, then pkexec.
+
+        Order (NOPASSWD admin must not see a password dialog):
+          1. already root → ``ncc`` directly
+          2. ``sudo -n`` works → ``sudo -n ncc …``
+          3. pkexec
+          4. interactive sudo
+        """
+        import os
+        import subprocess
 
         ncc = shutil.which("ncc") or "ncc"
-        if shutil.which("pkexec"):
-            program, argv = "pkexec", [ncc, *list(args)]
-        elif shutil.which("sudo"):
-            program, argv = "sudo", ["-n", ncc, *list(args)]
-        else:
-            error(self, label, "Need pkexec or sudo.")
-            return
+        argv_tail = list(args)
 
+        if os.geteuid() == 0:
+            program, argv = ncc, argv_tail
+        elif shutil.which("sudo") and subprocess.run(
+            ["sudo", "-n", "true"],
+            check=False,
+            capture_output=True,
+        ).returncode == 0:
+            program, argv = "sudo", ["-n", ncc, *argv_tail]
+        elif shutil.which("pkexec"):
+            program, argv = "pkexec", [ncc, *argv_tail]
+        elif shutil.which("sudo"):
+            program, argv = "sudo", [ncc, *argv_tail]
+        else:
+            error(self, label, "Need sudo or pkexec for this action.")
+            return
+        self._start_ncc_process(program, argv, label=label, on_done=on_done)
+
+    def run_ncc_async(
+        self,
+        args: Sequence[str],
+        *,
+        label: str = "Run",
+        on_done: Callable[[int], None] | None = None,
+        env: dict[str, str] | None = None,
+    ) -> None:
+        """Async ``ncc …`` as the current user (script may self-elevate via ncc-priv)."""
+        ncc = shutil.which("ncc") or "ncc"
+        self._start_ncc_process(ncc, list(args), label=label, on_done=on_done, env=env)
+
+    def _start_ncc_process(
+        self,
+        program: str,
+        argv: Sequence[str],
+        *,
+        label: str,
+        on_done: Callable[[int], None] | None,
+        env: dict[str, str] | None = None,
+    ) -> None:
+        if self.set_busy():
+            return
         self.log_append(f"• {label}\n")
         self._on_proc_done = on_done
         self._proc = QProcess(self)
         self._proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self._proc.readyReadStandardOutput.connect(self._on_root_out)
         self._proc.finished.connect(lambda code, _s: self._finish_root(code, label))
-        self._proc.setProcessEnvironment(QProcessEnvironment.systemEnvironment())
-        self._proc.start(program, argv)
+        pe = QProcessEnvironment.systemEnvironment()
+        if env:
+            for key, val in env.items():
+                pe.insert(key, val)
+        self._proc.setProcessEnvironment(pe)
+        self._proc.start(program, list(argv))
         if not self._proc.waitForStarted(5000):
             error(self, label, "Failed to start.")
             self._proc = None

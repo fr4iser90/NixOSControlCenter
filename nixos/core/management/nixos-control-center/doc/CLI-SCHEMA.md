@@ -79,7 +79,7 @@ Only for **legacy aliases** that already shipped (see §4). New public domains m
 |--------|--------------------------|-------|
 | `packages` | CLI help; `--gui` for Qt | |
 | `system` | CLI help; `--gui` / `--tui` | children under `system` |
-| `modules` | CLI help; `--gui` / `--tui` | |
+| `modules` | CLI help; `--gui` / `--tui`; `list`/`show`/`enable`/`disable` | |
 | `network` | CLI help; `--gui` / `--tui` | wifi under `network` |
 | `desktop` | CLI help; `--gui` / `--tui` | |
 | `user` | CLI help; `--gui` / `--tui` | |
@@ -112,8 +112,10 @@ ncc system build|update|report|allow-unfree|…
 ncc system config layout detect|convert …
 ncc system channel update|check …          # fold update-channels / check-release
 
-ncc modules …                              # TUI/GUI; enable|disable later
-ncc network wifi scan|list|status|connect|disconnect|forget
+ncc modules list [--json] | show NAME | enable|disable NAME [--rebuild]
+ncc network status [--json]
+ncc network wifi scan [--json]|list|status|connect|disconnect|forget|on|off
+ncc network ethernet status|disconnect|reconnect
 ncc lock discover|restore|fetch|restore-from-github …
 ncc vm status|list
 ncc vm test run <distro> …

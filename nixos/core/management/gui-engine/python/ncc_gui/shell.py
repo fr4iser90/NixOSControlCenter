@@ -184,6 +184,15 @@ class NccShell(QMainWindow):
                     self._nav.setCurrentRow(i)
                 return
 
+    def current_domain_id(self) -> str | None:
+        row = self._nav.currentRow()
+        if row < 0 or row >= len(self._nav_rows):
+            return None
+        nav = self._nav_rows[row]
+        if nav.kind == "domain" and nav.info is not None:
+            return nav.info.id
+        return None
+
     def _select_first_visible(self) -> None:
         for i, row in enumerate(self._nav_rows):
             if row.kind != "domain":

@@ -34,6 +34,7 @@ class ExamplePage(DomainPage):
         self.add_actions_hint("Apply needs admin rights.")
         self.add_actions_widget(QCheckBox("Rebuild after apply"))
         self.add_action("Apply", self._apply, primary=True)
+        # Example: prefer run_ncc_async when CLI self-elevates; else run_ncc_root (§10)
         self.add_action("Reload", self.reload)
 
     def reload(self):
@@ -53,8 +54,9 @@ class ExamplePage(DomainPage):
 | `add_action(label, slot, primary=False)` | Bordered button in Actions |
 | `log_append` / `log_write` / `log_clear` | Activity (ANSI stripped) |
 | `run_ncc(*args, follow_target=, need_confirm=…)` | Sync `ncc` (+ Target) + log |
-| `run_ncc_root(args, label=, on_done=)` | Async pkexec/sudo + stream log |
-| `set_busy()` | Guard while root process runs |
+| `run_ncc_async(args, label=, on_done=, env=)` | Async **as current user** (CLI may self-elevate via `ncc-priv-run`) |
+| `run_ncc_root(args, label=, on_done=)` | Async **elevated** `ncc` — see §10 elevation order |
+| `set_busy()` | Guard while a process runs |
 | `activity_max_height=None` | Tall Activity (e.g. System update) |
 
 Order is **fixed inside the kit**. Do not hand-roll a second vertical layout.
@@ -168,11 +170,23 @@ Reload = refresh **widgets** from `ncc <domain> status` (parse into fields). Do 
 4. Actions  
 5. Activity for command output  
 
-### C. List + detail (SSH, VM, Hosts, Packages)
+### C. List + CRUD (Users, SSH servers, …)
 
 1. Header  
-2. Split or stacked: **List** block + **Detail/Actions** block  
-3. Activity for long ops  
+2. Block **List** — pick one row  
+3. Actions — **Create…** / **Edit…** / **Delete…** / Refresh (+ rebuild checkbox if config write)  
+4. Activity for command output  
+
+**Create and Edit use the same modal shape** (one dialog class, `mode=create|edit`).  
+Do **not** mix: Create in a dialog + Edit as inline form on the page.
+
+| Field | Create | Edit |
+|-------|--------|------|
+| Identity (username, host, …) | editable | read-only |
+| Password (if any) | optional / required per domain | optional (“leave empty to keep”) |
+| Other settings | editable | editable |
+
+Confirm destructive actions with `confirm()`. Prefer `run_ncc_async` when the CLI self-elevates (`ncc-priv-run`); use `run_ncc_root` only when the GUI must elevate a plain `ncc` that does not.
 
 ### D. Generic fallback (`GenericDomainPage`)
 
@@ -220,6 +234,7 @@ Desktop entry: `ncc.desktop`, exec `ncc`, icon name `ncc` (hicolor from gui-engi
 - End-user wording: “Login screen”, “Dark theme”, “Apply” — not `display.manager`, `theme.dark`.
 - Dangerous / rebuild: always `confirm()` with plain consequences (“rebuild”, “re-login”).
 - Errors: `error()` + short Activity line; strip ANSI (`ncc_gui.ansi.strip_ansi`).
+- **Never** mention `pkexec`, `sudo`, or store paths in UI copy. Say “administrator rights” / “you may be asked to confirm” if needed.
 
 ---
 
@@ -229,6 +244,8 @@ Desktop entry: `ncc.desktop`, exec `ncc`, icon name `ncc` (hicolor from gui-engi
 - [ ] Settings/status are human-readable (no raw dump as main UI)
 - [ ] Actions via `add_action` / `add_actions_*`; Activity via `log_*` / `run_ncc*`
 - [ ] Activity empty until an action runs
+- [ ] List+CRUD: Create/Edit same modal pattern (§4.C) if applicable
+- [ ] Elevation via kit (§10); no pkexec-first; no pkexec in copy
 - [ ] `registerGuiPage` + optional `registerGuiDomain` with `group`
 - [ ] Works in root shell **and** `ncc <domain> --gui`
 - [ ] No imports of other modules’ pages; only `ncc_gui.*` kit
@@ -245,4 +262,39 @@ Desktop entry: `ncc.desktop`, exec `ncc`, icon name `ncc` (hicolor from gui-engi
 
 ---
 
-*Last updated: GUI design lock — Desktop and all new pages must match §2.*
+## 10. Elevation (binding — no password spam for NOPASSWD admins)
+
+Admins with passwordless sudo must **not** get a polkit/password dialog for every click.
+
+### `run_ncc_root` order (kit)
+
+1. Already root → run `ncc`  
+2. `sudo -n true` succeeds → `sudo -n ncc …`  
+3. else `pkexec ncc …`  
+4. else interactive `sudo ncc …`  
+
+### `run_ncc_async`
+
+Run `ncc` as the logged-in user. Prefer this when the CLI already elevates via **`ncc-priv-run`** (same sudo-n-first order). Used for Users account CRUD.
+
+### Forbidden
+
+- Preferring `pkexec` before `sudo -n` in new code  
+- Hardcoding `pkexec` / `sudo` strings in page subtitles or action hints  
+- Double elevation (GUI `pkexec` wrapping a command that itself calls `pkexec`) when `run_ncc_async` + `ncc-priv-run` is enough  
+
+---
+
+## 11. Consistency checklist (audit before merge)
+
+- [ ] Page uses `DomainPage`; vertical order §2  
+- [ ] Create/Edit both modals **or** both inline — never mixed (§4.C)  
+- [ ] Elevated actions use kit helpers with §10 order  
+- [ ] No `pkexec`/`sudo` in user-visible strings  
+- [ ] Guest/role gating: hide actions, don’t only fail after click  
+- [ ] At least one `admin` / `restricted-admin` remains (Users helper + Nix assertion)  
+- [ ] After `nixos-rebuild switch`, GUI reloads via generation watcher (no manual restart required)
+
+---
+
+*Last updated: elevation sudo-n-first, Users CRUD modals, consistency §10–11.*

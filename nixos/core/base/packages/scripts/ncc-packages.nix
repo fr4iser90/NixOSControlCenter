@@ -790,6 +790,10 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   }
 
   module_add() {
+      if [[ "$(id -u)" -ne 0 ]]; then
+          log_error "Changing package modules/sets requires administrator rights"
+          exit 1
+      fi
       local cfg
       cfg=$(get_modules_config_path)
 
@@ -825,6 +829,10 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   }
 
   module_remove() {
+      if [[ "$(id -u)" -ne 0 ]]; then
+          log_error "Changing package modules/sets requires administrator rights"
+          exit 1
+      fi
       local cfg
       cfg=$(get_modules_config_path)
       if [[ ! -f "$cfg" ]]; then
@@ -867,9 +875,24 @@ pkgs.writeShellScriptBin "ncc-packages" ''
               local target_user
               target_user=$(resolve_target_user)
               if [[ "$TARGET_SYSTEM" == true ]]; then
+                  if [[ "$(id -u)" -ne 0 ]]; then
+                      log_error "System packages require administrator rights"
+                      exit 1
+                  fi
                   add_package "$(get_system_config_path)" "$PACKAGE" "systemPackages"
               else
-                  add_package "$(get_user_config_path "$target_user")" "$PACKAGE" "userPackages"
+                  # Leaf write via ncc-priv (stays under systemConfig/users/<name>/)
+                  if command -v ncc-priv-run >/dev/null 2>&1; then
+                      local args=(user-pkg add "$PACKAGE" --user "$target_user")
+                      [[ "$AUTO_BUILD" == true ]] && args+=(--rebuild)
+                      ncc-priv-run "''${args[@]}"
+                      CONFIG_CHANGED=false
+                  elif [[ "$(id -u)" -eq 0 ]]; then
+                      add_package "$(get_user_config_path "$target_user")" "$PACKAGE" "userPackages"
+                  else
+                      log_error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"
+                      exit 1
+                  fi
               fi
               ;;
 
@@ -877,9 +900,23 @@ pkgs.writeShellScriptBin "ncc-packages" ''
               local target_user
               target_user=$(resolve_target_user)
               if [[ "$TARGET_SYSTEM" == true ]]; then
+                  if [[ "$(id -u)" -ne 0 ]]; then
+                      log_error "System packages require administrator rights"
+                      exit 1
+                  fi
                   remove_package "$(get_system_config_path)" "$PACKAGE" "systemPackages"
               else
-                  remove_package "$(get_user_config_path "$target_user")" "$PACKAGE" "userPackages"
+                  if command -v ncc-priv-run >/dev/null 2>&1; then
+                      local args=(user-pkg remove "$PACKAGE" --user "$target_user")
+                      [[ "$AUTO_BUILD" == true ]] && args+=(--rebuild)
+                      ncc-priv-run "''${args[@]}"
+                      CONFIG_CHANGED=false
+                  elif [[ "$(id -u)" -eq 0 ]]; then
+                      remove_package "$(get_user_config_path "$target_user")" "$PACKAGE" "userPackages"
+                  else
+                      log_error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"
+                      exit 1
+                  fi
               fi
               ;;
 

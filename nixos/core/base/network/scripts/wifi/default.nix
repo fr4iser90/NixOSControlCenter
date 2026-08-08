@@ -145,12 +145,13 @@ EOF
 ncc network wifi — WiFi management (NetworkManager)
 
 Usage:
-  ncc network wifi scan                  Scan for networks
+  ncc network wifi scan [--json]         Scan for networks
   ncc network wifi list                  List saved WiFi profiles
   ncc network wifi status                Show WiFi / connection status
   ncc network wifi connect <SSID>        Connect and save password (system-only)
   ncc network wifi disconnect            Disconnect WiFi
   ncc network wifi forget <name|SSID>    Remove profile + system secret
+  ncc network wifi on|off                Enable / disable WiFi radio
 
 Connect options:
   --psk <password>               Password on command line (avoid in shared history)
@@ -174,6 +175,14 @@ HELP
       connect) exec ${wifiConnect}/bin/ncc-wifi-connect "$@" ;;
       disconnect) exec ${wifiDisconnect}/bin/ncc-wifi-disconnect "$@" ;;
       forget) exec ${wifiForget}/bin/ncc-wifi-forget "$@" ;;
+      on|radio-on)
+        ${pkgs.networkmanager}/bin/nmcli radio wifi on
+        echo "wifi radio=enabled"
+        ;;
+      off|radio-off)
+        ${pkgs.networkmanager}/bin/nmcli radio wifi off
+        echo "wifi radio=disabled"
+        ;;
       *)
         echo "Unknown: ncc network wifi $cmd" >&2
         echo "Try: ncc network wifi help" >&2
@@ -186,15 +195,37 @@ HELP
   wifiScan = pkgs.writeShellScriptBin "ncc-wifi-scan" ''
     #!${pkgs.bash}/bin/bash
     ${commonShell}
+    JSON=false
+    for a in "$@"; do
+      case "$a" in --json|-j) JSON=true ;; esac
+    done
     dev="$(wifi_device)"
     if [ -z "$dev" ]; then
       echo "error: no WiFi device found" >&2
       exit 1
     fi
-    echo "Scanning on $dev ..."
+    if [ "$JSON" != true ]; then
+      echo "Scanning on $dev ..."
+    fi
     "$NMCLI" device wifi rescan ifname "$dev" 2>/dev/null || true
     sleep 2
-    "$NMCLI" -f IN-USE,SSID,BSSID,CHAN,SIGNAL,SECURITY device wifi list ifname "$dev"
+    if [ "$JSON" = true ]; then
+      "$NMCLI" -t -f IN-USE,SSID,SIGNAL,SECURITY device wifi list ifname "$dev" 2>/dev/null \
+        | ${pkgs.jq}/bin/jq -R -s -c '
+            split("\n")
+            | map(select(length>0))
+            | map(split(":"))
+            | map(select(length>=2 and .[1] != ""))
+            | map({
+                in_use: (.[0] == "*"),
+                ssid: .[1],
+                signal: (.[2] // ""),
+                security: (.[3] // "")
+              })
+          '
+    else
+      "$NMCLI" -f IN-USE,SSID,BSSID,CHAN,SIGNAL,SECURITY device wifi list ifname "$dev"
+    fi
   '';
 
   wifiList = pkgs.writeShellScriptBin "ncc-wifi-list" ''

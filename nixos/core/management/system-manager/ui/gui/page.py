@@ -28,7 +28,7 @@ class SystemPage(DomainPage):
         )
 
         tip = QLabel(
-            "Same as `sudo ncc system update`: copy modules into /etc/nixos "
+            "Same as `ncc system update`: copy modules into /etc/nixos "
             "(preserves systemConfig + hardware-configuration), optional rebuild."
         )
         tip.setObjectName("nccPageSubtitle")
@@ -90,7 +90,7 @@ class SystemPage(DomainPage):
         note = f"Status actions follow Target ({t}). " if t else ""
         self.set_subtitle(
             f"{note}Config sync (local/remote/channels) always runs on this machine "
-            "and needs root (pkexec/sudo)."
+            "and requires administrator rights."
         )
 
     def _start_sync(self, mode: str) -> None:

@@ -103,7 +103,8 @@ let
     actions = [];
   }) guiDomainAttrs;
 
-  # Stubs first, then commands overwrite (enabled domains win); preserve stub group
+  # Stubs first, then commands. Prefer registerGuiDomain label (sidebar name)
+  # over shortHelp-derived labels like "Enable/disable NCC modules".
   catalogById = lib.foldl' (acc: item:
     let
       prev = acc.${item.id} or {};
@@ -112,11 +113,16 @@ let
         if (item.actions or []) != []
         then item.actions
         else (prev.actions or []);
+      # Stub label wins when present (explicit GUI name)
+      label =
+        if (prev.label or "") != ""
+        then prev.label
+        else (item.label or item.id);
     in
       acc // {
         ${item.id} = {
           inherit (item) id;
-          label = item.label or prev.label or item.id;
+          inherit label;
           description = item.description or prev.description or "";
           enabled = if item ? enabled then item.enabled else (prev.enabled or false);
           inherit group actions;

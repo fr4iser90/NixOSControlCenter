@@ -11,6 +11,7 @@ let
     then (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi getModuleConfig; }).tuiScript
     else null;
   wifiCli = import ./scripts/wifi/default.nix { inherit pkgs; };
+  netCli = import ./scripts/network-status.nix { inherit pkgs; };
   domainGui = (getModuleApi "gui-engine").domainGui pkgs config;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
@@ -44,14 +45,19 @@ Usage:
   ncc network                 Help
   ncc network --gui           Domain GUI
   ncc network --tui           TUI (if enabled)
-  ncc network wifi scan|list|status|connect|disconnect|forget
+  ncc network status [--json]
+  ncc network wifi …          WiFi (scan/list/status/connect/…)
+  ncc network ethernet …      Wired (status/disconnect/reconnect)
 EOF
             ;;
         esac
         ;;
+      status) shift; exec ${netCli.statusScript}/bin/ncc-network-status "$@" ;;
+      wifi) shift; exec ${wifiCli.wifiRouter}/bin/ncc-wifi-router "$@" ;;
+      ethernet|eth) shift; exec ${netCli.ethernetRouter}/bin/ncc-ethernet-router "$@" ;;
       help|-h|--help) exec "$0" ;;
       *)
-        echo "Usage: ncc network [--gui|--tui] | ncc network wifi …" >&2
+        echo "Usage: ncc network [--gui|--tui] | status | wifi … | ethernet …" >&2
         exit 1
         ;;
     esac
@@ -80,8 +86,19 @@ in
           longHelp = ''
             ncc network                 CLI help
             ncc network --gui|--tui
+            ncc network status [--json]
             ncc network wifi …
+            ncc network ethernet …
           '';
+        }
+        {
+          name = "status";
+          parent = "network";
+          domain = "network";
+          description = "Network overview status";
+          category = "base";
+          script = "${netCli.statusScript}/bin/ncc-network-status";
+          shortHelp = "status - Overview (devices, online)";
         }
         {
           name = "wifi";
@@ -93,6 +110,17 @@ in
           type = "manager";
           shortHelp = "wifi - WiFi management";
           longHelp = "ncc network wifi scan|list|status|connect|disconnect|forget";
+        }
+        {
+          name = "ethernet";
+          parent = "network";
+          domain = "network";
+          description = "Ethernet / wired link";
+          category = "base";
+          script = "${netCli.ethernetRouter}/bin/ncc-ethernet-router";
+          type = "manager";
+          shortHelp = "ethernet - Wired link";
+          longHelp = "ncc network ethernet status|disconnect|reconnect";
         }
       ]
       ++ lib.optionals tuiOn [
