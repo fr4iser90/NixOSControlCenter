@@ -1,99 +1,45 @@
-"""Hosts domain — fleet targets from SSH client list (~/.creds)."""
+"""Hosts — DomainPage kit (fleet targets from SSH client list)."""
 
 from __future__ import annotations
 
-import subprocess
-
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QFormLayout,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QListWidget,
-    QListWidgetItem,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QLabel, QLineEdit, QListWidgetItem
 
 from ncc_gui.dialogs import confirm, error, info
+from ncc_gui.scaffold import DomainPage
 from ncc_gui.target_bar import TargetBar
 from ncc_gui.target_bus import bus as target_bus
-from ncc_gui.target_state import (
-    get_active_target,
-    list_host_pairs,
-    set_active_target,
-)
-from ncc_gui.theme import APP_STYLE
+from ncc_gui.target_state import get_active_target, list_host_pairs, set_active_target
 
 
-def _run(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["ncc", *args],
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-
-
-class HostsPage(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setStyleSheet(APP_STYLE)
-        root = QVBoxLayout(self)
-        root.setContentsMargins(20, 16, 20, 16)
-
-        title = QLabel("Hosts")
-        title.setObjectName("nccPageTitle")
-        root.addWidget(title)
-        sub = QLabel(
+class HostsPage(DomainPage):
+    def __init__(self, parent=None) -> None:
+        super().__init__(
+            "Hosts",
             "Fleet targets reuse the SSH client list (`~/.creds` / `ncc ssh client`). "
-            "Activate a host to set the global Target bar."
+            "Activate a host to set the global Target bar.",
+            parent=parent,
         )
-        sub.setObjectName("nccPageSubtitle")
-        sub.setWordWrap(True)
-        root.addWidget(sub)
-
         self.active = QLabel()
         self.active.setObjectName("nccPageSubtitle")
-        root.addWidget(self.active)
+        self.add_content_widget(self.active)
 
-        self.list = QListWidget()
+        _, self.list = self.add_list_block("Saved hosts")
         self.list.itemDoubleClicked.connect(lambda _i: self._use())
-        root.addWidget(self.list, stretch=1)
 
-        btns = QHBoxLayout()
-        use_btn = QPushButton("Use as target")
-        use_btn.clicked.connect(self._use)
-        local_btn = QPushButton("This machine")
-        local_btn.clicked.connect(self._use_local)
-        refresh = QPushButton("Refresh")
-        refresh.clicked.connect(self.reload)
-        btns.addWidget(use_btn)
-        btns.addWidget(local_btn)
-        btns.addWidget(refresh)
-        btns.addStretch(1)
-        root.addLayout(btns)
-
-        form = QFormLayout()
+        form = self.add_form_block("Add host")
         self.host_edit = QLineEdit()
         self.host_edit.setPlaceholderText("hostname or IP")
         self.user_edit = QLineEdit()
         self.user_edit.setPlaceholderText("user")
         form.addRow("Host", self.host_edit)
         form.addRow("User", self.user_edit)
-        root.addLayout(form)
-        add_row = QHBoxLayout()
-        add_btn = QPushButton("Add (ssh client)")
-        add_btn.clicked.connect(self._add)
-        rem_btn = QPushButton("Remove")
-        rem_btn.clicked.connect(self._remove)
-        add_row.addWidget(add_btn)
-        add_row.addWidget(rem_btn)
-        add_row.addStretch(1)
-        root.addLayout(add_row)
+
+        self.add_action("Use as target", self._use, primary=True)
+        self.add_action("This machine", self._use_local)
+        self.add_action("Add (ssh client)", self._add)
+        self.add_action("Remove", self._remove)
+        self.add_action("Refresh", self.reload)
 
         target_bus().changed.connect(lambda _t: self._refresh_active())
         self.reload()
@@ -154,10 +100,8 @@ class HostsPage(QWidget):
         if not host or not user:
             error(self, "Add", "Host and user required.")
             return
-        proc = _run("ssh", "client", "add", host, user)
-        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+        proc = self.run_ncc("ssh", "client", "add", host, user)
         if proc.returncode != 0:
-            error(self, "Add", out or "ncc ssh client add failed (is ssh-client enabled?)")
             return
         self.host_edit.clear()
         self.user_edit.clear()
@@ -175,10 +119,8 @@ class HostsPage(QWidget):
         host, _user, target = sel
         if not confirm(self, "Remove", f"Remove {target} from SSH client list?"):
             return
-        proc = _run("ssh", "client", "delete", host)
-        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+        proc = self.run_ncc("ssh", "client", "delete", host)
         if proc.returncode != 0:
-            error(self, "Remove", out or "delete failed")
             return
         if get_active_target() == target:
             self._use_local()
@@ -190,7 +132,7 @@ class HostsPage(QWidget):
                 bar.reload_hosts()
 
 
-def create_page() -> QWidget:
+def create_page() -> HostsPage:
     return HostsPage()
 
 

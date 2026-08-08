@@ -938,6 +938,7 @@ Module können mehrere UI-Formen unterstützen:
 - **fzf aus Scripts extrahieren**: Scripts enthalten nur reine Commands, UI-Logik in `ui/cli/fzf/`
 - **TUI via Engine**: `getModuleApi "tui-engine"`
 - **GUI via Engine**: `getModuleApi "gui-engine"` + `registerGuiPage` — **kein** Page-Code unter `gui-engine/python/ncc_gui/pages/`
+- **Layout SSOT**: `nixos/core/management/gui-engine/doc/GUI-DESIGN.md` (Header → Content → Actions → Activity)
 - **Sidebar-Gruppe**: `registerGuiDomain … group = "core" | "features"` (Core = immer-an Base/Management; Features = optionale Module)
 - **Web optional**: Nur wenn Modul Web-Service benötigt (wie nixify)
 - **Docker einsortieren**: `docker/` oder `ui/web/docker/` statt Root
@@ -985,17 +986,19 @@ ui/gui/
 └── page.py    # must export create_page() and/or Page
 ```
 
-**page.py** (uses core helpers only):
+**page.py** (uses gui-engine kit):
 ```python
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
-from ncc_gui.theme import APP_STYLE  # from gui-engine
+from PySide6.QtWidgets import QComboBox
+from ncc_gui.scaffold import DomainPage
 
-class ExamplePage(QWidget):
+class ExamplePage(DomainPage):
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setStyleSheet(APP_STYLE)
-        lay = QVBoxLayout(self)
-        lay.addWidget(QLabel("Example"))
+        super().__init__("Example", "Short end-user sentence.", parent=parent)
+        form = self.add_form_block("Settings")
+        self.mode = QComboBox()
+        form.addRow("Mode", self.mode)
+        self.add_action("Apply", self._apply, primary=True)
+        self.add_action("Reload", self.reload)
 
 def create_page():
     return ExamplePage()

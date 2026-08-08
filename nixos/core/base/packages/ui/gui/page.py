@@ -1,4 +1,4 @@
-"""Packages domain page — clearer end-user layout."""
+"""Packages — DomainPage kit (sets / presets)."""
 
 from __future__ import annotations
 
@@ -11,19 +11,15 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QGroupBox,
-    QHBoxLayout,
-    QLabel,
     QListWidget,
     QListWidgetItem,
-    QPushButton,
     QSplitter,
     QTextEdit,
     QVBoxLayout,
-    QWidget,
 )
 
 from ncc_gui.dialogs import confirm, confirm_rebuild, error, info
-from ncc_gui.theme import APP_STYLE
+from ncc_gui.scaffold import DomainPage
 
 
 def _packages_bin() -> str:
@@ -39,12 +35,10 @@ def _catalog_path() -> Path:
 
 def load_catalog() -> dict:
     catalog = _catalog_path()
-    # Preferred: build-time JSON (NCC_PACKAGES_CATALOG from mk-catalog-json.nix)
     if catalog.suffix == ".json" and catalog.is_file():
         return json.loads(catalog.read_text(encoding="utf-8"))
 
-    # Dev fallback: evaluate Nix SSOT in-tree (needs sibling metadata/sets/presets)
-    expr = f'(import {catalog} {{}})'
+    expr = f"(import {catalog} {{}})"
     proc = subprocess.run(
         ["nix-instantiate", "--eval", "--strict", "--json", "-E", expr],
         check=False,
@@ -82,45 +76,18 @@ def run_packages(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def maybe_rebuild(parent: QWidget, summary: str) -> None:
-    if not confirm_rebuild(parent, summary):
-        return
-    proc = subprocess.run(
-        ["sudo", "nixos-rebuild", "switch"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if proc.returncode != 0:
-        error(parent, "Rebuild failed", proc.stderr or proc.stdout or "unknown error")
-    else:
-        info(parent, "Rebuild", "System update finished.")
-
-
-class PackagesPage(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setStyleSheet(APP_STYLE)
+class PackagesPage(DomainPage):
+    def __init__(self, parent=None) -> None:
+        super().__init__(
+            "Packages",
+            "Turn software sets and presets on or off. Changes are written to your NixOS config; "
+            "rebuild when you are ready.",
+            parent=parent,
+        )
         self._catalog: dict = {"sets": [], "presets": []}
         self._active: set[str] = set()
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 16, 20, 16)
-
-        title = QLabel("Packages")
-        title.setObjectName("nccPageTitle")
-        layout.addWidget(title)
-        sub = QLabel(
-            "Turn software sets and presets on or off. Changes are written to your NixOS config; "
-            "rebuild when you are ready."
-        )
-        sub.setObjectName("nccPageSubtitle")
-        sub.setWordWrap(True)
-        layout.addWidget(sub)
-
         split = QSplitter(Qt.Orientation.Horizontal)
-        layout.addWidget(split, stretch=1)
-
         left = QGroupBox("Available")
         left_l = QVBoxLayout(left)
         self.available = QListWidget()
@@ -142,25 +109,21 @@ class PackagesPage(QWidget):
         right_l.addWidget(self.details)
         split.addWidget(right)
         split.setSizes([320, 280, 360])
+        self.add_content_widget(split, stretch=1)
 
-        btns = QHBoxLayout()
-        self.btn_refresh = QPushButton("Refresh")
-        self.btn_add = QPushButton("Add selected")
-        self.btn_remove = QPushButton("Remove selected")
-        self.btn_rebuild = QPushButton("Rebuild system…")
-        for b in (self.btn_refresh, self.btn_add, self.btn_remove):
-            btns.addWidget(b)
-        btns.addStretch(1)
-        btns.addWidget(self.btn_rebuild)
-        layout.addLayout(btns)
+        self.add_action("Add selected", self.add_selected, primary=True)
+        self.add_action("Remove selected", self.remove_selected)
+        self.add_action("Refresh", self.reload)
+        self.add_action("Rebuild system…", self._rebuild)
 
-        self.btn_refresh.clicked.connect(self.reload)
-        self.btn_add.clicked.connect(self.add_selected)
-        self.btn_remove.clicked.connect(self.remove_selected)
-        self.btn_rebuild.clicked.connect(lambda: maybe_rebuild(self, "Apply package changes."))
         self.available.currentItemChanged.connect(self._show_available_details)
         self.active_list.currentItemChanged.connect(self._show_active_details)
         self.reload()
+
+    def _rebuild(self) -> None:
+        if not confirm_rebuild(self, "Apply package changes."):
+            return
+        self.run_ncc_root(["system", "build", "switch"], label="Rebuild")
 
     def reload(self) -> None:
         try:
@@ -195,8 +158,7 @@ class PackagesPage(QWidget):
         if kind == "preset":
             mods = ", ".join(data.get("modules") or [])
             self.details.setPlainText(
-                f"{data['name']}\n\n{data.get('description') or ''}\n\n"
-                f"Includes: {mods}"
+                f"{data['name']}\n\n{data.get('description') or ''}\n\nIncludes: {mods}"
             )
         else:
             self.details.setPlainText(
@@ -234,9 +196,11 @@ class PackagesPage(QWidget):
         if proc.returncode != 0:
             error(self, "Add failed", proc.stderr or proc.stdout or "error")
             return
+        self.log_append(f"• Added {', '.join(names)}\n")
         info(self, "Added", "Saved to config. Rebuild when you want it active.")
         self.reload()
-        maybe_rebuild(self, f"Added: {', '.join(names)}")
+        if confirm_rebuild(self, f"Added: {', '.join(names)}"):
+            self.run_ncc_root(["system", "build", "switch"], label="Rebuild")
 
     def remove_selected(self) -> None:
         names = [i.text() for i in self.active_list.selectedItems()]
@@ -251,6 +215,15 @@ class PackagesPage(QWidget):
         if proc.returncode != 0:
             error(self, "Remove failed", proc.stderr or proc.stdout or "error")
             return
+        self.log_append(f"• Removed {', '.join(names)}\n")
         info(self, "Removed", "Saved to config.")
         self.reload()
-        maybe_rebuild(self, f"Removed: {', '.join(names)}")
+        if confirm_rebuild(self, f"Removed: {', '.join(names)}"):
+            self.run_ncc_root(["system", "build", "switch"], label="Rebuild")
+
+
+def create_page() -> PackagesPage:
+    return PackagesPage()
+
+
+Page = PackagesPage

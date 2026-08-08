@@ -1,8 +1,11 @@
-"""Shared stylesheet + helpers for end-user friendly NCC GUI."""
+"""Shared stylesheet + helpers for end-user friendly NCC GUI.
+
+Layout rules: see doc/GUI-DESIGN.md (binding).
+"""
 
 from __future__ import annotations
 
-# Avoid palette(mid) for body text — on Plasma dark it is often near-black.
+# Prefer palette() for Plasma light/dark. Buttons MUST have a visible border.
 APP_STYLE = """
 QMainWindow, QWidget#nccShellRoot {
   background: palette(window);
@@ -40,7 +43,6 @@ QLabel#nccPageSubtitle,
 QLabel#nccMuted {
   font-size: 13px;
   font-weight: 400;
-  /* window-text stays readable on Plasma dark; mid/placeholder often near-black */
   color: palette(window-text);
   padding-bottom: 8px;
 }
@@ -59,13 +61,26 @@ QGroupBox::title {
   color: palette(window-text);
 }
 QPushButton {
+  border: 1px solid palette(mid);
   border-radius: 8px;
   padding: 8px 14px;
   font-weight: 600;
+  background: palette(button);
   color: palette(button-text);
+}
+QPushButton:hover {
+  border-color: palette(highlight);
 }
 QPushButton:disabled {
   color: palette(placeholder-text);
+}
+QComboBox, QLineEdit {
+  border: 1px solid palette(mid);
+  border-radius: 6px;
+  padding: 4px 8px;
+  min-height: 24px;
+  color: palette(window-text);
+  background: palette(base);
 }
 QTextEdit#nccActivityLog {
   border: 1px solid palette(mid);

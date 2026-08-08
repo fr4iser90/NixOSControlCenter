@@ -1,49 +1,21 @@
-"""Network domain page with WiFi connect form."""
+"""Network — DomainPage kit (WiFi status + connect form)."""
 
 from __future__ import annotations
 
-import subprocess
+from PySide6.QtWidgets import QLineEdit
 
-from PySide6.QtWidgets import (
-    QFormLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
-
-from ncc_gui.dialogs import confirm, error, info
-from ncc_gui.pages.base import DomainActionsPage
-from ncc_gui.theme import APP_STYLE
+from ncc_gui.dialogs import confirm, info
+from ncc_gui.scaffold import DomainPage
 
 
-class NetworkPage(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setStyleSheet(APP_STYLE)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        actions = DomainActionsPage(
-            "network",
+class NetworkPage(DomainPage):
+    def __init__(self, parent=None) -> None:
+        super().__init__(
             "Network",
-            [
-                ("WiFi status", ("wifi", "status")),
-                ("Scan networks", ("wifi", "scan")),
-                ("Saved networks", ("wifi", "list")),
-                ("Disconnect", ("wifi", "disconnect")),
-            ],
-            subtitle="Check status or connect to a wireless network.",
-            confirm_labels=("Disconnect",),
+            "Check status or connect to a wireless network.",
+            parent=parent,
         )
-        layout.addWidget(actions)
-
-        # Connect form sits under actions; re-parent into page after actions stretch
-        box = QGroupBox("Connect to WiFi")
-        form = QFormLayout(box)
+        form = self.add_form_block("Connect to WiFi")
         self.ssid = QLineEdit()
         self.ssid.setPlaceholderText("Network name (SSID)")
         self.psk = QLineEdit()
@@ -51,14 +23,15 @@ class NetworkPage(QWidget):
         self.psk.setPlaceholderText("Password")
         form.addRow("Network", self.ssid)
         form.addRow("Password", self.psk)
-        row = QHBoxLayout()
-        connect_btn = QPushButton("Connect")
-        connect_btn.clicked.connect(self._connect)
-        row.addWidget(connect_btn)
-        row.addStretch(1)
-        form.addRow(row)
-        # Insert before stretch: add to outer layout
-        actions.layout().insertWidget(actions.layout().count() - 1, box)
+
+        self.add_action("Connect", self._connect, primary=True)
+        self.add_action("WiFi status", lambda: self.run_ncc("network", "wifi", "status"))
+        self.add_action("Scan networks", lambda: self.run_ncc("network", "wifi", "scan"))
+        self.add_action("Saved networks", lambda: self.run_ncc("network", "wifi", "list"))
+        self.add_action(
+            "Disconnect",
+            lambda: self.run_ncc("network", "wifi", "disconnect", need_confirm="Disconnect"),
+        )
 
     def _connect(self) -> None:
         ssid = self.ssid.text().strip()
@@ -71,18 +44,14 @@ class NetworkPage(QWidget):
             return
         if not confirm(self, "Connect", f"Connect to “{ssid}”?"):
             return
-        proc = subprocess.run(
-            ["ncc", "network", "wifi", "connect", ssid, "--psk", psk],
-            capture_output=True,
-            text=True,
-        )
-        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
-        if proc.returncode != 0:
-            error(self, "Could not connect", out or "Connection failed.")
-        else:
-            info(self, "Connected", out or f"Connected to {ssid}.")
+        proc = self.run_ncc("network", "wifi", "connect", ssid, "--psk", psk)
+        if proc.returncode == 0:
+            info(self, "Connected", f"Connected to {ssid}.")
             self.psk.clear()
 
 
 def create_page(parent=None):
     return NetworkPage(parent)
+
+
+Page = NetworkPage

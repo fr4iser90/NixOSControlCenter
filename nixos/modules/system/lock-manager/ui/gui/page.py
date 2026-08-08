@@ -1,49 +1,21 @@
-"""Lock domain page with discover / fetch / restore file picker."""
+"""Lock — DomainPage kit (snapshot / restore)."""
 
 from __future__ import annotations
 
-import subprocess
+from PySide6.QtWidgets import QCheckBox, QFileDialog, QHBoxLayout, QLineEdit, QPushButton, QWidget
 
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QFileDialog,
-    QFormLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QLineEdit,
-    QPushButton,
-    QWidget,
-)
-
-from ncc_gui.dialogs import confirm, error, info
-from ncc_gui.pages.base import DomainActionsPage
-from ncc_gui.theme import APP_STYLE
+from ncc_gui.dialogs import confirm, info
+from ncc_gui.scaffold import DomainPage
 
 
-class LockPage(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setStyleSheet(APP_STYLE)
-        layout = self.layout() if self.layout() else None
-        from PySide6.QtWidgets import QVBoxLayout
-
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-
-        actions = DomainActionsPage(
-            "lock",
+class LockPage(DomainPage):
+    def __init__(self, parent=None) -> None:
+        super().__init__(
             "Lock",
-            [
-                ("Create snapshot", ("discover",)),
-                ("List cloud snapshots", ("fetch", "--list")),
-            ],
-            subtitle="Back up desktop settings and restore them later.",
-            confirm_labels=("Create snapshot",),
+            "Back up desktop settings and restore them later.",
+            parent=parent,
         )
-        outer.addWidget(actions)
-
-        box = QGroupBox("Restore from a file")
-        form = QFormLayout(box)
+        form = self.add_form_block("Restore from a file")
         path_row = QHBoxLayout()
         self.path = QLineEdit()
         self.path.setPlaceholderText("Choose a snapshot file…")
@@ -51,7 +23,9 @@ class LockPage(QWidget):
         browse.clicked.connect(self._browse)
         path_row.addWidget(self.path, stretch=1)
         path_row.addWidget(browse)
-        form.addRow("Snapshot", path_row)
+        path_wrap = QWidget()
+        path_wrap.setLayout(path_row)
+        form.addRow("Snapshot", path_wrap)
 
         self.opt_all = QCheckBox("Everything")
         self.opt_all.setChecked(True)
@@ -62,12 +36,19 @@ class LockPage(QWidget):
         opts = QHBoxLayout()
         for w in (self.opt_all, self.opt_browsers, self.opt_ides, self.opt_desktop, self.opt_dry):
             opts.addWidget(w)
-        form.addRow("Include", opts)
+        opts_wrap = QWidget()
+        opts_wrap.setLayout(opts)
+        form.addRow("Include", opts_wrap)
 
-        restore_btn = QPushButton("Restore")
-        restore_btn.clicked.connect(self._restore)
-        form.addRow(restore_btn)
-        actions.layout().insertWidget(actions.layout().count() - 1, box)
+        self.add_action("Restore", self._restore, primary=True)
+        self.add_action(
+            "Create snapshot",
+            lambda: self.run_ncc("lock", "discover", need_confirm="Create snapshot"),
+        )
+        self.add_action(
+            "List cloud snapshots",
+            lambda: self.run_ncc("lock", "fetch", "--list"),
+        )
 
     def _browse(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -84,7 +65,7 @@ class LockPage(QWidget):
         if not snap:
             info(self, "Restore", "Choose a snapshot file first.")
             return
-        args = ["restore", "--snapshot", snap]
+        args: list[str] = ["lock", "restore", "--snapshot", snap]
         if self.opt_dry.isChecked():
             args.append("--dry-run")
         if self.opt_all.isChecked():
@@ -98,13 +79,11 @@ class LockPage(QWidget):
                 args.append("--desktop")
         if not confirm(self, "Restore", "Restore settings from this snapshot?"):
             return
-        proc = subprocess.run(["ncc", "lock", *args], capture_output=True, text=True)
-        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
-        if proc.returncode != 0:
-            error(self, "Restore failed", out or "Could not restore.")
-        else:
-            info(self, "Restore", out or "Done.")
+        self.run_ncc(*args)
 
 
 def create_page(parent=None):
     return LockPage(parent)
+
+
+Page = LockPage

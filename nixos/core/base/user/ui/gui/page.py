@@ -1,23 +1,14 @@
-"""User domain — list configured users / roles (this machine only)."""
+"""User — DomainPage kit (list configured users / roles)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
-    QListWidget,
-    QListWidgetItem,
-    QPushButton,
-    QTextEdit,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QListWidgetItem, QTextEdit, QVBoxLayout
 
 from ncc_gui.remote import run_ncc
-from ncc_gui.theme import APP_STYLE
+from ncc_gui.scaffold import DomainPage
 
 
 @dataclass(frozen=True)
@@ -46,40 +37,28 @@ def load_users() -> list[UserRow]:
     return rows
 
 
-class UserPage(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setStyleSheet(APP_STYLE)
-        root = QVBoxLayout(self)
-        root.setContentsMargins(20, 16, 20, 16)
-
-        title = QLabel("Users")
-        title.setObjectName("nccPageTitle")
-        root.addWidget(title)
-        sub = QLabel(
+class UserPage(DomainPage):
+    def __init__(self, parent=None) -> None:
+        super().__init__(
+            "Users",
             "Users on this machine (systemConfig). "
-            "Add or change users in systemConfig/users/ — GUI editing later."
+            "Add or change users in systemConfig/users/ — GUI editing later.",
+            activity=False,
+            parent=parent,
         )
-        sub.setObjectName("nccPageSubtitle")
-        sub.setWordWrap(True)
-        root.addWidget(sub)
-
-        row = QHBoxLayout()
-        refresh = QPushButton("Refresh")
-        refresh.clicked.connect(self.reload)
-        row.addWidget(refresh)
-        row.addStretch(1)
-        root.addLayout(row)
-
-        self.list = QListWidget()
+        _, self.list = self.add_list_block("Configured users")
         self.list.currentItemChanged.connect(self._on_select)
-        root.addWidget(self.list, stretch=1)
 
+        detail_box = self.add_block("Details")
+        dl = QVBoxLayout(detail_box)
         self.detail = QTextEdit()
         self.detail.setObjectName("nccActivityLog")
         self.detail.setReadOnly(True)
         self.detail.setMaximumHeight(120)
-        root.addWidget(self.detail)
+        self.detail.setPlaceholderText("Select a user…")
+        dl.addWidget(self.detail)
+
+        self.add_action("Refresh", self.reload, primary=True)
         self.reload()
 
     def reload(self) -> None:
@@ -104,7 +83,7 @@ class UserPage(QWidget):
         )
 
 
-def create_page() -> QWidget:
+def create_page() -> UserPage:
     return UserPage()
 
 

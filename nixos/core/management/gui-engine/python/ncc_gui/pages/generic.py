@@ -1,28 +1,10 @@
-"""Generic domain page — desktop UI for any module without a custom page.
-
-Shows useful domain verbs from the registry. Does not launch TUI/GUI
-wrappers: this page is already the GUI.
-"""
+"""Generic domain page — DomainPage kit + catalog actions."""
 
 from __future__ import annotations
 
-import subprocess
-
-from PySide6.QtWidgets import (
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QTextEdit,
-    QVBoxLayout,
-    QWidget,
-)
-
 from ncc_gui.catalog import DomainAction, DomainInfo
-from ncc_gui.dialogs import error
-from ncc_gui.theme import APP_STYLE
+from ncc_gui.scaffold import DomainPage
 
-# Launcher verbs — never show as primary GUI buttons
 _SKIP = frozenset({"tui", "gui", "manager"})
 
 
@@ -37,63 +19,35 @@ def _desktop_actions(info: DomainInfo) -> list[DomainAction]:
     return out
 
 
-class GenericDomainPage(QWidget):
-    def __init__(self, info: DomainInfo, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
+class GenericDomainPage(DomainPage):
+    def __init__(self, info: DomainInfo, parent=None) -> None:
+        super().__init__(
+            info.label,
+            info.description or f"Manage “{info.id}”.",
+            parent=parent,
+        )
         self.info = info
-        self.setStyleSheet(APP_STYLE)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 16, 20, 16)
-
-        title = QLabel(info.label)
-        title.setObjectName("nccPageTitle")
-        layout.addWidget(title)
-        sub = QLabel(info.description or f"Manage “{info.id}”.")
-        sub.setObjectName("nccPageSubtitle")
-        sub.setWordWrap(True)
-        layout.addWidget(sub)
-
         actions = _desktop_actions(info)
         if actions:
-            box = QGroupBox("Actions")
-            row = QHBoxLayout(box)
-            for action in actions:
-                btn = QPushButton(action.label)
-                btn.clicked.connect(
-                    lambda _=False, a=tuple(action.args), l=action.label: self._run(a, l)
+            for i, action in enumerate(actions):
+                self.add_action(
+                    action.label,
+                    lambda a=tuple(action.args), l=action.label: self._run(a, l),
+                    primary=(i == 0),
                 )
-                row.addWidget(btn)
-            row.addStretch(1)
-            layout.addWidget(box)
-
-            log_box = QGroupBox("Activity")
-            log_l = QVBoxLayout(log_box)
-            self.log = QTextEdit()
-            self.log.setObjectName("nccActivityLog")
-            self.log.setReadOnly(True)
-            self.log.setMaximumHeight(180)
-            log_l.addWidget(self.log)
-            layout.addWidget(log_box)
         else:
-            self.log = None
+            from PySide6.QtWidgets import QLabel
+
             hint = QLabel(
-                "No desktop controls for this area yet — the page will fill in "
-                "as module UIs are added.\n\n"
-                f"For scripting you can use:  ncc {info.id} …"
+                "No desktop controls for this area yet.\n\n"
+                f"For scripting:  ncc {info.id} …"
             )
             hint.setObjectName("nccMuted")
             hint.setWordWrap(True)
-            layout.addWidget(hint)
-
-        layout.addStretch(1)
+            self.add_content_widget(hint)
+            self._actions_box.setVisible(False)
+            if self._activity_box is not None:
+                self._activity_box.setVisible(False)
 
     def _run(self, args: tuple[str, ...], label: str) -> None:
-        cmd = ["ncc", self.info.id, *args]
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
-        pretty = out or ("Done." if proc.returncode == 0 else "Something went wrong.")
-        if self.log is not None:
-            self.log.append(f"• {label}\n{pretty}\n")
-        if proc.returncode != 0:
-            error(self, label, pretty)
+        self.run_ncc(self.info.id, *args)

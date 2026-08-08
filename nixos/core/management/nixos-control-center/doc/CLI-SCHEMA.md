@@ -193,7 +193,7 @@ When adding or renaming a command:
 - [ ] `domain` field matches the domain token
 - [ ] `longHelp` / script usage use `ncc …` only (never `ncc-foo`)
 - [ ] **No aliases**
-- [ ] GUI: top-level manager auto-appears in root shell; optional `registerGuiDomain`; rich UX via `registerGuiPage` + `ui/gui/page.py` in the **module**
+- [ ] GUI: `DomainPage` from `ncc_gui.scaffold` + `registerGuiPage`; see `gui-engine/doc/GUI-DESIGN.md`
 
 ---
 

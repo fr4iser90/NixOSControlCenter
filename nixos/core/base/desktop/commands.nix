@@ -1,4 +1,4 @@
-{ config, lib, pkgs, getModuleApi, getModuleConfig, ... }:
+{ config, lib, pkgs, getModuleApi, getModuleConfig, getModuleMetadata, ... }:
 
 let
   moduleName = baseNameOf ./.;
@@ -27,6 +27,10 @@ pinnedAppsAuto=${if cfg.pinnedAppsAuto or true then "true" else "false"}
 pinnedAppsForce=${if cfg.pinnedAppsForce or false then "true" else "false"}
 EOF
   '';
+
+  desktopSet = import ./scripts/desktop-set.nix {
+    inherit pkgs getModuleApi getModuleMetadata getModuleConfig moduleName;
+  };
 
   entry = pkgs.writeShellScriptBin "ncc-desktop-entry" ''
     set -euo pipefail
@@ -58,13 +62,15 @@ Usage:
   ncc desktop --gui           Domain GUI
   ncc desktop --tui           TUI (if enabled)
   ncc desktop status          Current module settings (key=value)
+  ncc desktop set …           Write settings (needs sudo; optional --rebuild)
 EOF
             ;;
         esac
         ;;
       status) exec ${desktopStatus}/bin/ncc-desktop-status ;;
+      set) shift; exec ${desktopSet}/bin/ncc-desktop-set "$@" ;;
       help|-h|--help) exec "$0" ;;
-      *) echo "Usage: ncc desktop [--gui|--tui] | ncc desktop status" >&2; exit 1 ;;
+      *) echo "Usage: ncc desktop [--gui|--tui] | status | set …" >&2; exit 1 ;;
     esac
   '';
 in
@@ -92,6 +98,7 @@ in
               ncc desktop                 CLI help
               ncc desktop --gui|--tui
               ncc desktop status
+              ncc desktop set … [--rebuild]
             '';
           }
           {
@@ -103,6 +110,20 @@ in
             script = "${desktopStatus}/bin/ncc-desktop-status";
             shortHelp = "status - Desktop settings";
             longHelp = "ncc desktop status";
+          }
+          {
+            name = "set";
+            parent = "desktop";
+            domain = "desktop";
+            description = "Write desktop settings to systemConfig";
+            category = "base";
+            script = "${desktopSet}/bin/ncc-desktop-set";
+            requiresSudo = true;
+            shortHelp = "set - Change desktop settings";
+            longHelp = ''
+              sudo ncc desktop set environment=plasma manager=sddm server=wayland dark=true
+              sudo ncc desktop set environment=gnome manager=gdm --rebuild
+            '';
           }
         ]
         ++ lib.optionals tuiOn [

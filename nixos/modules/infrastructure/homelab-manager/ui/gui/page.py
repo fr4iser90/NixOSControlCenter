@@ -1,78 +1,49 @@
-"""Homelab domain — Docker/Swarm status & stacks via global Target."""
+"""Homelab — DomainPage kit (Swarm / stacks via Target)."""
 
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QListWidget,
-    QListWidgetItem,
-    QPushButton,
-    QTextEdit,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QLabel, QListWidgetItem, QVBoxLayout
 
-from ncc_gui.dialogs import confirm, error
-from ncc_gui.remote import run_ncc, target_from_env
+from ncc_gui.ansi import strip_ansi
+from ncc_gui.remote import target_from_env
+from ncc_gui.scaffold import DomainPage
 from ncc_gui.target_bus import bus as target_bus
-from ncc_gui.theme import APP_STYLE
 
 
-class HomelabPage(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setStyleSheet(APP_STYLE)
-        root = QVBoxLayout(self)
-        root.setContentsMargins(20, 16, 20, 16)
-
-        title = QLabel("Homelab")
-        title.setObjectName("nccPageTitle")
-        root.addWidget(title)
-        sub = QLabel(
-            "Docker Swarm and stacks. Use the top Target bar to run "
-            "`ncc homelab` on your server (shared modules, different systemConfig)."
+class HomelabPage(DomainPage):
+    def __init__(self, parent=None) -> None:
+        super().__init__(
+            "Homelab",
+            "Docker Swarm and stacks. Use the top Target bar to run on your server "
+            "(shared modules, different systemConfig).",
+            parent=parent,
         )
-        sub.setObjectName("nccPageSubtitle")
-        sub.setWordWrap(True)
-        root.addWidget(sub)
+        status_box = self.add_block("Status")
+        sl = QVBoxLayout(status_box)
+        self.status = QLabel("—")
+        self.status.setObjectName("nccPageSubtitle")
+        self.status.setWordWrap(True)
+        sl.addWidget(self.status)
 
-        row = QHBoxLayout()
-        for label, args, need_confirm in (
-            ("Status", ("status",), False),
-            ("Refresh stacks", ("list-stacks",), False),
-            ("Init Swarm", ("init-swarm",), True),
-        ):
-            btn = QPushButton(label)
-            btn.clicked.connect(
-                lambda _=False, a=args, c=need_confirm, lab=label: self._run(a, c, lab)
-            )
-            row.addWidget(btn)
-        row.addStretch(1)
-        root.addLayout(row)
+        _, self.stacks = self.add_list_block("Stacks")
 
-        self.status = QTextEdit()
-        self.status.setObjectName("nccActivityLog")
-        self.status.setReadOnly(True)
-        self.status.setMaximumHeight(160)
-        root.addWidget(self.status)
-
-        box = QGroupBox("Stacks")
-        bl = QVBoxLayout(box)
-        self.stacks = QListWidget()
-        bl.addWidget(self.stacks)
-        root.addWidget(box, stretch=1)
+        self.add_action("Refresh", self.reload, primary=True)
+        self.add_action(
+            "Init Swarm",
+            lambda: self._run(("init-swarm",), "Init Swarm", confirm=True),
+        )
 
         target_bus().changed.connect(lambda _t: self.reload())
         self.reload()
 
     def reload(self) -> None:
-        t = target_from_env()
-        st = run_ncc("homelab", "status", target=t)
-        self.status.setPlainText(((st.stdout or "") + (st.stderr or "")).strip() or "(no status)")
-        ls = run_ncc("homelab", "list-stacks", target=t)
+        st = self.run_ncc("homelab", "status", follow_target=True, log=False, show_error=False)
+        text = strip_ansi(((st.stdout or "") + (st.stderr or "")).strip())
+        self.status.setText(text or "(no status)")
+        ls = self.run_ncc(
+            "homelab", "list-stacks", follow_target=True, log=False, show_error=False
+        )
         self.stacks.clear()
         out = (ls.stdout or "") + (ls.stderr or "")
         for line in out.splitlines():
@@ -88,19 +59,13 @@ class HomelabPage(QWidget):
         if ls.returncode != 0 and self.stacks.count() == 0:
             self.stacks.addItem(QListWidgetItem(out.strip() or "Cannot list stacks"))
 
-    def _run(self, args: tuple[str, ...], need_confirm: bool, label: str) -> None:
-        if need_confirm and not confirm(self, label, f"Run “{label}” on target?"):
-            return
-        proc = run_ncc("homelab", *args, target=target_from_env())
-        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
-        self.status.setPlainText(out or ("Done." if proc.returncode == 0 else "Failed."))
-        if proc.returncode != 0:
-            error(self, label, out or "Command failed.")
-        if args[0] in ("status", "list-stacks", "init-swarm"):
-            self.reload()
+    def _run(self, args: tuple[str, ...], label: str, *, confirm: bool = False) -> None:
+        need = label if confirm else None
+        self.run_ncc("homelab", *args, follow_target=True, need_confirm=need)
+        self.reload()
 
 
-def create_page() -> QWidget:
+def create_page() -> HomelabPage:
     return HomelabPage()
 
 

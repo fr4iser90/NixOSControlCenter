@@ -1,27 +1,32 @@
 # NCC GUI Engine — domain pages roadmap
 
+**Design SSOT:** [GUI-DESIGN.md](./GUI-DESIGN.md) — Header → Content → Actions → Activity.
+
 ## Architecture
 
 Rich pages live **in each module** (`ui/gui/page.py` + `registerGuiPage`).  
-`gui-engine` only provides shell / Target / theme / generic fallback.
+`gui-engine` provides the **kit** (`DomainPage` / scaffold), shell, Target, theme, generic fallback.
 
 ## Done
 
 | Domain | Page location | Notes |
 |--------|---------------|--------|
+| **kit** | `gui-engine` → `ncc_gui.scaffold.DomainPage` | Header → Content → Actions → Activity |
 | packages | `core/base/packages/ui/gui` | catalog + modules |
 | system | `system-manager/ui/gui` | local/remote/channels sync + rebuild |
 | network | `core/base/network/ui/gui` | wifi form |
 | lock | `lock-manager/ui/gui` | snapshot / restore |
-| ai | `ncc-assistant/ui/gui` | chat / tools / jobs |
+| ai | `ncc-assistant/ui/gui` | chat / tools / jobs (+ DomainPage fallback) |
 | modules | `ncc-modules-gui` | separate binary |
 | ssh | `ssh-client-manager/ui/gui` | client list, embedded PTY |
 | hosts | `hosts/ui/gui` | fleet targets |
 | homelab | `homelab-manager/ui/gui` | status / stacks |
 | vm | `vm/ui/gui` | domains + start/stop |
-| desktop | `desktop/ui/gui` | follows Target |
-| user | `user/ui/gui` | follows Target |
+| desktop | `desktop/ui/gui` | editable + rebuild |
+| user | `user/ui/gui` | list / detail |
 | chronicle | own app GUI | catalog stub |
+
+All listed rich pages subclass **`DomainPage`** (or embed assistant; fallback uses kit).
 
 ## Global Target (fleet)
 
