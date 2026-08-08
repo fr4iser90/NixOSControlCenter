@@ -19,7 +19,8 @@ from PySide6.QtWidgets import (
 )
 
 from ncc_gui.branding import app_icon
-from ncc_gui.catalog import DomainInfo
+from ncc_gui.catalog import DomainInfo, load_domains
+from ncc_gui.reload import generation_bus
 from ncc_gui.target_bar import TargetBar
 from ncc_gui.target_bus import bus as target_bus
 from ncc_gui.target_state import (
@@ -63,19 +64,23 @@ class NccShell(QMainWindow):
         self._nav = QListWidget()
         self._nav.setObjectName("nccNav")
         self._nav.setFixedWidth(200)
+        self._build_page = build_page
         self._infos = list(domains)
         self._local_enabled = {d.id: d.enabled for d in domains}
         self._pages: list[QWidget] = []
         self._nav_rows: list[_NavRow] = []
+        self._id_to_stack: dict[str, int] = {}
 
         # Build pages in catalog order (already core-then-features)
         for info in domains:
             page = build_page(info)
+            self._id_to_stack[info.id] = len(self._pages)
             self._pages.append(page)
             self._stack.addWidget(page)
 
         self._rebuild_nav()
         self._nav.currentRowChanged.connect(self._on_nav_row)
+        generation_bus().soft_switched.connect(self._on_soft_generation)
 
         self._target = TargetBar(
             hint="Which machine’s NCC you are using",
@@ -136,11 +141,7 @@ class NccShell(QMainWindow):
         self._nav_rows = []
 
         for group_id, title in (("core", "Core"), ("features", "Features")):
-            group_domains = [
-                (i, info)
-                for i, info in enumerate(self._infos)
-                if info.group == group_id
-            ]
+            group_domains = [info for info in self._infos if info.group == group_id]
             if not group_domains:
                 continue
 
@@ -154,7 +155,10 @@ class NccShell(QMainWindow):
             self._nav.addItem(hdr)
             self._nav_rows.append(_NavRow(kind="section"))
 
-            for stack_i, info in group_domains:
+            for info in group_domains:
+                stack_i = self._id_to_stack.get(info.id)
+                if stack_i is None:
+                    continue
                 item = QListWidgetItem(f"  {info.label}")
                 item.setFlags(
                     Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
@@ -211,6 +215,36 @@ class NccShell(QMainWindow):
         if item is None or item.isHidden() or (
             cur < len(self._nav_rows) and self._nav_rows[cur].kind == "section"
         ):
+            self._select_first_visible()
+
+    def _on_soft_generation(self) -> None:
+        """Catalog/modules changed, GUI kit same — refresh sidebar without re-exec."""
+        keep_id = self.current_domain_id()
+        new_infos = load_domains()
+        if not new_infos:
+            return
+
+        # Add pages for newly enabled domains (imports use refreshed PYTHONPATH).
+        for info in new_infos:
+            if info.id in self._id_to_stack:
+                continue
+            page = self._build_page(info)
+            self._id_to_stack[info.id] = len(self._pages)
+            self._pages.append(page)
+            self._stack.addWidget(page)
+
+        # Reorder catalog list; keep stack indices via id map.
+        self._infos = list(new_infos)
+        self._local_enabled = {d.id: d.enabled for d in new_infos}
+        self._rebuild_nav()
+        self._apply_nav_for_target(get_active_target())
+
+        if keep_id and any(
+            i.id == keep_id and self._local_enabled.get(keep_id, False)
+            for i in self._infos
+        ):
+            self.select_domain(keep_id)
+        else:
             self._select_first_visible()
 
     def _apply_nav_for_target(self, target: str | None) -> None:

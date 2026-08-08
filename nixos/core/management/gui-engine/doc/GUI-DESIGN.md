@@ -75,6 +75,7 @@ class ExamplePage(DomainPage):
 | `set_busy()` | Guard while a process runs |
 | `activity_max_height=None` | Tall Activity (e.g. System update) |
 | `commit_bar=False` | Rare opt-out (read-only tools) |
+| soft generation | `reload.generation_bus().soft_switched` → page `reload()`; Activity kept (§12) |
 
 Order is **fixed inside the kit**. Do not hand-roll a second vertical layout.
 
@@ -406,8 +407,23 @@ Run `ncc` as the logged-in user. Prefer this when the CLI already elevates via *
 - [ ] No `pkexec`/`sudo` in user-visible strings  
 - [ ] Guest/role gating: hide actions, don’t only fail after click  
 - [ ] At least one `admin` / `restricted-admin` remains (Users helper + Nix assertion)  
-- [ ] After `nixos-rebuild switch`, GUI reloads via generation watcher (no manual restart required)
+- [ ] After `nixos-rebuild switch`: **soft refresh** (page `reload()`, Activity kept) unless GUI store paths changed — then hard re-exec (§ generation watcher)
 
 ---
 
-*Last updated: PtyTerminal (pyte) for interactive SSH; Activity stays strip_ansi-only.*
+## 12. Generation switch (soft vs hard)
+
+`ncc_gui.reload.GenerationWatcher` polls `/run/current-system`.
+
+| Case | Behavior |
+|------|----------|
+| New generation, **same** `ncc_gui/` kit digest + Python env | Soft: refresh catalog/`PYTHONPATH`, shell nav, page `reload()`; **Activity stays** |
+| New generation, kit sources or Python env changed | Hard: persist Activity → `exec` new `ncc … --gui` |
+
+Fingerprint is **not** the `ncc` wrapper (that moves on every module toggle). Module enable/disable and config-only rebuilds soft-refresh. Hard restart only when gui-engine kit code (or PySide env) actually changed.
+
+Activity is also mirrored under `~/.cache/ncc/gui-activity/` so a hard re-exec can restore it.
+
+---
+
+*Last updated: soft generation refresh + Activity persistence; PtyTerminal for interactive SSH.*

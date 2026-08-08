@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 from ncc_gui.ansi import strip_ansi
 from ncc_gui.commit_bar import CommitController
 from ncc_gui.dialogs import confirm, error
+from ncc_gui.reload import generation_bus, load_activity, save_activity
 from ncc_gui.theme import APP_STYLE
 
 
@@ -57,6 +58,11 @@ class DomainPage(QWidget):
         self.setStyleSheet(APP_STYLE)
         self._proc: QProcess | None = None
         self._on_proc_done: Callable[[int], None] | None = None
+        # Persist Activity across hard GUI re-exec (generation watcher).
+        self._activity_key = (
+            "".join(c if c.isalnum() or c in "-_" else "-" for c in title.strip().lower())
+            or "page"
+        )
         self._root = QVBoxLayout(self)
         self._root.setContentsMargins(20, 16, 20, 16)
         self._root.setSpacing(8)
@@ -98,6 +104,12 @@ class DomainPage(QWidget):
                 self.log.setMaximumHeight(activity_max_height)
             log_l.addWidget(self.log)
             root.addWidget(self._activity_box, stretch=0)
+            restored = load_activity(self._activity_key)
+            if restored.strip():
+                self.log.setPlainText(restored)
+
+        # Soft generation switch: refresh widgets, keep Activity / window.
+        generation_bus().soft_switched.connect(self._on_soft_generation)
 
         # 4. Footer — domain buttons left, CommitBar (Undo/Save/Apply) bottom-right
         self._actions_box = QGroupBox("Actions")
@@ -223,14 +235,30 @@ class DomainPage(QWidget):
 
     # ----- activity -----
 
+    def _persist_activity(self) -> None:
+        if self.log is None:
+            return
+        save_activity(self._activity_key, self.log.toPlainText())
+
+    def _on_soft_generation(self) -> None:
+        """New NixOS generation, same GUI store paths — refresh data only."""
+        reload_fn = getattr(self, "reload", None)
+        if callable(reload_fn):
+            try:
+                reload_fn()
+            except Exception:
+                pass
+
     def log_clear(self) -> None:
         if self.log is not None:
             self.log.clear()
+            self._persist_activity()
 
     def log_append(self, text: str) -> None:
         if self.log is None:
             return
         self.log.append(strip_ansi(text))
+        self._persist_activity()
 
     def log_write(self, text: str) -> None:
         """Append without extra bullet formatting; strips ANSI."""
@@ -240,6 +268,7 @@ class DomainPage(QWidget):
         self.log.moveCursor(self.log.textCursor().MoveOperation.End)
         self.log.insertPlainText(plain)
         self.log.moveCursor(self.log.textCursor().MoveOperation.End)
+        self._persist_activity()
 
     # ----- run ncc -----
 
