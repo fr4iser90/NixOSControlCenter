@@ -78,6 +78,9 @@ QPushButton#nccPrimaryButton {
   border-color: palette(highlight);
   font-weight: 700;
 }
+QGroupBox#nccPageFooter {
+  margin-top: 4px;
+}
 QComboBox, QLineEdit {
   border: 1px solid palette(mid);
   border-radius: 6px;

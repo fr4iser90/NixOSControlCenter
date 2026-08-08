@@ -1,4 +1,4 @@
-# ncc hardware — status (configured + detected) and auto-detect toggle
+# ncc hardware — status (configured + detected enums + live probe) and auto-detect toggle
 { pkgs, getModuleMetadata }:
 
 let
@@ -7,7 +7,7 @@ let
 in
 pkgs.writeShellScriptBin "ncc-hardware" ''
   set -euo pipefail
-  export PATH="${pkgs.jq}/bin:${pkgs.coreutils}/bin:${pkgs.gnugrep}/bin:${pkgs.gnused}/bin:${pkgs.util-linux}/bin:${pkgs.pciutils}/bin:${pkgs.nix}/bin:$PATH"
+  export PATH="${pkgs.jq}/bin:${pkgs.coreutils}/bin:${pkgs.gawk}/bin:${pkgs.gnugrep}/bin:${pkgs.gnused}/bin:${pkgs.util-linux}/bin:${pkgs.pciutils}/bin:${pkgs.nix}/bin:$PATH"
 
   NIXOS_DIR="''${NIXOS_DIR:-/etc/nixos}"
   ${facade.sourcePreamble { nixosRoot = "/etc/nixos"; }}
@@ -23,8 +23,10 @@ Usage:
   ncc hardware status [--json]
   ncc hardware set autoDetect=true|false
 
-status   Configured CPU/GPU/RAM vs live detection; autoDetect (= system-manager.enableChecks)
+status   Configured enums vs check enums + live probe (models); autoDetect (= enableChecks)
 set      Toggle hardware auto-detection checks (writes enableChecks; needs root)
+
+Probe details are live-only (not written to systemConfig).
 EOF
   }
 
@@ -96,6 +98,59 @@ EOF
     fi
   }
 
+  # Live probe — human-readable; never written to systemConfig
+  probe_json() {
+    local model cores threads mhz_max kib exact_gb
+    model=$(lscpu 2>/dev/null | awk -F: '/Model name/ { sub(/^[ \t]+/, "", $2); print $2; exit }' || true)
+    [[ -n "$model" ]] || model="unknown"
+    cores=$(lscpu 2>/dev/null | awk -F: '/^Core\(s\) per socket/ { gsub(/[ \t]/,"",$2); c=$2 }
+      /^Socket\(s\)/ { gsub(/[ \t]/,"",$2); s=$2 }
+      END { if (c+0 > 0 && s+0 > 0) print c*s; else print 0 }' || echo 0)
+    threads=$(nproc 2>/dev/null || echo 0)
+    mhz_max=$(lscpu 2>/dev/null | awk -F: '/CPU max MHz/ { gsub(/[ \t]/,"",$2); print $2; exit }' || true)
+    [[ -n "$mhz_max" ]] || mhz_max="null"
+
+    kib=$(awk '/MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    exact_gb=$(awk -v k="$kib" 'BEGIN { printf "%.1f", k/1048576 }')
+
+    local gpus_json
+    gpus_json=$(
+      lspci -nn 2>/dev/null | grep -iE 'VGA|3D|Display' | while IFS= read -r line; do
+        # "00:02.0 VGA compatible controller [0300]: Intel Corporation ... [8086:xxxx] (rev xx)"
+        addr=$(echo "$line" | awk '{print $1}')
+        name=$(echo "$line" | sed -E 's/^[0-9a-f:.]+[[:space:]]+([^:]+:[[:space:]]*)?//; s/[[:space:]]*\[[0-9a-f]{4}:[0-9a-f]{4}\].*$//; s/[[:space:]]*\(rev [^)]*\)[[:space:]]*$//')
+        vendor="other"
+        echo "$line" | grep -qi 'NVIDIA\|10de:' && vendor="nvidia"
+        echo "$line" | grep -qiE 'AMD|ATI|1002:' && vendor="amd"
+        echo "$line" | grep -qi 'Intel\|8086:' && vendor="intel"
+        jq -nc --arg a "$addr" --arg n "$name" --arg v "$vendor" '{address:$a, name:$n, vendor:$v}'
+      done | jq -s '.'
+    )
+    [[ -n "$gpus_json" ]] || gpus_json='[]'
+
+    jq -nc \
+      --arg model "$model" \
+      --argjson cores "$cores" \
+      --argjson threads "$threads" \
+      --arg mhzMax "$mhz_max" \
+      --argjson exactGB "$exact_gb" \
+      --argjson kib "$kib" \
+      --argjson gpus "$gpus_json" \
+      '{
+        cpu: {
+          model: $model,
+          cores: $cores,
+          threads: $threads,
+          maxMHz: (if $mhzMax == "null" then null else ($mhzMax|tonumber) end)
+        },
+        gpus: $gpus,
+        ram: {
+          totalGiB: $exactGB,
+          totalKiB: $kib
+        }
+      }'
+  }
+
   cmd_status() {
     local json_out=false
     for a in "$@"; do
@@ -112,16 +167,18 @@ EOF
     ram_cfg=$(echo "$hw" | jq -r 'if .ram.sizeGB == null then "null" else (.ram.sizeGB|tostring) end')
     auto=$(echo "$sm" | jq -r 'if .enableChecks == false then "false" else "true" end')
 
-    local cpu_det gpu_det ram_det
+    local cpu_det gpu_det ram_det probed
     cpu_det=$(detect_cpu)
     gpu_det=$(detect_gpu)
     ram_det=$(detect_ram_gb)
+    probed=$(probe_json)
 
     if [[ "$json_out" == true ]]; then
       jq -nc \
         --arg cpuCfg "$cpu_cfg" --arg gpuCfg "$gpu_cfg" --arg ramCfg "$ram_cfg" \
         --arg cpuDet "$cpu_det" --arg gpuDet "$gpu_det" --argjson ramDet "$ram_det" \
         --argjson autoDetect "$( [[ "$auto" == true ]] && echo true || echo false )" \
+        --argjson probed "$probed" \
         '{
           autoDetect: $autoDetect,
           configured: {
@@ -138,7 +195,8 @@ EOF
             cpu: ($cpuCfg == $cpuDet),
             gpu: ($gpuCfg == $gpuDet),
             ram: (if $ramCfg == "null" then false else (($ramCfg|tonumber) == $ramDet) end)
-          }
+          },
+          probed: $probed
         }'
     else
       echo "autoDetect=$auto"
@@ -148,6 +206,16 @@ EOF
       echo "detected.cpu=$cpu_det"
       echo "detected.gpu=$gpu_det"
       echo "detected.ramGB=$ram_det"
+      echo "probed.cpu.model=$(echo "$probed" | jq -r '.cpu.model')"
+      echo "probed.cpu.cores=$(echo "$probed" | jq -r '.cpu.cores')"
+      echo "probed.cpu.threads=$(echo "$probed" | jq -r '.cpu.threads')"
+      echo "probed.cpu.maxMHz=$(echo "$probed" | jq -r '.cpu.maxMHz // "null"')"
+      echo "probed.ram.totalGiB=$(echo "$probed" | jq -r '.ram.totalGiB')"
+      local i n
+      n=$(echo "$probed" | jq '.gpus | length')
+      for ((i=0; i<n; i++)); do
+        echo "probed.gpu.$i=$(echo "$probed" | jq -r --argjson i "$i" '.gpus[$i] | "\(.vendor): \(.name)"')"
+      done
     fi
   }
 

@@ -16,7 +16,8 @@ The Hardware System module is a **core module** that manages hardware-specific c
 - **CLI / GUI**: `ncc hardware status [--json]`, `ncc hardware set autoDetect=…`, `ncc hardware --gui`
 
 Auto-detect is `system-manager.enableChecks` (default on). The Hardware GUI shows
-configured vs detected values and stages the autoDetect toggle via the CommitBar.
+configured vs detected **enums**, plus a live **probe** (CPU model, GPU names, RAM)
+from `ncc hardware status --json` → `probed`. Probe data is not stored in systemConfig.
 
 ## Documentation
 

@@ -1,6 +1,6 @@
 # NCC GUI Engine — domain pages roadmap
 
-**Design SSOT:** [GUI-DESIGN.md](./GUI-DESIGN.md) — Header → Content → Actions → Activity.
+**Design SSOT:** [GUI-DESIGN.md](./GUI-DESIGN.md) — Header → Content → Activity → Footer Actions.
 
 ## Architecture
 
@@ -11,7 +11,7 @@ Rich pages live **in each module** (`ui/gui/page.py` + `registerGuiPage`).
 
 | Domain | Page location | Notes |
 |--------|---------------|--------|
-| **kit** | `gui-engine` → `ncc_gui.scaffold.DomainPage` | Header → Content → Actions → Activity |
+| **kit** | `gui-engine` → `ncc_gui.scaffold.DomainPage` | Header → Content → Activity → Footer Actions |
 | modules | `module-manager/ui/gui` | list / show / enable / disable |
 | packages | `core/base/packages/ui/gui` | catalog + modules |
 | system | `system-manager/ui/gui` | local/remote/channels sync + rebuild |

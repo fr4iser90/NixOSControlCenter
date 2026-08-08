@@ -1,4 +1,4 @@
-"""NCC GUI page kit — enforces Header → Content → Actions → Activity.
+"""NCC GUI page kit — Header → Content → Activity → Footer (Actions).
 
 Use ``DomainPage`` for every domain ``ui/gui/page.py``. See doc/GUI-DESIGN.md.
 """
@@ -32,11 +32,11 @@ class DomainPage(QWidget):
     """
     Complete page scaffold from gui-engine.
 
-    Order is fixed:
+    Order is fixed (app-like footer):
       1. Header (title + subtitle)
-      2. Content blocks (``add_block`` / ``add_form_block`` / ``add_widget``)
-      3. Actions block (domain buttons + CommitBar: Undo / Save / Apply)
-      4. Activity log (optional)
+      2. Content blocks (stretch)
+      3. Activity log (optional)
+      4. Footer Actions — domain buttons left, CommitBar right (pinned bottom)
 
     Config writes go through ``self.commit`` (stage → Save/Undo → Apply).
     """
@@ -70,28 +70,12 @@ class DomainPage(QWidget):
         self._subtitle.setVisible(bool(subtitle))
         root.addWidget(self._subtitle)
 
-        # 2. Content
+        # 2. Content (fills remaining space above footer)
         self._content = QVBoxLayout()
         self._content.setSpacing(8)
-        root.addLayout(self._content, stretch=1 if activity_max_height is None else 0)
+        root.addLayout(self._content, stretch=1)
 
-        # 3. Actions — domain buttons left, CommitBar (Undo/Save/Apply) right
-        self._actions_box = QGroupBox("Actions")
-        self._actions_col = QVBoxLayout(self._actions_box)
-        self._button_row = QHBoxLayout()
-        self._actions_col.addLayout(self._button_row)
-        self._button_row.addStretch(1)
-        self._has_action_button = False
-        self.commit: CommitController | None = None
-        if commit_bar:
-            self.commit = CommitController(self)
-            self._button_row.addWidget(self.commit.bar)
-            self._actions_box.setVisible(True)
-        root.addWidget(self._actions_box)
-        if not commit_bar:
-            self._actions_box.setVisible(False)
-
-        # 4. Activity
+        # 3. Activity (above footer — not below the commit buttons)
         self._activity_box: QGroupBox | None = None
         self.log: QTextEdit | None = None
         if activity:
@@ -106,13 +90,24 @@ class DomainPage(QWidget):
             else:
                 self.log.setMaximumHeight(activity_max_height)
             log_l.addWidget(self.log)
-            root.addWidget(
-                self._activity_box,
-                stretch=1 if activity_max_height is None else 0,
-            )
+            root.addWidget(self._activity_box, stretch=0)
 
-        if activity_max_height is not None:
-            root.addStretch(1)
+        # 4. Footer — domain buttons left, CommitBar (Undo/Save/Apply) bottom-right
+        self._actions_box = QGroupBox("Actions")
+        self._actions_box.setObjectName("nccPageFooter")
+        self._actions_col = QVBoxLayout(self._actions_box)
+        self._button_row = QHBoxLayout()
+        self._actions_col.addLayout(self._button_row)
+        self._button_row.addStretch(1)
+        self._has_action_button = False
+        self.commit: CommitController | None = None
+        if commit_bar:
+            self.commit = CommitController(self)
+            self._button_row.addWidget(self.commit.bar)
+            self._actions_box.setVisible(True)
+        else:
+            self._actions_box.setVisible(False)
+        root.addWidget(self._actions_box, stretch=0)
 
     # ----- header -----
 

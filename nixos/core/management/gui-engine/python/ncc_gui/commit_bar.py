@@ -122,16 +122,17 @@ def offer_rebuild_after_apply(parent: QWidget | None, summary: str) -> bool:
 
 
 class CommitBar(QWidget):
-    """Always-visible footer controls: Undo · Save · Apply (right-aligned)."""
+    """Footer cluster: status + Undo · Save · Apply (sits bottom-right)."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
         self.status = QLabel("No pending changes")
         self.status.setObjectName("nccPageSubtitle")
-        self.status.setWordWrap(True)
-        row.addWidget(self.status, stretch=1)
+        self.status.setWordWrap(False)
+        row.addWidget(self.status)
         self.btn_undo = QPushButton("Undo")
         self.btn_save = QPushButton("Save")
         self.btn_apply = QPushButton("Apply")

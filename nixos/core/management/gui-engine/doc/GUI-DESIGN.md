@@ -106,6 +106,7 @@ ncc                          ncc desktop --gui
 ## 2. Mandatory page vertical order
 
 Every domain page stacks **top → bottom** in this order. No reordering.
+The footer stays **pinned to the bottom** of the page (app-like), not above Activity.
 
 ```text
 ┌─────────────────────────────────────────────┐
@@ -113,21 +114,20 @@ Every domain page stacks **top → bottom** in this order. No reordering.
 │    Title (#nccPageTitle)                    │
 │    Subtitle — 1–2 sentences, end-user speak │
 ├─────────────────────────────────────────────┤
-│ 2. CONTENT                                  │
+│ 2. CONTENT (stretch)                        │
 │    One or more BLOCKS (QGroupBox)           │
 │    Settings / Status / Lists / Forms        │
 │    Human labels — NEVER raw key=value dump  │
 ├─────────────────────────────────────────────┤
-│ 3. ACTIONS                                  │
-│    Exactly one QGroupBox titled "Actions"   │
-│    Left: domain buttons (Add, Refresh, …)   │
-│    Right (always): CommitBar                │
-│         Undo · Save · Apply                 │
-├─────────────────────────────────────────────┤
-│ 4. ACTIVITY (optional)                      │
+│ 3. ACTIVITY (optional)                      │
 │    QGroupBox "Activity" + #nccActivityLog   │
 │    Empty until the user runs an action      │
 │    Strip ANSI. Not a status dump on load.   │
+├─────────────────────────────────────────────┤
+│ 4. FOOTER / ACTIONS (pinned bottom)         │
+│    QGroupBox "Actions" (#nccPageFooter)     │
+│    Left: domain buttons (Add, Refresh, …)   │
+│    Right: CommitBar — status · Undo · Save · Apply │
 └─────────────────────────────────────────────┘
 ```
 
@@ -243,8 +243,8 @@ immediate on the left).
 
 1. Header  
 2. Block **Settings** — combos/toggles (stage into `self.commit` on change)  
-3. Block **Actions** — Reload (left) + CommitBar Undo/Save/Apply (right)  
-4. Activity — only after Apply/Reload commands  
+3. Activity — only after Apply/Reload commands  
+4. Footer **Actions** — Reload (left) + CommitBar Undo/Save/Apply (right)  
 
 Reload = refresh **widgets** from `ncc <domain> status` (parse into fields). Do **not** dump status text into Activity on load.
 
@@ -260,8 +260,8 @@ Reload = refresh **widgets** from `ncc <domain> status` (parse into fields). Do 
 
 1. Header  
 2. Block **List** — live rows + **draft/pending** rows from staged Create/Edit/Delete  
-3. Actions — **Create…** / **Edit…** / **Delete…** / Refresh (left) + CommitBar (right)  
-4. Activity for command output (after Apply / refresh — not on Create click)
+3. Activity for command output (after Apply / refresh — not on Create click)  
+4. Footer Actions — **Create…** / **Edit…** / **Delete…** / Refresh (left) + CommitBar (right)
 
 **Create and Edit use the same modal shape** (one dialog class, `mode=create|edit`).  
 Do **not** mix: Create in a dialog + Edit as inline form on the page.
@@ -292,7 +292,7 @@ Prefer `run_ncc_async` when the CLI self-elevates (`ncc-priv-run`); use `run_ncc
 ### D. Immediate tool pages (System update, VM runtime, …)
 
 Same vertical layout, but primary buttons are **allowlisted immediate** actions
-(§2.1). CommitBar stays (unused unless the page also has config drafts).
+(§2.1). CommitBar stays in the **page footer** (below Activity), bottom-right (`commit_bar=False` only for pure read-only tools).
 Confirm destructive/build actions; stream output into Activity.
 
 ### E. Generic fallback (`GenericDomainPage`)
@@ -347,7 +347,7 @@ Desktop entry: `ncc.desktop`, exec `ncc`, icon name `ncc` (hicolor from gui-engi
 
 ## 8. Checklist for a new `ui/gui/page.py`
 
-- [ ] `DomainPage` kit; Header → Content → Actions → Activity; no raw dump as main UI
+- [ ] `DomainPage` kit; Header → Content → Activity → Footer Actions; no raw dump as main UI
 - [ ] Settings/status are human-readable (no raw dump as main UI)
 - [ ] Config writes draft-first: UI shows pending + CommitBar (`stage` → Apply → `notify_apply_finished`)
 - [ ] No Create/Add that already runs `ncc` before Apply; no ad-hoc rebuild checkbox
@@ -408,4 +408,4 @@ Run `ncc` as the logged-in user. Prefer this when the CLI already elevates via *
 
 ---
 
-*Last updated: SSH + Hosts draft-first; offer_rebuild=False for non-Nix writes.*
+*Last updated: page footer order Header → Content → Activity → Actions (CommitBar bottom-right).*

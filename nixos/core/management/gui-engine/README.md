@@ -54,7 +54,7 @@ domainGui = gui.domainGui pkgs config;
 
 | Location | Responsibility |
 |----------|----------------|
-| `scaffold.DomainPage` | Header → Content → Actions → Activity |
+| `scaffold.DomainPage` | Header → Content → Activity → Footer Actions |
 | `shell` / Target / catalog | Root `ncc` chrome only |
 | `<module>/ui/gui/page.py` | Domain fields + actions |
 | `assets/ncc-icon.*` | App icon |
