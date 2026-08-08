@@ -78,6 +78,15 @@ QPushButton#nccPrimaryButton {
   border-color: palette(highlight);
   font-weight: 700;
 }
+QToolButton#nccHeaderAction {
+  border: 1px solid palette(mid);
+  border-radius: 8px;
+  padding: 6px;
+  background: palette(button);
+}
+QToolButton#nccHeaderAction:hover {
+  border-color: palette(highlight);
+}
 QGroupBox#nccPageFooter {
   margin-top: 4px;
 }
@@ -96,6 +105,15 @@ QTextEdit#nccActivityLog {
   color: palette(window-text);
   font-family: monospace;
   font-size: 11px;
+}
+QTextEdit#nccPtyTerminal {
+  border: 1px solid palette(mid);
+  border-radius: 8px;
+  background: #0d1117;
+  color: #e5e5e5;
+  font-family: monospace;
+  font-size: 10pt;
+  padding: 6px;
 }
 QFrame#nccDisabledBanner {
   background: palette(alternate-base);

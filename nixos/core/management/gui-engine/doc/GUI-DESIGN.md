@@ -66,6 +66,7 @@ class ExamplePage(DomainPage):
 | `add_content_widget` / `add_content_layout` | Splitters, lists, custom |
 | `add_actions_hint` / `add_actions_widget` | Text / checkboxes in Actions |
 | `add_action(label, slot, primary=False)` | Domain button (left of CommitBar) |
+| `add_header_action(slot, tooltip=, icon=)` | Compact header control (e.g. settings gear → modal) |
 | `self.commit` | CommitBar: Undo / Save / Apply (§2.1) |
 | `log_append` / `log_write` / `log_clear` | Activity (ANSI stripped) |
 | `run_ncc(*args, follow_target=, need_confirm=…)` | Sync `ncc` (+ Target) + log |
@@ -219,7 +220,8 @@ immediate on the left).
 | **Primary button** | `QPushButton#nccPrimaryButton` | CommitBar **Apply** (config); or allowlisted immediate (e.g. System update) |
 | **Secondary button** | `QPushButton` | Create… / Refresh / domain ops that **stage**, or Undo/Save |
 | **List** | `QListWidget` | Pick one of many (hosts, VMs, stacks) |
-| **Activity log** | `QTextEdit#nccActivityLog` | Command output only |
+| **Activity log** | `QTextEdit#nccActivityLog` | Non-interactive command output only (`strip_ansi`) |
+| **PTY terminal** | `ncc_gui.pty_terminal.PtyTerminal` (`#nccPtyTerminal`) | Interactive SSH/shell — pyte VT + colors; **never** dump into Activity |
 | **Dialogs** | `ncc_gui.dialogs` | `confirm` / `error` / `info` — never invent custom modal chrome |
 | **Banner** | `QFrame#nccDisabledBanner` | Module off / not on target |
 
@@ -408,4 +410,4 @@ Run `ncc` as the logged-in user. Prefer this when the CLI already elevates via *
 
 ---
 
-*Last updated: page footer order Header → Content → Activity → Actions (CommitBar bottom-right).*
+*Last updated: PtyTerminal (pyte) for interactive SSH; Activity stays strip_ansi-only.*

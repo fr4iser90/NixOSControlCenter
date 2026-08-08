@@ -24,6 +24,9 @@ let
   enableDesktopScript = import ./scripts/enable-desktop.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   updateDesktopConfig = import ./scripts/update-desktop-config.nix { inherit config lib pkgs systemConfig; };
   allowUnfreeScript = import ./scripts/allow-unfree.nix { inherit pkgs getModuleApi; };
+  systemStatusScript = import ./scripts/ncc-system-status.nix {
+    inherit pkgs getModuleMetadata;
+  };
   
   # Import config migration and validation
   # CLI APIs - elegant registration
@@ -124,6 +127,7 @@ in {
           enableDesktopScript
           updateDesktopConfig
           allowUnfreeScript
+          systemStatusScript
         ] ++ lib.optionals (cfg.components.configMigration.enable or false) [
           configMigration.check.configCheck
           configMigration.validator.validateSystemConfig
@@ -162,6 +166,24 @@ in {
       }
       ]
       ++ [
+      {
+        name = "status";
+        domain = "system";
+        parent = "system";
+        description = "Show system-manager overview (layout, systemType, configVersion)";
+        category = "system";
+        script = "${systemStatusScript}/bin/ncc-system-status";
+        arguments = [ "--json" ];
+        shortHelp = "status - System config overview";
+        longHelp = ''
+          Read core.management.system-manager via the config facade
+          (monolith or split). Used by the System GUI status panel.
+
+          Examples:
+            ncc system status
+            ncc system status --json
+        '';
+      }
       {
         name = "allow-unfree";
         domain = "system";

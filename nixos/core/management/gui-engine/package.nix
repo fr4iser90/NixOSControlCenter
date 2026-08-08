@@ -2,7 +2,7 @@
 { pkgs }:
 
 let
-  pythonEnv = pkgs.python3.withPackages (ps: with ps; [ pyside6 ]);
+  pythonEnv = pkgs.python3.withPackages (ps: with ps; [ pyside6 pyte ]);
   src = pkgs.runCommand "ncc-gui-engine-src" { } ''
     mkdir -p $out/ncc_gui/assets
     cp -r ${./python/ncc_gui}/. $out/ncc_gui/

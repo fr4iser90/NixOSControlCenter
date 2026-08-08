@@ -17,7 +17,9 @@ from PySide6.QtWidgets import (
     QLabel,
     QListWidget,
     QPushButton,
+    QStyle,
     QTextEdit,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -60,10 +62,15 @@ class DomainPage(QWidget):
         self._root.setSpacing(8)
         root = self._root
 
-        # 1. Header
+        # 1. Header (title + optional trailing controls, then subtitle)
+        self._header_row = QHBoxLayout()
         heading = QLabel(title)
         heading.setObjectName("nccPageTitle")
-        root.addWidget(heading)
+        self._header_row.addWidget(heading, stretch=1)
+        self._header_trailing = QHBoxLayout()
+        self._header_trailing.setSpacing(6)
+        self._header_row.addLayout(self._header_trailing)
+        root.addLayout(self._header_row)
         self._subtitle = QLabel(subtitle)
         self._subtitle.setObjectName("nccPageSubtitle")
         self._subtitle.setWordWrap(True)
@@ -114,6 +121,32 @@ class DomainPage(QWidget):
     def set_subtitle(self, text: str) -> None:
         self._subtitle.setText(text)
         self._subtitle.setVisible(bool(text.strip()))
+
+    def add_header_action(
+        self,
+        slot: Callable[[], None],
+        *,
+        tooltip: str = "Settings",
+        icon: str | None = "configure",
+    ) -> QToolButton:
+        """Compact header control (e.g. settings gear) — not an Actions footer button."""
+        btn = QToolButton()
+        btn.setToolTip(tooltip)
+        btn.setAutoRaise(True)
+        btn.setObjectName("nccHeaderAction")
+        from PySide6.QtGui import QIcon
+
+        qicon = QIcon.fromTheme(icon or "configure")
+        if qicon.isNull():
+            qicon = QIcon.fromTheme("preferences-system")
+        if qicon.isNull():
+            qicon = self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView)
+        btn.setIcon(qicon)
+        if qicon.isNull():
+            btn.setText("…")
+        btn.clicked.connect(lambda _=False: slot())
+        self._header_trailing.addWidget(btn)
+        return btn
 
     # ----- content -----
 
