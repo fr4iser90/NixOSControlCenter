@@ -130,7 +130,8 @@ let
     export NCC_ASSISTANT_MCP_SERVERS_JSON='${mcpServersJson}'
     export NCC_ASSISTANT_MCP_SERVERS_FILE="${mcpServersFile}"
 
-    # Per-module ai/ tools (build-time discovery)
+    # Per-module ai/ tools (build-time discovery). Drop inherited stub JSON.
+    unset NCC_ASSISTANT_DOMAIN_TOOLS_JSON || true
     export NCC_ASSISTANT_DOMAIN_TOOLS_FILE="${domainAi.indexFile}"
 
     # Agent configuration

@@ -89,6 +89,9 @@ class AgentRunner:
 
     def _build_system_prompt(self) -> str:
         """Build system prompt for agent mode."""
+        from .memory import for_prompt
+        from .registry import tools_prompt_section
+
         base = self.settings.load_system_prompt()
 
         agent_context = f"""
@@ -114,12 +117,15 @@ You are running in agent mode to accomplish a specific goal.
 4. If you encounter an error, try to recover or report the issue via agent_finish
 
 """
-        from .memory import for_prompt
+        tools_ctx = tools_prompt_section(
+            allow_write=self._profile.allow_write,
+            allow_rebuild=self._profile.allow_rebuild,
+        )
         memory_context = for_prompt(limit=10, max_chars=2000)
         if memory_context:
             agent_context += f"\n{memory_context}\n"
 
-        return base + agent_context
+        return base + agent_context + tools_ctx
 
     def _log_event(self, event: JobEvent) -> None:
         """Log event to job store."""
@@ -324,7 +330,10 @@ You are running in agent mode to accomplish a specific goal.
             yield {"kind": "tool", "name": name, "args": args}
             self._log_event(JobEvent(kind="tool", data={"name": name, "args": args}))
 
-            result = self._call_tool(name, args)
+            from .registry import get_registry
+
+            canonical = get_registry().resolve_name(name) or name
+            result = self._call_tool(canonical, args)
 
             payload = json.dumps(result, ensure_ascii=False, indent=2)
             if len(payload) > 6000:

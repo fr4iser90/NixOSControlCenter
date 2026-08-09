@@ -99,6 +99,16 @@ def mcp_servers_file() -> Path:
     return config_home() / "mcp-servers.json"
 
 
+def preferences_file() -> Path:
+    """Path to preferences.json (last model / provider)."""
+    return config_home() / "preferences.json"
+
+
+def providers_file() -> Path:
+    """Path to providers.json (user LLM endpoints)."""
+    return config_home() / "providers.json"
+
+
 def credentials_file() -> Path:
     """Path to credentials.json (exists in auth.py, aliased here)."""
     return config_home() / "credentials.json"

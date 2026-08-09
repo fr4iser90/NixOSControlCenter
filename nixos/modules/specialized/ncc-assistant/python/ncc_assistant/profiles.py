@@ -152,7 +152,7 @@ def is_mutating_tool(tool_name: str) -> bool:
     try:
         from .registry import get_registry
 
-        entry = get_registry().get(tool_name)
+        entry = get_registry().get_resolved(tool_name)
         if entry is not None and entry.risk in ("write", "rebuild"):
             return True
     except Exception:
@@ -198,7 +198,7 @@ class ProfileContext:
         try:
             from .registry import get_registry
 
-            entry = get_registry().get(tool_name)
+            entry = get_registry().get_resolved(tool_name)
             if entry is not None:
                 if entry.risk in ("write", "rebuild") and not self.profile.allow_write:
                     return False, "Writes not allowed by profile"

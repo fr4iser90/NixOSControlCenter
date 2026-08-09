@@ -47,12 +47,28 @@ class ChatSession:
     cancel_event: threading.Event = field(default_factory=threading.Event)
     available_models: list[dict[str, Any]] = field(default_factory=list)
 
+    def _system_prompt(self) -> str:
+        from .registry import tools_prompt_section
+
+        return self.settings.load_system_prompt() + tools_prompt_section(
+            allow_write=self.settings.writes_enabled,
+            allow_rebuild=bool(self.settings.allow_rebuild),
+        )
+
+    def refresh_system_prompt(self) -> None:
+        """Replace/insert system message with current tool catalog (role-filtered)."""
+        prompt = self._system_prompt()
+        if self.messages and self.messages[0].get("role") == "system":
+            self.messages[0] = {"role": "system", "content": prompt}
+        else:
+            self.messages.insert(0, {"role": "system", "content": prompt})
+
     def __post_init__(self) -> None:
         if not self.messages:
             self.messages = [
                 {
                     "role": "system",
-                    "content": self.settings.load_system_prompt(),
+                    "content": self._system_prompt(),
                 }
             ]
 
@@ -85,6 +101,7 @@ class ChatSession:
         session = cls(settings=settings, runtime=runtime)
         if messages is not None:
             session.messages = messages
+            session.refresh_system_prompt()
         if session_id:
             session.session_id = session_id
         if title:
@@ -145,12 +162,23 @@ class ChatSession:
 
     def persist(self) -> None:
         self.title = title_from_messages(self.messages) or self.title
+        provider_name = ""
+        try:
+            from .providers import find_provider_by_endpoint
+
+            p = find_provider_by_endpoint(self.settings.endpoint)
+            if p:
+                provider_name = p.name
+        except Exception:
+            pass
         save_session(
             {
                 "id": self.session_id,
                 "title": self.title,
                 "model": self.settings.model or self.model_label,
                 "endpoint": self.settings.endpoint,
+                "api": self.settings.api,
+                "provider": provider_name,
                 "messages": strip_heavy_content(self.messages),
             }
         )
@@ -161,7 +189,7 @@ class ChatSession:
         self.messages = [
             {
                 "role": "system",
-                "content": self.settings.load_system_prompt(),
+                "content": self._system_prompt(),
             }
         ]
         self.persist()
@@ -207,6 +235,7 @@ class ChatSession:
             content = text
             yield {"kind": "user", "text": text}
 
+        self.refresh_system_prompt()
         self.messages.append({"role": "user", "content": content})
         tools = self.runtime.openai_tools()
 

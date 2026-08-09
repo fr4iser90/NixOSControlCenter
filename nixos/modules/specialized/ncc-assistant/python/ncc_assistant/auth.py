@@ -75,13 +75,9 @@ def probe_needs_auth(settings: Settings) -> bool | None:
         return settings.api_key is None
 
     url = f"{settings.endpoint}/models"
-    headers: dict[str, str] = {}
-    if settings.api_key:
-        name = (settings.api_header_name or "").strip()
-        if not name or name.lower() == "authorization":
-            headers["Authorization"] = f"Bearer {settings.api_key}"
-        else:
-            headers[name] = settings.api_key
+    from .llm import _auth_headers
+
+    headers = _auth_headers(settings)
 
     try:
         with httpx.Client(timeout=15.0) as client:
@@ -98,10 +94,11 @@ def probe_needs_auth(settings: Settings) -> bool | None:
 
 def _try_headers(settings: Settings, api_key: str) -> list[str | None]:
     """Candidate header names; None means Authorization: Bearer."""
+    del api_key  # reserved for future key-shape heuristics
     ordered: list[str | None] = []
     if settings.api_header_name:
         ordered.append(settings.api_header_name.strip() or None)
-    for candidate in (None, "X-API-KEY", "x-api-key"):
+    for candidate in (None, "X-API-KEY", "x-api-key", "x-ai-key", "api-key"):
         if candidate not in ordered:
             ordered.append(candidate)
     return ordered

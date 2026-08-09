@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,14 @@ from typing import Any
 from .paths import tools_dir, tool_state_file, mcp_servers_file
 from .permissions import invoker_role, role_has_permission
 from .runtime import TOOL_DEFINITIONS
+
+# OpenAI / many gateways: function.name must match ^[a-zA-Z0-9_-]+$
+_LLM_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
+
+
+def llm_tool_name(name: str) -> str:
+    """Map canonical tool id → LLM-safe name (dots → underscores)."""
+    return name.replace(".", "_")
 
 
 @dataclass
@@ -37,14 +46,12 @@ class ToolEntry:
 
 
 def _domain_tools_payload() -> dict[str, Any]:
-    env_json = os.environ.get("NCC_ASSISTANT_DOMAIN_TOOLS_JSON", "").strip()
-    if env_json:
-        try:
-            data = json.loads(env_json)
-            if isinstance(data, dict):
-                return data
-        except json.JSONDecodeError:
-            pass
+    """Load domain tool index.
+
+    Prefer ``NCC_ASSISTANT_DOMAIN_TOOLS_FILE`` (Nix build SSOT). Fall back to
+    ``NCC_ASSISTANT_DOMAIN_TOOLS_JSON`` only when the file is unset/missing so a
+    stale shell export cannot shadow the rebuilt index.
+    """
     path = Path(os.environ.get("NCC_ASSISTANT_DOMAIN_TOOLS_FILE", "") or "")
     if path.is_file():
         try:
@@ -52,6 +59,14 @@ def _domain_tools_payload() -> dict[str, Any]:
             if isinstance(data, dict):
                 return data
         except (OSError, json.JSONDecodeError):
+            pass
+    env_json = os.environ.get("NCC_ASSISTANT_DOMAIN_TOOLS_JSON", "").strip()
+    if env_json:
+        try:
+            data = json.loads(env_json)
+            if isinstance(data, dict):
+                return data
+        except json.JSONDecodeError:
             pass
     return {}
 
@@ -284,6 +299,19 @@ class ToolRegistry:
             out.append(t)
         return out
 
+    def resolve_name(self, name: str) -> str | None:
+        """Resolve LLM-safe or canonical name → canonical registry key."""
+        if name in self._tools:
+            return name
+        for canonical in self._tools:
+            if llm_tool_name(canonical) == name:
+                return canonical
+        return None
+
+    def get_resolved(self, name: str) -> ToolEntry | None:
+        canonical = self.resolve_name(name)
+        return self._tools.get(canonical) if canonical else None
+
     def openai_tools(
         self,
         *,
@@ -294,6 +322,7 @@ class ToolRegistry:
         denylist: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         tools = []
+        seen_llm: set[str] = set()
         for t in self.list_for_invoker(
             role=role,
             allow_write=allow_write,
@@ -301,11 +330,17 @@ class ToolRegistry:
             allowlist=allowlist,
             denylist=denylist,
         ):
+            llm_name = llm_tool_name(t.name)
+            if llm_name in seen_llm:
+                continue
+            if not _LLM_NAME_RE.match(llm_name):
+                continue
+            seen_llm.add(llm_name)
             tools.append(
                 {
                     "type": "function",
                     "function": {
-                        "name": t.name,
+                        "name": llm_name,
                         "description": t.description,
                         "parameters": t.input_schema,
                     },
@@ -340,3 +375,51 @@ def reload_registry() -> ToolRegistry:
     global _default_registry
     _default_registry = ToolRegistry()
     return _default_registry
+
+
+def tools_prompt_section(
+    *,
+    allow_write: bool = True,
+    allow_rebuild: bool = False,
+    role: str | None = None,
+) -> str:
+    """Compact catalog for the system prompt (role/policy filtered)."""
+    registry = get_registry()
+    tools = registry.list_for_invoker(
+        role=role,
+        allow_write=allow_write,
+        allow_rebuild=allow_rebuild,
+    )
+    if not tools:
+        return ""
+
+    by_kind: dict[str, list[ToolEntry]] = {}
+    for t in tools:
+        by_kind.setdefault(t.kind, []).append(t)
+
+    lines = [
+        "",
+        "## Available tools (this session)",
+        "When asked what you can do, list these — do not invent extras.",
+        "Call tools using the exact names below (underscores; OpenAI-safe).",
+        f"Invoker role: {role if role is not None else invoker_role()}.",
+    ]
+    order = ("builtin", "domain", "shell", "mcp")
+    for kind in order:
+        group = by_kind.get(kind) or []
+        if not group:
+            continue
+        lines.append(f"### {kind}")
+        for t in sorted(group, key=lambda x: x.name):
+            shown = llm_tool_name(t.name)
+            desc = (t.description or "").replace("\n", " ").strip()
+            if len(desc) > 120:
+                desc = desc[:117] + "…"
+            lines.append(f"- `{shown}` — {desc}" if desc else f"- `{shown}`")
+    for kind, group in sorted(by_kind.items()):
+        if kind in order:
+            continue
+        lines.append(f"### {kind}")
+        for t in sorted(group, key=lambda x: x.name):
+            lines.append(f"- `{llm_tool_name(t.name)}`")
+    return "\n".join(lines) + "\n"

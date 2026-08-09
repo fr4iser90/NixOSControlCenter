@@ -323,6 +323,21 @@ Confirm destructive/build actions; stream output into Activity.
 
 Buttons **must** have an explicit border in `APP_STYLE` so they don’t dissolve into the background on dark Plasma.
 
+### 5.1 NCC AI chat (`ncc-assistant` bubbles)
+
+Chat UI is Plasma-palette based (same rules as shell pages). Hard requirements:
+
+| Element | Color rule |
+|---------|------------|
+| Bubble body text / role label | `palette(window-text)` or `palette(text)` — **never** `palette(mid)` on `palette(base)` / grey surfaces |
+| Markdown / code in `QTextBrowser` | Set `document().setDefaultStyleSheet(...)` with concrete `QPalette` hex colors (Qt doc CSS does not resolve `palette()`) |
+| Tool traces | Frame: `alternate-base` + `mid` border; body: `base` + `text` |
+| Secondary chrome | Prefer footer status bar over duplicate “Status” / empty “Assistant” bubbles |
+
+Do **not** create an Assistant bubble on `assistant_start` — only on first `assistant_delta` or final `assistant` text. Tool-only rounds must discard empty stream placeholders.
+
+Each message bubble: icon **Copy** (theme `edit-copy`). Tool traces stay **collapsed** until expanded.
+
 ---
 
 ## 6. Icons & assets
@@ -411,19 +426,26 @@ Run `ncc` as the logged-in user. Prefer this when the CLI already elevates via *
 
 ---
 
-## 12. Generation switch (soft vs hard)
+## 12. Generation switch (soft vs hard) — event-driven
 
-`ncc_gui.reload.GenerationWatcher` polls `/run/current-system`.
+**No polling.** `/run/current-system` is the generation SSOT; activation also
+atomically replaces `/run/ncc/generation` so inotify wakes. Running GUIs use
+`QFileSystemWatcher` plus a check when the window becomes active again.
+
+`ensure_app()` installs the watcher **once per process** (also if a
+`QApplication` already existed). Relaunch defaults to `sys.argv`.
 
 | Case | Behavior |
 |------|----------|
-| New generation, **same** `ncc_gui/` kit digest + Python env | Soft: refresh catalog/`PYTHONPATH`, shell nav, page `reload()`; **Activity stays** |
-| New generation, kit sources or Python env changed | Hard: persist Activity → `exec` new `ncc … --gui` |
+| New generation, **same** digests **and** loaded modules already match profile | Soft: refresh catalog/`PYTHONPATH`, `soft_switched` → page `reload()`; Activity stays |
+| New generation, digest changed **or** process still imports old store paths | Hard: persist Activity → `exec` current app |
 
-Fingerprint is **not** the `ncc` wrapper (that moves on every module toggle). Module enable/disable and config-only rebuilds soft-refresh. Hard restart only when gui-engine kit code (or PySide env) actually changed.
+**Hard fingerprint** (generic discovery under `/run/current-system/sw/bin`):
+`ncc-gui`, `ncc-assistant`, `ncc-*-gui` wrappers → hash `ncc_gui` / `ncc_assistant`
+trees (+ assistant domain-tools file path). **Not** domain-page dumps / catalogs
+(those soft-refresh on module toggle). Wrapper `PYTHONPATH` values strip bash
+`${…}` expansions so store roots resolve correctly.
 
-Activity is also mirrored under `~/.cache/ncc/gui-activity/` so a hard re-exec can restore it.
+Debug: `NCC_GUI_RELOAD_DEBUG=1` logs evaluate/restart decisions to stderr.
 
----
-
-*Last updated: soft generation refresh + Activity persistence; PtyTerminal for interactive SSH.*
+Optional: `set_relaunch_argv(...)` only to resume domain / prefer a binary name.

@@ -15,6 +15,25 @@ from .config import Settings
 
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
+        "name": "list_available_tools",
+        "description": (
+            "Return the exact tools available in this session (role- and "
+            "policy-filtered), including domain_* CLI tools. Call this when "
+            "the user asks what you can do, your capabilities, or which tools "
+            "you have — do not invent a list from memory."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string",
+                    "enum": ["all", "builtin", "domain", "shell", "mcp"],
+                    "description": "Optional filter (default: all)",
+                }
+            },
+        },
+    },
+    {
         "name": "list_modules",
         "description": (
             "List known NCC modules from the knowledge registries "
@@ -414,6 +433,43 @@ class ToolRuntime:
             if path.is_file() and not any(p == path for _, p in entries):
                 entries.append((extra, path))
         return entries
+
+    def list_available_tools(self, kind: str | None = None) -> dict[str, Any]:
+        """Exact tool catalog for this session (same filter as the LLM tools array)."""
+        from .permissions import invoker_role
+        from .registry import get_registry, llm_tool_name
+
+        registry = get_registry()
+        role = invoker_role()
+        entries = registry.list_for_invoker(
+            role=role,
+            allow_write=self.settings.writes_enabled,
+            allow_rebuild=bool(self.settings.allow_rebuild),
+        )
+        want = (kind or "all").strip().lower()
+        if want and want != "all":
+            entries = [t for t in entries if t.kind == want]
+
+        tools = [
+            {
+                "name": llm_tool_name(t.name),
+                "canonical": t.name,
+                "kind": t.kind,
+                "risk": t.risk,
+                "description": t.description,
+            }
+            for t in sorted(entries, key=lambda x: (x.kind, x.name))
+        ]
+        by_kind: dict[str, int] = {}
+        for t in tools:
+            by_kind[t["kind"]] = by_kind.get(t["kind"], 0) + 1
+        return {
+            "ok": True,
+            "role": role,
+            "count": len(tools),
+            "by_kind": by_kind,
+            "tools": tools,
+        }
 
     def list_modules(self, query: str | None = None) -> dict[str, Any]:
         modules: list[dict[str, str]] = []
@@ -1031,7 +1087,10 @@ class ToolRuntime:
         args = dict(arguments or {})
         try:
             from .registry import get_registry
+
             registry = get_registry()
+            # LLM may send OpenAI-safe names (domain_packages_list)
+            name = registry.resolve_name(name) or name
             tool_entry = registry.get(name)
             mutating = _tool_is_mutating(name, tool_entry)
 
@@ -1174,6 +1233,8 @@ class ToolRuntime:
                 return self.list_modules(args.get("query"))
             if name == "read_module_config":
                 return self.read_module_config(args["module_path"])
+            if name == "list_available_tools":
+                return self.list_available_tools(args.get("kind"))
             if name == "search_knowledge":
                 return self.search_knowledge(
                     args["query"], int(args.get("limit", 8))

@@ -30,6 +30,17 @@ in {
     { ${configPath}.api = apiValue; }
     (lib.mkIf guiOn {
       environment.systemPackages = [ iconTheme desktop ];
+      # Event for running GUIs (QFileSystemWatcher) — no polling.
+      system.activationScripts.ncc-gui-generation = {
+        # After the new system is linked; atomic replace so inotify/dir watches fire.
+        text = ''
+          mkdir -p /run/ncc
+          _ncc_gen_tmp=/run/ncc/generation.tmp.$$
+          ${pkgs.coreutils}/bin/readlink -f /run/current-system > "$_ncc_gen_tmp"
+          ${pkgs.coreutils}/bin/mv -f "$_ncc_gen_tmp" /run/ncc/generation
+          ${pkgs.coreutils}/bin/chmod 644 /run/ncc/generation
+        '';
+      };
     })
   ];
 }

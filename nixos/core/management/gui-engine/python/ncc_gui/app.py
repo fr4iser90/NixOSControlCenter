@@ -12,8 +12,19 @@ from ncc_gui.branding import app_icon
 
 
 def ensure_app(argv: list[str] | None = None) -> QApplication:
+    """Create the shared QApplication and install the generation watcher once.
+
+    Every NCC Qt GUI that goes through ``ensure_app`` automatically soft/hard
+    reloads on system switch — no per-window wiring.
+    """
     existing = QApplication.instance()
     if existing is not None:
+        try:
+            from ncc_gui.reload import install_generation_watcher
+
+            install_generation_watcher(parent=existing)
+        except Exception:
+            pass
         return existing  # type: ignore[return-value]
     app = QApplication(argv if argv is not None else sys.argv)
     app.setApplicationName("NixOS Control Center")
@@ -21,6 +32,13 @@ def ensure_app(argv: list[str] | None = None) -> QApplication:
     icon = app_icon()
     if not icon.isNull():
         app.setWindowIcon(icon)
+    try:
+        from ncc_gui.reload import install_generation_watcher
+
+        install_generation_watcher(parent=app)
+    except Exception:
+        # Off NixOS / missing /run — GUI still works
+        pass
     return app
 
 

@@ -8,13 +8,14 @@ import traceback
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal, Slot
-from PySide6.QtGui import QFont, QKeySequence, QShortcut
+from PySide6.QtGui import QFont, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -36,55 +37,100 @@ from PySide6.QtWidgets import (
 )
 
 
-class ToolTraceWidget(QWidget):
-    """Compact collapsible tool-call / result row (phase 25)."""
+class ToolTraceWidget(QFrame):
+    """Compact collapsible tool-call row — collapsed by default."""
 
     def __init__(self, name: str, args: object, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setObjectName("nccToolTrace")
+        self.setStyleSheet(
+            "QFrame#nccToolTrace {"
+            "  background: palette(alternate-base);"
+            "  border: 1px solid palette(mid);"
+            "  border-radius: 8px;"
+            "}"
+        )
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(4, 2, 4, 2)
-        layout.setSpacing(2)
+        layout.setContentsMargins(10, 6, 10, 6)
+        layout.setSpacing(4)
 
         header = QHBoxLayout()
         self._toggle = QToolButton()
         self._toggle.setText("▸")
         self._toggle.setCheckable(True)
         self._toggle.setChecked(False)
+        self._toggle.setToolTip("Show / hide tool details")
         self._toggle.toggled.connect(self._on_toggle)
         header.addWidget(self._toggle)
 
-        summary = str(args)
-        if len(summary) > 80:
-            summary = summary[:77] + "…"
-        self._title = QLabel(f"tool {name}({summary})")
-        self._title.setStyleSheet("font-family: monospace; color: palette(mid);")
+        self._name = name
+        self._raw_args = args
+        self._result = ""
+        # Short label when collapsed — do not dump args into the header.
+        self._title = QLabel(f"tool {name}")
+        self._title.setObjectName("nccToolTraceTitle")
+        self._title.setStyleSheet(
+            "QLabel#nccToolTraceTitle {"
+            "  font-family: monospace; color: palette(window-text);"
+            "}"
+        )
+        self._title.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
         header.addWidget(self._title, stretch=1)
+
+        copy_btn = QToolButton()
+        copy_btn.setAutoRaise(True)
+        copy_btn.setToolTip("Copy tool args + result")
+        icon = QIcon.fromTheme("edit-copy")
+        if not icon.isNull():
+            copy_btn.setIcon(icon)
+        else:
+            copy_btn.setText("⎘")
+        copy_btn.clicked.connect(self._copy)
+        header.addWidget(copy_btn)
         layout.addLayout(header)
 
         self._body = QTextBrowser()
         self._body.setVisible(False)
-        self._body.setMaximumHeight(160)
-        self._body.setStyleSheet("font-family: monospace; font-size: 11px;")
+        self._body.setMaximumHeight(200)
+        self._body.setStyleSheet(
+            "QTextBrowser {"
+            "  font-family: monospace; font-size: 11px;"
+            "  background: palette(base); color: palette(text);"
+            "  border: 1px solid palette(mid); border-radius: 4px;"
+            "}"
+        )
         layout.addWidget(self._body)
-        self._raw_args = args
-        self._result = ""
 
     def _on_toggle(self, checked: bool) -> None:
         self._toggle.setText("▾" if checked else "▸")
         self._body.setVisible(checked)
-        self._refresh()
+        if checked:
+            self._refresh()
 
     def set_result(self, text: str) -> None:
         self._result = text
         ok = "ok" if "error" not in text.lower()[:80] else "err"
-        self._title.setText(self._title.text().split(" →")[0] + f" → {ok}")
-        self._refresh()
+        self._title.setText(f"tool {self._name} → {ok}")
+        # Stay collapsed; only refresh body if user already opened it.
+        if self._toggle.isChecked():
+            self._refresh()
 
-    def _refresh(self) -> None:
-        self._body.setPlainText(
+    def _payload(self) -> str:
+        return (
+            f"tool: {self._name}\n"
             f"args:\n{json.dumps(self._raw_args, indent=2, default=str)[:2000]}\n\n"
             f"result:\n{self._result[:3000]}"
         )
+
+    def _copy(self) -> None:
+        from PySide6.QtGui import QGuiApplication
+
+        QGuiApplication.clipboard().setText(self._payload())
+
+    def _refresh(self) -> None:
+        self._body.setPlainText(self._payload())
 
 
 class DiffReviewDialog(QDialog):
@@ -1035,10 +1081,40 @@ class SchedulesPage(QWidget):
 
 
 class SettingsPage(QWidget):
+    providers_changed = Signal()
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
+
+        providers_group = QGroupBox("LLM providers")
+        pg = QVBoxLayout(providers_group)
+        self.provider_list = QListWidget()
+        self.provider_list.setMaximumHeight(160)
+        self.provider_list.itemDoubleClicked.connect(lambda _i: self._edit_provider())
+        pg.addWidget(self.provider_list)
+
+        prow = QHBoxLayout()
+        add_btn = QPushButton("Add…")
+        add_btn.clicked.connect(self._add_provider)
+        prow.addWidget(add_btn)
+        edit_btn = QPushButton("Edit…")
+        edit_btn.clicked.connect(self._edit_provider)
+        prow.addWidget(edit_btn)
+        rm_btn = QPushButton("Remove")
+        rm_btn.clicked.connect(self._remove_provider)
+        prow.addWidget(rm_btn)
+        prow.addStretch()
+        pg.addLayout(prow)
+        hint = QLabel(
+            "API keys are masked in the editor and stored in credentials.json (0600). "
+            "Use custom auth headers and extra headers (x-ai-*, org ids, …) per provider."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: palette(placeholder-text);")
+        pg.addWidget(hint)
+        layout.addWidget(providers_group)
 
         presence_group = QGroupBox("Presence")
         presence_layout = QFormLayout(presence_group)
@@ -1110,6 +1186,59 @@ class SettingsPage(QWidget):
 
         layout.addStretch()
         self._load_memory()
+        self._reload_providers()
+
+    def _reload_providers(self) -> None:
+        from .providers import load_providers
+
+        self.provider_list.clear()
+        for p in load_providers():
+            auth = p.auth_header or "Bearer"
+            extras = f" +{len(p.extra_headers)} hdr" if p.extra_headers else ""
+            item = QListWidgetItem(f"{p.name}  ·  {p.api}  ·  {auth}{extras}  ·  {p.endpoint}")
+            item.setData(Qt.ItemDataRole.UserRole, p.id)
+            self.provider_list.addItem(item)
+
+    def _add_provider(self) -> None:
+        from .provider_ui import edit_provider_dialog
+
+        if edit_provider_dialog(self, provider=None) is None:
+            return
+        self._reload_providers()
+        self.providers_changed.emit()
+
+    def _edit_provider(self) -> None:
+        from .provider_ui import edit_provider_dialog
+        from .providers import get_provider
+
+        item = self.provider_list.currentItem()
+        if not item:
+            QMessageBox.information(self, "Providers", "Select a provider to edit.")
+            return
+        prov = get_provider(str(item.data(Qt.ItemDataRole.UserRole)))
+        if prov is None:
+            return
+        if edit_provider_dialog(self, provider=prov) is None:
+            return
+        self._reload_providers()
+        self.providers_changed.emit()
+
+    def _remove_provider(self) -> None:
+        from .providers import remove_provider
+
+        item = self.provider_list.currentItem()
+        if not item:
+            return
+        pid = item.data(Qt.ItemDataRole.UserRole)
+        if not remove_provider(str(pid)):
+            QMessageBox.information(
+                self,
+                "Providers",
+                "Keep at least one provider (or select a different one to remove).",
+            )
+            return
+        self._reload_providers()
+        self.providers_changed.emit()
 
     def _on_presence_changed(self, status: str) -> None:
         try:

@@ -42,13 +42,19 @@ EOF
 
   role_of() {
     local user="$1" line u r
-    [[ -f "$NCC_USER_ROLES" ]] || { echo "guest"; return 0; }
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      [[ -z "$line" || "$line" == \#* ]] && continue
-      u="''${line%%=*}"
-      r="''${line#*=}"
-      [[ "$u" == "$user" ]] && { echo "$r"; return 0; }
-    done < "$NCC_USER_ROLES"
+    if [[ -f "$NCC_USER_ROLES" ]]; then
+      while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        u="''${line%%=*}"
+        r="''${line#*=}"
+        [[ "$u" == "$user" ]] && { echo "$r"; return 0; }
+      done < "$NCC_USER_ROLES"
+    fi
+    # Fallback when roles file missing/stale or user absent (e.g. pre-activation)
+    r=$(accounts_json | ${pkgs.jq}/bin/jq -r --arg u "$user" '
+      [.[] | select(.name == $u) | .role] | first // empty
+    ' 2>/dev/null || true)
+    [[ -n "$r" ]] && { echo "$r"; return 0; }
     echo "guest"
   }
 

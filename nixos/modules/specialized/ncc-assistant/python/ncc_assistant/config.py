@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -90,6 +90,8 @@ class Settings:
     notify_on_timeout: str  # "block" | "queue" | "pause"
     # MCP settings
     mcp_servers_json: str | None
+    # Extra HTTP headers (org, x-ai-*, …); primary API key stays in api_key
+    extra_headers: tuple[tuple[str, str], ...] = field(default_factory=tuple)
 
     @property
     def provider(self) -> str:
@@ -180,6 +182,7 @@ class Settings:
             notify_on_timeout=os.environ.get("NCC_ASSISTANT_NOTIFY_ON_TIMEOUT", "block"),
             # MCP settings
             mcp_servers_json=_env_optional_str("NCC_ASSISTANT_MCP_SERVERS_JSON"),
+            extra_headers=(),
         )
 
     def load_system_prompt(self) -> str:

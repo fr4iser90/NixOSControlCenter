@@ -20,12 +20,15 @@ class CancelledError(LLMError):
 
 
 def _auth_headers(settings: Settings) -> dict[str, str]:
+    headers = {k: v for k, v in (settings.extra_headers or ()) if k and v}
     if not settings.api_key:
-        return {}
+        return headers
     name = (settings.api_header_name or "").strip()
     if not name or name.lower() == "authorization":
-        return {"Authorization": f"Bearer {settings.api_key}"}
-    return {name: settings.api_key}
+        headers["Authorization"] = f"Bearer {settings.api_key}"
+    else:
+        headers[name] = settings.api_key
+    return headers
 
 
 def list_models(settings: Settings) -> list[dict[str, Any]]:

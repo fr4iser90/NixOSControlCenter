@@ -78,6 +78,17 @@ Short markdown under `ai/docs/` is copied into the assistant knowledge tree (`kn
 | `environment={{environment?}}` | Optional inline; omit whole token if unset |
 | `{{flag:system}}` | If arg `system` is true → emit `--system`; else omit |
 
+## Runtime env
+
+| Variable | Role |
+|----------|------|
+| `NCC_ASSISTANT_DOMAIN_TOOLS_FILE` | Build-time JSON index (preferred) |
+| `NCC_ASSISTANT_DOMAIN_TOOLS_JSON` | Optional fallback when file unset; wrapper unsets inherited stubs |
+
+## LLM tool names
+
+Pack JSON keeps dotted ids (`domain.packages.list`). The assistant exposes **OpenAI-safe** names to the model (`domain_packages_list`, dots → `_`) because `^[a-zA-Z0-9_-]+$` is required by OpenAI-compatible APIs. Calls are resolved back to the canonical id before execution.
+
 ## Reference packs
 
 `user`, `desktop`, `packages`, `modules` (module-manager).
