@@ -152,12 +152,14 @@ Historical aliases (if any remain in old generations) are unsupported after rebu
 |-------|--------|
 | Desktop GUI | Qt / PySide6 — root `ncc`, or `ncc <domain> --gui` (gated by `gui-engine.enable`) |
 | CLI | **Default for every domain** — scripting / interactive managers |
-| TUI | Optional — `ncc <domain> --tui` when `tui-engine.enable` |
+| TUI | Optional — `ncc <domain> --tui` when `tui-engine.enable` (Go tui-engine) |
 | Domain default | **`ncc <domain>` is never Qt** — use `--gui` |
 | GUI toggle | `core.management.gui-engine.enable` — `null` = auto (on with desktop), `true`/`false` override |
 | TUI toggle | `core.management.tui-engine.enable` — `null` = auto (off with desktop), `true`/`false` override |
 | Toolkit debt | Chronicle GTK → migrate to PySide6 |
 | Data | Nix libraries shared by CLI + GUI |
+
+**Install shell (separate from runtime `ncc`):** UI modes are **GUI** (PySide6 wizard) and **fzf** (terminal menus). Do **not** call the fzf path “TUI” — that word is reserved for Go `tui-engine`. Aliases: `install-gui` / `install-fzf` (`install-tui` is a deprecated alias for fzf).
 
 Do **not** register bare verbs `gui` / `tui` as primary actions (flags only). Filter legacy launcher names out of GUI catalog actions if they still exist.
 

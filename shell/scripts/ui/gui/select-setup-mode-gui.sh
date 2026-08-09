@@ -17,11 +17,18 @@ if [[ ! -f "$WIZARD" ]]; then
 fi
 
 if ! ncc_gui_available; then
-  echo "GUI unavailable (no display or tkinter)" >&2
+  echo "GUI unavailable (no display or PySide6)" >&2
   exit 2
 fi
 
 ncc_gui_ensure_answers_file
+
+# gui-engine theme/branding (repo checkout)
+REPO_ROOT="$(cd "${GUI_DIR}/../../../.." && pwd)"
+GUI_ENGINE_PY="${REPO_ROOT}/nixos/core/management/gui-engine/python"
+if [[ -d "$GUI_ENGINE_PY" ]]; then
+  export PYTHONPATH="${GUI_ENGINE_PY}${PYTHONPATH:+:$PYTHONPATH}"
+fi
 
 PYTHON_BIN="${NCC_PYTHON:-}"
 if [[ -z "$PYTHON_BIN" ]]; then

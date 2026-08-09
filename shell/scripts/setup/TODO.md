@@ -3,6 +3,10 @@
 Checklist zum Abarbeiten. Priorität: P0 = zuerst, P3 = später / nice-to-have.
 
 Kontext: Wizard + Strategy-Pipeline (`init.sh` → detect → mode → writers → deploy).
+GUI: **PySide6 + NCC `APP_STYLE`** (`shell/scripts/ui/gui/install_wizard.py`); logic SSOT in
+`install_wizard_logic.py`. Mid-flow prompts: `gui_ask.py` (also PySide6). Terminal path:
+**fzf** menus (`install-fzf`; not Go tui-engine). Dry-run: `install-dry` / `NCC_DRY_RUN=1`.
+
 Siehe Analyse: Preset-`features`/`overrides` oft ungenutzt, Memory/Storage-Checks fehlen, Disk-Härtung & Compatibility-Gate ausbaufähig.
 
 ---

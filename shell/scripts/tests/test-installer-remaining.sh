@@ -54,7 +54,7 @@ export CONFIG_DIR="$SETUP_DIR/config"
 export SERIALIZE_NIX="$ROOT/nixos/core/management/system-manager/lib/serialize-json-to-nix.nix"
 export NCC_LAYOUT=split
 export NCC_DRY_RUN=0
-export NCC_INSTALL_UI=tui
+export NCC_INSTALL_UI=fzf
 export NCC_DEPLOY_SKIP_PERMS=1
 export NCC_DEPLOY_SKIP_REBUILD=1
 export NCC_DEPLOY_NONINTERACTIVE=1
@@ -490,6 +490,7 @@ echo "== Aliases / entry points declared =="
 ALIASES=$(cat "$ROOT/shell/hooks/ui-aliases.nix")
 assert_contains "alias install" "$ALIASES" 'alias install='
 assert_contains "install-gui" "$ALIASES" 'install-gui()'
+assert_contains "install-fzf" "$ALIASES" 'install-fzf()'
 assert_contains "install-tui" "$ALIASES" 'install-tui()'
 assert_contains "install-dry" "$ALIASES" 'install-dry()'
 

@@ -5,7 +5,8 @@
 ncc_gui_available() {
     [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]] || return 1
     command -v python3 >/dev/null 2>&1 || return 1
-    python3 -c "import tkinter" 2>/dev/null || return 1
+    # Install GUI path is PySide6 only (wizard + gui_ask).
+    python3 -c "import PySide6" 2>/dev/null || return 1
     return 0
 }
 
@@ -13,7 +14,8 @@ ncc_install_ui_prefer_gui() {
     local mode="${NCC_INSTALL_UI:-auto}"
     case "$mode" in
         gui) return 0 ;;
-        tui|fzf|terminal) return 1 ;;
+        # fzf = installer terminal wizard (NOT Go tui-engine). Legacy: tui|terminal
+        fzf|tui|terminal) return 1 ;;
         auto|*)
             ncc_gui_available && return 0
             return 1
@@ -137,6 +139,14 @@ ncc_gui_ask() {
 
     if ! ncc_gui_available; then
         return 2
+    fi
+
+    # Same gui-engine theme path as the install wizard
+    local repo_root gui_engine_py
+    repo_root="$(cd "${gui_dir}/../../../.." && pwd)"
+    gui_engine_py="${repo_root}/nixos/core/management/gui-engine/python"
+    if [[ -d "$gui_engine_py" ]]; then
+        export PYTHONPATH="${gui_engine_py}${PYTHONPATH:+:$PYTHONPATH}"
     fi
 
     local out rc

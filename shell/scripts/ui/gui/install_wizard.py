@@ -1,412 +1,233 @@
 #!/usr/bin/env python3
-"""NCC install wizard — full GUI over the install selection + Homelab prompts.
+"""NCC install wizard — PySide6 UI matching the Control Center design kit.
 
-Prints one selection line to stdout on success (exit 0). Cancel → exit 1.
-Homelab (and related) answers are written to --answers-file as KEY=shell-quoted values.
+Stdout: one selection line on success (exit 0). Cancel → exit 1. No display → 2.
+Homelab/Docker answers → --answers-file as KEY=shell-quoted values.
 """
 
 from __future__ import annotations
 
 import argparse
-import getpass
 import os
 import re
 import secrets
-import shlex
 import sys
-import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional
 
-EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
-DOMAIN_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$")
+# Repo gui-engine on PYTHONPATH (install shell + local dry-run)
+_GUI_ENGINE = (
+    Path(__file__).resolve().parents[4]
+    / "nixos"
+    / "core"
+    / "management"
+    / "gui-engine"
+    / "python"
+)
+if _GUI_ENGINE.is_dir():
+    sys.path.insert(0, str(_GUI_ENGINE))
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (
+    QApplication,
+    QButtonGroup,
+    QCheckBox,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QRadioButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
-class InstallOptions:
-    """Loaded from shell/scripts/ui/prompts via export-options.sh (SSOT)."""
+from install_wizard_logic import (
+    DOMAIN_RE,
+    EMAIL_RE,
+    InstallOptions,
+    default_admin,
+    filter_feature_groups_for_system,
+    filter_features_for_system,
+    host_blueprints_dir,
+    load_options,
+    resolve_features,
+    write_answers,
+)
 
-    def __init__(self) -> None:
-        self.system_presets: List[str] = []
-        self.device_presets: List[str] = []
-        self.feature_groups: List[Tuple[str, List[str]]] = []  # (name, features) sans Desktop Env
-        self.desktop_envs: List[str] = []  # internal ids incl. "none"
-        self.install_types: List[str] = []
-        self.advanced_options: List[str] = []
-        self.conflicts: Dict[str, set] = {}
-        self.dependencies: Dict[str, set] = {}
-        self.descriptions: Dict[str, str] = {}
-        self.preset_defaults: Dict[str, List[str]] = {}
-        # (nixpkgs attr, UI label) — SSOT: setup-options.sh DESKTOP_BROWSERS
-        self.browser_choices: List[Tuple[str, str]] = []
-        self.browser_default: str = "firefox"
-        # feature → allowed systemTypes (from metadata.nix); empty set = unrestricted
-        self.feature_system_types: Dict[str, set] = {}
+try:
+    from ncc_gui.theme import APP_STYLE
+except ImportError:  # pragma: no cover
+    APP_STYLE = ""
 
-    def desc(self, name: str, fallback: str = "") -> str:
-        key = name.strip().lower()
-        if key in self.descriptions:
-            return self.descriptions[key]
-        # strip emoji / punctuation prefixes from INSTALL_TYPE labels
-        bare = re.sub(r"^[^\w]+", "", key).strip()
-        return self.descriptions.get(bare, fallback or name)
+try:
+    from ncc_gui.branding import app_icon
+except ImportError:  # pragma: no cover
 
-    def desktop_env_label(self, env_id: str) -> str:
-        if env_id in ("", "none"):
-            return "None (CLI only)"
-        # descriptions use keys like "plasma (kde)"
-        for key, text in self.descriptions.items():
-            if key.startswith(env_id):
-                # Prefer short label from description first sentence / known map
-                if env_id == "plasma":
-                    return "Plasma (KDE)"
-                return env_id.upper() if env_id in ("gnome", "xfce") else env_id
-        if env_id == "plasma":
-            return "Plasma (KDE)"
-        if env_id == "gnome":
-            return "GNOME"
-        if env_id == "xfce":
-            return "XFCE"
-        return env_id
+    def app_icon():  # type: ignore[misc]
+        from PySide6.QtGui import QIcon
 
-
-def _export_options_script() -> Path:
-    return Path(__file__).resolve().parent / "export-options.sh"
-
-
-def load_options() -> InstallOptions:
-    """Source setup-options.sh + descriptions via export-options.sh."""
-    script = _export_options_script()
-    if not script.is_file():
-        raise FileNotFoundError(f"Missing options exporter: {script}")
-
-    import subprocess
-
-    proc = subprocess.run(
-        ["bash", str(script)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    opts = InstallOptions()
-    section: Optional[str] = None
-    for raw in proc.stdout.splitlines():
-        line = raw.rstrip("\n")
-        if line.startswith("[") and line.endswith("]"):
-            section = line[1:-1]
-            continue
-        if not line or section is None:
-            continue
-        if section == "INSTALL_BASES":
-            opts.system_presets.append(line)
-        elif section == "DEVICE_TARGETS":
-            opts.device_presets.append(line)
-        elif section == "FEATURE_GROUPS":
-            name, _, feats = line.partition(":")
-            if name == "Desktop Environment":
-                continue  # handled via DESKTOP_ENVS screen
-            opts.feature_groups.append((name, [f for f in feats.split("|") if f]))
-        elif section == "DESKTOP_ENVS":
-            opts.desktop_envs.append("" if line == "none" else line)
-        elif section == "INSTALL_TYPE_OPTIONS":
-            opts.install_types.append(line)
-        elif section == "ADVANCED_OPTIONS":
-            opts.advanced_options.append(line)
-        elif section == "FEATURE_CONFLICTS":
-            k, _, v = line.partition("=")
-            opts.conflicts[k] = {x for x in v.split("|") if x}
-        elif section == "FEATURE_DEPENDENCIES":
-            k, _, v = line.partition("=")
-            opts.dependencies[k] = {x for x in v.split("|") if x}
-        elif section == "INSTALL_BASE_DEFAULT_PACKAGES":
-            k, _, v = line.partition("=")
-            opts.preset_defaults[k] = [x for x in v.split() if x]
-        elif section == "DESKTOP_BROWSERS":
-            pkg, _, label = line.partition("|")
-            pkg = pkg.strip()
-            if pkg:
-                opts.browser_choices.append((pkg, label.strip() or pkg))
-        elif section == "DESKTOP_BROWSER_DEFAULT":
-            if line.strip():
-                opts.browser_default = line.strip()
-        elif section == "FEATURE_SYSTEM_TYPES":
-            k, _, v = line.partition("=")
-            opts.feature_system_types[k.strip()] = {x for x in v.split("|") if x}
-        elif section == "DESCRIPTIONS":
-            k, _, v = line.partition("=")
-            opts.descriptions[k.lower()] = v
-    if not opts.browser_choices:
-        # Fallback if export is incomplete
-        opts.browser_choices = [
-            ("firefox", "Firefox — default, free"),
-            ("chromium", "Chromium — open-source Chrome"),
-            ("brave", "Brave — privacy Chromium (unfree)"),
-            ("librewolf", "LibreWolf — privacy Firefox fork"),
-        ]
-    return opts
+        return QIcon()
 
 
-def resolve_features(
-    selected: List[str],
-    conflicts: Dict[str, set],
-    dependencies: Dict[str, set],
-) -> List[str]:
-    kept: List[str] = []
-    for feat in selected:
-        conf = conflicts.get(feat, set())
-        if any(c in kept for c in conf):
-            continue
-        if any(feat in conflicts.get(k, set()) for k in kept):
-            continue
-        kept.append(feat)
-    resolved = list(kept)
-    for feat in list(resolved):
-        for dep in dependencies.get(feat, set()):
-            if dep not in resolved:
-                resolved.append(dep)
-    return resolved
+def _is_dry_run() -> bool:
+    return os.environ.get("NCC_DRY_RUN", "").lower() in ("1", "true", "yes", "on")
 
 
-def feature_allowed_for_system(feat: str, system_type: str, type_map: Dict[str, set]) -> bool:
-    """True if metadata allows feat for system_type (missing entry = allow)."""
-    allowed = type_map.get(feat)
-    if not allowed:
-        return True
-    return system_type in allowed
-
-
-def filter_features_for_system(
-    features: List[str],
-    system_type: str,
-    type_map: Dict[str, set],
-) -> List[str]:
-    return [f for f in features if feature_allowed_for_system(f, system_type, type_map)]
-
-
-def filter_feature_groups_for_system(
-    groups: List[Tuple[str, List[str]]],
-    system_type: str,
-    type_map: Dict[str, set],
-) -> List[Tuple[str, List[str]]]:
-    out: List[Tuple[str, List[str]]] = []
-    for name, feats in groups:
-        allowed = filter_features_for_system(feats, system_type, type_map)
-        if allowed:
-            out.append((name, allowed))
-    return out
-
-
-def host_blueprints_dir() -> Path:
-    setup = os.environ.get("SETUP_DIR", "")
-    if setup:
-        return Path(setup) / "modes" / "host-blueprints"
-    here = Path(__file__).resolve()
-    return here.parents[2] / "setup" / "modes" / "host-blueprints"
-
-
-# Back-compat alias
-profiles_dir = host_blueprints_dir
-
-
-def write_answers(path: Path, data: Dict[str, str]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    lines = ["# NCC GUI answers — generated by install_wizard.py"]
-    for key, value in data.items():
-        if value is None:
-            continue
-        lines.append(f"{key}={shlex.quote(str(value))}")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    try:
-        os.chmod(path, 0o600)
-    except OSError:
-        pass
-
-
-def default_admin() -> str:
-    """Prefer the real user under sudo — never silently pick root."""
-    for key in ("SUDO_USER", "PKEXEC_UID", "LOGNAME"):
-        val = os.environ.get(key, "").strip()
-        if key == "PKEXEC_UID" and val.isdigit():
-            try:
-                import pwd
-
-                return pwd.getpwuid(int(val)).pw_name
-            except Exception:
-                continue
-        if val and val != "root":
-            return val
-    try:
-        user = getpass.getuser()
-        if user and user != "root":
-            return user
-    except Exception:
-        pass
-    # Last resort: still avoid root as a "friendly" default
-    return os.environ.get("SUDO_USER") or "user"
-
-
-# Theme tokens
-BG = "#14161a"
-FG = "#e8eaed"
-MUTED = "#9aa0a6"
-ACCENT = "#4a9eff"
-FIELD = "#1e2229"
-ROW = "#1a1d23"
-SELECT_BG = "#2a4a6a"
-SELECT_FG = "#ffffff"
-
-
-class InstallWizard(tk.Tk):
+class InstallWizard(QMainWindow):
     def __init__(self, answers_file: Path, options: InstallOptions) -> None:
         super().__init__()
         self.answers_file = answers_file
         self.opts = options
-        self.title("NixOS Control Center — Install")
-        self.minsize(640, 520)
-        self.geometry("740x600")
-        self.configure(bg=BG)
-
         self._selection: Optional[str] = None
         self._answers: Dict[str, str] = {}
         self._path: List[str] = []
-        self._vars: dict = {}
+        self._state: dict = {}
 
-        self._style()
-        self._build_chrome()
+        self.setWindowTitle("NixOS Control Center — Install")
+        self.setMinimumSize(720, 560)
+        self.resize(800, 640)
+        icon = app_icon()
+        if not icon.isNull():
+            self.setWindowIcon(icon)
+
+        root = QWidget()
+        root.setObjectName("nccShellRoot")
+        self.setCentralWidget(root)
+        lay = QVBoxLayout(root)
+        lay.setContentsMargins(20, 16, 20, 16)
+        lay.setSpacing(10)
+
+        brand = QLabel("NCC")
+        brand.setObjectName("nccPageTitle")
+        f = QFont()
+        f.setPointSize(11)
+        f.setBold(True)
+        brand.setFont(f)
+        lay.addWidget(brand)
+
+        self.header = QLabel()
+        self.header.setObjectName("nccPageTitle")
+        lay.addWidget(self.header)
+
+        self.subheader = QLabel()
+        self.subheader.setObjectName("nccPageSubtitle")
+        self.subheader.setWordWrap(True)
+        lay.addWidget(self.subheader)
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.body_host = QWidget()
+        self.body = QVBoxLayout(self.body_host)
+        self.body.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.body.setSpacing(8)
+        self.scroll.setWidget(self.body_host)
+        lay.addWidget(self.scroll, stretch=1)
+
+        nav = QHBoxLayout()
+        self.btn_back = QPushButton("Back")
+        self.btn_back.clicked.connect(self._back)
+        nav.addWidget(self.btn_back)
+        nav.addStretch()
+        self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.clicked.connect(self._cancel)
+        nav.addWidget(self.btn_cancel)
+        self.btn_next = QPushButton("Next")
+        self.btn_next.setObjectName("nccPrimaryButton")
+        self.btn_next.clicked.connect(self._next)
+        nav.addWidget(self.btn_next)
+        lay.addLayout(nav)
+
         self._navigate("welcome")
 
-        self.bind("<Escape>", lambda _e: self._cancel())
-        self.protocol("WM_DELETE_WINDOW", self._cancel)
+    def selection(self) -> Optional[str]:
+        return self._selection
 
-    def _style(self) -> None:
-        style = ttk.Style(self)
-        try:
-            style.theme_use("clam")
-        except tk.TclError:
-            pass
-        # Global selection colors (fixes white-on-white)
-        self.option_add("*selectBackground", SELECT_BG)
-        self.option_add("*selectForeground", SELECT_FG)
-        self.option_add("*Entry.selectBackground", SELECT_BG)
-        self.option_add("*Entry.selectForeground", SELECT_FG)
-        self.option_add("*Text.selectBackground", SELECT_BG)
-        self.option_add("*Text.selectForeground", SELECT_FG)
+    # ---- chrome helpers ----
 
-        style.configure(".", background=BG, foreground=FG, fieldbackground=FIELD)
-        style.configure("TFrame", background=BG)
-        style.configure("TLabel", background=BG, foreground=FG, font=("Sans", 11))
-        style.configure("Title.TLabel", background=BG, foreground=FG, font=("Sans", 18, "bold"))
-        style.configure("Sub.TLabel", background=BG, foreground=MUTED, font=("Sans", 10))
-        style.configure("Hint.TLabel", background=BG, foreground=MUTED, font=("Sans", 9))
-        style.configure("TButton", font=("Sans", 10), padding=8)
-        style.configure("Accent.TButton", font=("Sans", 10, "bold"), padding=8)
-        style.map("Accent.TButton", background=[("active", ACCENT)])
-        style.configure(
-            "TRadiobutton",
-            background=BG,
-            foreground=FG,
-            font=("Sans", 11, "bold"),
-            focuscolor=BG,
-            indicatorcolor=FIELD,
-        )
-        style.map(
-            "TRadiobutton",
-            background=[("active", BG), ("selected", BG)],
-            foreground=[("active", FG), ("selected", FG)],
-            indicatorcolor=[("selected", ACCENT), ("!selected", FIELD)],
-        )
-        style.configure(
-            "TCheckbutton",
-            background=BG,
-            foreground=FG,
-            font=("Sans", 11),
-            focuscolor=BG,
-        )
-        style.map(
-            "TCheckbutton",
-            background=[("active", BG), ("selected", BG)],
-            foreground=[("active", FG), ("selected", FG)],
-        )
-        style.configure("TLabelframe", background=BG, foreground=FG)
-        style.configure("TLabelframe.Label", background=BG, foreground=FG, font=("Sans", 10, "bold"))
-        style.configure("TEntry", fieldbackground=FIELD, foreground=FG, insertcolor=FG)
-        style.map("TEntry", fieldbackground=[("focus", FIELD)], foreground=[("focus", FG)])
+    def _clear_body(self) -> None:
+        while self.body.count():
+            item = self.body.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+            elif item.layout():
+                self._clear_layout(item.layout())
+
+    def _clear_layout(self, layout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+            elif item.layout():
+                self._clear_layout(item.layout())
+
+    def _add(self, w: QWidget) -> None:
+        self.body.addWidget(w)
+
+    def _info(self, title: str, text: str) -> None:
+        QMessageBox.information(self, title, text)
+
+    def _error(self, title: str, text: str) -> None:
+        QMessageBox.critical(self, title, text)
+
+    def _radio_group(
+        self,
+        options: List[tuple[str, str, str]],
+        *,
+        key: str,
+        default: str,
+    ) -> QButtonGroup:
+        """options: (value, title, description)."""
+        group = QButtonGroup(self)
+        current = self._state.get(key, default)
+        self._state[key] = current
+        for value, title, desc in options:
+            box = QGroupBox()
+            box.setFlat(True)
+            v = QVBoxLayout(box)
+            rb = QRadioButton(title)
+            rb.setChecked(value == current)
+            group.addButton(rb)
+            group.setId(rb, hash(value) & 0x7FFFFFFF)
+            rb.toggled.connect(
+                lambda on, val=value: self._state.__setitem__(key, val) if on else None
+            )
+            # Store value on button
+            rb.setProperty("nccValue", value)
+            v.addWidget(rb)
+            if desc:
+                d = QLabel(desc)
+                d.setObjectName("nccMuted")
+                d.setWordWrap(True)
+                d.setStyleSheet("padding-left: 22px; color: palette(window-text);")
+                v.addWidget(d)
+            self._add(box)
+
+        def sync() -> None:
+            for b in group.buttons():
+                if b.isChecked():
+                    self._state[key] = b.property("nccValue")
+
+        group.buttonClicked.connect(lambda _b: sync())
+        return group
 
     def _clear_answers(self) -> None:
-        """Drop leftover Homelab/Docker answers when switching install path."""
         self._answers.clear()
 
-    def _entry(self, parent: tk.Misc, textvariable: tk.StringVar, show: str = "") -> tk.Entry:
-        """tk.Entry with readable selection (ttk Entry ignores select colors on many themes)."""
-        kwargs = {
-            "textvariable": textvariable,
-            "bg": FIELD,
-            "fg": FG,
-            "insertbackground": FG,
-            "selectbackground": SELECT_BG,
-            "selectforeground": SELECT_FG,
-            "relief": "flat",
-            "highlightthickness": 1,
-            "highlightbackground": "#333843",
-            "highlightcolor": ACCENT,
-            "font": ("Sans", 11),
-        }
-        if show:
-            kwargs["show"] = show
-        ent = tk.Entry(parent, **kwargs)
-        return ent
+    # ---- navigation ----
 
-    def _option_row(
-        self,
-        parent: tk.Misc,
-        text: str,
-        value: str,
-        variable: tk.StringVar,
-        desc: str = "",
-    ) -> None:
-        """Simple radio row — no card chrome, readable when selected."""
-        row = tk.Frame(parent, bg=BG)
-        row.pack(fill="x", pady=(2, 8), anchor="w")
-        rb = tk.Radiobutton(
-            row,
-            text=text,
-            value=value,
-            variable=variable,
-            bg=BG,
-            fg=FG,
-            activebackground=BG,
-            activeforeground=FG,
-            selectcolor=FIELD,
-            highlightthickness=0,
-            font=("Sans", 11, "bold"),
-            anchor="w",
-            padx=0,
-        )
-        rb.pack(anchor="w")
-        if desc:
-            tk.Label(row, text=desc, bg=BG, fg=MUTED, font=("Sans", 9), wraplength=640, justify="left").pack(
-                anchor="w", padx=22
-            )
-
-    def _build_chrome(self) -> None:
-        self.header = ttk.Label(self, text="", style="Title.TLabel")
-        self.header.pack(anchor="w", padx=24, pady=(20, 4))
-        self.subheader = ttk.Label(self, text="", style="Sub.TLabel", wraplength=680)
-        self.subheader.pack(anchor="w", padx=24, pady=(0, 12))
-
-        self.body = ttk.Frame(self)
-        self.body.pack(fill="both", expand=True, padx=24, pady=8)
-
-        nav = ttk.Frame(self)
-        nav.pack(fill="x", padx=24, pady=(8, 20))
-        self.btn_back = ttk.Button(nav, text="Back", command=self._back)
-        self.btn_back.pack(side="left")
-        self.btn_cancel = ttk.Button(nav, text="Cancel", command=self._cancel)
-        self.btn_cancel.pack(side="right", padx=(8, 0))
-        self.btn_next = ttk.Button(nav, text="Next", style="Accent.TButton", command=self._next)
-        self.btn_next.pack(side="right")
-
-    def _screens(self) -> dict:
+    def _screens(self) -> Dict[str, Callable[[], None]]:
         return {
             "welcome": self._screen_welcome,
             "presets": self._screen_presets,
@@ -426,14 +247,10 @@ class InstallWizard(tk.Tk):
             "confirm": self._screen_confirm,
         }
 
-    def _clear_body(self) -> None:
-        for child in self.body.winfo_children():
-            child.destroy()
-
     def _render(self, name: str) -> None:
         self._clear_body()
         self._screens()[name]()
-        self.btn_back.configure(state=("disabled" if name == "welcome" else "normal"))
+        self.btn_back.setEnabled(name != "welcome")
 
     def _navigate(self, name: str) -> None:
         self._path.append(name)
@@ -446,25 +263,23 @@ class InstallWizard(tk.Tk):
         self._render(self._path[-1])
 
     def _needs_homelab(self) -> bool:
-        return self._vars.get("pending_selection") == "Homelab Server"
+        return self._state.get("pending_selection") == "Homelab Server"
 
     def _needs_from_scratch(self) -> bool:
-        return self._vars.get("pending_selection") == "From Scratch"
+        return self._state.get("pending_selection") == "From Scratch"
 
     def _packages_include_docker(self) -> bool:
-        mods = self._answers.get("PACKAGE_MODULES", "").split()
-        return "docker" in mods
+        return "docker" in self._answers.get("PACKAGE_MODULES", "").split()
 
     def _package_system_type(self) -> str:
-        """systemType used to filter package modules (matches packages assertion)."""
-        preset = self._vars.get("pending_selection") or ""
+        preset = self._state.get("pending_selection") or ""
         if preset == "From Scratch":
-            return self._vars.get("system_type", tk.StringVar(value="desktop")).get() or "desktop"
+            return self._state.get("system_type") or "desktop"
         if preset in ("Server", "Homelab Server"):
             return "server"
         return "desktop"
 
-    def _feature_groups_for_current_type(self) -> List[Tuple[str, List[str]]]:
+    def _feature_groups_for_current_type(self):
         return filter_feature_groups_for_system(
             self.opts.feature_groups,
             self._package_system_type(),
@@ -472,22 +287,18 @@ class InstallWizard(tk.Tk):
         )
 
     def _is_desktop_install(self) -> bool:
-        """True when this path should require at least one browser."""
         if self._needs_homelab():
             return self._answers.get("ENABLE_DESKTOP") == "true"
         if self._needs_from_scratch():
-            st = self._vars.get("system_type", tk.StringVar(value="desktop")).get()
-            de = self._vars.get("desktop_env", tk.StringVar(value="")).get()
-            return st == "desktop" and bool(de)
-        preset = self._vars.get("pending_selection") or ""
-        if preset in ("Server",):
-            return False
-        if preset == "Homelab Server":
+            return self._state.get("system_type") == "desktop" and bool(
+                self._state.get("desktop_env")
+            )
+        preset = self._state.get("pending_selection") or ""
+        if preset in ("Server", "Homelab Server"):
             return False
         return True
 
     def _needs_browsers_after_packages(self) -> bool:
-        """Browser screen right after packages (not Homelab — that waits for hl_desktop)."""
         if self._needs_homelab():
             return False
         return self._is_desktop_install()
@@ -515,29 +326,26 @@ class InstallWizard(tk.Tk):
     def _next(self) -> None:
         step = self._path[-1]
         if step == "welcome":
-            choice = self._vars.get("install_type", tk.StringVar(value="presets")).get()
+            choice = self._state.get("install_type", "presets")
             self._clear_answers()
-            if choice == "advanced":
-                self._navigate("advanced")
-            else:
-                self._navigate("presets")
+            self._navigate("advanced" if choice == "advanced" else "presets")
         elif step == "presets":
-            preset = self._vars.get("preset", tk.StringVar()).get()
+            preset = self._state.get("preset") or ""
             if not preset:
-                messagebox.showinfo("Select a preset", "Please choose a preset to continue.")
+                self._info("Select a preset", "Please choose a preset to continue.")
                 return
             self._clear_answers()
-            self._vars["pending_selection"] = preset
+            self._state["pending_selection"] = preset
             if preset == "From Scratch":
                 self._navigate("custom_type")
             else:
                 self._navigate("packages")
         elif step == "custom_type":
-            st = self._vars.get("system_type", tk.StringVar(value="desktop")).get()
+            st = self._state.get("system_type", "desktop")
             if st == "desktop":
                 self._navigate("custom_de")
             else:
-                self._vars["desktop_env"] = tk.StringVar(value="")
+                self._state["desktop_env"] = ""
                 self._navigate("packages")
         elif step == "custom_de":
             self._navigate("packages")
@@ -545,7 +353,7 @@ class InstallWizard(tk.Tk):
             if not self._capture_packages():
                 return
             if self._needs_from_scratch():
-                self._vars["pending_selection"] = self._build_from_scratch_selection()
+                self._state["pending_selection"] = self._build_custom_selection()
             self._continue_after_packages()
         elif step == "browsers":
             if not self._capture_browsers():
@@ -613,34 +421,39 @@ class InstallWizard(tk.Tk):
             sel = self._build_advanced_selection()
             if sel is None:
                 return
-            self._vars["pending_selection"] = sel
+            self._state["pending_selection"] = sel
             self._navigate("confirm")
         elif step == "confirm":
             self._finish()
 
     def _finish(self) -> None:
-        sel = self._vars.get("pending_selection")
+        sel = self._state.get("pending_selection")
         if not sel:
-            messagebox.showerror("Error", "Nothing selected.")
+            self._error("Error", "Nothing selected.")
             return
-        # Always write answers file (may be empty extras) so backend can skip prompts
         write_answers(self.answers_file, self._answers)
         self._selection = sel
-        self.destroy()
+        self.close()
 
     def _cancel(self) -> None:
         self._selection = None
-        self.destroy()
+        self.close()
 
-    # ---- capture helpers ----
+    def closeEvent(self, event) -> None:  # noqa: N802
+        # Treat window X like cancel unless we already finished
+        if self._selection is None and not getattr(self, "_finishing", False):
+            pass
+        event.accept()
+
+    # ---- capture ----
 
     def _capture_account(self) -> bool:
-        admin = self._vars.get("account_user", tk.StringVar()).get().strip()
+        admin = (self._state.get("account_user") or "").strip()
         if not admin:
-            messagebox.showinfo("Required", "Main username cannot be empty.")
+            self._info("Required", "Main username cannot be empty.")
             return False
         if admin == "root":
-            messagebox.showerror(
+            self._error(
                 "Invalid user",
                 "Don't use 'root' as the main login user.\n"
                 "Pick a normal username (e.g. your own).",
@@ -650,16 +463,15 @@ class InstallWizard(tk.Tk):
         return True
 
     def _capture_packages(self) -> bool:
-        selected: List[str] = []
-        for name, var in self._vars.get("feature_vars", {}).items():
-            if var.get():
-                selected.append(name)
+        checks: Dict[str, QCheckBox] = self._state.get("feature_checks") or {}
+        selected = [n for n, cb in checks.items() if cb.isChecked()]
         st = self._package_system_type()
         selected = filter_features_for_system(
             selected, st, self.opts.feature_system_types
         )
-        selected = resolve_features(selected, self.opts.conflicts, self.opts.dependencies)
-        # Drop deps that aren't allowed for this system type
+        selected = resolve_features(
+            selected, self.opts.conflicts, self.opts.dependencies
+        )
         selected = filter_features_for_system(
             selected, st, self.opts.feature_system_types
         )
@@ -667,10 +479,10 @@ class InstallWizard(tk.Tk):
         return True
 
     def _capture_browsers(self) -> bool:
-        checks = self._vars.get("browser_vars", {})
-        selected = [name for name, var in checks.items() if var.get()]
+        checks: Dict[str, QCheckBox] = self._state.get("browser_checks") or {}
+        selected = [n for n, cb in checks.items() if cb.isChecked()]
         if not selected:
-            messagebox.showinfo(
+            self._info(
                 "Select a browser",
                 "Pick at least one browser for the desktop install.",
             )
@@ -678,18 +490,16 @@ class InstallWizard(tk.Tk):
         self._answers["BROWSERS"] = " ".join(selected)
         return True
 
-    def _build_from_scratch_selection(self) -> str:
-        # alias kept for clarity; same as former custom selection
-        return self._build_custom_selection()
-
     def _build_custom_selection(self) -> str:
-        system_type = self._vars.get("system_type", tk.StringVar(value="desktop")).get()
+        system_type = self._state.get("system_type") or "desktop"
         features: List[str] = []
-        de = self._vars.get("desktop_env", tk.StringVar(value="")).get()
+        de = self._state.get("desktop_env") or ""
         if de:
             features.append(de)
         features.extend(self._answers.get("PACKAGE_MODULES", "").split())
-        features = resolve_features(features, self.opts.conflicts, self.opts.dependencies)
+        features = resolve_features(
+            features, self.opts.conflicts, self.opts.dependencies
+        )
         des = [f for f in features if f in ("plasma", "gnome", "xfce")]
         others = [f for f in features if f not in ("plasma", "gnome", "xfce")]
         if de and de not in des:
@@ -699,12 +509,12 @@ class InstallWizard(tk.Tk):
         return " ".join([system_type] + des + others)
 
     def _capture_hl_basics(self) -> bool:
-        admin = self._vars.get("hl_admin", tk.StringVar()).get().strip()
+        admin = (self._state.get("hl_admin") or "").strip()
         if not admin:
-            messagebox.showinfo("Required", "Admin username cannot be empty.")
+            self._info("Required", "Admin username cannot be empty.")
             return False
         if admin == "root":
-            messagebox.showerror(
+            self._error(
                 "Invalid user",
                 "Don't use 'root' as the admin login user.\n"
                 "Pick a normal username (e.g. your own).",
@@ -714,40 +524,40 @@ class InstallWizard(tk.Tk):
         return True
 
     def _capture_hl_type(self) -> bool:
-        t = self._vars.get("hl_type", tk.StringVar(value="single")).get()
+        t = self._state.get("hl_type") or "single"
         self._answers["HOMELAB_TYPE"] = t
         if t == "single":
             self._answers["SWARM_ROLE"] = "none"
         return True
 
     def _capture_hl_swarm(self) -> bool:
-        role = self._vars.get("hl_swarm", tk.StringVar(value="manager")).get()
+        role = self._state.get("hl_swarm") or "manager"
         self._answers["SWARM_ROLE"] = role
         self._answers["HOMELAB_TYPE"] = "swarm"
         return True
 
     def _capture_hl_docker_user(self) -> bool:
-        use = self._vars.get("hl_extra_user", tk.StringVar(value="yes")).get()
+        use = self._state.get("hl_extra_user") or "yes"
         self._answers["USE_EXTRA_USER"] = use
-        self._answers["DOCKER_USER_SETUP"] = use  # yes/no — bash maps as needed
+        self._answers["DOCKER_USER_SETUP"] = use
         return True
 
     def _capture_hl_virt_user(self) -> bool:
-        virt = self._vars.get("hl_virt_user", tk.StringVar(value="docker")).get().strip() or "docker"
+        virt = (self._state.get("hl_virt_user") or "docker").strip() or "docker"
         admin = self._answers.get("ADMIN_USER", default_admin())
         if virt == admin:
-            messagebox.showerror("Conflict", "Admin user and virtualization user cannot be the same.")
+            self._error("Conflict", "Admin user and virtualization user cannot be the same.")
             return False
-        pw = self._vars.get("hl_virt_pw", tk.StringVar()).get()
-        pw2 = self._vars.get("hl_virt_pw2", tk.StringVar()).get()
-        suggested = self._vars.get("hl_virt_pw_suggested", "")
+        pw = self._state.get("hl_virt_pw") or ""
+        pw2 = self._state.get("hl_virt_pw2") or ""
+        suggested = self._state.get("hl_virt_pw_suggested") or ""
         if not pw and not pw2:
             pw = suggested
         elif len(pw) < 8:
-            messagebox.showerror("Too short", "Password must be at least 8 characters.")
+            self._error("Too short", "Password must be at least 8 characters.")
             return False
         elif pw != pw2:
-            messagebox.showerror("Mismatch", "Passwords do not match.")
+            self._error("Mismatch", "Passwords do not match.")
             return False
         self._answers["VIRT_USER"] = virt
         self._answers["VIRT_PASSWORD"] = pw
@@ -756,28 +566,26 @@ class InstallWizard(tk.Tk):
         return True
 
     def _capture_hl_hosting(self) -> bool:
-        email = self._vars.get("hl_email", tk.StringVar()).get().strip()
-        domain = self._vars.get("hl_domain", tk.StringVar()).get().strip()
+        email = (self._state.get("hl_email") or "").strip()
+        domain = (self._state.get("hl_domain") or "").strip()
         if not EMAIL_RE.match(email):
-            messagebox.showerror("Invalid email", "Please enter a valid email address.")
+            self._error("Invalid email", "Please enter a valid email address.")
             return False
         if not DOMAIN_RE.match(domain):
-            messagebox.showerror("Invalid domain", "Please enter a valid domain (e.g. example.com).")
+            self._error("Invalid domain", "Please enter a valid domain (e.g. example.com).")
             return False
         self._answers["EMAIL"] = email
         self._answers["DOMAIN"] = domain
         return True
 
     def _capture_hl_desktop(self) -> bool:
-        en = self._vars.get("hl_desktop", tk.StringVar(value="true")).get()
-        self._answers["ENABLE_DESKTOP"] = en
+        self._answers["ENABLE_DESKTOP"] = self._state.get("hl_desktop") or "true"
         return True
 
     # ---- screens ----
 
     def _install_type_value(self, label: str) -> str:
         low = label.lower()
-        # "Install bases" (and legacy "Presets")
         if "install base" in low or "preset" in low:
             return "presets"
         if "custom" in low:
@@ -785,299 +593,365 @@ class InstallWizard(tk.Tk):
         return "advanced"
 
     def _screen_welcome(self) -> None:
-        self.header.configure(text="Install NixOS Control Center")
-        self.subheader.configure(
-            text="Pick an install base (then tweak packages), or Advanced to load a host blueprint."
+        self.header.setText("Install NixOS Control Center")
+        self.subheader.setText(
+            "Pick an install base (then tweak packages), or Advanced to load a host blueprint."
         )
-        self.btn_next.configure(text="Next")
+        self.btn_next.setText("Next")
         types = self.opts.install_types or ["Install bases", "Advanced Options"]
-        default = self._install_type_value(types[0])
-        var = self._vars.setdefault("install_type", tk.StringVar(value=default))
+        default = self._state.get("install_type") or self._install_type_value(types[0])
+        opts = []
         for label in types:
             value = self._install_type_value(label)
             title = re.sub(r"^[^\w]+", "", label).strip() or label
             desc = self.opts.desc(title, self.opts.desc(value, ""))
-            self._option_row(self.body, title, value, var, desc)
+            opts.append((value, title, desc))
+        self._radio_group(opts, key="install_type", default=default)
 
     def _screen_presets(self) -> None:
-        self.header.configure(text="Choose an install base")
-        self.subheader.configure(
-            text="Next: add or remove package sets. Homelab starts with docker/database/web-server."
+        self.header.setText("Choose an install base")
+        self.subheader.setText(
+            "Next: add or remove package sets. Homelab starts with docker/database/web-server."
         )
-        self.btn_next.configure(text="Next")
+        self.btn_next.setText("Next")
         presets = self.opts.system_presets + self.opts.device_presets
-        default = presets[0] if presets else "Desktop"
-        var = self._vars.setdefault("preset", tk.StringVar(value=default))
+        default = self._state.get("preset") or (presets[0] if presets else "Desktop")
+        opts = []
         for name in presets:
             defaults = self.opts.preset_defaults.get(name, [])
-            extra = f"Defaults: {', '.join(defaults)}" if defaults else "Defaults: (none — add extras next)"
+            extra = (
+                f"Defaults: {', '.join(defaults)}"
+                if defaults
+                else "Defaults: (none — add extras next)"
+            )
             desc = self.opts.desc(name)
             hint = f"{desc}\n{extra}" if desc else extra
-            self._option_row(self.body, name, name, var, hint)
+            opts.append((name, name, hint))
+        self._radio_group(opts, key="preset", default=default)
 
     def _screen_packages(self) -> None:
-        preset = self._vars.get("pending_selection", "")
+        preset = self._state.get("pending_selection", "")
         st = self._package_system_type()
-        self.header.configure(text="Packages / features")
-        defaults = self.opts.preset_defaults.get(preset, [])
+        self.header.setText("Packages / features")
         defaults = filter_features_for_system(
-            defaults, st, self.opts.feature_system_types
+            self.opts.preset_defaults.get(preset, []),
+            st,
+            self.opts.feature_system_types,
         )
         if preset == "From Scratch":
-            self.subheader.configure(
-                text=f"Select package modules for this {st} install "
+            self.subheader.setText(
+                f"Select package modules for this {st} install "
                 f"(server-only / desktop-only sets are hidden)."
             )
             defaults = []
         else:
-            self.subheader.configure(
-                text=f"Install base “{preset}” ({st}): defaults pre-checked. "
+            self.subheader.setText(
+                f"Install base “{preset}” ({st}): defaults pre-checked. "
                 f"Incompatible modules for this type are hidden."
             )
-        self.btn_next.configure(text="Next")
+        self.btn_next.setText("Next")
 
-        # Reset feature vars when entering from a different preset or system type
-        prev = self._vars.get("_packages_for_preset")
-        prev_st = self._vars.get("_packages_for_system_type")
-        if prev != preset or prev_st != st:
-            self._vars["feature_vars"] = {}
-            self._vars["_packages_for_preset"] = preset
-            self._vars["_packages_for_system_type"] = st
+        prev = self._state.get("_packages_for_preset")
+        prev_st = self._state.get("_packages_for_system_type")
+        saved: Dict[str, bool] = {}
+        if prev == preset and prev_st == st:
+            old = self._state.get("feature_checks") or {}
+            for name, cb in old.items():
+                try:
+                    saved[name] = bool(cb.isChecked())
+                except RuntimeError:
+                    pass
+        self._state["_packages_for_preset"] = preset
+        self._state["_packages_for_system_type"] = st
 
-        checks = self._vars.setdefault("feature_vars", {})
-        canvas = tk.Canvas(self.body, bg=BG, highlightthickness=0)
-        scroll = ttk.Scrollbar(self.body, orient="vertical", command=canvas.yview)
-        inner = ttk.Frame(canvas)
-        inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=inner, anchor="nw")
-        canvas.configure(yscrollcommand=scroll.set)
-        canvas.pack(side="left", fill="both", expand=True)
-        scroll.pack(side="right", fill="y")
-
+        checks: Dict[str, QCheckBox] = {}
+        self._state["feature_checks"] = checks
         default_set = set(defaults)
         groups = self._feature_groups_for_current_type()
         if not groups:
-            ttk.Label(
-                inner,
-                text="No package modules available for this system type.",
-            ).pack(anchor="w", padx=4, pady=8)
+            self._add(QLabel("No package modules available for this system type."))
             return
         for group_name, features in groups:
-            box = ttk.LabelFrame(inner, text=group_name, padding=8)
-            box.pack(fill="x", pady=6, padx=4)
+            box = QGroupBox(group_name)
+            v = QVBoxLayout(box)
             for feat in features:
-                if feat not in checks:
-                    checks[feat] = tk.BooleanVar(value=(feat in default_set))
                 d = self.opts.desc(feat, "")
                 label = f"{feat} — {d}" if d else feat
-                ttk.Checkbutton(box, text=label, variable=checks[feat]).pack(anchor="w")
+                cb = QCheckBox(label)
+                if feat in saved:
+                    cb.setChecked(saved[feat])
+                else:
+                    cb.setChecked(feat in default_set)
+                checks[feat] = cb
+                v.addWidget(cb)
+            self._add(box)
 
     def _screen_browsers(self) -> None:
-        self.header.configure(text="Web browsers")
-        self.subheader.configure(
-            text="Desktop installs need at least one browser. Firefox is pre-selected."
+        self.header.setText("Web browsers")
+        self.subheader.setText(
+            "Desktop installs need at least one browser. Firefox is pre-selected."
         )
-        self.btn_next.configure(text="Next")
-        checks = self._vars.setdefault("browser_vars", {})
+        self.btn_next.setText("Next")
+        saved: Dict[str, bool] = {}
+        for name, cb in (self._state.get("browser_checks") or {}).items():
+            try:
+                saved[name] = bool(cb.isChecked())
+            except RuntimeError:
+                pass
+        checks: Dict[str, QCheckBox] = {}
+        self._state["browser_checks"] = checks
         default = self.opts.browser_default or "firefox"
         for name, label in self.opts.browser_choices:
-            if name not in checks:
-                checks[name] = tk.BooleanVar(value=(name == default))
-            ttk.Checkbutton(self.body, text=label, variable=checks[name]).pack(
-                anchor="w", pady=4
-            )
+            cb = QCheckBox(label)
+            if name in saved:
+                cb.setChecked(saved[name])
+            else:
+                cb.setChecked(name == default)
+            checks[name] = cb
+            self._add(cb)
 
     def _screen_account(self) -> None:
-        self.header.configure(text="Main user")
-        self.subheader.configure(text="Normal login account (not root). Detected from SUDO_USER when possible.")
-        self.btn_next.configure(text="Next")
-        var = self._vars.setdefault("account_user", tk.StringVar(value=default_admin()))
-        ttk.Label(self.body, text="Username").pack(anchor="w")
-        self._entry(self.body, var).pack(anchor="w", fill="x", pady=6)
+        self.header.setText("Main user account")
+        self.subheader.setText("Primary login user for this machine (not root).")
+        self.btn_next.setText("Next")
+        form = QFormLayout()
+        edit = QLineEdit(self._state.get("account_user") or default_admin())
+        edit.textChanged.connect(lambda t: self._state.__setitem__("account_user", t))
+        self._state["account_user"] = edit.text()
+        form.addRow("Username", edit)
+        wrap = QWidget()
+        wrap.setLayout(form)
+        self._add(wrap)
 
     def _screen_custom_type(self) -> None:
-        self.header.configure(text="From Scratch — system type")
-        self.subheader.configure(text="Desktop includes a graphical environment; Server is CLI-first.")
-        self.btn_next.configure(text="Next")
-        var = self._vars.setdefault("system_type", tk.StringVar(value="desktop"))
-        self._option_row(self.body, "Desktop", "desktop", var, self.opts.desc("desktop"))
-        self._option_row(self.body, "Server", "server", var, self.opts.desc("server"))
+        self.header.setText("System type")
+        self.subheader.setText("Desktop includes a graphical environment; Server is CLI-first.")
+        self.btn_next.setText("Next")
+        self._radio_group(
+            [
+                ("desktop", "Desktop", self.opts.desc("desktop")),
+                ("server", "Server", self.opts.desc("server")),
+            ],
+            key="system_type",
+            default=self._state.get("system_type") or "desktop",
+        )
 
     def _screen_custom_de(self) -> None:
-        self.header.configure(text="Desktop environment")
-        self.subheader.configure(text="Pick the UI you want (or None for CLI-only).")
-        self.btn_next.configure(text="Next")
+        self.header.setText("Desktop environment")
+        self.subheader.setText("Pick the UI you want (or None for CLI-only).")
+        self.btn_next.setText("Next")
         envs = self.opts.desktop_envs or ["plasma", "gnome", "xfce", ""]
-        default = "plasma" if "plasma" in envs else envs[0]
-        var = self._vars.setdefault("desktop_env", tk.StringVar(value=default))
+        default = self._state.get("desktop_env")
+        if default is None:
+            default = "plasma" if "plasma" in envs else envs[0]
+        opts = []
         for env_id in envs:
             label = self.opts.desktop_env_label(env_id)
             desc_key = "plasma (kde)" if env_id == "plasma" else (env_id or "none")
-            self._option_row(self.body, label, env_id, var, self.opts.desc(desc_key))
+            opts.append((env_id, label, self.opts.desc(desc_key)))
+        self._radio_group(opts, key="desktop_env", default=default)
 
     def _screen_hl_basics(self) -> None:
-        self.header.configure(text="Homelab — admin user")
-        self.subheader.configure(text="Primary admin account for this machine (not root).")
-        self.btn_next.configure(text="Next")
-        var = self._vars.setdefault("hl_admin", tk.StringVar(value=default_admin()))
-        ttk.Label(self.body, text="Admin username").pack(anchor="w")
-        self._entry(self.body, var).pack(anchor="w", fill="x", pady=6)
+        self.header.setText("Homelab — admin user")
+        self.subheader.setText("Primary admin account for this machine (not root).")
+        self.btn_next.setText("Next")
+        form = QFormLayout()
+        edit = QLineEdit(self._state.get("hl_admin") or default_admin())
+        edit.textChanged.connect(lambda t: self._state.__setitem__("hl_admin", t))
+        self._state["hl_admin"] = edit.text()
+        form.addRow("Admin username", edit)
+        wrap = QWidget()
+        wrap.setLayout(form)
+        self._add(wrap)
 
     def _screen_hl_type(self) -> None:
-        self.header.configure(text="Homelab — topology")
-        self.subheader.configure(text="Single server is the default. Multi-server uses Docker Swarm.")
-        self.btn_next.configure(text="Next")
-        var = self._vars.setdefault("hl_type", tk.StringVar(value="single"))
-        ttk.Radiobutton(self.body, text="Single server", value="single", variable=var).pack(anchor="w", pady=4)
-        ttk.Radiobutton(
-            self.body, text="Multi-server (Docker Swarm)", value="swarm", variable=var
-        ).pack(anchor="w", pady=4)
+        self.header.setText("Homelab — topology")
+        self.subheader.setText("Single server is the default. Multi-server uses Docker Swarm.")
+        self.btn_next.setText("Next")
+        self._radio_group(
+            [
+                ("single", "Single server", ""),
+                ("swarm", "Multi-server (Docker Swarm)", ""),
+            ],
+            key="hl_type",
+            default=self._state.get("hl_type") or "single",
+        )
 
     def _screen_hl_swarm(self) -> None:
-        self.header.configure(text="Homelab — Swarm role")
-        self.subheader.configure(text="Manager coordinates the swarm; Worker joins an existing one.")
-        self.btn_next.configure(text="Next")
-        var = self._vars.setdefault("hl_swarm", tk.StringVar(value="manager"))
-        ttk.Radiobutton(self.body, text="Manager", value="manager", variable=var).pack(anchor="w", pady=4)
-        ttk.Radiobutton(self.body, text="Worker", value="worker", variable=var).pack(anchor="w", pady=4)
+        self.header.setText("Homelab — Swarm role")
+        self.subheader.setText("Manager coordinates the swarm; Worker joins an existing one.")
+        self.btn_next.setText("Next")
+        self._radio_group(
+            [
+                ("manager", "Manager", ""),
+                ("worker", "Worker", ""),
+            ],
+            key="hl_swarm",
+            default=self._state.get("hl_swarm") or "manager",
+        )
 
     def _screen_hl_docker_user(self) -> None:
-        self.header.configure(text="Docker user setup")
-        self.subheader.configure(
-            text="A separate virtualization user is safer for Docker. Recommended for Homelab."
+        self.header.setText("Docker user setup")
+        self.subheader.setText(
+            "A separate virtualization user is safer for Docker. Recommended for Homelab."
         )
-        self.btn_next.configure(text="Next")
-        var = self._vars.setdefault("hl_extra_user", tk.StringVar(value="yes"))
-        ttk.Radiobutton(
-            self.body, text="Yes — separate Docker/virt user", value="yes", variable=var
-        ).pack(anchor="w", pady=4)
-        ttk.Radiobutton(
-            self.body, text="No — use the admin user only", value="no", variable=var
-        ).pack(anchor="w", pady=4)
+        self.btn_next.setText("Next")
+        self._radio_group(
+            [
+                ("yes", "Yes — separate Docker/virt user", ""),
+                ("no", "No — use the admin user only", ""),
+            ],
+            key="hl_extra_user",
+            default=self._state.get("hl_extra_user") or "yes",
+        )
 
     def _screen_hl_virt_user(self) -> None:
-        self.header.configure(text="Virtualization user")
-        self.subheader.configure(
-            text="Username + password for the Docker/virt account. Leave password empty for a random one."
+        self.header.setText("Virtualization user")
+        self.subheader.setText(
+            "Username + password for the Docker/virt account. Leave password empty for a random one."
         )
-        self.btn_next.configure(text="Next")
-        suggested = f"P@ssw0rd-{secrets.token_hex(4)}"
-        self._vars["hl_virt_pw_suggested"] = suggested
-        u = self._vars.setdefault("hl_virt_user", tk.StringVar(value="docker"))
-        p1 = self._vars.setdefault("hl_virt_pw", tk.StringVar())
-        p2 = self._vars.setdefault("hl_virt_pw2", tk.StringVar())
-        ttk.Label(self.body, text="Username").pack(anchor="w")
-        self._entry(self.body, u).pack(anchor="w", fill="x", pady=(0, 8))
-        ttk.Label(self.body, text=f"Suggested password: {suggested}", style="Sub.TLabel").pack(anchor="w")
-        ttk.Label(self.body, text="Password (empty = use suggested)").pack(anchor="w", pady=(8, 0))
-        self._entry(self.body, p1, show="•").pack(anchor="w", fill="x", pady=(0, 8))
-        ttk.Label(self.body, text="Confirm password").pack(anchor="w")
-        self._entry(self.body, p2, show="•").pack(anchor="w", fill="x", pady=(0, 8))
+        self.btn_next.setText("Next")
+        suggested = self._state.get("hl_virt_pw_suggested") or f"P@ssw0rd-{secrets.token_hex(4)}"
+        self._state["hl_virt_pw_suggested"] = suggested
+        form = QFormLayout()
+        u = QLineEdit(self._state.get("hl_virt_user") or "docker")
+        u.textChanged.connect(lambda t: self._state.__setitem__("hl_virt_user", t))
+        self._state["hl_virt_user"] = u.text()
+        form.addRow("Username", u)
+        hint = QLabel(f"Suggested password: {suggested}")
+        hint.setObjectName("nccMuted")
+        form.addRow("", hint)
+        p1 = QLineEdit(self._state.get("hl_virt_pw") or "")
+        p1.setEchoMode(QLineEdit.EchoMode.Password)
+        p1.textChanged.connect(lambda t: self._state.__setitem__("hl_virt_pw", t))
+        form.addRow("Password (empty = use suggested)", p1)
+        p2 = QLineEdit(self._state.get("hl_virt_pw2") or "")
+        p2.setEchoMode(QLineEdit.EchoMode.Password)
+        p2.textChanged.connect(lambda t: self._state.__setitem__("hl_virt_pw2", t))
+        form.addRow("Confirm password", p2)
+        wrap = QWidget()
+        wrap.setLayout(form)
+        self._add(wrap)
 
     def _screen_hl_hosting(self) -> None:
-        self.header.configure(text="Homelab — hosting")
-        self.subheader.configure(text="Used for certificates / reverse-proxy defaults.")
-        self.btn_next.configure(text="Next")
-        email = self._vars.setdefault("hl_email", tk.StringVar(value=os.environ.get("HOST_EMAIL", "")))
-        domain = self._vars.setdefault("hl_domain", tk.StringVar(value=os.environ.get("HOST_DOMAIN", "")))
-        ttk.Label(self.body, text="Email").pack(anchor="w")
-        self._entry(self.body, email).pack(anchor="w", fill="x", pady=(0, 8))
-        ttk.Label(self.body, text="Domain (e.g. example.com)").pack(anchor="w")
-        self._entry(self.body, domain).pack(anchor="w", fill="x", pady=(0, 8))
+        self.header.setText("Homelab — hosting")
+        self.subheader.setText("Used for certificates / reverse-proxy defaults.")
+        self.btn_next.setText("Next")
+        form = QFormLayout()
+        email = QLineEdit(
+            self._state.get("hl_email") or os.environ.get("HOST_EMAIL", "")
+        )
+        email.textChanged.connect(lambda t: self._state.__setitem__("hl_email", t))
+        self._state["hl_email"] = email.text()
+        form.addRow("Email", email)
+        domain = QLineEdit(
+            self._state.get("hl_domain") or os.environ.get("HOST_DOMAIN", "")
+        )
+        domain.textChanged.connect(lambda t: self._state.__setitem__("hl_domain", t))
+        self._state["hl_domain"] = domain.text()
+        form.addRow("Domain (e.g. example.com)", domain)
+        wrap = QWidget()
+        wrap.setLayout(form)
+        self._add(wrap)
 
     def _screen_hl_desktop(self) -> None:
-        self.header.configure(text="Homelab — desktop")
-        self.subheader.configure(
-            text='Enable a desktop environment on this server? ("no" can be buggy until reboot after build.)'
+        self.header.setText("Homelab — desktop")
+        self.subheader.setText(
+            'Enable a desktop environment on this server? ("no" can be buggy until reboot after build.)'
         )
-        self.btn_next.configure(text="Next")
-        var = self._vars.setdefault("hl_desktop", tk.StringVar(value="true"))
-        ttk.Radiobutton(self.body, text="Yes — enable desktop (Plasma)", value="true", variable=var).pack(
-            anchor="w", pady=4
+        self.btn_next.setText("Next")
+        self._radio_group(
+            [
+                ("true", "Yes — enable desktop (Plasma)", ""),
+                ("false", "No — CLI only", ""),
+            ],
+            key="hl_desktop",
+            default=self._state.get("hl_desktop") or "true",
         )
-        ttk.Radiobutton(self.body, text="No — CLI only", value="false", variable=var).pack(anchor="w", pady=4)
 
     def _screen_advanced(self) -> None:
-        self.header.configure(text="Advanced options")
-        self.subheader.configure(text="Load a host blueprint or import an existing systemConfig.")
-        self.btn_next.configure(text="Next")
-        var = self._vars.setdefault("advanced_action", tk.StringVar(value="profiles"))
-        ttk.Radiobutton(
-            self.body, text="Browse available host blueprints", value="profiles", variable=var
-        ).pack(anchor="w", pady=4)
-        ttk.Radiobutton(
-            self.body, text="Load host blueprint from file…", value="file", variable=var
-        ).pack(anchor="w", pady=4)
-        ttk.Radiobutton(
-            self.body, text="Import existing system config", value="import", variable=var
-        ).pack(anchor="w", pady=4)
-
-        self._vars.setdefault("profile_pick", tk.StringVar(value=""))
+        self.header.setText("Advanced options")
+        self.subheader.setText("Load a host blueprint or import an existing systemConfig.")
+        self.btn_next.setText("Next")
+        self._radio_group(
+            [
+                ("profiles", "Browse available host blueprints", ""),
+                ("file", "Load host blueprint from file…", ""),
+                ("import", "Import existing system config", ""),
+            ],
+            key="advanced_action",
+            default=self._state.get("advanced_action") or "profiles",
+        )
         plist = host_blueprints_dir()
         names = sorted(p.name for p in plist.iterdir() if p.is_file()) if plist.is_dir() else []
         if names:
-            ttk.Label(self.body, text="Host blueprints:", style="Sub.TLabel").pack(anchor="w", pady=(12, 4))
-            lb = tk.Listbox(
-                self.body,
-                height=min(8, len(names)),
-                bg="#242830",
-                fg="#e8eaed",
-                selectbackground="#4a9eff",
-                relief="flat",
-                font=("Sans", 11),
-            )
+            self._add(QLabel("Host blueprints:"))
+            lb = QListWidget()
+            lb.setMaximumHeight(180)
             for n in names:
-                lb.insert("end", n)
-            lb.pack(fill="x")
-            lb.bind(
-                "<<ListboxSelect>>",
-                lambda _e: self._vars["profile_pick"].set(lb.get(lb.curselection()[0]))
-                if lb.curselection()
-                else None,
+                lb.addItem(QListWidgetItem(n))
+            pick = self._state.get("profile_pick") or ""
+            if pick:
+                matches = lb.findItems(pick, Qt.MatchFlag.MatchExactly)
+                if matches:
+                    lb.setCurrentItem(matches[0])
+            lb.currentTextChanged.connect(
+                lambda t: self._state.__setitem__("profile_pick", t)
             )
+            self._add(lb)
         else:
-            ttk.Label(self.body, text=f"No host blueprints in {plist}", style="Sub.TLabel").pack(anchor="w")
+            self._add(QLabel(f"No host blueprints in {plist}"))
 
     def _screen_confirm(self) -> None:
-        dry = os.environ.get("NCC_DRY_RUN", "").lower() in ("1", "true", "yes", "on")
-        self.header.configure(text="Confirm" + (" (DRY-RUN)" if dry else ""))
-        self.subheader.configure(
-            text=(
-                "DRY-RUN: validate path only — nothing will be written or deployed."
-                if dry
-                else "Review selection and answers, then start install."
-            )
+        dry = _is_dry_run()
+        self.header.setText("Confirm" + (" (DRY-RUN)" if dry else ""))
+        self.subheader.setText(
+            "DRY-RUN: validate path only — nothing will be written or deployed."
+            if dry
+            else "Review selection and answers, then start install."
         )
-        self.btn_next.configure(text="Dry-run" if dry else "Install")
-        sel = self._vars.get("pending_selection", "")
-        ttk.Label(self.body, text="Selection", style="Sub.TLabel").pack(anchor="w")
-        ttk.Label(self.body, text=sel, wraplength=640, font=("Mono", 11)).pack(anchor="w", pady=(0, 12))
+        self.btn_next.setText("Dry-run" if dry else "Install")
+        sel = self._state.get("pending_selection", "")
+        self._add(QLabel("Selection"))
+        sel_l = QLabel(str(sel))
+        sel_l.setWordWrap(True)
+        sel_l.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        mono = QFont("monospace")
+        mono.setStyleHint(QFont.StyleHint.Monospace)
+        sel_l.setFont(mono)
+        self._add(sel_l)
         if self._answers:
-            ttk.Label(self.body, text="Answers", style="Sub.TLabel").pack(anchor="w")
+            self._add(QLabel("Answers"))
             safe = {
                 k: ("••••••••" if "PASSWORD" in k else v)
                 for k, v in self._answers.items()
                 if v != ""
             }
             summary = "\n".join(f"{k}={v}" for k, v in safe.items()) or "(none)"
-            ttk.Label(self.body, text=summary, wraplength=640, font=("Mono", 10)).pack(anchor="w")
+            ans = QLabel(summary)
+            ans.setWordWrap(True)
+            ans.setFont(mono)
+            ans.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            self._add(ans)
 
     def _build_advanced_selection(self) -> Optional[str]:
-        action = self._vars.get("advanced_action", tk.StringVar(value="profiles")).get()
+        action = self._state.get("advanced_action") or "profiles"
         if action == "profiles":
-            name = self._vars.get("profile_pick", tk.StringVar()).get()
+            name = self._state.get("profile_pick") or ""
             if not name:
-                messagebox.showinfo("Pick a blueprint", "Select a host blueprint from the list.")
+                self._info("Pick a blueprint", "Select a host blueprint from the list.")
                 return None
             path = host_blueprints_dir() / name
             if not path.is_file():
-                messagebox.showerror("Missing", f"Host blueprint not found:\n{path}")
+                self._error("Missing", f"Host blueprint not found:\n{path}")
                 return None
             return f"LOAD_BLUEPRINT:{path}"
         if action == "file":
-            path = filedialog.askopenfilename(
-                title="Select host blueprint",
-                filetypes=[("Nix / blueprint", "*.nix *"), ("All", "*")],
+            path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Select host blueprint",
+                "",
+                "Nix / blueprint (*.nix *);;All (*)",
             )
             if not path:
                 return None
@@ -1087,15 +961,11 @@ class InstallWizard(tk.Tk):
         for candidate in (monolith, cfg):
             if candidate and Path(candidate).is_file():
                 return f"IMPORT_CONFIG:{candidate}"
-        messagebox.showerror(
+        self._error(
             "No config",
             f"No existing config found at:\n{monolith}\nor\n{cfg}",
         )
         return None
-
-    def run(self) -> Optional[str]:
-        self.mainloop()
-        return self._selection
 
 
 def main() -> int:
@@ -1123,21 +993,30 @@ def main() -> int:
         print(f"Failed to load options from shell: {exc}", file=sys.stderr)
         return 2
 
+    app = QApplication.instance() or QApplication(sys.argv)
+    app.setApplicationName("NCC Install")
+    if APP_STYLE:
+        app.setStyleSheet(APP_STYLE)
+    icon = app_icon()
+    if not icon.isNull():
+        app.setWindowIcon(icon)
+
     try:
-        app = InstallWizard(answers, options)
-    except tk.TclError as exc:
+        win = InstallWizard(answers, options)
+    except Exception as exc:
         print(f"Failed to start GUI: {exc}", file=sys.stderr)
         return 2
 
-    selection = app.run()
+    win.show()
+    app.exec()
+    selection = win.selection()
     if not selection:
         print("Install cancelled.", file=sys.stderr)
         return 1
-    # Ensure parent knows the path even if it set NCC_GUI_ANSWERS_FILE already
     print(f"NCC_GUI_ANSWERS_FILE={answers}", file=sys.stderr)
     print(selection)
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

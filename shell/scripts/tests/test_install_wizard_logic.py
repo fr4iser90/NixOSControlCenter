@@ -1,49 +1,20 @@
 #!/usr/bin/env python3
-"""Unit tests for install_wizard.py logic (no Tk display required)."""
+"""Unit tests for install_wizard_logic.py (no GUI display required)."""
 
 from __future__ import annotations
 
 import os
 import sys
 import tempfile
-import types
 import unittest
 from pathlib import Path
 from unittest import mock
 
-# Mock tkinter before importing the wizard module (headless CI / no DISPLAY).
-_tk = types.ModuleType("tkinter")
-_tk.Tk = mock.MagicMock
-_tk.StringVar = mock.MagicMock
-_tk.BooleanVar = mock.MagicMock
-_tk.Misc = object
-_tk.Entry = mock.MagicMock
-_tk.Frame = mock.MagicMock
-_tk.Label = mock.MagicMock
-_tk.Radiobutton = mock.MagicMock
-_tk.Checkbutton = mock.MagicMock
-_tk.Button = mock.MagicMock
-_tk.Canvas = mock.MagicMock
-_tk.Scrollbar = mock.MagicMock
-_tk.LEFT = "left"
-_tk.RIGHT = "right"
-_tk.BOTH = "both"
-_tk.X = "x"
-_tk.Y = "y"
-_tk.END = "end"
-_tk.NORMAL = "normal"
-_tk.DISABLED = "disabled"
-_tk.WORD = "word"
-sys.modules["tkinter"] = _tk
-sys.modules["tkinter.ttk"] = types.ModuleType("tkinter.ttk")
-sys.modules["tkinter.filedialog"] = types.ModuleType("tkinter.filedialog")
-sys.modules["tkinter.messagebox"] = types.ModuleType("tkinter.messagebox")
-
 ROOT = Path(__file__).resolve().parents[3]
-WIZARD = ROOT / "shell" / "scripts" / "ui" / "gui" / "install_wizard.py"
-sys.path.insert(0, str(WIZARD.parent))
+GUI = ROOT / "shell" / "scripts" / "ui" / "gui"
+sys.path.insert(0, str(GUI))
 
-import install_wizard as wiz  # noqa: E402
+import install_wizard_logic as wiz  # noqa: E402
 
 
 class WizardLogicTests(unittest.TestCase):
@@ -90,7 +61,6 @@ class WizardLogicTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertIn("ADMIN_USER=", text)
             self.assertIn("PACKAGE_MODULES=", text)
-            # sourcable by bash
             import subprocess
 
             out = subprocess.check_output(
@@ -167,11 +137,17 @@ class WizardLogicTests(unittest.TestCase):
         ):
             with mock.patch("getpass.getuser", return_value="root"):
                 name = wiz.default_admin()
-                # Last resort may still be "root" from SUDO_USER, or "user"
                 self.assertIn(name, ("root", "user"))
                 self.assertTrue(isinstance(name, str) and len(name) > 0)
 
+    def test_homelab_defaults_present(self) -> None:
+        opts = wiz.load_options()
+        self.assertEqual(
+            opts.preset_defaults["Homelab Server"],
+            ["docker", "database", "web-server"],
+        )
+
+
 if __name__ == "__main__":
-    # Fail loud
     result = unittest.main(verbosity=2, exit=False)
     sys.exit(0 if result.result.wasSuccessful() else 1)

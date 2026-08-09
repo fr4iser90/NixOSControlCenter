@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Single-question GUI dialogs for install prompts (fallback mid-flow).
+"""Single-question GUI dialogs for install prompts (mid-flow fallback).
+
+PySide6 + NCC APP_STYLE — same look as the install wizard / Control Center.
 
 Usage:
   gui_ask.py text TITLE PROMPT [DEFAULT]
@@ -10,144 +12,235 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import sys
-import tkinter as tk
-from tkinter import messagebox, ttk
+from collections.abc import Callable
+from pathlib import Path
 from typing import List, Optional
 
+_GUI_ENGINE = (
+    Path(__file__).resolve().parents[4]
+    / "nixos"
+    / "core"
+    / "management"
+    / "gui-engine"
+    / "python"
+)
+if _GUI_ENGINE.is_dir():
+    sys.path.insert(0, str(_GUI_ENGINE))
 
-def _style(root: tk.Tk) -> None:
-    root.configure(bg="#1a1d23")
-    style = ttk.Style(root)
-    try:
-        style.theme_use("clam")
-    except tk.TclError:
-        pass
-    bg, fg, card = "#1a1d23", "#e8eaed", "#242830"
-    style.configure(".", background=bg, foreground=fg, fieldbackground=card)
-    style.configure("TFrame", background=bg)
-    style.configure("TLabel", background=bg, foreground=fg, font=("Sans", 11))
-    style.configure("Title.TLabel", background=bg, foreground=fg, font=("Sans", 14, "bold"))
-    style.configure("Sub.TLabel", background=bg, foreground="#9aa0a6", font=("Sans", 10))
-    style.configure("TButton", font=("Sans", 10), padding=8)
-    style.configure("TRadiobutton", background=bg, foreground=fg, font=("Sans", 11))
-    style.configure("TEntry", fieldbackground=card, foreground=fg)
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QApplication,
+    QButtonGroup,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QRadioButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
+
+try:
+    from ncc_gui.theme import APP_STYLE
+except ImportError:  # pragma: no cover
+    APP_STYLE = ""
+
+try:
+    from ncc_gui.branding import app_icon
+except ImportError:  # pragma: no cover
+
+    def app_icon():  # type: ignore[misc]
+        from PySide6.QtGui import QIcon
+
+        return QIcon()
 
 
-class AskApp(tk.Tk):
-    def __init__(self, title: str, prompt: str) -> None:
+def _ensure_app() -> QApplication:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+    if APP_STYLE:
+        app.setStyleSheet(APP_STYLE)
+    icon = app_icon()
+    if not icon.isNull():
+        app.setWindowIcon(icon)
+    return app  # type: ignore[return-value]
+
+
+class AskDialog(QDialog):
+    def __init__(self, title: str, prompt: str, *, min_h: int = 220) -> None:
         super().__init__()
-        self.title(title)
-        self.geometry("520x280")
-        self.minsize(420, 220)
-        self.result: Optional[str] = None
-        _style(self)
-        self.protocol("WM_DELETE_WINDOW", self._cancel)
-        ttk.Label(self, text=title, style="Title.TLabel").pack(anchor="w", padx=20, pady=(16, 4))
-        ttk.Label(self, text=prompt, style="Sub.TLabel", wraplength=460).pack(anchor="w", padx=20, pady=(0, 12))
-        self.body = ttk.Frame(self)
-        self.body.pack(fill="both", expand=True, padx=20)
-        nav = ttk.Frame(self)
-        nav.pack(fill="x", padx=20, pady=16)
-        ttk.Button(nav, text="Cancel", command=self._cancel).pack(side="right", padx=(8, 0))
-        ttk.Button(nav, text="OK", command=self._ok).pack(side="right")
-        self.bind("<Return>", lambda _e: self._ok())
-        self.bind("<Escape>", lambda _e: self._cancel())
+        self.setWindowTitle(title)
+        self.setMinimumSize(480, min_h)
+        self.resize(540, max(280, min_h))
+        self._result: Optional[str] = None
+        self._ok_handler: Callable[[], None] = self.accept
 
-    def _ok(self) -> None:
-        self.destroy()
+        root = QWidget(self)
+        root.setObjectName("nccShellRoot")
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(root)
 
-    def _cancel(self) -> None:
-        self.result = None
-        self.destroy()
+        lay = QVBoxLayout(root)
+        lay.setContentsMargins(20, 16, 20, 16)
+        lay.setSpacing(10)
+
+        brand = QLabel("NCC")
+        brand.setObjectName("nccPageTitle")
+        lay.addWidget(brand)
+
+        h = QLabel(title)
+        h.setObjectName("nccPageTitle")
+        lay.addWidget(h)
+
+        sub = QLabel(prompt)
+        sub.setObjectName("nccPageSubtitle")
+        sub.setWordWrap(True)
+        lay.addWidget(sub)
+
+        self.body = QVBoxLayout()
+        self.body.setAlignment(Qt.AlignmentFlag.AlignTop)
+        lay.addLayout(self.body, stretch=1)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        ok = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        if ok is not None:
+            ok.setObjectName("nccPrimaryButton")
+            ok.setText("OK")
+        buttons.accepted.connect(lambda: self._ok_handler())
+        buttons.rejected.connect(self.reject)
+        lay.addWidget(buttons)
+
+    def result_value(self) -> Optional[str]:
+        if self.exec() != QDialog.DialogCode.Accepted:
+            return None
+        return self._result
 
 
 def ask_text(title: str, prompt: str, default: str = "") -> Optional[str]:
-    app = AskApp(title, prompt)
-    var = tk.StringVar(value=default)
-    entry = ttk.Entry(app.body, textvariable=var, width=48)
-    entry.pack(fill="x", pady=8)
-    entry.focus_set()
+    _ensure_app()
+    dlg = AskDialog(title, prompt)
+    edit = QLineEdit(default)
+    dlg.body.addWidget(edit)
+    edit.setFocus()
 
     def _ok() -> None:
-        app.result = var.get().strip() or default
-        if not app.result:
-            messagebox.showinfo("Required", "Please enter a value.")
+        val = edit.text().strip() or default
+        if not val:
+            QMessageBox.information(dlg, "Required", "Please enter a value.")
             return
-        app.destroy()
+        dlg._result = val
+        dlg.accept()
 
-    app._ok = _ok  # type: ignore[method-assign]
-    app.mainloop()
-    return app.result
+    dlg._ok_handler = _ok
+    return dlg.result_value()
 
 
 def ask_yesno(title: str, prompt: str, default: str = "y") -> Optional[str]:
-    app = AskApp(title, prompt)
+    _ensure_app()
+    dlg = AskDialog(title, prompt)
     default_norm = "y" if default.lower() in ("y", "yes", "true") else "n"
-    var = tk.StringVar(value=default_norm)
-    ttk.Radiobutton(app.body, text="Yes", value="y", variable=var).pack(anchor="w", pady=4)
-    ttk.Radiobutton(app.body, text="No", value="n", variable=var).pack(anchor="w", pady=4)
+    group = QButtonGroup(dlg)
+    for label, value in (("Yes", "y"), ("No", "n")):
+        rb = QRadioButton(label)
+        rb.setChecked(value == default_norm)
+        rb.setProperty("nccValue", value)
+        group.addButton(rb)
+        dlg.body.addWidget(rb)
 
     def _ok() -> None:
-        app.result = var.get()
-        app.destroy()
+        for b in group.buttons():
+            if b.isChecked():
+                dlg._result = str(b.property("nccValue"))
+                break
+        dlg.accept()
 
-    app._ok = _ok  # type: ignore[method-assign]
-    app.mainloop()
-    return app.result
+    dlg._ok_handler = _ok
+    return dlg.result_value()
 
 
-def ask_choice(title: str, prompt: str, options: List[str], default: str = "") -> Optional[str]:
-    app = AskApp(title, prompt)
-    app.geometry("520x360")
-    var = tk.StringVar(value=default if default in options else (options[0] if options else ""))
+def ask_choice(
+    title: str, prompt: str, options: List[str], default: str = ""
+) -> Optional[str]:
+    _ensure_app()
+    dlg = AskDialog(title, prompt, min_h=320)
+    current = default if default in options else (options[0] if options else "")
+    group = QButtonGroup(dlg)
+
+    scroll = QScrollArea()
+    scroll.setWidgetResizable(True)
+    scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+    host = QWidget()
+    host_lay = QVBoxLayout(host)
+    host_lay.setAlignment(Qt.AlignmentFlag.AlignTop)
     for opt in options:
-        ttk.Radiobutton(app.body, text=opt, value=opt, variable=var).pack(anchor="w", pady=3)
+        rb = QRadioButton(opt)
+        rb.setChecked(opt == current)
+        rb.setProperty("nccValue", opt)
+        group.addButton(rb)
+        host_lay.addWidget(rb)
+    scroll.setWidget(host)
+    dlg.body.addWidget(scroll)
 
     def _ok() -> None:
-        app.result = var.get()
-        app.destroy()
+        for b in group.buttons():
+            if b.isChecked():
+                dlg._result = str(b.property("nccValue"))
+                break
+        dlg.accept()
 
-    app._ok = _ok  # type: ignore[method-assign]
-    app.mainloop()
-    return app.result
+    dlg._ok_handler = _ok
+    return dlg.result_value()
 
 
 def ask_password(title: str, prompt: str, hint: str = "") -> Optional[str]:
-    app = AskApp(title, prompt + (("\n" + hint) if hint else ""))
-    app.geometry("520x320")
-    p1 = tk.StringVar()
-    p2 = tk.StringVar()
-    ttk.Label(app.body, text="Password").pack(anchor="w")
-    e1 = ttk.Entry(app.body, textvariable=p1, show="•", width=48)
-    e1.pack(fill="x", pady=(0, 8))
-    ttk.Label(app.body, text="Confirm").pack(anchor="w")
-    ttk.Entry(app.body, textvariable=p2, show="•", width=48).pack(fill="x", pady=(0, 8))
+    _ensure_app()
+    full = prompt + (("\n" + hint) if hint else "")
+    dlg = AskDialog(title, full, min_h=300)
+    form = QFormLayout()
+    p1 = QLineEdit()
+    p1.setEchoMode(QLineEdit.EchoMode.Password)
+    p2 = QLineEdit()
+    p2.setEchoMode(QLineEdit.EchoMode.Password)
+    form.addRow("Password", p1)
+    form.addRow("Confirm", p2)
+    wrap = QWidget()
+    wrap.setLayout(form)
+    dlg.body.addWidget(wrap)
     if hint:
-        ttk.Label(app.body, text="Leave empty to use the suggested/random password.", style="Sub.TLabel").pack(
-            anchor="w"
-        )
-    e1.focus_set()
+        note = QLabel("Leave empty to use the suggested/random password.")
+        note.setObjectName("nccMuted")
+        note.setWordWrap(True)
+        dlg.body.addWidget(note)
+    p1.setFocus()
 
     def _ok() -> None:
-        a, b = p1.get(), p2.get()
+        a, b = p1.text(), p2.text()
         if not a and not b:
-            # empty = accept random/default (caller handles)
-            app.result = ""
-            app.destroy()
+            dlg._result = ""
+            dlg.accept()
             return
         if len(a) < 8:
-            messagebox.showerror("Too short", "Password must be at least 8 characters.")
+            QMessageBox.critical(
+                dlg, "Too short", "Password must be at least 8 characters."
+            )
             return
         if a != b:
-            messagebox.showerror("Mismatch", "Passwords do not match.")
+            QMessageBox.critical(dlg, "Mismatch", "Passwords do not match.")
             return
-        app.result = a
-        app.destroy()
+        dlg._result = a
+        dlg.accept()
 
-    app._ok = _ok  # type: ignore[method-assign]
-    app.mainloop()
-    return app.result
+    dlg._ok_handler = _ok
+    return dlg.result_value()
 
 
 def main(argv: List[str]) -> int:
@@ -157,7 +250,7 @@ def main(argv: List[str]) -> int:
     ask_type, title, prompt = argv[0], argv[1], argv[2]
     rest = argv[3:]
 
-    if not (__import__("os").environ.get("DISPLAY") or __import__("os").environ.get("WAYLAND_DISPLAY")):
+    if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
         print("No graphical display", file=sys.stderr)
         return 2
 
@@ -179,7 +272,7 @@ def main(argv: List[str]) -> int:
         else:
             print(f"Unknown ask type: {ask_type}", file=sys.stderr)
             return 2
-    except tk.TclError as exc:
+    except Exception as exc:
         print(f"GUI failed: {exc}", file=sys.stderr)
         return 2
 
@@ -190,4 +283,4 @@ def main(argv: List[str]) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    raise SystemExit(main(sys.argv[1:]))

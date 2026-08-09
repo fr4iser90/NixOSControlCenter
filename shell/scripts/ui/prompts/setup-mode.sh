@@ -5,7 +5,13 @@
 # declare -p SUB_OPTIONS # This might be sourced from setup-options.sh now
 
 # Prefer GUI when a display is available (friends / non-terminal). Override with:
-#   NCC_INSTALL_UI=gui|tui|auto   (default: auto)
+#   NCC_INSTALL_UI=gui|fzf|auto   (default: auto)
+# Naming (align with NCC runtime):
+#   GUI  = PySide6 install wizard
+#   fzf  = terminal fzf menus (installer only) — NOT Go tui-engine
+#   CLI  = ncc <domain> <verb> (runtime; not this installer)
+#   TUI  = Go tui-engine (runtime --tui) — do not use that word for fzf here
+# Legacy: NCC_INSTALL_UI=tui|terminal still force the fzf path.
 #
 # GUI helpers live in ui/gui/gui-lib.sh (sourced from imports or here as fallback).
 if ! declare -F ncc_install_ui_prefer_gui >/dev/null 2>&1; then
@@ -55,9 +61,9 @@ select_setup_mode() {
             log_error "Installation cancelled."
             return 1
         else
-            # 2 = GUI unavailable → fall back to fzf TUI
-            log_info "GUI unavailable — falling back to terminal UI (fzf)."
-            log_info "Force GUI: NCC_INSTALL_UI=gui   | force TUI: NCC_INSTALL_UI=tui"
+            # 2 = GUI unavailable → fall back to fzf terminal menus
+            log_info "GUI unavailable — falling back to fzf terminal menus."
+            log_info "Force GUI: NCC_INSTALL_UI=gui   | force fzf: NCC_INSTALL_UI=fzf"
         fi
     fi
 
@@ -141,7 +147,7 @@ select_setup_mode() {
                 esac
             fi
             local selected_features
-            selected_features=($(ncc_tui_select_packages "" "$system_type")) || return 1
+            selected_features=($(ncc_fzf_select_packages "" "$system_type")) || return 1
             if declare -F ncc_gui_write_answer >/dev/null 2>&1; then
                 ncc_gui_write_answer PACKAGE_MODULES "${selected_features[*]}"
             fi
@@ -159,7 +165,7 @@ select_setup_mode() {
             esac
             log_info "Package extras for $preset_choice (defaults: ${defaults:-none}, type=$preset_st)"
             local selected_features
-            selected_features=($(ncc_tui_select_packages "$defaults" "$preset_st")) || return 1
+            selected_features=($(ncc_fzf_select_packages "$defaults" "$preset_st")) || return 1
             if declare -F ncc_gui_write_answer >/dev/null 2>&1; then
                 ncc_gui_write_answer PACKAGE_MODULES "${selected_features[*]}"
             fi
@@ -272,9 +278,9 @@ select_setup_mode() {
     return 0
 }
 
-# Multi-select package modules.
+# Multi-select package modules (fzf terminal menus — not Go tui-engine).
 # $1 = space-separated defaults; $2 = system type (desktop|server) for metadata filter
-ncc_tui_select_packages() {
+ncc_fzf_select_packages() {
     local defaults_str="${1:-}"
     local system_type="${2:-desktop}"
     local -a defaults=()
@@ -426,6 +432,9 @@ resolve_dependencies() {
 # Export functions and variables
 export -f select_setup_mode_gui
 export -f select_setup_mode
+export -f ncc_fzf_select_packages
+# Back-compat name (installer fzf path was mislabeled "tui")
+ncc_tui_select_packages() { ncc_fzf_select_packages "$@"; }
 export -f ncc_tui_select_packages
 export -f detect_system_type
 export -f resolve_conflicts

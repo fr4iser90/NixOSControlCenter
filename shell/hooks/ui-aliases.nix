@@ -1,10 +1,13 @@
 { pkgs }:
 ''
-  # Hauptinstallation (GUI when DISPLAY/WAYLAND set, else fzf TUI)
+  # Hauptinstallation (GUI when DISPLAY/WAYLAND set, else fzf menus)
   alias install="$CORE_DIR/init.sh"
   # Force UI mode for install
+  # NCC vocab: GUI = PySide6; fzf = terminal menus. (TUI = Go engine elsewhere — not here.)
   install-gui() { NCC_INSTALL_UI=gui "$CORE_DIR/init.sh" "$@"; }
-  install-tui() { NCC_INSTALL_UI=tui "$CORE_DIR/init.sh" "$@"; }
+  install-fzf() { NCC_INSTALL_UI=fzf "$CORE_DIR/init.sh" "$@"; }
+  # Deprecated alias — same as install-fzf (kept so old muscle memory works)
+  install-tui() { NCC_INSTALL_UI=fzf "$CORE_DIR/init.sh" "$@"; }
   # Dry-run: full wizard, no disk writes / deploy / rebuild
   install-dry() { NCC_DRY_RUN=1 "$CORE_DIR/init.sh" --dry-run "$@"; }
   

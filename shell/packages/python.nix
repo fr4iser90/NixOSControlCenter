@@ -1,12 +1,11 @@
-# app/shell/install/packages/python.nix
+# Install-shell Python: PySide6 for wizard + gui_ask (NCC design kit)
 { pkgs }:
 
 let
-  # tkinter powers shell/scripts/ui/gui/install_wizard.py
   pythonEnv = pkgs.python3.withPackages (ps: with ps; [
     pip
     setuptools
-    tkinter
+    pyside6
   ]);
 in
 [ pythonEnv ]
