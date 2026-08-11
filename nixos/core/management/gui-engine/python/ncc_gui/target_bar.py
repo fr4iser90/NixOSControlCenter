@@ -390,11 +390,15 @@ class TargetBar(QWidget):
             return
         # Successful connection after password — ask once about saving the key.
         self._clear_key_offer()
+        from ncc_gui.chrome_prefs import remember_skip_ssh_key_offer
         from ncc_gui.dialogs import error, info
         from ncc_gui.ssh_auth_dialog import prompt_save_ssh_key
         from ncc_gui.target_probe import copy_ssh_key
 
-        if not prompt_save_ssh_key(self, host):
+        choice = prompt_save_ssh_key(self, host)
+        if choice.dont_ask_again:
+            remember_skip_ssh_key_offer(host)
+        if not choice.save:
             return
         ok, err = copy_ssh_key(host, password)
         if ok:

@@ -215,16 +215,26 @@ in
         case "$full_cmd" in
           ${caseBlock}
           *)
-            set -- "$action" "$@"
-            case "$cmd" in
-              ${caseBlock}
-              *)
-                ${ui.badges.error "Unknown command '$cmd $action'"}
-                ${ui.text.newline}
-                show_help
-                exit 1
-                ;;
-            esac
+            # Flags like ``ncc system --gui`` belong to the domain launcher.
+            # Named verbs (``ncc system check-release``) must be registered —
+            # do not fall through to entry/TUI stubs (fake "no TUI" errors).
+            if [[ "$action" == -* ]]; then
+              set -- "$action" "$@"
+              case "$cmd" in
+                ${caseBlock}
+                *)
+                  ${ui.badges.error "Unknown command '$cmd $action'"}
+                  ${ui.text.newline}
+                  show_help
+                  exit 1
+                  ;;
+              esac
+            else
+              ${ui.badges.error "Unknown command '$cmd $action'"}
+              ${ui.text.newline}
+              show_help
+              exit 1
+            fi
             ;;
         esac
       else

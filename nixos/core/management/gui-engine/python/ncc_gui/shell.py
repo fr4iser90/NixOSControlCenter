@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QFrame,
@@ -75,6 +75,7 @@ class NccShell(QMainWindow):
         self._is_ncc_chrome_shell = True
         self.setWindowTitle(title)
         self.resize(1120, 740)
+        self.setMinimumSize(800, 520)
         self.setStyleSheet(APP_STYLE)
 
         self._build_page = build_page
@@ -84,9 +85,13 @@ class NccShell(QMainWindow):
         self._current_id: str | None = None
         self._current_page: QWidget | None = None
         self._sticky: dict[str, QWidget] = {}
+        self._geom_lock: QSize | None = None
 
         self._doc_host = QWidget()
         self._doc_host.setObjectName("nccDocumentHost")
+        self._doc_host.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         self._doc_layout = QVBoxLayout(self._doc_host)
         self._doc_layout.setContentsMargins(0, 0, 0, 0)
         self._doc_layout.setSpacing(0)
@@ -118,8 +123,8 @@ class NccShell(QMainWindow):
         outer = QVBoxLayout(root)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
-        outer.addWidget(self._target)
-        outer.addWidget(self._gate)
+        outer.addWidget(self._target, stretch=0)
+        outer.addWidget(self._gate, stretch=0)
 
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
@@ -153,6 +158,9 @@ class NccShell(QMainWindow):
         body.addWidget(self._doc_host, stretch=1)
         body_w = QWidget()
         body_w.setLayout(body)
+        body_w.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         outer.addWidget(body_w, stretch=1)
         self.setCentralWidget(root)
 
@@ -226,6 +234,9 @@ class NccShell(QMainWindow):
         ):
             return
 
+        # Keep window geometry stable across document swaps (user resize only).
+        geom = self.geometry()
+
         self._unmount_current(keep_sticky=not force)
 
         if force:
@@ -237,11 +248,27 @@ class NccShell(QMainWindow):
         else:
             page.show()
 
+        page.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         self._clear_doc_layout()
         self._doc_layout.addWidget(page)
         self._current_page = page
         self._current_id = domain_id
         self._state.current_domain_id = domain_id
+
+        if self.isVisible():
+            self.setGeometry(geom)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        if self.isVisible():
+            self._geom_lock = self.size()
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        if self._geom_lock is not None:
+            return self._geom_lock
+        return QSize(1120, 740)
 
     # ----- gate / chrome -----
 

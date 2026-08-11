@@ -5,9 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QLabel,
     QLineEdit,
     QVBoxLayout,
     QWidget,
@@ -22,6 +24,14 @@ class SshAuthChoice:
 
     action: str  # "connect" | "cancel"
     password: str = ""
+
+
+@dataclass(frozen=True)
+class SshKeySaveChoice:
+    """Result of the post-connect key-save prompt."""
+
+    save: bool
+    dont_ask_again: bool = False
 
 
 class SshAuthDialog(QDialog):
@@ -44,7 +54,6 @@ class SshAuthDialog(QDialog):
         layout.addWidget(intro)
 
         if detail.strip():
-            # Short technical hint — FormValueLabel avoids clipped wrap
             err = FormValueLabel(detail.strip()[:200])
             layout.addWidget(err)
 
@@ -77,6 +86,55 @@ class SshAuthDialog(QDialog):
         return self._choice
 
 
+class SshKeySaveDialog(QDialog):
+    """After password Connect: optional key install, with don't-ask-again."""
+
+    def __init__(self, host: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Save SSH key?")
+        self.setModal(True)
+        self.setMinimumWidth(440)
+        self._choice = SshKeySaveChoice(save=False, dont_ask_again=False)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        body = FormValueLabel(
+            f"Connected to {host}.\n\n"
+            "Install your public key on that host so the next Connect "
+            "does not need a password?"
+        )
+        layout.addWidget(body)
+
+        self.dont_ask = QCheckBox("Don't ask again for this host")
+        self.dont_ask.setToolTip(
+            "If you choose No with this checked, NCC will keep using "
+            "password Connect for this host and will not offer key save again."
+        )
+        layout.addWidget(self.dont_ask)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Yes | QDialogButtonBox.StandardButton.No
+        )
+        buttons.accepted.connect(self._yes)
+        buttons.rejected.connect(self._no)
+        layout.addWidget(buttons)
+
+    def _yes(self) -> None:
+        self._choice = SshKeySaveChoice(
+            save=True, dont_ask_again=self.dont_ask.isChecked()
+        )
+        self.accept()
+
+    def _no(self) -> None:
+        self._choice = SshKeySaveChoice(
+            save=False, dont_ask_again=self.dont_ask.isChecked()
+        )
+        self.accept()  # accept so we can read dont_ask; reject would lose it
+
+    def choice(self) -> SshKeySaveChoice:
+        return self._choice
+
+
 def prompt_ssh_auth(
     parent: QWidget | None, host: str, *, detail: str = ""
 ) -> SshAuthChoice:
@@ -86,14 +144,14 @@ def prompt_ssh_auth(
     return dlg.choice()
 
 
-def prompt_save_ssh_key(parent: QWidget | None, host: str) -> bool:
+def prompt_save_ssh_key(parent: QWidget | None, host: str) -> SshKeySaveChoice:
     """Ask after a successful password Connect whether to install the local key."""
-    from ncc_gui.dialogs import confirm
+    from ncc_gui.chrome_prefs import should_offer_ssh_key_save
 
-    return confirm(
-        parent,
-        "Save SSH key?",
-        f"Connected to {host}.\n\n"
-        "Install your public key on that host so the next Connect "
-        "does not need a password?",
-    )
+    if not should_offer_ssh_key_save(host):
+        return SshKeySaveChoice(save=False, dont_ask_again=False)
+
+    dlg = SshKeySaveDialog(host, parent)
+    if dlg.exec() != QDialog.DialogCode.Accepted:
+        return SshKeySaveChoice(save=False, dont_ask_again=False)
+    return dlg.choice()

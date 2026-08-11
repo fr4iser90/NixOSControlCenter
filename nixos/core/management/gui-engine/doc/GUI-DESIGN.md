@@ -62,7 +62,7 @@ class ExamplePage(DomainPage):
 | Method | Purpose |
 |--------|---------|
 | `add_block(title)` | Content `QGroupBox` |
-| `add_form_block` / **`add_form_value`** | Status rows — **must** use kit (`FormValueLabel`) |
+| `add_form_block` / `add_form_value` | Form section + status rows |
 | `add_list_block(title)` | Block + `QListWidget` |
 | `add_content_widget` / `add_content_layout` | Splitters, lists, custom |
 | `add_actions_hint` / `add_actions_widget` | Text / checkboxes in Actions |
@@ -223,7 +223,7 @@ immediate on the left).
 | Element | Qt | Role |
 |---------|-----|------|
 | **Block** | `QGroupBox` | Framed section with title (`Settings`, `Actions`, `Activity`, `Stacks`, …) |
-| **Form row** | `add_form_value` / editable widgets | Status text via **`FormValueLabel`**; edits via Combo/LineEdit/Check |
+| **Form row** | `QFormLayout` + widgets | Status `QLabel` / edits via Combo/LineEdit/Check |
 | **Primary button** | `QPushButton#nccPrimaryButton` | CommitBar **Apply** (config); or allowlisted immediate (e.g. System update) |
 | **Secondary button** | `QPushButton` | Create… / Refresh / domain ops that **stage**, or Undo/Save |
 | **List** | `QListWidget` | Pick one of many (hosts, VMs, stacks) |
@@ -232,17 +232,9 @@ immediate on the left).
 | **Dialogs** | `ncc_gui.dialogs` | `confirm` / `error` / `info` — never invent custom modal chrome |
 | **Banner** | `QFrame#nccDisabledBanner` | Module off / not on target |
 
-**Wrapping text (binding — no magic):** Qt does **not** auto-fix clipped
-`QLabel`s. The engine does **not** patch every label.
-
-- **Multi-line / status / dialog body text:** always `FormValueLabel` (or
-  `page.add_form_value(...)` on domain pages). That class sets `heightForWidth`.
-- **Forbidden for wrapping text:** raw `QLabel(wordWrap=True)`, especially with
-  `#nccPageSubtitle` (extra padding → half-lines / overlap).
-- **Single-line chrome** (page titles, button labels, combo items): plain
-  `QLabel` / widgets without word-wrap is fine.
-
-Debug: `NCC_GUI_LAYOUT_DEBUG=1 ncc` audits wrapping labels that are too short.
+**Form status text (binding):** `page.add_form_value(form, "Label")` — wraps with
+`heightForWidth`. Forbidden: raw `QLabel(wordWrap=True)` + `#nccPageSubtitle`
+in form fields (clips/overlaps). Debug: `NCC_GUI_LAYOUT_DEBUG=1 ncc`.
 
 ### Cards
 

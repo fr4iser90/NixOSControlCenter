@@ -42,11 +42,28 @@ if [ -d /etc/nixos ]; then
 fi
 VER=
 HOST=
+# Prefer filesystem (works when ncc status is missing/broken on old targets)
+if [ -f /etc/nixos/systemConfig/core/management/system-manager/config.nix ]; then
+  VER=$(sed -n 's/.*configVersion[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' \
+    /etc/nixos/systemConfig/core/management/system-manager/config.nix 2>/dev/null | head -1)
+elif [ -f /etc/nixos/systemConfig.nix ]; then
+  VER=$(sed -n 's/.*configVersion[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' \
+    /etc/nixos/systemConfig.nix 2>/dev/null | head -1)
+fi
+if [ -f /etc/nixos/systemConfig/core/base/network/config.nix ]; then
+  HOST=$(sed -n 's/.*hostName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' \
+    /etc/nixos/systemConfig/core/base/network/config.nix 2>/dev/null | head -1)
+fi
+if [ -z "$HOST" ]; then
+  HOST=$(uname -n 2>/dev/null || true)
+fi
 if [ "$NCC" = 1 ]; then
   RAW=$(ncc system status --json 2>/dev/null || true)
   if [ -n "$RAW" ]; then
-    VER=$(printf '%s\n' "$RAW" | sed -n 's/.*"configVersion"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
-    HOST=$(printf '%s\n' "$RAW" | sed -n 's/.*"hostname"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+    V2=$(printf '%s\n' "$RAW" | sed -n 's/.*"configVersion"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+    H2=$(printf '%s\n' "$RAW" | sed -n 's/.*"hostname"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+    [ -n "$V2" ] && VER=$V2
+    [ -n "$H2" ] && HOST=$H2
   fi
 fi
 printf 'arch=%s\n' "$ARCH"
@@ -187,7 +204,7 @@ def _local_etc_kind() -> str:
 def _read_config_version_files() -> str:
     """Fast path: parse configVersion from /etc/nixos without invoking ncc."""
     candidates = [
-        Path("/etc/nixos/systemConfig/core/management/system-manager.nix"),
+        Path("/etc/nixos/systemConfig/core/management/system-manager/config.nix"),
         Path("/etc/nixos/systemConfig.nix"),
         Path("/etc/nixos/system-config.nix"),
     ]
@@ -205,12 +222,32 @@ def _read_config_version_files() -> str:
     return ""
 
 
+def _read_configured_hostname_files() -> str:
+    """Fast path: hostName from network config (split or monolith text)."""
+    split = Path("/etc/nixos/systemConfig/core/base/network/config.nix")
+    try:
+        text = split.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        text = ""
+    if text:
+        m = re.search(r'hostName\s*=\s*"([^"]+)"', text)
+        if m:
+            return m.group(1)
+    mono = Path("/etc/nixos/systemConfig.nix")
+    try:
+        text = mono.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return ""
+    m = re.search(r'hostName\s*=\s*"([^"]+)"', text)
+    return m.group(1) if m else ""
+
+
 def probe_local(*, timeout: float = 2.5, invoke_ncc: bool = False) -> TargetProbe:
     """Local probe. Default is filesystem-only (instant); optional short ncc call."""
     osr = _read_os_release()
     is_nixos = osr.get("ID") == "nixos" or Path("/run/current-system").exists()
     arch = platform.machine() or "unknown"
-    hostname = socket.gethostname()
+    hostname = _read_configured_hostname_files() or socket.gethostname()
     ncc = bool(shutil.which("ncc"))
     ver = _read_config_version_files()
     etc_kind = _local_etc_kind()

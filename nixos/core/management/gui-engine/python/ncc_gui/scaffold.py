@@ -9,14 +9,17 @@ import shutil
 import subprocess
 from collections.abc import Callable, Sequence
 
-from PySide6.QtCore import QProcess, QProcessEnvironment, Qt, QTimer
+from PySide6.QtCore import QProcess, QProcessEnvironment, QSize, Qt, QTimer
 from PySide6.QtWidgets import (
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QStyle,
     QTextEdit,
     QToolButton,
@@ -57,6 +60,10 @@ class DomainPage(QWidget):
     ) -> None:
         super().__init__(parent)
         self.setStyleSheet(APP_STYLE)
+        # Fill the shell document host — never drive top-level window size.
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         self._proc: QProcess | None = None
         self._on_proc_done: Callable[[int], None] | None = None
         # Persist Activity across hard GUI re-exec (generation watcher).
@@ -69,7 +76,7 @@ class DomainPage(QWidget):
         self._root.setSpacing(8)
         root = self._root
 
-        # 1. Header (title + optional trailing controls, then subtitle)
+        # 1. Header (title + optional trailing controls, then subtitle) — pinned top
         self._header_row = QHBoxLayout()
         heading = QLabel(title)
         heading.setObjectName("nccPageTitle")
@@ -77,32 +84,50 @@ class DomainPage(QWidget):
         self._header_trailing = QHBoxLayout()
         self._header_trailing.setSpacing(6)
         self._header_row.addLayout(self._header_trailing)
-        root.addLayout(self._header_row)
+        root.addLayout(self._header_row, stretch=0)
         self._subtitle = QLabel(subtitle)
         self._subtitle.setObjectName("nccPageSubtitle")
         self._subtitle.setWordWrap(True)
         self._subtitle.setVisible(bool(subtitle))
-        root.addWidget(self._subtitle)
+        root.addWidget(self._subtitle, stretch=0)
 
-        # 2. Content (fills remaining space above footer)
-        self._content = QVBoxLayout()
+        # 2. Content (scrolls inside fixed chrome — does not push footer)
+        self._content_host = QWidget()
+        self._content = QVBoxLayout(self._content_host)
+        self._content.setContentsMargins(0, 0, 0, 0)
         self._content.setSpacing(8)
-        root.addLayout(self._content, stretch=1)
+        self._content_scroll = QScrollArea()
+        self._content_scroll.setObjectName("nccContentScroll")
+        self._content_scroll.setWidgetResizable(True)
+        self._content_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self._content_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        self._content_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        self._content_scroll.setWidget(self._content_host)
+        self._content_scroll.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        root.addWidget(self._content_scroll, stretch=1)
 
-        # 3. Activity (above footer — not below the commit buttons)
+        # 3. Activity (above footer — capped height so it cannot shove footer)
         self._activity_box: QGroupBox | None = None
         self.log: QTextEdit | None = None
         if activity:
             self._activity_box = QGroupBox("Activity")
+            self._activity_box.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+            )
             log_l = QVBoxLayout(self._activity_box)
             self.log = QTextEdit()
             self.log.setObjectName("nccActivityLog")
             self.log.setReadOnly(True)
             self.log.setPlaceholderText("Command output appears here after an action…")
-            if activity_max_height is None:
-                self.log.setMinimumHeight(160)
-            else:
-                self.log.setMaximumHeight(activity_max_height)
+            cap = 180 if activity_max_height is None else activity_max_height
+            self.log.setMinimumHeight(80)
+            self.log.setMaximumHeight(max(80, cap))
             log_l.addWidget(self.log)
             root.addWidget(self._activity_box, stretch=0)
             restored = load_activity(self._activity_key)
@@ -112,22 +137,44 @@ class DomainPage(QWidget):
         # Soft generation switch: refresh widgets, keep Activity / window.
         generation_bus().soft_switched.connect(self._on_soft_generation)
 
-        # 4. Footer — domain buttons left, CommitBar (Undo/Save/Apply) bottom-right
+        # 4. Footer — domain buttons (wrap grid, no scrollbar) + CommitBar right
         self._actions_box = QGroupBox("Actions")
         self._actions_box.setObjectName("nccPageFooter")
+        self._actions_box.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum
+        )
         self._actions_col = QVBoxLayout(self._actions_box)
-        self._button_row = QHBoxLayout()
-        self._actions_col.addLayout(self._button_row)
-        self._button_row.addStretch(1)
+        footer_row = QHBoxLayout()
+        footer_row.setSpacing(8)
+        self._button_grid = QGridLayout()
+        self._button_grid.setHorizontalSpacing(6)
+        self._button_grid.setVerticalSpacing(6)
+        self._button_cols = 4
+        self._button_count = 0
+        # Keep name for older call sites that touch _button_row
+        self._button_row = self._button_grid
+        btn_wrap = QWidget()
+        btn_wrap.setLayout(self._button_grid)
+        btn_wrap.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum
+        )
+        footer_row.addWidget(btn_wrap, stretch=1)
         self._has_action_button = False
         self.commit: CommitController | None = None
         if commit_bar:
             self.commit = CommitController(self)
-            self._button_row.addWidget(self.commit.bar)
+            footer_row.addWidget(self.commit.bar, stretch=0)
             self._actions_box.setVisible(True)
         else:
             self._actions_box.setVisible(False)
+        self._actions_col.addLayout(footer_row)
         root.addWidget(self._actions_box, stretch=0)
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        return QSize(0, 0)
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        return QSize(0, 0)
 
     # ----- header -----
 
@@ -257,12 +304,26 @@ class DomainPage(QWidget):
         self._ensure_actions_visible()
         btn = QPushButton(label)
         btn.clicked.connect(lambda _=False: slot())
-        # Primary first among buttons
+        if primary:
+            btn.setObjectName("nccPrimaryButton")
+        idx = self._button_count
         if primary and not self._has_action_button:
-            self._button_row.insertWidget(0, btn)
+            # Shift existing buttons right by one slot
+            widgets: list[QWidget] = []
+            while self._button_grid.count():
+                item = self._button_grid.takeAt(0)
+                w = item.widget()
+                if w is not None:
+                    widgets.append(w)
+            self._button_grid.addWidget(btn, 0, 0)
+            for i, w in enumerate(widgets, start=1):
+                r, c = divmod(i, self._button_cols)
+                self._button_grid.addWidget(w, r, c)
+            self._button_count = 1 + len(widgets)
         else:
-            idx = self._button_row.count() - 1  # before stretch
-            self._button_row.insertWidget(max(idx, 0), btn)
+            r, c = divmod(idx, self._button_cols)
+            self._button_grid.addWidget(btn, r, c)
+            self._button_count = idx + 1
         self._has_action_button = True
         return btn
 
