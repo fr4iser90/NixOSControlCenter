@@ -46,6 +46,14 @@ QLabel#nccMuted {
   color: palette(window-text);
   padding-bottom: 8px;
 }
+/* Form status values — no extra bottom padding (that clips in QFormLayout). */
+QLabel#nccFormValue {
+  font-size: 13px;
+  font-weight: 400;
+  color: palette(window-text);
+  padding: 0;
+  margin: 0;
+}
 QGroupBox {
   font-weight: 600;
   color: palette(window-text);
@@ -120,5 +128,23 @@ QFrame#nccDisabledBanner {
   border: 1px solid palette(mid);
   border-radius: 12px;
   color: palette(window-text);
+}
+QFrame#nccGateBanner {
+  background: palette(alternate-base);
+  border: none;
+  border-bottom: 1px solid palette(mid);
+  color: palette(window-text);
+}
+QWidget#nccTargetBar {
+  border: none;
+  border-bottom: 1px solid palette(mid);
+  max-height: 44px;
+}
+QLabel#nccTargetStatus {
+  font-size: 12px;
+  font-weight: 400;
+  color: palette(window-text);
+  padding: 0;
+  margin: 0;
 }
 """

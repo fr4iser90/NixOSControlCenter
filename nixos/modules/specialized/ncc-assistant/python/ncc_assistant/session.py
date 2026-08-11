@@ -83,6 +83,8 @@ class ChatSession:
         messages: list[dict[str, Any]] | None = None,
         session_id: str | None = None,
         title: str | None = None,
+        refresh_models: bool = True,
+        available_models: list[dict[str, Any]] | None = None,
     ) -> "ChatSession":
         settings = settings or Settings.from_env(client_mode="chat")
         settings = with_cached_credentials(settings)
@@ -106,7 +108,11 @@ class ChatSession:
             session.session_id = session_id
         if title:
             session.title = title
-        session.refresh_models()
+        if refresh_models:
+            # HTTP GET /models — avoid on chat-switch (pass refresh_models=False).
+            session.refresh_models()
+        elif available_models is not None:
+            session.available_models = list(available_models)
         session.refresh_model_label()
         return session
 

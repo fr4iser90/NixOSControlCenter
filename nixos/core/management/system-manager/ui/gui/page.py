@@ -21,11 +21,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ncc_gui.ansi import strip_ansi
 from ncc_gui.dialogs import confirm, error, info
-from ncc_gui.remote import build_ncc_argv, run_ncc, target_from_env
+from ncc_gui.remote import build_ncc_argv, target_from_env
 from ncc_gui.scaffold import DomainPage
 from ncc_gui.target_bus import bus as target_bus
 from ncc_gui.theme import APP_STYLE
+# FormValueLabel via DomainPage.add_form_value
 
 _SETTINGS_ORG = "NixOSControlCenter"
 _SETTINGS_APP = "ncc-gui"
@@ -70,25 +72,6 @@ def _release_badge(status: str) -> str:
     if status == "current":
         return "up to date"
     return status or "—"
-
-
-def _load_system_status() -> dict:
-    """``ncc system status --json`` — config facade (monolith or split)."""
-    proc = run_ncc(
-        "system",
-        "status",
-        "--json",
-        target=target_from_env(),
-        timeout=45,
-    )
-    raw = (proc.stdout or "").strip()
-    if proc.returncode != 0 or not raw:
-        return {}
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        return {}
-    return data if isinstance(data, dict) else {}
 
 
 class SystemSettingsDialog(QDialog):
@@ -172,7 +155,8 @@ class SystemPage(DomainPage):
     def __init__(self, parent=None) -> None:
         super().__init__(
             "System",
-            "Machine overview. Sync preferences are in the header settings.",
+            "Sync the NCC tree, migrate config, or rebuild. "
+            "Gear (top right) opens sync preferences.",
             activity_max_height=None,
             parent=parent,
         )
@@ -189,52 +173,30 @@ class SystemPage(DomainPage):
         self.add_header_action(self._open_settings, tooltip="Sync preferences")
 
         status = self.add_form_block("Status")
-        self.lbl_target = QLabel("—")
-        self.lbl_host = QLabel("—")
-        self.lbl_nixos = QLabel("—")
-        self.lbl_latest = QLabel("—")
-        self.lbl_channel = QLabel("—")
-        self.lbl_release = QLabel("—")
-        self.lbl_running = QLabel("—")
-        self.lbl_config_ver = QLabel("—")
-        self.lbl_system_type = QLabel("—")
-        self.lbl_layout = QLabel("—")
-        self.lbl_checks = QLabel("—")
-        for w in (
-            self.lbl_target,
-            self.lbl_host,
-            self.lbl_nixos,
-            self.lbl_latest,
-            self.lbl_channel,
-            self.lbl_release,
-            self.lbl_running,
-            self.lbl_config_ver,
-            self.lbl_system_type,
-            self.lbl_layout,
-            self.lbl_checks,
-        ):
-            w.setWordWrap(True)
-            w.setObjectName("nccPageSubtitle")
-        status.addRow("Target", self.lbl_target)
-        status.addRow("Hostname", self.lbl_host)
-        status.addRow("NixOS pin", self.lbl_nixos)
-        status.addRow("Latest stable", self.lbl_latest)
-        status.addRow("Channel", self.lbl_channel)
-        status.addRow("Release status", self.lbl_release)
-        status.addRow("Running", self.lbl_running)
-        status.addRow("Config version", self.lbl_config_ver)
-        status.addRow("System type", self.lbl_system_type)
-        status.addRow("Config layout", self.lbl_layout)
-        status.addRow("Preflight checks", self.lbl_checks)
+        self.lbl_host = self.add_form_value(status, "Hostname")
+        self.lbl_nixos = self.add_form_value(status, "NixOS pin")
+        self.lbl_latest = self.add_form_value(status, "Latest stable")
+        self.lbl_channel = self.add_form_value(status, "Channel")
+        self.lbl_release = self.add_form_value(status, "Release status")
+        self.lbl_running = self.add_form_value(status, "Running")
+        self.lbl_config_ver = self.add_form_value(status, "Config version")
+        self.lbl_system_type = self.add_form_value(status, "System type")
+        self.lbl_layout = self.add_form_value(status, "Config layout")
+        self.lbl_checks = self.add_form_value(status, "Preflight checks")
 
         self.add_actions_hint(
-            "Sync / rebuild need administrator rights. "
+            "Sync / rebuild need administrator rights on the Target. "
+            "Remote sync uses ssh + sudo -n on that host. "
             "Check versions & validate write to Activity only."
         )
         self.add_action("Refresh status", self.reload)
         self.add_action("From local repo", lambda: self._start_sync("local"), primary=True)
         self.add_action("From GitHub", lambda: self._start_sync("remote"))
         self.add_action("Channels only", lambda: self._start_sync("channels"))
+        self.add_action(
+            "Migrate config",
+            lambda: self._run_quick(("migrate-config",), "Migrate config", True),
+        )
         self.add_action(
             "Check versions",
             lambda: self._run_quick(("check-versions",), "Check versions", False),
@@ -260,8 +222,15 @@ class SystemPage(DomainPage):
             lambda: self._run_quick(("allow-unfree",), "Allow unfree", True),
         )
 
-        target_bus().changed.connect(lambda _t: self.reload())
-        QTimer.singleShot(0, self.reload)
+        self._status_proc: QProcess | None = None
+        self._reload_timer = QTimer(self)
+        self._reload_timer.setSingleShot(True)
+        self._reload_timer.setInterval(150)
+        self._reload_timer.timeout.connect(self._reload_now)
+
+        # Only when connected target changes — not every session status tick
+        target_bus().changed.connect(lambda _t: self._schedule_reload())
+        QTimer.singleShot(0, self._schedule_reload)
 
     def _open_settings(self) -> None:
         dlg = SystemSettingsDialog(self)
@@ -272,11 +241,88 @@ class SystemPage(DomainPage):
         self._auto_build = vals["auto_build"]
         self._with_channels = vals["with_channels"]
 
-    def reload(self) -> None:
-        t = target_from_env()
-        self.lbl_target.setText(t or "This machine")
+    def _schedule_reload(self) -> None:
+        self._reload_timer.start()
 
-        meta = _load_system_status()
+    def reload(self) -> None:
+        self._schedule_reload()
+
+    def _reload_now(self) -> None:
+        t = target_from_env()
+        if not t:
+            self.lbl_host.setText(self._local_hostname())
+        self.set_subtitle(
+            f"Actions run on {t} (header Target). "
+            "Sync the NCC tree, migrate config, or rebuild — gear = preferences."
+            if t
+            else "Sync the NCC tree, migrate config, or rebuild. "
+            "Gear (top right) opens sync preferences."
+        )
+
+        # Placeholders while async probes run — do not block the UI thread
+        self.lbl_nixos.setText("…")
+        self.lbl_latest.setText("…")
+        self.lbl_channel.setText("…")
+        self.lbl_release.setText("checking…")
+        self.lbl_running.setText("…")
+        self.lbl_config_ver.setText("…")
+        self.lbl_system_type.setText("…")
+        self.lbl_layout.setText("…")
+        self.lbl_checks.setText("…")
+
+        self._start_status_probe()
+        self._start_release_probe()
+
+    @staticmethod
+    def _local_hostname() -> str:
+        try:
+            return socket.gethostname()
+        except OSError:
+            return "—"
+
+    def _start_status_probe(self) -> None:
+        if self._status_proc is not None:
+            if self._status_proc.state() != QProcess.ProcessState.NotRunning:
+                self._status_proc.kill()
+            self._status_proc = None
+
+        argv = build_ncc_argv(
+            ("system", "status", "--json"),
+            target=target_from_env(),
+        )
+        proc = QProcess(self)
+        self._status_proc = proc
+        proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        proc.finished.connect(self._on_status_finished)
+        prog, *args = argv
+        proc.start(prog, args)
+        if not proc.waitForStarted(3000):
+            self.lbl_config_ver.setText("—")
+            self.lbl_system_type.setText("—")
+            self.lbl_layout.setText("—")
+            self.lbl_checks.setText("—")
+            self._status_proc = None
+
+    def _on_status_finished(self, code: int, _status) -> None:
+        proc = self._status_proc
+        self._status_proc = None
+        if proc is None:
+            return
+        raw = bytes(proc.readAllStandardOutput()).decode("utf-8", errors="replace")
+        raw = strip_ansi(raw)
+        meta: dict = {}
+        if code == 0 and (raw or "").strip():
+            try:
+                start = raw.find("{")
+                end = raw.rfind("}")
+                if start >= 0 and end > start:
+                    data = json.loads(raw[start : end + 1])
+                    if isinstance(data, dict):
+                        meta = data
+            except json.JSONDecodeError:
+                meta = {}
+
+        t = target_from_env()
         if meta:
             host = str(meta.get("hostname") or "").strip()
             self.lbl_host.setText(host or self._local_hostname())
@@ -291,38 +337,15 @@ class SystemPage(DomainPage):
             else:
                 self.lbl_checks.setText("—")
             ch = str(meta.get("channel") or "").strip()
-            if ch and ch != "—":
+            if ch:
                 self.lbl_channel.setText(ch)
         else:
-            self.lbl_host.setText(self._local_hostname())
+            if not t:
+                self.lbl_host.setText(self._local_hostname())
             self.lbl_config_ver.setText("—")
             self.lbl_system_type.setText("—")
             self.lbl_layout.setText("—")
             self.lbl_checks.setText("—")
-            # Until rebuild installs `ncc system status`
-            if not t:
-                self.lbl_config_ver.setText("(needs rebuild: ncc system status)")
-
-        self.lbl_nixos.setText("…")
-        self.lbl_latest.setText("…")
-        if not (meta.get("channel") if meta else None):
-            self.lbl_channel.setText("…")
-        self.lbl_release.setText("checking…")
-        self.lbl_running.setText("…")
-        self._start_release_probe()
-
-        note = f"Status probes follow Target ({t}). " if t else ""
-        self.set_subtitle(
-            f"{note}Header settings = sync prefs only. "
-            "Sync actions always run on this machine."
-        )
-
-    @staticmethod
-    def _local_hostname() -> str:
-        try:
-            return socket.gethostname()
-        except OSError:
-            return "—"
 
     def _start_release_probe(self) -> None:
         if self._release_proc is not None:
@@ -352,48 +375,67 @@ class SystemPage(DomainPage):
         self._release_proc = None
         if proc is None:
             return
-        raw = bytes(proc.readAllStandardOutput()).decode("utf-8", errors="replace")
-        if code not in (0, 10) and not (raw or "").strip():
-            self.lbl_nixos.setText("—")
-            self.lbl_latest.setText("—")
-            self.lbl_release.setText("probe failed")
-            self.lbl_running.setText("—")
+        raw = strip_ansi(
+            bytes(proc.readAllStandardOutput()).decode("utf-8", errors="replace")
+        )
+        payload = raw.strip()
+        if "{" in payload:
+            payload = payload[payload.find("{") : payload.rfind("}") + 1]
+            rel = _parse_release_json(payload)
+            pin = rel["current"]
+            latest = rel["latest"]
+            self.lbl_nixos.setText(f"nixos-{pin}" if pin != "—" else "—")
+            self.lbl_latest.setText(f"nixos-{latest}" if latest != "—" else "—")
+            if self.lbl_channel.text() in ("…", "—", ""):
+                self.lbl_channel.setText(rel["channel"])
+            self.lbl_release.setText(_release_badge(rel["status"]))
+            running = rel["running"]
+            self.lbl_running.setText(running if running and running != "—" else "—")
             return
-        rel = _parse_release_json(raw)
-        pin = rel["current"]
-        latest = rel["latest"]
-        self.lbl_nixos.setText(f"nixos-{pin}" if pin != "—" else "—")
-        self.lbl_latest.setText(f"nixos-{latest}" if latest != "—" else "—")
-        if self.lbl_channel.text() in ("…", "—", ""):
-            self.lbl_channel.setText(rel["channel"])
-        self.lbl_release.setText(_release_badge(rel["status"]))
-        running = rel["running"]
-        self.lbl_running.setText(running if running and running != "—" else "—")
+
+        # No JSON — show a short reason instead of silent "unknown"
+        err = " ".join(raw.split())[:80] or f"exit {code}"
+        if "Flake not found" in raw or "flake" in raw.lower():
+            err = "flake missing"
+        elif "GitHub" in raw or "Failed to reach" in raw:
+            err = "network / GitHub"
+        self.lbl_nixos.setText("—")
+        self.lbl_latest.setText("—")
+        self.lbl_running.setText("—")
+        self.lbl_release.setText(err)
 
     def _start_sync(self, mode: str) -> None:
         if self.set_busy():
             return
+        t = target_from_env()
+        where = t or "this machine"
         if mode == "local":
             path = self._local_path
-            if not path or not Path(path).is_dir():
+            if not t and (not path or not Path(path).is_dir()):
                 error(
                     self,
                     "Local update",
                     f"Directory not found:\n{path}\n\nSet the path in Settings.",
                 )
                 return
-            summary = f"Copy from local tree:\n{path}"
+            if t:
+                summary = (
+                    f"On {where}: sync from a path available there "
+                    f"(configured local path is for this PC):\n{path}"
+                )
+            else:
+                summary = f"Copy from local tree:\n{path}"
         elif mode == "remote":
-            summary = f"Clone GitHub NixOSControlCenter @ {self._branch}"
+            summary = f"On {where}: clone GitHub NixOSControlCenter @ {self._branch}"
         else:
-            summary = "Update flake channels / inputs only"
+            summary = f"On {where}: update flake channels / inputs only"
 
         build = self._auto_build
         extra = "Then build & switch." if build else "No rebuild (copy/channels only)."
         if not confirm(
             self,
             "System update",
-            f"{summary}\n\n{extra}\n\nThis changes /etc/nixos. Continue?",
+            f"{summary}\n\n{extra}\n\nThis changes /etc/nixos on {where}. Continue?",
         ):
             return
 
@@ -410,9 +452,17 @@ class SystemPage(DomainPage):
         def _done(code: int) -> None:
             if code == 0:
                 info(self, f"system update ({mode})", "Finished successfully.")
+                from ncc_gui.target_session import session_controller
+
+                session_controller().refresh()
                 self.reload()
 
-        self.run_ncc_root(args, label=f"system update ({mode})", on_done=_done)
+        self.run_ncc_root(
+            args,
+            label=f"system update ({mode})",
+            on_done=_done,
+            follow_target=True,
+        )
 
     def _run_quick(self, args: tuple[str, ...], label: str, need_confirm: bool) -> None:
         if self.set_busy():
@@ -422,11 +472,20 @@ class SystemPage(DomainPage):
         if need_confirm and not confirm(self, label, f"Run “{label}” on {where}?"):
             return
 
-        if args[:1] in (("build",), ("allow-unfree",)) and not t:
+        elevated = args[:1] in (("build",), ("allow-unfree",), ("migrate-config",))
+        if elevated:
+            def _done(code: int) -> None:
+                if code == 0:
+                    from ncc_gui.target_session import session_controller
+
+                    session_controller().refresh()
+                    self.reload()
+
             self.run_ncc_root(
                 ["system", *args],
                 label=label,
-                on_done=lambda c: self.reload() if c == 0 else None,
+                follow_target=True,
+                on_done=_done,
             )
             return
 

@@ -829,10 +829,13 @@ class ChatPage(QWidget):
             self.provider_combo.setCurrentIndex(0)
         self._provider_guard = False
 
-    def _populate_models(self) -> None:
+    def _populate_models(self, *, fetch: bool = True) -> None:
         self._model_guard = True
         self.model_combo.clear()
-        models = self.session.refresh_models()
+        if fetch:
+            models = self.session.refresh_models()
+        else:
+            models = list(self.session.available_models)
         current = self.session.settings.model or self.session.model_label
         if not models and current:
             models = [{"id": current, "vision": self.session.current_model_vision()}]
@@ -1101,6 +1104,8 @@ class ChatPage(QWidget):
         if model:
             from dataclasses import replace
             settings = replace(settings, model=model)
+        # Reuse model catalog — do NOT GET /models on every chat switch (UI freeze).
+        prev_models = list(self.session.available_models)
         self.session = ChatSession.create(
             settings,
             interactive_auth=False,
@@ -1108,13 +1113,15 @@ class ChatPage(QWidget):
             messages=data.get("messages") or [],
             session_id=data.get("id"),
             title=data.get("title"),
+            refresh_models=False,
+            available_models=prev_models,
         )
         while self.feed.count():
             item = self.feed.takeAt(0)
             w = item.widget()
             if w:
                 w.deleteLater()
-        self._populate_models()
+        self._populate_models(fetch=False)
         self._update_vision_ui()
         self._replay_history_bubbles()
         self._refresh_landing()

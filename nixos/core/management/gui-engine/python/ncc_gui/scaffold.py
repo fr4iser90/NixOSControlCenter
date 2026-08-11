@@ -9,7 +9,7 @@ import shutil
 import subprocess
 from collections.abc import Callable, Sequence
 
-from PySide6.QtCore import QProcess, QProcessEnvironment
+from PySide6.QtCore import QProcess, QProcessEnvironment, Qt, QTimer
 from PySide6.QtWidgets import (
     QFormLayout,
     QGroupBox,
@@ -29,6 +29,7 @@ from ncc_gui.commit_bar import CommitController
 from ncc_gui.dialogs import confirm, error
 from ncc_gui.reload import generation_bus, load_activity, save_activity
 from ncc_gui.theme import APP_STYLE
+from ncc_gui.widgets import FormValueLabel, audit_wrapping_labels, layout_debug_enabled
 
 
 class DomainPage(QWidget):
@@ -169,9 +170,33 @@ class DomainPage(QWidget):
         return box
 
     def add_form_block(self, title: str) -> QFormLayout:
+        """Status/settings form. Value cells should use ``add_form_value``."""
         box = self.add_block(title)
         form = QFormLayout(box)
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+        form.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow
+        )
+        form.setLabelAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        )
+        form.setFormAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        )
+        form.setHorizontalSpacing(16)
+        form.setVerticalSpacing(8)
         return form
+
+    def add_form_value(
+        self,
+        form: QFormLayout,
+        label: str,
+        text: str = "—",
+    ) -> FormValueLabel:
+        """Status/body row via ``FormValueLabel`` (must use for wrapping text)."""
+        value = FormValueLabel(text)
+        form.addRow(label, value)
+        return value
 
     def add_list_block(self, title: str) -> tuple[QGroupBox, QListWidget]:
         """Content block with a list (hosts, stacks, users, …)."""
@@ -180,6 +205,14 @@ class DomainPage(QWidget):
         lst = QListWidget()
         col.addWidget(lst)
         return box, lst
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        if layout_debug_enabled():
+            QTimer.singleShot(
+                0,
+                lambda: audit_wrapping_labels(self, context=type(self).__name__),
+            )
 
     def add_content_widget(self, widget: QWidget, *, stretch: int = 0) -> None:
         """Add a pre-built widget into the content zone (e.g. splitter)."""
@@ -240,8 +273,21 @@ class DomainPage(QWidget):
             return
         save_activity(self._activity_key, self.log.toPlainText())
 
+    def _chrome_shell_ancestor(self) -> bool:
+        """True when hosted by multi-domain ``NccShell`` (document recreate owns soft)."""
+        obj: QWidget | None = self.parentWidget()
+        while obj is not None:
+            if getattr(obj, "_is_ncc_chrome_shell", False):
+                return True
+            obj = obj.parentWidget()
+        return False
+
     def _on_soft_generation(self) -> None:
-        """New NixOS generation, same GUI store paths — refresh data only."""
+        """Standalone domain windows: reload visible page. Shell: skip (recreate)."""
+        if self._chrome_shell_ancestor():
+            return
+        if not self.isVisible():
+            return
         reload_fn = getattr(self, "reload", None)
         if callable(reload_fn):
             try:
@@ -308,37 +354,31 @@ class DomainPage(QWidget):
         *,
         label: str = "Apply",
         on_done: Callable[[int], None] | None = None,
+        follow_target: bool = False,
     ) -> None:
         """Async elevated ``ncc …``. Prefer passwordless sudo, then pkexec.
 
-        Order (NOPASSWD admin must not see a password dialog):
+        Local order (NOPASSWD admin must not see a password dialog):
           1. already root → ``ncc`` directly
           2. ``sudo -n`` works → ``sudo -n ncc …``
           3. pkexec
           4. interactive sudo
+
+        With ``follow_target=True`` and a connected remote session:
+          ``ssh host -- sudo -n ncc …`` (target user needs NOPASSWD sudo).
         """
-        import os
-        import subprocess
+        from ncc_gui.remote import build_elevated_ncc_argv, target_from_env
 
-        ncc = shutil.which("ncc") or "ncc"
-        argv_tail = list(args)
-
-        if os.geteuid() == 0:
-            program, argv = ncc, argv_tail
-        elif shutil.which("sudo") and subprocess.run(
-            ["sudo", "-n", "true"],
-            check=False,
-            capture_output=True,
-        ).returncode == 0:
-            program, argv = "sudo", ["-n", ncc, *argv_tail]
-        elif shutil.which("pkexec"):
-            program, argv = "pkexec", [ncc, *argv_tail]
-        elif shutil.which("sudo"):
-            program, argv = "sudo", [ncc, *argv_tail]
-        else:
-            error(self, label, "Need sudo or pkexec for this action.")
+        host = target_from_env() if follow_target else None
+        try:
+            program, argv = build_elevated_ncc_argv(args, target=host)
+        except PermissionError as e:
+            error(self, label, str(e))
             return
-        self._start_ncc_process(program, argv, label=label, on_done=on_done)
+        where = f" @ {host}" if host else ""
+        self._start_ncc_process(
+            program, argv, label=f"{label}{where}", on_done=on_done
+        )
 
     def run_ncc_async(
         self,

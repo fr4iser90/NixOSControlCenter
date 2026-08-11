@@ -30,9 +30,13 @@ def apply_env(target: str | None) -> None:
 
 
 def get_active_target() -> str | None:
+    """Currently *connected* fleet target (env). File alone is only a candidate."""
     env = (os.environ.get("NCC_TARGET_HOST") or "").strip()
-    if env:
-        return env
+    return env or None
+
+
+def saved_target_candidate() -> str | None:
+    """Last Connect host from disk (not necessarily connected)."""
     try:
         raw = _ACTIVE_FILE.read_text(encoding="utf-8").strip()
     except OSError:
@@ -84,7 +88,7 @@ def _hosts_from_ssh_client() -> list[tuple[str, str]] | None:
             check=False,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=2.5,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -103,11 +107,12 @@ def _hosts_from_ssh_client() -> list[tuple[str, str]] | None:
 
 
 def list_host_pairs() -> list[tuple[str, str]]:
-    """Return (hostname, user) from SSH client list or ~/.creds."""
+    """Return (hostname, user). Prefer ~/.creds (instant); ncc only as fallback."""
+    creds = _hosts_from_creds()
+    if creds:
+        return creds
     from_cli = _hosts_from_ssh_client()
-    if from_cli is not None:
-        return from_cli
-    return _hosts_from_creds()
+    return from_cli if from_cli is not None else []
 
 
 def list_host_targets() -> list[str]:
@@ -118,7 +123,7 @@ def list_host_targets() -> list[str]:
 _DOMAIN_RE = re.compile(r"^\s{0,4}([a-z][a-z0-9]{0,11})\s+-\s+", re.MULTILINE)
 
 
-def probe_remote_domains(target: str, *, timeout: float = 20) -> set[str] | None:
+def probe_remote_domains(target: str, *, timeout: float = 8) -> set[str] | None:
     """Parse `ncc help` on remote. None = probe failed."""
     from ncc_gui.remote import run_ncc
 
@@ -133,7 +138,5 @@ def probe_remote_domains(target: str, *, timeout: float = 20) -> set[str] | None
     return found if found else None
 
 
-# Sync env from disk on import so pages see the last active target.
-_boot = get_active_target()
-if _boot:
-    apply_env(_boot)
+# Do not auto-apply a persisted remote target into the environment.
+# Root TargetBar Connect activates the fleet session explicitly.

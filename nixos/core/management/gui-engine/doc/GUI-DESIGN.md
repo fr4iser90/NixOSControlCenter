@@ -15,6 +15,7 @@ Related code (the **kit** — use this, don’t reinvent layout):
 - Domain window: `python/ncc_gui/domain_gui.py`
 - Icons: `assets/ncc-icon.{svg,png}` + `python/ncc_gui/branding.py`
 - Page stub: `doc/PAGE-TEMPLATE.md`
+- Perf / cache (UI thread, what to cache): `doc/PERFORMANCE.md`
 - Pages live in **each module** (`ui/gui/page.py` + `registerGuiPage`) — never in `gui-engine/pages/` for domains
 
 ---
@@ -61,7 +62,7 @@ class ExamplePage(DomainPage):
 | Method | Purpose |
 |--------|---------|
 | `add_block(title)` | Content `QGroupBox` |
-| `add_form_block(title)` | Block + `QFormLayout` |
+| `add_form_block` / **`add_form_value`** | Status rows — **must** use kit (`FormValueLabel`) |
 | `add_list_block(title)` | Block + `QListWidget` |
 | `add_content_widget` / `add_content_layout` | Splitters, lists, custom |
 | `add_actions_hint` / `add_actions_widget` | Text / checkboxes in Actions |
@@ -75,7 +76,7 @@ class ExamplePage(DomainPage):
 | `set_busy()` | Guard while a process runs |
 | `activity_max_height=None` | Tall Activity (e.g. System update) |
 | `commit_bar=False` | Rare opt-out (read-only tools) |
-| soft generation | `reload.generation_bus().soft_switched` → page `reload()`; Activity kept (§12) |
+| soft generation | `soft_switched` → chrome catalog + recreate document (§12) |
 
 Order is **fixed inside the kit**. Do not hand-roll a second vertical layout.
 
@@ -92,7 +93,12 @@ Rules:
 
 - The **page body** is identical in both modes (one `create_page()`).
 - Root adds navigation + Target. Domain window does **not** duplicate the sidebar.
-- Target bar is **only** on the root shell (fleet). Local-only domains (`hosts`, `ssh`) ignore Target for their actions; others follow `NCC_TARGET_HOST` when set from the bar.
+- Target bar is **only** on the root shell (fleet). Selecting a host is a
+  **candidate**; **Connect** probes and activates (`NCC_TARGET_HOST`).
+  Local-only domains (`hosts`, `ssh`) ignore Target for their actions; others
+  follow the connected target when set.
+- Do **not** duplicate a “Target” row inside domain Status/Preflight forms —
+  the header is the single place. Subtitle may mention the connected host.
 
 ```text
 ncc                          ncc desktop --gui
@@ -217,7 +223,7 @@ immediate on the left).
 | Element | Qt | Role |
 |---------|-----|------|
 | **Block** | `QGroupBox` | Framed section with title (`Settings`, `Actions`, `Activity`, `Stacks`, …) |
-| **Form row** | `QFormLayout` + `QLabel` / `QComboBox` / `QLineEdit` / `QCheckBox` | Editable or read-only fields with **human** labels |
+| **Form row** | `add_form_value` / editable widgets | Status text via **`FormValueLabel`**; edits via Combo/LineEdit/Check |
 | **Primary button** | `QPushButton#nccPrimaryButton` | CommitBar **Apply** (config); or allowlisted immediate (e.g. System update) |
 | **Secondary button** | `QPushButton` | Create… / Refresh / domain ops that **stage**, or Undo/Save |
 | **List** | `QListWidget` | Pick one of many (hosts, VMs, stacks) |
@@ -225,6 +231,18 @@ immediate on the left).
 | **PTY terminal** | `ncc_gui.pty_terminal.PtyTerminal` (`#nccPtyTerminal`) | Interactive SSH/shell — pyte VT + colors; **never** dump into Activity |
 | **Dialogs** | `ncc_gui.dialogs` | `confirm` / `error` / `info` — never invent custom modal chrome |
 | **Banner** | `QFrame#nccDisabledBanner` | Module off / not on target |
+
+**Wrapping text (binding — no magic):** Qt does **not** auto-fix clipped
+`QLabel`s. The engine does **not** patch every label.
+
+- **Multi-line / status / dialog body text:** always `FormValueLabel` (or
+  `page.add_form_value(...)` on domain pages). That class sets `heightForWidth`.
+- **Forbidden for wrapping text:** raw `QLabel(wordWrap=True)`, especially with
+  `#nccPageSubtitle` (extra padding → half-lines / overlap).
+- **Single-line chrome** (page titles, button labels, combo items): plain
+  `QLabel` / widgets without word-wrap is fine.
+
+Debug: `NCC_GUI_LAYOUT_DEBUG=1 ncc` audits wrapping labels that are too short.
 
 ### Cards
 
@@ -383,11 +401,26 @@ Desktop entry: `ncc.desktop`, exec `ncc`, icon name `ncc` (hicolor from gui-engi
 
 ## 9. Root shell chrome (not part of domain pages)
 
-1. **Target** bar (full width)  
-2. Brand (icon + “NCC” / “Control Center”)  
-3. Sidebar sections **Core** / **Features** (`registerGuiDomain.group`)  
-4. Disabled domains: **hidden** (not grey stubs)  
-5. Content = resolved page for selection  
+1. **Header** (full width), fixed layout:
+   - **Left:** Target cluster (`Target` + combo + `+` + Connect/Disconnect) — optional  
+   - **Middle:** one-line status (elided)  
+   - **Right:** Settings (⚙) — always  
+2. **Gate** banner (only when Target chrome is on and session not ready)  
+3. Brand (icon + “NCC” / “Control Center”)  
+4. Sidebar sections **Core** / **Features** (`registerGuiDomain.group`)  
+5. Disabled domains: **hidden** (not grey stubs)  
+6. Content = resolved page for selection  
+
+**Never** put stretch between the “Target” label and the combo — that shoved the
+combo to the right. Stretch belongs only between the left cluster and Settings.
+
+Settings (`~/.config/ncc/gui-chrome.json`): `show_target` toggles the Target
+cluster. When off → this machine only, gate hidden, header ≈ Settings button.
+
+Session (`ncc_gui.target_session`): candidate → Connect → probe →  
+`blocked` | `needs_install` | `needs_update` | `ready` (local ready ≈ `idle`).  
+`NCC_TARGET_HOST` is set only while connected.
+
 
 ---
 
@@ -422,11 +455,11 @@ Run `ncc` as the logged-in user. Prefer this when the CLI already elevates via *
 - [ ] No `pkexec`/`sudo` in user-visible strings  
 - [ ] Guest/role gating: hide actions, don’t only fail after click  
 - [ ] At least one `admin` / `restricted-admin` remains (Users helper + Nix assertion)  
-- [ ] After `nixos-rebuild switch`: **soft refresh** (page `reload()`, Activity kept) unless GUI store paths changed — then hard re-exec (§ generation watcher)
+- [ ] After `nixos-rebuild switch`: **soft refresh** (catalog + recreate document) unless GUI store paths changed — then hard re-exec (§ generation watcher)
 
 ---
 
-## 12. Generation switch (soft vs hard) — event-driven
+## 12. Generation switch + Chrome/Document — event-driven
 
 **No polling.** `/run/current-system` is the generation SSOT; activation also
 atomically replaces `/run/ncc/generation` so inotify wakes. Running GUIs use
@@ -435,9 +468,24 @@ atomically replaces `/run/ncc/generation` so inotify wakes. Running GUIs use
 `ensure_app()` installs the watcher **once per process** (also if a
 `QApplication` already existed). Relaunch defaults to `sys.argv`.
 
+### Layers
+
+| Layer | Owns | NCC modules |
+|-------|------|-------------|
+| **Process** | Soft vs hard re-exec, kit fingerprint | `ncc_gui.reload` |
+| **State** | Catalog, current domain id; target session | `shell_state`, `target_session` |
+| **View** | Chrome (nav/target/gate) + **one** document | `shell.NccShell` + domain `page.py` |
+
+Multi-domain shell is **Chrome + Document**:
+
+- Sidebar projects catalog state (no per-domain page stack).
+- Navigating mounts **one** domain page (previous destroyed; Activity persisted to disk).
+- **Sticky** exceptions: `ai`, `ssh` stay parked while you visit other domains (interactive sessions). Soft generation drops parked stickies and **recreates** the current document.
+- Standalone `ncc <domain> --gui` windows still soft-`reload()` the visible `DomainPage`.
+
 | Case | Behavior |
 |------|----------|
-| New generation, **same** digests **and** loaded modules already match profile | Soft: refresh catalog/`PYTHONPATH`, `soft_switched` → page `reload()`; Activity stays |
+| New generation, **same** digests **and** loaded modules already match profile | Soft: refresh catalog → rebuild nav → recreate current document; Activity restored from disk on construct |
 | New generation, digest changed **or** process still imports old store paths | Hard: persist Activity → `exec` current app |
 
 **Hard fingerprint** (generic discovery under `/run/current-system/sw/bin`):

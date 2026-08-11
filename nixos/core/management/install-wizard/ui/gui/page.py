@@ -8,12 +8,12 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtWidgets import QLabel
-
 from ncc_gui.dialogs import confirm, error, info
 from ncc_gui.remote import target_from_env
 from ncc_gui.scaffold import DomainPage
 from ncc_gui.target_bus import bus as target_bus
+from ncc_gui.target_session import current_session
+from ncc_gui.widgets import FormValueLabel
 
 try:
     from .preflight import gather_preflight, mode_label
@@ -25,59 +25,32 @@ class InstallPage(DomainPage):
     def __init__(self, parent=None) -> None:
         super().__init__(
             "Install",
-            "Prepare this machine (or note the GUI target), then start the "
-            "install / migrate wizard. Wizard opens in its own window.",
+            "Adopt or install NCC on the header Target. "
+            "Wizard opens in its own window.",
             parent=parent,
         )
 
         status = self.add_form_block("Preflight")
-        self.lbl_target = QLabel("—")
-        self.lbl_host = QLabel("—")
-        self.lbl_arch = QLabel("—")
-        self.lbl_platform = QLabel("—")
-        self.lbl_os = QLabel("—")
-        self.lbl_etc = QLabel("—")
-        self.lbl_repo = QLabel("—")
-        self.lbl_hw = QLabel("—")
-        self.lbl_mode = QLabel("—")
-        self.lbl_warn = QLabel("—")
-        for w in (
-            self.lbl_target,
-            self.lbl_host,
-            self.lbl_arch,
-            self.lbl_platform,
-            self.lbl_os,
-            self.lbl_etc,
-            self.lbl_repo,
-            self.lbl_hw,
-            self.lbl_mode,
-            self.lbl_warn,
-        ):
-            w.setWordWrap(True)
-            w.setObjectName("nccPageSubtitle")
-        status.addRow("Target", self.lbl_target)
-        status.addRow("Hostname", self.lbl_host)
-        status.addRow("Architecture", self.lbl_arch)
-        status.addRow("system.platform", self.lbl_platform)
-        status.addRow("OS", self.lbl_os)
-        status.addRow("/etc/nixos", self.lbl_etc)
-        status.addRow("NCC repo", self.lbl_repo)
-        status.addRow("Device targets", self.lbl_hw)
-        status.addRow("Recommended", self.lbl_mode)
-        status.addRow("Notes", self.lbl_warn)
+        self.lbl_host = self.add_form_value(status, "Hostname")
+        self.lbl_arch = self.add_form_value(status, "Architecture")
+        self.lbl_platform = self.add_form_value(status, "system.platform")
+        self.lbl_os = self.add_form_value(status, "OS")
+        self.lbl_etc = self.add_form_value(status, "/etc/nixos")
+        self.lbl_repo = self.add_form_value(status, "NCC repo")
+        self.lbl_hw = self.add_form_value(status, "Device targets")
+        self.lbl_mode = self.add_form_value(status, "Recommended")
+        self.lbl_warn = self.add_form_value(status, "Notes")
 
         next_box = self.add_form_block("Next step")
-        self.lbl_next = QLabel("—")
-        self.lbl_next.setWordWrap(True)
-        self.lbl_next.setObjectName("nccPageSubtitle")
+        self.lbl_next = FormValueLabel("—")
         next_box.addRow(self.lbl_next)
 
         self.add_actions_hint(
             "Wizard is a separate window (answers → install shell). "
             "Back up /etc/nixos before migrate. Full deploy: "
-            "nix-shell <repo>/shell.nix"
+            "nix-shell <repo>/shell.nix. "
+            "Remote Target: Connect first; use wizard / shell on that host."
         )
-        # primary must be first add_action for kit insert-at-0 behavior
         self.btn_wizard = self.add_action(
             "Start wizard", self._wizard, primary=True
         )
@@ -92,28 +65,63 @@ class InstallPage(DomainPage):
 
     def reload(self) -> None:
         t = target_from_env() or ""
+        sess = current_session()
         pf = gather_preflight(remote_target=t)
         self._pf = pf
 
-        self.lbl_target.setText(t or "This machine")
-        self.lbl_host.setText(pf.hostname)
-        self.lbl_arch.setText(pf.arch)
-        arch_l = (pf.arch or "").lower()
-        if arch_l in ("aarch64", "arm64"):
-            self.lbl_platform.setText("aarch64-linux (from live arch)")
-        elif arch_l in ("x86_64", "amd64"):
-            self.lbl_platform.setText("x86_64-linux (from live arch)")
-        else:
-            self.lbl_platform.setText(f"(unknown from {pf.arch})")
-        nix = "NixOS" if pf.is_nixos else "not NixOS"
-        self.lbl_os.setText(f"{pf.os_pretty} ({nix})")
+        probe = sess.probe if (t and sess.connected == t and sess.probe) else None
 
-        kind = {
-            "missing": "missing",
-            "plain": "present (plain / non-NCC)",
-            "ncc": "present (looks like NCC)",
-        }.get(pf.etc_nixos_kind, pf.etc_nixos_kind)
-        self.lbl_etc.setText(kind)
+        if probe:
+            self.lbl_host.setText(probe.hostname or "—")
+            self.lbl_arch.setText(probe.arch or "—")
+            plat = probe.platform_linux or f"(unknown from {probe.arch})"
+            self.lbl_platform.setText(plat)
+            nix = "NixOS" if probe.is_nixos else "not NixOS"
+            self.lbl_os.setText(f"{probe.os_pretty} ({nix})")
+            kind = {
+                "missing": "missing",
+                "plain": "present (plain / non-NCC)",
+                "ncc": "present (looks like NCC)",
+            }.get(probe.etc_nixos_kind, probe.etc_nixos_kind)
+            self.lbl_etc.setText(kind)
+            if sess.state == "needs_install":
+                mode = "migrate" if probe.etc_nixos_kind == "plain" else "fresh"
+            elif sess.state == "needs_update":
+                mode = "reconfigure"
+            elif sess.state == "blocked":
+                mode = "blocked"
+            elif sess.state == "ready":
+                mode = "reconfigure"
+            else:
+                mode = pf.recommended_mode
+            self.lbl_mode.setText(mode_label(mode))
+            notes = [sess.message] if sess.message else []
+            if pf.warnings:
+                notes.extend(pf.warnings)
+            self.lbl_warn.setText(" · ".join(notes) if notes else "—")
+        else:
+            self.lbl_host.setText(pf.hostname)
+            self.lbl_arch.setText(pf.arch)
+            arch_l = (pf.arch or "").lower()
+            if arch_l in ("aarch64", "arm64"):
+                self.lbl_platform.setText("aarch64-linux (from live arch)")
+            elif arch_l in ("x86_64", "amd64"):
+                self.lbl_platform.setText("x86_64-linux (from live arch)")
+            else:
+                self.lbl_platform.setText(f"(unknown from {pf.arch})")
+            nix = "NixOS" if pf.is_nixos else "not NixOS"
+            self.lbl_os.setText(f"{pf.os_pretty} ({nix})")
+            kind = {
+                "missing": "missing",
+                "plain": "present (plain / non-NCC)",
+                "ncc": "present (looks like NCC)",
+            }.get(pf.etc_nixos_kind, pf.etc_nixos_kind)
+            self.lbl_etc.setText(kind)
+            self.lbl_mode.setText(mode_label(pf.recommended_mode))
+            self.lbl_warn.setText(
+                " · ".join(pf.warnings) if pf.warnings else "—"
+            )
+            mode = pf.recommended_mode
 
         self.lbl_repo.setText(pf.repo or "(not found — set NCC_INSTALL_REPO)")
 
@@ -129,42 +137,59 @@ class InstallPage(DomainPage):
             hw = "none discovered (open install shell / set SCRIPT_ROOT)"
         self.lbl_hw.setText(hw)
 
-        self.lbl_mode.setText(mode_label(pf.recommended_mode))
-        self.lbl_warn.setText(
-            " · ".join(pf.warnings) if pf.warnings else "—"
-        )
-
-        if pf.recommended_mode == "migrate":
+        if sess.state == "needs_install" and t:
+            self.lbl_next.setText(
+                "1) On the Target: backup /etc/nixos  →  2) Start wizard / "
+                "nix-shell deploy  →  3) Re-probe (Connect). "
+                "Platform stays ARM/x86 from the Target CPU."
+            )
+        elif sess.state == "needs_update":
+            self.lbl_next.setText(
+                "NCC is present but outdated — prefer System → "
+                "From GitHub / Migrate config, then Re-probe."
+            )
+        elif mode == "migrate":
             self.lbl_next.setText(
                 "1) Backup /etc/nixos  →  2) Start wizard  →  3) finish in "
                 "nix-shell. Device starters appear only if hardware matches."
             )
-        elif pf.recommended_mode == "reconfigure":
+        elif mode == "reconfigure":
             self.lbl_next.setText(
-                "NCC markers found under /etc/nixos. Prefer System sync for "
-                "day-to-day updates; use the wizard to re-run install choices."
+                "NCC markers found. Prefer System sync for day-to-day updates; "
+                "use the wizard to re-run install choices."
             )
-        elif pf.recommended_mode == "fresh":
+        elif mode == "fresh":
             self.lbl_next.setText(
                 "Fresh path: Start wizard (or dry-run), then deploy from the "
                 "install nix-shell on a NixOS system / ISO."
             )
+        elif mode == "blocked":
+            self.lbl_next.setText(
+                "Target blocked (OS / arch). Disconnect or fix the host."
+            )
         else:
             self.lbl_next.setText("Refresh preflight, then Start wizard.")
 
-        note = f"Target bar: {t}. " if t else ""
-        self.set_subtitle(
-            f"{note}Preflight is local. Wizard opens separately — "
-            "not embedded in this page."
-        )
+        if t:
+            self.set_subtitle(
+                f"Preflight for {t}. Use the wizard to adopt or reconfigure."
+            )
+        else:
+            self.set_subtitle(
+                "Preflight for this PC. Connect a host in the Target bar "
+                "to adopt remote NixOS."
+            )
 
     def _wizard(self) -> None:
         pf = getattr(self, "_pf", None)
-        if pf and pf.etc_nixos and pf.recommended_mode == "migrate":
+        sess = current_session()
+        if sess.state == "needs_install" or (
+            pf and pf.etc_nixos and pf.recommended_mode == "migrate"
+        ):
             if not confirm(
                 self,
-                "Migrate",
-                "/etc/nixos already exists. Prefer Backup first. Continue to wizard?",
+                "Migrate / install",
+                "Existing /etc/nixos may be overwritten. Prefer Backup first. Continue?",
             ):
                 return
         self._run_ncc(["install", "wizard"], "Install wizard")
@@ -176,6 +201,15 @@ class InstallPage(DomainPage):
         self._run_ncc(["install", "shell"], "Install shell hint")
 
     def _backup(self) -> None:
+        t = target_from_env()
+        if t:
+            error(
+                self,
+                "Backup",
+                f"Connected to {t}. Backup from this GUI copies local "
+                "/etc/nixos only. Run backup on the Target (SSH) for now.",
+            )
+            return
         src = Path("/etc/nixos")
         if not src.is_dir():
             error(self, "Backup", "/etc/nixos not found — nothing to back up.")
@@ -193,7 +227,6 @@ class InstallPage(DomainPage):
             dest_root.mkdir(parents=True, exist_ok=True)
             shutil.copytree(src, dest, symlinks=True)
         except OSError as e:
-            # Fallback: cp -a (handles some permission edge cases better with sudo later)
             try:
                 subprocess.run(
                     ["cp", "-a", str(src), str(dest)],
@@ -213,7 +246,6 @@ class InstallPage(DomainPage):
             error(self, "ncc missing", "ncc is not on PATH.")
             return
 
-        # Ensure wizard can discover blueprints when launched from GUI
         repo = getattr(self, "_pf", None)
         repo_path = repo.repo if repo else ""
         if repo_path and not os.environ.get("NCC_INSTALL_REPO"):

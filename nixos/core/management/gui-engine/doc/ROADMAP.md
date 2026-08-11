@@ -1,6 +1,7 @@
 # NCC GUI Engine — domain pages roadmap
 
-**Design SSOT:** [GUI-DESIGN.md](./GUI-DESIGN.md) — Header → Content → Activity → Footer Actions.
+**Design SSOT:** [GUI-DESIGN.md](./GUI-DESIGN.md) — Header → Content → Activity → Footer Actions.  
+**Perf / cache SSOT:** [PERFORMANCE.md](./PERFORMANCE.md) — UI thread, Chrome+Document, catalogs vs live state.
 
 ## Architecture
 
@@ -30,14 +31,18 @@ All listed rich pages subclass **`DomainPage`** (or embed assistant; fallback us
 
 ## Global Target (fleet)
 
-Root NCC GUI has a **Target** bar = *which machine’s NCC you are using*
+Root NCC GUI has a **Target** bar = *which machine you Connect to*
 (This machine + hosts from `ncc ssh client` / `~/.creds`).
 
-- Persists to `~/.config/ncc/active-target` and `NCC_TARGET_HOST`
-- Most domains follow Target (`ssh user@host -- ncc …`)
-- **Always local:** `hosts`, `ssh` (manage connections from this PC)
-- **Sidebar:** only domains **enabled on the active target** (disabled = hidden)
-- No custom sidebar editor — enable/disable via **Modules** on that host
+- **Select** a host = candidate only (not yet remote NCC)
+- **Connect** = SSH probe (OS / arch / `ncc` / `configVersion`) → session gate
+- **Disconnect** = back to this machine
+- Persists last Connect to `~/.config/ncc/active-target`; live session uses `NCC_TARGET_HOST`
+- Gate banner: **blocked** | **needs_install** → Install | **needs_update** → System | **ready**
+- Most domains follow connected Target (`ssh user@host -- ncc …`); elevated: `ssh … sudo -n ncc …`
+- **Always local:** `hosts`, `ssh`
+- While gated remote: sidebar limited (hosts/ssh + install/system as needed)
+- When **ready**: sidebar = domains enabled on that host
 
 CLI: `ncc hosts list|show|use|add|remove` and `ncc hosts --gui`.
 

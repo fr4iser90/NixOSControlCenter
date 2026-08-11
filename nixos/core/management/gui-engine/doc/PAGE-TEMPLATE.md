@@ -1,7 +1,8 @@
 # Domain GUI page template
 
 Copy into `nixos/.../<module>/ui/gui/page.py`. Binding rules:
-`gui-engine/doc/GUI-DESIGN.md`.
+`gui-engine/doc/GUI-DESIGN.md`. Perf/cache:
+`gui-engine/doc/PERFORMANCE.md`.
 
 ```python
 """<Domain> — short end-user description."""
@@ -20,7 +21,10 @@ class ExamplePage(DomainPage):
             parent=parent,
         )
         form = self.add_form_block("Settings")
-        # form.addRow("…", widget)
+        self.mode = self.add_form_value(form, "Mode", "—")
+        # editable widgets: form.addRow("…", combo) still fine
+        # status / wrapping text: ALWAYS FormValueLabel / add_form_value
+        # (engine does NOT auto-fix raw QLabels)
 
         self.add_action("Refresh", self.reload)
         # Domain ops stage changes — do not write config here.

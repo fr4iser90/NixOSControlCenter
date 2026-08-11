@@ -8,29 +8,81 @@ from collections.abc import Sequence
 
 
 def target_from_env() -> str | None:
+    """Connected fleet target from the GUI session env only.
+
+    Persistence (``~/.config/ncc/active-target``) is a reconnect candidate;
+    Connect must set ``NCC_TARGET_HOST`` before remote ``ncc`` runs.
+    """
     raw = (os.environ.get("NCC_TARGET_HOST") or "").strip()
-    if raw:
-        return raw
-    # Persisted path without importing target_state (avoids cycles at import).
-    path = os.path.expanduser("~/.config/ncc/active-target")
-    try:
-        with open(path, encoding="utf-8") as fh:
-            value = fh.read().strip()
-    except OSError:
-        return None
-    if not value or value.lower() == "local":
-        return None
-    return value
+    return raw or None
 
 
 def build_ncc_argv(args: Sequence[str], *, target: str | None = None) -> list[str]:
-    """Build argv for local `ncc …` or `ssh target -- ncc …`."""
+    """Build argv for local ``ncc …`` or ``ssh target -- ncc …``."""
     host = (target if target is not None else target_from_env()) or ""
     host = host.strip()
     if not host:
         return ["ncc", *args]
-    # Non-interactive remote; caller can use -t for PTY when needed.
-    return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", host, "--", "ncc", *args]
+    return [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=8",
+        host,
+        "--",
+        "ncc",
+        *args,
+    ]
+
+
+def build_elevated_ncc_argv(
+    args: Sequence[str],
+    *,
+    target: str | None = None,
+) -> tuple[str, list[str]]:
+    """Return ``(program, argv)`` for elevated ``ncc``.
+
+    Local: prefer passwordless sudo, then pkexec, then interactive sudo.
+    Remote: ``ssh host -- sudo -n ncc …`` (requires NOPASSWD on the target).
+    """
+    import shutil
+
+    host = (target if target is not None else target_from_env()) or ""
+    host = host.strip()
+    ncc = shutil.which("ncc") or "ncc"
+    argv_tail = list(args)
+
+    if host:
+        return (
+            "ssh",
+            [
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ConnectTimeout=8",
+                host,
+                "--",
+                "sudo",
+                "-n",
+                "ncc",
+                *argv_tail,
+            ],
+        )
+
+    if os.geteuid() == 0:
+        return ncc, argv_tail
+    if shutil.which("sudo") and subprocess.run(
+        ["sudo", "-n", "true"],
+        check=False,
+        capture_output=True,
+    ).returncode == 0:
+        return "sudo", ["-n", ncc, *argv_tail]
+    if shutil.which("pkexec"):
+        return "pkexec", [ncc, *argv_tail]
+    if shutil.which("sudo"):
+        return "sudo", [ncc, *argv_tail]
+    raise PermissionError("Need sudo or pkexec for elevated ncc")
 
 
 def run_ncc(

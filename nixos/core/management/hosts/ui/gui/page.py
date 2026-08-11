@@ -20,8 +20,8 @@ class HostsPage(DomainPage):
         super().__init__(
             "Hosts",
             "Fleet targets reuse the SSH client list. "
-            "Add/Remove stage drafts — Apply writes. "
-            "Use as target / This machine run immediately.",
+            "Use as target Connects and probes that host. "
+            "Add/Remove stage drafts — Apply writes.",
             parent=parent,
         )
         self._live: list[tuple[str, str]] = []
@@ -61,8 +61,15 @@ class HostsPage(DomainPage):
         self.reload()
 
     def _refresh_active(self) -> None:
-        t = get_active_target()
-        self.active.setText(f"Active target: {t or 'This machine'}")
+        from ncc_gui.target_session import current_session
+
+        s = current_session()
+        if s.connected:
+            self.active.setText(f"Connected: {s.connected}")
+        elif s.candidate:
+            self.active.setText(f"Selected (not connected): {s.candidate}")
+        else:
+            self.active.setText("Active target: This machine")
 
     def _pending_by_host(self) -> dict[str, PendingChange]:
         assert self.commit is not None
@@ -153,15 +160,26 @@ class HostsPage(DomainPage):
             return None
         return data  # type: ignore[return-value]
 
-    def _sync_bar(self, target: str | None) -> None:
+    def _sync_bar(self, target: str | None, *, connect: bool = False) -> None:
+        from ncc_gui.target_session import session_controller
+
         win = self.window()
         bar = win.findChild(TargetBar) if win is not None else None
         if isinstance(bar, TargetBar):
             bar.reload_hosts()
-            bar.set_target(target, emit=True)
+            bar.set_target(target, emit=False)
+        if connect and target:
+            s = session_controller().connect_target(target)
+            target_bus().changed.emit(s.connected)
+            if isinstance(bar, TargetBar):
+                bar.reload_hosts()
+        elif target is None:
+            session_controller().disconnect_target()
+            target_bus().changed.emit(None)
         else:
-            set_active_target(target)
-            target_bus().changed.emit(target)
+            session_controller().set_candidate(target)
+            set_active_target(None)
+            target_bus().changed.emit(None)
 
     def _use(self) -> None:
         sel = self._selected()
@@ -176,12 +194,16 @@ class HostsPage(DomainPage):
         if pending is not None and pending.meta.get("action") == "delete":
             info(self, "Target", "This host is marked for delete.")
             return
-        self._sync_bar(target)
+        self._sync_bar(target, connect=True)
         self._render_list()
-        info(self, "Target", f"Active target: {target}")
+        info(
+            self,
+            "Target",
+            f"Connecting to {target}…\nWatch the Target bar status (not linked until probe finishes).",
+        )
 
     def _use_local(self) -> None:
-        self._sync_bar(None)
+        self._sync_bar(None, connect=False)
         self._render_list()
 
     @staticmethod
