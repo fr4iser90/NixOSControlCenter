@@ -505,7 +505,8 @@ class PackagesPage(DomainPage):
         tip = QLabel(
             "Individual apps only (→ userPackages). "
             "✓ = already in your config (or via an active set). "
-            "Try = temporary nix-shell. Bundles: Sets & recipes. "
+            "Bundles: Sets & recipes. "
+            "Try selected… = temporary nix-shell. "
             "Package versions follow the nixpkgs pin — use Update nixpkgs… then Rebuild."
         )
         tip.setObjectName("nccPageSubtitle")
@@ -1321,8 +1322,6 @@ class PackagesPage(DomainPage):
             mark = ""
             if st["state"] != "missing":
                 mark += "  ✓"
-            if it.get("tryable"):
-                mark += "  · try"
             part = it.get("partOfSet")
             if part:
                 mark += f"  · set:{part}"
