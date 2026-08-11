@@ -73,6 +73,9 @@ in
             CLI — single packages (nixpkgs):
               ncc packages add|remove|list …
 
+            CLI — Store (intent search / try):
+              ncc packages search|resolve|try|categories …
+
             CLI — module sets:
               ncc packages module list|available|add|remove|info …
           '';

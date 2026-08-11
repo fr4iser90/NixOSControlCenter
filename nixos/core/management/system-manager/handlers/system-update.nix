@@ -43,27 +43,18 @@ let
         y|Y)
           ${ui.messages.loading "Building system configuration..."}
           BUILD_CMD="sudo ncc system build switch --flake /etc/nixos#${hostname}"
-          
-          # Run build and capture exit code (sh -c completely isolates from parent shell)
-          if sh -c "$BUILD_CMD" 2>&1; then
+          BUILD_LOG=$(mktemp /tmp/ncc-update-build.XXXXXX.log)
+          set +e
+          sh -c "$BUILD_CMD" 2>&1 | tee "$BUILD_LOG"
+          EXIT_CODE=''${PIPESTATUS[0]}
+          set -e
+          if [ "$EXIT_CODE" -eq 0 ]; then
             ${ui.messages.success "System successfully updated and rebuilt!"}
+            rm -f "$BUILD_LOG"
           else
-            EXIT_CODE=$?
-            # Check if build was successful but switch failed (common with service reload errors)
-            if [ -f /nix/var/nix/profiles/system ]; then
-              CURRENT_GEN=$(readlink /nix/var/nix/profiles/system | cut -d'-' -f2)
-              if [ -n "$CURRENT_GEN" ]; then
-                ${ui.messages.warning "Build completed, but switch encountered issues (exit code: $EXIT_CODE)"}
-                ${ui.messages.info "Current generation: $CURRENT_GEN"}
-                ${ui.messages.info "Some services may have failed to reload (e.g., dbus-broker.service)"}
-                ${ui.messages.info "This is often harmless - the system should still work correctly."}
-                ${ui.messages.info "You can verify with: sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}
-              else
-                ${ui.messages.error "Build may have failed. Check logs for details."}
-              fi
-            else
-              ${ui.messages.error "Build failed! Check logs for details."}
-            fi
+            ${ui.messages.error "Build FAILED (exit $EXIT_CODE) — files were updated, but the running system was NOT switched."}
+            print_copyable_build_error "$BUILD_LOG" "$EXIT_CODE"
+            ${ui.messages.info "Retry: sudo ncc system build switch --flake /etc/nixos#${hostname}"}
           fi
           break
           ;;
@@ -168,6 +159,71 @@ let
 
     # Layout/paths SSOT — never hardcode monolith vs split elsewhere in this script
     ${configFacade.sourcePreamble { nixosRoot = "/etc/nixos"; }}
+
+    # flake.nix requires system-manager.system.platform — heal before rebuild (no silent x86).
+    ensure_system_platform() {
+      local platform current have
+      case "$(uname -m 2>/dev/null || true)" in
+        aarch64|arm64) platform="aarch64-linux" ;;
+        x86_64|amd64) platform="x86_64-linux" ;;
+        *)
+          ${ui.messages.error "Cannot detect platform from uname -m"}
+          return 1
+          ;;
+      esac
+      current=$(ncc_read_module_config "core/management/system-manager" 2>/dev/null || echo "{}")
+      have=""
+      if echo "$current" | grep -qE 'system\.platform[[:space:]]*='; then
+        have=$(echo "$current" | grep -oE 'system\.platform[[:space:]]*=[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f2 || true)
+      elif echo "$current" | grep -qE '^[[:space:]]*platform[[:space:]]*='; then
+        have=$(echo "$current" | grep -E '^[[:space:]]*platform[[:space:]]*=' | head -1 | cut -d'"' -f2 || true)
+      fi
+      if [ "$have" = "$platform" ]; then
+        ${ui.messages.info "system.platform already $platform"}
+        return 0
+      fi
+      if echo "$current" | grep -qE 'system\.platform[[:space:]]*='; then
+        current=$(echo "$current" | sed -E "s/system\.platform[[:space:]]*=[[:space:]]*\"[^\"]*\"/system.platform = \"$platform\"/")
+      elif echo "$current" | grep -qE '^[[:space:]]*platform[[:space:]]*='; then
+        current=$(echo "$current" | sed -E "s/(^[[:space:]]*platform[[:space:]]*=[[:space:]]*)\"[^\"]*\"/\1\"$platform\"/")
+      elif echo "$current" | grep -qE 'system\.channel[[:space:]]*='; then
+        current=$(echo "$current" | sed -E "s/(system\.channel[[:space:]]*=[[:space:]]*\"[^\"]*\"[[:space:]]*;)/\1\n  system.platform = \"$platform\";/")
+      elif echo "$current" | grep -qE '^[[:space:]]*channel[[:space:]]*='; then
+        current=$(echo "$current" | sed -E "s/(^[[:space:]]*channel[[:space:]]*=[[:space:]]*\"[^\"]*\"[[:space:]]*;)/\1\n    platform = \"$platform\";/")
+      elif echo "$current" | grep -qE 'system[[:space:]]*=[[:space:]]*\{'; then
+        current=$(echo "$current" | ${pkgs.gnused}/bin/sed -E "0,/system[[:space:]]*=[[:space:]]*\{/s//system = {\n    platform = \"$platform\";/")
+      elif echo "$current" | grep -qE 'systemType[[:space:]]*='; then
+        current=$(echo "$current" | sed -E "s/(systemType[[:space:]]*=[[:space:]]*\"[^\"]*\"[[:space:]]*;)/\1\n  system.platform = \"$platform\";/")
+      else
+        current=$(printf '%s\n' "$current" | ${pkgs.gnused}/bin/sed "\$ i\  system.platform = \"$platform\";")
+      fi
+      if ! ncc_write_module_config "core/management/system-manager" "$current"; then
+        ${ui.messages.error "Failed to write system.platform = $platform"}
+        return 1
+      fi
+      ${ui.messages.success "Set system.platform = $platform (required by flake)"}
+      return 0
+    }
+
+    print_copyable_build_error() {
+      local log="$1"
+      local rc="$2"
+      echo ""
+      echo "======== COPYABLE ERROR (start) ========"
+      if [ -f "$log" ] && grep -q 'error:' "$log" 2>/dev/null; then
+        # First error: and following context (cap size for easy copy)
+        awk '/error:/{p=1} p{print; c++; if(c>=40) exit}' "$log"
+      elif [ -f "$log" ]; then
+        tail -n 50 "$log"
+      else
+        echo "(no build log captured)"
+      fi
+      echo "======== COPYABLE ERROR (end) ========"
+      echo "exit code: $rc"
+      if [ -f "$log" ]; then
+        echo "full log: $log"
+      fi
+    }
 
     # Legacy: core.base.packages.userPackages = { alice = […]; }
     # → users.<name>.userPackages = […]; then delete packages.userPackages.
@@ -1223,8 +1279,9 @@ EOF
       fi
     done
     
-    ${ui.messages.success "Update completed successfully!"}
+    ${ui.messages.success "Module/tree files updated successfully"}
     ${ui.tables.keyValue "Backup created in" "$BACKUP_DIR"}
+    ${ui.messages.info "Note: running system is not switched until build succeeds."}
     
     # PASSWORT-INTEGRITAET: Pruefe ob konfigurierte User Passwort-Dateien haben
     # Secrets werden nie vom Update ueberschrieben (nicht in COPY_ITEMS),
@@ -1249,6 +1306,15 @@ EOF
       ${ui.badges.warning "$pw_issues user(s) have password issues - they will be prompted during prebuild checks"}
     else
       ${ui.badges.success "Password files OK"}
+    fi
+
+    # After copying a flake that requires system.platform, heal before rebuild
+    # (old preflight on PATH may not include check-platform yet — chicken/egg).
+    ${ui.messages.loading "Ensuring system.platform is set for flake eval..."}
+    if ! ensure_system_platform; then
+      ${ui.messages.error "Cannot set system.platform — refusing auto-build"}
+      ${ui.messages.info "Retry heal: sudo ncc-migrate-config --verbose"}
+      exit 1
     fi
 
     # After config update (opt 1/2): offer channel bump when a newer stable pin exists
@@ -1316,24 +1382,22 @@ EOF
     if [ "$AUTO_BUILD" = "true" ] || [ "$autoBuild" = "true" ]; then
       ${ui.messages.loading "Auto-build enabled, building configuration..."}
       BUILD_CMD="sudo ncc system build switch --flake /etc/nixos#${hostname}"
-      
-      if sh -c "$BUILD_CMD" 2>&1; then
+      BUILD_LOG=$(mktemp /tmp/ncc-autobuild.XXXXXX.log)
+
+      set +e
+      sh -c "$BUILD_CMD" 2>&1 | tee "$BUILD_LOG"
+      EXIT_CODE=''${PIPESTATUS[0]}
+      set -e
+
+      if [ "$EXIT_CODE" -eq 0 ]; then
         ${ui.messages.success "System successfully updated and rebuilt!"}
+        rm -f "$BUILD_LOG"
       else
-        EXIT_CODE=$?
-        # Check if build was successful but switch failed
-        if [ -f /nix/var/nix/profiles/system ]; then
-          CURRENT_GEN=$(readlink /nix/var/nix/profiles/system | cut -d'-' -f2)
-          if [ -n "$CURRENT_GEN" ]; then
-            ${ui.messages.warning "Build completed, but switch encountered issues (exit code: $EXIT_CODE)"}
-            ${ui.messages.info "Current generation: $CURRENT_GEN"}
-            ${ui.messages.info "Some services may have failed to reload - this is often harmless."}
-          else
-            ${ui.messages.error "Auto-build failed! Check logs for details."}
-          fi
-        else
-          ${ui.messages.error "Auto-build failed! Check logs for details."}
-        fi
+        ${ui.messages.error "Auto-build FAILED (exit $EXIT_CODE) — files are updated, but the system was NOT switched."}
+        print_copyable_build_error "$BUILD_LOG" "$EXIT_CODE"
+        ${ui.messages.info "Heal platform: sudo ncc-migrate-config"}
+        ${ui.messages.info "Retry build:  sudo ncc system build switch --flake /etc/nixos#${hostname}"}
+        exit "$EXIT_CODE"
       fi
     elif [ "$AUTO_CONFIRM" = "true" ]; then
       # Auto-confirm enabled but no auto-build - skip build prompt

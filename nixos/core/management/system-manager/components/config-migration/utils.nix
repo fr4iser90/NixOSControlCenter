@@ -89,7 +89,8 @@ rec {
       # BFS to find path
       findPath = current: target: visited: path:
         if current == target then
-          lib.reverseList path
+          # Include the target version in the chain (path only has ancestors)
+          lib.reverseList ([ current ] ++ path)
         else if lib.elem current visited then
           null
         else

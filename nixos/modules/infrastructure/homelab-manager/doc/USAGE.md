@@ -115,11 +115,13 @@ The homelab manager works with Docker packages:
 
 Available through ncc command-center:
 
-- `ncc homelab create` - Create homelab environment
-- `ncc homelab fetch` - Fetch stack definitions
-- `ncc homelab status` - Show homelab status
-- `ncc homelab update` - Update stacks
-- `ncc homelab delete` - Remove homelab environment
+- `ncc homelab --gui` — Domain GUI (overview, containers, ports, domains, stacks)
+- `ncc homelab status [--json]` — Docker/Swarm status plus domain, email, virt user
+- `ncc homelab list-containers` — `name|status|image|ports`
+- `ncc homelab list-ports` — published `container|proto|host_ip|host_port|container_port`
+- `ncc homelab list-domains` — config domain plus Traefik/`VIRTUAL_HOST` discoveries
+- `ncc homelab list-stacks` / `init-swarm` / `manager`
+- Packages (outside this CLI): `homelab-create`, `homelab-fetch`, `ncc homelab-minimize`
 
 ## Troubleshooting
 

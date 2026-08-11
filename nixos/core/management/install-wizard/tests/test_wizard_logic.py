@@ -37,9 +37,13 @@ class WizardLogicTests(unittest.TestCase):
         self.assertNotIn("Homelab Server", opts.system_presets)
         self.assertIn("From Scratch", opts.system_presets)
         self.assertIn("Homelab Server", opts.install_starters)
-        self.assertIn("Jetson Nano", opts.device_presets)
+        self.assertIn("Jetson Orin Nano", opts.device_presets)
         self.assertIn("Strix Halo", opts.device_presets)
         self.assertEqual(opts.device_blueprint_map.get("Strix Halo"), "fr4iser-strix-halo")
+        self.assertEqual(
+            opts.device_blueprint_map.get("Jetson Orin Nano"),
+            "fr4iser-jetson-orin",
+        )
         self.assertEqual(
             opts.preset_defaults.get("Homelab Server"),
             ["docker", "database", "web-server"],

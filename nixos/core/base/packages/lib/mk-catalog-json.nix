@@ -1,4 +1,4 @@
-# Build-time JSON export of the packages catalog (sets / recipes / user-presets).
+# Build-time JSON export of the packages catalog (sets / recipes / user-presets / intents).
 { pkgs }:
 
 let
@@ -8,6 +8,7 @@ let
     recipesDir = ../components/recipes;
     userPresetsDir = ../components/user-presets;
   };
+  intents = import ./intent-catalog.nix;
   export = {
     sets = data.sets;
     recipes = data.recipes;
@@ -18,6 +19,9 @@ let
     recipeNames = data.recipeNames;
     userPresetNames = data.userPresetNames;
     presetNames = data.presetNames;
+    # Store search: curated product → action map
+    categories = intents.categories;
+    intents = intents.intents;
   };
 in
 pkgs.writeText "ncc-packages-catalog.json" (builtins.toJSON export)

@@ -1,10 +1,11 @@
-"""Packages — My packages + Sets & presets (+ system packages for admins)."""
+"""Packages — Store (apps) + My packages + Sets & recipes (+ system for admins)."""
 
 from __future__ import annotations
 
 import json
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QSplitter,
@@ -30,9 +32,33 @@ from ncc_gui.dialogs import confirm_rebuild, error, info
 from ncc_gui.remote import run_ncc
 from ncc_gui.scaffold import DomainPage
 
+try:
+    from .intent_store import (
+        format_intent_details,
+        install_status,
+        intents_in_category,
+        is_store_intent,
+        search_intents,
+        stage_argv_for_intent,
+        store_intents,
+        undo_argv_for_intent,
+    )
+except ImportError:  # flat load in unit tests / source tree
+    from intent_store import (
+        format_intent_details,
+        install_status,
+        intents_in_category,
+        is_store_intent,
+        search_intents,
+        stage_argv_for_intent,
+        store_intents,
+        undo_argv_for_intent,
+    )
+
+TAB_STORE = "Store"
 TAB_MINE = "My packages"
-# Qt uses & as mnemonic — escape as && so the tab bar stays intact
-TAB_SETS = "Recipes && sets"
+# Qt uses & as mnemonic — escape as && so the tab bar shows "Sets & recipes"
+TAB_SETS = "Sets && recipes"
 TAB_SYSTEM = "System packages"
 
 
@@ -317,6 +343,23 @@ def load_catalog() -> dict:
     if catalog.suffix == ".json" and catalog.is_file():
         return json.loads(catalog.read_text(encoding="utf-8"))
     expr = f"(import {catalog} {{}})"
+    # Prefer full JSON builder next to catalog.nix when present
+    mk = catalog.parent / "mk-catalog-json.nix"
+    if catalog.name == "catalog.nix" and mk.is_file():
+        # Cannot import writeText easily; eval intent+catalog via small expr
+        intent = catalog.parent / "intent-catalog.nix"
+        if intent.is_file():
+            expr = f"""
+              let
+                data = import {catalog} {{
+                  metadata = import {catalog.parent}/metadata.nix;
+                  setsDir = {catalog.parent.parent}/components/sets;
+                  recipesDir = {catalog.parent.parent}/components/recipes;
+                  userPresetsDir = {catalog.parent.parent}/components/user-presets;
+                }};
+                intents = import {intent};
+              in data // {{ categories = intents.categories; intents = intents.intents; }}
+            """
     proc = subprocess.run(
         ["nix-instantiate", "--eval", "--strict", "--json", "-E", expr],
         check=False,
@@ -406,15 +449,21 @@ class PackagesPage(DomainPage):
     def __init__(self, parent=None) -> None:
         super().__init__(
             "Packages",
-            "Browse and mark items, then Add/Remove to stage changes. "
-            "Save a draft, Undo if needed, then Apply — rebuild is offered after Apply.",
+            "Store = individual apps → your userPackages. "
+            "Sets & recipes = bundles / combos (system or user presets). "
+            "Save draft → Apply → Rebuild when offered.",
             parent=parent,
         )
         self._me = ""
         self._role = "guest"
         self._can_system = False
         self._system_type = "desktop"
-        self._catalog: dict = {"sets": [], "presets": []}
+        self._catalog: dict = {
+            "sets": [],
+            "presets": [],
+            "intents": [],
+            "categories": [],
+        }
         self._sets_by_name: dict[str, dict] = {}
         self._presets_by_name: dict[str, dict] = {}
         self._active: set[str] = set()
@@ -424,6 +473,7 @@ class PackagesPage(DomainPage):
         self._flush_summary = ""
 
         self.tabs = QTabWidget()
+        self._build_store_tab()
         self._build_mine_tab()
         self._build_sets_tab()
         self._build_system_pkgs_tab()
@@ -439,11 +489,78 @@ class PackagesPage(DomainPage):
         self.btn_add = self.add_action("Add selected", self._add_selected)
         self.btn_remove = self.add_action("Remove selected", self._remove_selected)
         self.btn_add_typed = self.add_action("Add by name…", self._add_by_name)
+        self.btn_try = self.add_action("Try selected…", self._try_selected)
+        self.btn_update_nixpkgs = self.add_action(
+            "Update nixpkgs…", self._update_nixpkgs
+        )
         self.add_action("Refresh", self.reload)
         self.btn_rebuild = self.add_action("Rebuild…", self._rebuild)
 
         self.tabs.currentChanged.connect(self._sync_actions_for_tab)
         self.reload()
+
+    def _build_store_tab(self) -> None:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        tip = QLabel(
+            "Individual apps only (→ userPackages). "
+            "✓ = already in your config (or via an active set). "
+            "Try = temporary nix-shell. Bundles: Sets & recipes. "
+            "Package versions follow the nixpkgs pin — use Update nixpkgs… then Rebuild."
+        )
+        tip.setObjectName("nccPageSubtitle")
+        tip.setWordWrap(True)
+        lay.addWidget(tip)
+
+        search_row = QHBoxLayout()
+        self.store_search = QLineEdit()
+        self.store_search.setPlaceholderText(
+            "Search apps… e.g. obs, vscode, firefox, lutris"
+        )
+        self.store_search.textChanged.connect(self._on_store_search)
+        self.store_search.returnPressed.connect(self._on_store_search)
+        search_row.addWidget(self.store_search, stretch=1)
+        lay.addLayout(search_row)
+
+        self.store_empty = QLabel("")
+        self.store_empty.setObjectName("nccPageSubtitle")
+        self.store_empty.setWordWrap(True)
+        lay.addWidget(self.store_empty)
+
+        split = QSplitter(Qt.Orientation.Horizontal)
+
+        left = QWidget()
+        left_l = QVBoxLayout(left)
+        left_l.setContentsMargins(0, 0, 0, 0)
+        box_cat = QGroupBox("Categories")
+        bc = QVBoxLayout(box_cat)
+        self.store_categories = QListWidget()
+        self.store_categories.currentItemChanged.connect(self._on_store_category)
+        self.store_categories.itemClicked.connect(self._on_store_category)
+        bc.addWidget(self.store_categories)
+        left_l.addWidget(box_cat)
+        split.addWidget(left)
+
+        mid = QGroupBox("Apps")
+        mid_l = QVBoxLayout(mid)
+        self.store_results = QListWidget()
+        self.store_results.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self.store_results.currentItemChanged.connect(self._show_store_details)
+        self.store_results.itemClicked.connect(self._show_store_details)
+        mid_l.addWidget(self.store_results)
+        split.addWidget(mid)
+
+        right = QGroupBox("Details")
+        right_l = QVBoxLayout(right)
+        self.store_details = QTextEdit()
+        self.store_details.setReadOnly(True)
+        right_l.addWidget(self.store_details)
+        split.addWidget(right)
+        split.setSizes([200, 320, 300])
+        lay.addWidget(split, stretch=1)
+        self.tabs.addTab(w, TAB_STORE)
 
     def _build_mine_tab(self) -> None:
         w = QWidget()
@@ -485,11 +602,10 @@ class PackagesPage(DomainPage):
         w = QWidget()
         lay = QVBoxLayout(w)
         tip = QLabel(
-            "Three kinds — not mixed: "
-            "Recipes [system] = several sets at once. "
-            "User presets [user] = only your account. "
-            "Individual sets [system] = single toggles (optional list below). "
-            "When a recipe is fully on, Active shows the recipe — not each set again."
+            "Sets = one thematic bundle (e.g. streaming, gaming). "
+            "Recipes = several sets at once (e.g. gaming-desktop). "
+            "User presets = several apps into your userPackages only. "
+            "Store adds single apps — use this tab for bundles."
         )
         tip.setObjectName("nccPageSubtitle")
         tip.setWordWrap(True)
@@ -499,7 +615,7 @@ class PackagesPage(DomainPage):
         self.filter_machine.setChecked(True)
         self.filter_machine.stateChanged.connect(lambda _=0: self._rebuild_available())
         self.show_individual_sets = QCheckBox("Show individual system sets")
-        self.show_individual_sets.setChecked(False)
+        self.show_individual_sets.setChecked(True)
         self.show_individual_sets.stateChanged.connect(self._on_show_sets_toggled)
         filt.addWidget(self.filter_machine)
         filt.addWidget(self.show_individual_sets)
@@ -512,7 +628,7 @@ class PackagesPage(DomainPage):
         left_l = QVBoxLayout(left)
         left_l.setContentsMargins(0, 0, 0, 0)
 
-        box_r = QGroupBox("1 · System recipes  [system]")
+        box_r = QGroupBox("1 · Recipes  [system combos]")
         br = QVBoxLayout(box_r)
         self.list_recipes = QListWidget()
         self.list_recipes.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
@@ -528,13 +644,13 @@ class PackagesPage(DomainPage):
         bu.addWidget(self.list_user_presets)
         left_l.addWidget(box_u, stretch=2)
 
-        self.box_sets = QGroupBox("3 · Individual system sets  [system]")
+        self.box_sets = QGroupBox("3 · Sets  [system bundles]")
         bs = QVBoxLayout(self.box_sets)
         self.list_sets = QListWidget()
         self.list_sets.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         bs.addWidget(self.list_sets)
         left_l.addWidget(self.box_sets, stretch=3)
-        self.box_sets.setVisible(False)
+        self.box_sets.setVisible(True)
 
         # Keep alias used by older helpers / clear paths
         self.available = self.list_recipes
@@ -597,6 +713,7 @@ class PackagesPage(DomainPage):
 
     def _sync_actions_for_tab(self, _idx: int = 0) -> None:
         tab = self._current_tab()
+        is_store = tab == TAB_STORE
         is_sets = tab == TAB_SETS
         is_mine = tab == TAB_MINE
         is_sys = tab == TAB_SYSTEM
@@ -604,7 +721,14 @@ class PackagesPage(DomainPage):
         can_write_mine = True
 
         self.btn_add_typed.setVisible(is_mine or (is_sys and can_write_sys))
-        if is_sets:
+        self.btn_try.setVisible(is_store)
+        self.btn_update_nixpkgs.setVisible(is_store and can_write_sys)
+        if is_store:
+            self.btn_add.setEnabled(True)
+            self.btn_add.setVisible(True)
+            self.btn_remove.setVisible(False)
+            self.btn_try.setEnabled(True)
+        elif is_sets:
             # User presets: any user; system sets/presets: gated in handlers
             self.btn_add.setEnabled(True)
             self.btn_remove.setEnabled(True)
@@ -626,6 +750,31 @@ class PackagesPage(DomainPage):
         if not confirm_rebuild(self, "Rebuild && switch the running system."):
             return
         self.run_ncc_root(["system", "build", "switch"], label="Rebuild && switch")
+
+    def _update_nixpkgs(self) -> None:
+        """Refresh flake inputs (all packages follow the pin) — not per-app apt upgrade."""
+        if not self._can_system:
+            error(self, "Update nixpkgs", "Administrator rights required.")
+            return
+        info(
+            self,
+            "Update nixpkgs",
+            "NixOS does not upgrade one Store app in isolation.\n\n"
+            "This runs: ncc system update-channels\n"
+            "(refresh flake inputs / channel pin, then rebuild).\n\n"
+            "Confirm in the next dialog if prompted.",
+        )
+        self.run_ncc_root(
+            ["system", "update-channels"],
+            label="Update nixpkgs (channels)",
+        )
+
+    def _store_status(self, intent: dict) -> dict:
+        return install_status(
+            intent,
+            mine=self._mine,
+            active_sets=self._active,
+        )
 
     def _stage(
         self,
@@ -680,7 +829,7 @@ class PackagesPage(DomainPage):
             self._catalog = load_catalog()
         except Exception as exc:  # noqa: BLE001
             error(self, "Catalog", str(exc))
-            self._catalog = {"sets": [], "presets": []}
+            self._catalog = {"sets": [], "presets": [], "intents": [], "categories": []}
         self._sets_by_name = {
             s["name"]: s for s in (self._catalog.get("sets") or []) if s.get("name")
         }
@@ -692,6 +841,8 @@ class PackagesPage(DomainPage):
         except Exception:  # noqa: BLE001
             self._active = set()
         self._mine, self._system_pkgs = load_package_lists()
+
+        self._rebuild_store()
 
         self.mine_list.clear()
         for name in sorted(self._mine):
@@ -1065,6 +1216,9 @@ class PackagesPage(DomainPage):
             )
 
     def _add_selected(self) -> None:
+        if self._current_tab() == TAB_STORE:
+            self._add_store_selected()
+            return
         if self._current_tab() != TAB_SETS:
             return
         names = self._selected_available_names()
@@ -1085,6 +1239,265 @@ class PackagesPage(DomainPage):
             )
             return
         self._stage_module("add", user_names, system_names)
+
+    def _selected_store_intent(self) -> dict | None:
+        if not hasattr(self, "store_results"):
+            return None
+        item = self.store_results.currentItem()
+        if item is None:
+            sels = _selected(self.store_results)
+            item = sels[0] if sels else None
+        if item is None:
+            return None
+        raw = item.data(Qt.ItemDataRole.UserRole)
+        return raw if isinstance(raw, dict) else None
+
+    def _rebuild_store(self) -> None:
+        if not hasattr(self, "store_categories"):
+            return
+        q = ""
+        if hasattr(self, "store_search"):
+            q = self.store_search.text().strip()
+        self.store_categories.blockSignals(True)
+        self.store_categories.clear()
+        for cat in self._catalog.get("categories") or []:
+            if not isinstance(cat, dict) or not cat.get("id"):
+                continue
+            title = str(cat.get("title") or cat["id"])
+            self.store_categories.addItem(
+                _make_item(title, ("category", cat))
+            )
+        self.store_categories.blockSignals(False)
+
+        empty = not self._mine and not self._active
+        if empty and not q:
+            self.store_empty.setText(
+                "Browse a category (Media, Games, …) or search an app name. "
+                "For bundles like streaming / gaming-desktop use Sets & recipes."
+            )
+            self.store_empty.setVisible(True)
+        elif not q:
+            self.store_empty.setText(
+                "Browse a category or type an app name above."
+            )
+            self.store_empty.setVisible(True)
+        else:
+            self.store_empty.setVisible(False)
+
+        if q:
+            self._fill_store_results(search_intents(self._catalog, q, store_only=True))
+        else:
+            popular_ids = {
+                "firefox",
+                "vscode",
+                "cursor",
+                "steam",
+                "obs",
+                "vlc",
+                "htop",
+            }
+            popular = [
+                it
+                for it in store_intents(self._catalog)
+                if it.get("id") in popular_ids
+            ]
+            self._fill_store_results(popular)
+
+    def _fill_store_results(self, intents: list[dict]) -> None:
+        self.store_results.clear()
+        if not intents:
+            self.store_details.setPlainText(
+                "No curated match.\n\n"
+                "If you know the nixpkgs attribute name, use My packages → Add by name…\n"
+                "Or try: ncc packages search <query>"
+            )
+            return
+        for it in intents:
+            if not is_store_intent(it):
+                continue
+            title = str(it.get("title") or it.get("id") or "")
+            kind = it.get("kind") or "?"
+            st = self._store_status(it)
+            mark = ""
+            if st["state"] != "missing":
+                mark += "  ✓"
+            if it.get("tryable"):
+                mark += "  · try"
+            part = it.get("partOfSet")
+            if part:
+                mark += f"  · set:{part}"
+            if kind == "guided":
+                row = f"{title}  [tip]{mark}"
+            else:
+                row = f"{title}  [app]{mark}"
+            self.store_results.addItem(_make_item(row, it))
+        if self.store_results.count() > 0:
+            self.store_results.setCurrentRow(0)
+
+    def _on_store_search(self, _text: str = "") -> None:
+        if not hasattr(self, "store_results"):
+            return
+        q = self.store_search.text().strip()
+        if not q:
+            self._rebuild_store()
+            return
+        self.store_empty.setVisible(False)
+        self._fill_store_results(search_intents(self._catalog, q, store_only=True))
+
+    def _on_store_category(self, cur: QListWidgetItem | None, _prev=None) -> None:
+        if cur is None or not isinstance(cur, QListWidgetItem):
+            return
+        raw = cur.data(Qt.ItemDataRole.UserRole)
+        if not raw or not isinstance(raw, tuple) or raw[0] != "category":
+            return
+        cat = raw[1]
+        cid = str(cat.get("id") or "")
+        if hasattr(self, "store_search"):
+            self.store_search.blockSignals(True)
+            self.store_search.clear()
+            self.store_search.blockSignals(False)
+        self.store_empty.setVisible(False)
+        self._fill_store_results(
+            intents_in_category(self._catalog, cid, store_only=True)
+        )
+
+    def _show_store_details(self, cur: QListWidgetItem | None, _prev=None) -> None:
+        if cur is None or not isinstance(cur, QListWidgetItem):
+            return
+        raw = cur.data(Qt.ItemDataRole.UserRole)
+        if isinstance(raw, dict):
+            self.store_details.setPlainText(
+                format_intent_details(raw, status=self._store_status(raw))
+            )
+
+    def _add_store_selected(self) -> None:
+        intent = self._selected_store_intent()
+        if not intent:
+            info(self, "Add", "Select a Store app, then Add selected.")
+            return
+        if intent.get("kind") == "guided":
+            notes = intent.get("notes") or intent.get("description") or ""
+            part = intent.get("partOfSet")
+            hint = (
+                f"\n\nRelated set: {part} under Sets & recipes."
+                if part
+                else "\n\nSee Sets & recipes for bundles."
+            )
+            info(
+                self,
+                str(intent.get("title") or "Tip"),
+                f"{notes}{hint}",
+            )
+            return
+        st = self._store_status(intent)
+        if st.get("via_user"):
+            info(
+                self,
+                "Already installed",
+                f"{intent.get('title') or intent.get('attr')} is already in your "
+                f"userPackages.\n\nStatus: {st['label']}\n\n"
+                "Remove it from My packages if you want it gone. "
+                "To get newer builds: Update nixpkgs… then Rebuild.",
+            )
+            return
+        staged = stage_argv_for_intent(intent)
+        if not staged:
+            error(self, "Store", "Cannot stage this app automatically.")
+            return
+        summary, argv, elevated = staged
+        if elevated and not self._can_system:
+            error(
+                self,
+                "Packages",
+                "Only administrators can install this:\n"
+                + str(intent.get("title") or summary),
+            )
+            return
+        undo = undo_argv_for_intent(intent)
+        undo_argv = undo[0] if undo else None
+        undo_elev = undo[1] if undo else False
+        self._stage(
+            summary,
+            argv,
+            elevated=elevated,
+            undo_argv=undo_argv,
+            undo_elevated=undo_elev,
+        )
+
+    def _try_selected(self) -> None:
+        if self._current_tab() != TAB_STORE:
+            return
+        intent = self._selected_store_intent()
+        if not intent:
+            info(self, "Try", "Select a Store result that supports Try.")
+            return
+        if not intent.get("tryable") or not intent.get("attr"):
+            error(
+                self,
+                "Try",
+                "This item cannot be tried in nix-shell "
+                "(needs a module enable and rebuild).\n\n"
+                + (intent.get("notes") or ""),
+            )
+            return
+        self._run_try_shell(str(intent.get("attr")))
+
+    def _run_try_shell(self, attr: str) -> None:
+        term = (
+            shutil.which("konsole")
+            or shutil.which("gnome-terminal")
+            or shutil.which("xfce4-terminal")
+            or shutil.which("xterm")
+            or shutil.which("kitty")
+            or shutil.which("alacritty")
+        )
+        nix_shell = shutil.which("nix-shell") or "nix-shell"
+        if term:
+            try:
+                if "gnome-terminal" in term:
+                    subprocess.Popen(
+                        [term, "--", nix_shell, "-p", attr],
+                        start_new_session=True,
+                    )
+                elif "konsole" in term:
+                    subprocess.Popen(
+                        [term, "-e", nix_shell, "-p", attr],
+                        start_new_session=True,
+                    )
+                else:
+                    subprocess.Popen(
+                        [term, "-e", nix_shell, "-p", attr],
+                        start_new_session=True,
+                    )
+                info(
+                    self,
+                    "Try",
+                    f"Opened a temporary shell with {attr}.\n"
+                    "Exit the shell when done, then Add selected to install permanently.",
+                )
+                return
+            except OSError as exc:
+                error(self, "Try", str(exc))
+                return
+        # Fallback: non-interactive smoke build
+        proc = subprocess.run(
+            [nix_shell, "-p", attr, "--run", "true"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode == 0:
+            info(
+                self,
+                "Try",
+                f"{attr} is available via nix-shell.\n"
+                "No graphical terminal found to open an interactive shell.\n"
+                f"CLI: ncc packages try {attr}\n"
+                "Add selected to install permanently into your userPackages.",
+            )
+        else:
+            err = (proc.stderr or proc.stdout or "nix-shell failed").strip()
+            error(self, "Try", err[:800])
 
     def _remove_selected(self) -> None:
         tab = self._current_tab()

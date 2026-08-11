@@ -3,11 +3,13 @@
   # System manager is essential for system management operations
   
   # Core system configuration
-  configVersion = "2.0";
+  configVersion = "2.1";
   # layout: "monolith" (systemConfig.nix) | "split" (systemConfig/**/config.nix)
   layout = "monolith";
   systemType = "desktop";
   system.channel = "stable";
+  # system.platform: install / migrate / prebuild-check-platform / system-update
+  # write from live uname. Flake also reads hardware-configuration.nix (pure; no --impure).
   # Nix Config
   allowUnfree = true;
   # Modules are managed via systemConfig (monolith nested attrs or split leaf files).

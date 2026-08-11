@@ -55,6 +55,7 @@ EOF
   systemType=$(echo "$sm" | jq -r '.systemType // "desktop"')
   enableChecks=$(echo "$sm" | jq -r 'if .enableChecks == false then "false" else "true" end')
   channel=$(echo "$sm" | jq -r '.system.channel // .channel // "—"')
+  platform=$(echo "$sm" | jq -r '.system.platform // .platform // "—"')
   # Prefer live detect; fall back to declared layout field
   declared=$(echo "$sm" | jq -r '.layout // empty')
   [[ -n "$declared" && "$layout" == "none" ]] && layout="$declared"
@@ -66,6 +67,7 @@ EOF
       --arg configVersion "$configVersion" \
       --arg systemType "$systemType" \
       --arg channel "$channel" \
+      --arg platform "$platform" \
       --argjson enableChecks "$( [[ "$enableChecks" == true ]] && echo true || echo false )" \
       --argjson sm "$sm" \
       '{
@@ -74,6 +76,7 @@ EOF
         configVersion: $configVersion,
         systemType: $systemType,
         channel: $channel,
+        platform: $platform,
         enableChecks: $enableChecks,
         systemManager: $sm
       }'
@@ -83,6 +86,7 @@ EOF
     echo "configVersion=$configVersion"
     echo "systemType=$systemType"
     echo "channel=$channel"
+    echo "platform=$platform"
     echo "enableChecks=$enableChecks"
   fi
 ''

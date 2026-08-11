@@ -5,6 +5,7 @@ let
   utils = import ./utils.nix { inherit lib; };
   detection = import ./detection.nix { inherit pkgs lib; };
   formatter = getModuleApi "cli-formatter";
+  facade = import ../../lib/config-facade.nix { inherit pkgs; };
   
   currentVersion = schema.currentVersion;
   minSupportedVersion = schema.minSupportedVersion;
@@ -61,6 +62,97 @@ let
     NIX_BIN="${pkgs.nix}/bin/nix-instantiate"
     JQ_BIN="${pkgs.jq}/bin/jq"
     FIND_CHAIN_FILE="${findChainFile}"
+
+    ${facade.sourcePreamble { nixosRoot = "/etc/nixos"; }}
+    export NIXOS_ROOT="$NIXOS_CONFIG_DIR"
+    export CONFIGS_BASE="$CONFIGS_DIR"
+    export MONOLITH_FILE="$NIXOS_CONFIG_DIR/systemConfig.nix"
+
+    # Live arch → system.platform (same policy as prebuild-check-platform / CPU+GPU)
+    ncc_detect_live_platform() {
+      case "$(uname -m 2>/dev/null || true)" in
+        aarch64|arm64) printf '%s\n' "aarch64-linux" ;;
+        x86_64|amd64) printf '%s\n' "x86_64-linux" ;;
+        *) return 1 ;;
+      esac
+    }
+
+    ncc_migrate_write_platform() {
+      local platform="$1"
+      local current
+      current=$(ncc_read_module_config "core/management/system-manager" 2>/dev/null || echo "{}")
+
+      if echo "$current" | grep -qE 'system\.platform[[:space:]]*='; then
+        current=$(echo "$current" | sed -E "s/system\.platform[[:space:]]*=[[:space:]]*\"[^\"]*\"/system.platform = \"$platform\"/")
+      elif echo "$current" | grep -qE '^[[:space:]]*platform[[:space:]]*='; then
+        current=$(echo "$current" | sed -E "s/(^[[:space:]]*platform[[:space:]]*=[[:space:]]*)\"[^\"]*\"/\1\"$platform\"/")
+      elif echo "$current" | grep -qE 'system\.channel[[:space:]]*='; then
+        current=$(echo "$current" | sed -E "s/(system\.channel[[:space:]]*=[[:space:]]*\"[^\"]*\"[[:space:]]*;)/\1\n  system.platform = \"$platform\";/")
+      elif echo "$current" | grep -qE '^[[:space:]]*channel[[:space:]]*='; then
+        current=$(echo "$current" | sed -E "s/(^[[:space:]]*channel[[:space:]]*=[[:space:]]*\"[^\"]*\"[[:space:]]*;)/\1\n    platform = \"$platform\";/")
+      elif echo "$current" | grep -qE 'system[[:space:]]*=[[:space:]]*\{'; then
+        # Nested system = { … }; inject platform after opening brace
+        current=$(echo "$current" | ${pkgs.gnused}/bin/sed -E "0,/system[[:space:]]*=[[:space:]]*\{/s//system = {\n    platform = \"$platform\";/")
+      elif echo "$current" | grep -qE 'systemType[[:space:]]*='; then
+        current=$(echo "$current" | sed -E "s/(systemType[[:space:]]*=[[:space:]]*\"[^\"]*\"[[:space:]]*;)/\1\n  system.platform = \"$platform\";/")
+      elif [ "$current" = "{}" ] || [ -z "$(echo "$current" | tr -d '[:space:]{}')" ]; then
+        current="{
+  configVersion = \"2.1\";
+  layout = \"monolith\";
+  systemType = \"desktop\";
+  system.platform = \"$platform\";
+}"
+      else
+        current=$(printf '%s\n' "$current" | ${pkgs.gnused}/bin/sed "\$ i\  system.platform = \"$platform\";")
+      fi
+
+      # Bump leaf configVersion to 2.1 when present
+      if echo "$current" | grep -qE 'configVersion[[:space:]]*='; then
+        current=$(echo "$current" | sed -E 's/configVersion[[:space:]]*=[[:space:]]*"[^"]*"/configVersion = "2.1"/')
+      else
+        current=$(echo "$current" | sed -E '0,/{/s/{/{\n  configVersion = "2.1";/')
+      fi
+
+      if ! ncc_write_module_config "core/management/system-manager" "$current"; then
+        ${formatter.messages.error "Failed to write system-manager config (platform)"}
+        return 1
+      fi
+    }
+
+    ncc_migrate_read_platform() {
+      local current
+      current=$(ncc_read_module_config "core/management/system-manager" 2>/dev/null || echo "{}")
+      if echo "$current" | grep -qE 'system\.platform[[:space:]]*='; then
+        echo "$current" | grep -oE 'system\.platform[[:space:]]*=[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f2
+        return 0
+      fi
+      if echo "$current" | grep -qE '^[[:space:]]*platform[[:space:]]*='; then
+        echo "$current" | grep -E '^[[:space:]]*platform[[:space:]]*=' | head -1 | cut -d'"' -f2
+        return 0
+      fi
+      printf '%s\n' ""
+    }
+
+    ncc_migrate_ensure_platform() {
+      local platform have
+      platform=$(ncc_detect_live_platform) || {
+        ${formatter.messages.error "Cannot detect platform from uname -m"}
+        return 1
+      }
+      have=$(ncc_migrate_read_platform)
+      if [ "$have" = "$platform" ]; then
+        ${formatter.messages.success "system.platform already $platform"}
+        return 0
+      fi
+      ncc_migrate_write_platform "$platform" || return 1
+      have=$(ncc_migrate_read_platform)
+      if [ "$have" != "$platform" ]; then
+        ${formatter.messages.error ''system.platform write did not stick (got: ''${have:-empty})''}
+        ${formatter.messages.info "Retry: sudo ncc-migrate-config --verbose"}
+        return 1
+      fi
+      ${formatter.messages.success "system.platform = $platform (from live arch)"}
+    }
     
     # PRE-CHECK: If already at current schema version, only clean stale artifacts
     # Just clean up stale files from incomplete previous migrations
@@ -73,7 +165,7 @@ let
     fi
     if [ "$DETECTED_PRE" = "$CURRENT_VERSION_PRE" ]; then
       if [ -f "$SYSTEM_CONFIG" ]; then
-        ${formatter.messages.info "Removing stale system-config.nix (v2 already active)"}
+        ${formatter.messages.info "Removing stale system-config.nix (v2.1 already active)"}
         rm -f "$SYSTEM_CONFIG"
       fi
       for agg in \
@@ -92,6 +184,17 @@ let
           fi
         fi
       done
+      # Heal missing/wrong platform even when already on current schema
+      if ! ncc_migrate_ensure_platform; then
+        exit 1
+      fi
+      exit 0
+    fi
+
+    # v2.0 → v2.1: write system.platform from live uname (no x86 fallback in flake)
+    if [ "$DETECTED_PRE" = "2.0" ] && { [ -f "$MONOLITH_FILE" ] || [ -f "$SM_CONFIG" ]; }; then
+      ${formatter.messages.info "Migrating v2.0 → v2.1 (system.platform from live arch)"}
+      ncc_migrate_ensure_platform
       exit 0
     fi
 
@@ -108,6 +211,9 @@ let
       else
         sed -i '0,/{/s/{/{\n  layout = "split";/' "$SM_CONFIG"
       fi
+      ${formatter.messages.info "Continuing → v2.1 (system.platform)"}
+      DETECTED_PRE="2.0"
+      ncc_migrate_ensure_platform
       exit 0
     fi
     

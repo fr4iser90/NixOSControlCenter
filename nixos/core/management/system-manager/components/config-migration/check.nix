@@ -50,7 +50,7 @@ in
         ${formatter.messages.warning "Configuration version outdated or has issues"}
         ${formatter.messages.info "Attempting automatic migration..."}
         
-        # Step 2: Try migration
+        # Step 2: Try migration (also heals missing system.platform on v2.1)
         if ${migration.migrateSystemConfig}/bin/ncc-migrate-config $VERBOSE_FLAG 2>&1; then
           ${formatter.messages.success "Migration completed successfully"}
 

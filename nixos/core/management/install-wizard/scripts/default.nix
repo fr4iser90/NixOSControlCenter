@@ -5,6 +5,7 @@ let
   inherit (pkgs) lib;
 
   checks_hardware_cpu = import ./checks/hardware/cpu.nix { inherit pkgs; };
+  checks_hardware_device_targets = import ./checks/hardware/device-targets.nix { inherit pkgs; };
   checks_hardware_gpu = import ./checks/hardware/gpu.nix { inherit pkgs; };
   checks_hardware_hardware_config = import ./checks/hardware/hardware-config.nix { inherit pkgs; };
   checks_hardware_memory = import ./checks/hardware/memory.nix { inherit pkgs; };
@@ -105,6 +106,8 @@ let
 
     cp "${checks_hardware_cpu}" "$out/checks/hardware/cpu.sh"
     chmod +x "$out/checks/hardware/cpu.sh"
+    cp "${checks_hardware_device_targets}" "$out/checks/hardware/device-targets.sh"
+    chmod +x "$out/checks/hardware/device-targets.sh"
     cp "${checks_hardware_gpu}" "$out/checks/hardware/gpu.sh"
     chmod +x "$out/checks/hardware/gpu.sh"
     cp "${checks_hardware_hardware_config}" "$out/checks/hardware/hardware-config.sh"
@@ -240,6 +243,8 @@ let
     cp ${../ui/gui/wizard.py} "$out/ui/gui/install_wizard.py"
     cp ${../ui/gui/wizard_logic.py} "$out/ui/gui/install_wizard_logic.py"
     cp ${../ui/gui/gui_ask.py} "$out/ui/gui/gui_ask.py"
+    cp ${../ui/gui/device_detect.py} "$out/ui/gui/device_detect.py"
+    cp ${../ui/gui/device_discover.py} "$out/ui/gui/device_discover.py"
   '';
 
   guiEnginePython = toString ../../gui-engine/python;

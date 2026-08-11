@@ -9,11 +9,13 @@ let
   cpuCheck = import ../components/system-checks/prebuild/checks/hardware/cpu.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   gpuCheck = import ../components/system-checks/prebuild/checks/hardware/gpu.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   memoryCheck = import ../components/system-checks/prebuild/checks/hardware/memory.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
+  platformCheck = import ../components/system-checks/prebuild/checks/hardware/platform.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   usersCheck = import ../components/system-checks/prebuild/checks/system/users.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
 
 in {
   # Merge all check module configs to ensure ALL scripts are available
   imports = [
+    platformCheck
     cpuCheck
     gpuCheck  
     memoryCheck

@@ -59,8 +59,8 @@ ncc install — Install / migrate wizard
 
 Usage:
   ncc install                 Help
-  ncc install --gui           Install domain GUI
-  ncc install wizard          PySide6 wizard
+  ncc install --gui           Install domain GUI (preflight + actions)
+  ncc install wizard          PySide6 wizard (separate window)
   ncc install dry-run         Dry-run install flow
   ncc install shell           Print nix-shell invocation
 EOF

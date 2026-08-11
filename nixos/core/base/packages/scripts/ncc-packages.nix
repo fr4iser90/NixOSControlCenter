@@ -3,11 +3,12 @@
 let
   smRoot = (getModuleMetadata "system-manager").path;
   facade = import "${smRoot}/lib/config-facade.nix" { inherit pkgs; };
+  catalogFile = import ../lib/mk-catalog-json.nix { inherit pkgs; };
 in
 pkgs.writeShellScriptBin "ncc-packages" ''
   # User-facing name only — never show the internal binary (ncc-packages)
   SCRIPT_NAME="ncc packages"
-  VERSION="2.0.0"
+  VERSION="2.1.0"
 
   set -euo pipefail
 
@@ -19,6 +20,10 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   export NIXOS_ROOT="$NIXOS_DIR"
   export CONFIGS_BASE="$SYSTEM_CONFIG"
   export MONOLITH_FILE="$NIXOS_DIR/systemConfig.nix"
+
+  CATALOG_JSON="''${NCC_PACKAGES_CATALOG:-${catalogFile}}"
+  JQ="${pkgs.jq}/bin/jq"
+  NIX_SHELL_BIN="${pkgs.nix}/bin/nix-shell"
 
   # (path helpers below stage monolith edits and flush on EXIT)
 
@@ -41,6 +46,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   JSON_OUT=false
   PACKAGES=()
   NAMES=()
+  QUERY=""
   # Rebuild prompt after mutating config (like system-update)
   SKIP_BUILD_PROMPT=false
   AUTO_BUILD=false
@@ -56,6 +62,12 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       $SCRIPT_NAME remove <package>... [--user <name>] [--system]
       $SCRIPT_NAME list [--system] [--json]
 
+    Store (intent search / try) — individual apps → userPackages:
+      $SCRIPT_NAME search <query> [--json]   Search curated apps (+ rare tips)
+      $SCRIPT_NAME resolve <query> [--json]  Best match → packages add action
+      $SCRIPT_NAME try <package>             Temporary nix-shell -p (no config write)
+      $SCRIPT_NAME categories [--json]       List Store categories
+
     Module sets and presets (packageModules / userPackages):
       $SCRIPT_NAME module list                 List active packageModules
       $SCRIPT_NAME module available            Show sets and presets (system|user)
@@ -64,7 +76,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       $SCRIPT_NAME module info <name>          Show details for a set or preset
 
     User presets (scope = \"user\") write users.<you>.userPackages via ncc-priv.
-    System presets (default) write packageModules (needs root).
+    System presets / sets write packageModules (needs root). Use GUI tab Sets & recipes.
 
   Flags:
     --system       Target systemPackages (global, all users)
@@ -80,6 +92,8 @@ pkgs.writeShellScriptBin "ncc-packages" ''
     Module operations edit core.base.packages via config-facade
     (monolith: systemConfig.nix | split: systemConfig/core/base/packages/config.nix).
     After add/remove, you are prompted to rebuild so packages become active.
+    resolve recommends a Store app attr (e.g. OBS → add obs-studio). Bundles:
+    ncc packages module add streaming|gaming|gaming-desktop (Sets & recipes).
 
   Layout:
     ncc system config-layout detect
@@ -89,6 +103,11 @@ pkgs.writeShellScriptBin "ncc-packages" ''
     $SCRIPT_NAME add vscode                          Add vscode to current user
     $SCRIPT_NAME add nginx --system                  Add nginx to systemPackages
     $SCRIPT_NAME list                                List all single packages
+
+    $SCRIPT_NAME search obs                          Find OBS Studio (user app)
+    $SCRIPT_NAME resolve obs --json                  → packages add obs-studio
+    $SCRIPT_NAME try firefox                         Try firefox in a temp shell
+    $SCRIPT_NAME module add streaming                Full OBS stack (set)
 
     $SCRIPT_NAME module available                    Show what can be enabled
     $SCRIPT_NAME module add gaming                   Enable single set
@@ -124,6 +143,12 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           add|remove|list)
               parse_package_args "$@"
               ;;
+          search|resolve|try)
+              parse_query_args "$@"
+              ;;
+          categories)
+              parse_categories_args "$@"
+              ;;
           module)
               parse_module_args "$@"
               ;;
@@ -135,7 +160,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
               ;;
           *)
               log_error "Unknown command: $COMMAND"
-              echo "Valid commands: add, remove, list, module"
+              echo "Valid commands: add, remove, list, search, resolve, try, categories, module"
               echo "GUI: ncc packages"
               exit 1
               ;;
@@ -200,6 +225,59 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           log_error "Missing package name. Usage: $SCRIPT_NAME $COMMAND <package>... [flags]"
           exit 1
       fi
+  }
+
+  parse_query_args() {
+      while [[ $# -gt 0 ]]; do
+          case "$1" in
+              --json|-j)
+                  JSON_OUT=true
+                  shift
+                  ;;
+              -h|--help) usage ;;
+              -*)
+                  log_error "Unknown flag: $1"
+                  exit 1
+                  ;;
+              *)
+                  if [[ -n "$QUERY" ]]; then
+                      QUERY="$QUERY $1"
+                  else
+                      QUERY="$1"
+                  fi
+                  # try also accepts as PACKAGE for shell
+                  PACKAGES+=("$1")
+                  if [[ -z "$PACKAGE" ]]; then
+                      PACKAGE="$1"
+                  fi
+                  shift
+                  ;;
+          esac
+      done
+      if [[ -z "$QUERY" ]]; then
+          log_error "Missing query. Usage: $SCRIPT_NAME $COMMAND <query>"
+          exit 1
+      fi
+  }
+
+  parse_categories_args() {
+      while [[ $# -gt 0 ]]; do
+          case "$1" in
+              --json|-j)
+                  JSON_OUT=true
+                  shift
+                  ;;
+              -h|--help) usage ;;
+              -*)
+                  log_error "Unknown flag: $1"
+                  exit 1
+                  ;;
+              *)
+                  log_error "Unexpected argument: $1"
+                  exit 1
+                  ;;
+          esac
+      done
   }
 
   parse_module_args() {
@@ -787,6 +865,151 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       return 1
   }
 
+  # ----- Store: search / resolve / try / categories -----
+
+  _catalog_ok() {
+      if [[ ! -f "$CATALOG_JSON" ]]; then
+          log_error "Catalog not found: $CATALOG_JSON"
+          exit 1
+      fi
+  }
+
+  # Score intents for QUERY; emit ranked JSON array of intent objects.
+  _intent_matches_json() {
+      local q
+      q=$(echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      "$JQ" -c --arg q "$q" '
+        def norm: ascii_downcase | gsub("^\\s+|\\s+$";"");
+        def score($q; $it):
+          (($it.aliases // []) + [$it.id, $it.title]
+            | map(norm) | map(select(length > 0))) as $names
+          | if ($names | map(select(. == $q)) | length) > 0 then 100
+            elif ($names | map(select(startswith($q))) | length) > 0 then 80
+            elif ($q | length) >= 3
+                 and ($names
+                      | map(select(. as $n | ($n | length) >= 3 and ($q | startswith($n))))
+                      | length) > 0
+                 then 70
+            elif ($names | map(select(contains($q))) | length) > 0 then 60
+            elif (($it.description // "") | norm | contains($q)) then 40
+            elif (($it.category // "") | norm) == $q then 30
+            else 0 end;
+        [.intents[] | . as $it | (score($q; $it)) as $s | select($s > 0) | $it + {_score: $s}]
+        | sort_by(-._score, .title)
+      ' "$CATALOG_JSON"
+  }
+
+  cmd_categories() {
+      _catalog_ok
+      if [[ "$JSON_OUT" == true ]]; then
+          "$JQ" -c '{categories: (.categories // [])}' "$CATALOG_JSON"
+          return 0
+      fi
+      echo "=== Store categories ==="
+      "$JQ" -r '.categories[]? | "  \(.id)\t\(.title)\t\(.description // "")"' "$CATALOG_JSON"
+  }
+
+  cmd_search() {
+      _catalog_ok
+      local matches
+      matches=$(_intent_matches_json "$QUERY")
+      if [[ "$JSON_OUT" == true ]]; then
+          "$JQ" -nc --arg q "$QUERY" --argjson matches "$matches" \
+            '{query:$q, matches:$matches}'
+          return 0
+      fi
+      local count
+      count=$("$JQ" -r 'length' <<<"$matches")
+      echo "=== Search: $QUERY ($count hit(s)) ==="
+      if [[ "$count" -eq 0 ]]; then
+          echo "  (no curated intent — try exact nixpkgs attr with: $SCRIPT_NAME add <attr>)"
+          return 0
+      fi
+      "$JQ" -r '.[] | "  \(.title)  [\(.kind)/\(.scope)]  \(.description // "")\n    id=\(.id)  action=\(if .kind == "attr" then ("add " + (.attr // "?")) elif .module then ("module add " + .module) else "guided" end)\(if .tryable then "  (tryable)" else "" end)"' <<<"$matches"
+  }
+
+  cmd_resolve() {
+      _catalog_ok
+      local matches best
+      matches=$(_intent_matches_json "$QUERY")
+      best=$("$JQ" -c '.[0] // null' <<<"$matches")
+      if [[ "$best" == "null" ]]; then
+          if [[ "$JSON_OUT" == true ]]; then
+              "$JQ" -nc --arg q "$QUERY" \
+                '{query:$q, match:null, action:{type:"unknown", argv:[], message:"No curated intent; use add <nixpkgs-attr> if you know the attribute name."}}'
+          else
+              log_warn "No curated intent for: $QUERY"
+              echo "Hint: $SCRIPT_NAME search \"$QUERY\"  or  $SCRIPT_NAME add <nixpkgs-attr>"
+          fi
+          return 0
+      fi
+
+      local action_json
+      action_json=$("$JQ" -c '
+        . as $m
+        | if $m.kind == "attr" and ($m.attr != null) then
+            {type:"add", scope:"user", attr:$m.attr, module:null, argv:["add", $m.attr], tryable:($m.tryable == true), requiresAdmin:($m.requiresAdmin == true)}
+          elif $m.kind == "guided" then
+            {type:"guided", scope:$m.scope, attr:null, module:$m.module,
+             argv:(if $m.module then ["module","add",$m.module] else [] end),
+             tryable:false, requiresAdmin:($m.requiresAdmin == true),
+             message:($m.notes // $m.description // "")}
+          elif ($m.kind == "set" or $m.kind == "recipe" or $m.kind == "user-preset") and ($m.module != null) then
+            {type:"module-add", scope:$m.scope, attr:$m.attr, module:$m.module,
+             argv:["module","add",$m.module], tryable:false, requiresAdmin:($m.requiresAdmin == true)}
+          else
+            {type:"unknown", scope:$m.scope, attr:$m.attr, module:$m.module, argv:[], tryable:false, requiresAdmin:($m.requiresAdmin == true)}
+          end
+      ' <<<"$best")
+
+      if [[ "$JSON_OUT" == true ]]; then
+          "$JQ" -nc --arg q "$QUERY" --argjson match "$best" --argjson action "$action_json" \
+            '{query:$q, match:$match, action:$action}'
+          return 0
+      fi
+      echo "=== Resolve: $QUERY ==="
+      "$JQ" -r '"Title: \(.title)\nKind:  \(.kind) / scope=\(.scope)\nDesc:  \(.description // "")\nNotes: \(.notes // "")"' <<<"$best"
+      echo ""
+      "$JQ" -r '
+        "Action: \(.type)"
+        + (if .attr then "\nAttr:   \(.attr)" else "" end)
+        + (if .module then "\nModule: \(.module)" else "" end)
+        + "\nCLI:    ncc packages " + (.argv | join(" "))
+        + (if .tryable then "\nTry:    ncc packages try " + (.attr // "") else "" end)
+        + (if .requiresAdmin then "\nNeeds:  administrator" else "\nNeeds:  your user account" end)
+        + (if .message then "\n\(.message)" else "" end)
+      ' <<<"$action_json"
+  }
+
+  cmd_try() {
+      local attr="$PACKAGE"
+      if [[ ! "$attr" =~ ^[a-zA-Z0-9][a-zA-Z0-9._+-]*$ ]]; then
+          log_error "Invalid package attribute: $attr"
+          exit 1
+      fi
+      # If query looks like a product name, resolve to attr when tryable
+      if [[ -f "$CATALOG_JSON" ]]; then
+          local resolved
+          resolved=$(_intent_matches_json "$QUERY")
+          local try_attr
+          try_attr=$("$JQ" -r '
+            [.[] | select(.tryable == true and .attr != null)] | .[0].attr // empty
+          ' <<<"$resolved")
+          if [[ -n "$try_attr" ]]; then
+              attr="$try_attr"
+          elif "$JQ" -e --arg a "$attr" '
+              [.intents[] | select((.attr == $a) and (.tryable == false))] | length > 0
+            ' "$CATALOG_JSON" >/dev/null 2>&1; then
+              log_error "'$attr' is not safe to try in nix-shell (needs a module/rebuild)."
+              echo "Hint: $SCRIPT_NAME resolve \"$QUERY\""
+              exit 1
+          fi
+      fi
+      log_info "Trying $attr in a temporary nix-shell (no config write)…"
+      log_info "Exit the shell when done. To install permanently: $SCRIPT_NAME add $attr"
+      exec "$NIX_SHELL_BIN" -p "$attr"
+  }
+
   # ----- module subcommands -----
 
   module_list() {
@@ -1134,30 +1357,30 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                           system = sys;
                         }
                       " 2>/dev/null) || raw=""
-                      if [[ -n "$raw" ]] && ${pkgs.jq}/bin/jq -e . >/dev/null 2>&1 <<<"$raw"; then
+                      if [[ -n "$raw" ]] && "$JQ" -e . >/dev/null 2>&1 <<<"$raw"; then
                           if [[ "$TARGET_SYSTEM" == true ]]; then
-                              echo "$raw" | ${pkgs.jq}/bin/jq -c '{system}'
+                              echo "$raw" | "$JQ" -c '{system}'
                           else
-                              echo "$raw" | ${pkgs.jq}/bin/jq -c .
+                              echo "$raw" | "$JQ" -c .
                           fi
                       else
                           user_json='[]'
                           system_json=$(collect_package_names "$(get_system_config_path)" "systemPackages" | names_to_json_array)
-                          ${pkgs.jq}/bin/jq -nc --arg user "$target_user" --argjson mine "$user_json" --argjson system "$system_json" \
+                          "$JQ" -nc --arg user "$target_user" --argjson mine "$user_json" --argjson system "$system_json" \
                             '{user:$user, mine:$mine, system:$system}'
                       fi
                   else
                       if [[ "$TARGET_SYSTEM" == true ]]; then
                           system_json=$(collect_package_names "$(get_system_config_path)" "systemPackages" | names_to_json_array)
-                          ${pkgs.jq}/bin/jq -nc --argjson system "$system_json" '{system:$system}'
+                          "$JQ" -nc --argjson system "$system_json" '{system:$system}'
                       else
                           user_json=$(collect_package_names "$(get_user_config_path "$target_user")" "userPackages" | names_to_json_array)
                           # also leaf environment.systemPackages via facade read + grep is hard; try path
                           local leaf_env
                           leaf_env=$(collect_package_names "$(get_user_config_path "$target_user")" "systemPackages" | names_to_json_array)
-                          user_json=$(${pkgs.jq}/bin/jq -nc --argjson a "$user_json" --argjson b "$leaf_env" '$a + $b | unique')
+                          user_json=$("$JQ" -nc --argjson a "$user_json" --argjson b "$leaf_env" '$a + $b | unique')
                           system_json=$(collect_package_names "$(get_system_config_path)" "systemPackages" | names_to_json_array)
-                          ${pkgs.jq}/bin/jq -nc --arg user "$target_user" --argjson mine "$user_json" --argjson system "$system_json" \
+                          "$JQ" -nc --arg user "$target_user" --argjson mine "$user_json" --argjson system "$system_json" \
                             '{user:$user, mine:$mine, system:$system}'
                       fi
                   fi
@@ -1176,6 +1399,19 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                       list_packages_from_config "$(get_system_config_path)" "systemPackages" "System Packages"
                   fi
               fi
+              ;;
+
+          search)
+              cmd_search
+              ;;
+          resolve)
+              cmd_resolve
+              ;;
+          try)
+              cmd_try
+              ;;
+          categories)
+              cmd_categories
               ;;
 
           module)

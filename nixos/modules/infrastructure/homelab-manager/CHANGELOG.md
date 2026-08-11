@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `ncc homelab status --json` overview (docker, swarm, domain, email, virt user)
+- `ncc homelab list-containers` / `list-ports` / `list-domains` for inventory
+- Homelab Domain GUI: overview form + containers, ports, domains, stacks lists
+
 ## [1.0.0] - 2025-12-09
 
 ### Added

@@ -1,0 +1,28 @@
+---
+description: Never inspect live host NixOS state (/etc/nixos, running system)
+alwaysApply: true
+---
+
+# No live host filesystem access
+
+## Forbidden (never do this)
+
+Do **not** read, list, search, `stat`, `cat`, `grep`, or otherwise inspect:
+
+- `/etc/nixos/**` (and any symlink into it)
+- `/run/current-system/**`
+- `/nix/var/nix/profiles/system*`
+- Other hosts' live config under `/etc/`, `/var/lib/nixos*`, `/run/ncc/**` unless the user **explicitly** pastes paths/output into chat
+- Other users' `/proc/<pid>/environ` or running NCC GUI process state on the machine
+
+`ncc system-update` (local/remote) is the user's deploy path. After they update from the repo, treat the **git workspace** as source of truth — not the live machine.
+
+## Required instead
+
+- Work only in the **repository** (`NixOSControlCenter/`, especially `nixos/`).
+- If live-host facts are needed (generation, catalog in use, GUI state, `/etc/nixos` contents): **ask the user** to paste output. Do not discover it yourself.
+- Validate with repo-only tools: `nix-instantiate` / tests / builds against files **in the workspace**.
+
+## Why
+
+Live `/etc/nixos` is private host state (fleet machines). Agents must not poke the running system to "verify" deploys.

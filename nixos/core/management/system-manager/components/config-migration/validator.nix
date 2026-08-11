@@ -199,6 +199,39 @@ let
       ERRORS=$((ERRORS + 1))
     fi
 
+    # v2.1+: flake requires system-manager.system.platform (no silent x86 fallback)
+    if [ "$CONFIG_VERSION" = "$CURRENT_VERSION" ] || [ "$CONFIG_VERSION" = "2.1" ]; then
+      PLATFORM_VAL=""
+      case "$LAYOUT" in
+        monolith)
+          if [ -f "$MONOLITH_FILE" ]; then
+            PLATFORM_VAL=$(${pkgs.nix}/bin/nix-instantiate --eval --strict --json -E \
+              "let c = import $MONOLITH_FILE; sm = c.core.management.\"system-manager\" or {}; in (sm.system or {}).platform or null" \
+              2>/dev/null | ${pkgs.jq}/bin/jq -r 'if . == null then empty else . end' || true)
+          fi
+          ;;
+        split)
+          SM_LEAF="$CONFIGS_BASE/core/management/system-manager/config.nix"
+          if [ -f "$SM_LEAF" ]; then
+            PLATFORM_VAL=$(${pkgs.nix}/bin/nix-instantiate --eval --strict --json -E \
+              "let sm = import $SM_LEAF; in (sm.system or {}).platform or sm.\"system.platform\" or null" \
+              2>/dev/null | ${pkgs.jq}/bin/jq -r 'if . == null then empty else . end' || true)
+            # Dotted attr in leaf file: system.platform = "…"
+            if [ -z "$PLATFORM_VAL" ] && grep -qE 'system\.platform[[:space:]]*=' "$SM_LEAF" 2>/dev/null; then
+              PLATFORM_VAL=$(grep -oE 'system\.platform[[:space:]]*=[[:space:]]*"[^"]*"' "$SM_LEAF" | head -1 | cut -d'"' -f2 || true)
+            fi
+          fi
+          ;;
+      esac
+      if [ -z "$PLATFORM_VAL" ]; then
+        ${formatter.messages.error "system-manager.system.platform is missing (required for v2.1)"}
+        ${formatter.messages.info "Auto-heal: sudo ncc-migrate-config   (or: sudo ncc system build switch — preflight writes it)"}
+        ERRORS=$((ERRORS + 1))
+      elif [ "$VERBOSE" = "true" ]; then
+        ${formatter.messages.success "system.platform = $PLATFORM_VAL"}
+      fi
+    fi
+
     # Split only: validate leaves. Monolith must NOT require systemConfig/**/config.nix
     if [ "$LAYOUT" = "split" ] && [ -d "$CONFIGS_BASE" ]; then
       if [ "$VERBOSE" = "true" ]; then

@@ -652,7 +652,8 @@ class InstallWizard(QMainWindow):
     def _screen_presets(self) -> None:
         self.header.setText("Choose an install base")
         self.subheader.setText(
-            "Desktop or Server first. Optional starters (Homelab, Jetson, Strix Halo) come next."
+            "Desktop or Server first. Optional Homelab starter next; "
+            "hardware device targets only if this machine matches."
         )
         self.btn_next.setText("Next")
         presets = list(self.opts.system_presets) or ["Desktop", "Server", "From Scratch"]
@@ -674,17 +675,21 @@ class InstallWizard(QMainWindow):
         base = self._state.get("preset") or "Desktop"
         self.header.setText("Optional starter")
         self.subheader.setText(
-            f"Base: {base}. Pick None for a plain install, Homelab (Server only), "
-            "or a hardware blueprint (Jetson / Strix Halo)."
+            f"Base: {base}. Homelab is a software starter (Server). "
+            "Hardware blueprints appear only when this machine matches "
+            "(discovered device targets). All blueprints stay under Advanced."
         )
         self.btn_next.setText("Next")
+        from device_detect import detect_matched_device_targets
+
+        matched = set(detect_matched_device_targets(self.opts.device_presets))
         starters: list[str] = []
         for s in self.opts.install_starters or ["None"]:
             if s == "Homelab Server" and base != "Server":
                 continue
             starters.append(s)
         for d in self.opts.device_presets:
-            if d not in starters:
+            if d in matched and d not in starters:
                 starters.append(d)
         if "None" not in starters:
             starters.insert(0, "None")
@@ -709,6 +714,16 @@ class InstallWizard(QMainWindow):
                 d = self.opts.desc(name)
                 desc = f"{d}\n{extra}" if d else extra
             opts.append((name, name, desc))
+        if matched:
+            hint = QLabel("Detected hardware: " + ", ".join(sorted(matched)))
+            hint.setObjectName("nccPageSubtitle")
+            self._add(hint)
+        else:
+            hint = QLabel(
+                "No matching device hardware detected — use Advanced → blueprints to load manually."
+            )
+            hint.setObjectName("nccPageSubtitle")
+            self._add(hint)
         self._radio_group(opts, key="starter", default=default)
 
     def _screen_packages(self) -> None:
