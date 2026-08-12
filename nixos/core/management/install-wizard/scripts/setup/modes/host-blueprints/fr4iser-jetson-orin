@@ -58,8 +58,7 @@
     system-logger = false;
     system-checks = true;
     system-updater = true;
-    ssh-client-manager = true;
-    ssh-server-manager = true;
+    ssh-manager = true; # server; set client.enable = true in module config for outbound
     bootentry-manager = false;
     homelab-manager = false;
     vm-manager = false;

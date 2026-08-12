@@ -52,24 +52,8 @@
     }
   },
   "security": {
-    "ssh-client-manager": {
-      "path": "nixos/modules/security/ssh-client-manager",
-      "files": [
-        "commands.nix",
-        "config.nix",
-        "default.nix",
-        "options.nix",
-        "template-config.nix"
-      ],
-      "subdirs": [
-        "/workspace/NixOSControlCenter/nixos/modules/security//ssh-client-manager/handlers",
-        "/workspace/NixOSControlCenter/nixos/modules/security//ssh-client-manager/lib",
-        "/workspace/NixOSControlCenter/nixos/modules/security//ssh-client-manager/scripts"
-      ],
-      "description": "ssh-client-manager"
-    },
-    "ssh-server-manager": {
-      "path": "nixos/modules/security/ssh-server-manager",
+    "ssh-manager": {
+      "path": "nixos/modules/security/ssh-manager",
       "files": [
         "auth.nix",
         "commands.nix",
@@ -80,9 +64,10 @@
         "template-config.nix"
       ],
       "subdirs": [
-        "/workspace/NixOSControlCenter/nixos/modules/security//ssh-server-manager/scripts"
+        "/workspace/NixOSControlCenter/nixos/modules/security/ssh-manager/scripts",
+        "/workspace/NixOSControlCenter/nixos/modules/security/ssh-manager/client"
       ],
-      "description": "ssh-server-manager"
+      "description": "SSH server (sshd/unlock/lockdown) + optional client"
     }
   },
   "specialized": {

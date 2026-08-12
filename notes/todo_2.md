@@ -62,8 +62,8 @@ in {
 - [ ] `vm` - Name hardcoded in options.nix, config.nix
 
 #### **Security Module (2/2 haben hardcoded Namen):**
-- [ ] `ssh-client-manager` - Name hardcoded in options.nix, config.nix
-- [ ] `ssh-server-manager` - Name hardcoded in options.nix, config.nix
+- [ ] `ssh-manager` - Name hardcoded in options.nix, config.nix
+- [ ] `ssh-manager` - Name hardcoded in options.nix, config.nix
 
 #### **Specialized Module (2/2 haben hardcoded Namen):**
 - [ ] `ai-workspace` - Name hardcoded in options.nix, config.nix
@@ -127,7 +127,7 @@ in {
 
 ### **PHASE 5: Optional Module (7 Module) - FERTIG ✅**
 - ✅ Infrastructure: homelab-manager, lock-manager, vm
-- ✅ Security: ssh-client-manager, ssh-server-manager
+- ✅ Security: ssh-manager, ssh-manager
 - ✅ Specialized: ai-workspace, hackathon
 - **Status:** Alle Optional Module migriert!
 

@@ -19,7 +19,7 @@ Rich pages live **in each module** (`ui/gui/page.py` + `registerGuiPage`).
 | network | `core/base/network/ui/gui` | wifi form |
 | lock | `lock-manager/ui/gui` | snapshot / restore |
 | ai | `ncc-assistant/ui/gui` | chat / tools / jobs (+ DomainPage fallback) |
-| ssh | `ssh-client-manager/ui/gui` | client list, embedded PTY |
+| ssh | `ssh-manager/ui/gui` | client list, embedded PTY |
 | hosts | `hosts/ui/gui` | fleet targets |
 | homelab | `homelab-manager/ui/gui` | status / stacks |
 | vm | `vm/ui/gui` | domains + start/stop |

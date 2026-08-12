@@ -5,10 +5,18 @@ let
   rules = import ../lib/rules.nix { inherit lib; };
   
   # Service-Konfigurationen aus systemConfig.nix
-  services = lib.attrByPath ["services"] {} (getModuleConfig "network");
-  
-  # Firewall-Config lesen
   networkCfg = getModuleConfig "network";
+  configuredServices = lib.attrByPath ["services"] {} networkCfg;
+
+  # Anti-lockout: if OpenSSH is on but network.services.ssh is unset, open
+  # port 22 publicly (VPS). Override with network.services.ssh.exposure = "local".
+  services =
+    configuredServices
+    // lib.optionalAttrs ((config.services.openssh.enable or false) && !(configuredServices ? ssh)) {
+      ssh = { exposure = "public"; };
+    };
+
+  # Firewall-Config lesen
   firewallEnabled = lib.attrByPath ["firewall" "enable"] true networkCfg;
 
   # Helper für sicheres Prüfen der Exposure

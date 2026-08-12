@@ -13,7 +13,7 @@ Modules may set a preferred layout via `buildDomainTui { layout = "medium"; }` w
 ### Module Recommendations
 | Module | Current UI | Recommended Layout | Notes |
 |--------|------------|--------------------|-------|
-| ssh-client-manager | FZF/CLI + TUI wrapper | `medium` | 2-panel-ish list + details preview |
+| ssh-manager | FZF/CLI + TUI wrapper | `medium` | 2-panel-ish list + details preview |
 | system-manager | TUI wrapper | `full` | Dashboard style |
 | module-manager | Go TUI | `full` | 5-panel manager |
 | lock-manager | TUI wrapper | `medium` or `full` | snapshots + stats |
@@ -24,7 +24,7 @@ Modules may set a preferred layout via `buildDomainTui { layout = "medium"; }` w
 | packages | CLI stub | `compact` | package list |
 | nixify | CLI | `compact`/`form` | wizard flow |
 | chronicle | CLI | `compact`/`status` | sessions list |
-| ssh-server-manager | CLI | `status` | status-only |
+| ssh-manager | CLI | `status` | status-only |
 # UI-Matrix pro Modul (CLI / fzf / TUI / GUI / Web)
 
 > Generiert aus Repo-Struktur (default.nix, commands/scripts, fzf-Vorkommen, ui/tui/gui/web-Verzeichnisse).
@@ -48,8 +48,8 @@ Modules may set a preferred layout via `buildDomainTui { layout = "medium"; }` w
 | `nixos/modules/infrastructure/bootentry-manager` | ✅ | — | — | — | — | ⚠️ CLI commands only (no scripts/ dir) | Medium |
 | `nixos/modules/infrastructure/homelab-manager` | ✅ | ✅ | ✅ | — | — | ⚠️ CLI commands only (no scripts/ dir) | Medium |
 | `nixos/modules/infrastructure/vm` | ✅ | — | ✅ | — | — | ⚠️ CLI commands only (no scripts/ dir) | Medium |
-| `nixos/modules/security/ssh-client-manager` | ✅ | ✅ | ✅ | — | — | ✅ ok | Low |
-| `nixos/modules/security/ssh-server-manager` | ✅ | — | — | — | — | ✅ ok | Low |
+| `nixos/modules/security/ssh-manager` | ✅ | ✅ | ✅ | — | — | ✅ ok | Low |
+| `nixos/modules/security/ssh-manager` | ✅ | — | — | — | — | ✅ ok | Low |
 | `nixos/modules/specialized/ai-workspace` | — | — | — | — | — | ✅ ok | Low |
 | `nixos/modules/specialized/chronicle` | ✅ | — | — | ✅ | — | ✅ ok | Low |
 | `nixos/modules/specialized/hackathon` | — | — | — | — | — | ✅ ok | Low |
@@ -92,14 +92,14 @@ Modules may set a preferred layout via `buildDomainTui { layout = "medium"; }` w
 6. `nixos/core/base/network` → Net/Troubleshooting
 7. `nixos/core/base/desktop` → Desktop Tuning
 8. `nixos/core/base/user` → User/Groups
-9. `nixos/modules/security/ssh-client-manager` → SSH client (fzf → TUI)
+9. `nixos/modules/security/ssh-manager` → SSH client (fzf → TUI)
 10. `nixos/modules/system/lock-manager` → Locks/Maintenance
 
 ### Low Priority (später/optional)
 11. `nixos/core/base/audio`
 12. `nixos/core/base/hardware`
 13. `nixos/core/base/localization`
-14. `nixos/modules/security/ssh-server-manager`
+14. `nixos/modules/security/ssh-manager`
 15. `nixos/modules/infrastructure/bootentry-manager`
 16. `nixos/modules/specialized/nixify` (evtl. Web-UI wichtiger)
 17. `nixos/modules/specialized/chronicle` (GUI vorhanden)

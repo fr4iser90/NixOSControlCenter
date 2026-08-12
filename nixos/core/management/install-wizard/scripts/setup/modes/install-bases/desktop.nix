@@ -60,8 +60,8 @@
     system-logger = true;     
     system-checks = true;      
     system-updater = true;    
-    ssh-client-manager = false;
-    ssh-server-manager = false;        
+    # client: ssh-manager.client.enable (default false)
+    ssh-manager = false;        
     bootentry-manager = false; 
     homelab-manager = false;    
     vm-manager = false;         

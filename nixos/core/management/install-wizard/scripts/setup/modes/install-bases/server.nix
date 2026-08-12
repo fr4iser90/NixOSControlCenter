@@ -59,8 +59,8 @@
     system-logger = true;     
     system-checks = true;      
     system-updater = true;    
-    ssh-client-manager = false;
-    ssh-server-manager = true;  # Server typically needs SSH
+    # enable = sshd+unlock; client.enable separate (default false)
+    ssh-manager = true;
     bootentry-manager = false; 
     homelab-manager = false;    
     vm-manager = false;         
@@ -79,7 +79,9 @@
   # Profile Overrides
   #
   overrides = {
-    enableSSH = true;  # Server typically needs SSH
+    # Prefer features.ssh-manager (INST-01 still pending for apply).
+    # Maps to: keep sshd enabled — never silently disable during setup.
+    enableSSH = true;
   };
 
   #

@@ -17,6 +17,52 @@ def target_from_env() -> str | None:
     return raw or None
 
 
+def can_elevate(*, target: str | None = None, timeout: float = 8) -> bool:
+    """True when elevated ``ncc`` can run without an interactive password.
+
+    Local: already root, or ``sudo -n true``.
+    Remote: ``ssh host -- sudo -n true`` (NOPASSWD on the Target).
+    """
+    host = (target if target is not None else target_from_env()) or ""
+    host = host.strip()
+    if host:
+        try:
+            proc = subprocess.run(
+                [
+                    "ssh",
+                    "-o",
+                    "BatchMode=yes",
+                    "-o",
+                    "ConnectTimeout=8",
+                    host,
+                    "--",
+                    "sudo",
+                    "-n",
+                    "true",
+                ],
+                check=False,
+                capture_output=True,
+                timeout=timeout,
+            )
+            return proc.returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+    if os.geteuid() == 0:
+        return True
+    try:
+        return (
+            subprocess.run(
+                ["sudo", "-n", "true"],
+                check=False,
+                capture_output=True,
+                timeout=timeout,
+            ).returncode
+            == 0
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def build_ncc_argv(args: Sequence[str], *, target: str | None = None) -> list[str]:
     """Build argv for local ``ncc …`` or ``ssh target -- ncc …``."""
     host = (target if target is not None else target_from_env()) or ""

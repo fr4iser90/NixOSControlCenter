@@ -21,6 +21,11 @@ let
   };
   updateBin = "${mmLib.updateModuleConfig}/bin/update-module-config";
 
+  moduleMigration = import ./components/module-migration {
+    inherit pkgs lib getModuleApi getModuleMetadata;
+  };
+  moduleMigrateBin = "${moduleMigration.moduleMigrate}/bin/ncc-module-migrate";
+
   # Modules that must not be disabled via CLI/GUI (break NCC itself)
   protected = "module-manager cli-registry nixos-control-center system-manager";
 
@@ -173,6 +178,7 @@ Usage:
   ncc modules show NAME       Module details (key=value)
   ncc modules enable NAME [--rebuild]
   ncc modules disable NAME [--rebuild]
+  ncc modules migrate [--dry-run] [--verbose] [--skip-orphans]
 
 Enable/disable write systemConfig (needs write access to /etc/nixos; use sudo).
 Protected (cannot disable): ${protected}
@@ -184,6 +190,7 @@ EOF
       show) shift; exec ${showScript}/bin/ncc-modules-show "$@" ;;
       enable) shift; exec ${setEnableScript}/bin/ncc-modules-set-enable enable "$@" ;;
       disable) shift; exec ${setEnableScript}/bin/ncc-modules-set-enable disable "$@" ;;
+      migrate) shift; exec ${moduleMigrateBin} "$@" ;;
       help|-h|--help) exec "$0" ;;
       *)
         echo "Unknown: ncc modules $1" >&2
@@ -195,6 +202,9 @@ EOF
 in
 {
   config = mkMerge [
+    {
+      environment.systemPackages = [ moduleMigration.moduleMigrate ];
+    }
     (cliRegistry.registerGuiDomain "modules" {
       label = "Modules";
       description = "Turn NCC modules on or off";
@@ -221,6 +231,7 @@ in
             ncc modules show NAME
             ncc modules enable NAME [--rebuild]
             ncc modules disable NAME [--rebuild]
+            ncc modules migrate [--dry-run] [--verbose] [--skip-orphans]
           '';
         }
         {
@@ -266,6 +277,24 @@ in
           permission = "system.manage";
           requiresSudo = true;
           shortHelp = "disable - Disable module";
+        }
+        {
+          name = "migrate";
+          domain = "modules";
+          parent = "modules";
+          description = "Migrate/clean legacy module configs (renames, merges)";
+          category = "system";
+          script = "${moduleMigration.moduleMigrate}/bin/ncc-module-migrate";
+          permission = "system.manage";
+          requiresSudo = true;
+          shortHelp = "migrate - Module config migrations";
+          longHelp = ''
+            ncc modules migrate [--dry-run] [--verbose] [--skip-orphans]
+
+            Applies module migration plans (e.g. ssh-server-manager +
+            ssh-client-manager → ssh-manager), then removes orphan
+            systemConfig/{core,modules} leaves. Never touches custom/ or users/.
+          '';
         }
         {
           name = "get-module-data";

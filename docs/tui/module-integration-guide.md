@@ -11,9 +11,9 @@ This guide explains how to integrate Bubble Tea TUI interfaces into existing Nix
 Keep existing CLI/bash interfaces and add TUI alongside:
 
 ```
-modules/security/ssh-client-manager/
+modules/security/ssh-manager/
 ├── scripts/
-│   └── ssh-client-manager.nix    ← Existing CLI interface
+│   └── ssh-manager.nix    ← Existing CLI interface
 └── tui/
     └── menu.nix                  ← New TUI interface
 ```

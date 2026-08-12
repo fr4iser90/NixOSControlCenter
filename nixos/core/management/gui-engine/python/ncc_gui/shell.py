@@ -411,8 +411,7 @@ class NccShell(QMainWindow):
             self._gate_btn.setText(f"Update to {EXPECTED_CONFIG_VERSION}")
             self._gate_btn.setEnabled(True)
             self._gate_btn.show()
-            self._gate_secondary.setText("Open System")
-            self._gate_secondary.show()
+            self._gate_secondary.hide()
             self._gate_action = "update"
         else:  # blocked — only when Target bar can't resolve it (e.g. not NixOS)
             self._gate_btn.setText("Disconnect")
@@ -434,9 +433,10 @@ class NccShell(QMainWindow):
             self.select_domain("install")
             target_bus().navigate.emit("install")
         elif action == "update":
+            # Open System + source modal (Host tree or GitHub branch → Target).
             self.select_domain("system")
             target_bus().navigate.emit("system")
-            target_bus().changed.emit(ctrl.session().connected)
+            target_bus().systemAction.emit("update-config")
 
     def _on_soft_generation(self) -> None:
         """Catalog/data changed, same GUI kit — refresh chrome + recreate document."""

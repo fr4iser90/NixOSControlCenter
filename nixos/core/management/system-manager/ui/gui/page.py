@@ -21,7 +21,12 @@ from PySide6.QtWidgets import (
 
 from ncc_gui.ansi import strip_ansi
 from ncc_gui.dialogs import confirm, error, info
-from ncc_gui.remote import target_from_env
+from ncc_gui.push_tree import (
+    apply_staged_tree_on_target,
+    push_nixos_tree_to_target,
+    remote_staging_dir,
+)
+from ncc_gui.remote import can_elevate, target_from_env
 from ncc_gui.scaffold import DomainPage
 from ncc_gui.system_fs_status import (
     STATUS_SCRIPT,
@@ -31,7 +36,9 @@ from ncc_gui.system_fs_status import (
     release_from_fs,
 )
 from ncc_gui.target_bus import bus as target_bus
+from ncc_gui.target_probe import EXPECTED_CONFIG_VERSION
 from ncc_gui.theme import APP_STYLE
+from ncc_gui.update_source_dialog import UpdateSourceDialog, local_path_ok
 
 _SETTINGS_ORG = "NixOSControlCenter"
 _SETTINGS_APP = "ncc-gui"
@@ -170,18 +177,24 @@ class SystemPage(DomainPage):
         self.lbl_layout = self.add_form_value(status, "Config layout")
         self.lbl_checks = self.add_form_value(status, "Preflight checks")
 
-        self.add_actions_hint(
-            "Sync / rebuild need administrator rights on the Target. "
-            "Remote sync uses ssh + sudo -n on that host. "
-            "Check versions & validate write to Activity only."
-        )
+        self._elevated_btns: list = []
         self.add_action("Refresh status", self.reload)
-        self.add_action("From local repo", lambda: self._start_sync("local"), primary=True)
-        self.add_action("From GitHub", lambda: self._start_sync("remote"))
-        self.add_action("Channels only", lambda: self._start_sync("channels"))
-        self.add_action(
-            "Migrate config",
-            lambda: self._run_quick(("migrate-config",), "Migrate config", True),
+        self._elevated_btns.append(
+            self.add_action(
+                "From local repo", lambda: self._start_sync("local"), primary=True
+            )
+        )
+        self._elevated_btns.append(
+            self.add_action("From GitHub", lambda: self._start_sync("remote"))
+        )
+        self._elevated_btns.append(
+            self.add_action("Channels only", lambda: self._start_sync("channels"))
+        )
+        self._elevated_btns.append(
+            self.add_action(
+                "Migrate config",
+                lambda: self._run_quick(("migrate-config",), "Migrate config", True),
+            )
         )
         self.add_action(
             "Check versions",
@@ -195,17 +208,21 @@ class SystemPage(DomainPage):
             "System report",
             lambda: self._run_quick(("report",), "System report", False),
         )
-        self.add_action(
-            "Rebuild only",
-            lambda: self._run_quick(("build", "switch"), "Rebuild only", True),
+        self._elevated_btns.append(
+            self.add_action(
+                "Rebuild only",
+                lambda: self._run_quick(("build", "switch"), "Rebuild only", True),
+            )
         )
         self.add_action(
             "Config layout",
             lambda: self._run_quick(("config-layout", "detect"), "Config layout", False),
         )
-        self.add_action(
-            "Allow unfree",
-            lambda: self._run_quick(("allow-unfree",), "Allow unfree", True),
+        self._elevated_btns.append(
+            self.add_action(
+                "Allow unfree",
+                lambda: self._run_quick(("allow-unfree",), "Allow unfree", True),
+            )
         )
 
         self._status_proc: QProcess | None = None
@@ -215,7 +232,9 @@ class SystemPage(DomainPage):
         self._reload_timer.timeout.connect(self._reload_now)
 
         target_bus().changed.connect(lambda _t: self._schedule_reload())
+        target_bus().systemAction.connect(self._on_system_action)
         QTimer.singleShot(0, self._schedule_reload)
+        QTimer.singleShot(0, self._refresh_elevated_actions)
 
     def _open_settings(self) -> None:
         dlg = SystemSettingsDialog(self)
@@ -231,6 +250,270 @@ class SystemPage(DomainPage):
 
     def reload(self) -> None:
         self._schedule_reload()
+
+    def _refresh_elevated_actions(self) -> None:
+        ok = can_elevate(target=target_from_env())
+        tip = (
+            ""
+            if ok
+            else "Needs passwordless sudo on the Target (sudo -n)"
+        )
+        for btn in self._elevated_btns:
+            btn.setEnabled(ok)
+            btn.setToolTip(tip)
+
+    def _on_system_action(self, name: object) -> None:
+        if not isinstance(name, str) or not name.strip():
+            return
+        action = name.strip()
+        if action in ("update-config", "migrate-config"):
+            QTimer.singleShot(0, self._start_update_to_current)
+
+    def _start_update_to_current(self) -> None:
+        """Banner «Update to 2.1»: modal → Host rsync or GitHub → Target update."""
+        if not can_elevate(target=target_from_env()):
+            error(
+                self,
+                f"Update to {EXPECTED_CONFIG_VERSION}",
+                "Passwordless sudo required on the Target "
+                "(ssh … sudo -n true).",
+            )
+            self._refresh_elevated_actions()
+            return
+
+        dlg = UpdateSourceDialog(
+            self,
+            schema_version=EXPECTED_CONFIG_VERSION,
+            target=target_from_env(),
+            local_path=self._local_path,
+            branch=self._branch,
+            auto_build=self._auto_build,
+        )
+        if dlg.exec() != UpdateSourceDialog.DialogCode.Accepted:
+            return
+        choice = dlg.choice()
+        # Persist prefs for next time
+        self._local_path = choice["path"] or self._local_path
+        self._branch = choice["branch"]
+        self._auto_build = bool(choice["auto_build"])
+        self._settings.setValue(_KEY_LOCAL, self._local_path)
+        self._settings.setValue(_KEY_BRANCH, self._branch)
+        self._settings.setValue(_KEY_AUTO_BUILD, self._auto_build)
+        self._settings.sync()
+
+        if choice["source"] == "local":
+            self._run_update_from_host(
+                choice["path"], auto_build=choice["auto_build"]
+            )
+        else:
+            self._run_update_from_github(
+                choice["branch"], auto_build=choice["auto_build"]
+            )
+
+    def _run_update_from_host(self, path: str, *, auto_build: bool) -> None:
+        """This PC → Target/local: sync tree, rebuild, then migrate-config → schema."""
+        ok, err = local_path_ok(path)
+        if not ok:
+            error(self, f"Update to {EXPECTED_CONFIG_VERSION}", err)
+            return
+        t = target_from_env()
+        where = t or "this machine"
+
+        if t:
+            # Host→Target never uses Target's old ``ncc --source-dir`` (often ignored).
+            # Always rebuild after apply so PATH gets the new migrate-config.
+            summary = (
+                f"On {t}:\n"
+                f"1) Copy this PC's tree → {remote_staging_dir()}\n"
+                f"2) Apply into /etc/nixos (keep your systemConfig)\n"
+                f"3) Rebuild & switch\n"
+                f"4) Migrate config → {EXPECTED_CONFIG_VERSION}"
+            )
+        else:
+            steps = (
+                f"1) Update from local tree\n"
+                f"2) Rebuild & switch\n"
+                f"3) Migrate config → {EXPECTED_CONFIG_VERSION}"
+                if auto_build
+                else (
+                    f"1) Update from local tree (no rebuild)\n"
+                    f"2) Migrate config → {EXPECTED_CONFIG_VERSION}"
+                )
+            )
+            summary = f"On this machine:\n{path}\n\n{steps}"
+
+        if not confirm(
+            self,
+            f"Update to {EXPECTED_CONFIG_VERSION}",
+            f"{summary}\n\nContinue on {where}?",
+        ):
+            return
+
+        if t:
+            self._host_push_apply_rebuild_migrate(path)
+            return
+
+        # Local (no Target): update --local, then migrate
+        args = [
+            "system",
+            "update",
+            "--yes",
+            "--local",
+            f"--source-dir={path}",
+        ]
+        if auto_build:
+            args.append("--auto-build")
+
+        def _done(code: int) -> None:
+            if code != 0:
+                return
+            self._run_migrate_after_update()
+
+        if self.set_busy():
+            return
+        self.run_ncc_root(
+            args,
+            label=f"update to {EXPECTED_CONFIG_VERSION} (this PC)",
+            on_done=_done,
+            follow_target=False,
+        )
+
+    def _host_push_apply_rebuild_migrate(self, path: str) -> None:
+        """rsync → apply → rebuild → migrate (Target). Blocking push/apply, then async."""
+        from PySide6.QtWidgets import QApplication
+
+        t = target_from_env()
+        if not t:
+            return
+        if self.set_busy():
+            return
+
+        self.log_append(f"• rsync {path} → {t}:{remote_staging_dir()}\n")
+        QApplication.processEvents()
+        pushed, detail = push_nixos_tree_to_target(path, t)
+        if not pushed:
+            error(
+                self,
+                f"Update to {EXPECTED_CONFIG_VERSION}",
+                f"Failed to copy tree from this PC to Target:\n{detail}",
+            )
+            return
+        self.log_append(f"• staged at {detail}\n")
+        self.log_append("• apply staged tree → /etc/nixos (preserve systemConfig)\n")
+        QApplication.processEvents()
+        applied, apply_out = apply_staged_tree_on_target(t, staging=detail)
+        self.log_append(f"{apply_out}\n")
+        if not applied:
+            error(
+                self,
+                f"Update to {EXPECTED_CONFIG_VERSION}",
+                f"Failed to apply staged tree on Target:\n{apply_out}",
+            )
+            return
+
+        self._chain_rebuild_then_migrate(auto_build=True)
+
+    def _chain_rebuild_then_migrate(self, *, auto_build: bool) -> None:
+        """After Host→Target apply: rebuild (new ncc), then migrate-config."""
+
+        def _after_rebuild(code: int) -> None:
+            if code != 0:
+                error(
+                    self,
+                    f"Update to {EXPECTED_CONFIG_VERSION}",
+                    "Rebuild failed — migrate skipped. Fix build, then "
+                    "run Migrate config (or Update to "
+                    f"{EXPECTED_CONFIG_VERSION} again).",
+                )
+                return
+            self._run_migrate_after_update()
+
+        if auto_build:
+            if self.set_busy():
+                return
+            self.run_ncc_root(
+                ["system", "build", "switch"],
+                label="rebuild after tree sync",
+                on_done=_after_rebuild,
+                follow_target=True,
+            )
+        else:
+            self._run_migrate_after_update()
+
+    def _run_migrate_after_update(self) -> None:
+        """Bump Target systemConfig schema to EXPECTED_CONFIG_VERSION."""
+
+        def _done(code: int) -> None:
+            from ncc_gui.target_session import session_controller
+
+            if code == 0:
+                info(
+                    self,
+                    f"Update to {EXPECTED_CONFIG_VERSION}",
+                    f"Done. Config schema is {EXPECTED_CONFIG_VERSION}.",
+                )
+            else:
+                error(
+                    self,
+                    f"Update to {EXPECTED_CONFIG_VERSION}",
+                    "Tree synced but migrate-config failed. "
+                    "Try Actions → Migrate config.",
+                )
+            session_controller().refresh()
+            self.reload()
+
+        if self.set_busy():
+            return
+        self.run_ncc_root(
+            ["system", "migrate-config"],
+            label=f"migrate config → {EXPECTED_CONFIG_VERSION}",
+            on_done=_done,
+            follow_target=True,
+        )
+
+    def _run_update_from_github(self, branch: str, *, auto_build: bool) -> None:
+        t = target_from_env()
+        where = t or "this machine"
+        steps = (
+            f"1) Clone GitHub @{branch or 'main'} and sync tree\n"
+            f"2) Rebuild & switch\n"
+            f"3) Migrate config → {EXPECTED_CONFIG_VERSION}"
+            if auto_build
+            else (
+                f"1) Clone GitHub @{branch or 'main'} and sync tree\n"
+                f"2) Migrate config → {EXPECTED_CONFIG_VERSION} (no rebuild)"
+            )
+        )
+        if not confirm(
+            self,
+            f"Update to {EXPECTED_CONFIG_VERSION}",
+            f"On {where}:\n{steps}\n\nContinue?",
+        ):
+            return
+
+        args = [
+            "system",
+            "update",
+            "--yes",
+            "--remote",
+            f"--branch={branch or 'main'}",
+        ]
+        if auto_build:
+            args.append("--auto-build")
+
+        def _done(code: int) -> None:
+            if code != 0:
+                return
+            self._run_migrate_after_update()
+
+        if self.set_busy():
+            return
+        self.run_ncc_root(
+            args,
+            label=f"update to {EXPECTED_CONFIG_VERSION} (GitHub @{branch})",
+            on_done=_done,
+            follow_target=True,
+        )
 
     def _set_status_loading(self) -> None:
         self.lbl_host.setText("…")
@@ -300,6 +583,7 @@ class SystemPage(DomainPage):
             "Gear (top right) opens sync preferences."
         )
         self._set_status_loading()
+        self._refresh_elevated_actions()
         self._start_fs_status_probe()
 
     def _start_fs_status_probe(self) -> None:
@@ -334,6 +618,15 @@ class SystemPage(DomainPage):
 
     def _start_sync(self, mode: str) -> None:
         if self.set_busy():
+            return
+        if not can_elevate(target=target_from_env()):
+            error(
+                self,
+                "System update",
+                "Passwordless sudo required on the Target "
+                "(ssh … sudo -n true).",
+            )
+            self._refresh_elevated_actions()
             return
         t = target_from_env()
         where = t or "this machine"
@@ -401,6 +694,15 @@ class SystemPage(DomainPage):
             return
 
         elevated = args[:1] in (("build",), ("allow-unfree",), ("migrate-config",))
+        if elevated and not can_elevate(target=target_from_env()):
+            error(
+                self,
+                label,
+                "Passwordless sudo required on the Target "
+                "(ssh … sudo -n true).",
+            )
+            self._refresh_elevated_actions()
+            return
         if elevated:
 
             def _done(code: int) -> None:

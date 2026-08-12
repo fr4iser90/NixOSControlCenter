@@ -60,12 +60,12 @@ Für die hierarchische CLI-Architektur sollen diese Parameter verfügbar sein (C
 ncc module enable homelab-manager
 ncc module disable homelab-manager
 
-ncc module enable ssh-server-manager
-ncc module disable ssh-server-manager
+ncc module enable ssh-manager
+ncc module disable ssh-manager
 
 # Security-Module
-ncc module enable ssh-client-manager
-ncc module disable ssh-client-manager
+ncc module enable ssh-manager
+ncc module disable ssh-manager
 
 # Specialized-Module
 ncc module enable ai-workspace

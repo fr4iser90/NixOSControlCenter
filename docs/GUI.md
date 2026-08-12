@@ -19,8 +19,8 @@ Hier ist die **UI‑Matrix pro Modul (CLI / fzf / TUI / GUI / Web)** auf Basis d
 | `nixos/modules/infrastructure/bootentry-manager` | ✅ | — | — | — | — |
 | `nixos/modules/infrastructure/homelab-manager` | ✅ | ✅ | ✅ | — | — |
 | `nixos/modules/infrastructure/vm` | ✅ | — | — | — | — |
-| `nixos/modules/security/ssh-client-manager` | ✅ | ✅ | — | — | — |
-| `nixos/modules/security/ssh-server-manager` | ✅ | — | — | — | — |
+| `nixos/modules/security/ssh-manager` | ✅ | ✅ | — | — | — |
+| `nixos/modules/security/ssh-manager` | ✅ | — | — | — | — |
 | `nixos/modules/specialized/ai-workspace` | — | — | — | — | — |
 | `nixos/modules/specialized/chronicle` | ✅ | — | — | ✅ | — |
 | `nixos/modules/specialized/hackathon` | — | — | — | — | — |

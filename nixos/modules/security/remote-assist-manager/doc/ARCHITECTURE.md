@@ -104,7 +104,7 @@ Host start → Raise to gated → Guest proposes action → Host approve/deny �
 
 **Context**: Module mixes UX (share) with remote control trust boundaries  
 **Decision**: Place under `modules/security/remote-assist-manager`  
-**Rationale**: Input from outside is an access-control problem; mirrors `ssh-server-manager`  
+**Rationale**: Input from outside is an access-control problem; mirrors `ssh-manager`  
 **Alternatives**: `system/` (too discovery-oriented), `specialized/` (premature product bucket)
 
 ### Decision 2: Stream and input are separate channels
@@ -168,7 +168,7 @@ Exact defaults are configuration; architecture only requires events to be classi
 
 - Desktop / display session (Wayland or X11)
 - Notification path (desktop notifications for pending approvals)
-- Optional: patterns from `ssh-server-manager` for request lifecycle + audit
+- Optional: patterns from `ssh-manager` for request lifecycle + audit
 
 ### External Dependencies (expected)
 

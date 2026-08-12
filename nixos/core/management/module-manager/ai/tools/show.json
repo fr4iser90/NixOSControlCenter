@@ -9,7 +9,7 @@
     "properties": {
       "name": {
         "type": "string",
-        "description": "Module name (e.g. chronicle, ssh-client-manager)"
+        "description": "Module name (e.g. chronicle, ssh-manager)"
       }
     },
     "required": ["name"]

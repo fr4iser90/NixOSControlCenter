@@ -36,7 +36,7 @@ $ ncc module-manager
 ❌ homelab-manager (Infrastructure)      │ 📂 Category: Infrastructure
 ✅ audio (Core)                          │ ⚡ Status: enabled
 ✅ boot (Core)                           │ 📝 Description: Core audio module
-❌ ssh-server-manager (Security)         │ 🎯 Actions: enable, disable, info
+❌ ssh-manager (Security)         │ 🎯 Actions: enable, disable, info
 ❌ ai-workspace (Specialized)            │ 🔍 Fuzzy search: "audio" → filter
 
 > audio  ↵  (fuzzy search aktiv)

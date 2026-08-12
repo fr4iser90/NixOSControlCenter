@@ -16,6 +16,8 @@ class TargetBus(QObject):
     changed = Signal(object)
     sessionChanged = Signal(object)
     navigate = Signal(str)
+    # System page: run a named action (e.g. ``migrate-config``) after navigate.
+    systemAction = Signal(str)
 
 
 _bus: TargetBus | None = None

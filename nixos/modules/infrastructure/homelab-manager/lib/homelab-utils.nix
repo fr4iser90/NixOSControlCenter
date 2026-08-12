@@ -30,13 +30,15 @@ let
       exit 1
     fi
 
-    echo "Enabling SSH Client & Server Manager..."
-    # Use update-modules-config from module-manager or system-config-manager
-    if command -v update-modules-config >/dev/null 2>&1; then
-      update-modules-config ssh-client-manager true
-      update-modules-config ssh-server-manager true
+    echo "Enabling ssh-manager (server + optional client)..."
+    if command -v update-module-config >/dev/null 2>&1; then
+      update-module-config ssh-manager true
+      echo "Also set client.enable = true in ssh-manager config for outbound ncc ssh client"
+    elif command -v update-modules-config >/dev/null 2>&1; then
+      update-modules-config ssh-manager true
+      echo "Also set client.enable = true in ssh-manager config for outbound ncc ssh client"
     else
-      echo "Error: update-modules-config command not found. Is module-manager or system-config-manager enabled?"
+      echo "Error: update-module-config not found"
       exit 1
     fi
 

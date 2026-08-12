@@ -864,15 +864,52 @@ EOF
       fi
     }
     
-    # Cleanup modules that no longer exist in SOURCE (only if --cleanup flag is set)
+    # Remove leaf modules gone from SOURCE (always). Nested under categories
+    # are not covered by top-level rsync without --delete, so stale trees
+    # keep evaluating and break rebuilds after renames/removals.
+    cleanup_stale_leaf_modules() {
+      local item_type="$1"  # "core" or "modules"
+      local base="$NIXOS_DIR/$item_type"
+      local removed_count=0
+
+      if [ ! -d "$base" ]; then
+        return 0
+      fi
+
+      # Leaf module = directory containing options.nix (and usually default.nix)
+      while IFS= read -r -d $'\0' options_file; do
+        [ -n "$options_file" ] || continue
+        local target_module
+        target_module=$(dirname "$options_file")
+        local rel="''${target_module#$base/}"
+        # Skip if path math failed
+        if [ "$rel" = "$target_module" ]; then
+          continue
+        fi
+        local source_module="$SOURCE_DIR/$item_type/$rel"
+        if [ ! -f "$source_module/options.nix" ]; then
+          ${ui.messages.warning "Removing stale module: $item_type/$rel (gone from source)"}
+          rm -rf "$target_module"
+          removed_count=$((removed_count + 1))
+        fi
+      done < <(find "$base" -type f -name options.nix -print0 2>/dev/null)
+
+      if [ "$removed_count" -gt 0 ]; then
+        ${ui.messages.success "Removed $removed_count stale module(s) from $item_type/"}
+      elif [ "$VERBOSE" = "true" ]; then
+        ${ui.messages.info "No stale leaf modules in $item_type/"}
+      fi
+    }
+
+    # Cleanup top-level category dirs that no longer exist in SOURCE (--cleanup only)
     cleanup_removed_modules() {
       local item_type="$1"  # "core" or "modules"
       
       if [ "$CLEANUP" != "true" ]; then
-        return 0  # Skip cleanup if flag not set
+        return 0  # Skip aggressive top-level cleanup if flag not set
       fi
       
-      ${ui.messages.loading "Cleaning up removed modules in $item_type/..."}
+      ${ui.messages.loading "Cleaning up removed top-level dirs in $item_type/..."}
       
       local removed_count=0
       
@@ -891,7 +928,7 @@ EOF
           if [ "$VERBOSE" = "true" ]; then
             ${ui.messages.warning "Removing module: $item_type/$MODULE_NAME (no longer exists in source)"}
           fi
-          sudo rm -rf "$target_module"
+          rm -rf "$target_module"
           removed_count=$((removed_count + 1))
         fi
       done
@@ -985,7 +1022,9 @@ EOF
             
             ${ui.messages.success "$item/ updated (systemConfig preserved)"}
             
-            # Cleanup removed modules (only if --cleanup flag is set)
+            # Always drop leaf modules missing from source (renames/removals)
+            cleanup_stale_leaf_modules "$item"
+            # Aggressive: also drop top-level category dirs (only if --cleanup)
             cleanup_removed_modules "$item"
           elif [ "$item" = "packages" ]; then
             # CRITICAL: packages/ is a single module - use SAME GENERIC LOGIC as core/modules
@@ -1392,6 +1431,39 @@ EOF
       if [ "$EXIT_CODE" -eq 0 ]; then
         ${ui.messages.success "System successfully updated and rebuilt!"}
         rm -f "$BUILD_LOG"
+        # Tree sync preserves systemConfig — schema bump is migrate-config (1.0→2.1…)
+        ${ui.messages.loading "Migrating config schema if needed..."}
+        if command -v ncc-migrate-config >/dev/null 2>&1; then
+          if ncc-migrate-config; then
+            ${ui.messages.success "Config schema is current"}
+          else
+            ${ui.messages.warning "ncc-migrate-config failed — run: sudo ncc system migrate-config"}
+          fi
+        elif command -v ncc >/dev/null 2>&1; then
+          if ncc system migrate-config; then
+            ${ui.messages.success "Config schema is current"}
+          else
+            ${ui.messages.warning "migrate-config failed — run: sudo ncc system migrate-config"}
+          fi
+        else
+          ${ui.messages.warning "migrate-config not on PATH — run: sudo ncc system migrate-config"}
+        fi
+        ${ui.messages.loading "Migrating module configs if needed..."}
+        if command -v ncc-module-migrate >/dev/null 2>&1; then
+          if ncc-module-migrate; then
+            ${ui.messages.success "Module configs are current"}
+          else
+            ${ui.messages.warning "ncc-module-migrate failed — run: sudo ncc modules migrate"}
+          fi
+        elif command -v ncc >/dev/null 2>&1; then
+          if ncc modules migrate; then
+            ${ui.messages.success "Module configs are current"}
+          else
+            ${ui.messages.warning "modules migrate failed — run: sudo ncc modules migrate"}
+          fi
+        else
+          ${ui.messages.warning "module-migrate not on PATH — run: sudo ncc modules migrate"}
+        fi
       else
         ${ui.messages.error "Auto-build FAILED (exit $EXIT_CODE) — files are updated, but the system was NOT switched."}
         print_copyable_build_error "$BUILD_LOG" "$EXIT_CODE"
@@ -1402,6 +1474,7 @@ EOF
     elif [ "$AUTO_CONFIRM" = "true" ]; then
       # Auto-confirm enabled but no auto-build - skip build prompt
       ${ui.messages.info "Skipping build. You can manually run: sudo ncc system build switch --flake /etc/nixos#${hostname}"}
+      ${ui.messages.info "Then migrate schema: sudo ncc system migrate-config"}
     else
       ${prompt_build}
     fi

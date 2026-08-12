@@ -224,8 +224,8 @@ _module.metadata = {
     │   ├── homelab-manager       # Module name
     │   └── vm                    # Module name
     ├── security
-    │   ├── ssh-client-manager    # Module name
-    │   └── ssh-server-manager    # Module name
+    │   ├── ssh-manager    # Module name
+    │   └── ssh-manager    # Module name
     ├── specialized
     │   ├── ai-workspace          # Module name
     │   └── hackathon             # Module name

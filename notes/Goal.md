@@ -333,8 +333,8 @@ $ ncc module-manager
 │ ▸ ❌ vm-manager         QEMU/KVM management         │
 │                                                     │
 │ Security (1/5 active)                               │
-│ ▸ ✅ ssh-server-manager SSH server hardening        │
-│ ▸ ❌ ssh-client-manager SSH client tools            │
+│ ▸ ✅ ssh-manager SSH server hardening        │
+│ ▸ ❌ ssh-manager SSH client tools            │
 │                                                     │
 │ Specialized (0/3 active)                            │
 │ ▸ ❌ ai-workspace       AI/ML development           │
@@ -1025,10 +1025,10 @@ ncc system check --fast            # Schnelle Checks
 ```bash
 # Infrastructure-Module (wie Plugins)
 ncc module enable homelab-manager     # Homelab-Plugin aktivieren
-ncc module enable ssh-server-manager  # SSH-Plugin aktivieren
+ncc module enable ssh-manager  # SSH-Plugin aktivieren
 
 # Security-Module (wie Plugins)
-ncc module enable ssh-client-manager  # SSH-Client Plugin
+ncc module enable ssh-manager  # SSH-Client Plugin
 
 # Specialized-Module (wie Plugins)
 ncc module enable ai-workspace        # AI/ML Plugin

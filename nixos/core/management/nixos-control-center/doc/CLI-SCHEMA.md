@@ -66,7 +66,7 @@ Only for **legacy aliases** that already shipped (see §4). New public domains m
 | `packages` | `package-manager` | suffix noise; length |
 | `system` | `system-manager` | same |
 | `modules` | `module-manager` | alias at most |
-| `ssh` | `ssh-client-manager` | nest client/server under `ssh` |
+| `ssh` | `ssh-manager` | nest client/server under `ssh` |
 | `homelab` | `homelab-status` | status is a verb |
 | `lock` | `discover` at top level | verb must sit under domain |
 | `ai` | `ncc-assistant` / `assistant` as primary | keep short; binary may stay `ncc-assistant` internally |

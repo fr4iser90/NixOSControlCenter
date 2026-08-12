@@ -14,6 +14,7 @@ ncc modules list --json
 ncc modules show homelab-manager
 sudo ncc modules enable homelab-manager
 sudo ncc modules disable some-feature --rebuild
+sudo ncc modules migrate --dry-run   # legacy module config renames/merges
 ncc modules --gui
 ```
 
@@ -22,6 +23,7 @@ ncc modules --gui
 - **Always Active**: Core module, no enable option needed
 - **Module Discovery**: Automatic recursive module discovery
 - **Configuration Management**: Centralized module configuration management
+- **Module Migration**: Rename/merge plans (e.g. SSH server+client → ssh-manager)
 - **Default Configs**: Automatic creation of default configurations
 - **Config Helpers**: Helper functions for module configuration
 - **Metadata System**: Module metadata for discovery and management
@@ -35,6 +37,7 @@ For detailed documentation, see:
 
 ## Related Components
 
-- **System Manager**: System-level management
+- **System Manager**: System-level management + config schema migration
+- **Module Migration**: `components/module-migration/` (see README there)
 - **CLI Registry**: Command registration
 - **All Modules**: Provides foundation for all modules

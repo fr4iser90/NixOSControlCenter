@@ -63,7 +63,8 @@ programs.git = {
 };
 
 # System overrides
-services.openssh.enable = true;
+# Prefer features.ssh-manager = true (owns OpenSSH; stays on while enabled).
+# passwordAuthentication defaults true (VPS-safe); set false after keys work.
 networking.firewall.allowedTCPPorts = [ 22 ];
 ```
 
