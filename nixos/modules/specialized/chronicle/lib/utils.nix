@@ -1,13 +1,30 @@
-{ lib, pkgs }:
+{ lib, pkgs, getModuleApi }:
 
+let
+  ui = getModuleApi "cli-formatter";
+  c = ui.colors;
+in
 {
-  # Logging functions
-  log = message: ''echo "✅ [StepRecorder] ${message}"'';
-  warn = message: ''echo "⚠️  [StepRecorder] ${message}"'';
-  error = message: ''echo "❌ [StepRecorder] ${message}" >&2'';
+  # Dynamic log helpers — must use colors + printf on ONE line (messages.* end
+  # with a newline and break `fn() { ${ui.messages…}; }` → `; }` syntax errors).
+  shellHelpers = ''
+    log() { printf '%b\n' "${c.green}[StepRecorder] $*${c.reset}"; }
+    warn() { printf '%b\n' "${c.yellow}[StepRecorder] $*${c.reset}"; }
+    error() { printf '%b\n' "${c.red}[StepRecorder] $*${c.reset}" >&2; }
+    debug() {
+      if [ "''${DEBUG_MODE:-false}" = "true" ]; then
+        printf '%b\n' "${c.dim}[DEBUG] $*${c.reset}" >&2
+      fi
+    }
+  '';
+
+  # One-shot helpers (fixed Nix-time message text — OK as full statements)
+  log = message: ''${ui.messages.success "[StepRecorder] ${message}"}'';
+  warn = message: ''${ui.messages.warning "[StepRecorder] ${message}"}'';
+  error = message: ''${ui.messages.error "[StepRecorder] ${message}"}'';
   debug = message: ''
-    if [ "$DEBUG_MODE" = "true" ]; then
-      echo "🐛 [DEBUG] ${message}" >&2
+    if [ "''${DEBUG_MODE:-false}" = "true" ]; then
+      ${ui.messages.detailLevel "DEBUG" "${message}"}
     fi
   '';
 
@@ -17,7 +34,7 @@
 
   # Path helpers
   expandPath = path: ''eval echo "${path}"'';
-  
+
   # Session ID generation
   generateSessionId = ''echo "session_$(date '+%Y%m%d_%H%M%S')"'';
 

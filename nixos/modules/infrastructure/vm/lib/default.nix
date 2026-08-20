@@ -1,8 +1,8 @@
-{ lib, pkgs, ... }:
+{ lib, pkgs, getModuleApi, ... }:
 
 let
   distroLib = import ./distros.nix { inherit lib; };
-  vmLib = import ./vm.nix { inherit lib pkgs; };
+  vmLib = import ./vm.nix { inherit lib pkgs getModuleApi; };
   typeLib = import ./types.nix { inherit lib; };
 in {
   # DIREKT EXPORTIEREN, KEIN VM NAMESPACE!

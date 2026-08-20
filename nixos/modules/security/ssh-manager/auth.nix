@@ -4,6 +4,7 @@ with lib;
 
 let
   ui = getModuleApi "cli-formatter";
+  c = ui.colors;
   cliRegistry = getModuleApi "cli-registry";
 
   sshTempOpenScript = pkgs.writeScriptBin "ssh-temp-open" ''
@@ -45,7 +46,7 @@ let
 
     LOCKFILE="/tmp/ssh-force-open.lock"
     exec 200>$LOCKFILE
-    flock -n 200 || { ${ui.messages.error "Another instance is running."}; exit 1; }
+    flock -n 200 || { printf '%b\n' "${c.red}Another instance is running.${c.reset}" >&2; exit 1; }
 
     USER="$1"
     if [ -z "$USER" ]; then

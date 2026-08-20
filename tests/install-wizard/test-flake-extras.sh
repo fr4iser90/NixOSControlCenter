@@ -6,81 +6,92 @@ NCC_FLAKE="$ROOT/nixos/flake.nix"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# Host with short nixpkgs + home-manager (NCC aliases) plus real extras
 cat >"$TMP/host-flake.nix" <<'EOF'
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    home-manager.url = "github:nix-community/home-manager/release-25.11";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
     jetpack.url = "github:fr4iser90/jetpack-nixos/master";
     jetpack.inputs.nixpkgs.follows = "nixpkgs";
     my-private.url = "git+ssh://git@example.com/org/private.git";
   };
-  outputs = { self, nixpkgs, jetpack, my-private, ... }: {
+  outputs = { self, nixpkgs, home-manager, jetpack, my-private, ... }: {
     nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
-      modules = [ ./configuration.nix jetpack.nixosModules.default ];
+      modules = [
+        ./configuration.nix
+        home-manager.nixosModules.home-manager
+        jetpack.nixosModules.default
+      ];
     };
   };
 }
 EOF
 
-extract_inputs() {
-  python3 - "$1" <<'PY'
+# Inline same alias rules as flake-extras.nix (keep in sync)
+python3 - "$TMP/host-flake.nix" "$NCC_FLAKE" <<'PY'
 import re, sys
-path = sys.argv[1]
-text = open(path, encoding="utf-8", errors="replace").read()
-lines = []
-for line in text.splitlines():
-    if "#" in line:
-        line = line[: line.index("#")]
-    lines.append(line)
-text = "\n".join(lines)
-m = re.search(r"\binputs\s*=\s*\{", text)
-if not m:
-    sys.exit(0)
-i = m.end() - 1
-depth = 0
-end = None
-for j in range(i, len(text)):
-    c = text[j]
-    if c == "{":
-        depth += 1
-    elif c == "}":
-        depth -= 1
-        if depth == 0:
-            end = j
-            break
-if end is None:
-    sys.exit(0)
-body = text[i + 1 : end]
-names = set()
-for m in re.finditer(
-    r"(?m)^[ \t]*([A-Za-z_][A-Za-z0-9_-]*)\s*(?:\.url\s*=|\s*=)",
-    body,
-):
-    name = m.group(1)
-    if name in ("url", "flake", "type", "follows", "inputs"):
-        continue
-    names.add(name)
-for n in sorted(names):
-    print(n)
-PY
+from pathlib import Path
+
+SKIP = {"url", "flake", "type", "follows", "inputs"}
+ALIASES = {
+    "nixpkgs": {"nixpkgs-stable", "nixpkgs-unstable"},
+    "home-manager": {"home-manager-stable", "home-manager-unstable"},
 }
 
-mapfile -t HOST < <(extract_inputs "$TMP/host-flake.nix")
-mapfile -t NCC < <(extract_inputs "$NCC_FLAKE")
+def extract(path):
+    text = Path(path).read_text(encoding="utf-8", errors="replace")
+    lines = []
+    for line in text.splitlines():
+        if "#" in line:
+            line = line[: line.index("#")]
+        lines.append(line)
+    text = "\n".join(lines)
+    m = re.search(r"\binputs\s*=\s*\{", text)
+    if not m:
+        return []
+    i = m.end() - 1
+    depth = 0
+    end = None
+    for j in range(i, len(text)):
+        if text[j] == "{":
+            depth += 1
+        elif text[j] == "}":
+            depth -= 1
+            if depth == 0:
+                end = j
+                break
+    body = text[i + 1 : end]
+    names = []
+    for m in re.finditer(r"(?m)^[ \t]*([A-Za-z_][A-Za-z0-9_-]*)\s*(?:\.url\s*=|\s*=)", body):
+        n = m.group(1)
+        if n not in SKIP and n not in names:
+            names.append(n)
+    return names
 
-declare -A NCC_SET=()
-for n in "${NCC[@]}"; do NCC_SET["$n"]=1; done
+def host_only(live, incoming):
+    in_set = set(incoming)
+    out = []
+    for n in live:
+        if n in in_set:
+            continue
+        aliases = ALIASES.get(n)
+        if aliases and (in_set & aliases):
+            continue
+        out.append(n)
+    return sorted(set(out))
 
-EXTRAS=()
-for n in "${HOST[@]}"; do
-  [[ -z "${NCC_SET[$n]:-}" ]] && EXTRAS+=("$n")
-done
+live = extract(sys.argv[1])
+incoming = extract(sys.argv[2])
+extras = host_only(live, incoming)
+print("host inputs:", " ".join(live))
+print("ncc inputs: ", " ".join(sorted(incoming)))
+print("extras:     ", " ".join(extras) if extras else "(none)")
 
-echo "host inputs: ${HOST[*]}"
-echo "ncc inputs:  ${NCC[*]}"
-echo "extras:      ${EXTRAS[*]}"
-
-printf '%s\n' "${EXTRAS[@]}" | grep -qx jetpack
-printf '%s\n' "${EXTRAS[@]}" | grep -qx my-private
-# nixpkgs may or may not be extra depending on NCC naming (nixpkgs-stable)
-echo "OK: generic host-only input detection"
+assert "jetpack" in extras, extras
+assert "my-private" in extras, extras
+assert "nixpkgs" not in extras, "nixpkgs must be skipped (NCC aliases)"
+assert "home-manager" not in extras, "home-manager must be skipped (NCC aliases)"
+print("OK: aliases skipped; real extras kept")
+PY

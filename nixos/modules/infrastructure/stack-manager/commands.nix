@@ -10,7 +10,7 @@ let
   cliRegistry = getModuleApi "cli-registry";
   tuiOn = (getModuleApi "tui-engine").isEnabled getModuleConfig;
   tuiOff = (getModuleApi "tui-engine").disabledHint;
-  tuiActions = if tuiOn then import ./ui/tui/actions.nix { inherit config lib pkgs; } else null;
+  tuiActions = if tuiOn then import ./ui/tui/actions.nix { inherit config lib pkgs getModuleApi; } else null;
   domainGui = (getModuleApi "gui-engine").domainGui pkgs config;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;

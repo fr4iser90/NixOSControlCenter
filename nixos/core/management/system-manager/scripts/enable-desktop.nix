@@ -13,25 +13,25 @@ pkgs.writeScriptBin "enable-desktop" ''
 
   # Sudo check
   if [ "$EUID" -ne 0 ]; then
-    echo "This script must be run as root (use sudo)"
+    ${ui.messages.error "This script must be run as root (use sudo)"}
     exit 1
   fi
 
   # Enable or disable desktop
   if [ "$1" == "disable" ]; then
-    echo "Disabling desktop..."
+    ${ui.messages.loading "Disabling desktop..."}
     ${updateDesktopConfig}/bin/update-desktop-config "false"
   elif [ "$1" == "enable" ]; then
-    echo "Enabling desktop..."
+    ${ui.messages.loading "Enabling desktop..."}
     ${updateDesktopConfig}/bin/update-desktop-config "true"
   else
-    echo "Invalid option. Use 'enable' or 'disable'."
+    ${ui.messages.error "Invalid option. Use 'enable' or 'disable'."}
     exit 1
   fi
 
   # Apply the changes
-  echo "Rebuilding system..."
+  ${ui.messages.loading "Rebuilding system..."}
   sudo nixos-rebuild switch --flake /etc/nixos#${hostname}
 
-  echo "Desktop configuration updated successfully!"
+  ${ui.messages.success "Desktop configuration updated successfully!"}
 ''

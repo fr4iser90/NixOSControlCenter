@@ -1,14 +1,14 @@
 # GUI Engine API — getModuleApi "gui-engine"
 # Peer module paths via getModuleMetadata — never relative ../../other-module
 # Domain pages: always pass `config` so guiPages from cli-registry are aggregated.
-{ lib, metadata, getModuleMetadata }:
+{ lib, metadata, getModuleMetadata, getModuleApi, ... }:
 
 let
   packagesRoot = (getModuleMetadata "packages").path;
   assistantRoot = (getModuleMetadata "ncc-assistant").path;
   cliMeta = getModuleMetadata "cli-registry";
   cliApi = import "${cliMeta.path}/api.nix" {
-    inherit lib getModuleMetadata;
+    inherit lib getModuleMetadata getModuleApi;
     metadata = cliMeta;
   };
 in
@@ -32,19 +32,19 @@ in
   # domainGui pkgs config — includes every registerGuiPage from modules
   domainGui = pkgs: config:
     (import ./domain-gui.nix {
-      inherit pkgs lib getModuleMetadata packagesRoot assistantRoot;
+      inherit pkgs lib getModuleMetadata getModuleApi packagesRoot assistantRoot;
       guiPages = cliApi.guiPages config;
     }).nccDomainGui;
 
   rootGui = pkgs: config:
     (import ./root-gui.nix {
-      inherit pkgs lib getModuleMetadata packagesRoot;
+      inherit pkgs lib getModuleMetadata getModuleApi packagesRoot;
       guiPages = cliApi.guiPages config;
     }).nccGui;
 
   domainGuiBundle = pkgs: config:
     import ./domain-gui.nix {
-      inherit pkgs lib getModuleMetadata packagesRoot assistantRoot;
+      inherit pkgs lib getModuleMetadata getModuleApi packagesRoot assistantRoot;
       guiPages = cliApi.guiPages config;
     };
 }

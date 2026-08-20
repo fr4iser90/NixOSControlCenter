@@ -1,5 +1,5 @@
 # Installer UI options — feature catalog from packages metadata (generated).
-{ pkgs }:
+{ pkgs, getModuleApi ? null, ... }:
 let
   inherit (pkgs) lib;
   # prompts → … → core/base/packages (stay under core/, no ../core/ jump)

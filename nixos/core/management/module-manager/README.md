@@ -34,6 +34,7 @@ For detailed documentation, see:
 - [Architecture](./doc/ARCHITECTURE.md) - System architecture and design decisions
 - [Usage Guide](./doc/USAGE.md) - Detailed usage examples and best practices
 - [API Reference](./doc/API.md) - Complete API documentation
+- [CLI contract](./CLI.md) - Formatter standards for migrate / modules commands
 
 ## Related Components
 

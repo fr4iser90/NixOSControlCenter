@@ -1,6 +1,6 @@
 # Installer bridge → system-manager prebuild checks (SSOT).
 # NO second CPU/GPU detection — only call prebuild-check-*.
-{ pkgs }:
+{ pkgs, getModuleApi ? null, ... }:
 pkgs.writeText "system-checks-bridge.sh" ''
 #!/usr/bin/env bash
 # SSOT: nixos/core/management/system-manager/components/system-checks/prebuild/checks/

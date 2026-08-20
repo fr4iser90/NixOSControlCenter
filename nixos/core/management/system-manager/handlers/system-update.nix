@@ -81,6 +81,7 @@ let
     inherit pkgs getModuleApi;
   };
   flakeExtrasCheck = flakeExtras.checkScript;
+  flakeExtrasMerge = flakeExtras.mergeScript;
   
   # Create script with runtime dependencies (only available for this script, not system-wide)
   systemUpdateMainScript = pkgs.symlinkJoin {
@@ -95,6 +96,7 @@ let
     FORCE_MIGRATION=false
     FORCE_UPDATE=false
     ALLOW_FLAKE_EXTRAS=false
+    DRY_RUN=false
     CLEANUP=false
     AUTO_CONFIRM=false
     AUTO_SOURCE=""
@@ -113,9 +115,13 @@ let
         --force-update)
           FORCE_UPDATE=true
           ;;
-        --allow-flake-extras)
-          # Destructive: overwrite flake.nix even if host has inputs NCC lacks
+        --allow-flake-extras|--drop-flake-extras)
+          # Destructive opt-out: skip merge — stock NCC flake (drops host inputs)
           ALLOW_FLAKE_EXTRAS=true
+          ;;
+        --dry-run|-d)
+          # Preview only: source resolve + flake extras merge to /tmp, no /etc/nixos writes
+          DRY_RUN=true
           ;;
         --cleanup)
           CLEANUP=true
@@ -156,10 +162,11 @@ let
       shift || true
     done
 
-    # Sudo-Check
-    if [ "$EUID" -ne 0 ]; then
-      ${ui.messages.error "This script must be run as root (use sudo)"}
-      ${ui.messages.info "Usage: sudo $0"}
+    # Sudo-Check (dry-run is read-only — allow non-root)
+    if [ "$EUID" -ne 0 ] && [ "$DRY_RUN" != "true" ]; then
+      ${ui.messages.error "Root required for a real update"}
+      ${ui.messages.info "Try: sudo ncc system update …"}
+      ${ui.messages.info "Preview only: ncc system update --dry-run --local --source-dir /path/to/nixos"}
       exit 1
     fi
 
@@ -325,8 +332,8 @@ let
       esac
     }
     
-    # Show dangerous warning unless auto-confirm is enabled
-    if [ "$AUTO_CONFIRM" != "true" ]; then
+    # Show dangerous warning unless auto-confirm or dry-run
+    if [ "$AUTO_CONFIRM" != "true" ] && [ "$DRY_RUN" != "true" ]; then
       ${ui.messages.warning "WARNING: This command is potentially dangerous!"}
       ${ui.messages.info "This may cause system instability or data loss."}
       while true; do
@@ -349,19 +356,32 @@ let
       done
     fi
     
-    ${ui.text.header "NixOS System Update"}
-    
-    # Step 1: Check system configuration (validates + migrates if needed)
-    # ncc-config-check already outputs status messages, so we just check the exit code
-    if ! ${configModule.configCheck}/bin/ncc-config-check $([ "$VERBOSE" = "true" ] && echo "--verbose") 2>&1; then
-      ${ui.messages.warning "Configuration has issues (migration may have been attempted)"}
-      if [ "$AUTO_CONFIRM" != "true" ]; then
+    if [ "$DRY_RUN" = "true" ]; then
+      ${ui.text.header "NixOS System Update (dry-run)"}
+      ${ui.messages.info "Preview only — nothing will be written under $NIXOS_DIR"}
+    else
+      ${ui.text.header "NixOS System Update"}
+    fi
+
+    # Step 1: Check system configuration
+    # dry-run → validate + migration preview only (ncc-config-check --dry-run)
+    _cfg_flags=""
+    [ "$VERBOSE" = "true" ] && _cfg_flags="$_cfg_flags --verbose"
+    [ "$DRY_RUN" = "true" ] && _cfg_flags="$_cfg_flags --dry-run"
+    if ! ${configModule.configCheck}/bin/ncc-config-check $_cfg_flags 2>&1; then
+      ${ui.messages.warning "Configuration has issues"}
+      if [ "$DRY_RUN" = "true" ]; then
+        ${ui.messages.info "Dry-run continues so you can still review flake extras"}
+      elif [ "$AUTO_CONFIRM" != "true" ]; then
         ${ui.messages.info "You may want to review the configuration before proceeding"}
       fi
     fi
 
     # Drop legacy packages.userPackages (attrs) → users.<name>.userPackages
-    migrate_legacy_packages_user_packages || true
+    # Never mutate during dry-run.
+    if [ "$DRY_RUN" != "true" ]; then
+      migrate_legacy_packages_user_packages || true
+    fi
     
     # Auto-select source if specified
     if [ -n "$AUTO_SOURCE" ]; then
@@ -958,10 +978,126 @@ EOF
         "packages"        # Packages directory
         "flake.nix"       # Flake configuration
     )
+
+    # --- Flake extras preview / merge (end-user friendly) ---
+    # Writes a readable preview under /tmp, lists extras, optional confirm.
+    # Used by --dry-run (exit after) and by real update (confirm then apply).
+    ncc_flake_extras_prepare() {
+      FLAKE_COPY_SRC="$SOURCE_DIR/flake.nix"
+      FLAKE_MERGED_TMP=""
+      FLAKE_PREVIEW_PATH="/tmp/ncc-flake-update-preview.nix"
+      if [ ! -f "$NIXOS_DIR/flake.nix" ] || [ ! -f "$SOURCE_DIR/flake.nix" ]; then
+        ${ui.messages.info "No existing system flake to compare — using the new one as-is"}
+        return 0
+      fi
+      ${ui.messages.loading "Checking whether this machine has extra flake inputs…"}
+      set +e
+      EXTRAS_JSON=$(${flakeExtrasCheck}/bin/ncc-check-flake-extras --live "$NIXOS_DIR/flake.nix" --incoming "$SOURCE_DIR/flake.nix" --json 2>/dev/null)
+      FLAKE_EXTRAS_RC=$?
+      set -e
+      if [ "''${FLAKE_EXTRAS_RC:-0}" -eq 0 ]; then
+        ${ui.messages.success "Nothing extra to keep — standard update flake"}
+        return 0
+      fi
+      if [ "''${FLAKE_EXTRAS_RC:-0}" -ne 2 ]; then
+        ${ui.messages.error "Could not check flake extras"}
+        [ "$VERBOSE" = "true" ] && ${ui.messages.info "check rc=$FLAKE_EXTRAS_RC"}
+        return 1
+      fi
+      EXTRAS_LIST=$(echo "$EXTRAS_JSON" | ${pkgs.jq}/bin/jq -r '.hostOnlyExtras // [] | join(", ")' 2>/dev/null || echo "unknown")
+      ${ui.text.header "Extra software sources on this machine"}
+      ${ui.messages.info "These will be kept and merged into the update."}
+      echo "$EXTRAS_JSON" | ${pkgs.jq}/bin/jq -r '.hostOnlyExtras[]?' 2>/dev/null | while read -r x; do
+        [ -n "$x" ] && echo "    • $x"
+      done
+      if [ "$ALLOW_FLAKE_EXTRAS" = "true" ]; then
+        ${ui.messages.warning "Dropping those extras (--drop-flake-extras)"}
+        FLAKE_COPY_SRC="$SOURCE_DIR/flake.nix"
+        return 0
+      fi
+      ${ui.messages.loading "Preparing merged update preview…"}
+      if ! ${flakeExtrasMerge}/bin/ncc-merge-flake-extras \
+          --live "$NIXOS_DIR/flake.nix" \
+          --incoming "$SOURCE_DIR/flake.nix" \
+          --out "$FLAKE_PREVIEW_PATH"; then
+        ${ui.messages.error "Could not build the merged preview"}
+        # Chicken-egg: old ncc treated nixpkgs/home-manager short names as extras.
+        # If those are the only ones, continue with stock NCC flake (safe — aliases exist).
+        _alias_only=true
+        while read -r _x; do
+          [ -z "$_x" ] && continue
+          case "$_x" in
+            nixpkgs|home-manager) ;;
+            *) _alias_only=false; break ;;
+          esac
+        done < <(echo "$EXTRAS_JSON" | ${pkgs.jq}/bin/jq -r '.hostOnlyExtras[]?' 2>/dev/null)
+        if [ "$_alias_only" = "true" ] && [ -n "$EXTRAS_LIST" ] && [ "$EXTRAS_LIST" != "unknown" ]; then
+          ${ui.messages.warning "Only nixpkgs/home-manager aliases — using stock NCC flake (same as --drop-flake-extras)"}
+          FLAKE_COPY_SRC="$SOURCE_DIR/flake.nix"
+          return 0
+        fi
+        ${ui.messages.info "Retry once: sudo ncc system update --local --drop-flake-extras --source-dir \"$SOURCE_DIR\""}
+        return 1
+      fi
+      FLAKE_MERGED_TMP="$FLAKE_PREVIEW_PATH"
+      FLAKE_COPY_SRC="$FLAKE_PREVIEW_PATH"
+      ${ui.messages.success "Preview ready — extras will be kept"}
+      if [ "$VERBOSE" = "true" ]; then
+        ${ui.tables.keyValue "Extras" "$EXTRAS_LIST"}
+        ${ui.tables.keyValue "Preview" "$FLAKE_PREVIEW_PATH"}
+        echo "  less $FLAKE_PREVIEW_PATH"
+        echo "  diff -u $SOURCE_DIR/flake.nix $FLAKE_PREVIEW_PATH | less"
+      else
+        ${ui.messages.info "Preview: $FLAKE_PREVIEW_PATH  (add --verbose for diff hints)"}
+      fi
+      if [ "$DRY_RUN" = "true" ]; then
+        return 0
+      fi
+      if [ "$AUTO_CONFIRM" = "true" ]; then
+        ${ui.messages.info "Continuing update…"}
+        return 0
+      fi
+      while true; do
+        printf "Continue update? [Y/n]: "
+        read -r _fe_ans || _fe_ans=n
+        case "''${_fe_ans:-Y}" in
+          y|Y|yes|YES|"") return 0 ;;
+          n|N|no|NO)
+            ${ui.messages.info "Cancelled — nothing was changed"}
+            exit 0
+            ;;
+          *) echo "Please answer Y or n" ;;
+        esac
+      done
+    }
+
+    if [ "$DRY_RUN" = "true" ]; then
+      ${ui.text.header "Update dry-run"}
+      ${ui.messages.info "No files will be written. This only shows what would happen."}
+      if [ "$VERBOSE" = "true" ]; then
+        ${ui.tables.keyValue "Source" "$SOURCE_DIR"}
+        ${ui.tables.keyValue "Target" "$NIXOS_DIR"}
+      fi
+      if ! ncc_flake_extras_prepare; then
+        exit 1
+      fi
+      ${ui.messages.success "Dry-run OK — safe to run the real update when ready"}
+      ${ui.messages.info "Next: sudo ncc system update --local --source-dir \"$SOURCE_DIR\""}
+      exit 0
+    fi
+
+    # Preview + confirm extras merge BEFORE backup/writes
+    if ! ncc_flake_extras_prepare; then
+      ${ui.messages.error "Flake extras step failed — nothing written under $NIXOS_DIR"}
+      exit 1
+    fi
     
     # Create backup directory and perform backup
     BACKUP_DIR="$BACKUP_ROOT/$(date +%Y-%m-%d_%H-%M-%S)"
-    ${ui.messages.loading "Creating backup in: $BACKUP_DIR"}
+    ${ui.messages.loading "Creating a safety backup…"}
+    if [ "$VERBOSE" = "true" ]; then
+      ${ui.messages.info "Backup path: $BACKUP_DIR"}
+    fi
     
     # Prepare backup directory
     mkdir -p "$BACKUP_ROOT"
@@ -969,51 +1105,26 @@ EOF
     # Clean up old backups (keep the last 5)
     cleanup_old_backups() {
       local keep=5
-      ${ui.messages.loading "Cleaning up old backups (keeping last $keep)..."}
+      [ "$VERBOSE" = "true" ] && ${ui.messages.loading "Cleaning up old backups (keeping last $keep)..."}
       ls -dt "$BACKUP_ROOT"/* | tail -n +$((keep + 1)) | xargs -r rm -rf
     }
     
     # Perform backup
     if cp -r "$NIXOS_DIR" "$BACKUP_DIR"; then
-      ${ui.messages.success "Backup created successfully"}
+      ${ui.messages.success "Backup created"}
       cleanup_old_backups
     else
-      ${ui.messages.error "Failed to create backup!"}
+      ${ui.messages.error "Backup failed — update stopped"}
       exit 1
     fi
     
     # Update files
-    ${ui.messages.loading "Updating NixOS configuration..."}
-
-    # Before replacing flake.nix: refuse if live host has inputs NCC does not ship
-    # (jetpack, private modules, etc.). Generic — no per-repo hardcoding.
-    if [ -f "$NIXOS_DIR/flake.nix" ] && [ -f "$SOURCE_DIR/flake.nix" ]; then
-      ${ui.messages.loading "Checking host flake extras vs incoming flake..."}
-      set +e
-      ${flakeExtrasCheck}/bin/ncc-check-flake-extras --live "$NIXOS_DIR/flake.nix" --incoming "$SOURCE_DIR/flake.nix"
-      FLAKE_EXTRAS_RC=$?
-      set -e
-      if [ "''${FLAKE_EXTRAS_RC:-0}" -eq 2 ]; then
-        if [ "$ALLOW_FLAKE_EXTRAS" = "true" ]; then
-          ${ui.messages.warning "Host flake extras present — continuing because --allow-flake-extras (destructive)"}
-        else
-          ${ui.messages.error "Refusing to overwrite flake.nix — host-only flake inputs would be lost"}
-          ${ui.messages.info "Backup already at: $BACKUP_DIR"}
-          ${ui.messages.info "Override (destructive): sudo ncc system update ... --allow-flake-extras"}
-          exit 2
-        fi
-      elif [ "''${FLAKE_EXTRAS_RC:-0}" -ne 0 ]; then
-        ${ui.messages.error "flake extras check failed (rc=$FLAKE_EXTRAS_RC)"}
-        exit 1
-      else
-        ${ui.messages.success "Flake extras check OK (no host-only inputs)"}
-      fi
-    fi
+    ${ui.messages.loading "Updating system files…"}
     
     # Copy defined directories and files
     # IMPORTANT: systemConfig/ and custom/ are NEVER overwritten - user-specific
     for item in "''${COPY_ITEMS[@]}"; do
-      if [ -e "$SOURCE_DIR/$item" ]; then
+      if [ -e "$SOURCE_DIR/$item" ] || { [ "$item" = "flake.nix" ] && [ -n "''${FLAKE_COPY_SRC:-}" ] && [ -f "$FLAKE_COPY_SRC" ]; }; then
         ${ui.messages.loading "Copying $item..."}
         # Use cp with --update to only copy new files (no overwrite)
         # But for directories we need to be more careful
@@ -1059,6 +1170,18 @@ EOF
             cleanup_stale_leaf_modules "$item"
             # Aggressive: also drop top-level category dirs (only if --cleanup)
             cleanup_removed_modules "$item"
+
+            # Install-wizard: hardware checks moved to system-manager prebuild.
+            # Sync without --delete leaves scripts/checks/ behind → build break
+            # (getModuleApi passed to legacy `{ pkgs }:`). Remove if gone from source.
+            if [ "$item" = "core" ]; then
+              _iw_checks="$NIXOS_DIR/core/management/install-wizard/scripts/checks"
+              _iw_src_checks="$SOURCE_DIR/core/management/install-wizard/scripts/checks"
+              if [ -d "$_iw_checks" ] && [ ! -e "$_iw_src_checks" ]; then
+                ${ui.messages.warning "Removing obsolete install-wizard scripts/checks/"}
+                rm -rf "$_iw_checks"
+              fi
+            fi
           elif [ "$item" = "packages" ]; then
             # CRITICAL: packages/ is a single module - use SAME GENERIC LOGIC as core/modules
             ${ui.messages.loading "Updating packages/ (preserving systemConfig)..."}
@@ -1087,12 +1210,18 @@ EOF
           fi
         else
           # Files: copy if missing or always update flake.nix
-          if [ "$item" = "flake.nix" ] || [ ! -e "$NIXOS_DIR/$item" ]; then
+          if [ "$item" = "flake.nix" ]; then
+            sudo cp "$FLAKE_COPY_SRC" "$NIXOS_DIR/flake.nix"
+          elif [ ! -e "$NIXOS_DIR/$item" ]; then
             sudo cp "$SOURCE_DIR/$item" "$NIXOS_DIR/$item"
           fi
         fi
       fi
     done
+    # Keep preview at stable path for the user; only remove if it was a random mktemp (legacy)
+    if [ -n "''${FLAKE_MERGED_TMP:-}" ] && [ "$FLAKE_MERGED_TMP" != "$FLAKE_PREVIEW_PATH" ]; then
+      rm -f "$FLAKE_MERGED_TMP"
+    fi
      
       # Template sync / per-user leaf migration — SPLIT only (via facade layout).
       # Monolith SSOT is $MONOLITH_FILE; scrub leftover split leaves instead of recreating them.
@@ -1518,6 +1647,7 @@ EOF
       pkgs.fzf
       pkgs.tree
       flakeExtrasCheck
+      flakeExtrasMerge
     ];
   };
 
@@ -1529,6 +1659,7 @@ in lib.mkMerge [
     environment.systemPackages = [
       systemUpdateMainScript
       flakeExtrasCheck
+      flakeExtrasMerge
       configModule.configCheck
       configModule.cleanupLegacyConfigs
     ];

@@ -1,6 +1,6 @@
 # Device-target discovery + match — thin bash over ui/gui/device_discover.py
 # SSOT: host-blueprints/*/deviceTarget { enable = true; … }
-{ pkgs }:
+{ pkgs, getModuleApi ? null, ... }:
 pkgs.writeText "device-targets.sh" ''
   #!/usr/bin/env bash
   # Discover DEVICE_TARGETS from blueprints; match live hardware.

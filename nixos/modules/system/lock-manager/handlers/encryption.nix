@@ -1,4 +1,4 @@
-{ pkgs, lib, cfg }:
+{ pkgs, lib, cfg, ui }:
 
 with lib;
 
@@ -44,7 +44,7 @@ pkgs.writeShellScriptBin "encrypt-snapshot" ''
   done
   
   if [ -z "$INPUT_FILE" ] || [ ! -f "$INPUT_FILE" ]; then
-    echo "Error: --input file is required and must exist"
+    ${ui.messages.error "--input file is required and must exist"}
     exit 1
   fi
   
@@ -66,17 +66,17 @@ pkgs.writeShellScriptBin "encrypt-snapshot" ''
       USE_FIDO2=true
       ;;
     *)
-      echo "Error: Invalid method. Use 'sops', 'fido2', or 'both'"
+      ${ui.messages.error "Invalid method. Use 'sops', 'fido2', or 'both'"}
       exit 1
       ;;
   esac
   
   # Encrypt with sops
   if [ "$USE_SOPS" = "true" ]; then
-    echo "🔐 Encrypting with sops..."
+    ${ui.messages.loading "Encrypting with sops..."}
     
     if ! command -v sops >/dev/null 2>&1; then
-      echo "⚠️  sops not found, skipping sops encryption"
+      ${ui.messages.warning "sops not found, skipping sops encryption"}
       USE_SOPS=false
     else
       # Create sops config if it doesn't exist
@@ -102,10 +102,10 @@ EOF
       
       # Encrypt with sops
       if sops -e "$INPUT_FILE" > "$OUTPUT_FILE" 2>/dev/null; then
-        echo "✅ Encrypted with sops"
+        ${ui.messages.success "Encrypted with sops"}
         INPUT_FILE="$OUTPUT_FILE"  # Use encrypted file for next step if using both
       else
-        echo "⚠️  sops encryption failed, continuing without sops"
+        ${ui.messages.warning "sops encryption failed, continuing without sops"}
         USE_SOPS=false
         OUTPUT_FILE="$INPUT_FILE.encrypted"
       fi
@@ -114,7 +114,7 @@ EOF
   
   # Encrypt with FIDO2 (using age-plugin-yubikey or similar)
   if [ "$USE_FIDO2" = "true" ]; then
-    echo "🔐 Encrypting with FIDO2..."
+    ${ui.messages.loading "Encrypting with FIDO2..."}
     
     # Check for age-plugin-yubikey
     if command -v age-plugin-yubikey >/dev/null 2>&1; then
@@ -134,42 +134,42 @@ EOF
         RECIPIENT=$(age-plugin-yubikey -r 2>/dev/null | head -1)
         if [ -n "$RECIPIENT" ]; then
           if age -r "$RECIPIENT" -o "$OUTPUT_FILE" "$INPUT_FILE" 2>/dev/null; then
-            echo "✅ Encrypted with FIDO2/YubiKey"
+            ${ui.messages.success "Encrypted with FIDO2/YubiKey"}
           else
-            echo "⚠️  FIDO2 encryption failed"
+            ${ui.messages.warning "FIDO2 encryption failed"}
           fi
         else
-          echo "⚠️  Could not get FIDO2 recipient"
+          ${ui.messages.warning "Could not get FIDO2 recipient"}
         fi
       else
-        echo "⚠️  Could not access FIDO2 device"
+        ${ui.messages.warning "Could not access FIDO2 device"}
       fi
     elif command -v age >/dev/null 2>&1; then
       # Fallback: Use age with manual FIDO2 setup
-      echo "⚠️  age-plugin-yubikey not found, FIDO2 encryption requires manual setup"
+      ${ui.messages.warning "age-plugin-yubikey not found, FIDO2 encryption requires manual setup"}
       echo "   Install age-plugin-yubikey for FIDO2 support"
     else
-      echo "⚠️  age not found, skipping FIDO2 encryption"
+      ${ui.messages.warning "age not found, skipping FIDO2 encryption"}
     fi
   fi
   
   # If no encryption succeeded, create a simple encrypted archive as fallback
   if [ ! -f "$OUTPUT_FILE" ] || [ "$OUTPUT_FILE" = "$INPUT_FILE" ]; then
-    echo "⚠️  No encryption method succeeded, using gpg as fallback..."
+    ${ui.messages.warning "No encryption method succeeded, using gpg as fallback..."}
     if command -v gpg >/dev/null 2>&1; then
       # Try to encrypt with GPG (user's default key)
       if gpg --encrypt --armor --output "$OUTPUT_FILE" "$INPUT_FILE" 2>/dev/null; then
-        echo "✅ Encrypted with GPG (fallback)"
+        ${ui.messages.success "Encrypted with GPG (fallback)"}
       else
-        echo "❌ All encryption methods failed"
+        ${ui.messages.error "All encryption methods failed"}
         exit 1
       fi
     else
-      echo "❌ No encryption tools available"
+      ${ui.messages.error "No encryption tools available"}
       exit 1
     fi
   fi
   
-  echo "✅ Encryption complete: $OUTPUT_FILE"
+  ${ui.messages.success "Encryption complete: $OUTPUT_FILE"}
 ''
 

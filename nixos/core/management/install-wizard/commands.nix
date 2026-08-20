@@ -8,7 +8,7 @@ let
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
 
-  installer = import ./scripts { inherit pkgs; };
+  installer = import ./scripts { inherit pkgs getModuleApi; };
 
   resolveRepoSnippet = ''
     _ncc_install_repo() {

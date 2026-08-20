@@ -6,6 +6,7 @@ let
   moduleName = baseNameOf ./.;
   cfg = getModuleConfig moduleName;
   cliRegistry = getModuleApi "cli-registry";
+  ui = getModuleApi "cli-formatter";
   
   # Path to ISO builder
   isoBuilderPath = ./iso-builder;
@@ -24,19 +25,19 @@ let
         SUBACTION=''${2:-help}
         case "$SUBACTION" in
           start)
-            echo "Starting Nixify web service..."
+            ${ui.messages.loading "Starting Nixify web service..."}
             systemctl start nixify-service
             systemctl status nixify-service
             ;;
           stop)
-            echo "Stopping Nixify web service..."
+            ${ui.messages.loading "Stopping Nixify web service..."}
             systemctl stop nixify-service
             ;;
           status)
             systemctl status nixify-service
             ;;
           restart)
-            echo "Restarting Nixify web service..."
+            ${ui.messages.loading "Restarting Nixify web service..."}
             systemctl restart nixify-service
             systemctl status nixify-service
             ;;
@@ -91,12 +92,12 @@ let
         # Validate desktop environment
         case "$DESKTOP_ENV" in
           gnome|plasma6)
-            echo "Building NixOS ISO with Calamares and NixOS Control Center..."
-            echo "Desktop Environment: $DESKTOP_ENV"
+            ${ui.messages.loading "Building NixOS ISO with Calamares and NixOS Control Center..."}
+            ${ui.messages.info "Desktop Environment: $DESKTOP_ENV"}
             echo ""
             ;;
           *)
-            echo "Error: Invalid desktop environment: $DESKTOP_ENV"
+            ${ui.messages.error "Invalid desktop environment: $DESKTOP_ENV"}
             echo ""
             echo "Valid options:"
             echo "  gnome    - GNOME Desktop"
@@ -217,10 +218,10 @@ let
             cp "$BUILT_ISO" "$TARGET_ISO"
             chmod 644 "$TARGET_ISO" 2>/dev/null || true
             echo ""
-            echo "✅ ISO build successful!"
+            ${ui.messages.success "ISO build successful!"}
             echo ""
             ABS_ISO_PATH="$(readlink -f "$RESULT_ISO_DIR/$ISO_NAME")"
-            echo "ISO location: $ABS_ISO_PATH"
+            ${ui.messages.info "ISO location: $ABS_ISO_PATH"}
             echo ""
             echo "To test in QEMU:"
             echo "  qemu-system-x86_64 -cdrom \"$ABS_ISO_PATH\" -m 4G"
@@ -228,15 +229,15 @@ let
             echo "To write to USB:"
             echo "  sudo dd if=\"$ABS_ISO_PATH\" of=/dev/sdX bs=4M status=progress"
             echo ""
-            echo "📦 All ISOs in $RESULT_ISO_DIR/:"
+            ${ui.messages.info "All ISOs in $RESULT_ISO_DIR/:"}
             ls -lh "$RESULT_ISO_DIR"/*.iso 2>/dev/null | awk '{print "  - " $9 " (" $5 ")"}' || echo "  (none)"
           else
-            echo "Error: Could not find ISO file in build output"
+            ${ui.messages.error "Could not find ISO file in build output"}
             exit 1
           fi
         else
           echo ""
-          echo "❌ ISO build failed!"
+          ${ui.messages.error "ISO build failed!"}
           exit 1
         fi
         ;;

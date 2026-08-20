@@ -1,4 +1,4 @@
-{ pkgs, lib, cfg }:
+{ pkgs, lib, cfg, ui }:
 
 with lib;
 
@@ -52,7 +52,7 @@ pkgs.writeShellScriptBin "download-from-github" ''
   fi
   
   if [ -z "$REPOSITORY" ]; then
-    echo "Error: --repository is required (format: owner/repo)"
+    ${ui.messages.error "--repository is required (format: owner/repo)"}
     exit 1
   fi
   
@@ -61,7 +61,7 @@ pkgs.writeShellScriptBin "download-from-github" ''
   REPO=$(echo "$REPOSITORY" | cut -d'/' -f2)
   
   if [ -z "$OWNER" ] || [ -z "$REPO" ]; then
-    echo "Error: Invalid repository format. Use 'owner/repo'"
+    ${ui.messages.error "Invalid repository format. Use 'owner/repo'"}
     exit 1
   fi
   
@@ -82,7 +82,7 @@ pkgs.writeShellScriptBin "download-from-github" ''
   elif [ -n "$GITHUB_TOKEN" ]; then
     GITHUB_TOKEN="$GITHUB_TOKEN"
   else
-    echo "Error: GitHub token required. Set --token-file or GITHUB_TOKEN environment variable"
+    ${ui.messages.error "GitHub token required. Set --token-file or GITHUB_TOKEN environment variable"}
     exit 1
   fi
   
@@ -94,7 +94,7 @@ pkgs.writeShellScriptBin "download-from-github" ''
   mkdir -p "$OUTPUT_DIR"
   
   # List snapshots
-  echo "📥 Fetching snapshots from GitHub..."
+  ${ui.messages.loading "Fetching snapshots from GitHub..."}
   
   # Use GitHub API to list files in snapshots directory
   API_URL="https://api.github.com/repos/$REPOSITORY/contents/snapshots?ref=$BRANCH"
@@ -102,7 +102,7 @@ pkgs.writeShellScriptBin "download-from-github" ''
   SNAPSHOTS_JSON=$(${pkgs.curl}/bin/curl -s -H "Authorization: token $GITHUB_TOKEN" "$API_URL" || echo "[]")
   
   if [ "$SNAPSHOTS_JSON" = "[]" ] || echo "$SNAPSHOTS_JSON" | ${pkgs.jq}/bin/jq -e '.message' >/dev/null 2>&1; then
-    echo "⚠️  Could not fetch snapshots. Check repository, branch, and token permissions."
+    ${ui.messages.warning "Could not fetch snapshots. Check repository, branch, and token permissions."}
     exit 1
   fi
   
@@ -110,7 +110,7 @@ pkgs.writeShellScriptBin "download-from-github" ''
   SNAPSHOT_FILES=$(${pkgs.jq}/bin/jq -r '.[] | select(.name | endswith(".json") or endswith(".encrypted")) | .name' <<< "$SNAPSHOTS_JSON")
   
   if [ -z "$SNAPSHOT_FILES" ]; then
-    echo "⚠️  No snapshots found in repository"
+    ${ui.messages.warning "No snapshots found in repository"}
     exit 0
   fi
   
@@ -134,7 +134,7 @@ pkgs.writeShellScriptBin "download-from-github" ''
         SIZE_MB="?"
       fi
       
-      echo "  📦 $filename"
+      ${ui.messages.info "$filename"}
       echo "     Size: $SIZE_MB MB | Updated: $DATE"
       echo ""
       
@@ -151,23 +151,23 @@ pkgs.writeShellScriptBin "download-from-github" ''
     # Get latest snapshot (by name/timestamp)
     LATEST_SNAPSHOT=$(printf '%s\n' "''${SNAPSHOT_LIST[@]}" | sort -r | head -1)
     SNAPSHOT_NAME="$LATEST_SNAPSHOT"
-    echo "📥 Downloading latest snapshot: $SNAPSHOT_NAME"
+    ${ui.messages.loading "Downloading latest snapshot: $SNAPSHOT_NAME"}
   else
     # Check if snapshot exists
     if ! printf '%s\n' "''${SNAPSHOT_LIST[@]}" | grep -q "^$SNAPSHOT_NAME$"; then
-      echo "❌ Snapshot '$SNAPSHOT_NAME' not found"
+      ${ui.messages.error "Snapshot '$SNAPSHOT_NAME' not found"}
       echo "Available snapshots:"
       printf '  - %s\n' "''${SNAPSHOT_LIST[@]}"
       exit 1
     fi
-    echo "📥 Downloading snapshot: $SNAPSHOT_NAME"
+    ${ui.messages.loading "Downloading snapshot: $SNAPSHOT_NAME"}
   fi
   
   # Get download URL
   DOWNLOAD_URL=$(echo "$SNAPSHOTS_JSON" | ${pkgs.jq}/bin/jq -r ".[] | select(.name == \"$SNAPSHOT_NAME\") | .download_url")
   
   if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ]; then
-    echo "❌ Could not get download URL for snapshot"
+    ${ui.messages.error "Could not get download URL for snapshot"}
     exit 1
   fi
   
@@ -175,12 +175,12 @@ pkgs.writeShellScriptBin "download-from-github" ''
   OUTPUT_FILE="$OUTPUT_DIR/$SNAPSHOT_NAME"
   
   if ${pkgs.curl}/bin/curl -s -H "Authorization: token $GITHUB_TOKEN" -L "$DOWNLOAD_URL" -o "$OUTPUT_FILE"; then
-    echo "✅ Downloaded: $OUTPUT_FILE"
+    ${ui.messages.success "Downloaded: $OUTPUT_FILE"}
     echo ""
     echo "To restore, run:"
     echo "  ncc-restore --snapshot $OUTPUT_FILE --all"
   else
-    echo "❌ Failed to download snapshot"
+    ${ui.messages.error "Failed to download snapshot"}
     exit 1
   fi
 ''

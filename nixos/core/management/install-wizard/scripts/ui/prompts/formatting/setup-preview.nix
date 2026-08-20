@@ -1,5 +1,86 @@
-# Migrated from ui/prompts/formatting/setup-preview.sh — body via fromJSON (Nix-safe).
-{ pkgs }:
-pkgs.writeText "setup-preview.sh" (builtins.fromJSON ''
-"#!/usr/bin/env bash\nset -euo pipefail\n\n# Source core components\nsource \"\u0024CORE_DIR/imports.sh\"\n\n# Constants\ndeclare -r PREVIEW_WIDTH=40\n\ngenerate_preview() {\n    local selection=\"\u00241\"\n    \n    # Clean up selection string\n    local clean_selection\n    clean_selection=\u0024(clean_selection_string \"\u0024selection\") || return 1\n    \n    # Generate preview sections\n    generate_header \"\u0024clean_selection\"\n    generate_description \"\u0024clean_selection\"\n    generate_features \"\u0024clean_selection\"\n    generate_dependencies \"\u0024clean_selection\"\n    \n    return 0\n}\nexport -f generate_preview\n\nclean_selection_string() {\n    # Remove emojis and clean up selection string\n    echo \"\u00241\" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*\u0024//' \\\n        -e 's/\ud83d\udce6 //' -e 's/\ud83d\udd27 //' -e 's/\u2699\ufe0f  //' \\\n        -e 's/\ud83d\udcc1 //' -e 's/\ud83d\udccb //' -e 's/\ud83d\udd04 //' \\\n        -e 's/\ud83d\udda5\ufe0f  //' -e 's/\ud83e\udd16 //' \\\n        -e 's/ /-/g' | tr '[:upper:]' '[:lower:]'\n}\nexport -f clean_selection_string\n\ngenerate_header() {\n    local title=\"\u00241\"\n    echo -e \"\\\\033[1;34m\u0024{title}\\\\033[0m\" # Bold Blue\n    echo \"------------------------------------\"\n}\nexport -f generate_header\n\ngenerate_description() {\n    local selection=\"\u00241\"\n    echo # Empty line for spacing\n    get_setup_description \"\u0024selection\"\n}\nexport -f generate_description\n\ngenerate_features() {\n    local selection=\"\u00241\"\n    \n    echo # Empty line\n    echo -e \"\\\\033[1mType:\\\\033[0m \u0024{SETUP_TYPES[\u0024selection]:-N/A}\"\n    echo -e \"\\\\033[1mFeatures:\\\\033[0m\"\n    local features_text=\u0024{SETUP_FEATURES[\u0024selection]:-N/A}\n    if [[ \"\u0024features_text\" == \"N/A\" || -z \"\u0024features_text\" ]]; then\n        echo \"  - No specific features listed.\"\n    else\n        echo \"\u0024features_text\" | tr '|' '\\n' | sed 's/^/  - /' # Convert | to newlines and indent\n    fi\n}\nexport -f generate_features\n\ngenerate_dependencies() {\n    local selection=\"\u00241\"\n    \n    # Check for dependencies\n    if [[ -n \"\u0024{REQUIRES[\u0024selection]:-}\" ]]; then\n        echo # Empty line\n        echo -e \"\\\\033[1mDependencies:\\\\033[0m\"\n        # Use activate_dependencies to get the full list\n        local deps\n        deps=\u0024(activate_dependencies \"\u0024selection\")\n        for dep in \u0024deps; do\n            # Skip self-dependency in display if present\n            [[ \"\u0024dep\" == \"\u0024selection\" ]] && continue\n            local display_dep_name\n            display_dep_name=\u0024(get_display_name \"\u0024dep\")\n            echo \"  - \u0024display_dep_name\"\n        done\n    else\n        echo # Empty line\n        echo -e \"\\\\033[1mDependencies:\\\\033[0m None\"\n    fi\n}\nexport -f generate_dependencies\n\n# Check script execution\ncheck_script_execution \"CORE_DIR\" \"generate_preview\""
-'')
+# Setup preview — colors from cli-formatter palette (colors.sh).
+{ pkgs, getModuleApi ? null, ... }:
+pkgs.writeText "setup-preview.sh" ''
+#!/usr/bin/env bash
+set -euo pipefail
+
+source "$CORE_DIR/imports.sh"
+
+if [[ -n "''${LIB_DIR:-}" && -f "$LIB_DIR/colors.sh" && -z "''${COLORS_IMPORTED:-}" ]]; then
+  # shellcheck disable=SC1091
+  source "$LIB_DIR/colors.sh"
+fi
+
+declare -r PREVIEW_WIDTH=40
+
+generate_preview() {
+    local selection="$1"
+    local clean_selection
+    clean_selection=$(clean_selection_string "$selection") || return 1
+    generate_header "$clean_selection"
+    generate_description "$clean_selection"
+    generate_features "$clean_selection"
+    generate_dependencies "$clean_selection"
+    return 0
+}
+export -f generate_preview
+
+clean_selection_string() {
+    echo "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+        -e 's/📦 //' -e 's/🔧 //' -e 's/⚙️  //' \
+        -e 's/📁 //' -e 's/📋 //' -e 's/🔄 //' \
+        -e 's/🖥️  //' -e 's/🤖 //' \
+        -e 's/ /-/g' | tr '[:upper:]' '[:lower:]'
+}
+export -f clean_selection_string
+
+generate_header() {
+    local title="$1"
+    printf '%b\n' "''${BLUE}''${BOLD}''${title}''${NC}"
+    echo "------------------------------------"
+}
+export -f generate_header
+
+generate_description() {
+    local selection="$1"
+    echo
+    get_setup_description "$selection"
+}
+export -f generate_description
+
+generate_features() {
+    local selection="$1"
+    echo
+    printf '%b\n' "''${BOLD}Type:''${NC} ''${SETUP_TYPES[$selection]:-N/A}"
+    printf '%b\n' "''${BOLD}Features:''${NC}"
+    local features_text=''${SETUP_FEATURES[$selection]:-N/A}
+    if [[ "$features_text" == "N/A" || -z "$features_text" ]]; then
+        echo "  - No specific features listed."
+    else
+        echo "$features_text" | tr '|' '\n' | sed 's/^/  - /'
+    fi
+}
+export -f generate_features
+
+generate_dependencies() {
+    local selection="$1"
+    if [[ -n "''${REQUIRES[$selection]:-}" ]]; then
+        echo
+        printf '%b\n' "''${BOLD}Dependencies:''${NC}"
+        local deps
+        deps=$(activate_dependencies "$selection")
+        for dep in $deps; do
+            [[ "$dep" == "$selection" ]] && continue
+            local display_dep_name
+            display_dep_name=$(get_display_name "$dep")
+            echo "  - $display_dep_name"
+        done
+    else
+        echo
+        printf '%b\n' "''${BOLD}Dependencies:''${NC} None"
+    fi
+}
+export -f generate_dependencies
+
+check_script_execution "CORE_DIR" "generate_preview"
+''

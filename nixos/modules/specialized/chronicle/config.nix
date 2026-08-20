@@ -1,10 +1,10 @@
-{ config, lib, pkgs, systemConfig, getModuleApi, ... }:
+{ config, lib, pkgs, systemConfig, getModuleApi, getModuleConfig, ... }:
 
 let
-  cfg = systemConfig.modules.specialized.chronicle;
+  cfg = getModuleConfig (baseNameOf ./.);
   
   # Import library
-  chronicleLib = import ./lib/default.nix { inherit lib pkgs cfg; };
+  chronicleLib = import ./lib/default.nix { inherit lib pkgs cfg getModuleApi; };
   
   # Determine backend based on mode
   backend = if cfg.mode == "automatic" then "x11" else "wayland";
@@ -77,7 +77,7 @@ let
 
   # Main recorder script
   recorderScript = import ./scripts/main.nix {
-    inherit lib pkgs cfg chronicleLib backend;
+    inherit lib pkgs cfg chronicleLib backend getModuleApi;
   };
 
   # GUI script — Qt/PySide6 only (GTK removed)
@@ -89,14 +89,14 @@ let
     import ./api/default.nix { inherit lib pkgs cfg; }
   );
 
-  # Integrations module (v2.0.0 - Phase 5)
-  integrationsModule = import ./integrations/default.nix { inherit lib pkgs cfg; };
+  # Integrations module (v2.0.0 - Phase 5) — script packages
+  integrationsModule = import ./integrations/scripts.nix { inherit lib pkgs cfg getModuleApi; };
 
   # Cloud upload module (v2.0.0 - Phase 5)
-  cloudModule = import ./cloud/default.nix { inherit lib pkgs cfg; };
+  cloudModule = import ./cloud/default.nix { inherit lib pkgs cfg getModuleApi; };
 
   # Email module (v2.0.0 - Phase 5)
-  emailModule = import ./email/default.nix { inherit lib pkgs cfg; };
+  emailModule = import ./email/default.nix { inherit lib pkgs cfg getModuleApi; };
 
   # Analysis module (v2.0.0 - Phase 5)
   analysisModule = import ./analysis/default.nix { inherit lib pkgs cfg; };

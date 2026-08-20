@@ -5,11 +5,10 @@
 ### Accessing the API
 
 ```nix
-# In other modules
-let
-  formatter = config.core.management.cli-formatter.api;
-in
-  formatter.box "Title" "Content"
+# In other modules — discovery only (never config.core.management.*)
+ui = getModuleApi "cli-formatter";
+# ${ui.messages.info "…"} ${ui.messages.success "…"} ${ui.messages.error "…"}
+# ${ui.boxes.box "Title" "Content"}  # or ui.prompts / ui.tables / …
 ```
 
 ### Available Functions
@@ -19,28 +18,24 @@ in
 - **Interactive**: Menus, prompts, spinners
 - **Components**: Progress bars, tables, lists
 - **TUI Integration**: Advanced TUI components
+- **Status**: `ui.messages.*` / `ui.badges.*` for user-facing CLI status
 
 ## Common Use Cases
 
-### Use Case 1: Simple Text Formatting
+### Use Case 1: Simple status messages
 
 ```nix
-let
-  formatter = config.core.management.cli-formatter.api;
-in
-  formatter.color "red" "Error message"
+ui = getModuleApi "cli-formatter";
+# In a writeShellScript:
+# ${ui.messages.error "Something failed"}
+# ${ui.messages.success "Done"}
 ```
 
 ### Use Case 2: Interactive Menu
 
 ```nix
-let
-  formatter = config.core.management.cli-formatter.api;
-in
-  formatter.menu {
-    title = "Select Option";
-    items = [ "Option 1" "Option 2" "Option 3" ];
-  }
+ui = getModuleApi "cli-formatter";
+# ${ui.menus.menu { title = "Select Option"; items = [ "Option 1" "Option 2" ]; }}
 ```
 
 ### Use Case 3: Custom Component
@@ -101,32 +96,20 @@ template = ''
 
 The CLI formatter integrates with TUI engine:
 ```nix
-let
-  formatter = config.core.management.cli-formatter.api;
-  tui = config.core.management.tui-engine.api;
-in
-  tui.createMenu {
-    title = "Menu";
-    items = formatter.formatItems items;
-  }
+ui = getModuleApi "cli-formatter";
+tui = (getModuleApi "tui-engine").fromConfig config;
+# Use ui.* for status/layout; tui.* for interactive menus
 ```
 
 ## Integration with Other Modules
 
 ### Integration with CLI Registry
 
-The CLI formatter works with command registration:
+Register commands via the registry API (not hardcoded option paths):
 ```nix
-{
-  config.core.management.cli-registry.commandSets.module = [
-    {
-      name = "command";
-      script = pkgs.writeScriptBin "command" ''
-        ${formatter.box "Title" "Content"}
-      '';
-    };
-  ];
-}
+cliRegistry = getModuleApi "cli-registry";
+ui = getModuleApi "cli-formatter";
+# cliRegistry.registerCommandsFor "my-module" [ { … script with ui.messages … } ]
 ```
 
 ## Troubleshooting
@@ -136,7 +119,7 @@ The CLI formatter works with command registration:
 **Issue**: Formatting not working
 **Symptoms**: Output not formatted correctly
 **Solution**: 
-1. Check API access: `config.core.management.cli-formatter.api`
+1. Check API access: `ui = getModuleApi "cli-formatter"`
 2. Verify component configuration
 3. Check template syntax
 **Prevention**: Use correct API access pattern

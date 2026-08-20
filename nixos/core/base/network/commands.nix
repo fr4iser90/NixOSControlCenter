@@ -10,8 +10,8 @@ let
     if tuiOn
     then (import ./ui/tui/default.nix { inherit config lib pkgs getModuleApi getModuleConfig; }).tuiScript
     else null;
-  wifiCli = import ./scripts/wifi/default.nix { inherit pkgs; };
-  netCli = import ./scripts/network-status.nix { inherit pkgs; };
+  wifiCli = import ./scripts/wifi/default.nix { inherit pkgs getModuleApi; };
+  netCli = import ./scripts/network-status.nix { inherit pkgs getModuleApi; };
   domainGui = (getModuleApi "gui-engine").domainGui pkgs config;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;

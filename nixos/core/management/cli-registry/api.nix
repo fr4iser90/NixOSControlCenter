@@ -1,6 +1,6 @@
 # CLI Registry API — behavior only. Prefer: getModuleApi "cli-registry"
 # Raw import (config.nix) must pass metadata + getModuleMetadata explicitly.
-{ lib, metadata, getModuleMetadata }:
+{ lib, metadata, getModuleMetadata, ... }:
 
 let
   selfPath = metadata.configPath;

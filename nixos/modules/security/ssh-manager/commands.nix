@@ -39,8 +39,8 @@ let
     ${ui.tables.keyValue "Active Sessions" "$SESSIONS"}
     if ${if passwordAuth then "true" else "false"}; then
       echo ""
-      echo "Next: ncc ssh lockdown   (checks keys + recent pubkey login, then writes config)"
-      echo "Temporary reopen later: ncc ssh temp-open USER | ncc ssh grant-access USER"
+      ${ui.messages.info "Next: ncc ssh lockdown   (checks keys + recent pubkey login, then writes config)"}
+      ${ui.messages.info "Temporary reopen later: ncc ssh temp-open USER | ncc ssh grant-access USER"}
     fi
   '';
 

@@ -16,7 +16,7 @@ let
   domainGui = (getModuleApi "gui-engine").domainGui pkgs config;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
-  libVM = import ./lib { inherit lib pkgs; };
+  libVM = import ./lib { inherit lib pkgs getModuleApi; };
   availableDistros = attrNames libVM.distros;
 
   vmEntry = pkgs.writeShellScriptBin "ncc-vm-entry" ''

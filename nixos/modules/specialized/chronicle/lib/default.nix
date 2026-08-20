@@ -1,4 +1,4 @@
-{ lib, pkgs, cfg }:
+{ lib, pkgs, cfg, getModuleApi }:
 
 let
   # Helper to import modules with cfg parameter
@@ -6,7 +6,7 @@ let
 in
 {
   # Import all library modules
-  utils = import ./utils.nix { inherit lib pkgs; };
+  utils = import ./utils.nix { inherit lib pkgs getModuleApi; };
   privacy = import ./privacy.nix { inherit lib pkgs; };
   validators = import ./validators.nix { inherit lib pkgs; };
   state = import ./state.nix { inherit lib pkgs; };
@@ -23,7 +23,7 @@ in
   # Phase 2 modules - Production Ready
   multiMonitor = importWithCfg ./multi-monitor.nix;
   crashRecovery = importWithCfg ./crash-recovery.nix;
-  errorHandling = importWithCfg ./error-handling.nix;
+  errorHandling = import ./error-handling.nix { inherit lib pkgs cfg getModuleApi; };
   
   # Performance module
   performance = import ./performance.nix { inherit lib pkgs; };

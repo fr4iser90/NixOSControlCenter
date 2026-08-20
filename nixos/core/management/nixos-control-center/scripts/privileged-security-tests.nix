@@ -1,10 +1,10 @@
 # Escalation / policy tests for ncc-priv leaf model (no root required)
 # Run: nix-build -E '...' or bash this script with POLICY lib from the store
-{ pkgs, lib, getModuleConfig, getModuleMetadata }:
+{ pkgs, lib, getModuleConfig, getModuleMetadata, getModuleApi }:
 
 let
   priv = import ./privileged-helper.nix {
-    inherit pkgs lib getModuleConfig getModuleMetadata;
+    inherit pkgs lib getModuleConfig getModuleMetadata getModuleApi;
   };
 in
 pkgs.writeShellScriptBin "ncc-priv-security-tests" ''

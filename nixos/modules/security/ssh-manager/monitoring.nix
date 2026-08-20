@@ -43,7 +43,7 @@ let
         
         if [ -n "$USER" ] && [ -n "$IP" ]; then
           ACTIVE_CONNECTIONS=$((ACTIVE_CONNECTIONS - 1))
-          CONNECTIONS=$(echo -e "$CONNECTIONS" | grep -v "$USER@$IP")
+          CONNECTIONS=$(printf '%b\n' "$CONNECTIONS" | grep -v "$USER@$IP")
           
           if [ "${monitoringCfg.notificationLevel}" != "none" ]; then
             ${pkgs.libnotify}/bin/notify-send \

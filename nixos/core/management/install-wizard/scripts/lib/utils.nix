@@ -1,5 +1,157 @@
-# Migrated from lib/utils.sh — body via fromJSON (Nix-safe).
-{ pkgs }:
-pkgs.writeText "utils.sh" (builtins.fromJSON ''
-"#!/usr/bin/env bash\n\n# =====================\n# = Script Management =\n# =====================\n\ncheck_script_execution() {\n    local required_var=\"\u00241\"\n    local main_function=\"\u00242\"\n\n    # Run main only when the *calling file* is executed as the process script.\n    # When test.sh sources foo.sh, \u00240 is test.sh and BASH_SOURCE[1] is foo.sh \u2192 skip.\n    # When foo.sh is executed directly, both are foo.sh \u2192 run.\n    [[ \"\u0024{BASH_SOURCE[1]}\" == \"\u0024{0}\" ]] || return 0\n\n    if [[ -z \"\u0024{!required_var:-}\" ]]; then\n        echo \"Error: Environment not properly initialized (\u0024{required_var} missing)\"\n        exit 1\n    fi\n    # shellcheck disable=SC2086\n    \u0024main_function\n}\n\n# ===================\n# = System Helpers =\n# ===================\n\ncheck_root() {\n    if [ \"\u0024EUID\" -ne 0 ]; then \n        if command -v sudo >/dev/null 2>&1; then\n            if ! sudo -n true 2>/dev/null; then\n                log_error \"Neither root privileges nor passwordless sudo available\"\n                log_info \"Please add NOPASSWD entry to sudoers for this script\"\n                exit 1\n            fi\n            export SUDO=\"sudo\"\n        else\n            log_error \"Neither root privileges nor sudo available\"\n            exit 1\n        fi\n    else\n        export SUDO=\"\"\n    fi\n}\n\n# ====================\n# = File Management =\n# ====================\n\nensure_dir() {\n    local dir=\"\u00241\"\n    if [ ! -d \"\u0024dir\" ]; then\n        mkdir -p \"\u0024dir\" || {\n            log_error \"Failed to create directory: \u0024dir\"\n            return 1\n        }\n        log_info \"Created directory: \u0024dir\"\n    fi\n}\n\nbackup_file() {\n    local file=\"\u00241\"\n\n    if declare -F ncc_dry_run >/dev/null 2>&1 && ncc_dry_run; then\n        ncc_dry_skip \"backup\" \"\u0024file\"\n        return 0\n    fi\n\n    if [ -f \"\u0024file\" ]; then\n        # Determine backup location based on file path\n        local backup_root\n        local backup_file\n        \n        if echo \"\u0024file\" | grep -q \"^/etc/ssh/\"; then\n            # SSH config \u2192 use SSH backup\n            backup_root=\"/var/backup/nixos/ssh\"\n            backup_file=\"\u0024backup_root/\u0024(basename \"\u0024file\").backup.\u0024(date +%Y%m%d_%H%M%S)\"\n            # Create directory if it doesn't exist (ActivationScript should have created it)\n            if [ ! -d \"\u0024backup_root\" ]; then\n                mkdir -p \"\u0024backup_root\"\n                chmod 700 \"\u0024backup_root\" 2>/dev/null || sudo chmod 700 \"\u0024backup_root\" 2>/dev/null || true\n                chown root:root \"\u0024backup_root\" 2>/dev/null || sudo chown root:root \"\u0024backup_root\" 2>/dev/null || true\n            else\n                mkdir -p \"\u0024backup_root\"  # Ensure it exists\n            fi\n            # Create backup file and set permissions (600 = read/write for owner only)\n            if cp \"\u0024file\" \"\u0024backup_file\" 2>/dev/null || sudo cp \"\u0024file\" \"\u0024backup_file\" 2>/dev/null; then\n                chmod 600 \"\u0024backup_file\" 2>/dev/null || sudo chmod 600 \"\u0024backup_file\" 2>/dev/null || true\n                chown root:root \"\u0024backup_file\" 2>/dev/null || sudo chown root:root \"\u0024backup_file\" 2>/dev/null || true\n                # Cleanup old backups (keep last 5)\n                ls -t \"\u0024backup_root\"/\u0024(basename \"\u0024file\").backup.* 2>/dev/null | tail -n +6 | xargs -r rm -f 2>/dev/null || sudo xargs -r rm -f 2>/dev/null || true\n                log_info \"Created backup: \u0024backup_file\"\n                return 0\n            fi\n        elif echo \"\u0024file\" | grep -q \"^/etc/nixos/\"; then\n            # NixOS config \u2192 use config backup\n            backup_root=\"/var/backup/nixos/systemConfig\"\n            backup_file=\"\u0024backup_root/\u0024(basename \"\u0024file\").backup.\u0024(date +%Y%m%d_%H%M%S)\"\n            # Create directory if it doesn't exist (ActivationScript should have created it)\n            if [ ! -d \"\u0024backup_root\" ]; then\n                mkdir -p \"\u0024backup_root\"\n                chmod 700 \"\u0024backup_root\" 2>/dev/null || sudo chmod 700 \"\u0024backup_root\" 2>/dev/null || true\n                chown root:root \"\u0024backup_root\" 2>/dev/null || sudo chown root:root \"\u0024backup_root\" 2>/dev/null || true\n            else\n                mkdir -p \"\u0024backup_root\"  # Ensure it exists\n            fi\n            # Create backup file and set permissions (600 = read/write for owner only)\n            if cp \"\u0024file\" \"\u0024backup_file\" 2>/dev/null || sudo cp \"\u0024file\" \"\u0024backup_file\" 2>/dev/null; then\n                chmod 600 \"\u0024backup_file\" 2>/dev/null || sudo chmod 600 \"\u0024backup_file\" 2>/dev/null || true\n                chown root:root \"\u0024backup_file\" 2>/dev/null || sudo chown root:root \"\u0024backup_file\" 2>/dev/null || true\n                # Cleanup old backups (keep last 10)\n                ls -t \"\u0024backup_root\"/\u0024(basename \"\u0024file\").backup.* 2>/dev/null | tail -n +11 | xargs -r rm -f 2>/dev/null || sudo xargs -r rm -f 2>/dev/null || true\n                log_info \"Created backup: \u0024backup_file\"\n                return 0\n            fi\n        else\n            # Generic file \u2192 use config backup location\n            backup_root=\"/var/backup/nixos/systemConfig\"\n            backup_file=\"\u0024backup_root/\u0024(basename \"\u0024file\").backup.\u0024(date +%Y%m%d_%H%M%S)\"\n            # Create directory if it doesn't exist (ActivationScript should have created it)\n            if [ ! -d \"\u0024backup_root\" ]; then\n                mkdir -p \"\u0024backup_root\"\n                chmod 700 \"\u0024backup_root\" 2>/dev/null || sudo chmod 700 \"\u0024backup_root\" 2>/dev/null || true\n                chown root:root \"\u0024backup_root\" 2>/dev/null || sudo chown root:root \"\u0024backup_root\" 2>/dev/null || true\n            else\n                mkdir -p \"\u0024backup_root\"  # Ensure it exists\n            fi\n            # Create backup file and set permissions (600 = read/write for owner only)\n            if cp \"\u0024file\" \"\u0024backup_file\" 2>/dev/null || sudo cp \"\u0024file\" \"\u0024backup_file\" 2>/dev/null; then\n                chmod 600 \"\u0024backup_file\" 2>/dev/null || sudo chmod 600 \"\u0024backup_file\" 2>/dev/null || true\n                chown root:root \"\u0024backup_file\" 2>/dev/null || sudo chown root:root \"\u0024backup_file\" 2>/dev/null || true\n                # Cleanup old backups (keep last 10)\n                ls -t \"\u0024backup_root\"/\u0024(basename \"\u0024file\").backup.* 2>/dev/null | tail -n +11 | xargs -r rm -f 2>/dev/null || sudo xargs -r rm -f 2>/dev/null || true\n                log_info \"Created backup: \u0024backup_file\"\n                return 0\n            fi\n        fi\n        \n        log_error \"Failed to create backup of \u0024file\"\n        return 1\n    fi\n}\n\n# =======================\n# = User Interaction =\n# =======================\n\nask_user() {\n    local prompt=\"\u00241\"\n    local default=\"\u0024{2:-N}\"  # Default to No if not specified\n    local response\n    \n    if [[ \"\u0024default\" == \"Y\" ]]; then\n        echo -en \"\u0024{BLUE}[?]\u0024{NC} \u0024prompt [Y/n] \"\n    else\n        echo -en \"\u0024{BLUE}[?]\u0024{NC} \u0024prompt [y/N] \"\n    fi\n    \n    read -r response\n    response=\u0024{response:-\u0024default}\n    \n    case \"\u0024response\" in\n        [yY][eE][sS]|[yY]) return 0 ;;\n        *) return 1 ;;\n    esac\n}\n\nselect_model() {\n    local options=(\"minimal\" \"desktop\" \"server\" \"gaming\")\n    local selected\n    \n    echo -e \"\u0024{BLUE}[?]\u0024{NC} Select installation model:\"\n    select selected in \"\u0024{options[@]}\"; do\n        if [[ -n \"\u0024selected\" ]]; then\n            echo \"\u0024selected\"\n            return 0\n        fi\n        log_error \"Invalid selection. Please try again.\"\n    done\n}\n\nconfirm_installation() {\n    ask_user \"Ready to proceed with installation?\" \"N\"\n}\n\n# =============\n# = Exports =\n# =============\n\ndeclare -a util_functions=(\n    \"check_script_execution\"\n    \"check_root\"\n    \"ensure_dir\"\n    \"backup_file\"\n    \"ask_user\"\n    \"select_model\"\n    \"confirm_installation\"\n)\n\nfor func in \"\u0024{util_functions[@]}\"; do\n    export -f \"\u0024func\"\ndone\n\n# Check environment\ncheck_script_execution \"LIB_DIR\" \"log_info 'Utils initialized'\"\n\n# Ensure required dependencies are available\nif [[ -z \"\u0024COLORS_IMPORTED\" ]]; then\n    source \"\u0024(dirname \"\u0024{BASH_SOURCE[0]}\")/colors.sh\"\nfi\n\nif ! command -v log_info &> /dev/null; then\n    source \"\u0024(dirname \"\u0024{BASH_SOURCE[0]}\")/logging.sh\"\nfi"
-'')
+# Utils — prompts use colors.sh (cli-formatter palette).
+{ pkgs, getModuleApi ? null, ... }:
+pkgs.writeText "utils.sh" ''
+#!/usr/bin/env bash
+
+check_script_execution() {
+    local required_var="$1"
+    local main_function="$2"
+
+    [[ "''${BASH_SOURCE[1]}" == "''${0}" ]] || return 0
+
+    if [[ -z "''${!required_var:-}" ]]; then
+        echo "Error: Environment not properly initialized (''${required_var} missing)"
+        exit 1
+    fi
+    # shellcheck disable=SC2086
+    $main_function
+}
+
+check_root() {
+    if [ "$EUID" -ne 0 ]; then
+        if command -v sudo >/dev/null 2>&1; then
+            if ! sudo -n true 2>/dev/null; then
+                log_error "Neither root privileges nor passwordless sudo available"
+                log_info "Please add NOPASSWD entry to sudoers for this script"
+                exit 1
+            fi
+            export SUDO="sudo"
+        else
+            log_error "Neither root privileges nor sudo available"
+            exit 1
+        fi
+    else
+        export SUDO=""
+    fi
+}
+
+ensure_dir() {
+    local dir="$1"
+    if [ ! -d "$dir" ]; then
+        mkdir -p "$dir" || {
+            log_error "Failed to create directory: $dir"
+            return 1
+        }
+        log_info "Created directory: $dir"
+    fi
+}
+
+backup_file() {
+    local file="$1"
+
+    if declare -F ncc_dry_run >/dev/null 2>&1 && ncc_dry_run; then
+        ncc_dry_skip "backup" "$file"
+        return 0
+    fi
+
+    if [ -f "$file" ]; then
+        local backup_root backup_file
+
+        if echo "$file" | grep -q "^/etc/ssh/"; then
+            backup_root="/var/backup/nixos/ssh"
+            backup_file="$backup_root/$(basename "$file").backup.$(date +%Y%m%d_%H%M%S)"
+        elif echo "$file" | grep -q "^/etc/nixos/"; then
+            backup_root="/var/backup/nixos/systemConfig"
+            backup_file="$backup_root/$(basename "$file").backup.$(date +%Y%m%d_%H%M%S)"
+        else
+            backup_root="/var/backup/nixos/systemConfig"
+            backup_file="$backup_root/$(basename "$file").backup.$(date +%Y%m%d_%H%M%S)"
+        fi
+
+        if [ ! -d "$backup_root" ]; then
+            mkdir -p "$backup_root"
+            chmod 700 "$backup_root" 2>/dev/null || sudo chmod 700 "$backup_root" 2>/dev/null || true
+            chown root:root "$backup_root" 2>/dev/null || sudo chown root:root "$backup_root" 2>/dev/null || true
+        else
+            mkdir -p "$backup_root"
+        fi
+
+        if cp "$file" "$backup_file" 2>/dev/null || sudo cp "$file" "$backup_file" 2>/dev/null; then
+            chmod 600 "$backup_file" 2>/dev/null || sudo chmod 600 "$backup_file" 2>/dev/null || true
+            chown root:root "$backup_file" 2>/dev/null || sudo chown root:root "$backup_file" 2>/dev/null || true
+            if echo "$file" | grep -q "^/etc/ssh/"; then
+                ls -t "$backup_root"/$(basename "$file").backup.* 2>/dev/null | tail -n +6 | xargs -r rm -f 2>/dev/null || true
+            else
+                ls -t "$backup_root"/$(basename "$file").backup.* 2>/dev/null | tail -n +11 | xargs -r rm -f 2>/dev/null || true
+            fi
+            log_info "Created backup: $backup_file"
+            return 0
+        fi
+
+        log_error "Failed to create backup of $file"
+        return 1
+    fi
+}
+
+ask_user() {
+    local prompt="$1"
+    local default="''${2:-N}"
+    local response
+
+    if [[ "$default" == "Y" ]]; then
+        printf '%b' "''${BLUE}[?]''${NC} $prompt [Y/n] "
+    else
+        printf '%b' "''${BLUE}[?]''${NC} $prompt [y/N] "
+    fi
+
+    read -r response
+    response=''${response:-$default}
+
+    case "$response" in
+        [yY][eE][sS]|[yY]) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+select_model() {
+    local options=("minimal" "desktop" "server" "gaming")
+    local selected
+
+    printf '%b\n' "''${BLUE}[?]''${NC} Select installation model:"
+    select selected in "''${options[@]}"; do
+        if [[ -n "$selected" ]]; then
+            echo "$selected"
+            return 0
+        fi
+        log_error "Invalid selection. Please try again."
+    done
+}
+
+confirm_installation() {
+    ask_user "Ready to proceed with installation?" "N"
+}
+
+declare -a util_functions=(
+    "check_script_execution"
+    "check_root"
+    "ensure_dir"
+    "backup_file"
+    "ask_user"
+    "select_model"
+    "confirm_installation"
+)
+
+for func in "''${util_functions[@]}"; do
+    export -f "$func"
+done
+
+check_script_execution "LIB_DIR" "log_info 'Utils initialized'"
+
+if [[ -z "''${COLORS_IMPORTED:-}" ]]; then
+    source "$(dirname "''${BASH_SOURCE[0]}")/colors.sh"
+fi
+
+if ! command -v log_info &> /dev/null; then
+    source "$(dirname "''${BASH_SOURCE[0]}")/logging.sh"
+fi
+''

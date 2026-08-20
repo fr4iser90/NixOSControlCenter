@@ -4,7 +4,7 @@ let
   cfg = getModuleConfig moduleName;
   cliRegistry = getModuleApi "cli-registry";
 
-  packagesCli = import ./scripts/ncc-packages.nix { inherit pkgs getModuleMetadata; };
+  packagesCli = import ./scripts/ncc-packages.nix { inherit pkgs getModuleMetadata getModuleApi; };
   packagesGui = import ./gui/default.nix { inherit pkgs packagesCli getModuleApi config; };
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;

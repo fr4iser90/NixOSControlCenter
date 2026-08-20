@@ -4,7 +4,7 @@ let
   ui = getModuleApi "cli-formatter";
   cfg = sshClientCfg;
   previewScript = import ../scripts/connection-preview.nix {
-    inherit pkgs;
+    inherit pkgs getModuleApi;
     sshClientCfg = cfg;
   };
 

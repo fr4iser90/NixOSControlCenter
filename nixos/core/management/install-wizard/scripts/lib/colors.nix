@@ -1,5 +1,21 @@
-# Migrated from lib/colors.sh — body via fromJSON (Nix-safe).
-{ pkgs }:
-pkgs.writeText "colors.sh" (builtins.fromJSON ''
-"#!/usr/bin/env bash\n\n# Terminal Colors\nexport RED='\\033[0;31m'\nexport GREEN='\\033[0;32m'\nexport YELLOW='\\033[1;33m'\nexport BLUE='\\033[0;34m'\nexport PURPLE='\\033[0;35m'\nexport CYAN='\\033[0;36m'\nexport GRAY='\\033[0;37m'\nexport NC='\\033[0m'\n\n# Mark as imported\nexport COLORS_IMPORTED=1"
-'')
+# SSOT colors from cli-formatter (no private ANSI palette).
+{ pkgs, getModuleApi ? null, ... }:
+assert getModuleApi != null;
+let
+  ui = getModuleApi "cli-formatter";
+  c = ui.colors;
+in
+pkgs.writeText "colors.sh" ''
+#!/usr/bin/env bash
+# Generated from getModuleApi "cli-formatter" — do not edit palette here.
+export RED='${c.red}'
+export GREEN='${c.green}'
+export YELLOW='${c.yellow}'
+export BLUE='${c.blue}'
+export PURPLE='${c.magenta}'
+export CYAN='${c.cyan}'
+export GRAY='${c.dim}'
+export BOLD='${c.bold}'
+export NC='${c.reset}'
+export COLORS_IMPORTED=1
+''

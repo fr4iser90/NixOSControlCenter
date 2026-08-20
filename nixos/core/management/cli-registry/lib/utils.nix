@@ -12,6 +12,8 @@ in
     permission = cmd.permission or null;
     dangerous = if cmd.dangerous or false then "true" else "false";
     requiresSudo = if cmd.requiresSudo or false then "true" else "false";
+    # Commands that document `-d` as --dry-run (not --debug)
+    dryRunShortD = builtins.elem (cmd.name or "") [ "update" "update-modules" ];
     userApi = getModuleApi "user";
     userModuleCfg = getModuleConfig "user";
     # Verwende userAttrs aus der bestehenden user config (wie in user/config.nix)
@@ -105,7 +107,16 @@ in
             ;;
         esac
       fi
-      if [ "${requiresSudo}" = "true" ]; then
+      # Dry-run must stay non-root so users can validate without elevating.
+      # Match --dry-run always; `-d` only for commands that document it as dry-run.
+      _ncc_dry=false
+      for _ncc_arg in "$@"; do
+        case "$_ncc_arg" in
+          --dry-run) _ncc_dry=true ;;
+          ${if dryRunShortD then ''-d) _ncc_dry=true ;;'' else ""}
+        esac
+      done
+      if [ "${requiresSudo}" = "true" ] && [ "$_ncc_dry" != "true" ]; then
         exec sudo "${cmd.script}" "$@"
       else
         exec "${cmd.script}" "$@"

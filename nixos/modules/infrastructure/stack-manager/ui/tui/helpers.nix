@@ -1,29 +1,23 @@
-üüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüü# Stacks Manager TUI Helpers
+# Stacks Manager TUI Helpers
 # Utility functions for TUI operations
 
-{ lib, config, ... }:
+{ lib, getModuleApi, tuiActions, ... }:
 
 let
-  # Get UI utilities
-  ui = config.${builtins.getModuleApi "cli-formatter"};
+  ui = getModuleApi "cli-formatter";
 
   # Menu configuration from menu.nix
   menuConfig = import ./menu.nix;
 
-in
-{
-  # Format menu items for fzf display
   formatMenuItems = items: lib.concatStringsSep "\n" (
     map (item: "${item.key}) ${item.name} - ${item.description}") items
   );
 
-  # Get items by category
   getItemsByCategory = category: lib.filter (item: item.category or "other" == category) menuConfig.items;
 
-  # Create categorized menu display
   createCategorizedMenu = ''
     ${ui.text.header menuConfig.title}
-    ${if menuConfig.subtitle or "" != "" then ui.text.subheader menuConfig.subtitle else ""}
+    ${if menuConfig.subtitle or "" != "" then ui.text.subHeader menuConfig.subtitle else ""}
 
     ${lib.concatStringsSep "\n\n" (
       lib.mapAttrsToList (catKey: catName:
@@ -39,13 +33,12 @@ in
       ) menuConfig.categories
     )}
 
-    ${ui.text.footer ''
+    ${ui.text.paragraph ''
       Use ↑↓/jk to navigate, Enter to select, / to search
       Or press the shortcut key shown in brackets
     ''}
   '';
 
-  # Validate TUI dependencies
   checkDependencies = ''
     # Check if fzf is available
     if ! command -v fzf >/dev/null 2>&1; then
@@ -54,25 +47,24 @@ in
       exit 1
     fi
 
-    # Check if homelab CLI commands are available
+    # Check if ncc CLI commands are available
     if ! command -v ncc >/dev/null 2>&1; then
       ${ui.badges.error "ncc command not found"}
       exit 1
     fi
   '';
 
-  # Handle TUI user input
   handleUserInput = selectedItem: ''
     case "$selectedItem" in
       ${lib.concatStringsSep "\n      " (
         map (item: ''
         "${item.key}) ${item.name}")
           ${ui.messages.info "Selected: ${item.name}"}
-          exec ${config.${builtins.getModuleApi "stack-manager"}.tuiActions} "${item.action}" "$@"
+          exec ${tuiActions}/bin/homelab-tui-actions "${item.action}" "$@"
           ;;
         "${item.name}")
           ${ui.messages.info "Selected: ${item.name}"}
-          exec ${config.${builtins.getModuleApi "stack-manager"}.tuiActions} "${item.action}" "$@"
+          exec ${tuiActions}/bin/homelab-tui-actions "${item.action}" "$@"
           ;;'') menuConfig.items
       )}
       *)
@@ -82,17 +74,15 @@ in
     esac
   '';
 
-  # Show help information
   showHelp = ''
     ${ui.text.header "Stacks Manager Help"}
     cat << 'EOF'
     ${menuConfig.help}
     EOF
-    ${ui.text.footer "Press Enter to continue"}
+    ${ui.text.paragraph "Press Enter to continue"}
     read -r
   '';
 
-  # Create main TUI loop
   createMainLoop = ''
     while true; do
       clear
@@ -104,7 +94,7 @@ in
 
       case "$choice" in
         "q"|"Q"|"quit"|"exit")
-          ${ui.messages.info "Goodbye! 👋"}
+          ${ui.messages.info "Goodbye!"}
           exit 0
           ;;
         "h"|"H"|"help")
@@ -118,4 +108,14 @@ in
       esac
     done
   '';
+in
+{
+  inherit
+    formatMenuItems
+    getItemsByCategory
+    createCategorizedMenu
+    checkDependencies
+    handleUserInput
+    showHelp
+    createMainLoop;
 }

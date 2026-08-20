@@ -1,11 +1,10 @@
 # Homelab Manager TUI Actions
 # Handles TUI menu selections by calling appropriate CLI commands
 
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, getModuleApi, ... }:
 
 let
-  # Get UI utilities
-  ui = config.${builtins.getModuleApi "cli-formatter"};
+  ui = getModuleApi "cli-formatter";
 
   # Helper function to execute CLI commands
   executeCommand = action: args: ''

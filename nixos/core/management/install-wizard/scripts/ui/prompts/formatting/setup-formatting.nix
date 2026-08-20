@@ -1,5 +1,5 @@
 # Migrated from ui/prompts/formatting/setup-formatting.sh — body via fromJSON (Nix-safe).
-{ pkgs }:
+{ pkgs, getModuleApi ? null, ... }:
 pkgs.writeText "setup-formatting.sh" (builtins.fromJSON ''
 "#!/usr/bin/env bash\nset -euo pipefail\n\n# Source core components\nsource \"\u0024CORE_DIR/imports.sh\"\n\nformat_option() {\n    local option=\"\u00241\"\n    local is_selected=\"\u0024{2:-false}\"\n    \n    # Format based on option type\n    case \"\u0024option\" in\n        \"Desktop\"|\"Server\"|\"HomelabServer\")\n            # Main categories in cyan\n            log_formatted \"\u0024{CYAN}\u0024{option}\u0024{NC}\"\n            ;;\n        *)\n            # Other options in default color\n            log_formatted \"\u0024option\"\n            ;;\n    esac\n}\n\nformat_selected_option() {\n    local option=\"\u00241\"\n    log_success \"Selected: \u0024option\"\n}\n\nformat_header() {\n    local text=\"\u00241\"\n    log_header \"\u0024text\"\n}\n\nformat_section() {\n    local text=\"\u00241\"\n    log_section \"\u0024text\"\n}\n\n# Check script execution\ncheck_script_execution \"CORE_DIR\" \"format_option\""
 '')

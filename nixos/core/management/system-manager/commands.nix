@@ -426,12 +426,19 @@ in {
             --verbose, -v        Show verbose output during update
             --force-migration    Force migration even if versions match
             --force-update       Force update even if versions match
-            --allow-flake-extras Overwrite flake.nix even if host has extra inputs (destructive)
+            --drop-flake-extras  Discard host-only flake extras (rare; destructive)
+                                 (--allow-flake-extras is an alias)
+            --dry-run, -d        Validate only: config check + migration preview + merged flake
+                                 (no writes; no sudo needed with --dry-run)
             --cleanup            Remove modules that no longer exist in source
 
           Examples:
             # Interactive update (default)
             ncc system update
+
+            # Validate before touching the machine (recommended)
+            ncc system update --dry-run --local --source-dir ~/Documents/Git/NixOSControlCenter/nixos
+            ncc system update --dry-run -v --local --source-dir ~/Documents/Git/NixOSControlCenter/nixos
 
             # Fully automated local update with rebuild
             sudo ncc system update --yes --local --auto-build
@@ -448,9 +455,10 @@ in {
             # Channel update only
             sudo ncc system update --yes --channels
 
-          Note: Requires root (sudo / pkexec). Canonical path is `ncc system update` (not bare system-update).
-          Host-only flake inputs (private flakes, jetpack, …) block replacing flake.nix unless --allow-flake-extras.
+          Note: Real update needs root. Prefer --dry-run first. Host flake extras stay merged by default.
+          Preview file: /tmp/ncc-flake-update-preview.nix. Prompt is only "Continue update?".
         '';
+        # Script enforces root except --dry-run; wrapper skips sudo when --dry-run is present.
         requiresSudo = true;
       }
     ])

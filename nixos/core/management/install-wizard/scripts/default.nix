@@ -1,6 +1,6 @@
 # Install-wizard script tree — bash bodies in sibling *.nix (no repo .sh).
 # Packaging is a recursive walk: add/remove a script under scripts/ without editing this file.
-{ pkgs }:
+{ pkgs, getModuleApi }:
 
 let
   inherit (pkgs) lib;
@@ -11,10 +11,15 @@ let
     || rel == "ui/prompts/gen-features-from-metadata.nix"
     || lib.hasPrefix "setup/modes/install-bases/" rel;
 
-  # Skip entire trees (copied separately or not packaged as scripts).
+  # Skip entire trees (copied separately, obsolete, or not packaged as scripts).
   skipDir = rel:
     rel == "setup/modes/host-blueprints"
-    || rel == "setup/modes/install-bases";
+    || rel == "setup/modes/install-bases"
+    # Legacy install-wizard hardware checks — SSOT is system-manager prebuild
+    # (+ lib/system-checks-bridge.sh). Host trees may still have stale checks/
+    # after sync without --delete; never package them.
+    || rel == "checks"
+    || lib.hasPrefix "checks/" rel;
 
   collectBashScripts = dir: prefix:
     let
@@ -49,9 +54,21 @@ let
 
   bashScripts = collectBashScripts ./. "";
 
+  # Only pass getModuleApi when the script declares it (legacy `{ pkgs }:` leftovers
+  # under /etc/nixos after sync-without-delete must not break the build).
+  callScript = path:
+    let
+      fn = import path;
+      fa = builtins.functionArgs fn;
+    in
+    if fa ? getModuleApi then
+      fn { inherit pkgs getModuleApi; }
+    else
+      fn { inherit pkgs; };
+
   scriptDrvs = map (s: {
     inherit (s) outRel;
-    drv = import s.path { inherit pkgs; };
+    drv = callScript s.path;
   }) bashScripts;
 
   installBasesDir = ./setup/modes/install-bases;

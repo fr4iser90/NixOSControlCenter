@@ -1,4 +1,4 @@
-{ pkgs, lib, cfg }:
+{ pkgs, lib, cfg, ui }:
 
 with lib;
 
@@ -10,7 +10,7 @@ pkgs.writeShellScriptBin "scan-credentials" ''
   INCLUDE_PRIVATE="${if cfg.scanners.credentials.includePrivateKeys then "true" else "false"}"
   KEY_TYPES="${concatStringsSep " " cfg.scanners.credentials.keyTypes}"
   
-  echo "🔐 Scanning credentials (will be encrypted)..."
+  ${ui.messages.loading "Scanning credentials (will be encrypted)..."}
   
   CREDENTIALS=()
   
@@ -43,7 +43,7 @@ pkgs.writeShellScriptBin "scan-credentials" ''
       
       # Private keys (only if enabled)
       if [ "$INCLUDE_PRIVATE" = "true" ]; then
-        echo "⚠️  WARNING: Including private SSH keys in snapshot!"
+        ${ui.messages.warning "WARNING: Including private SSH keys in snapshot!"}
         while IFS= read -r privkey; do
           if [ -f "$privkey" ] && [ ! -f "$privkey.pub" ]; then
             # Standalone private key
@@ -115,7 +115,7 @@ pkgs.writeShellScriptBin "scan-credentials" ''
     
     # Private keys (only if enabled)
     if [ "$INCLUDE_PRIVATE" = "true" ]; then
-      echo "⚠️  WARNING: Including private GPG keys in snapshot!"
+      ${ui.messages.warning "WARNING: Including private GPG keys in snapshot!"}
       GPG_SECRET_KEYS=$(gpg --list-secret-keys --with-colons 2>/dev/null | grep "^sec:" || true)
       if [ -n "$GPG_SECRET_KEYS" ]; then
         while IFS= read -r key_line; do
@@ -194,6 +194,6 @@ pkgs.writeShellScriptBin "scan-credentials" ''
     }' > "$OUTPUT_FILE"
   
   CRED_COUNT=$(${pkgs.jq}/bin/jq '.credentials.count' "$OUTPUT_FILE")
-  echo "✅ Found $CRED_COUNT credential entries (metadata only, no secrets stored)"
+  ${ui.messages.success "Found $CRED_COUNT credential entries (metadata only, no secrets stored)"}
 ''
 

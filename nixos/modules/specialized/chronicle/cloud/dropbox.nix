@@ -1,4 +1,9 @@
-{ lib, pkgs, cfg }:
+{ lib, pkgs, cfg, getModuleApi }:
+
+let
+  ui = getModuleApi "cli-formatter";
+  c = ui.colors;
+in
 
 # Dropbox Upload via API
 # Uses Dropbox API v2
@@ -46,17 +51,10 @@ pkgs.writeShellScriptBin "chronicle-dropbox" ''
   EOF
   }
   
-  # Colors
-  RED='\033[0;31m'
-  GREEN='\033[0;32m'
-  YELLOW='\033[1;33m'
-  BLUE='\033[0;34m'
-  NC='\033[0m'
-  
-  log() { echo -e "''${BLUE}[INFO]''${NC} $*"; }
-  success() { echo -e "''${GREEN}[SUCCESS]''${NC} $*"; }
-  warn() { echo -e "''${YELLOW}[WARN]''${NC} $*"; }
-  error() { echo -e "''${RED}[ERROR]''${NC} $*"; }
+  log() { printf '%b\n' "${c.blue}$*${c.reset}"; }
+  success() { printf '%b\n' "${c.green}$*${c.reset}"; }
+  warn() { printf '%b\n' "${c.yellow}$*${c.reset}"; }
+  error() { printf '%b\n' "${c.red}$*${c.reset}" >&2; }
   
   check_requirements() {
     [ -z "$DROPBOX_TOKEN" ] && { error "DROPBOX_TOKEN not set"; exit 1; }

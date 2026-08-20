@@ -1,5 +1,5 @@
 # ncc-assistant API — getModuleApi "ncc-assistant"
-{ lib, metadata, getModuleMetadata }:
+{ lib, metadata, getModuleMetadata, ... }:
 
 {
   package = { pkgs, cfg, getModuleApi, getModuleMetadata }:

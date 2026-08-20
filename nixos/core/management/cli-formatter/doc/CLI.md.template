@@ -1,0 +1,32 @@
+# CLI — \<module-name\>
+
+> SSOT: [cli-formatter STANDARDS](../../management/cli-formatter/doc/STANDARDS.md) · [COPY](../../management/cli-formatter/doc/COPY.md)
+>
+> Adjust the relative link depth for your module path.
+
+**Status:** `todo` | `partial` | `compliant`
+
+## Commands
+
+| Command | Purpose | Dry-run | Needs root |
+|---------|---------|---------|------------|
+| `ncc …` | … | yes/no | yes/no |
+
+## Output contract
+
+- Normal: short `ui.messages.*` / `ui.badges.*` / `ui.text.header`
+- `-v`: paths, JSON, diffs
+- Errors: one clear line + optional “Next: …”
+
+## Self-audit
+
+- [ ] `ui = getModuleApi "cli-formatter"` in every shell script this module ships
+- [ ] No local colors / `echo -e` / ANSI
+- [ ] No `config.core.management…` hardcoding
+- [ ] Verbose detail gated
+- [ ] `longHelp` matches COPY tone
+- [ ] Dry-run documented (or explicitly N/A)
+
+## Notes
+
+(Gaps, exceptions, planned fixes.)

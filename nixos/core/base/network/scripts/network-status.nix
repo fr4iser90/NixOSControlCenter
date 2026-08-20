@@ -1,6 +1,7 @@
-{ pkgs }:
+{ pkgs, getModuleApi }:
 
 let
+  ui = getModuleApi "cli-formatter";
   nmcli = "${pkgs.networkmanager}/bin/nmcli";
 
   common = ''
@@ -222,16 +223,16 @@ EOF
       disconnect)
         ETH_DEV="$(device_of_type ethernet || true)"
         if [[ -z "$ETH_DEV" ]]; then
-          echo "error: no ethernet device" >&2
+          ${ui.messages.error "no ethernet device"}
           exit 1
         fi
         "$NMCLI" device disconnect "$ETH_DEV"
-        echo "disconnected $ETH_DEV"
+        ${ui.messages.success "disconnected $ETH_DEV"}
         ;;
       reconnect|connect)
         ETH_DEV="$(device_of_type ethernet || true)"
         if [[ -z "$ETH_DEV" ]]; then
-          echo "error: no ethernet device" >&2
+          ${ui.messages.error "no ethernet device"}
           exit 1
         fi
         conn="$(device_connection "$ETH_DEV")"
@@ -240,10 +241,10 @@ EOF
         else
           "$NMCLI" device connect "$ETH_DEV"
         fi
-        echo "connected $ETH_DEV"
+        ${ui.messages.success "connected $ETH_DEV"}
         ;;
       *)
-        echo "Unknown: ncc network ethernet $cmd" >&2
+        ${ui.messages.error "Unknown: ncc network ethernet $cmd"}
         exit 1
         ;;
     esac

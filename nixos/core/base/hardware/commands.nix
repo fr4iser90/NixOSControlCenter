@@ -9,7 +9,7 @@ let
   guiOff = (getModuleApi "gui-engine").disabledHint;
 
   hardwareCli = import ./scripts/ncc-hardware.nix {
-    inherit pkgs getModuleMetadata;
+    inherit pkgs getModuleMetadata getModuleApi;
   };
 
   statusBin = pkgs.writeShellScriptBin "ncc-hardware-status" ''

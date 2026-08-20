@@ -45,6 +45,8 @@ EOF
 
     ${facade.sourcePreamble { nixosRoot = "/etc/nixos"; }}
 
+    ${backupHelpers.backupConfigFileFn}
+
     PLANS_JSON='${plansJson}'
     STATE_FILE="''${CONFIGS_BASE}/.ncc-module-migrations.json"
     mkdir -p "$CONFIGS_BASE" 2>/dev/null || sudo mkdir -p "$CONFIGS_BASE"
@@ -202,9 +204,11 @@ EOF
       fi
 
       ${ui.messages.loading "Plan $id: merge SSH server/client → ssh-manager"}
-      echo "  legacy server config: $([[ $has_s -eq 1 ]] && echo yes || echo no)"
-      echo "  legacy client config: $([[ $has_c -eq 1 ]] && echo yes || echo no)"
-      echo "  target ssh-manager:   $([[ $has_t -eq 1 ]] && echo exists || echo new)"
+      if [[ "$VERBOSE" -eq 1 ]]; then
+        echo "  legacy server config: $([[ $has_s -eq 1 ]] && echo yes || echo no)"
+        echo "  legacy client config: $([[ $has_c -eq 1 ]] && echo yes || echo no)"
+        echo "  target ssh-manager:   $([[ $has_t -eq 1 ]] && echo exists || echo new)"
+      fi
 
       local server_j client_j target_j merged
       server_j=$([[ "$has_s" -eq 1 ]] && read_leaf_json "$server_p" || echo '{}')
@@ -242,11 +246,13 @@ EOF
         } | with_entries(select(.value != null)))
       ')
 
-      echo "  merged preview:"
-      echo "$merged" | ${pkgs.jq}/bin/jq -C '.' 2>/dev/null | sed 's/^/    /' || echo "$merged" | sed 's/^/    /'
+      if [[ "$VERBOSE" -eq 1 ]]; then
+        echo "  merged preview:"
+        echo "$merged" | ${pkgs.jq}/bin/jq -C '.' 2>/dev/null | sed 's/^/    /' || echo "$merged" | sed 's/^/    /'
+      fi
 
       if [[ "$DRY" -eq 1 ]]; then
-        ${ui.messages.info "Dry-run — no changes written"}
+        ${ui.messages.info "Would merge SSH configs (dry-run) — no changes written"}
         return 0
       fi
 
@@ -257,17 +263,17 @@ EOF
 
       # Backup
       if [[ -f "$MONOLITH_FILE" ]]; then
-        ${backupHelpers.backupConfigFile "/etc/nixos/systemConfig.nix" "module-migrate-ssh"} >/dev/null 2>&1 || true
+        ncc_backup_config_file "$MONOLITH_FILE" "module-migrate-ssh" >/dev/null 2>&1 || true
       fi
       if [[ "$has_s" -eq 1 ]]; then
         local sf
         sf=$(ncc_module_config_path "$server_p")
-        [[ -f "$sf" ]] && ${backupHelpers.backupConfigFile "$sf" "module-migrate-ssh"} >/dev/null 2>&1 || true
+        [[ -f "$sf" ]] && ncc_backup_config_file "$sf" "module-migrate-ssh" >/dev/null 2>&1 || true
       fi
       if [[ "$has_c" -eq 1 ]]; then
         local cf
         cf=$(ncc_module_config_path "$client_p")
-        [[ -f "$cf" ]] && ${backupHelpers.backupConfigFile "$cf" "module-migrate-ssh"} >/dev/null 2>&1 || true
+        [[ -f "$cf" ]] && ncc_backup_config_file "$cf" "module-migrate-ssh" >/dev/null 2>&1 || true
       fi
 
       write_leaf_json "$to_path" "$merged" || {
@@ -317,27 +323,31 @@ EOF
             _migratedFrom: (( $t._migratedFrom // [] ) + [ ($from | split("/") | .[-1]) ] | unique)
           }
         ')
-        echo "  preview:"
-        echo "$merged" | ${pkgs.jq}/bin/jq -C '.' 2>/dev/null | sed 's/^/    /' || true
+        if [[ "$VERBOSE" -eq 1 ]]; then
+          echo "  preview:"
+          echo "$merged" | ${pkgs.jq}/bin/jq -C '.' 2>/dev/null | sed 's/^/    /' || true
+        fi
         if [[ "$DRY" -eq 1 ]]; then
-          ${ui.messages.info "Dry-run — no changes written"}
+          ${ui.messages.info "Would rename (dry-run) — no changes written"}
           return 0
         fi
         local sf
         sf=$(ncc_module_config_path "$from_p")
-        [[ -f "$sf" ]] && ${backupHelpers.backupConfigFile "$sf" "module-migrate-rename"} >/dev/null 2>&1 || true
+        [[ -f "$sf" ]] && ncc_backup_config_file "$sf" "module-migrate-rename" >/dev/null 2>&1 || true
         write_leaf_json "$to_p" "$merged" || {
           ${ui.messages.error "Failed to write $to_p"}
           return 1
         }
         delete_leaf "$from_p"
       elif [[ "$DRY" -eq 1 ]]; then
-        ${ui.messages.info "Dry-run — would remove leftover tree $NIXOS_ROOT/$from_p"}
+        ${ui.messages.info "Would remove leftover module tree (dry-run)"}
+        [[ "$VERBOSE" -eq 1 ]] && ${ui.messages.info "Path: $NIXOS_ROOT/$from_p"}
         return 0
       fi
 
       if [[ -d "$NIXOS_ROOT/$from_p" ]]; then
-        ${ui.messages.warning "Removing leftover module tree: $NIXOS_ROOT/$from_p"}
+        ${ui.messages.warning "Removing leftover module tree"}
+        [[ "$VERBOSE" -eq 1 ]] && ${ui.messages.info "Path: $NIXOS_ROOT/$from_p"}
         rm -rf "$NIXOS_ROOT/$from_p" 2>/dev/null || sudo rm -rf "$NIXOS_ROOT/$from_p"
       fi
 
@@ -400,7 +410,7 @@ EOF
             rm -f "$tmp" "$tmp.allowed" "$disc"
             return 1
           fi
-          ${backupHelpers.backupConfigFile "$cf" "module-orphan-cleanup"} >/dev/null 2>&1 || true
+          ncc_backup_config_file "$cf" "module-orphan-cleanup" >/dev/null 2>&1 || true
           rm -f "$cf" 2>/dev/null || sudo rm -f "$cf"
           rmdir "$(dirname "$cf")" 2>/dev/null || true
           removed=$((removed + 1))
@@ -425,7 +435,9 @@ EOF
     }
 
     ${ui.messages.loading "Scanning module migration plans…"}
-    echo "Layout: $(ncc_detect_layout)"
+    if [[ "$VERBOSE" -eq 1 ]]; then
+      ${ui.tables.keyValue "Layout" "$(ncc_detect_layout)"}
+    fi
     PENDING=0
     FAILED=0
 
@@ -464,7 +476,8 @@ EOF
           fi
           ;;
         *)
-          ${ui.messages.warning "Unknown plan kind=$kind id=$id — skip"}
+          ${ui.messages.warning "Unknown migration plan — skipped"}
+          [[ "$VERBOSE" -eq 1 ]] && ${ui.messages.info "kind=$kind id=$id"}
           ;;
       esac
     done < <(echo "$PLANS_JSON" | ${pkgs.jq}/bin/jq -c '.[]')

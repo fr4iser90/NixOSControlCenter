@@ -1,7 +1,8 @@
 # ncc hardware — status (configured + detected enums + live probe) and auto-detect toggle
-{ pkgs, getModuleMetadata }:
+{ pkgs, getModuleMetadata, getModuleApi }:
 
 let
+  ui = getModuleApi "cli-formatter";
   smRoot = (getModuleMetadata "system-manager").path;
   facade = import "${smRoot}/lib/config-facade.nix" { inherit pkgs; };
 in
@@ -226,13 +227,20 @@ EOF
         autoDetect=true|autoDetect=false) auto="''${arg#autoDetect=}" ;;
         enableChecks=true|enableChecks=false) auto="''${arg#enableChecks=}" ;;
         --help|-h) usage; exit 0 ;;
-        *) echo "Unknown: $arg" >&2; usage >&2; exit 2 ;;
+        *)
+          ${ui.messages.error "Unknown: $arg"}
+          usage >&2
+          exit 2
+          ;;
       esac
     done
-    [[ -n "$auto" ]] || { echo "Usage: ncc hardware set autoDetect=true|false" >&2; exit 2; }
+    [[ -n "$auto" ]] || {
+      ${ui.messages.error "Usage: ncc hardware set autoDetect=true|false"}
+      exit 2
+    }
 
     if [[ "''${EUID:-$(id -u)}" -ne 0 ]]; then
-      echo "Run as root: sudo ncc hardware set autoDetect=$auto" >&2
+      ${ui.messages.error "Run as root: sudo ncc hardware set autoDetect=$auto"}
       exit 1
     fi
 
@@ -248,7 +256,7 @@ EOF
       sm=$(printf '%s\n' "$sm" | sed "\$ i\\  enableChecks = $auto;")
     fi
     ncc_write_module_config "core/management/system-manager" "$sm"
-    echo "OK: autoDetect=$auto (system-manager.enableChecks)"
+    ${ui.messages.success "autoDetect=$auto (system-manager.enableChecks)"}
   }
 
   case "''${1:-}" in
@@ -256,7 +264,7 @@ EOF
     status) shift; cmd_status "$@" ;;
     set) shift; cmd_set "$@" ;;
     *)
-      echo "Unknown: ncc hardware $1" >&2
+      ${ui.messages.error "Unknown: ncc hardware $1"}
       usage >&2
       exit 2
       ;;

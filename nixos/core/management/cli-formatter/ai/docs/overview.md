@@ -10,6 +10,7 @@ Shared CLI formatting (colors, badges, tables) for other modules.
 ## CLI
 
 - Prefer registered `ncc` commands for this module when they exist (`ncc --help` / domain help).
+- **Copy rules:** see `doc/COPY.md` — GUI plain language; CLI clear; `-v` for full technical detail.
 - Tools live in `ai/tools/*.json` only when a safe argv wrapper exists — none required for docs-only packs.
 
 ## Ownership

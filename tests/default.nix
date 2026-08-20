@@ -2,8 +2,12 @@
 { pkgs }:
 pkgs.runCommand "ncc-tests" {
   preferLocalBuild = true;
+  nativeBuildInputs = [ pkgs.ripgrep pkgs.nix pkgs.bash pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.gnused ];
 } ''
   set -euo pipefail
+  export NIX_PATH=nixpkgs=${pkgs.path}
+  echo "=== cli-formatter / CLI validation ==="
+  bash ${./cli-formatter/validate-cli.sh}
   echo "=== install-wizard ==="
   # Force build of the install-wizard suite
   echo ${import ./install-wizard { inherit pkgs; }}

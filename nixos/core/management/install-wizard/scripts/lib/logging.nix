@@ -1,5 +1,89 @@
-# Migrated from lib/logging.sh — body via fromJSON (Nix-safe).
-{ pkgs }:
-pkgs.writeText "logging.sh" (builtins.fromJSON ''
-"#!/usr/bin/env bash\n\n# Ensure colors are available\nif [[ -z \"\u0024COLORS_IMPORTED\" ]]; then\n    source \"\u0024LIB_DIR/colors.sh\"\nfi\n\n# Logging Configuration (nur wenn noch nicht definiert)\nif [[ -z \"\u0024{LOG_LEVEL_DEBUG:-}\" ]]; then\n    declare -g LOG_LEVEL_DEBUG=0\n    declare -g LOG_LEVEL_INFO=1\n    declare -g LOG_LEVEL_WARN=2\n    declare -g LOG_LEVEL_ERROR=3\n    \n    # Default log level (can be overridden by environment)\n    declare -g CURRENT_LOG_LEVEL=\u0024{INSTALL_DEBUG:-1}\nfi\n\n# Logging Functions\nlog_header() {\n    echo -e \"\\n\u0024{BLUE}\u2550\u2550\u2550 \u00241 \u2550\u2550\u2550\u0024{NC}\\n\"\n}\n\nlog_debug() {\n    [[ \u0024CURRENT_LOG_LEVEL -le \u0024LOG_LEVEL_DEBUG ]] && \n        echo -e \"\u0024{GRAY}[DEBUG]\u0024{NC} \u0024*\"\n}\n\nlog_info() {\n    [[ \u0024CURRENT_LOG_LEVEL -le \u0024LOG_LEVEL_INFO ]] && \n        echo -e \"\u0024{GREEN}[INFO]\u0024{NC} \u0024*\"\n}\n\nlog_warn() {\n    [[ \u0024CURRENT_LOG_LEVEL -le \u0024LOG_LEVEL_WARN ]] && \n        echo -e \"\u0024{YELLOW}[WARN]\u0024{NC} \u0024*\" >&2\n}\n\nlog_error() {\n    [[ \u0024CURRENT_LOG_LEVEL -le \u0024LOG_LEVEL_ERROR ]] && \n        echo -e \"\u0024{RED}[ERROR]\u0024{NC} \u0024*\" >&2\n}\n\nlog_section() {\n    echo -e \"\\n\u0024{BLUE}\u2550\u2550\u2550 \u0024* \u2550\u2550\u2550\u0024{NC}\\n\"\n}\n\nlog_success() {\n    echo -e \"\u0024{GREEN}\u2713\u0024{NC} \u0024*\"\n}\n\nlog_failure() {\n    echo -e \"\u0024{RED}\u2717\u0024{NC} \u0024*\"\n}\n\nlog_status() {\n    local status=\u00241\n    shift\n    if [[ \u0024status -eq 0 ]]; then\n        log_success \"\u0024*\"\n    else\n        log_failure \"\u0024*\"\n    fi\n}\n\n# Error exit helper\nlog_error_exit() {\n    log_error \"\u00241\"\n    exit 1\n}\n\n# Export all logging functions\ndeclare -a logging_functions=(\n    \"log_header\"\n    \"log_debug\"\n    \"log_info\"\n    \"log_warn\"\n    \"log_error\"\n    \"log_section\"\n    \"log_success\"\n    \"log_failure\"\n    \"log_status\"\n    \"log_error_exit\"\n)\n\nfor func in \"\u0024{logging_functions[@]}\"; do\n    export -f \"\u0024func\"\ndone\n\n# Check script execution\ncheck_script_execution \"COLORS_IMPORTED\" \"log_info 'Logging system initialized'\""
-'')
+# Logging helpers — colors from cli-formatter via colors.sh; badge tone matches ui.badges.
+{ pkgs, getModuleApi ? null, ... }:
+pkgs.writeText "logging.sh" ''
+#!/usr/bin/env bash
+
+# Ensure colors are available (cli-formatter palette)
+if [[ -z "''${COLORS_IMPORTED:-}" ]]; then
+    source "$LIB_DIR/colors.sh"
+fi
+
+# Logging Configuration (nur wenn noch nicht definiert)
+if [[ -z "''${LOG_LEVEL_DEBUG:-}" ]]; then
+    declare -g LOG_LEVEL_DEBUG=0
+    declare -g LOG_LEVEL_INFO=1
+    declare -g LOG_LEVEL_WARN=2
+    declare -g LOG_LEVEL_ERROR=3
+    declare -g CURRENT_LOG_LEVEL=''${INSTALL_DEBUG:-1}
+fi
+
+log_header() {
+    printf '%b\n' "\n''${BLUE}=== $1 ===''${NC}\n"
+}
+
+log_debug() {
+    [[ $CURRENT_LOG_LEVEL -le $LOG_LEVEL_DEBUG ]] && \
+        printf '%b\n' "''${GRAY}[DEBUG]''${NC} $*"
+}
+
+log_info() {
+    [[ $CURRENT_LOG_LEVEL -le $LOG_LEVEL_INFO ]] && \
+        printf '%b\n' "''${BLUE}[INFO]''${NC} $*"
+}
+
+log_warn() {
+    [[ $CURRENT_LOG_LEVEL -le $LOG_LEVEL_WARN ]] && \
+        printf '%b\n' "''${YELLOW}[WARN]''${NC} $*" >&2
+}
+
+log_error() {
+    [[ $CURRENT_LOG_LEVEL -le $LOG_LEVEL_ERROR ]] && \
+        printf '%b\n' "''${RED}[ERROR]''${NC} $*" >&2
+}
+
+log_section() {
+    printf '%b\n' "\n''${CYAN}=== $* ===''${NC}\n"
+}
+
+log_success() {
+    printf '%b\n' "''${GREEN}[ OK ]''${NC} $*"
+}
+
+log_failure() {
+    printf '%b\n' "''${RED}[ERROR]''${NC} $*"
+}
+
+log_status() {
+    local status=$1
+    shift
+    if [[ $status -eq 0 ]]; then
+        log_success "$*"
+    else
+        log_failure "$*"
+    fi
+}
+
+log_error_exit() {
+    log_error "$1"
+    exit 1
+}
+
+declare -a logging_functions=(
+    "log_header"
+    "log_debug"
+    "log_info"
+    "log_warn"
+    "log_error"
+    "log_section"
+    "log_success"
+    "log_failure"
+    "log_status"
+    "log_error_exit"
+)
+
+for func in "''${logging_functions[@]}"; do
+    export -f "$func"
+done
+
+check_script_execution "COLORS_IMPORTED" "log_info 'Logging system initialized'"
+''

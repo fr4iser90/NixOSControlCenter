@@ -4,10 +4,10 @@ let
   moduleName = baseNameOf ./.;
   cfg = getModuleConfig moduleName;
   priv = import ./scripts/privileged-helper.nix {
-    inherit pkgs lib getModuleConfig getModuleMetadata;
+    inherit pkgs lib getModuleConfig getModuleMetadata getModuleApi;
   };
   privTests = import ./scripts/privileged-security-tests.nix {
-    inherit pkgs lib getModuleConfig getModuleMetadata;
+    inherit pkgs lib getModuleConfig getModuleMetadata getModuleApi;
   };
 in {
   imports = [

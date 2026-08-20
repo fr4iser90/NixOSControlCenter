@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, ui }:
 
 pkgs.writeShellScriptBin "scan-packages" ''
   #!${pkgs.bash}/bin/bash
@@ -6,7 +6,7 @@ pkgs.writeShellScriptBin "scan-packages" ''
   
   OUTPUT_FILE="$1"
   
-  echo "📦 Scanning installed packages..."
+  ${ui.messages.info "Scanning installed packages..."}
   
   # Get NixOS packages
   NIX_PACKAGES="[]"
@@ -60,6 +60,6 @@ pkgs.writeShellScriptBin "scan-packages" ''
     }' > "$OUTPUT_FILE"
   
   TOTAL=$(${pkgs.jq}/bin/jq '.packages.total' "$OUTPUT_FILE")
-  echo "✅ Found $TOTAL packages"
+  ${ui.messages.success "Found $TOTAL packages"}
 ''
 

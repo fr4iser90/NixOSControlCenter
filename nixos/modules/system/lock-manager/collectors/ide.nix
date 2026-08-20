@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, ui }:
 
 pkgs.writeShellScriptBin "scan-ide" ''
   #!${pkgs.bash}/bin/bash
@@ -6,7 +6,7 @@ pkgs.writeShellScriptBin "scan-ide" ''
   
   OUTPUT_FILE="$1"
   
-  echo "💻 Scanning IDE extensions and settings..."
+  ${ui.messages.info "Scanning IDE extensions and settings..."}
   
   IDES=()
   
@@ -245,6 +245,6 @@ pkgs.writeShellScriptBin "scan-ide" ''
   
   IDE_COUNT=$(${pkgs.jq}/bin/jq '.ides.count' "$OUTPUT_FILE")
   TOTAL_PLUGINS=$(${pkgs.jq}/bin/jq '[.ides.items[] | .extensions.count // .plugins.count // 0] | add' "$OUTPUT_FILE")
-  echo "✅ Found $IDE_COUNT IDE(s) with $TOTAL_PLUGINS total extensions/plugins"
+  ${ui.messages.success "Found $IDE_COUNT IDE(s) with $TOTAL_PLUGINS total extensions/plugins"}
 ''
 

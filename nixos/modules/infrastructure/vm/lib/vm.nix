@@ -1,9 +1,10 @@
-{ lib, pkgs }:
+{ lib, pkgs, getModuleApi }:
 
 let
+  ui = getModuleApi "cli-formatter";
   distros = import ./distros.nix { inherit lib; };
-  portManager = import ./port-manager.nix { inherit lib pkgs; };
-  isoManager = import ./iso-manager.nix { inherit lib pkgs; };
+  portManager = import ./port-manager.nix { inherit lib pkgs getModuleApi; };
+  isoManager = import ./iso-manager.nix { inherit lib pkgs getModuleApi; };
 in
 {
   inherit (distros) distros validateDistro getDistroUrl isLocalIso getOsFamily getIsoHint;
@@ -74,7 +75,7 @@ in
         chmod 2775 "$d" 2>/dev/null || sudo chmod 2775 "$d" 2>/dev/null || true
       fi
       if [ ! -w "$d" ]; then
-        echo "❌ Directory not writable: $d (user must be in group libvirtd; re-login after rebuild)" >&2
+        ${ui.messages.error "Directory not writable: $d (user must be in group libvirtd; re-login after rebuild)"} >&2
         exit 1
       fi
     }
@@ -102,7 +103,7 @@ in
       own_path "${vars_path}"
       # QEMU needs write access to VARS (UEFI NVRAM)
       if [ ! -w "${vars_path}" ]; then
-        echo "❌ OVMF VARS not writable: ${vars_path}" >&2
+        ${ui.messages.error "OVMF VARS not writable: ${vars_path}"} >&2
         exit 1
       fi
     }
@@ -121,7 +122,7 @@ in
       fi
       own_path "${image.path}"
       if [ ! -w "${image.path}" ]; then
-        echo "❌ Disk image not writable: ${image.path}" >&2
+        ${ui.messages.error "Disk image not writable: ${image.path}"} >&2
         exit 1
       fi
     }
@@ -154,7 +155,7 @@ in
     function print_running_vm_help() {
       local pid="$1"
       local port="$2"
-      echo "⚠️  VM ${name} is already running"
+      ${ui.messages.warning "VM ${name} is already running"}
       echo "  PID:   $pid"
       if [ -n "''${port:-}" ]; then
         echo "  SPICE: spice://localhost:$port"
@@ -216,7 +217,7 @@ in
 
     function report_disk_lock_failure() {
       local pids pid port
-      echo "❌ Disk is locked: ${image.path}" >&2
+      ${ui.messages.error "Disk is locked: ${image.path}"} >&2
       pids=$(qemu_pids_for_vm)
       if [ -n "''${pids:-}" ]; then
         pid=$(echo "$pids" | head -1)
@@ -251,7 +252,7 @@ in
         sleep 0.2
       done
       if [ ! -S "$SWTPM_DIR/swtpm-sock" ]; then
-        echo "❌ swtpm socket was not created at $SWTPM_DIR/swtpm-sock" >&2
+        ${ui.messages.error "swtpm socket was not created at $SWTPM_DIR/swtpm-sock"} >&2
         exit 1
       fi
     }
@@ -370,23 +371,23 @@ PY
       echo ""
 
       if [ "$boot_mode" = "iso" ] && { [ -z "$iso_path" ] || [ ! -f "$iso_path" ]; }; then
-        echo "❌ Error: ISO file not found!"
+        ${ui.messages.error "Error: ISO file not found!"}
         exit 1
       fi
       if [ "$boot_mode" = "disk" ] && [ ! -f "${image.path}" ]; then
-        echo "❌ No disk image yet: ${image.path}" >&2
+        ${ui.messages.error "No disk image yet: ${image.path}"} >&2
         echo "   Install first: ncc vm test-${distro}-run" >&2
         exit 1
       fi
 
       if [ ! -e /dev/kvm ]; then
-        echo "❌ /dev/kvm missing — KVM kernel module not loaded" >&2
+        ${ui.messages.error "/dev/kvm missing — KVM kernel module not loaded"} >&2
         echo "   After enabling the VM module, rebuild+switch should load kvm-intel/kvm-amd." >&2
         echo "   If this persists after rebuild, VT-x/AMD-V may be disabled in firmware." >&2
         exit 1
       fi
       if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
-        echo "❌ /dev/kvm not accessible — user must be in group 'kvm' (re-login after rebuild)" >&2
+        ${ui.messages.error "/dev/kvm not accessible — user must be in group 'kvm' (re-login after rebuild)"} >&2
         exit 1
       fi
 
@@ -571,7 +572,7 @@ PY
       echo "Debug: ISO path = $iso_path"
       
       if [ -z "$iso_path" ] || [ ! -f "$iso_path" ]; then
-        echo "❌ ISO management failed!"
+        ${ui.messages.error "ISO management failed!"}
         exit 1
       fi
       start_vm "$iso_path" iso

@@ -1,26 +1,23 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 let
   cfg = getModuleConfig "system-checks";
   postbuildCfg = cfg.postbuild or {};
+  ui = getModuleApi "cli-formatter";
 
-  # Available postbuild checks
   postbuildChecks = {
     filesystem = {
       enable = postbuildCfg.checks.filesystem.enable or true;
       script = pkgs.writeScript "check-filesystem" ''
         #!${pkgs.bash}/bin/bash
 
-        # Check important directories and permissions
-        echo "Checking critical directories..."
+        ${ui.messages.loading "Checking critical directories…"}
 
-        # System Directories
         dirs=(
           "/etc/nixos/secrets:root:root:700"
           "/etc/nixos/secrets/passwords:root:root:700"
         )
 
-        # Add user-specific password directories
         for user in $(getent group wheel | cut -d: -f4 | tr ',' ' '); do
           dirs+=("/etc/nixos/secrets/passwords/$user:$user:users:700")
         done
@@ -29,7 +26,7 @@ let
           IFS=: read -r dir owner group perms <<< "$dir_spec"
 
           if [ ! -d "$dir" ]; then
-            echo -e "''${YELLOW}⚠️  Creating $dir''${NC}"
+            ${ui.messages.warning "Creating $dir"}
             mkdir -p "$dir"
           fi
 
@@ -40,7 +37,7 @@ let
           if [ "$current_perms" != "$perms" ] || \
              [ "$current_owner" != "$owner" ] || \
              [ "$current_group" != "$group" ]; then
-            echo -e "''${YELLOW}⚠️  Fixing permissions for $dir''${NC}"
+            ${ui.messages.warning "Fixing permissions for $dir"}
             chown "$owner:$group" "$dir"
             chmod "$perms" "$dir"
           fi
@@ -53,47 +50,44 @@ let
       script = pkgs.writeScript "check-passwords" ''
         #!${pkgs.bash}/bin/bash
 
-        # Check passwords for ALL normal users (nicht nur wheel)
         for user in $(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 && $1 !~ /^nixbld/ {print $1}'); do
           SHADOW_LINE=$(getent shadow "$user" 2>/dev/null)
           SHADOW_HASH=$(echo "$SHADOW_LINE" | cut -d: -f2)
 
-          # Check 1: User has no password at all
           if echo "$SHADOW_HASH" | grep -q '^[!\*]' || [ -z "$SHADOW_HASH" ]; then
-            echo -e "''${YELLOW}⚠️  User '$user' has no valid password!''${NC}"
+            ${ui.messages.warning "User '$user' has no valid password"}
 
             while true; do
-              read -p "Do you want to set a password for $user now? [Y/n/s(skip)] " response
+              printf "Set a password for %s now? [Y/n/s(skip)] " "$user"
+              read -r response
               case $response in
                 [Nn]* )
-                  echo "Password check failed."
+                  ${ui.messages.error "Password check failed"}
                   exit 1
                   ;;
                 [Ss]* )
-                  echo "Skipping password for $user"
+                  ${ui.messages.info "Skipping password for $user"}
                   break
                   ;;
                 * )
                   if passwd "$user"; then
-                    echo -e "''${GREEN}✅ Password set successfully for $user''${NC}"
+                    ${ui.messages.success "Password set for $user"}
                     break
                   else
-                    echo -e "''${RED}❌ Failed to set password, please try again''${NC}"
+                    ${ui.messages.error "Failed to set password — try again"}
                   fi
                   ;;
               esac
             done
           fi
 
-          # Check 2: Compare .hashedPassword vs /etc/shadow hash
           HASH_FILE="/etc/nixos/secrets/passwords/$user/.hashedPassword"
           if [ -f "$HASH_FILE" ]; then
             EXPECTED_HASH=$(cat "$HASH_FILE")
             SHADOW_HASH=$(echo "$SHADOW_LINE" | cut -d: -f2)
             if [ -n "$SHADOW_HASH" ] && [ "$SHADOW_HASH" != "!" ] && [ "$SHADOW_HASH" != "*" ] && [ "$SHADOW_HASH" != "$EXPECTED_HASH" ]; then
-              echo -e "''${YELLOW}⚠️  Password hash mismatch for '$user'!''${NC}"
-              echo -e "  ''${RED}.hashedPassword${NC} hash differs from ''${RED}/etc/shadow${NC}."
-              echo -e "  Run 'sudo ncc system build switch' to apply the saved password declaratively."
+              ${ui.messages.warning "Password hash mismatch for '$user'"}
+              ${ui.messages.info "Run: sudo ncc system build switch"}
             fi
           fi
         done
@@ -105,8 +99,7 @@ let
       script = pkgs.writeScript "check-services" ''
         #!${pkgs.bash}/bin/bash
 
-        # Check critical system services
-        echo "Checking critical services..."
+        ${ui.messages.loading "Checking critical services…"}
 
         services=(
           "dbus"
@@ -116,10 +109,10 @@ let
 
         for service in "''${services[@]}"; do
           if ! systemctl is-active --quiet "$service"; then
-            echo -e "''${RED}❌ Service $service is not running!''${NC}"
-            echo "Attempting to start $service..."
+            ${ui.messages.error "Service $service is not running"}
+            ${ui.messages.loading "Starting $service…"}
             systemctl start "$service" || {
-              echo -e "''${RED}Failed to start $service''${NC}"
+              ${ui.messages.error "Failed to start $service"}
               exit 1
             }
           fi
@@ -132,22 +125,16 @@ in
     #!${pkgs.bash}/bin/bash
     set -e
 
-    # Color definitions
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[1;33m'
-    BLUE='\033[0;34m'
-    NC='\033[0m'
+    ${ui.text.header "NixOS postbuild checks"}
 
-    echo -e "''${BLUE}=== NixOS postbuild Checks ===''${NC}"
-
-    # Run all enabled checks
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: check:
       if check.enable then
-        "echo -e \"\\n\\033[0;34mRunning ${name} check...\\033[0m\""
-        + "\n''${check.script} || exit 1"
+        ''
+          ${ui.badges.info "Running ${name} check…"}
+          ${check.script} || exit 1
+        ''
       else ""
     ) postbuildChecks)}
 
-    echo -e "\\n\\033[0;32m✅ All postbuild checks passed\\033[0m"
+    ${ui.messages.success "All postbuild checks passed"}
   ''

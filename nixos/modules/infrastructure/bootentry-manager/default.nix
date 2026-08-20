@@ -1,4 +1,4 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleMetadata, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleMetadata, getModuleApi, ... }:
 
 with lib;
 
@@ -8,7 +8,7 @@ let
   cfg = getModuleConfig moduleName;
 
   # Importiere die benötigten Module
-  common = import ./lib/common.nix { inherit lib; };
+  common = import ./lib/common.nix { inherit lib getModuleApi; };
 
   # Wähle Provider basierend auf dem Bootloader
   providers = {

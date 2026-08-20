@@ -12,7 +12,7 @@ in {
     ./options.nix
     # Path import so flake specialArgs (getModuleConfig, getModuleApi, …) are injected
     ./commands.nix
-  ] ++ optional (cfg.enable or false) (import ./testing { inherit config lib pkgs systemConfig getModuleConfig; });
+  ] ++ optional (cfg.enable or false) (import ./testing { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; });
 
   # Host KVM + libvirt stack (deterministic — no manual modprobe/chown)
   boot.kernelModules = mkIf (cfg.enable or false) [ "kvm-intel" "kvm-amd" ];

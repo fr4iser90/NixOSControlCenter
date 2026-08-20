@@ -1,6 +1,8 @@
-{ lib, pkgs, cfg, chronicleLib, backend }:
+{ lib, pkgs, cfg, chronicleLib, backend, getModuleApi }:
 
 let
+  ui = getModuleApi "cli-formatter";
+
   # Import handlers
   recordingHandler = import ../handlers/recording.nix { 
     inherit lib pkgs cfg chronicleLib; 
@@ -38,11 +40,8 @@ in pkgs.writeShellScriptBin "chronicle" ''
   ${state.stateDir}
   ${state.initState}
 
-  # Utility functions
-  ${utils.log ""}
-  ${utils.warn ""}
-  ${utils.error ""}
-  ${utils.debug ""}
+  # Utility functions (cli-formatter)
+  ${utils.shellHelpers}
 
   # Privacy functions
   ${privacy.isWindowAllowed { 
@@ -169,16 +168,16 @@ in pkgs.writeShellScriptBin "chronicle" ''
     "status")
       load_state || true
       if [ "$RECORDING" = "true" ]; then
-        echo "✅ Recording active: $SESSION_ID (Step $STEP_COUNT)"
-        echo "   State file: $STATE_FILE"
-        echo "   Output directory: $OUTPUT_DIR/$SESSION_ID"
+        ${ui.messages.success "Recording active: $SESSION_ID (Step $STEP_COUNT)"}
+        ${ui.messages.info "State file: $STATE_FILE"}
+        ${ui.messages.info "Output directory: $OUTPUT_DIR/$SESSION_ID"}
       else
-        echo "⚠️  No active recording"
+        ${ui.messages.warning "No active recording"}
       fi
       ;;
       
     "list")
-      echo "📁 Available recordings in $OUTPUT_DIR:"
+      ${ui.messages.info "Available recordings in $OUTPUT_DIR:"}
       if [ ! -d "$OUTPUT_DIR" ]; then
         warn "Output directory does not exist: $OUTPUT_DIR"
         exit 1
@@ -188,8 +187,7 @@ in pkgs.writeShellScriptBin "chronicle" ''
         if [ -f "$session_path/session.json" ]; then
           start_time=$(${pkgs.jq}/bin/jq -r '.start_time' "$session_path/session.json")
           total_steps=$(${pkgs.jq}/bin/jq -r '.total_steps // "in progress"' "$session_path/session.json")
-          echo "  📊 $session"
-          echo "     Started: $start_time | Steps: $total_steps"
+          ${ui.messages.info "$session — Started: $start_time | Steps: $total_steps"}
         fi
       done
       ;;
@@ -214,8 +212,7 @@ in pkgs.writeShellScriptBin "chronicle" ''
       ;;
       
     "test")
-      echo "🧪 Running Step Recorder System Tests..."
-      echo ""
+      ${ui.messages.loading "Running Step Recorder System Tests..."}
       # Simplified test - just check if tools are available
       missing_tools=""
       for tool in bash date jq mkdir cat; do

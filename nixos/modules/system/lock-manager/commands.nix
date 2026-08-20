@@ -69,18 +69,18 @@ in
     (cliRegistry.registerGuiPage "lock" ./ui/gui)
     (lib.mkIf (cfg.enable or false) (let
     # Import collector modules (only those that don't use cfg can be in outer let)
-    desktopScanner = import ./collectors/desktop.nix { inherit pkgs; };
-    steamScanner = import ./collectors/steam.nix { inherit pkgs; };
-    packagesScanner = import ./collectors/packages.nix { inherit pkgs; };
-    browserScanner = import ./collectors/browser.nix { inherit pkgs; };
-    ideScanner = import ./collectors/ide.nix { inherit pkgs; };
+    desktopScanner = import ./collectors/desktop.nix { inherit pkgs ui; };
+    steamScanner = import ./collectors/steam.nix { inherit pkgs ui; };
+    packagesScanner = import ./collectors/packages.nix { inherit pkgs ui; };
+    browserScanner = import ./collectors/browser.nix { inherit pkgs ui; };
+    ideScanner = import ./collectors/ide.nix { inherit pkgs ui; };
 
     # Import collector that uses cfg
-    credentialsScanner = import ./collectors/credentials.nix { inherit pkgs lib cfg; };
+    credentialsScanner = import ./collectors/credentials.nix { inherit pkgs lib cfg ui; };
 
     # Snapshot generator
     snapshotGenerator = import ./handlers/snapshot-generator.nix {
-      inherit pkgs cfg;
+      inherit pkgs cfg ui;
       scanners = {
         desktop = desktopScanner;
         steam = steamScanner;
@@ -93,17 +93,17 @@ in
 
     # Encryption handler
     encryptionHandler = import ./handlers/encryption.nix {
-      inherit pkgs lib cfg;
+      inherit pkgs lib cfg ui;
     };
 
     # GitHub upload handler
     githubHandler = import ./handlers/github-upload.nix {
-      inherit pkgs lib cfg;
+      inherit pkgs lib cfg ui;
     };
 
     # GitHub download handler
     githubDownloadHandler = import ./handlers/github-download.nix {
-      inherit pkgs lib cfg;
+      inherit pkgs lib cfg ui;
     };
 
     # Restore handler
@@ -237,7 +237,7 @@ in
       done
 
       # Download snapshot
-      echo "📥 Fetching snapshot from GitHub..."
+      ${ui.messages.loading "Fetching snapshot from GitHub..."}
       TEMP_DIR=$(mktemp -d)
       trap "rm -rf $TEMP_DIR" EXIT
 
@@ -257,14 +257,14 @@ in
 
         if [ -n "$DOWNLOADED_SNAPSHOT" ] && [ -f "$DOWNLOADED_SNAPSHOT" ]; then
           echo ""
-          echo "🔄 Restoring from downloaded snapshot..."
+          ${ui.messages.loading "Restoring from downloaded snapshot..."}
           ${restoreHandler}/bin/restore-snapshot --snapshot "$DOWNLOADED_SNAPSHOT" $RESTORE_OPTIONS
         else
-          echo "❌ Could not find downloaded snapshot"
+          ${ui.messages.error "Could not find downloaded snapshot"}
           exit 1
         fi
       else
-        echo "❌ Failed to download snapshot"
+        ${ui.messages.error "Failed to download snapshot"}
         exit 1
       fi
     '';

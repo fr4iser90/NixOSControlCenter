@@ -3,7 +3,7 @@
 let
   metadata = getCurrentModuleMetadata ./.;
   configPath = metadata.configPath;
-  apiValue = import ./api.nix { inherit lib getModuleMetadata; metadata = metadata; };
+  apiValue = import ./api.nix { inherit lib getModuleMetadata getModuleApi; metadata = metadata; };
   engPkg = import ./package.nix { inherit pkgs; };
   guiOn = apiValue.isEnabled getModuleConfig;
 

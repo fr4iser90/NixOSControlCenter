@@ -13,7 +13,7 @@ let
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
 
-  userCli = import ./scripts/ncc-user.nix { inherit pkgs getModuleMetadata; };
+  userCli = import ./scripts/ncc-user.nix { inherit pkgs getModuleMetadata getModuleApi; };
 
   wrap = name: args: pkgs.writeShellScriptBin name ''
     exec ${userCli}/bin/ncc-user ${args} "$@"

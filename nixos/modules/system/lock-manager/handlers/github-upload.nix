@@ -1,4 +1,4 @@
-{ pkgs, lib, cfg }:
+{ pkgs, lib, cfg, ui }:
 
 with lib;
 
@@ -38,12 +38,12 @@ pkgs.writeShellScriptBin "upload-to-github" ''
   done
   
   if [ -z "$REPOSITORY" ]; then
-    echo "Error: --repository is required (format: owner/repo)"
+    ${ui.messages.error "--repository is required (format: owner/repo)"}
     exit 1
   fi
   
   if [ -z "$SNAPSHOT_FILE" ] || [ ! -f "$SNAPSHOT_FILE" ]; then
-    echo "Error: --snapshot file is required and must exist"
+    ${ui.messages.error "--snapshot file is required and must exist"}
     exit 1
   fi
   
@@ -52,7 +52,7 @@ pkgs.writeShellScriptBin "upload-to-github" ''
   REPO=$(echo "$REPOSITORY" | cut -d'/' -f2)
   
   if [ -z "$OWNER" ] || [ -z "$REPO" ]; then
-    echo "Error: Invalid repository format. Use 'owner/repo'"
+    ${ui.messages.error "Invalid repository format. Use 'owner/repo'"}
     exit 1
   fi
   
@@ -75,7 +75,7 @@ pkgs.writeShellScriptBin "upload-to-github" ''
     # Use environment variable if set
     GITHUB_TOKEN="$GITHUB_TOKEN"
   else
-    echo "Error: GitHub token required. Set --token-file or GITHUB_TOKEN environment variable"
+    ${ui.messages.error "GitHub token required. Set --token-file or GITHUB_TOKEN environment variable"}
     exit 1
   fi
   
@@ -86,7 +86,7 @@ pkgs.writeShellScriptBin "upload-to-github" ''
   cd "$TEMP_DIR"
   
   # Clone repository
-  echo "📥 Cloning repository..."
+  ${ui.messages.loading "Cloning repository..."}
   GIT_URL="https://''${GITHUB_TOKEN}@github.com/$REPOSITORY.git"
   if ! git clone --depth 1 --branch "$BRANCH" "$GIT_URL" repo 2>/dev/null; then
     # If branch doesn't exist, create it
@@ -137,12 +137,12 @@ EOF
   git add snapshots/
   git commit -m "Add system snapshot: $SNAPSHOT_NAME" || echo "No changes to commit"
   
-  echo "📤 Pushing to GitHub..."
+  ${ui.messages.loading "Pushing to GitHub..."}
   git push origin "$BRANCH" || {
-    echo "❌ Failed to push to GitHub"
+    ${ui.messages.error "Failed to push to GitHub"}
     exit 1
   }
   
-  echo "✅ Successfully uploaded to GitHub: https://github.com/$REPOSITORY/tree/$BRANCH/snapshots"
+  ${ui.messages.success "Successfully uploaded to GitHub: https://github.com/$REPOSITORY/tree/$BRANCH/snapshots"}
 ''
 

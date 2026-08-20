@@ -1,7 +1,8 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, isSwarmMode, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, isSwarmMode, ... }:
 
 let
   cfg = getModuleConfig "stack-manager";
+  ui = getModuleApi "cli-formatter";
 
   virtUsers = lib.filterAttrs
     (name: user: user.role == "virtualization")
@@ -31,17 +32,12 @@ let
     INSTALL_ROOT=${lib.escapeShellArg installRoot}
     TEMP_DIR="/tmp/ncc-stacks-fetch"
 
-    GREEN='\033[0;32m'
-    YELLOW='\033[1;33m'
-    RED='\033[0;31m'
-    NC='\033[0m'
-
     if [[ -z "$VIRT_USER" ]]; then
-      echo -e "''${RED}Error: no virtualization/admin user configured''${NC}"
+      ${ui.messages.error "Error: no virtualization/admin user configured"}
       exit 1
     fi
     if [[ "$(whoami)" != "$VIRT_USER" ]]; then
-      echo -e "''${RED}Error: run as $VIRT_USER (e.g. sudo -u $VIRT_USER ncc stacks fetch)''${NC}"
+      ${ui.messages.error "Error: run as $VIRT_USER (e.g. sudo -u $VIRT_USER ncc stacks fetch)"}
       exit 1
     fi
 
@@ -51,14 +47,14 @@ let
       mkdir -p "$DEST"
     fi
 
-    echo -e "''${YELLOW}Fetching stack catalog…''${NC}"
+    ${ui.messages.loading "Fetching stack catalog…"}
     echo "  repo: $REPO_URL ($REPO_REF)"
     echo "  dest: $DEST"
     rm -rf "$TEMP_DIR"
     mkdir -p "$TEMP_DIR"
 
     if ! git clone --depth 1 --branch "$REPO_REF" "$REPO_URL" "$TEMP_DIR"; then
-      echo -e "''${RED}Failed to clone repository''${NC}"
+      ${ui.messages.error "Failed to clone repository"}
       exit 1
     fi
 
@@ -86,7 +82,7 @@ let
     find "$DEST/docker-scripts" -type f -name '*.sh' -exec chmod 755 {} \; 2>/dev/null || true
 
     rm -rf "$TEMP_DIR"
-    echo -e "''${GREEN}Stack catalog fetch completed''${NC}"
+    ${ui.messages.success "Stack catalog fetch completed"}
     echo "Next: ncc stacks init --profile <name>   or   bash $DEST/docker-scripts/bin/init-homelab.sh"
   '';
 

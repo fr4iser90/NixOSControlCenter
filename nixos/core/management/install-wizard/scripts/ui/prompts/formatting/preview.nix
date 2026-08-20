@@ -1,5 +1,59 @@
-# Migrated from ui/prompts/formatting/preview.sh — body via fromJSON (Nix-safe).
-{ pkgs }:
-pkgs.writeText "preview.sh" (builtins.fromJSON ''
-"#!/usr/bin/env bash\n\n# Source necessary files\nSCRIPT_DIR=\"\u0024(cd \"\u0024(dirname \"\u0024{BASH_SOURCE[0]}\")\" && pwd)\"\nsource \"\u0024SCRIPT_DIR/../descriptions/setup-descriptions.sh\"\nsource \"\u0024SCRIPT_DIR/../setup-options.sh\"\n\nselection=\"\u00241\"\n\n# Clean up selection string (handle emojis and special characters)\nclean_selection=\u0024(echo \"\u0024selection\" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*\u0024//' \\\n    -e 's/^\\* //' -e 's/^\\*//' \\\n    -e 's/\ud83d\udce6 //' -e 's/\ud83d\udd27 //' -e 's/\u2699\ufe0f  //' \\\n    -e 's/\ud83d\udcc1 //' -e 's/\ud83d\udccb //' -e 's/\ud83d\udd04 //' \\\n    -e 's/\ud83d\udda5\ufe0f  //' -e 's/\ud83e\udd16 //')\n\n# Remove [Category] prefix if present (e.g., [Containerization] docker-rootless -> docker-rootless)\nclean_selection=\u0024(echo \"\u0024clean_selection\" | sed 's/^\\[.*\\] //')\n\n# Convert to lowercase\nclean_selection=\u0024(echo \"\u0024clean_selection\" | tr '[:upper:]' '[:lower:]')\n\n# Installation types and presets in SETUP_DESCRIPTIONS have spaces: \"advanced options\", \"custom setup\", \"homelab server\"\n# Features have dashes: \"docker-rootless\", \"web-dev\"\n# Check if it exists in SETUP_DESCRIPTIONS with spaces first, if not try with dashes\nif [[ -z \"\u0024{SETUP_DESCRIPTIONS[\u0024clean_selection]:-}\" ]] && [[ \"\u0024clean_selection\" =~ \" \" ]]; then\n    # Try with dashes (for features)\n    clean_selection_dashed=\u0024(echo \"\u0024clean_selection\" | sed 's/ /-/g')\n    if [[ -n \"\u0024{SETUP_DESCRIPTIONS[\u0024clean_selection_dashed]:-}\" ]]; then\n        clean_selection=\"\u0024clean_selection_dashed\"\n    fi\n    # If still not found, keep spaces (for installation types/presets)\nfi\n\n# Header\necho -e \"\\\\033[1;34m\u0024{selection}\\\\033[0m\"\necho \"------------------------------------\"\n\n# Description\necho\nif [[ -n \"\u0024{SETUP_DESCRIPTIONS[\u0024clean_selection]:-}\" ]]; then\n    echo -e \"\u0024{SETUP_DESCRIPTIONS[\u0024clean_selection]}\"\nelse\n    echo \"No specific description available for \\\"\u0024clean_selection\\\".\"\nfi\n\n# Type and Features\necho\necho -e \"\\\\033[1mType:\\\\033[0m \u0024{SETUP_TYPES[\u0024clean_selection]:-Predefined Desktop Profile}\"\necho -e \"\\\\033[1mFeatures:\\\\033[0m\"\nfeatures_text=\u0024{SETUP_FEATURES[\u0024clean_selection]:-\"Development Environment|Common Applications|Personalized Settings|Dotfiles Integration\"}\nif [[ \"\u0024features_text\" == \"N/A\" || -z \"\u0024features_text\" ]]; then\n    echo \"  - No specific features listed.\"\nelse\n    echo \"\u0024features_text\" | tr '|' '\\n' | sed 's/^/  - /'\nfi\n\n# Dependencies\necho\necho -e \"\\\\033[1mDependencies:\\\\033[0m None\" "
-'')
+# FZF preview — colors from cli-formatter palette (colors.sh).
+{ pkgs, getModuleApi ? null, ... }:
+pkgs.writeText "preview.sh" ''
+#!/usr/bin/env bash
+
+SCRIPT_DIR="$(cd "$(dirname "''${BASH_SOURCE[0]}")" && pwd)"
+# Prefer install-wizard LIB_DIR colors (cli-formatter SSOT)
+if [[ -n "''${LIB_DIR:-}" && -f "$LIB_DIR/colors.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "$LIB_DIR/colors.sh"
+elif [[ -z "''${COLORS_IMPORTED:-}" ]]; then
+  # Colors should come from LIB_DIR/colors.sh (cli-formatter); plain fallback
+  export BLUE= BOLD= NC=
+fi
+
+source "$SCRIPT_DIR/../descriptions/setup-descriptions.sh"
+source "$SCRIPT_DIR/../setup-options.sh"
+
+selection="$1"
+
+clean_selection=$(echo "$selection" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+    -e 's/^\* //' -e 's/^\*//' \
+    -e 's/📦 //' -e 's/🔧 //' -e 's/⚙️  //' \
+    -e 's/📁 //' -e 's/📋 //' -e 's/🔄 //' \
+    -e 's/🖥️  //' -e 's/🤖 //')
+
+clean_selection=$(echo "$clean_selection" | sed 's/^\[.*\] //')
+clean_selection=$(echo "$clean_selection" | tr '[:upper:]' '[:lower:]')
+
+if [[ -z "''${SETUP_DESCRIPTIONS[$clean_selection]:-}" ]] && [[ "$clean_selection" =~ " " ]]; then
+    clean_selection_dashed=$(echo "$clean_selection" | sed 's/ /-/g')
+    if [[ -n "''${SETUP_DESCRIPTIONS[$clean_selection_dashed]:-}" ]]; then
+        clean_selection="$clean_selection_dashed"
+    fi
+fi
+
+printf '%b\n' "''${BLUE}''${BOLD}''${selection}''${NC}"
+echo "------------------------------------"
+
+echo
+if [[ -n "''${SETUP_DESCRIPTIONS[$clean_selection]:-}" ]]; then
+    printf '%b\n' "''${SETUP_DESCRIPTIONS[$clean_selection]}"
+else
+    echo "No specific description available for \"$clean_selection\"."
+fi
+
+echo
+printf '%b\n' "''${BOLD}Type:''${NC} ''${SETUP_TYPES[$clean_selection]:-Predefined Desktop Profile}"
+printf '%b\n' "''${BOLD}Features:''${NC}"
+features_text=''${SETUP_FEATURES[$clean_selection]:-"Development Environment|Common Applications|Personalized Settings|Dotfiles Integration"}
+if [[ "$features_text" == "N/A" || -z "$features_text" ]]; then
+    echo "  - No specific features listed."
+else
+    echo "$features_text" | tr '|' '\n' | sed 's/^/  - /'
+fi
+
+echo
+printf '%b\n' "''${BOLD}Dependencies:''${NC} None"
+''

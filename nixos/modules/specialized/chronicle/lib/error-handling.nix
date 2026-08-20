@@ -1,5 +1,8 @@
-{ lib, pkgs, cfg }:
+{ lib, pkgs, cfg, getModuleApi }:
 
+let
+  ui = getModuleApi "cli-formatter";
+in
 {
   # Comprehensive error handling and logging
   errorHandling = ''
@@ -32,7 +35,7 @@
       log "Error logging initialized: $ERROR_LOG_FILE"
     }
     
-    # Enhanced logging functions with levels
+    # Enhanced logging functions with levels (colors via cli-formatter)
     log_with_level() {
       local level="$1"
       local level_num="$2"
@@ -49,33 +52,33 @@
       
       # Console output with color
       if [ -t 1 ]; then
-        echo -e "''${color}$log_entry\033[0m"
+        printf '%b\n' "''${color}$log_entry${ui.colors.reset}"
       else
         echo "$log_entry"
       fi
       
-      # File output
+      # File output (raw, no ANSI)
       echo "$log_entry" >> "$ERROR_LOG_FILE"
     }
     
     log_debug() {
-      log_with_level "DEBUG" "$ERROR_LEVEL_DEBUG" "$1" "\033[0;36m"
+      log_with_level "DEBUG" "$ERROR_LEVEL_DEBUG" "$1" "${ui.colors.cyan}"
     }
     
     log() {
-      log_with_level "INFO" "$ERROR_LEVEL_INFO" "$1" "\033[0;32m"
+      log_with_level "INFO" "$ERROR_LEVEL_INFO" "$1" "${ui.colors.green}"
     }
     
     log_warn() {
-      log_with_level "WARN" "$ERROR_LEVEL_WARN" "$1" "\033[0;33m"
+      log_with_level "WARN" "$ERROR_LEVEL_WARN" "$1" "${ui.colors.yellow}"
     }
     
     log_error() {
-      log_with_level "ERROR" "$ERROR_LEVEL_ERROR" "$1" "\033[0;31m"
+      log_with_level "ERROR" "$ERROR_LEVEL_ERROR" "$1" "${ui.colors.red}"
     }
     
     log_critical() {
-      log_with_level "CRITICAL" "$ERROR_LEVEL_CRITICAL" "$1" "\033[1;31m"
+      log_with_level "CRITICAL" "$ERROR_LEVEL_CRITICAL" "$1" "${ui.colors.bold}${ui.colors.red}"
     }
     
     # Error handler with retry logic

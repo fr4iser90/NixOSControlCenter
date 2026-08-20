@@ -1,7 +1,9 @@
 # Runtime ncc user CLI — list/show/create/set/delete via config + ncc-priv
-{ pkgs, getModuleMetadata }:
+{ pkgs, getModuleMetadata, getModuleApi }:
 
 let
+  ui = getModuleApi "cli-formatter";
+  c = ui.colors;
   smRoot = (getModuleMetadata "system-manager").path;
   facade = import "${smRoot}/lib/config-facade.nix" { inherit pkgs; };
 in
@@ -131,11 +133,11 @@ NIX
     for a in "$@"; do
       case "$a" in --json|-j) json_out=true ;; esac
     done
-    [[ -n "$name" ]] || { echo "Usage: $SCRIPT_NAME show <name>" >&2; exit 2; }
+    [[ -n "$name" ]] || { printf '%b\n' "${c.red}Usage: $SCRIPT_NAME show <name>${c.reset}" >&2; exit 2; }
     local row
     row=$(accounts_json | filter_for_viewer | jq -c --arg n "$name" '.[] | select(.name == $n)' | head -1)
     if [[ -z "$row" ]]; then
-      echo "User not found (or not visible): $name" >&2
+      ${ui.messages.error "User not found (or not visible): $name"}
       exit 1
     fi
     if [[ "$json_out" == true ]]; then
@@ -172,7 +174,7 @@ NIX
     elif [[ "$(id -u)" -eq 0 ]] && command -v ncc-priv >/dev/null 2>&1; then
       ncc-priv "$@"
     else
-      echo "ncc-priv-run not found (rebuild NCC)" >&2
+      ${ui.messages.error "ncc-priv-run not found (rebuild NCC)"}
       exit 1
     fi
   }
@@ -180,7 +182,7 @@ NIX
   cmd_create() {
     local name="''${1:-}"
     shift || true
-    [[ -n "$name" ]] || { echo "Usage: $SCRIPT_NAME create <name> --role ROLE ..." >&2; exit 2; }
+    [[ -n "$name" ]] || { printf '%b\n' "${c.red}Usage: $SCRIPT_NAME create <name> --role ROLE ...${c.reset}" >&2; exit 2; }
     name=$(echo "$name" | tr '[:upper:]' '[:lower:]')
     elevate user-account create "$name" "$@"
   }
@@ -188,7 +190,7 @@ NIX
   cmd_set() {
     local name="''${1:-}"
     shift || true
-    [[ -n "$name" ]] || { echo "Usage: $SCRIPT_NAME set <name> [--role ROLE] ..." >&2; exit 2; }
+    [[ -n "$name" ]] || { printf '%b\n' "${c.red}Usage: $SCRIPT_NAME set <name> [--role ROLE] ...${c.reset}" >&2; exit 2; }
     name=$(echo "$name" | tr '[:upper:]' '[:lower:]')
     elevate user-account set "$name" "$@"
   }
@@ -196,7 +198,7 @@ NIX
   cmd_delete() {
     local name="''${1:-}"
     shift || true
-    [[ -n "$name" ]] || { echo "Usage: $SCRIPT_NAME delete <name>" >&2; exit 2; }
+    [[ -n "$name" ]] || { printf '%b\n' "${c.red}Usage: $SCRIPT_NAME delete <name>${c.reset}" >&2; exit 2; }
     name=$(echo "$name" | tr '[:upper:]' '[:lower:]')
     elevate user-account delete "$name" "$@"
   }
@@ -210,7 +212,7 @@ NIX
     set) shift; cmd_set "$@" ;;
     delete|remove) shift; cmd_delete "$@" ;;
     *)
-      echo "Unknown: $SCRIPT_NAME $1" >&2
+      ${ui.messages.error "Unknown: $SCRIPT_NAME $1"}
       usage >&2
       exit 2
       ;;

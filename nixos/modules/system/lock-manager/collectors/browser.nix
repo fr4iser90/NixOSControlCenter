@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, ui }:
 
 pkgs.writeShellScriptBin "scan-browser" ''
   #!${pkgs.bash}/bin/bash
@@ -6,7 +6,7 @@ pkgs.writeShellScriptBin "scan-browser" ''
   
   OUTPUT_FILE="$1"
   
-  echo "🌐 Scanning browser extensions and settings..."
+  ${ui.messages.info "Scanning browser extensions and settings..."}
   
   BROWSERS=()
   
@@ -262,6 +262,6 @@ pkgs.writeShellScriptBin "scan-browser" ''
   BROWSER_COUNT=$(${pkgs.jq}/bin/jq '.browsers.count' "$OUTPUT_FILE")
   TOTAL_EXTENSIONS=$(${pkgs.jq}/bin/jq '[.browsers.items[].extensions.count] | add' "$OUTPUT_FILE")
   TOTAL_BOOKMARKS=$(${pkgs.jq}/bin/jq '[.browsers.items[].bookmarks.count] | add' "$OUTPUT_FILE")
-  echo "✅ Found $BROWSER_COUNT browser(s) with $TOTAL_EXTENSIONS extensions and $TOTAL_BOOKMARKS bookmarks"
+  ${ui.messages.success "Found $BROWSER_COUNT browser(s) with $TOTAL_EXTENSIONS extensions and $TOTAL_BOOKMARKS bookmarks"}
 ''
 

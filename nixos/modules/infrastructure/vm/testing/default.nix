@@ -1,12 +1,12 @@
 # Default VM configuration for testing
-{ config, lib, pkgs, systemConfig, getModuleConfig, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 with lib;
 
 let
   # Use getModuleConfig to get the main VM config (Stage 1 pattern)
   cfg = getModuleConfig "vm";
-  libVM = import ../lib { inherit lib pkgs; };
+  libVM = import ../lib { inherit lib pkgs getModuleApi; };
 
   mkTestVM = distro: {
     config,

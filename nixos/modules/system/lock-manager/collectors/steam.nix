@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, ui }:
 
 pkgs.writeShellScriptBin "scan-steam" ''
   #!${pkgs.bash}/bin/bash
@@ -6,7 +6,7 @@ pkgs.writeShellScriptBin "scan-steam" ''
   
   OUTPUT_FILE="$1"
   
-  echo "🎮 Scanning Steam games..."
+  ${ui.messages.info "Scanning Steam games..."}
   
   STEAM_DIRS=(
     "$HOME/.steam/steam"
@@ -23,7 +23,7 @@ pkgs.writeShellScriptBin "scan-steam" ''
   done
   
   if [ -z "$STEAM_PATH" ]; then
-    echo "⚠️  Steam not found, skipping..."
+    ${ui.messages.warning "Steam not found, skipping..."}
     echo "[]" > "$OUTPUT_FILE"
     exit 0
   fi
@@ -88,6 +88,6 @@ pkgs.writeShellScriptBin "scan-steam" ''
     }' > "$OUTPUT_FILE"
   
   GAME_COUNT=$(${pkgs.jq}/bin/jq '.steam.installed' "$OUTPUT_FILE")
-  echo "✅ Found $GAME_COUNT Steam games"
+  ${ui.messages.success "Found $GAME_COUNT Steam games"}
 ''
 

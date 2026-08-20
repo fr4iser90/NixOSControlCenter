@@ -8,12 +8,12 @@ let
   cliRegistry = getModuleApi "cli-registry";
 
   # Import chronicleLib
-  chronicleLib = import ./lib/default.nix { inherit lib pkgs cfg; };
+  chronicleLib = import ./lib/default.nix { inherit lib pkgs cfg getModuleApi; };
 
   backend = if (cfg.mode or "automatic") == "automatic" then "x11" else "wayland";
 
   recorderScript = import ./scripts/main.nix {
-    inherit lib pkgs chronicleLib backend cfg;
+    inherit lib pkgs chronicleLib backend cfg getModuleApi;
   };
 
   registrationResult = cliRegistry.registerCommandsFor "chronicle" [

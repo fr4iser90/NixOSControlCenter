@@ -2,6 +2,7 @@
 { pkgs, lib, cfg, getModuleApi, getModuleMetadata }:
 
 let
+  ui = getModuleApi "cli-formatter";
   facade = import "${(getModuleMetadata "system-manager").path}/lib/config-facade.nix" {
     inherit pkgs;
   };
@@ -78,7 +79,7 @@ let
           echo "valid"
           exit 0
         fi
-        echo "Invalid Nix fragment" >&2
+        ${ui.messages.error "Invalid Nix fragment"}
         exit 1
         ;;
       *)

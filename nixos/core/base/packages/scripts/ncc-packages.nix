@@ -1,6 +1,8 @@
-{ pkgs, getModuleMetadata }:
+{ pkgs, getModuleMetadata, getModuleApi }:
 
 let
+  ui = getModuleApi "cli-formatter";
+  c = ui.colors;
   smRoot = (getModuleMetadata "system-manager").path;
   facade = import "${smRoot}/lib/config-facade.nix" { inherit pkgs; };
   catalogFile = import ../lib/mk-catalog-json.nix { inherit pkgs; };
@@ -26,17 +28,12 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   NIX_SHELL_BIN="${pkgs.nix}/bin/nix-shell"
 
   # (path helpers below stage monolith edits and flush on EXIT)
+  # Dynamic log_* use formatter palette / badge style; JSON/raw paths stay plain.
 
-  RED='\033[0;31m'
-  GREEN='\033[0;32m'
-  YELLOW='\033[0;33m'
-  BLUE='\033[0;34m'
-  NC='\033[0m'
-
-  log_info()    { echo -e "$BLUE"'[i]'"$NC $*"; }
-  log_success() { echo -e "$GREEN"'[+]'"$NC $*"; }
-  log_warn()    { echo -e "$YELLOW"'[!]'"$NC $*"; }
-  log_error()   { echo -e "$RED"'[-]'"$NC $*" >&2; }
+  log_info()    { printf '%b\n' "${c.blue}[INFO]${c.reset} $*"; }
+  log_success() { printf '%b\n' "${c.green}[ OK ]${c.reset} $*"; }
+  log_warn()    { printf '%b\n' "${c.yellow}[WARN]${c.reset} $*"; }
+  log_error()   { printf '%b\n' "${c.red}[ERROR]${c.reset} $*" >&2; }
 
   COMMAND=""
   SUBCOMMAND=""

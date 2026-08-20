@@ -4,7 +4,7 @@ let
   tuiEngine = (getModuleApi "tui-engine").fromConfig config;
 
     previewScript = import ../../scripts/connection-preview.nix {
-      inherit pkgs sshClientCfg;
+      inherit pkgs sshClientCfg getModuleApi;
     };
 
     listScript = pkgs.writeScript "ncc-ssh-client-tui-list" ''

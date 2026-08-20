@@ -1,4 +1,4 @@
-{ lib, pkgs, cfg }:
+{ lib, pkgs, cfg, getModuleApi }:
 
 # Email Module
-{ smtp = import ./smtp.nix { inherit lib pkgs cfg; }; }
+{ smtp = import ./smtp.nix { inherit lib pkgs cfg getModuleApi; }; }

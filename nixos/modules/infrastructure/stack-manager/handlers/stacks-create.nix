@@ -1,7 +1,8 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, isSwarmMode, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, isSwarmMode, ... }:
 
 let
   cfg = getModuleConfig "stack-manager";
+  ui = getModuleApi "cli-formatter";
 
   virtUsers = lib.filterAttrs
     (name: user: user.role == "virtualization")
@@ -29,17 +30,12 @@ let
     INSTALL_ROOT=${lib.escapeShellArg installRoot}
     CONFIG_PROFILES=( ${lib.concatMapStringsSep " " (p: lib.escapeShellArg p) profiles} )
 
-    GREEN='\033[0;32m'
-    YELLOW='\033[1;33m'
-    RED='\033[0;31m'
-    NC='\033[0m'
-
     if [[ -z "$VIRT_USER" ]]; then
-      echo -e "''${RED}Error: no virtualization/admin user configured''${NC}"
+      ${ui.messages.error "Error: no virtualization/admin user configured"}
       exit 1
     fi
     if [[ "$(whoami)" != "$VIRT_USER" ]]; then
-      echo -e "''${RED}Error: run as $VIRT_USER''${NC}"
+      ${ui.messages.error "Error: run as $VIRT_USER"}
       exit 1
     fi
 
@@ -48,8 +44,8 @@ let
     SCRIPTS="$BASE/docker-scripts/bin"
 
     if [[ ! -d "$BASE/catalog" || ! -d "$SCRIPTS" ]]; then
-      echo -e "''${RED}Catalog not found under $BASE''${NC}"
-      echo -e "''${YELLOW}Run: ncc stacks fetch''${NC}"
+      ${ui.messages.error "Catalog not found under $BASE"}
+      ${ui.messages.warning "Run: ncc stacks fetch"}
       exit 1
     fi
 
@@ -80,7 +76,7 @@ let
 
     # Substitute placeholders in yml/env under catalog
     if [[ -d "$BASE/catalog" ]]; then
-      echo -e "''${YELLOW}Updating placeholders in catalog…''${NC}"
+      ${ui.messages.loading "Updating placeholders in catalog…"}
       find "$BASE/catalog" -type f \( -name "*.yml" -o -name "*.yaml" -o -name "*.env" \) \
         -exec sed -i \
           -e "s|{{EMAIL}}|$EMAIL|g" \
@@ -98,13 +94,13 @@ let
     fi
 
     if [[ ! -f "$INIT" ]]; then
-      echo -e "''${RED}Missing $INIT''${NC}"
+      ${ui.messages.error "Missing $INIT"}
       exit 1
     fi
 
-    echo -e "''${YELLOW}Running $(basename "$INIT") ''${EXTRA[*]}…''${NC}"
+    ${ui.messages.loading ''Running $(basename "$INIT") ''${EXTRA[*]}…''}
     bash "$INIT" "''${EXTRA[@]}"
-    echo -e "''${GREEN}Stack init finished''${NC}"
+    ${ui.messages.success "Stack init finished"}
   '';
 
   # Back-compat

@@ -1,4 +1,4 @@
-{ pkgs, cfg, scanners }:
+{ pkgs, cfg, scanners, ui }:
 
 pkgs.writeShellScriptBin "generate-snapshot" ''
   #!${pkgs.bash}/bin/bash
@@ -51,7 +51,7 @@ pkgs.writeShellScriptBin "generate-snapshot" ''
   done
   
   if [ -z "$OUTPUT_FILE" ]; then
-    echo "Error: --output is required"
+    ${ui.messages.error "--output is required"}
     exit 1
   fi
   
@@ -131,6 +131,6 @@ pkgs.writeShellScriptBin "generate-snapshot" ''
   # Write final snapshot
   echo "$SNAPSHOT" | ${pkgs.jq}/bin/jq '.' > "$OUTPUT_FILE"
   
-  echo "✅ Snapshot generated: $OUTPUT_FILE"
+  ${ui.messages.success "Snapshot generated: $OUTPUT_FILE"}
 ''
 

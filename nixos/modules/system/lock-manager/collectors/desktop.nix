@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, ui }:
 
 pkgs.writeShellScriptBin "scan-desktop" ''
   #!${pkgs.bash}/bin/bash
@@ -6,7 +6,7 @@ pkgs.writeShellScriptBin "scan-desktop" ''
   
   OUTPUT_FILE="$1"
   
-  echo "🖥️  Scanning desktop settings..."
+  ${ui.messages.info "Scanning desktop settings..."}
   
   # Detect desktop environment
   DESKTOP_ENV=""
@@ -130,6 +130,6 @@ pkgs.writeShellScriptBin "scan-desktop" ''
       }
     }' > "$OUTPUT_FILE"
   
-  echo "✅ Desktop settings scanned"
+  ${ui.messages.success "Desktop settings scanned"}
 ''
 

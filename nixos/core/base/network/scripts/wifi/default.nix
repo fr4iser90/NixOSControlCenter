@@ -1,7 +1,9 @@
 # ncc wifi CLI — connect, list, scan, status, disconnect, forget (system-only secrets)
-{ pkgs }:
+{ pkgs, getModuleApi }:
 
 let
+  ui = getModuleApi "cli-formatter";
+  c = ui.colors;
   nmcli = "${pkgs.networkmanager}/bin/nmcli";
   embedPsk = import ../../lib/embed-psk.nix { inherit pkgs; };
   python3 = "${pkgs.python3}/bin/python3";
@@ -90,7 +92,7 @@ let
     persist_connection() {
       local ssid="$1" psk="$2"
       local stem out_file live_name conn_name
-      valid_psk "$psk" || { echo "error: invalid password" >&2; return 1; }
+      valid_psk "$psk" || { printf '%b\n' "${c.red}invalid password${c.reset}" >&2; return 1; }
       stem="$(sanitize_name "$ssid")"
       out_file="$PERSIST/$stem.nmconnection"
       live_name="$stem.nmconnection"
@@ -134,7 +136,7 @@ EOF
       "$PYTHON" "$EMBED_PSK" "$out_file" "$psk" 2>/dev/null || true
       chmod 600 "$out_file"
       install -m 0600 -D "$out_file" "$LIVE/$live_name"
-      echo "saved headless profile: $SECRETS_WIFI/$stem.psk"
+      ${ui.messages.success "saved headless profile: $SECRETS_WIFI/$stem.psk"}
     }
   '';
 
@@ -177,15 +179,15 @@ HELP
       forget) exec ${wifiForget}/bin/ncc-wifi-forget "$@" ;;
       on|radio-on)
         ${pkgs.networkmanager}/bin/nmcli radio wifi on
-        echo "wifi radio=enabled"
+        ${ui.messages.success "wifi radio=enabled"}
         ;;
       off|radio-off)
         ${pkgs.networkmanager}/bin/nmcli radio wifi off
-        echo "wifi radio=disabled"
+        ${ui.messages.success "wifi radio=disabled"}
         ;;
       *)
-        echo "Unknown: ncc network wifi $cmd" >&2
-        echo "Try: ncc network wifi help" >&2
+        ${ui.messages.error "Unknown: ncc network wifi $cmd"}
+        ${ui.messages.info "Try: ncc network wifi help"}
         exit 1
         ;;
     esac
@@ -201,11 +203,11 @@ HELP
     done
     dev="$(wifi_device)"
     if [ -z "$dev" ]; then
-      echo "error: no WiFi device found" >&2
+      ${ui.messages.error "no WiFi device found"}
       exit 1
     fi
     if [ "$JSON" != true ]; then
-      echo "Scanning on $dev ..."
+      ${ui.messages.loading "Scanning on $dev …"}
     fi
     "$NMCLI" device wifi rescan ifname "$dev" 2>/dev/null || true
     sleep 2
@@ -231,7 +233,7 @@ HELP
   wifiList = pkgs.writeShellScriptBin "ncc-wifi-list" ''
     #!${pkgs.bash}/bin/bash
     ${commonShell}
-    echo "=== NetworkManager WiFi connections ==="
+    ${ui.text.section "NetworkManager WiFi connections"}
     while IFS= read -r line; do
       [ -n "$line" ] || continue
       uuid="''${line%%:*}"
@@ -253,7 +255,7 @@ HELP
     done < <("$NMCLI" -t -f UUID connection show 2>/dev/null || true)
 
     echo ""
-    echo "=== System secret files ==="
+    ${ui.text.section "System secret files"}
     shopt -s nullglob
     files=("$SECRETS_WIFI"/*.psk)
     if [ ''${#files[@]} -eq 0 ]; then
@@ -268,15 +270,15 @@ HELP
   wifiStatus = pkgs.writeShellScriptBin "ncc-wifi-status" ''
     #!${pkgs.bash}/bin/bash
     ${commonShell}
-    echo "=== NetworkManager ==="
+    ${ui.text.section "NetworkManager"}
     "$NMCLI" general status 2>/dev/null || true
     echo ""
-    echo "=== Devices ==="
+    ${ui.text.section "Devices"}
     "$NMCLI" device status 2>/dev/null || true
     echo ""
     dev="$(wifi_device)"
     if [ -n "$dev" ]; then
-      echo "=== Active connection on $dev ==="
+      ${ui.text.section "Active connection on $dev"}
       "$NMCLI" -f GENERAL.CONNECTION,IP4.ADDRESS device show "$dev" 2>/dev/null || true
     fi
   '';
@@ -298,20 +300,20 @@ HELP
           exit 0
           ;;
         *)
-          if [ -z "$ssid" ]; then ssid="$1"; else echo "error: unexpected argument: $1" >&2; exit 1; fi
+          if [ -z "$ssid" ]; then ssid="$1"; else printf '%b\n' "${c.red}unexpected argument: $1${c.reset}" >&2; exit 1; fi
           shift
           ;;
       esac
     done
 
     if [ -z "$ssid" ]; then
-      echo "error: SSID required" >&2
+      ${ui.messages.error "SSID required"}
       echo "usage: ncc network wifi connect <SSID> [--psk PASS | --psk-file PATH]" >&2
       exit 1
     fi
 
     if [ -n "$psk_file" ]; then
-      [ -f "$psk_file" ] || { echo "error: psk file not found: $psk_file" >&2; exit 1; }
+      [ -f "$psk_file" ] || { printf '%b\n' "${c.red}psk file not found: $psk_file${c.reset}" >&2; exit 1; }
       psk="$(cat "$psk_file")"
     elif [ -z "$psk" ]; then
       printf "WiFi password for '%s': " "$ssid" >&2
@@ -319,23 +321,23 @@ HELP
       echo >&2
     fi
 
-    valid_psk "$psk" || { echo "error: invalid password (WPA needs 8-63 chars)" >&2; exit 1; }
+    valid_psk "$psk" || { printf '%b\n' "${c.red}invalid password (WPA needs 8-63 chars)${c.reset}" >&2; exit 1; }
 
     dev="$(wifi_device)"
     if [ -z "$dev" ]; then
-      echo "error: no WiFi device found" >&2
+      ${ui.messages.error "no WiFi device found"}
       exit 1
     fi
 
-    echo "Connecting to '$ssid' on $dev ..."
+    ${ui.messages.loading "Connecting to '$ssid' on $dev …"}
     conn_name="$(connect_wifi "$ssid" "$psk" "$dev" || true)"
     if [ -z "$conn_name" ]; then
-      echo "error: connection failed" >&2
+      ${ui.messages.error "connection failed"}
       exit 1
     fi
 
     persist_connection "$ssid" "$psk"
-    echo "connected: $ssid"
+    ${ui.messages.success "connected: $ssid"}
   '';
 
   wifiDisconnect = pkgs.writeShellScriptBin "ncc-wifi-disconnect" ''
@@ -343,11 +345,11 @@ HELP
     ${commonShell}
     dev="$(wifi_device)"
     if [ -z "$dev" ]; then
-      echo "error: no WiFi device found" >&2
+      ${ui.messages.error "no WiFi device found"}
       exit 1
     fi
     "$NMCLI" device disconnect "$dev"
-    echo "disconnected $dev"
+    ${ui.messages.success "disconnected $dev"}
   '';
 
   wifiForget = pkgs.writeShellScriptBin "ncc-wifi-forget" ''
@@ -356,7 +358,7 @@ HELP
 
     name="$1"
     if [ -z "$name" ]; then
-      echo "usage: ncc wifi forget <connection-name|SSID>" >&2
+      ${ui.messages.error "usage: ncc wifi forget <connection-name|SSID>"}
       exit 1
     fi
 
@@ -374,7 +376,7 @@ HELP
     done < <("$NMCLI" -t -f UUID connection show 2>/dev/null || true)
 
     if [ -z "$conn_name" ]; then
-      echo "error: no WiFi profile matching '$name'" >&2
+      ${ui.messages.error "no WiFi profile matching '$name'"}
       exit 1
     fi
 
@@ -382,7 +384,7 @@ HELP
     "$NMCLI" connection delete "$conn_name" 2>/dev/null || true
     rm -f "$SECRETS_WIFI/$stem.psk" "$PERSIST/$stem.psk" \
       "$PERSIST/$stem.nmconnection" "$LIVE/$stem.nmconnection" 2>/dev/null || true
-    echo "forgot: $conn_name"
+    ${ui.messages.success "forgot: $conn_name"}
   '';
 
   commands = [

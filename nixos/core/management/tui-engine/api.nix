@@ -1,5 +1,5 @@
 # TUI Engine API — behavior only. Identity/fromConfig injected by getModuleApi.
-{ lib, metadata, getModuleMetadata }:
+{ lib, metadata, getModuleMetadata, ... }:
 
 {
   disabledHint = import ./lib/disabled-hint.nix;

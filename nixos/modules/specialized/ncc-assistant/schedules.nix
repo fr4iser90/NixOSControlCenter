@@ -6,6 +6,7 @@ with lib;
 let
   moduleName = baseNameOf ./.;
   cfg = getModuleConfig moduleName;
+  ui = getModuleApi "cli-formatter";
   pkg = import ./package.nix { inherit pkgs lib cfg getModuleApi getModuleMetadata; };
 
   enabledSchedules = filterAttrs (_: s: s.enable or true) (cfg.agent.schedules or { });
@@ -38,11 +39,11 @@ let
     fi
     cfg="''${XDG_CONFIG_HOME:-$HOME/.config}/ncc-assistant"
     if [[ -f "$cfg/DISABLE" ]]; then
-      echo "ncc-assistant: kill-switch DISABLE present — skipping" >&2
+      ${ui.messages.warning "ncc-assistant: kill-switch DISABLE present — skipping"}
       exit 0
     fi
     if [[ -f "$cfg/presence.json" ]] && ${pkgs.jq}/bin/jq -e '.state == "paused"' "$cfg/presence.json" >/dev/null 2>&1; then
-      echo "ncc-assistant: presence paused — skipping" >&2
+      ${ui.messages.info "ncc-assistant: presence paused — skipping"}
       exit 0
     fi
   '';
@@ -83,7 +84,7 @@ let
     in
     pkgs.writeShellScript "ncc-assistant-schedule-${name}" ''
       ${mkHomePreamble}
-      echo "ncc-assistant: running probe ${probe} (threshold=${thr})"
+      ${ui.messages.loading "ncc-assistant: running probe ${probe} (threshold=${thr})"}
       exec ${concatStringsSep " " probeArgs}
     '';
 

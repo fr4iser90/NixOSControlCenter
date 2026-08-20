@@ -4,7 +4,7 @@ let
   moduleName = baseNameOf ../..; # modules/infrastructure/vm
   cliRegistry = getModuleApi "cli-registry";
   tuiEngine = (getModuleApi "tui-engine").fromConfig config;
-  availableDistros = builtins.attrNames (import ../../lib { inherit lib pkgs; }).distros;
+  availableDistros = builtins.attrNames (import ../../lib { inherit lib pkgs getModuleApi; }).distros;
   modulePath = ../..;
 
   vmTui = tuiEngine.domainTui.buildDomainTui {

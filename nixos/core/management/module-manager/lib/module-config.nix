@@ -99,7 +99,7 @@ let
       else
         let
           raw = import "${targetModule.path}/api.nix" {
-            inherit lib getModuleMetadata;
+            inherit lib getModuleMetadata getModuleApi;
             metadata = targetModule;
           };
           injected = {

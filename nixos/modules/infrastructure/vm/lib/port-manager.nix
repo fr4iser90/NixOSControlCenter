@@ -1,6 +1,8 @@
-{ lib, pkgs }:
+{ lib, pkgs, getModuleApi }:
 
 let
+  ui = getModuleApi "cli-formatter";
+
   # Basis-Port für SPICE-Verbindungen
   basePort = 5900;
   maxPort = 5999;  # Maximum port to try
@@ -64,14 +66,14 @@ in {
     # Hauptlogik — no stale "Active VMs" dump (live QEMU check lives in vm.nix)
     VM_PORT=$(find_free_port)
     if [ $? -ne 0 ]; then
-      echo "❌ $VM_PORT" >&2
+      ${ui.messages.error "$VM_PORT"} >&2
       exit 1
     fi
 
     track_vm_port "${name}" "$VM_PORT"
     trap 'cleanup_vm_port "${name}"' EXIT
 
-    # Nur den Port auf stdout
+    # Nur den Port auf stdout (machine-readable — keep raw)
     echo -n "$VM_PORT"
   '';
 
