@@ -486,15 +486,27 @@ class PackagesPage(DomainPage):
         assert self.commit is not None
         self.commit.set_flush_handler(self._flush_pending)
 
-        self.btn_add = self.add_action("Add selected", self._add_selected)
-        self.btn_remove = self.add_action("Remove selected", self._remove_selected)
-        self.btn_add_typed = self.add_action("Add by name…", self._add_by_name)
-        self.btn_try = self.add_action("Try selected…", self._try_selected)
-        self.btn_update_nixpkgs = self.add_action(
-            "Update nixpkgs…", self._update_nixpkgs
+        self.btn_add = self.add_action(
+            "Add selected", self._add_selected, ncc=("packages", "add")
         )
-        self.add_action("Refresh", self.reload)
-        self.btn_rebuild = self.add_action("Rebuild…", self._rebuild)
+        self.btn_remove = self.add_action(
+            "Remove selected", self._remove_selected, ncc=("packages", "remove")
+        )
+        self.btn_add_typed = self.add_action(
+            "Add by name…", self._add_by_name, ncc=("packages", "add")
+        )
+        self.btn_try = self.add_action(
+            "Try selected…", self._try_selected, ncc=("packages", "try")
+        )
+        self.btn_update_nixpkgs = self.add_action(
+            "Update nixpkgs…",
+            self._update_nixpkgs,
+            ncc=("system", "update-channels"),
+        )
+        self.add_action("Refresh", self.reload, local=True)
+        self.btn_rebuild = self.add_action(
+            "Rebuild…", self._rebuild, ncc=("system", "build")
+        )
 
         self.tabs.currentChanged.connect(self._sync_actions_for_tab)
         self.reload()

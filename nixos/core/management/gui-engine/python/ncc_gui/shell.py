@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QSettings, QSize, QTimer, Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QFrame,
@@ -36,6 +36,7 @@ from ncc_gui.shell_state import STICKY_DOMAIN_IDS, ShellChromeState
 from ncc_gui.target_bar import TargetBar
 from ncc_gui.target_bus import bus as target_bus
 from ncc_gui.target_probe import EXPECTED_CONFIG_VERSION
+from ncc_gui.session_ux import session_mode
 from ncc_gui.target_session import TargetSession, session_controller
 from ncc_gui.target_state import LOCAL_ONLY_DOMAINS
 from ncc_gui.theme import APP_STYLE
@@ -45,11 +46,15 @@ PageBuilder = Callable[[DomainInfo], QWidget]
 _ROLE_SECTION = Qt.ItemDataRole.UserRole
 _ROLE_DOMAIN = Qt.ItemDataRole.UserRole + 1
 
+_SETTINGS_ORG = "NixOSControlCenter"
+_SETTINGS_APP = "ncc-gui"
+_GEOMETRY_KEY = "shell/geometry"
+
 # Domains visible while a remote session is gated (plus LOCAL_ONLY always).
 _GATE_ALLOW: dict[str, frozenset[str]] = {
-    "blocked": frozenset({"hosts", "ssh"}),
-    "needs_install": frozenset({"hosts", "ssh", "install"}),
-    "needs_update": frozenset({"hosts", "ssh", "install", "system"}),
+    "blocked": frozenset({"ssh"}),
+    "needs_install": frozenset({"ssh", "install"}),
+    "needs_update": frozenset({"ssh", "install", "system"}),
 }
 
 
@@ -74,7 +79,6 @@ class NccShell(QMainWindow):
         # DomainPage soft-reload skips when under chrome shell (document recreate).
         self._is_ncc_chrome_shell = True
         self.setWindowTitle(title)
-        self.resize(1120, 740)
         self.setMinimumSize(800, 520)
         self.setStyleSheet(APP_STYLE)
 
@@ -86,6 +90,12 @@ class NccShell(QMainWindow):
         self._current_page: QWidget | None = None
         self._sticky: dict[str, QWidget] = {}
         self._geom_lock: QSize | None = None
+        self._geom_save_timer = QTimer(self)
+        self._geom_save_timer.setSingleShot(True)
+        self._geom_save_timer.setInterval(400)
+        self._geom_save_timer.timeout.connect(self._persist_geometry)
+
+        self._restore_geometry()
 
         self._doc_host = QWidget()
         self._doc_host.setObjectName("nccDocumentHost")
@@ -264,6 +274,30 @@ class NccShell(QMainWindow):
         super().resizeEvent(event)
         if self.isVisible():
             self._geom_lock = self.size()
+            self._geom_save_timer.start()
+
+    def moveEvent(self, event) -> None:  # noqa: N802
+        super().moveEvent(event)
+        if self.isVisible():
+            self._geom_save_timer.start()
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        self._persist_geometry()
+        super().closeEvent(event)
+
+    def _settings(self) -> QSettings:
+        return QSettings(_SETTINGS_ORG, _SETTINGS_APP)
+
+    def _restore_geometry(self) -> None:
+        raw = self._settings().value(_GEOMETRY_KEY)
+        if raw is not None and self.restoreGeometry(raw):
+            self._geom_lock = self.size()
+            return
+        self.resize(1120, 740)
+        self._geom_lock = QSize(1120, 740)
+
+    def _persist_geometry(self) -> None:
+        self._settings().setValue(_GEOMETRY_KEY, self.saveGeometry())
 
     def sizeHint(self) -> QSize:  # noqa: N802
         if self._geom_lock is not None:
@@ -276,14 +310,15 @@ class NccShell(QMainWindow):
         frame = QFrame()
         frame.setObjectName("nccGateBanner")
         frame.hide()
-        frame.setMaximumHeight(56)
+        frame.setMinimumHeight(44)
+        frame.setMaximumHeight(72)
         row = QHBoxLayout(frame)
-        row.setContentsMargins(12, 6, 12, 6)
+        row.setContentsMargins(12, 8, 12, 8)
         self._gate_msg = QLabel()
-        self._gate_msg.setObjectName("nccTargetStatus")
-        self._gate_msg.setWordWrap(False)
+        self._gate_msg.setObjectName("nccGateMessage")
+        self._gate_msg.setWordWrap(True)
         self._gate_msg.setSizePolicy(
-            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
         row.addWidget(self._gate_msg, stretch=1)
         self._gate_btn = QPushButton()
@@ -291,8 +326,10 @@ class NccShell(QMainWindow):
         self._gate_btn.clicked.connect(self._on_gate_action)
         row.addWidget(self._gate_btn)
         self._gate_secondary = QPushButton("Open System")
-        self._gate_secondary.clicked.connect(lambda: self.select_domain("system"))
+        self._gate_secondary.clicked.connect(self._on_gate_secondary)
         row.addWidget(self._gate_secondary)
+        self._gate_action = ""
+        self._gate_secondary_action = ""
         return frame
 
     def _rebuild_nav(self) -> None:
@@ -386,42 +423,93 @@ class NccShell(QMainWindow):
         ):
             self._select_first_visible()
 
+    def _set_gate_kind(self, kind: str) -> None:
+        self._gate.setProperty("gateKind", kind)
+        self._gate.style().unpolish(self._gate)
+        self._gate.style().polish(self._gate)
+        self._gate.update()
+
     def _update_gate_banner(self, s: TargetSession) -> None:
         # No fleet chrome → no gate strip.
         if not self._target.target_chrome_visible():
             self._gate.hide()
             return
         gate = s.state
-        # candidate / connecting: Target bar already has Connect + status — no second strip.
-        if gate in ("idle", "ready", "candidate", "connecting"):
+        mode = session_mode(s)
+
+        # Pending select: soft strip so selection ≠ connection is obvious.
+        if mode == "pending" and gate == "candidate":
+            host = s.candidate or "host"
+            self._gate_msg.setText(
+                f"{host} selected — still operating on LOCAL. "
+                "Press Connect to switch the session."
+            )
+            self._gate_btn.setText("Connect")
+            self._gate_btn.setEnabled(True)
+            self._gate_btn.show()
+            self._gate_secondary.setText("Clear")
+            self._gate_secondary.show()
+            self._gate_action = "connect"
+            self._gate_secondary_action = "clear"
+            self._set_gate_kind("warn")
+            self._gate.show()
+            return
+
+        if gate in ("idle", "ready", "connecting"):
             self._gate.hide()
             return
         if gate not in ("blocked", "needs_install", "needs_update"):
             self._gate.hide()
             return
 
-        self._gate_msg.setText(s.message)
-        self._gate_secondary.hide()
+        self._gate_msg.setText(s.message or "")
         if gate == "needs_install":
             self._gate_btn.setText("Open Install")
             self._gate_btn.setEnabled(True)
             self._gate_btn.show()
+            self._gate_secondary.hide()
             self._gate_action = "install"
+            self._gate_secondary_action = ""
+            self._set_gate_kind("warn")
         elif gate == "needs_update":
             self._gate_btn.setText(f"Update to {EXPECTED_CONFIG_VERSION}")
             self._gate_btn.setEnabled(True)
             self._gate_btn.show()
             self._gate_secondary.hide()
             self._gate_action = "update"
-        else:  # blocked — only when Target bar can't resolve it (e.g. not NixOS)
+            self._gate_secondary_action = ""
+            self._set_gate_kind("warn")
+        elif s.connected:
+            # Connected but blocked (e.g. not NixOS) — leave remote session.
             self._gate_btn.setText("Disconnect")
-            self._gate_btn.setEnabled(bool(s.connected))
-            self._gate_btn.setVisible(bool(s.connected))
+            self._gate_btn.setEnabled(True)
+            self._gate_btn.show()
+            self._gate_secondary.hide()
             self._gate_action = "disconnect"
-            if not s.connected and not (s.message or "").strip():
+            self._gate_secondary_action = ""
+            self._set_gate_kind("danger")
+        else:
+            # Unreachable / failed Connect — still LOCAL; make it unmissable.
+            if not (s.message or "").strip():
                 self._gate.hide()
                 return
+            self._gate_btn.setText("Retry Connect")
+            self._gate_btn.setEnabled(bool(s.candidate))
+            self._gate_btn.setVisible(bool(s.candidate))
+            self._gate_secondary.setText("Use this machine")
+            self._gate_secondary.show()
+            self._gate_action = "retry"
+            self._gate_secondary_action = "clear"
+            self._set_gate_kind("danger")
         self._gate.show()
+
+    def _on_gate_secondary(self) -> None:
+        action = getattr(self, "_gate_secondary_action", "")
+        if action == "clear":
+            self._gate_action = "clear"
+            self._on_gate_action()
+            return
+        self.select_domain("system")
 
     def _on_gate_action(self) -> None:
         action = getattr(self, "_gate_action", "")
@@ -429,6 +517,14 @@ class NccShell(QMainWindow):
         if action == "disconnect":
             ctrl.disconnect_target()
             target_bus().changed.emit(None)
+        elif action == "clear":
+            ctrl.disconnect_target()
+            self._target.set_target(None, emit=True)
+            target_bus().changed.emit(None)
+        elif action == "connect" or action == "retry":
+            host = ctrl.session().candidate
+            if host:
+                ctrl.connect_target(host)
         elif action == "install":
             self.select_domain("install")
             target_bus().navigate.emit("install")

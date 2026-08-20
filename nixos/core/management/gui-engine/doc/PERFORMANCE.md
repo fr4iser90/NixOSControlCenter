@@ -32,7 +32,7 @@ Hot paths that must stay cheap: **chat/session switch**, **sidebar nav** (dispos
 | `ncc user whoami` | `@lru_cache` in assistant permissions | User/role change; `clear_whoami_cache()` |
 | LLM model list | In-memory on `ChatSession`; reuse on chat switch (`refresh_models=False`) | Provider/endpoint change, explicit Refresh |
 | Domain catalog | Loaded at shell start / soft generation | Soft/hard generation |
-| Host list (`~/.creds`) | Target bar / hosts page | User refresh / hosts edit |
+| Host list (`~/.creds`) | Target bar / SSH client page | User refresh / ssh client edit |
 | Target probe result | `TargetSession` until Disconnect / re-probe | Disconnect, Connect, explicit Refresh |
 
 Optional TTL (5–15 min) is fine for model lists if a manual Refresh exists.

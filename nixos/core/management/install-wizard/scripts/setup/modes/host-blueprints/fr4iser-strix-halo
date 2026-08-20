@@ -73,7 +73,7 @@
     system-updater = true;
     ssh-manager = true; # server; set client.enable = true in module config for outbound
     bootentry-manager = true;
-    homelab-manager = false;  # enable when docker stacks ready
+    stack-manager = false;  # enable when docker stacks ready
     vm-manager = false;
     ai-workspace = true;
   };

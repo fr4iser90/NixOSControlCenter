@@ -267,6 +267,9 @@ class CommitController:
                 "This page has no Apply handler yet.",
             )
             return
+        confirm_fn = getattr(self.page, "confirm_scope_write", None)
+        if callable(confirm_fn) and not confirm_fn("Apply"):
+            return
         self._on_flush(list(self.pending))
 
     def notify_apply_finished(

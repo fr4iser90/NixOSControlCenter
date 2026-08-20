@@ -1,0 +1,21 @@
+{
+  "_schema": "ncc-domain/nixos/1.0",
+  "_version": "2.0.0",
+  "path": "nixos/",
+  "description": "Active NixOS tree. Module inventory is NOT listed here — use live discovery.",
+  "inventory": {
+    "ssot": "ncc modules list --json (runtime discovery)",
+    "tools": ["list_modules", "ncc modules list --json"]
+  },
+  "buckets": {
+    "core/": "Discovered domain=core (base + management)",
+    "modules/": "Discovered domain=modules (optional)",
+    "custom/": "User modules — never overwritten on update",
+    "flake.nix": "Flake entry — wires discovery helpers"
+  },
+  "rules": [
+    "Never hardcode module name lists in docs or skills",
+    "Delete a module directory → gone from live discovery after deploy to the scanned tree",
+    "Per-module AI packs live under <module>/ai/"
+  ]
+}

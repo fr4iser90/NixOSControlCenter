@@ -96,19 +96,37 @@ class NetworkPage(DomainPage):
         wifi_outer.addWidget(self.wifi_live)
         self.wifi_box.setVisible(False)
 
-        self.add_action("Refresh", self.reload, primary=True)
-        self._btn_eth_up = self.add_action("Reconnect Ethernet", self._eth_reconnect)
-        self._btn_eth_down = self.add_action("Disconnect Ethernet", self._eth_disconnect)
-        self._btn_wifi_on = self.add_action("Turn WiFi on", self._wifi_radio_on_act)
-        self._btn_scan = self.add_action("Scan WiFi", self._scan)
-        self._btn_connect = self.add_action("Connect WiFi", self._connect)
+        self.add_action("Refresh", self.reload, primary=True, local=True)
+        self._btn_eth_up = self.add_action(
+            "Reconnect Ethernet",
+            self._eth_reconnect,
+            ncc=("network", "ethernet"),
+        )
+        self._btn_eth_down = self.add_action(
+            "Disconnect Ethernet",
+            self._eth_disconnect,
+            ncc=("network", "ethernet"),
+        )
+        self._btn_wifi_on = self.add_action(
+            "Turn WiFi on", self._wifi_radio_on_act, ncc=("network", "wifi")
+        )
+        self._btn_scan = self.add_action(
+            "Scan WiFi", self._scan, ncc=("network", "wifi")
+        )
+        self._btn_connect = self.add_action(
+            "Connect WiFi", self._connect, ncc=("network", "wifi")
+        )
         self._btn_disconnect = self.add_action(
             "Disconnect WiFi",
-            lambda: self._run_then_reload("network", "wifi", "disconnect", need_confirm="Disconnect"),
+            lambda: self._run_then_reload(
+                "network", "wifi", "disconnect", need_confirm="Disconnect"
+            ),
+            ncc=("network", "wifi"),
         )
         self._btn_saved = self.add_action(
             "Saved networks",
             lambda: self.run_ncc("network", "wifi", "list"),
+            ncc=("network", "wifi"),
         )
 
         self.reload()

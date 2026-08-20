@@ -19,6 +19,23 @@ class CancelledError(LLMError):
     pass
 
 
+def _format_http_error(settings: Settings, status: int, body: str) -> str:
+    """Humanize gateway errors (e.g. nginx HTML 500) — not NCC knowledge bugs."""
+    text = (body or "").strip()
+    snippet = text[:500]
+    looks_html = "<html" in text.lower() or "<center>" in text.lower()
+    where = (settings.endpoint or "?").rstrip("/")
+    if looks_html and status >= 500:
+        return (
+            f"LLM gateway HTTP {status} at {where}\n\n"
+            "This is the reverse proxy / LLM server (nginx HTML), not the NCC knowledge pack.\n"
+            "Check that the OpenAI-compatible upstream behind that URL is healthy "
+            "(e.g. curl \"$ENDPOINT/models\").\n\n"
+            f"Body (truncated):\n{snippet}"
+        )
+    return f"LLM HTTP {status} at {where}:\n{snippet}"
+
+
 def _auth_headers(settings: Settings) -> dict[str, str]:
     headers = {k: v for k, v in (settings.extra_headers or ()) if k and v}
     if not settings.api_key:
@@ -39,11 +56,12 @@ def list_models(settings: Settings) -> list[dict[str, Any]]:
 
     url = f"{settings.endpoint}/models"
     try:
-        with httpx.Client(timeout=30.0) as client:
+        # Short timeout — UI must not freeze if the gateway is slow/500.
+        with httpx.Client(timeout=5.0) as client:
             resp = client.get(url, headers=_auth_headers(settings))
             if resp.status_code >= 400:
                 raise LLMError(
-                    f"GET {url} → HTTP {resp.status_code}: {resp.text[:400]}"
+                    _format_http_error(settings, resp.status_code, resp.text)
                 )
             data = resp.json()
     except LLMError:
@@ -178,7 +196,9 @@ def iter_chat_completion(
     Yield stream events:
       {"type":"delta","text":"..."}
       {"type":"done","message":{role,content,tool_calls,model}}
-    Falls back to non-streaming if the server rejects stream=true.
+
+    OpenAI-compatible: stream first. If the gateway rejects streaming, one
+    non-streaming POST with the same tools (not a silent tool-strip).
     """
     if settings.api == "anthropic":
         reply = _anthropic(settings, messages, tools)
@@ -189,19 +209,46 @@ def iter_chat_completion(
 
     try:
         yield from _openai_stream(settings, messages, tools, cancel_event)
+        return
     except CancelledError:
         raise
     except LLMError as exc:
-        # Some gateways reject streaming with tools — fall back once.
-        if "stream" in str(exc).lower() or "400" in str(exc):
-            if cancel_event and cancel_event.is_set():
-                raise CancelledError("cancelled") from exc
-            reply = _openai_compatible(settings, messages, tools)
-            if reply.get("content"):
-                yield {"type": "delta", "text": reply["content"]}
-            yield {"type": "done", "message": reply}
-            return
-        raise
+        if cancel_event and cancel_event.is_set():
+            raise CancelledError("cancelled") from exc
+        if not _stream_rejected(exc):
+            raise
+
+    reply = _openai_compatible(settings, messages, tools)
+    if reply.get("content"):
+        yield {"type": "delta", "text": reply["content"]}
+    yield {"type": "done", "message": reply}
+
+
+def _stream_rejected(exc: LLMError) -> bool:
+    """True when SSE/stream failed — use a normal non-streaming POST instead."""
+    msg = str(exc).lower()
+    return any(
+        k in msg
+        for k in (
+            "stream",
+            "sse",
+            "400",
+            "404",
+            "405",
+            "413",
+            "415",
+            "500",
+            "502",
+            "503",
+            "504",
+            "501",
+            "gateway",
+            "nginx",
+            "not implemented",
+            "unsupported",
+            "internal server",
+        )
+    )
 
 
 def _openai_payload(
@@ -235,12 +282,12 @@ def _openai_compatible(
     url = f"{settings.endpoint}/chat/completions"
     headers = {"Content-Type": "application/json", **_auth_headers(settings)}
 
-    with httpx.Client(timeout=120.0) as client:
+    with httpx.Client(timeout=300.0) as client:
         model = resolve_model(settings, client)
         payload = _openai_payload(settings, model, messages, tools, stream=False)
         resp = client.post(url, headers=headers, json=payload)
         if resp.status_code >= 400:
-            raise LLMError(f"LLM HTTP {resp.status_code}: {resp.text[:800]}")
+            raise LLMError(_format_http_error(settings, resp.status_code, resp.text))
         data = resp.json()
 
     choice = (data.get("choices") or [{}])[0]
@@ -291,13 +338,13 @@ def _openai_stream(
     tool_acc: dict[int, dict[str, Any]] = {}
     model_name = settings.model or ""
 
-    with httpx.Client(timeout=httpx.Timeout(120.0, connect=30.0)) as client:
+    with httpx.Client(timeout=httpx.Timeout(300.0, connect=30.0)) as client:
         model_name = resolve_model(settings, client)
         payload = _openai_payload(settings, model_name, messages, tools, stream=True)
         with client.stream("POST", url, headers=headers, json=payload) as resp:
             if resp.status_code >= 400:
                 body = resp.read().decode("utf-8", errors="replace")
-                raise LLMError(f"LLM HTTP {resp.status_code}: {body[:800]}")
+                raise LLMError(_format_http_error(settings, resp.status_code, body))
 
             for line in resp.iter_lines():
                 if cancel_event and cancel_event.is_set():

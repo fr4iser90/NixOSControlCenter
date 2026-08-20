@@ -223,10 +223,14 @@ class UserPage(DomainPage):
         self.commit.set_flush_handler(self._flush_pending)
         self.commit.set_pending_changed(self._render_list)
 
-        self.btn_create = self.add_action("Create…", self._create)
-        self.btn_edit = self.add_action("Edit…", self._edit)
-        self.btn_delete = self.add_action("Delete…", self._delete)
-        self.add_action("Refresh", self.reload)
+        self.btn_create = self.add_action(
+            "Create…", self._create, ncc=("user", "create")
+        )
+        self.btn_edit = self.add_action("Edit…", self._edit, local=True)
+        self.btn_delete = self.add_action(
+            "Delete…", self._delete, ncc=("user", "delete")
+        )
+        self.add_action("Refresh", self.reload, local=True)
 
         self.reload()
 

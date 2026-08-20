@@ -75,7 +75,7 @@
     system-updater = true;    
     ssh-manager = true; # server; set client.enable = true in module config for outbound
     bootentry-manager = false; 
-    homelab-manager = true;    
+    stack-manager = true;    
     vm-manager = false;         
     ai-workspace = false;       
   };

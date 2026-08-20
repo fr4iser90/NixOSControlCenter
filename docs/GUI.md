@@ -23,6 +23,5 @@ Hier ist die **UI‑Matrix pro Modul (CLI / fzf / TUI / GUI / Web)** auf Basis d
 | `nixos/modules/security/ssh-manager` | ✅ | — | — | — | — |
 | `nixos/modules/specialized/ai-workspace` | — | — | — | — | — |
 | `nixos/modules/specialized/chronicle` | ✅ | — | — | ✅ | — |
-| `nixos/modules/specialized/hackathon` | — | — | — | — | — |
 | `nixos/modules/specialized/nixify` | ✅ | — | — | — | — |
 | `nixos/modules/system/lock-manager` | ✅ | — | — | — | — |

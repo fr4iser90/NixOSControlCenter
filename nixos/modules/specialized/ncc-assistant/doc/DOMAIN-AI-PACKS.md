@@ -7,22 +7,27 @@
 ```text
 <module>/
   ai/
-    manifest.nix       # domain id, enable, description
+    manifest.nix       # domain id + description (pack is included if present)
     tools/*.json       # one tool per file
     docs/*.md          # short operator/AI guidance
+    skills/*.json      # optional: assistant skills (owned by this module)
+    domains/*.json     # optional: domain knowledge snippets
+    context/*.json     # optional: architecture/context snippets
 ```
 
-Mirrors `ui/gui/` and `commands.nix`: the **module owns** the pack; **ncc-assistant aggregates** at build time.
+Mirrors `ui/gui/` and `commands.nix`: the **module owns** the pack; **ncc-assistant only aggregates** at build time.
+Delete the module directory ⇒ tools, docs, skills, domains for that module disappear. No central knowledge dump.
 
 ## Manifest
 
 ```nix
 {
   domain = "user";           # CLI domain (ncc user …)
-  enable = true;
   description = "User accounts and roles";
 }
 ```
+
+`enable` is **not** module `systemConfig.enable`. It is only an optional pack opt-out (`enable = false`) if a pack must stay on disk but hidden from the assistant. Omit it (default: included).
 
 ## Tool JSON
 

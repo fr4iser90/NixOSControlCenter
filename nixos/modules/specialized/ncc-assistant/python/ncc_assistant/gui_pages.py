@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QSpinBox,
     QSplitter,
     QTableWidget,
@@ -38,40 +39,55 @@ from PySide6.QtWidgets import (
 
 
 class ToolTraceWidget(QFrame):
-    """Compact collapsible tool-call row — collapsed by default."""
+    """Tool row — same chrome as chat Bubble (radius/margins/border/header)."""
+
+    _RADIUS = 8
+    _MARGINS = (10, 8, 10, 8)
+    _SPACING = 4
+    _BODY_MAX = 160
 
     def __init__(self, name: str, args: object, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("nccToolTrace")
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
         self.setStyleSheet(
             "QFrame#nccToolTrace {"
-            "  background: palette(alternate-base);"
+            "  background: palette(base);"
             "  border: 1px solid palette(mid);"
-            "  border-radius: 8px;"
+            f"  border-radius: {self._RADIUS}px;"
             "}"
         )
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 6, 10, 6)
-        layout.setSpacing(4)
+        layout.setContentsMargins(*self._MARGINS)
+        layout.setSpacing(self._SPACING)
 
         header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(4)
+
         self._toggle = QToolButton()
+        self._toggle.setAutoRaise(True)
+        self._toggle.setFixedSize(22, 22)
         self._toggle.setText("▸")
         self._toggle.setCheckable(True)
         self._toggle.setChecked(False)
         self._toggle.setToolTip("Show / hide tool details")
+        self._toggle.setStyleSheet(
+            "QToolButton { border: none; padding: 0; margin: 0; }"
+        )
         self._toggle.toggled.connect(self._on_toggle)
         header.addWidget(self._toggle)
 
         self._name = name
         self._raw_args = args
         self._result = ""
-        # Short label when collapsed — do not dump args into the header.
-        self._title = QLabel(f"tool {name}")
+        self._title = QLabel(f"tool called: {name}")
         self._title.setObjectName("nccToolTraceTitle")
         self._title.setStyleSheet(
             "QLabel#nccToolTraceTitle {"
-            "  font-family: monospace; color: palette(window-text);"
+            "  font-weight: 700; font-size: 12px;"
+            "  font-family: monospace;"
+            "  color: palette(window-text); padding: 0; margin: 0;"
             "}"
         )
         self._title.setTextInteractionFlags(
@@ -81,39 +97,76 @@ class ToolTraceWidget(QFrame):
 
         copy_btn = QToolButton()
         copy_btn.setAutoRaise(True)
+        copy_btn.setFixedSize(22, 22)
         copy_btn.setToolTip("Copy tool args + result")
+        copy_btn.setStyleSheet(
+            "QToolButton { border: none; padding: 0; margin: 0; }"
+        )
         icon = QIcon.fromTheme("edit-copy")
         if not icon.isNull():
             copy_btn.setIcon(icon)
         else:
             copy_btn.setText("⎘")
         copy_btn.clicked.connect(self._copy)
+        self._copy_btn = copy_btn
         header.addWidget(copy_btn)
         layout.addLayout(header)
 
         self._body = QTextBrowser()
         self._body.setVisible(False)
-        self._body.setMaximumHeight(200)
+        self._body.setFixedHeight(0)
+        self._body.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        self._body.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._body.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._body.setStyleSheet(
             "QTextBrowser {"
             "  font-family: monospace; font-size: 11px;"
-            "  background: palette(base); color: palette(text);"
+            "  background: palette(alternate-base); color: palette(text);"
             "  border: 1px solid palette(mid); border-radius: 4px;"
+            "  padding: 4px; margin: 0;"
             "}"
         )
         layout.addWidget(self._body)
 
     def _on_toggle(self, checked: bool) -> None:
         self._toggle.setText("▾" if checked else "▸")
-        self._body.setVisible(checked)
         if checked:
+            self._body.setVisible(True)
             self._refresh()
+            from PySide6.QtCore import QTimer
+
+            QTimer.singleShot(0, self._keep_in_view)
+        else:
+            self._body.setVisible(False)
+            self._body.setFixedHeight(0)
+
+    def _fit_body_height(self) -> None:
+        """Height follows content — no empty 180px pane."""
+        doc = self._body.document()
+        width = self._body.viewport().width()
+        if width < 80:
+            width = max(self.width() - 24, 400)
+        doc.setTextWidth(float(width))
+        h = int(doc.size().height()) + 12
+        self._body.setFixedHeight(max(36, min(h, self._BODY_MAX)))
+
+    def _keep_in_view(self) -> None:
+        """Keep this row visible when expanding — do not jump the feed to the bottom."""
+        from PySide6.QtWidgets import QScrollArea
+
+        w: QWidget | None = self.parentWidget()
+        while w is not None:
+            if isinstance(w, QScrollArea):
+                w.ensureWidgetVisible(self, 0, 16)
+                return
+            w = w.parentWidget()
 
     def set_result(self, text: str) -> None:
         self._result = text
         ok = "ok" if "error" not in text.lower()[:80] else "err"
-        self._title.setText(f"tool {self._name} → {ok}")
-        # Stay collapsed; only refresh body if user already opened it.
+        self._title.setText(f"tool called: {self._name} → {ok}")
         if self._toggle.isChecked():
             self._refresh()
 
@@ -126,11 +179,40 @@ class ToolTraceWidget(QFrame):
 
     def _copy(self) -> None:
         from PySide6.QtGui import QGuiApplication
+        from PySide6.QtCore import QTimer
 
         QGuiApplication.clipboard().setText(self._payload())
+        btn = self._copy_btn
+        prev_tip = btn.toolTip()
+        prev_text = btn.text()
+        had_icon = not btn.icon().isNull()
+        btn.setToolTip("Copied")
+        ok = QIcon.fromTheme("dialog-ok")
+        if not ok.isNull():
+            btn.setIcon(ok)
+            btn.setText("")
+        else:
+            btn.setIcon(QIcon())
+            btn.setText("✓")
+
+        def _restore() -> None:
+            btn.setToolTip(prev_tip or "Copy tool args + result")
+            if had_icon:
+                icon = QIcon.fromTheme("edit-copy")
+                btn.setText("")
+                if not icon.isNull():
+                    btn.setIcon(icon)
+                else:
+                    btn.setText(prev_text or "⎘")
+            else:
+                btn.setIcon(QIcon())
+                btn.setText(prev_text or "⎘")
+
+        QTimer.singleShot(1200, _restore)
 
     def _refresh(self) -> None:
         self._body.setPlainText(self._payload())
+        self._fit_body_height()
 
 
 class DiffReviewDialog(QDialog):

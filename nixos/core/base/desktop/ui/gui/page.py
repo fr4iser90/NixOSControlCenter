@@ -92,7 +92,7 @@ class DesktopPage(DomainPage):
             "Tweaks stage a draft (CommitBar). Apply writes config; "
             "rebuild makes it active on the system."
         )
-        self.add_action("Reload", self.reload)
+        self.add_action("Reload", self.reload, local=True)
 
         assert self.commit is not None
         self.commit.set_flush_handler(self._flush_pending)

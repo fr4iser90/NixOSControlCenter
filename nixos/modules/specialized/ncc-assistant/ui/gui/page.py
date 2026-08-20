@@ -37,6 +37,7 @@ def create_page(parent=None):
                     "Open NCC AI window",
                     lambda: subprocess.Popen(["ncc", "ai", "gui"]),
                     primary=True,
+                    local=True,
                 )
 
         return _Fallback(parent)

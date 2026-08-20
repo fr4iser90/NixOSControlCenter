@@ -35,7 +35,7 @@ class ExamplePage(DomainPage):
         form = self.add_form_block("Settings")
         self.mode = QComboBox()
         form.addRow("Mode", self.mode)
-        self.add_action("Reload", self.reload)
+        self.add_action("Reload", self.reload, local=True)
         assert self.commit is not None
         self.commit.set_flush_handler(self._flush)
 
@@ -66,7 +66,7 @@ class ExamplePage(DomainPage):
 | `add_list_block(title)` | Block + `QListWidget` |
 | `add_content_widget` / `add_content_layout` | Splitters, lists, custom |
 | `add_actions_hint` / `add_actions_widget` | Text / checkboxes in Actions |
-| `add_action(label, slot, primary=False)` | Domain button (left of CommitBar) |
+| `add_action(label, slot, *, primary=False, ncc=…\|local=True)` | Domain button — declare `ncc=(domain, verb, …)` or `local=True` |
 | `add_header_action(slot, tooltip=, icon=)` | Compact header control (e.g. settings gear → modal) |
 | `self.commit` | CommitBar: Undo / Save / Apply (§2.1) |
 | `log_append` / `log_write` / `log_clear` | Activity (ANSI stripped) |
@@ -95,7 +95,7 @@ Rules:
 - Root adds navigation + Target. Domain window does **not** duplicate the sidebar.
 - Target bar is **only** on the root shell (fleet). Selecting a host is a
   **candidate**; **Connect** probes and activates (`NCC_TARGET_HOST`).
-  Local-only domains (`hosts`, `ssh`) ignore Target for their actions; others
+  Local-only domains (`ssh`) ignore Target for their actions; others
   follow the connected target when set.
 - Do **not** duplicate a “Target” row inside domain Status/Preflight forms —
   the header is the single place. Subtitle may mention the connected host.
@@ -173,9 +173,9 @@ network, modules, hosts records, …) must:
 The user must never feel that Create/Add already “built the system”. Create
 only means “add to the draft list”.
 
-Migrated: Packages; Users; Desktop; Module Manager; SSH Client; Hosts.  
+Migrated: Packages; Users; Desktop; Module Manager; SSH Client.  
 New domain: **Hardware** (`core/base/hardware`) — inventory + autoDetect badge/toggle.  
-(SSH/Hosts: `notify_apply_finished(..., offer_rebuild=False)` — no Nix rebuild.)
+(SSH client: `notify_apply_finished(..., offer_rebuild=False)` — no Nix rebuild.)
 
 #### Immediate actions (small allowlist — exceptions)
 
@@ -394,24 +394,29 @@ Desktop entry: `ncc.desktop`, exec `ncc`, icon name `ncc` (hicolor from gui-engi
 ## 9. Root shell chrome (not part of domain pages)
 
 1. **Header** (full width), fixed layout:
-   - **Left:** Target cluster (`Target` + combo + `+` + Connect/Disconnect) — optional  
+   - **Left:** Session chip (`LOCAL` / `REMOTE` / pending / failed) + host combo + `+` + Connect/Disconnect — optional  
    - **Middle:** one-line status (elided)  
    - **Right:** Settings (⚙) — always  
-2. **Gate** banner (only when Target chrome is on and session not ready)  
-3. Brand (icon + “NCC” / “Control Center”)  
-4. Sidebar sections **Core** / **Features** (`registerGuiDomain.group`)  
-5. Disabled domains: **hidden** (not grey stubs)  
-6. Content = resolved page for selection  
+   - Header tint follows session mode (local / pending / remote / failed)
+2. **Gate** banner when Target chrome is on and session is not idle/ready:
+   - **pending:** warn strip + Connect / Clear (selection ≠ connection)
+   - **failed (unreachable):** danger strip + Retry Connect / Use this machine
+   - **needs_install / needs_update:** warn + Open Install / Update
+3. Brand (icon + “NCC” / “Control Center”)
+4. Sidebar sections **Core** / **Features** (`registerGuiDomain.group`)
+5. Disabled domains: **hidden** (not grey stubs)
+6. Content = resolved page for selection; every `DomainPage` shows **Operating on: …**
+7. **Write gate:** Apply / `run_ncc_root` confirm when a remote host is selected/failed but session is still LOCAL
 
-**Never** put stretch between the “Target” label and the combo — that shoved the
+**Never** put stretch between the session chip and the combo — that shoved the
 combo to the right. Stretch belongs only between the left cluster and Settings.
 
 Settings (`~/.config/ncc/gui-chrome.json`): `show_target` toggles the Target
 cluster. When off → this machine only, gate hidden, header ≈ Settings button.
 
-Session (`ncc_gui.target_session`): candidate → Connect → probe →  
-`blocked` | `needs_install` | `needs_update` | `ready` (local ready ≈ `idle`).  
-`NCC_TARGET_HOST` is set only while connected.
+Session (`ncc_gui.target_session` + `session_ux`): candidate → Connect → probe →
+`blocked` | `needs_install` | `needs_update` | `ready` (local ready ≈ `idle`).
+`NCC_TARGET_HOST` is set only while connected. Selection alone never switches scope.
 
 
 ---

@@ -1,5 +1,4 @@
 {
   domain = "packages";
-  enable = true;
-  description = "nixpkgs packages, sets, and presets (ncc packages)";
+  description = "System/user packages and packageModules / Store intents.";
 }

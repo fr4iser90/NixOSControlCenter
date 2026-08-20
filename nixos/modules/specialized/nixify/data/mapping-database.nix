@@ -343,7 +343,7 @@
         "Docker Desktop"
       ];
       category = "infrastructure";
-      module = "modules.infrastructure.homelab-manager";
+      module = "modules.infrastructure.stack-manager";
       nixos_package = "docker";
       priority = "high";
     };

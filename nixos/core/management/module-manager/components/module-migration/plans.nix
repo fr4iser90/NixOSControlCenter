@@ -12,7 +12,14 @@
         "modules/security/ssh-client-manager"
       ];
       toPath = "modules/security/ssh-manager";
-      kind = "ssh-merge"; # runner dispatch
+      kind = "ssh-merge";
+    }
+    {
+      id = "stack-manager-rename-v1";
+      description = "Rename homelab-manager → stack-manager (homelab + compute catalogs)";
+      fromPaths = [ "modules/infrastructure/homelab-manager" ];
+      toPath = "modules/infrastructure/stack-manager";
+      kind = "rename";
     }
   ];
 }

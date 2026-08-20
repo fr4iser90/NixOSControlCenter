@@ -1,5 +1,0 @@
-# Migrated from tests/run-all.sh — body via fromJSON (Nix-safe).
-{ pkgs }:
-pkgs.writeText "run-all.sh" (builtins.fromJSON ''
-"#!/usr/bin/env bash\n# Run all installer shell tests.\nset -euo pipefail\nDIR=\"\u0024(cd \"\u0024(dirname \"\u0024{BASH_SOURCE[0]}\")\" && pwd)\"\nROOT=\"\u0024(cd \"\u0024DIR/../../..\" && pwd)\"\n\necho \">>> checks/modules/validate-no-hardcoded-paths.sh\"\nbash \"\u0024ROOT/shell/scripts/checks/modules/validate-no-hardcoded-paths.sh\"\necho\necho \">>> checks/modules/validate-module-imports.sh\"\nbash \"\u0024ROOT/shell/scripts/checks/modules/validate-module-imports.sh\"\necho\n\necho \">>> test-presets-dry-run.sh\"\nbash \"\u0024DIR/test-presets-dry-run.sh\"\necho\necho \">>> test-installer-full.sh\"\nbash \"\u0024DIR/test-installer-full.sh\"\necho\necho \">>> test-installer-remaining.sh\"\nbash \"\u0024DIR/test-installer-remaining.sh\"\necho\necho \">>> test-docker-mode.sh\"\nbash \"\u0024DIR/test-docker-mode.sh\"\necho\necho \">>> test-resolve-pins.sh\"\nbash \"\u0024DIR/test-resolve-pins.sh\"\necho\necho \"All installer tests passed.\"\n"
-'')

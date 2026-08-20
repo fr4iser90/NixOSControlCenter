@@ -9,10 +9,10 @@
 #
 # { systemConfig, packageModules, dockerRoot, dockerEnable } → null | "root" | "rootless"
 
-{ systemConfig
-, packageModules
-, dockerRoot
-, dockerEnable
+{ systemConfig ? { }
+, packageModules ? [ ]
+, dockerRoot ? null
+, dockerEnable ? false
 }:
 
 let
@@ -30,13 +30,17 @@ let
   hasDockerRootless = elem "docker-rootless" packageModules;
   wantsDocker = hasDocker || hasDockerRootless || dockerEnable;
 
+  # Swarm from stack-manager (or legacy homelab-manager / top-level homelab)
+  st = getPath [ "modules" "infrastructure" "stack-manager" ] systemConfig;
+  stAttrs = if st == null then { } else st;
   hl = getPath [ "modules" "infrastructure" "homelab-manager" ] systemConfig;
   hlAttrs = if hl == null then { } else hl;
   hlNested = if builtins.isAttrs (hlAttrs.homelab or null) then hlAttrs.homelab else { };
   legacyHomelab = let h = getPath [ "homelab" ] systemConfig; in if h == null then { } else h;
 
   isSwarm =
-    (hlAttrs.swarm or null) != null
+    (stAttrs.swarm or null) != null
+    || (hlAttrs.swarm or null) != null
     || (hlNested.type or null) == "swarm"
     || ((hlNested.role or null) != null && (hlNested.type or "swarm") == "swarm")
     || (getPath [ "swarm" "role" ] legacyHomelab) != null

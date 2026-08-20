@@ -61,37 +61,14 @@ class HealthReport:
         }
 
 
-def _load_registry(path: Path) -> dict[str, Any]:
-    """Load a registry JSON file."""
+def _load_json(path: Path) -> dict[str, Any]:
+    """Load a JSON file or return {}."""
     if not path.is_file():
         return {}
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-
-
-def _walk_registry_modules(node: Any, path_prefix: str = "") -> list[dict[str, Any]]:
-    """Extract module entries from registry tree."""
-    modules: list[dict[str, Any]] = []
-    if not isinstance(node, dict):
-        return modules
-
-    for key, value in node.items():
-        if key.startswith("_"):
-            continue
-        if isinstance(value, dict):
-            if "path" in value:
-                modules.append({
-                    "name": key,
-                    "path": value.get("path", ""),
-                    "description": value.get("description", ""),
-                    "enabled_default": value.get("enabledDefault", False),
-                })
-            else:
-                modules.extend(_walk_registry_modules(value, f"{path_prefix}{key}/"))
-
-    return modules
 
 
 def _check_nix_instantiate(nixos_dir: str) -> tuple[bool, str]:
@@ -130,36 +107,91 @@ def _check_nix_instantiate(nixos_dir: str) -> tuple[bool, str]:
         return False, str(e)
 
 
+def _load_live_modules() -> tuple[list[dict[str, Any]], str]:
+    """Ask ncc modules list --json (runtime discovery). Empty if unavailable."""
+    import json
+    import shutil
+    import subprocess
+
+    cmd = None
+    if shutil.which("ncc"):
+        cmd = ["ncc", "modules", "list", "--json"]
+    elif shutil.which("ncc-modules-discover"):
+        cmd = ["ncc-modules-discover"]
+    if not cmd:
+        return [], "none"
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=30, check=False
+        )
+        if proc.returncode != 0 or not (proc.stdout or "").strip():
+            return [], "none"
+        data = json.loads(proc.stdout)
+    except (OSError, json.JSONDecodeError, subprocess.TimeoutExpired):
+        return [], "none"
+
+    if isinstance(data, list):
+        rows = data
+    elif isinstance(data, dict):
+        rows = data.get("modules") or data.get("data") or []
+    else:
+        rows = []
+
+    modules: list[dict[str, Any]] = []
+    for m in rows:
+        if not isinstance(m, dict):
+            continue
+        name = m.get("name") or m.get("id") or ""
+        if not name:
+            continue
+        cat = str(m.get("category") or m.get("domain") or "")
+        kind = (
+            "core"
+            if cat.startswith("core") or m.get("scope") == "core"
+            else "optional"
+        )
+        modules.append(
+            {
+                "name": name,
+                "path": m.get("path") or m.get("relPath") or "",
+                "description": m.get("description") or name,
+                "enabled_default": m.get("defaultEnabled", kind == "core"),
+                "kind": m.get("kind") or kind,
+            }
+        )
+    return modules, "ncc-modules-discover"
+
+
 def config_health_report(settings: Settings) -> HealthReport:
     """
     Generate a configuration health report.
-    Uses knowledge registries + optional nix-instantiate check.
+    Module inventory = live ``ncc modules list`` only (no packaged JSON).
     """
     report = HealthReport()
     knowledge_root = settings.knowledge_root
 
-    core_registry = _load_registry(knowledge_root / "modules" / "core-registry.json")
-    optional_registry = _load_registry(knowledge_root / "modules" / "optional-registry.json")
+    all_modules, source = _load_live_modules()
 
-    if not core_registry and not optional_registry:
+    if not all_modules:
         report.add(HealthFinding(
             level="warning",
             category="knowledge",
-            message="No module registries found in knowledge root",
+            message="Live module discovery failed",
             path=str(knowledge_root),
-            suggestion="Ensure knowledge pack is installed",
+            suggestion="Ensure `ncc modules list --json` works on this host",
         ))
         return report
 
-    core_modules = _walk_registry_modules(core_registry)
-    optional_modules = _walk_registry_modules(optional_registry)
-    all_modules = core_modules + optional_modules
+    core_n = sum(1 for m in all_modules if m.get("kind") == "core" or str(m.get("path", "")).startswith("nixos/core/"))
+    optional_n = len(all_modules) - core_n
     report.modules_checked = len(all_modules)
 
     report.add(HealthFinding(
         level="info",
         category="discovery",
-        message=f"Found {len(core_modules)} core and {len(optional_modules)} optional modules in registries",
+        message=f"Modules from {source}: {len(all_modules)} "
+        f"(core≈{core_n}, optional≈{optional_n})",
+        path=str(knowledge_root),
     ))
 
     nixos_dir = Path(settings.nixos_dir)

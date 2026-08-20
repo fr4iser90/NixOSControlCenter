@@ -9,7 +9,6 @@
     ./cli-formatter
     ./tui-engine
     ./gui-engine
-    ./hosts
     ./install-wizard
   ];
 }

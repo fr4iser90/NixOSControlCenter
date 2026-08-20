@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QProgressBar,
     QPushButton,
@@ -48,7 +49,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .auth import apply_api_key, probe_needs_auth, with_cached_credentials
+from .auth import apply_api_key, with_cached_credentials
 from .config import Settings
 from .history import (
     delete_session,
@@ -70,6 +71,12 @@ from .providers import (
 from .provider_ui import edit_provider_dialog
 from .runtime import ToolRuntime
 from .session import ChatSession
+from .transcript import (
+    format_from_index_plaintext,
+    format_messages_markdown,
+    format_messages_plaintext,
+    message_plaintext,
+)
 
 try:
     from ncc_gui.dialogs import confirm as gui_engine_confirm
@@ -301,7 +308,8 @@ class SessionRow(QWidget):
             return btn
 
         copy_btn = _icon_btn("edit-copy", "Copy transcript", "⎘")
-        copy_btn.clicked.connect(lambda: self.copy_clicked.emit(self.session_id))
+        self._copy_btn = copy_btn
+        copy_btn.clicked.connect(self._on_copy_clicked)
         actions.addWidget(copy_btn)
 
         del_btn = _icon_btn("edit-delete", "Delete session", "⌫")
@@ -309,6 +317,36 @@ class SessionRow(QWidget):
         actions.addWidget(del_btn)
         actions.addStretch()
         lay.addLayout(actions)
+
+    def _on_copy_clicked(self) -> None:
+        self.copy_clicked.emit(self.session_id)
+        btn = self._copy_btn
+        prev_tip = btn.toolTip()
+        prev_text = btn.text()
+        had_icon = not btn.icon().isNull()
+        btn.setToolTip("Copied")
+        ok = QIcon.fromTheme("dialog-ok")
+        if not ok.isNull():
+            btn.setIcon(ok)
+            btn.setText("")
+        else:
+            btn.setIcon(QIcon())
+            btn.setText("✓")
+
+        def _restore() -> None:
+            btn.setToolTip(prev_tip or "Copy transcript")
+            if had_icon:
+                icon = QIcon.fromTheme("edit-copy")
+                btn.setText("")
+                if not icon.isNull():
+                    btn.setIcon(icon)
+                else:
+                    btn.setText(prev_text or "⎘")
+            else:
+                btn.setIcon(QIcon())
+                btn.setText(prev_text or "⎘")
+
+        QTimer.singleShot(1200, _restore)
 
 
 class SessionSidebar(QWidget):
@@ -402,6 +440,25 @@ class SessionSidebar(QWidget):
         QGuiApplication.clipboard().setText(text)
 
 
+class ModelsFetchWorker(QThread):
+    """Background GET /models so ChatPage open stays responsive."""
+
+    finished_ok = Signal(object)  # list[dict]
+    failed = Signal(str)
+
+    def __init__(self, settings: Settings, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self._settings = settings
+
+    def run(self) -> None:
+        try:
+            from .llm import list_models
+
+            self.finished_ok.emit(list_models(self._settings))
+        except Exception as exc:  # noqa: BLE001
+            self.failed.emit(str(exc))
+
+
 class ChatWorker(QThread):
     event = Signal(object)
     failed = Signal(str)
@@ -440,7 +497,11 @@ from .gui_pages import (
 
 
 class Bubble(QFrame):
-    """Chat bubble with theme-safe contrast and icon copy."""
+    """Chat bubble — shared chrome with ToolTraceWidget (radius/margins/border)."""
+
+    _RADIUS = 8
+    _MARGINS = (10, 8, 10, 8)
+    _SPACING = 4
 
     def __init__(
         self,
@@ -454,75 +515,67 @@ class Bubble(QFrame):
         super().__init__(parent)
         self.setObjectName("nccBubble")
         self.setFrameShape(QFrame.Shape.NoFrame)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
         self._markdown = markdown
         self._raw = text
         self._role = role
 
         role_l = role.lower()
-        # Always pair background with WindowText / Text — never mid-on-mid.
+        # Same radius/border weight for every role; only fill/accent differs.
         if role_l == "you":
             self.setProperty("nccRole", "you")
-            self.setStyleSheet(
-                "QFrame#nccBubble[nccRole='you'] {"
-                "  background: palette(alternate-base);"
-                "  border: 1px solid palette(mid);"
-                "  border-radius: 12px;"
-                "}"
-            )
+            bg, border = "palette(alternate-base)", "palette(mid)"
         elif role_l in ("assistant", "status"):
             self.setProperty("nccRole", "assistant")
-            border = (
-                "border: 1px solid palette(highlight);"
-                if role_l == "status"
-                else "border: 1px solid palette(mid);"
-            )
-            self.setStyleSheet(
-                "QFrame#nccBubble[nccRole='assistant'] {"
-                f"  background: palette(base); {border} border-radius: 12px;"
-                "}"
-            )
+            bg, border = "palette(base)", "palette(mid)"
         elif role_l == "error":
             self.setProperty("nccRole", "error")
-            self.setStyleSheet(
-                "QFrame#nccBubble[nccRole='error'] {"
-                "  background: palette(alternate-base);"
-                "  border: 1px solid #c44; border-radius: 10px;"
-                "}"
-            )
+            bg, border = "palette(alternate-base)", "#c44"
         else:
             self.setProperty("nccRole", "meta")
-            self.setStyleSheet(
-                "QFrame#nccBubble[nccRole='meta'] {"
-                "  background: palette(alternate-base);"
-                "  border: 1px solid palette(mid); border-radius: 10px;"
-                "}"
-            )
+            bg, border = "palette(alternate-base)", "palette(mid)"
+
+        self.setStyleSheet(
+            f"QFrame#nccBubble[nccRole='{self.property('nccRole')}'] {{"
+            f"  background: {bg};"
+            f"  border: 1px solid {border};"
+            f"  border-radius: {self._RADIUS}px;"
+            "}"
+        )
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setSpacing(6)
+        layout.setContentsMargins(*self._MARGINS)
+        layout.setSpacing(self._SPACING)
 
         header = QHBoxLayout()
-        header.setSpacing(8)
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(4)
 
         who = QLabel(role)
         who.setObjectName("nccBubbleRole")
         who.setStyleSheet(
-            "QLabel#nccBubbleRole { font-weight: 700; color: palette(window-text); }"
+            "QLabel#nccBubbleRole {"
+            "  font-weight: 700; font-size: 12px;"
+            "  color: palette(window-text); padding: 0; margin: 0;"
+            "}"
         )
         header.addWidget(who)
         header.addStretch()
 
         copy_btn = QToolButton()
         copy_btn.setAutoRaise(True)
+        copy_btn.setFixedSize(22, 22)
         copy_btn.setToolTip("Copy message")
+        copy_btn.setStyleSheet(
+            "QToolButton { border: none; padding: 0; margin: 0; }"
+        )
         icon = QIcon.fromTheme("edit-copy")
         if not icon.isNull():
             copy_btn.setIcon(icon)
         else:
             copy_btn.setText("⎘")
         copy_btn.clicked.connect(self.copy_to_clipboard)
+        self._copy_btn = copy_btn
         header.addWidget(copy_btn)
         layout.addLayout(header)
 
@@ -542,11 +595,15 @@ class Bubble(QFrame):
             self.body = QTextBrowser()
             self.body.setOpenExternalLinks(True)
             self.body.setFrameShape(QFrame.Shape.NoFrame)
+            self.body.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+            )
             self.body.setStyleSheet(
                 "QTextBrowser { background: transparent; color: palette(text);"
-                " padding: 0; border: none; }"
+                " padding: 0; margin: 0; border: none; }"
             )
             self.body.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.body.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             self.body.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse
                 | Qt.TextInteractionFlag.TextSelectableByKeyboard
@@ -557,7 +614,12 @@ class Bubble(QFrame):
         else:
             self.body = QLabel(text)
             self.body.setWordWrap(True)
-            self.body.setStyleSheet("color: palette(window-text);")
+            self.body.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum
+            )
+            self.body.setStyleSheet(
+                "color: palette(window-text); padding: 0; margin: 0;"
+            )
             self.body.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse
                 | Qt.TextInteractionFlag.TextSelectableByKeyboard
@@ -576,13 +638,24 @@ class Bubble(QFrame):
 
     def set_markdown(self, text: str) -> None:
         self._raw = text
-        if isinstance(self.body, QTextBrowser):
-            self.body.document().setDefaultStyleSheet(self._markdown_doc_css())
-            self.body.setMarkdown(text or "")
-            doc = self.body.document()
-            doc.setTextWidth(self.body.viewport().width() or 700)
-            h = int(doc.size().height()) + 8
-            self.body.setFixedHeight(max(h, 24))
+        if not isinstance(self.body, QTextBrowser):
+            return
+        raw = text or ""
+        self.body.document().setDefaultStyleSheet(self._markdown_doc_css())
+        if not raw.strip():
+            self.body.clear()
+            self.body.setFixedHeight(1)
+            return
+        self.body.setMarkdown(raw)
+        doc = self.body.document()
+        # Viewport is often 0 before first layout → wrong wrap → huge empty height.
+        width = self.body.viewport().width()
+        if width < 80:
+            width = max(self.width() - 48, 480)
+        doc.setTextWidth(float(width))
+        h = int(doc.size().height()) + 10
+        # Short replies stay short; long replies grow (hard cap for safety).
+        self.body.setFixedHeight(max(28, min(h, 12000)))
 
     def append_markdown(self, piece: str) -> None:
         self.set_markdown((self._raw or "") + piece)
@@ -596,7 +669,140 @@ class Bubble(QFrame):
 
     def copy_to_clipboard(self) -> None:
         QGuiApplication.clipboard().setText(self.plain_text())
+        btn = getattr(self, "_copy_btn", None)
+        if btn is None:
+            return
+        prev_tip = btn.toolTip()
+        prev_text = btn.text()
+        btn.setToolTip("Copied")
+        if btn.icon().isNull():
+            btn.setText("✓")
+        else:
+            ok = QIcon.fromTheme("dialog-ok")
+            if not ok.isNull():
+                btn.setIcon(ok)
+            else:
+                btn.setText("✓")
+                btn.setIcon(QIcon())
 
+        def _restore() -> None:
+            btn.setToolTip(prev_tip or "Copy message")
+            if prev_text:
+                btn.setText(prev_text)
+                btn.setIcon(QIcon())
+            else:
+                icon = QIcon.fromTheme("edit-copy")
+                btn.setText("")
+                if not icon.isNull():
+                    btn.setIcon(icon)
+                else:
+                    btn.setText("⎘")
+
+        QTimer.singleShot(1200, _restore)
+
+    def set_message_index(self, index: int | None) -> None:
+        self._message_index = index
+
+    def message_index(self) -> int | None:
+        return getattr(self, "_message_index", None)
+
+
+class TranscriptView(QTextBrowser):
+    """Document-like working view of the same ChatSession.messages (read-only)."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("nccTranscript")
+        self.setOpenExternalLinks(True)
+        self.setReadOnly(True)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        self.setStyleSheet(
+            "QTextBrowser#nccTranscript {"
+            "  background: palette(base); color: palette(text);"
+            "  padding: 16px 20px; border: none;"
+            "  selection-background-color: palette(highlight);"
+            "  selection-color: palette(highlighted-text);"
+            "}"
+        )
+        self.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+            | Qt.TextInteractionFlag.TextSelectableByKeyboard
+            | Qt.TextInteractionFlag.LinksAccessibleByMouse
+        )
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._on_menu)
+        self._plain_cache = ""
+        self._copy_all_cb = None
+        self._copy_md_cb = None
+
+    def set_copy_handlers(self, copy_all, copy_md) -> None:
+        self._copy_all_cb = copy_all
+        self._copy_md_cb = copy_md
+
+    def rebuild(
+        self,
+        messages: list,
+        *,
+        title: str | None = None,
+        streaming: bool = False,
+    ) -> None:
+        md = format_messages_markdown(
+            list(messages or []),
+            include_system=False,
+            include_tools=True,
+            title=title or "Conversation",
+        )
+        self._plain_cache = format_messages_plaintext(
+            list(messages or []), include_system=False, include_tools=True
+        )
+        if streaming:
+            md = (
+                md.rstrip()
+                + "\n\n---\n\n"
+                + "_A reply is still streaming in the Chat view. "
+                "This text updates when that turn finishes._\n"
+            )
+        elif not (messages or []):
+            md = (
+                "# Conversation\n\n"
+                "_No messages yet. Send a message in Chat, or keep typing here "
+                "in the composer below — this view stays open._\n"
+            )
+            self._plain_cache = ""
+        self.document().setDefaultStyleSheet(self._doc_css())
+        self.setMarkdown(md)
+
+    def _doc_css(self) -> str:
+        pal = self.palette()
+        fg = pal.color(QPalette.ColorRole.WindowText).name()
+        muted = pal.color(QPalette.ColorRole.PlaceholderText).name()
+        code_bg = pal.color(QPalette.ColorRole.AlternateBase).name()
+        return (
+            f"body {{ color: {fg}; font-size: 14px; }}"
+            f"h1 {{ font-size: 18px; font-weight: 700; margin: 0 0 16px 0; }}"
+            f"h3 {{ font-size: 13px; font-weight: 700; margin: 18px 0 6px 0;"
+            f" color: {muted}; text-transform: none; }}"
+            f"p {{ margin: 0 0 8px 0; }}"
+            f"code, pre {{ background-color: {code_bg}; color: {fg}; }}"
+            f"pre {{ padding: 8px; border-radius: 6px; }}"
+            f"a {{ color: {pal.color(QPalette.ColorRole.Link).name()}; }}"
+            f"hr {{ border: none; border-top: 1px solid {muted}; margin: 16px 0; }}"
+        )
+
+    def _on_menu(self, pos) -> None:
+        menu = QMenu(self)
+        cursor = self.textCursor()
+        if cursor.hasSelection():
+            act = menu.addAction("Copy")
+            act.triggered.connect(
+                lambda: QGuiApplication.clipboard().setText(cursor.selectedText())
+            )
+            menu.addSeparator()
+        if self._copy_all_cb:
+            menu.addAction("Copy entire chat", self._copy_all_cb)
+        if self._copy_md_cb:
+            menu.addAction("Copy entire chat as Markdown", self._copy_md_cb)
+        menu.exec(self.mapToGlobal(pos))
 
 
 class Composer(QTextEdit):
@@ -636,6 +842,8 @@ class ChatPage(QWidget):
         self._pulse = 0
         self._model_guard = False
         self._provider_guard = False
+        self._stick_bottom = True
+        self._view_mode = "chat"  # "chat" | "transcript"
 
         root = QHBoxLayout(self)
         root.setContentsMargins(8, 8, 8, 8)
@@ -696,6 +904,13 @@ class ChatPage(QWidget):
         open_btn.clicked.connect(self.on_open_session)
         bar.addWidget(open_btn)
 
+        self.view_btn = QPushButton("Transcript")
+        self.view_btn.setToolTip(
+            "Document view of this conversation — select across messages, Ctrl+C"
+        )
+        self.view_btn.clicked.connect(self.toggle_view)
+        bar.addWidget(self.view_btn)
+
         bar.addStretch()
         layout.addLayout(bar)
 
@@ -705,8 +920,9 @@ class ChatPage(QWidget):
         self.feed_host = QWidget()
         self.feed = QVBoxLayout(self.feed_host)
         self.feed.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.feed.setSpacing(10)
+        self.feed.setSpacing(8)
         self.scroll.setWidget(self.feed_host)
+        self.scroll.verticalScrollBar().valueChanged.connect(self._on_scroll_moved)
 
         # Empty landing (no fake chat bubble / no copy icon)
         self.landing = QLabel()
@@ -725,6 +941,11 @@ class ChatPage(QWidget):
         self.chat_stack = QStackedWidget()
         self.chat_stack.addWidget(self.scroll)
         self.chat_stack.addWidget(self.landing)
+        self.transcript = TranscriptView()
+        self.transcript.set_copy_handlers(
+            self.copy_entire_chat_plain, self.copy_entire_chat_markdown
+        )
+        self.chat_stack.addWidget(self.transcript)
         layout.addWidget(self.chat_stack, stretch=1)
 
         self.busy_bar = QProgressBar()
@@ -780,12 +1001,17 @@ class ChatPage(QWidget):
         self._pulse_timer.setInterval(450)
         self._pulse_timer.timeout.connect(self._pulse_status)
 
+        self._models_worker: ModelsFetchWorker | None = None
+        self._models_fetch_gen = 0
+
         self._populate_providers()
-        self._populate_models()
+        # Seed combo from settings only — GET /models runs in background.
+        self._populate_models(fetch=False)
         self._update_vision_ui()
         self._replay_history_bubbles()
         self.sidebar.refresh(self.session.session_id)
         self._refresh_landing()
+        QTimer.singleShot(0, self._start_models_fetch)
 
     def _landing_text(self) -> str:
         writes = "on" if self.session.settings.writes_enabled else "off"
@@ -799,7 +1025,10 @@ class ChatPage(QWidget):
         )
 
     def _refresh_landing(self) -> None:
-        """Show centered landing when there is no visible chat yet."""
+        """Show centered landing when there is no visible chat yet (chat view only)."""
+        if self._view_mode == "transcript":
+            self.chat_stack.setCurrentWidget(self.transcript)
+            return
         visible = 0
         for i in range(self.feed.count()):
             w = self.feed.itemAt(i).widget()
@@ -810,6 +1039,98 @@ class ChatPage(QWidget):
             self.chat_stack.setCurrentWidget(self.landing)
         else:
             self.chat_stack.setCurrentWidget(self.scroll)
+
+    @Slot()
+    def toggle_view(self) -> None:
+        if self._view_mode == "chat":
+            self._view_mode = "transcript"
+            self.view_btn.setText("Chat")
+            self.view_btn.setToolTip("Back to bubble chat (live streaming)")
+            self._rebuild_transcript()
+            self.chat_stack.setCurrentWidget(self.transcript)
+        else:
+            self._view_mode = "chat"
+            self.view_btn.setText("Transcript")
+            self.view_btn.setToolTip(
+                "Document view of this conversation — select across messages, Ctrl+C"
+            )
+            self._refresh_landing()
+
+    def _rebuild_transcript(self) -> None:
+        self.transcript.rebuild(
+            self.session.messages,
+            title=self.session.title or "Conversation",
+            streaming=bool(self._busy),
+        )
+
+    def _maybe_refresh_transcript(self) -> None:
+        if self._view_mode == "transcript":
+            self._rebuild_transcript()
+
+    def copy_entire_chat_plain(self) -> None:
+        text = format_messages_plaintext(
+            self.session.messages, include_system=False, include_tools=True
+        )
+        if text:
+            QGuiApplication.clipboard().setText(text)
+
+    def copy_entire_chat_markdown(self) -> None:
+        text = format_messages_markdown(
+            self.session.messages,
+            include_system=False,
+            include_tools=True,
+            title=self.session.title or "Conversation",
+        )
+        if text:
+            QGuiApplication.clipboard().setText(text)
+
+    def copy_from_message_index(self, index: int) -> None:
+        text = format_from_index_plaintext(
+            self.session.messages, index, include_system=False, include_tools=True
+        )
+        if text:
+            QGuiApplication.clipboard().setText(text)
+
+    def _bubble_context_menu(self, bubble: Bubble, pos) -> None:
+        menu = QMenu(self)
+        menu.addAction(
+            "Copy message",
+            lambda: QGuiApplication.clipboard().setText(bubble.plain_text() or ""),
+        )
+        idx = bubble.message_index()
+        if idx is None:
+            idx = self._guess_message_index(bubble)
+        if idx is not None:
+            menu.addAction(
+                "Copy from here",
+                lambda i=idx: self.copy_from_message_index(i),
+            )
+        menu.addAction("Copy entire chat", self.copy_entire_chat_plain)
+        menu.addAction("Copy entire chat as Markdown", self.copy_entire_chat_markdown)
+        menu.exec(bubble.mapToGlobal(pos))
+
+    def _guess_message_index(self, bubble: Bubble) -> int | None:
+        role_l = (bubble._role or "").lower()
+        want = "user" if role_l == "you" else "assistant" if role_l == "assistant" else None
+        if not want:
+            return None
+        needle = (bubble.plain_text() or "").strip()
+        last: int | None = None
+        for i, msg in enumerate(self.session.messages):
+            if not isinstance(msg, dict) or msg.get("role") != want:
+                continue
+            body = message_plaintext(msg)
+            if needle and needle in body:
+                last = i
+            elif not needle:
+                last = i
+        return last
+
+    def _wire_bubble_menu(self, bubble: Bubble) -> None:
+        bubble.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        bubble.customContextMenuRequested.connect(
+            lambda pos, b=bubble: self._bubble_context_menu(b, pos)
+        )
 
     def _populate_providers(self) -> None:
         self._provider_guard = True
@@ -836,14 +1157,23 @@ class ChatPage(QWidget):
             models = self.session.refresh_models()
         else:
             models = list(self.session.available_models)
-        current = self.session.settings.model or self.session.model_label
+        current = self.session.settings.model or (
+            self.session.model_label
+            if self.session.model_label not in ("auto", "unset", "auto (unavailable)")
+            else None
+        )
         if not models and current:
             models = [{"id": current, "vision": self.session.current_model_vision()}]
+        if not models:
+            # Keep the combo usable while /models is loading or failing.
+            self.model_combo.addItem("auto", "")
+            self._model_guard = False
+            return
         for m in models:
             mid = m.get("id") or ""
             label = mid + ("  (vision)" if m.get("vision") else "")
             self.model_combo.addItem(label, mid)
-        idx = self.model_combo.findData(current)
+        idx = self.model_combo.findData(current) if current else -1
         if idx < 0 and current:
             for i in range(self.model_combo.count()):
                 if self.model_combo.itemData(i) == current:
@@ -859,12 +1189,62 @@ class ChatPage(QWidget):
                 set_last_model(str(mid))
         self._model_guard = False
 
+    def _start_models_fetch(self) -> None:
+        self._models_fetch_gen += 1
+        gen = self._models_fetch_gen
+        self.model_combo.setToolTip("Loading models…")
+        worker = ModelsFetchWorker(self.session.settings, self)
+        self._models_worker = worker
+
+        def _ok(models: object, g: int = gen) -> None:
+            if g != self._models_fetch_gen:
+                return
+            self._on_models_loaded(models)
+
+        def _fail(message: str, g: int = gen) -> None:
+            if g != self._models_fetch_gen:
+                return
+            self._on_models_failed(message)
+
+        worker.finished_ok.connect(_ok)
+        worker.failed.connect(_fail)
+        worker.start()
+
+    @Slot(object)
+    def _on_models_loaded(self, models: object) -> None:
+        if not isinstance(models, list):
+            return
+        self.session.available_models = list(models)
+        self.model_combo.setToolTip("")
+        self._populate_models(fetch=False)
+        self._update_vision_ui()
+
+    @Slot(str)
+    def _on_models_failed(self, message: str) -> None:
+        self.model_combo.setToolTip(f"Could not list models: {message}")
+        # Keep configured / auto entry selectable.
+        if not self.session.available_models and self.session.settings.model:
+            self.session.available_models = [
+                {
+                    "id": self.session.settings.model,
+                    "vision": self.session.current_model_vision(),
+                }
+            ]
+            self._populate_models(fetch=False)
+        self.status.setText("Model list unavailable — using configured model")
+        self.status.show()
+
     def refresh_providers_ui(self) -> None:
         """Called from Settings after provider list edits."""
         self._populate_providers()
 
     def _replay_history_bubbles(self) -> None:
-        for msg in self.session.messages:
+        from .gui_pages import ToolTraceWidget
+
+        # Map tool_call_id / name → args from the preceding assistant message.
+        pending_args: dict[str, object] = {}
+
+        for idx, msg in enumerate(self.session.messages):
             role = msg.get("role")
             if role == "system":
                 continue
@@ -879,11 +1259,90 @@ class ChatPage(QWidget):
                         bits.append(p.get("text") or "")
                 text = "\n".join(bits) or "[multimodal message]"
             if role == "user":
-                self._add_bubble("You", text, markdown=False)
+                self._add_bubble("You", text, markdown=False, message_index=idx)
             elif role == "assistant":
-                self._add_bubble("Assistant", text or "", markdown=True)
+                for tc in msg.get("tool_calls") or []:
+                    if not isinstance(tc, dict):
+                        continue
+                    fn = tc.get("function") or {}
+                    name = str(fn.get("name") or "")
+                    raw = fn.get("arguments") or "{}"
+                    try:
+                        args = json.loads(raw) if isinstance(raw, str) else raw
+                    except json.JSONDecodeError:
+                        args = {"_raw": raw}
+                    tid = str(tc.get("id") or name)
+                    if tid:
+                        pending_args[tid] = args
+                    if name:
+                        pending_args[name] = args
+                # Skip tool-only shells (empty content + tool_calls).
+                if not text.strip() and (msg.get("tool_calls") or []):
+                    continue
+                if not text.strip():
+                    continue
+                self._add_bubble(
+                    "Assistant", text, markdown=True, message_index=idx
+                )
             elif role == "tool":
-                self._add_bubble("Result", text[:1400], markdown=False)
+                name = str(msg.get("name") or "tool")
+                tid = str(msg.get("tool_call_id") or "")
+                args = pending_args.pop(tid, None)
+                if args is None:
+                    args = pending_args.pop(name, {})
+                trace = ToolTraceWidget(name, args if args is not None else {})
+                trace.set_result(text)
+                self._wire_tool_menu(trace, idx)
+                self.feed.addWidget(trace)
+
+    def _wire_tool_menu(self, trace, message_index: int | None) -> None:
+        trace.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+
+        def _menu(pos, t=trace, mid=message_index) -> None:
+            menu = QMenu(self)
+            menu.addAction(
+                "Copy message",
+                lambda: QGuiApplication.clipboard().setText(t._payload()),
+            )
+            if mid is not None:
+                menu.addAction(
+                    "Copy from here",
+                    lambda i=mid: self.copy_from_message_index(i),
+                )
+            menu.addAction("Copy entire chat", self.copy_entire_chat_plain)
+            menu.addAction(
+                "Copy entire chat as Markdown", self.copy_entire_chat_markdown
+            )
+            menu.exec(t.mapToGlobal(pos))
+
+        # Avoid stacking duplicate connections on replay/live reuse.
+        try:
+            trace.customContextMenuRequested.disconnect()
+        except (TypeError, RuntimeError):
+            pass
+        trace.customContextMenuRequested.connect(_menu)
+
+    def _last_index_for_role(self, role: str) -> int | None:
+        last: int | None = None
+        for i, msg in enumerate(self.session.messages):
+            if isinstance(msg, dict) and msg.get("role") == role:
+                last = i
+        return last
+
+    def _tag_last_role_bubble(self, bubble: Bubble, role: str) -> None:
+        idx = self._last_index_for_role(role)
+        if idx is not None:
+            bubble.set_message_index(idx)
+
+    def _tag_latest_you_bubble(self) -> None:
+        for i in range(self.feed.count() - 1, -1, -1):
+            item = self.feed.itemAt(i)
+            if item is None:
+                continue
+            w = item.widget()
+            if isinstance(w, Bubble) and (w._role or "").lower() == "you":
+                self._tag_last_role_bubble(w, "user")
+                return
 
     def _update_meta(self) -> None:
         """Kept as no-op for call sites; endpoint/key chrome lives in provider editor."""
@@ -895,11 +1354,30 @@ class ChatPage(QWidget):
             self._pending_images.clear()
             self._refresh_attach_label()
 
-    def _scroll_bottom(self) -> None:
-        QApplication.processEvents()
-        self.scroll.verticalScrollBar().setValue(
-            self.scroll.verticalScrollBar().maximum()
-        )
+    def _near_scroll_bottom(self, *, slack: int = 80) -> bool:
+        bar = self.scroll.verticalScrollBar()
+        return bar.value() >= bar.maximum() - slack
+
+    @Slot(int)
+    def _on_scroll_moved(self, _value: int) -> None:
+        # User scrolled away from bottom → stop auto-follow until they send again
+        # or scroll back down.
+        if self._near_scroll_bottom():
+            self._stick_bottom = True
+        else:
+            self._stick_bottom = False
+
+    def _scroll_bottom(self, *, force: bool = False) -> None:
+        """Follow new content when stuck to bottom; force on send / errors."""
+        if not force and not self._stick_bottom and not self._near_scroll_bottom():
+            return
+
+        def _go() -> None:
+            bar = self.scroll.verticalScrollBar()
+            bar.setValue(bar.maximum())
+
+        # Layout often updates after this call — defer so we hit the real maximum.
+        QTimer.singleShot(0, _go)
 
     def _add_bubble(
         self,
@@ -908,15 +1386,24 @@ class ChatPage(QWidget):
         *,
         markdown: bool = False,
         pixmap: QPixmap | None = None,
+        scroll: bool = True,
+        message_index: int | None = None,
     ) -> Bubble:
         bubble = Bubble(role, text, markdown=markdown, pixmap=pixmap)
+        if message_index is not None:
+            bubble.set_message_index(message_index)
+        self._wire_bubble_menu(bubble)
         self.feed.addWidget(bubble)
         self._refresh_landing()
-        self._scroll_bottom()
+        if scroll:
+            force = role.lower() in ("you", "error")
+            if force:
+                self._stick_bottom = True
+            self._scroll_bottom(force=force or self._stick_bottom)
         return bubble
 
     def _discard_empty_stream_bubble(self) -> None:
-        """Remove a stream placeholder that never received text (tool-only rounds)."""
+        """Remove a stream bubble that never received text (tool-only rounds)."""
         b = self._stream_bubble
         if b is None:
             return
@@ -949,7 +1436,7 @@ class ChatPage(QWidget):
             self.feed.removeWidget(self._status_bubble)
             self._status_bubble.deleteLater()
             self._status_bubble = None
-        self._scroll_bottom()
+        # Do NOT scroll here — status updates during tool expand would yank the view.
 
     def _pulse_status(self) -> None:
         if not self.status.isVisible():
@@ -992,6 +1479,10 @@ class ChatPage(QWidget):
             set_last_model(str(mid))
             self._update_vision_ui()
             self._update_meta()
+        else:
+            self.session.set_model(None)
+            self._update_vision_ui()
+            self._update_meta()
 
     @Slot(int)
     def on_provider_changed(self, _index: int) -> None:
@@ -1010,8 +1501,9 @@ class ChatPage(QWidget):
             settings, confirm_hook=self.confirm.confirm
         )
         set_last_provider(prov.id, prov.endpoint)
-        self._populate_models()
+        self._populate_models(fetch=False)
         self._update_vision_ui()
+        QTimer.singleShot(0, self._start_models_fetch)
 
     @Slot()
     def on_add_provider(self) -> None:
@@ -1053,8 +1545,9 @@ class ChatPage(QWidget):
             settings, confirm_hook=self.confirm.confirm
         )
         set_last_provider(updated.id, updated.endpoint)
-        self._populate_models()
+        self._populate_models(fetch=False)
         self._update_vision_ui()
+        QTimer.singleShot(0, self._start_models_fetch)
 
     @Slot(str)
     def _on_session_deleted(self, session_id: str) -> None:
@@ -1075,9 +1568,8 @@ class ChatPage(QWidget):
                 w.deleteLater()
         self._refresh_landing()
         self.sidebar.refresh(self.session.session_id)
+        self._maybe_refresh_transcript()
 
-    @Slot()
-    def on_open_session(self) -> None:
         if self._busy:
             return
         picker = SessionPicker(self)
@@ -1126,9 +1618,8 @@ class ChatPage(QWidget):
         self._replay_history_bubbles()
         self._refresh_landing()
         self.sidebar.refresh(self.session.session_id)
+        self._maybe_refresh_transcript()
 
-    @Slot(dict)
-    def on_confirm_request(self, payload: dict) -> None:
         detail = payload.get("detail") or ""
         text = f"{payload.get('summary', '')}\n\n{detail}"
         box = QMessageBox(self)
@@ -1209,6 +1700,7 @@ class ChatPage(QWidget):
         self.composer.clear()
         self._pending_images.clear()
         self._refresh_attach_label()
+        self._stick_bottom = True
         self._set_busy(True)
         self._set_activity(f"Waiting for {self.session.model_label}")
 
@@ -1224,6 +1716,8 @@ class ChatPage(QWidget):
         elif images:
             preview = f"[{len(images)} image(s)]"
         self._add_bubble("You", preview, pixmap=pix)
+        self._scroll_bottom(force=True)
+        QTimer.singleShot(0, self._tag_latest_you_bubble)
 
         self._worker = ChatWorker(self.session, text, images, self)
         self._worker.event.connect(self.on_event)
@@ -1240,24 +1734,32 @@ class ChatPage(QWidget):
             return
         if kind == "assistant_start":
             self._set_activity(f"Streaming from {self.session.model_label}")
-            # Lazy: do not create an empty Assistant bubble (tool-only rounds
-            # used to leave a duplicate grey header).
+            # Lazy bubble on first token — do not show a fake "Generating…" wall.
             self._discard_empty_stream_bubble()
             self._stream_bubble = None
         elif kind == "assistant_delta":
+            piece = event.get("text") or ""
+            if not piece:
+                return
             if self._stream_bubble is None:
-                self._stream_bubble = self._add_bubble("Assistant", "", markdown=True)
-            self._stream_bubble.append_markdown(event.get("text") or "")
+                self._stream_bubble = self._add_bubble(
+                    "Assistant", piece, markdown=True
+                )
+            else:
+                self._stream_bubble.append_markdown(piece)
             self._scroll_bottom()
         elif kind == "assistant":
             self._set_activity(None)
             text = event.get("text") or ""
             if event.get("streamed") and self._stream_bubble is not None:
                 self._stream_bubble.set_markdown(text)
+                # Tag with last assistant message index once committed to session.
+                self._tag_last_role_bubble(self._stream_bubble, "assistant")
                 self._stream_bubble = None
             elif text.strip():
                 self._discard_empty_stream_bubble()
-                self._add_bubble("Assistant", text, markdown=True)
+                b = self._add_bubble("Assistant", text, markdown=True)
+                self._tag_last_role_bubble(b, "assistant")
             else:
                 self._discard_empty_stream_bubble()
             self._update_meta()
@@ -1273,11 +1775,18 @@ class ChatPage(QWidget):
             body = event.get("text") or ""
             if getattr(self, "_last_trace", None) is not None:
                 self._last_trace.set_result(body)
+                # Index of the tool message just appended in session.
+                tidx = self._last_index_for_role("tool")
+                self._wire_tool_menu(self._last_trace, tidx)
                 self._last_trace = None
             else:
-                if len(body) > 1400:
-                    body = body[:1400] + "..."
-                self._add_bubble("Result", f"```\n{body}\n```", markdown=True)
+                from .gui_pages import ToolTraceWidget
+
+                trace = ToolTraceWidget(str(event.get("name") or "tool"), {})
+                trace.set_result(body)
+                tidx = self._last_index_for_role("tool")
+                self._wire_tool_menu(trace, tidx)
+                self.feed.addWidget(trace)
             if event.get("name") == "propose_config_patch" or '"diff"' in body[:400]:
                 try:
                     data = json.loads(body) if body.strip().startswith("{") else None
@@ -1303,12 +1812,14 @@ class ChatPage(QWidget):
             self._stream_bubble = None
             self._add_bubble("Error", event.get("text") or "")
             self._maybe_reauth(str(event.get("text") or ""))
+            self._maybe_refresh_transcript()
         elif kind == "done":
             self._set_activity(None)
             self._discard_empty_stream_bubble()
             self._update_meta()
             self.session.persist()
             self.sidebar.refresh(self.session.session_id)
+            self._maybe_refresh_transcript()
 
     def _maybe_reauth(self, err: str) -> None:
         low = err.lower()
@@ -1319,9 +1830,9 @@ class ChatPage(QWidget):
             self.session.runtime = ToolRuntime(
                 self.session.settings, confirm_hook=self.confirm.confirm
             )
-            self.session.refresh_models()
-            self._populate_models()
+            self._populate_models(fetch=False)
             self._update_meta()
+            QTimer.singleShot(0, self._start_models_fetch)
             if self._last_user:
                 self.composer.setPlainText(self._last_user)
         except RuntimeError:
@@ -1415,10 +1926,43 @@ class MainWindow(QMainWindow):
         self.session = session
         self.confirm = confirm
         self.setWindowTitle("NCC AI Assistant")
-        self.resize(1000, 800)
+        self.setMinimumSize(720, 520)
         self.panel = AssistantPanel(session, confirm)
         self.setCentralWidget(self.panel)
         self.chat_page = self.panel.chat_page
+        self._geom_timer = QTimer(self)
+        self._geom_timer.setSingleShot(True)
+        self._geom_timer.setInterval(400)
+        self._geom_timer.timeout.connect(self._persist_geometry)
+        self._restore_geometry()
+
+    def _settings(self):
+        from PySide6.QtCore import QSettings
+
+        return QSettings("NixOSControlCenter", "ncc-assistant")
+
+    def _restore_geometry(self) -> None:
+        raw = self._settings().value("window/geometry")
+        if raw is not None and self.restoreGeometry(raw):
+            return
+        self.resize(1000, 800)
+
+    def _persist_geometry(self) -> None:
+        self._settings().setValue("window/geometry", self.saveGeometry())
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        if self.isVisible():
+            self._geom_timer.start()
+
+    def moveEvent(self, event) -> None:  # noqa: N802
+        super().moveEvent(event)
+        if self.isVisible():
+            self._geom_timer.start()
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        self._persist_geometry()
+        super().closeEvent(event)
 
 
 def create_assistant_panel(
@@ -1431,11 +1975,11 @@ def create_assistant_panel(
     settings = apply_startup_preferences(
         settings or Settings.from_env(client_mode="chat")
     )
+    # Do not probe the gateway on open (blocks UI when nginx/LLM is slow).
+    # Anthropic always needs a key; local openai-compatible often does not.
     try:
-        if not settings.api_key:
-            need = probe_needs_auth(settings)
-            if need is True or settings.api == "anthropic":
-                settings = prompt_auth_dialog(settings)
+        if not settings.api_key and settings.api == "anthropic":
+            settings = prompt_auth_dialog(settings)
     except RuntimeError as exc:
         box = QWidget(parent)
         lay = QVBoxLayout(box)
@@ -1446,6 +1990,7 @@ def create_assistant_panel(
     session_kwargs: dict = {
         "interactive_auth": False,
         "confirm_hook": confirm.confirm,
+        "refresh_models": False,
     }
     if not skip_session_picker:
         picker = SessionPicker()
@@ -1490,10 +2035,8 @@ def run_gui(settings: Settings | None = None) -> int:
     )
 
     try:
-        if not settings.api_key:
-            need = probe_needs_auth(settings)
-            if need is True or settings.api == "anthropic":
-                settings = prompt_auth_dialog(settings)
+        if not settings.api_key and settings.api == "anthropic":
+            settings = prompt_auth_dialog(settings)
     except RuntimeError as exc:
         QMessageBox.critical(None, "NCC AI", str(exc))
         return 1
@@ -1506,6 +2049,7 @@ def run_gui(settings: Settings | None = None) -> int:
     session_kwargs: dict = {
         "interactive_auth": False,
         "confirm_hook": confirm.confirm,
+        "refresh_models": False,
     }
 
     if picker.choice and picker.choice != "new":

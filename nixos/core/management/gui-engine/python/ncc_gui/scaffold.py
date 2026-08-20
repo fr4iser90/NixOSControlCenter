@@ -8,6 +8,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 
 from PySide6.QtCore import QProcess, QProcessEnvironment, QSize, Qt, QTimer
 from PySide6.QtWidgets import (
@@ -29,10 +30,26 @@ from PySide6.QtWidgets import (
 
 from ncc_gui.ansi import strip_ansi
 from ncc_gui.commit_bar import CommitController
-from ncc_gui.dialogs import confirm, error
+from ncc_gui.dialogs import confirm, error, summarize_command_failure
 from ncc_gui.reload import generation_bus, load_activity, save_activity
+from ncc_gui.session_ux import confirm_session_write, operating_on_line, session_mode
+from ncc_gui.target_bus import bus as target_bus
+from ncc_gui.target_session import current_session
 from ncc_gui.theme import APP_STYLE
 from ncc_gui.widgets import FormValueLabel, audit_wrapping_labels, layout_debug_enabled
+
+
+@dataclass(frozen=True)
+class DeclaredAction:
+    """Footer button contract for tests / catalog checks.
+
+    Every ``add_action`` must set either ``ncc=(domain, verb, …)`` (CLI path the
+    button intends) or ``local=True`` (UI-only: refresh, dialogs, raw ssh, …).
+    """
+
+    label: str
+    ncc: tuple[str, ...] | None
+    local: bool
 
 
 class DomainPage(QWidget):
@@ -59,6 +76,7 @@ class DomainPage(QWidget):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
+        self._declared_actions: list[DeclaredAction] = []
         self.setStyleSheet(APP_STYLE)
         # Fill the shell document host — never drive top-level window size.
         self.setSizePolicy(
@@ -90,6 +108,12 @@ class DomainPage(QWidget):
         self._subtitle.setWordWrap(True)
         self._subtitle.setVisible(bool(subtitle))
         root.addWidget(self._subtitle, stretch=0)
+        self._scope = QLabel("")
+        self._scope.setObjectName("nccOperatingScope")
+        self._scope.setWordWrap(True)
+        root.addWidget(self._scope, stretch=0)
+        self._refresh_operating_scope()
+        target_bus().sessionChanged.connect(self._on_session_scope)
 
         # 2. Content (scrolls inside fixed chrome — does not push footer)
         self._content_host = QWidget()
@@ -181,6 +205,24 @@ class DomainPage(QWidget):
     def set_subtitle(self, text: str) -> None:
         self._subtitle.setText(text)
         self._subtitle.setVisible(bool(text.strip()))
+
+    def _on_session_scope(self, _session: object = None) -> None:
+        self._refresh_operating_scope()
+
+    def _refresh_operating_scope(self) -> None:
+        session = current_session()
+        mode = session_mode(session)
+        self._scope.setText(operating_on_line(session))
+        self._scope.setProperty("sessionMode", mode)
+        self._scope.style().unpolish(self._scope)
+        self._scope.style().polish(self._scope)
+        self._scope.update()
+
+    def confirm_scope_write(self, action: str = "This action") -> bool:
+        """Block accidental LOCAL writes while a remote host is selected/failed."""
+        return confirm_session_write(
+            self, current_session(), action=action
+        )
 
     def add_header_action(
         self,
@@ -300,7 +342,33 @@ class DomainPage(QWidget):
         slot: Callable[[], None],
         *,
         primary: bool = False,
+        ncc: Sequence[str] | None = None,
+        local: bool = False,
     ) -> QPushButton:
+        """Register a footer button.
+
+        Pass ``ncc=("domain", "verb", …)`` when the button runs ``ncc`` (first
+        two tokens must be registered in cli-registry). Pass ``local=True`` for
+        non-ncc actions (Refresh, dialogs, commit staging, raw ssh, …).
+        One of ``ncc`` / ``local`` is required so tests can cover every button.
+        """
+        if ncc is not None and local:
+            raise ValueError(f"add_action({label!r}): ncc= and local= are mutually exclusive")
+        if ncc is None and not local:
+            raise ValueError(
+                f"add_action({label!r}): pass ncc=(domain, verb, …) or local=True"
+            )
+        argv: tuple[str, ...] | None = None
+        if ncc is not None:
+            argv = tuple(str(x) for x in ncc)
+            if not argv:
+                raise ValueError(f"add_action({label!r}): ncc= must be non-empty")
+            if any(not a for a in argv):
+                raise ValueError(f"add_action({label!r}): ncc= tokens must be non-empty")
+        self._declared_actions.append(
+            DeclaredAction(label=label, ncc=argv, local=local)
+        )
+
         self._ensure_actions_visible()
         btn = QPushButton(label)
         btn.clicked.connect(lambda _=False: slot())
@@ -428,6 +496,8 @@ class DomainPage(QWidget):
         With ``follow_target=True`` and a connected remote session:
           ``ssh host -- sudo -n ncc …`` (target user needs NOPASSWD sudo).
         """
+        if not self.confirm_scope_write(label):
+            return
         from ncc_gui.remote import build_elevated_ncc_argv, target_from_env
 
         host = target_from_env() if follow_target else None
@@ -494,7 +564,17 @@ class DomainPage(QWidget):
         self._proc = None
         self._on_proc_done = None
         if code != 0:
-            error(self, label, f"Finished with exit code {code}. See Activity.")
+            log = self.log.toPlainText() if self.log is not None else ""
+            short, copyable = summarize_command_failure(
+                log, exit_code=code, label=label
+            )
+            error(
+                self,
+                label,
+                short,
+                details=copyable,
+                copy_text=copyable,
+            )
         if cb is not None:
             cb(code)
 

@@ -18,6 +18,8 @@ class TargetBus(QObject):
     navigate = Signal(str)
     # System page: run a named action (e.g. ``migrate-config``) after navigate.
     systemAction = Signal(str)
+    # SSH client page: open edit modal for ``user@host`` (or empty = current selection).
+    sshClientEdit = Signal(object)
 
 
 _bus: TargetBus | None = None

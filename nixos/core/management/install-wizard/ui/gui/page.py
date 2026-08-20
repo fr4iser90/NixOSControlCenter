@@ -52,13 +52,15 @@ class InstallPage(DomainPage):
             "Remote Target: Connect first; use wizard / shell on that host."
         )
         self.btn_wizard = self.add_action(
-            "Start wizard", self._wizard, primary=True
+            "Start wizard", self._wizard, primary=True, ncc=("install", "wizard")
         )
         self.btn_wizard.setObjectName("nccPrimaryButton")
-        self.add_action("Dry-run wizard", self._dry_run)
-        self.add_action("Backup /etc/nixos", self._backup)
-        self.add_action("Show nix-shell command", self._shell_hint)
-        self.add_action("Refresh", self.reload)
+        self.add_action("Dry-run wizard", self._dry_run, ncc=("install", "dry-run"))
+        self.add_action("Backup /etc/nixos", self._backup, local=True)
+        self.add_action(
+            "Show nix-shell command", self._shell_hint, ncc=("install", "shell")
+        )
+        self.add_action("Refresh", self.reload, local=True)
 
         target_bus().changed.connect(lambda _t: self.reload())
         self.reload()
@@ -198,7 +200,19 @@ class InstallPage(DomainPage):
         self._run_ncc(["install", "dry-run"], "Install dry-run")
 
     def _shell_hint(self) -> None:
-        self._run_ncc(["install", "shell"], "Install shell hint")
+        # Sync: show the printed nix-shell line (not a generic "Finished").
+        ncc = shutil.which("ncc")
+        if not ncc:
+            error(self, "ncc missing", "ncc is not on PATH.")
+            return
+        repo = getattr(self, "_pf", None)
+        repo_path = repo.repo if repo else ""
+        if repo_path and not os.environ.get("NCC_INSTALL_REPO"):
+            os.environ["NCC_INSTALL_REPO"] = repo_path
+        proc = self.run_ncc("install", "shell", log=True, show_error=True)
+        if proc.returncode == 0:
+            hint = ((proc.stdout or "") + (proc.stderr or "")).strip()
+            info(self, "Install shell hint", hint or "Done.")
 
     def _backup(self) -> None:
         t = target_from_env()

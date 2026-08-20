@@ -135,9 +135,9 @@ class ModulesPage(DomainPage):
             "Some core modules are protected and cannot be turned off. "
             "Enable/Disable only stages — use Apply to write."
         )
-        self.add_action("Enable", self._enable)
-        self.add_action("Disable", self._disable)
-        self.add_action("Refresh", self.reload)
+        self.add_action("Enable", self._enable, ncc=("modules", "enable"))
+        self.add_action("Disable", self._disable, ncc=("modules", "disable"))
+        self.add_action("Refresh", self.reload, local=True)
 
         assert self.commit is not None
         self.commit.set_flush_handler(self._flush_pending)

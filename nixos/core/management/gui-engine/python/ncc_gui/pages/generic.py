@@ -34,6 +34,7 @@ class GenericDomainPage(DomainPage):
                     action.label,
                     lambda a=tuple(action.args), l=action.label: self._run(a, l),
                     primary=(i == 0),
+                    ncc=(info.id, *tuple(action.args)),
                 )
         else:
             from PySide6.QtWidgets import QLabel

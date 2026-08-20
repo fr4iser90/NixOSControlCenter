@@ -40,14 +40,16 @@ class LockPage(DomainPage):
         opts_wrap.setLayout(opts)
         form.addRow("Include", opts_wrap)
 
-        self.add_action("Restore", self._restore, primary=True)
+        self.add_action("Restore", self._restore, primary=True, ncc=("lock", "restore"))
         self.add_action(
             "Create snapshot",
             lambda: self.run_ncc("lock", "discover", need_confirm="Create snapshot"),
+            ncc=("lock", "discover"),
         )
         self.add_action(
             "List cloud snapshots",
             lambda: self.run_ncc("lock", "fetch", "--list"),
+            ncc=("lock", "fetch"),
         )
 
     def _browse(self) -> None:

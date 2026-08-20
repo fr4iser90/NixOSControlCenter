@@ -1,15 +1,14 @@
 {
   #
-  # NVIDIA Jetson Orin Nano (aarch64) — host blueprint stub
+  # NVIDIA Jetson Orin Nano (aarch64) — host blueprint
   #
-  # NOTE: flake reads system.platform (prebuild syncs like CPU/GPU).
-  # Jetpack modules are still a separate follow-up for full Orin deploy.
+  # gpu = "jetson" sets systemConfig intent. Jetpack stays a *host flake extra*
+  # (detected by ncc-check-flake-extras — not hardcoded into NCC flake.nix).
   #
-  # Opt into install "device target" discovery (no wiring elsewhere):
   deviceTarget = {
     enable = true;
     label = "Jetson Orin Nano";
-    description = "NVIDIA Jetson Orin Nano (aarch64 / jetpack). Platform via system.platform; jetpack input still TBD.";
+    description = "NVIDIA Jetson Orin Nano (aarch64 / jetpack host extras).";
     match = {
       arch = [ "aarch64" "arm64" ];
       filesAny = [ "/etc/nv_tegra_release" ];
@@ -28,7 +27,7 @@
   };
 
   packageModules = [
-    # docker / AI stacks — align with draft later
+    "docker"
   ];
 
   users = {
@@ -44,10 +43,17 @@
   };
 
   hardware = {
-    cpu = "none";  # aarch64 / tegra — not intel/amd enums
-    gpu = "nvidia";
+    cpu = "none";
+    gpu = "jetson";
     ram = {
       sizeGB = 8;
+    };
+    jetpack = {
+      som = "orin-nano";
+      carrierBoard = "devkit";
+      super = true;
+      containerToolkit = true;
+      nvpmodelProfile = 1;
     };
   };
 
@@ -58,9 +64,9 @@
     system-logger = false;
     system-checks = true;
     system-updater = true;
-    ssh-manager = true; # server; set client.enable = true in module config for outbound
+    ssh-manager = true;
     bootentry-manager = false;
-    homelab-manager = false;
+    stack-manager = false;
     vm-manager = false;
     ai-workspace = true;
   };
@@ -83,13 +89,4 @@
   email = "example@example.com";
   domain = "example.com";
   certEmail = "example@example.com";
-
-  # Draft host extras (not yet NCC options — document for migrate):
-  #   hardware.nvidia-jetpack.enable = true;
-  #   hardware.nvidia-jetpack.som = "orin-nano";
-  #   hardware.nvidia-jetpack.carrierBoard = "devkit";
-  #   hardware.nvidia-jetpack.super = true;
-  #   hardware.nvidia-container-toolkit.enable = true;
-  #   virtualisation.docker.enableNvidia = true;
-  #   zramSwap / swapfile as on draft host
 }

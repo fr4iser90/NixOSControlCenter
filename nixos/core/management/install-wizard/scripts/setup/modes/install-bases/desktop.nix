@@ -61,9 +61,10 @@
     system-checks = true;      
     system-updater = true;    
     # client: ssh-manager.client.enable (default false)
-    ssh-manager = false;        
+    ssh-manager = false;
+    # catalog stacks (homelab + compute); Swarm via stack-manager.swarm
+    stack-manager = false;
     bootentry-manager = false; 
-    homelab-manager = false;    
     vm-manager = false;         
     ai-workspace = false;       
   };

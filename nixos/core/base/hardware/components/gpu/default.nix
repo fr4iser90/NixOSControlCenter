@@ -6,6 +6,7 @@ let
   gpuConfigs = {
     # Single GPU configurations
     "nvidia" = ./nvidia.nix;
+    "jetson" = ./jetson.nix;  # Tegra / jetpack-nixos (not desktop nvidia)
     "amd" = ./amd.nix;
     "intel" = ./intel.nix;
     

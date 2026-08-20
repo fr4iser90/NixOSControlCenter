@@ -31,3 +31,4 @@
 # State: /etc/nixos/systemConfig/.ncc-module-migrations.json
 #
 # First plan: ssh-merge-v1 (ssh-server-manager + ssh-client-manager → ssh-manager)
+# Second: stack-manager-rename-v1 (homelab-manager → stack-manager)

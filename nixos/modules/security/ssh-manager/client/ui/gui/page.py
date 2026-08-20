@@ -6,7 +6,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -27,6 +27,7 @@ from ncc_gui.commit_bar import PendingChange
 from ncc_gui.dialogs import confirm, error, info
 from ncc_gui.pty_terminal import PtyTerminal
 from ncc_gui.scaffold import DomainPage
+from ncc_gui.target_bus import bus as target_bus
 from ncc_gui.theme import APP_STYLE
 
 _OP = "ssh-client"
@@ -103,24 +104,37 @@ class _ServerDialog(QDialog):
         user: str = "",
         host_editable: bool = True,
     ) -> None:
-        super().__init__(parent)
+        # Prefer top-level window so the dialog is not buried under the shell.
+        win = parent.window() if parent is not None else None
+        super().__init__(win if win is not None else parent)
         self.setWindowTitle(title)
+        self.setModal(True)
+        self.setMinimumWidth(380)
         self.setStyleSheet(APP_STYLE)
-        form = QFormLayout(self)
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
         self.host = QLineEdit(host)
         self.host.setEnabled(host_editable)
         self.user = QLineEdit(user)
         form.addRow("Host", self.host)
         form.addRow("Username", self.user)
+        layout.addLayout(form)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        form.addRow(buttons)
+        layout.addWidget(buttons)
+        self.user.setFocus()
 
     def values(self) -> tuple[str, str]:
         return self.host.text().strip(), self.user.text().strip()
+
+    def exec(self) -> int:  # noqa: A003
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        return super().exec()
 
 
 class SshPage(DomainPage):
@@ -193,32 +207,69 @@ class SshPage(DomainPage):
             "Add/Edit/Delete stage drafts (Apply writes the SSH client list). "
             "Connect and server controls run immediately."
         )
-        self.add_action("Connect (embedded)", self._connect_embedded)
-        self.add_action("External terminal", self._connect_external)
-        self.add_action("Add…", self._add)
-        self.add_action("Edit…", self._edit)
-        self.add_action("Delete", self._delete)
-        self.add_action("Refresh", self.reload)
-        self.add_action("Server status", self._refresh_server_status)
+        self.add_action("Connect (embedded)", self._connect_embedded, local=True)
+        self.add_action("External terminal", self._connect_external, local=True)
+        self.add_action("Add…", self._add, ncc=("ssh", "client"))
+        self.add_action("Edit…", self._edit, ncc=("ssh", "client"))
+        self.add_action("Delete", self._delete, ncc=("ssh", "client"))
+        self.add_action("Refresh", self.reload, local=True)
+        self.add_action("Server status", self._refresh_server_status, ncc=("ssh", "status"))
         self.add_action(
             "Temp-open (60s)",
             lambda: self._server_action(("temp-open",), True, "Temp-open (60s)"),
+            ncc=("ssh", "temp-open"),
         )
         self.add_action(
             "Force-open",
             lambda: self._server_action(("force-open",), True, "Force-open"),
+            ncc=("ssh", "force-open"),
         )
         self.add_action(
             "List requests",
-            lambda: self._server_action(("list-requests", "pending"), False, "List requests"),
+            lambda: self._server_action(
+                ("list-requests", "pending"), False, "List requests"
+            ),
+            ncc=("ssh", "list-requests"),
         )
 
         assert self.commit is not None
         self.commit.set_flush_handler(self._flush_pending)
         self.commit.set_pending_changed(self._render_list)
 
+        target_bus().sshClientEdit.connect(self._on_bus_edit_request)
         self.reload()
         self._refresh_server_status()
+
+    def _on_bus_edit_request(self, target: object) -> None:
+        """Header Edit: select host (user@host) and open the edit modal."""
+        raw = str(target or "").strip()
+        if not raw or "@" not in raw:
+            QTimer.singleShot(0, self._edit)
+            return
+        user, _, host = raw.rpartition("@")
+        user, host = user.strip(), host.strip()
+
+        def _open() -> None:
+            self._select_host(host, user)
+            self._edit()
+
+        QTimer.singleShot(0, _open)
+
+    def _select_host(self, host: str, user: str | None = None) -> None:
+        for i in range(self.list.count()):
+            item = self.list.item(i)
+            if item is None:
+                continue
+            entry = item.data(Qt.ItemDataRole.UserRole)
+            if not isinstance(entry, ServerEntry):
+                continue
+            if entry.host == host and (user is None or entry.user == user):
+                self.list.setCurrentItem(item)
+                return
+        # Not in list yet — still set selection so Edit can offer a dialog.
+        if host and user:
+            self._selected = ServerEntry(host=host, user=user)
+            self.detail.setText(f"Host: {host}\nUser: {user}")
 
     def _pending_by_host(self) -> dict[str, PendingChange]:
         assert self.commit is not None

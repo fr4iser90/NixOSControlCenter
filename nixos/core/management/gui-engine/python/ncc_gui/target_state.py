@@ -11,8 +11,7 @@ from pathlib import Path
 # Everything else follows the Target bar (sidebar + ncc commands).
 LOCAL_ONLY_DOMAINS = frozenset(
     {
-        "hosts",  # manage fleet list from this PC
-        "ssh",  # SSH client connections from this PC
+        "ssh",  # SSH client/server UI always on this machine
     }
 )
 

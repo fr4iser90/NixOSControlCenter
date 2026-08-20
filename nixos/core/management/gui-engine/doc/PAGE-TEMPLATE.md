@@ -26,9 +26,9 @@ class ExamplePage(DomainPage):
         # status / wrapping text: ALWAYS FormValueLabel / add_form_value
         # (engine does NOT auto-fix raw QLabels)
 
-        self.add_action("Refresh", self.reload)
+        self.add_action("Refresh", self.reload, local=True)
         # Domain ops stage changes — do not write config here.
-        # self.add_action("Add…", self._stage_add)
+        # self.add_action("Add…", self._stage_add, ncc=("domain", "add"))
 
         assert self.commit is not None
         self.commit.set_flush_handler(self._flush)

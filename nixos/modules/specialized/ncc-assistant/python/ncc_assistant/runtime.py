@@ -424,14 +424,7 @@ class ToolRuntime:
                 path = root / rel
                 if path.is_file():
                     entries.append((item.get("id", rel), path))
-        # Always include registries if present even without index
-        for extra in (
-            "modules/core-registry.json",
-            "modules/optional-registry.json",
-        ):
-            path = root / extra
-            if path.is_file() and not any(p == path for _, p in entries):
-                entries.append((extra, path))
+        # Discovery inventory is live via list_modules — not a packaged JSON file.
         return entries
 
     def list_available_tools(self, kind: str | None = None) -> dict[str, Any]:
@@ -472,15 +465,20 @@ class ToolRuntime:
         }
 
     def list_modules(self, query: str | None = None) -> dict[str, Any]:
-        modules: list[dict[str, str]] = []
-        root = self.settings.knowledge_root
-        for name in ("core-registry.json", "optional-registry.json"):
-            path = root / "modules" / name
-            if not path.is_file():
-                continue
-            data = json.loads(path.read_text(encoding="utf-8"))
-            kind = "core" if "core" in name else "optional"
-            self._walk_registry(data, kind, modules)
+        """Live discovery only — ``ncc modules list --json``. No packaged JSON fallback."""
+        modules = self._list_modules_live()
+        if not modules:
+            return {
+                "ok": False,
+                "count": 0,
+                "source": "none",
+                "modules": [],
+                "error": (
+                    "Live discovery failed. "
+                    "Need working `ncc modules list --json` (or ncc-modules-discover)."
+                ),
+            }
+
         if query:
             q = query.lower()
             modules = [
@@ -491,29 +489,63 @@ class ToolRuntime:
                 or q in m.get("domain", "").lower()
             ]
         modules.sort(key=lambda m: (m.get("domain", ""), m["name"]))
-        return {"ok": True, "count": len(modules), "modules": modules}
+        return {
+            "ok": True,
+            "count": len(modules),
+            "source": "ncc-modules-discover",
+            "modules": modules,
+        }
 
-    def _walk_registry(
-        self, node: Any, kind: str, out: list[dict[str, str]], domain: str = ""
-    ) -> None:
-        if not isinstance(node, dict):
-            return
-        # skip meta keys
-        for key, value in node.items():
-            if key.startswith("_"):
+    def _list_modules_live(self) -> list[dict[str, str]]:
+        """Live inventory via ncc modules list --json (runtime discovery)."""
+        import shutil
+        import subprocess
+
+        cmd = None
+        if shutil.which("ncc"):
+            cmd = ["ncc", "modules", "list", "--json"]
+        elif shutil.which("ncc-modules-discover"):
+            cmd = ["ncc-modules-discover"]
+        if not cmd:
+            return []
+        try:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+            if proc.returncode != 0 or not proc.stdout.strip():
+                return []
+            data = json.loads(proc.stdout)
+        except (OSError, json.JSONDecodeError, subprocess.TimeoutExpired):
+            return []
+        out: list[dict[str, str]] = []
+        if isinstance(data, list):
+            rows = data
+        elif isinstance(data, dict):
+            rows = data.get("modules") or data.get("data") or []
+        else:
+            rows = []
+        for m in rows:
+            if not isinstance(m, dict):
                 continue
-            if isinstance(value, dict) and "path" in value:
-                out.append(
-                    {
-                        "name": key,
-                        "domain": domain or kind,
-                        "kind": kind,
-                        "path": value.get("path", ""),
-                        "description": value.get("description", key),
-                    }
-                )
-            elif isinstance(value, dict):
-                self._walk_registry(value, kind, out, domain=key if not domain else domain)
+            name = m.get("name") or m.get("id") or ""
+            if not name:
+                continue
+            cat = str(m.get("category") or m.get("domain") or "")
+            kind = "core" if cat.startswith("core") or m.get("scope") == "core" else "optional"
+            out.append(
+                {
+                    "name": name,
+                    "domain": cat.split(".")[0] if cat else kind,
+                    "kind": kind,
+                    "path": str(m.get("path") or ""),
+                    "description": str(m.get("description") or name),
+                }
+            )
+        return out
 
     def search_knowledge(self, query: str, limit: int = 8) -> dict[str, Any]:
         q = query.lower().strip()

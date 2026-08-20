@@ -33,12 +33,13 @@ from PySide6.QtWidgets import (
 
 from ncc_gui.chrome_prefs import load_chrome_prefs, set_show_target, show_target_enabled
 from ncc_gui.dialogs import error
+from ncc_gui.session_ux import chip_text, session_mode
 from ncc_gui.target_bus import bus as target_bus
 from ncc_gui.target_session import TargetSession, session_controller
 from ncc_gui.target_state import list_host_targets
 from ncc_gui.theme import APP_STYLE
 
-_BAR_HEIGHT = 44
+_BAR_HEIGHT = 48
 _COMBO_W = 220
 
 
@@ -53,7 +54,7 @@ class _AddHostDialog(QDialog):
         self._open_hosts_clicked = False
         layout = QVBoxLayout(self)
         hint = QLabel(
-            "Adds to the same list as Hosts / SSH client (user@host in ~/.creds)."
+            "Adds to the SSH client list (ncc ssh client / ~/.creds)."
         )
         hint.setObjectName("nccTargetStatus")
         hint.setWordWrap(True)
@@ -73,7 +74,7 @@ class _AddHostDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         open_hosts = buttons.addButton(
-            "Open Hosts…", QDialogButtonBox.ButtonRole.ActionRole
+            "Open SSH…", QDialogButtonBox.ButtonRole.ActionRole
         )
         open_hosts.clicked.connect(self._open_hosts)
         layout.addWidget(buttons)
@@ -90,6 +91,49 @@ class _AddHostDialog(QDialog):
             user, _, host = host.rpartition("@")
             user, host = user.strip(), host.strip()
         return host, user
+
+
+class _EditHostDialog(QDialog):
+    """Edit username for an SSH client entry (~/.creds via ncc ssh client edit)."""
+
+    def __init__(
+        self,
+        parent: QWidget | None,
+        *,
+        host: str,
+        user: str,
+    ) -> None:
+        win = parent.window() if parent is not None else None
+        super().__init__(win if win is not None else parent)
+        self.setWindowTitle("Edit SSH target")
+        self.setModal(True)
+        self.setMinimumWidth(380)
+        self.setStyleSheet(APP_STYLE)
+        layout = QVBoxLayout(self)
+        hint = QLabel(
+            "Updates the SSH client list (ncc ssh client edit → ~/.creds)."
+        )
+        hint.setObjectName("nccTargetStatus")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        form = QFormLayout()
+        self.host_edit = QLineEdit(host)
+        self.host_edit.setEnabled(False)
+        self.user_edit = QLineEdit(user)
+        form.addRow("Host", self.host_edit)
+        form.addRow("User", self.user_edit)
+        layout.addLayout(form)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        self.user_edit.setFocus()
+
+    def values(self) -> tuple[str, str]:
+        return self.host_edit.text().strip(), self.user_edit.text().strip()
 
 
 class _ChromeSettingsDialog(QDialog):
@@ -110,7 +154,7 @@ class _ChromeSettingsDialog(QDialog):
         )
         layout.addWidget(self.show_target)
         note = QLabel(
-            "Target uses the same host list as Hosts / SSH (~/.creds). "
+            "Target uses the SSH client list (~/.creds via ncc ssh client). "
             "Turning it off disconnects any remote session."
         )
         note.setObjectName("nccTargetStatus")
@@ -165,18 +209,24 @@ class TargetBar(QWidget):
         left.setContentsMargins(0, 0, 0, 0)
         left.setSpacing(8)
 
-        self._target_lbl = QLabel("Target")
-        self._target_lbl.setSizePolicy(
-            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
+        # Truth chip: where mutations actually go (selection ≠ connection).
+        self._chip = QLabel("LOCAL")
+        self._chip.setObjectName("nccSessionChip")
+        self._chip.setSizePolicy(
+            QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed
         )
-        left.addWidget(self._target_lbl)
+        self._chip.setToolTip(
+            "Session scope. LOCAL = this machine. "
+            "REMOTE only after a successful Connect."
+        )
+        left.addWidget(self._chip)
 
         self.combo = QComboBox()
         self.combo.setFixedWidth(_COMBO_W)
         self.combo.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.combo.setToolTip(
-            "This machine = local NCC.\n"
-            "Pick a host, then Connect — only then do pages talk to that machine."
+            "Host candidate only.\n"
+            "Pick a host, then Connect — pages stay on LOCAL until Connect succeeds."
         )
         left.addWidget(self.combo)
 
@@ -184,10 +234,29 @@ class TargetBar(QWidget):
         self.btn_add.setObjectName("nccHeaderAction")
         self.btn_add.setText("+")
         self.btn_add.setToolTip(
-            "Add host to the SSH client list (~/.creds), same as Hosts."
+            "Quick-add a host to the SSH client list (~/.creds)."
         )
         self.btn_add.clicked.connect(self._on_add)
         left.addWidget(self.btn_add)
+
+        self.btn_edit = QToolButton()
+        self.btn_edit.setObjectName("nccHeaderAction")
+        edit_icon = QIcon.fromTheme("document-edit")
+        if edit_icon.isNull():
+            edit_icon = QIcon.fromTheme("edit")
+        if edit_icon.isNull():
+            edit_icon = self.style().standardIcon(
+                QStyle.StandardPixmap.SP_FileDialogDetailedView
+            )
+        if not edit_icon.isNull():
+            self.btn_edit.setIcon(edit_icon)
+        else:
+            self.btn_edit.setText("✎")
+        self.btn_edit.setToolTip(
+            "Edit the selected Target (SSH client user) — stays on this page."
+        )
+        self.btn_edit.clicked.connect(self._on_edit_targets)
+        left.addWidget(self.btn_edit)
 
         self.btn_connect = QPushButton("Connect")
         self.btn_connect.setObjectName("nccPrimaryButton")
@@ -324,11 +393,55 @@ class TargetBar(QWidget):
         self.apply_chrome_prefs()
         self.chromeChanged.emit()
 
+    def _on_edit_targets(self) -> None:
+        """Edit selected target in-place — no domain switch."""
+        cand = self.current_candidate()
+        if not cand or "@" not in cand:
+            error(
+                self,
+                "Edit target",
+                "Select a remote host in the Target list first "
+                "(not “This machine”).\n\n"
+                "Full list management: open SSH in the sidebar.",
+            )
+            return
+        user, _, host = cand.rpartition("@")
+        user, host = user.strip(), host.strip()
+        if not host or not user:
+            error(self, "Edit target", f"Invalid target: {cand}")
+            return
+        dlg = _EditHostDialog(self, host=host, user=user)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        new_host, new_user = dlg.values()
+        if not new_user:
+            error(self, "Edit target", "Username is required.")
+            return
+        try:
+            proc = subprocess.run(
+                ["ncc", "ssh", "client", "edit", new_host, new_user],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            error(self, "Edit target", str(exc))
+            return
+        if proc.returncode != 0:
+            err = (proc.stderr or proc.stdout or "ncc ssh client edit failed").strip()
+            error(self, "Edit target", err)
+            return
+        target = f"{new_user}@{new_host}"
+        self.reload_hosts()
+        self.set_target(target, emit=False)
+        self._apply_session_ui(self._ctrl.session())
+
     def _on_add(self) -> None:
         dlg = _AddHostDialog(self)
         result = dlg.exec()
         if dlg._open_hosts_clicked:
-            target_bus().navigate.emit("hosts")
+            target_bus().navigate.emit("ssh")
             return
         if result != QDialog.DialogCode.Accepted:
             return
@@ -338,7 +451,7 @@ class TargetBar(QWidget):
             return
         try:
             proc = subprocess.run(
-                ["ncc", "hosts", "add", host, user],
+                ["ncc", "ssh", "client", "add", host, user],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -348,7 +461,7 @@ class TargetBar(QWidget):
             error(self, "Add host", str(exc))
             return
         if proc.returncode != 0:
-            err = (proc.stderr or proc.stdout or "ncc hosts add failed").strip()
+            err = (proc.stderr or proc.stdout or "ncc ssh client add failed").strip()
             error(self, "Add host", err)
             return
         target = f"{user}@{host}"
@@ -491,6 +604,9 @@ class TargetBar(QWidget):
         self._elide_status()
 
     def _apply_session_ui(self, s: TargetSession) -> None:
+        mode = session_mode(s)
+        self._set_session_chrome(mode, chip_text(s))
+
         if not show_target_enabled():
             self._set_status("")
             self.btn_connect.setVisible(False)
@@ -523,8 +639,18 @@ class TargetBar(QWidget):
             self.btn_disconnect.setVisible(True)
             return
 
+        if mode == "failed":
+            # Detail lives in the gate banner; keep bar status short.
+            self._set_status(s.message or "Connect failed — still LOCAL")
+            self.btn_connect.setText("Retry")
+            self.btn_connect.setEnabled(True)
+            self.btn_connect.setVisible(True)
+            self.btn_disconnect.setEnabled(False)
+            self.btn_disconnect.setVisible(False)
+            return
+
         if remote_pick or s.state == "candidate":
-            self._set_status(s.message or "Press Connect to use that host")
+            self._set_status(s.message or "Press Connect — still on LOCAL")
             self.btn_connect.setText("Connect")
             self.btn_connect.setEnabled(True)
             self.btn_connect.setVisible(True)
@@ -535,3 +661,15 @@ class TargetBar(QWidget):
         self._set_status("")
         self.btn_connect.setVisible(False)
         self.btn_disconnect.setVisible(False)
+
+    def _set_session_chrome(self, mode: str, text: str) -> None:
+        self._chip.setText(text)
+        self._chip.setProperty("sessionMode", mode)
+        self.setProperty("sessionMode", mode)
+        # Force stylesheet re-eval for dynamic properties.
+        self._chip.style().unpolish(self._chip)
+        self._chip.style().polish(self._chip)
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self._chip.update()
+        self.update()

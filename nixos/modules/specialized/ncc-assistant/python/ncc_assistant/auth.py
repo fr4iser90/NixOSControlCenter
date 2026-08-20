@@ -80,7 +80,7 @@ def probe_needs_auth(settings: Settings) -> bool | None:
     headers = _auth_headers(settings)
 
     try:
-        with httpx.Client(timeout=15.0) as client:
+        with httpx.Client(timeout=3.0) as client:
             resp = client.get(url, headers=headers)
     except httpx.HTTPError:
         return None

@@ -348,6 +348,8 @@ class TargetSessionController(QObject):
 
 
 def _message_for(gate: str, probe: TargetProbe, host: str | None) -> str:
+    from ncc_gui.session_ux import local_hostname
+
     local = host is None
     where = host or "This machine"
     arch = probe.platform_linux or probe.arch or "?"
@@ -355,7 +357,14 @@ def _message_for(gate: str, probe: TargetProbe, host: str | None) -> str:
         if probe.auth_required:
             return f"{where}: authentication required (password or SSH key)"
         if not probe.reachable:
-            return f"{where}: unreachable ({probe.error or 'SSH failed'})"
+            # Explicit: fail does not switch scope — still LOCAL.
+            err = probe.error or "SSH failed"
+            if local:
+                return f"unreachable ({err})"
+            return (
+                f"Still on LOCAL ({local_hostname()}). "
+                f"Cannot reach {where}: {err}"
+            )
         if not probe.arch_supported:
             return f"{where}: unsupported architecture ({probe.arch})"
         if not probe.is_nixos:

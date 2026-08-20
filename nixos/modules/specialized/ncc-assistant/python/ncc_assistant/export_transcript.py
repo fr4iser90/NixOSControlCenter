@@ -50,88 +50,46 @@ def export_session_markdown(
     include_tool_results: bool = True,
 ) -> str:
     """Export a chat session to markdown format."""
+    from .transcript import format_messages_markdown
+
     data = load_session(session_id)
     if not data:
         return f"# Session Not Found\n\nSession `{session_id}` not found.\n"
 
-    lines: list[str] = []
-    lines.append(f"# {data.get('title', 'Untitled Session')}")
-    lines.append("")
-    lines.append(f"**Session ID:** `{session_id}`")
-    lines.append(f"**Model:** {data.get('model', 'unknown')}")
-    lines.append(f"**Endpoint:** {data.get('endpoint', 'unknown')}")
+    meta: list[str] = [
+        f"# {data.get('title', 'Untitled Session')}",
+        "",
+        f"**Session ID:** `{session_id}`",
+        f"**Model:** {data.get('model', 'unknown')}",
+        f"**Endpoint:** {data.get('endpoint', 'unknown')}",
+    ]
     if data.get("created"):
-        lines.append(f"**Created:** {_format_timestamp(data.get('created'))}")
+        meta.append(f"**Created:** {_format_timestamp(data.get('created'))}")
     if data.get("updated"):
-        lines.append(f"**Updated:** {_format_timestamp(data.get('updated'))}")
-    lines.append("")
-    lines.append("---")
-    lines.append("")
+        meta.append(f"**Updated:** {_format_timestamp(data.get('updated'))}")
+    meta.extend(["", "---", ""])
 
-    messages = data.get("messages", [])
-    for msg in messages:
-        role = msg.get("role", "unknown")
-        content = msg.get("content", "")
+    raw_messages = list(data.get("messages") or [])
+    if redact:
+        messages: list[dict[str, Any]] = []
+        for msg in raw_messages:
+            if not isinstance(msg, dict):
+                continue
+            m = dict(msg)
+            m["content"] = _redact_message_content(m.get("content"))
+            if m.get("role") == "tool" and isinstance(m.get("content"), str):
+                m["content"] = redact_secrets(m["content"])
+            messages.append(m)
+    else:
+        messages = [m for m in raw_messages if isinstance(m, dict)]
 
-        if redact:
-            content = _redact_message_content(content)
-
-        if isinstance(content, list):
-            text_parts = []
-            for item in content:
-                if isinstance(item, dict) and item.get("type") == "text":
-                    text_parts.append(item.get("text", ""))
-            content = "\n".join(text_parts)
-
-        if role == "system":
-            lines.append("## System Prompt")
-            lines.append("")
-            lines.append(content)
-            lines.append("")
-        elif role == "user":
-            lines.append("## User")
-            lines.append("")
-            lines.append(content)
-            lines.append("")
-        elif role == "assistant":
-            lines.append("## Assistant")
-            lines.append("")
-            if content:
-                lines.append(content)
-            tool_calls = msg.get("tool_calls", [])
-            if tool_calls:
-                lines.append("")
-                lines.append("**Tool Calls:**")
-                for tc in tool_calls:
-                    fn = tc.get("function", {})
-                    name = fn.get("name", "unknown")
-                    args = fn.get("arguments", "{}")
-                    if redact and isinstance(args, str):
-                        try:
-                            args_dict = json.loads(args)
-                            args = json.dumps(redact_dict(args_dict), indent=2)
-                        except json.JSONDecodeError:
-                            args = redact_secrets(args)
-                    lines.append(f"- `{name}`")
-                    lines.append("```json")
-                    lines.append(args if isinstance(args, str) else json.dumps(args, indent=2))
-                    lines.append("```")
-            lines.append("")
-        elif role == "tool" and include_tool_results:
-            name = msg.get("name", "unknown")
-            tool_content = msg.get("content", "")
-            if redact:
-                tool_content = redact_secrets(tool_content)
-            lines.append(f"### Tool Result: `{name}`")
-            lines.append("")
-            lines.append("```json")
-            lines.append(tool_content[:2000])
-            if len(tool_content) > 2000:
-                lines.append("... (truncated)")
-            lines.append("```")
-            lines.append("")
-
-    return "\n".join(lines)
+    body = format_messages_markdown(
+        messages,
+        include_system=True,
+        include_tools=include_tool_results,
+        title=None,
+    )
+    return "\n".join(meta) + body
 
 
 def export_job_markdown(

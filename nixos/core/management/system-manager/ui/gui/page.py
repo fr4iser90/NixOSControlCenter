@@ -178,50 +178,68 @@ class SystemPage(DomainPage):
         self.lbl_checks = self.add_form_value(status, "Preflight checks")
 
         self._elevated_btns: list = []
-        self.add_action("Refresh status", self.reload)
+        self.add_action("Refresh status", self.reload, local=True)
         self._elevated_btns.append(
             self.add_action(
-                "From local repo", lambda: self._start_sync("local"), primary=True
+                "From local repo",
+                lambda: self._start_sync("local"),
+                primary=True,
+                ncc=("system", "update"),
             )
         )
         self._elevated_btns.append(
-            self.add_action("From GitHub", lambda: self._start_sync("remote"))
+            self.add_action(
+                "From GitHub",
+                lambda: self._start_sync("remote"),
+                ncc=("system", "update"),
+            )
         )
         self._elevated_btns.append(
-            self.add_action("Channels only", lambda: self._start_sync("channels"))
+            self.add_action(
+                "Channels only",
+                lambda: self._start_sync("channels"),
+                ncc=("system", "update"),
+            )
         )
         self._elevated_btns.append(
             self.add_action(
                 "Migrate config",
                 lambda: self._run_quick(("migrate-config",), "Migrate config", True),
+                ncc=("system", "migrate-config"),
             )
         )
         self.add_action(
             "Check versions",
             lambda: self._run_quick(("check-versions",), "Check versions", False),
+            ncc=("system", "check-versions"),
         )
         self.add_action(
             "Validate config",
             lambda: self._run_quick(("validate-config",), "Validate config", False),
+            ncc=("system", "validate-config"),
         )
         self.add_action(
             "System report",
             lambda: self._run_quick(("report",), "System report", False),
+            ncc=("system", "report"),
         )
         self._elevated_btns.append(
             self.add_action(
                 "Rebuild only",
                 lambda: self._run_quick(("build", "switch"), "Rebuild only", True),
+                ncc=("system", "build"),
             )
         )
         self.add_action(
             "Config layout",
             lambda: self._run_quick(("config-layout", "detect"), "Config layout", False),
+            ncc=("system", "config-layout"),
         )
         self._elevated_btns.append(
             self.add_action(
                 "Allow unfree",
                 lambda: self._run_quick(("allow-unfree",), "Allow unfree", True),
+                ncc=("system", "allow-unfree"),
             )
         )
 

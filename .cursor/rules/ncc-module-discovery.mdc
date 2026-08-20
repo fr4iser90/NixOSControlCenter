@@ -75,7 +75,9 @@ Prefer: `imports = [ ./commands.nix ];` (flake specialArgs inject helpers).
 Never: `(import ./commands.nix { inherit … })` — drops helpers and breaks rebuild.
 
 ```bash
-bash shell/scripts/checks/modules/run-all.sh
+bash tests/install-wizard/validate-no-hardcoded-paths.sh
+# prefer: nix-build -E 'with import <nixpkgs> {}; import ./tests/install-wizard { inherit pkgs; }'
+
 ```
 
 Agents **must** run this (or at least `validate-no-hardcoded-paths.sh`) before claiming a Nix change works.

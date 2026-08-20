@@ -76,6 +76,11 @@ let
     inherit config pkgs lib systemConfig getModuleApi getModuleMetadata configPath;
     backupHelpers = import ../lib/backup-helpers.nix { inherit pkgs lib; };
   };
+
+  flakeExtras = import ../components/system-checks/prebuild/checks/system/flake-extras.nix {
+    inherit pkgs getModuleApi;
+  };
+  flakeExtrasCheck = flakeExtras.checkScript;
   
   # Create script with runtime dependencies (only available for this script, not system-wide)
   systemUpdateMainScript = pkgs.symlinkJoin {
@@ -89,6 +94,7 @@ let
     VERBOSE=false
     FORCE_MIGRATION=false
     FORCE_UPDATE=false
+    ALLOW_FLAKE_EXTRAS=false
     CLEANUP=false
     AUTO_CONFIRM=false
     AUTO_SOURCE=""
@@ -106,6 +112,10 @@ let
           ;;
         --force-update)
           FORCE_UPDATE=true
+          ;;
+        --allow-flake-extras)
+          # Destructive: overwrite flake.nix even if host has inputs NCC lacks
+          ALLOW_FLAKE_EXTRAS=true
           ;;
         --cleanup)
           CLEANUP=true
@@ -974,8 +984,31 @@ EOF
     
     # Update files
     ${ui.messages.loading "Updating NixOS configuration..."}
-    
 
+    # Before replacing flake.nix: refuse if live host has inputs NCC does not ship
+    # (jetpack, private modules, etc.). Generic — no per-repo hardcoding.
+    if [ -f "$NIXOS_DIR/flake.nix" ] && [ -f "$SOURCE_DIR/flake.nix" ]; then
+      ${ui.messages.loading "Checking host flake extras vs incoming flake..."}
+      set +e
+      ${flakeExtrasCheck}/bin/ncc-check-flake-extras --live "$NIXOS_DIR/flake.nix" --incoming "$SOURCE_DIR/flake.nix"
+      FLAKE_EXTRAS_RC=$?
+      set -e
+      if [ "''${FLAKE_EXTRAS_RC:-0}" -eq 2 ]; then
+        if [ "$ALLOW_FLAKE_EXTRAS" = "true" ]; then
+          ${ui.messages.warning "Host flake extras present — continuing because --allow-flake-extras (destructive)"}
+        else
+          ${ui.messages.error "Refusing to overwrite flake.nix — host-only flake inputs would be lost"}
+          ${ui.messages.info "Backup already at: $BACKUP_DIR"}
+          ${ui.messages.info "Override (destructive): sudo ncc system update ... --allow-flake-extras"}
+          exit 2
+        fi
+      elif [ "''${FLAKE_EXTRAS_RC:-0}" -ne 0 ]; then
+        ${ui.messages.error "flake extras check failed (rc=$FLAKE_EXTRAS_RC)"}
+        exit 1
+      else
+        ${ui.messages.success "Flake extras check OK (no host-only inputs)"}
+      fi
+    fi
     
     # Copy defined directories and files
     # IMPORTANT: systemConfig/ and custom/ are NEVER overwritten - user-specific
@@ -1484,6 +1517,7 @@ EOF
       pkgs.jq
       pkgs.fzf
       pkgs.tree
+      flakeExtrasCheck
     ];
   };
 
@@ -1494,6 +1528,7 @@ in lib.mkMerge [
 
     environment.systemPackages = [
       systemUpdateMainScript
+      flakeExtrasCheck
       configModule.configCheck
       configModule.cleanupLegacyConfigs
     ];

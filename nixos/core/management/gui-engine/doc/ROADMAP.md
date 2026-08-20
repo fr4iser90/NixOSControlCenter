@@ -19,8 +19,7 @@ Rich pages live **in each module** (`ui/gui/page.py` + `registerGuiPage`).
 | network | `core/base/network/ui/gui` | wifi form |
 | lock | `lock-manager/ui/gui` | snapshot / restore |
 | ai | `ncc-assistant/ui/gui` | chat / tools / jobs (+ DomainPage fallback) |
-| ssh | `ssh-manager/ui/gui` | client list, embedded PTY |
-| hosts | `hosts/ui/gui` | fleet targets |
+| ssh | `ssh-manager/ui/gui` | client list, embedded PTY; Target bar uses same `~/.creds` |
 | homelab | `homelab-manager/ui/gui` | status / stacks |
 | vm | `vm/ui/gui` | domains + start/stop |
 | desktop | `desktop/ui/gui` | editable + rebuild |
@@ -40,11 +39,11 @@ Root NCC GUI has a **Target** bar = *which machine you Connect to*
 - Persists last Connect to `~/.config/ncc/active-target`; live session uses `NCC_TARGET_HOST`
 - Gate banner: **blocked** | **needs_install** → Install | **needs_update** → System | **ready**
 - Most domains follow connected Target (`ssh user@host -- ncc …`); elevated: `ssh … sudo -n ncc …`
-- **Always local:** `hosts`, `ssh`
-- While gated remote: sidebar limited (hosts/ssh + install/system as needed)
+- **Always local:** `ssh` (client list / connections from this PC)
+- While gated remote: sidebar limited (ssh + install/system as needed)
 - When **ready**: sidebar = domains enabled on that host
 
-CLI: `ncc hosts list|show|use|add|remove` and `ncc hosts --gui`.
+Clients: `ncc ssh client list|add|…`. Session target: Target bar only (no separate hosts module).
 
 ## Next (optional)
 

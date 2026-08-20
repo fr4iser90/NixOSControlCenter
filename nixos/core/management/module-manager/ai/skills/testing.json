@@ -1,0 +1,12 @@
+{
+  "_schema": "ncc-skill/testing/1.0",
+  "_version": "2.0.0",
+  "testingApproach": "Repo-root tests/ only — never under docs/, never under scripts/",
+  "testLocation": "tests/<area>/ (install-wizard, packages, ncc-assistant, …)",
+  "entry": "tests/default.nix",
+  "rules": [
+    "All tests live under repo-root tests/",
+    "AI guidance lives under <module>/ai/ — never docs/AI",
+    "Installer runtime checks (hardware/system) stay under scripts/checks/ — those are not unit tests"
+  ]
+}

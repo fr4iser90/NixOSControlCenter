@@ -281,6 +281,70 @@ EOF
       ${ui.messages.success "Migrated → $to_path (legacy SSH module configs removed)"}
     }
 
+    # Simple rename: copy leaf config fromPaths[0] → toPath, delete old leaf + code tree
+    apply_rename() {
+      local id="$1" plan="$2"
+      local from_p to_p
+      from_p=$(echo "$plan" | ${pkgs.jq}/bin/jq -r '.fromPaths[0] // empty')
+      to_p=$(echo "$plan" | ${pkgs.jq}/bin/jq -r '.toPath // empty')
+      if [[ -z "$from_p" || -z "$to_p" ]]; then
+        ${ui.messages.error "rename plan $id missing fromPaths/toPath"}
+        return 1
+      fi
+
+      local has_from=0 has_to=0 has_code=0
+      path_exists "$from_p" && has_from=1
+      path_exists "$to_p" && has_to=1
+      [[ -d "$NIXOS_ROOT/$from_p" ]] && has_code=1
+
+      if [[ "$has_from" -eq 0 && "$has_code" -eq 0 ]]; then
+        log "rename $id: nothing to do"
+        if [[ "$has_to" -eq 1 ]] || already_applied "$id"; then
+          mark_applied "$id" || true
+        fi
+        return 0
+      fi
+
+      ${ui.messages.loading "Plan $id: rename $from_p → $to_p"}
+
+      if [[ "$has_from" -eq 1 ]]; then
+        local src_j tgt_j merged
+        src_j=$(read_leaf_json "$from_p")
+        tgt_j=$([[ "$has_to" -eq 1 ]] && read_leaf_json "$to_p" || echo '{}')
+        merged=$(${pkgs.jq}/bin/jq -nc --argjson s "$src_j" --argjson t "$tgt_j" --arg from "$from_p" '
+          ($t + $s) + {
+            _version: ($s._version // $t._version // "2.0.0"),
+            _migratedFrom: (( $t._migratedFrom // [] ) + [ ($from | split("/") | .[-1]) ] | unique)
+          }
+        ')
+        echo "  preview:"
+        echo "$merged" | ${pkgs.jq}/bin/jq -C '.' 2>/dev/null | sed 's/^/    /' || true
+        if [[ "$DRY" -eq 1 ]]; then
+          ${ui.messages.info "Dry-run — no changes written"}
+          return 0
+        fi
+        local sf
+        sf=$(ncc_module_config_path "$from_p")
+        [[ -f "$sf" ]] && ${backupHelpers.backupConfigFile "$sf" "module-migrate-rename"} >/dev/null 2>&1 || true
+        write_leaf_json "$to_p" "$merged" || {
+          ${ui.messages.error "Failed to write $to_p"}
+          return 1
+        }
+        delete_leaf "$from_p"
+      elif [[ "$DRY" -eq 1 ]]; then
+        ${ui.messages.info "Dry-run — would remove leftover tree $NIXOS_ROOT/$from_p"}
+        return 0
+      fi
+
+      if [[ -d "$NIXOS_ROOT/$from_p" ]]; then
+        ${ui.messages.warning "Removing leftover module tree: $NIXOS_ROOT/$from_p"}
+        rm -rf "$NIXOS_ROOT/$from_p" 2>/dev/null || sudo rm -rf "$NIXOS_ROOT/$from_p"
+      fi
+
+      mark_applied "$id"
+      ${ui.messages.success "Renamed → $to_p"}
+    }
+
     # --- Orphan cleanup (systemConfig leaves without a discovered module) ---
     # Never touch: custom/ (repo userspace), systemConfig/users/, systemConfig/custom/
     cleanup_orphans() {
@@ -390,6 +454,12 @@ EOF
         ssh-merge)
           PENDING=$((PENDING + 1))
           if ! apply_ssh_merge "$id" "$to_path"; then
+            FAILED=$((FAILED + 1))
+          fi
+          ;;
+        rename)
+          PENDING=$((PENDING + 1))
+          if ! apply_rename "$id" "$plan"; then
             FAILED=$((FAILED + 1))
           fi
           ;;

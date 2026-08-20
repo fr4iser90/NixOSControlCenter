@@ -26,7 +26,6 @@ from .llm import (
     iter_chat_completion,
     list_models,
     model_supports_vision,
-    resolve_model,
 )
 from .runtime import ToolRuntime
 
@@ -146,10 +145,8 @@ class ChatSession:
         if self.settings.api != "openai-compatible":
             self.model_label = self.settings.model or "unset"
             return self.model_label
-        try:
-            self.model_label = resolve_model(self.settings)
-        except LLMError:
-            self.model_label = "auto (unavailable)"
+        # Do not hit the network here (GUI open path). Resolve on first send.
+        self.model_label = "auto"
         return self.model_label
 
     def set_model(self, model_id: str | None) -> None:
@@ -337,7 +334,9 @@ class ChatSession:
                 }
                 return
 
-            if content:
+            # Tool-only rounds often have empty/whitespace content — do not emit
+            # a second empty assistant bubble before the tool traces.
+            if content.strip():
                 yield {
                     "kind": "assistant",
                     "text": content,

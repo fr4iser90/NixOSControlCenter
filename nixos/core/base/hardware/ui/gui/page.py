@@ -154,7 +154,7 @@ class HardwarePage(DomainPage):
             "Auto-detect → system-manager.enableChecks. "
             "Enums are stored in hardware config; probe is live-only."
         )
-        self.add_action("Refresh", self.reload)
+        self.add_action("Refresh", self.reload, local=True)
 
         assert self.commit is not None
         self.commit.set_flush_handler(self._flush_pending)

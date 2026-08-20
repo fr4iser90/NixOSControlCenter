@@ -1,0 +1,16 @@
+{
+  "_schema": "ncc-domain/docs/1.0",
+  "_version": "2.0.0",
+  "path": "docs/",
+  "description": "Human product docs only. AI packs NEVER live here.",
+  "status": "human-docs",
+  "ai": {
+    "location": "<module>/ai/",
+    "forbidden": ["docs/AI", "docs/**/ai"],
+    "note": "Skills, domains, context, manifests stay with the owning module"
+  },
+  "tests": {
+    "location": "tests/",
+    "forbidden": ["docs/**/tests", "nixos/**/tests (except none — use repo-root tests/)"]
+  }
+}

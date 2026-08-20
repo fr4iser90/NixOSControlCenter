@@ -135,10 +135,88 @@ QFrame#nccGateBanner {
   border-bottom: 1px solid palette(mid);
   color: palette(window-text);
 }
+QFrame#nccGateBanner[gateKind="danger"] {
+  background: #3d1515;
+  border-bottom: 2px solid #c44;
+  color: #f5d0d0;
+}
+QFrame#nccGateBanner[gateKind="warn"] {
+  background: #3d3010;
+  border-bottom: 2px solid #c90;
+  color: #f5e6c0;
+}
+QFrame#nccGateBanner[gateKind="info"] {
+  background: palette(alternate-base);
+  border-bottom: 1px solid palette(highlight);
+}
+QLabel#nccGateMessage {
+  font-size: 13px;
+  font-weight: 600;
+  color: inherit;
+  padding: 2px 0;
+}
 QWidget#nccTargetBar {
   border: none;
   border-bottom: 1px solid palette(mid);
-  max-height: 44px;
+  max-height: 48px;
+}
+QWidget#nccTargetBar[sessionMode="remote"] {
+  background: #0f2a1f;
+  border-bottom: 2px solid #2a8f5b;
+}
+QWidget#nccTargetBar[sessionMode="pending"],
+QWidget#nccTargetBar[sessionMode="connecting"] {
+  background: #2a2410;
+  border-bottom: 2px solid #c90;
+}
+QWidget#nccTargetBar[sessionMode="failed"] {
+  background: #2a1212;
+  border-bottom: 2px solid #c44;
+}
+QLabel#nccSessionChip {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid palette(mid);
+  background: palette(button);
+  color: palette(button-text);
+}
+QLabel#nccSessionChip[sessionMode="local"] {
+  border-color: palette(mid);
+}
+QLabel#nccSessionChip[sessionMode="remote"] {
+  border-color: #2a8f5b;
+  background: #1a3d2c;
+  color: #b8f0d0;
+}
+QLabel#nccSessionChip[sessionMode="pending"],
+QLabel#nccSessionChip[sessionMode="connecting"] {
+  border-color: #c90;
+  background: #3d3010;
+  color: #ffe6a0;
+}
+QLabel#nccSessionChip[sessionMode="failed"] {
+  border-color: #c44;
+  background: #4a1818;
+  color: #ffc0c0;
+}
+QLabel#nccOperatingScope {
+  font-size: 12px;
+  font-weight: 600;
+  color: palette(window-text);
+  padding: 0 0 6px 0;
+}
+QLabel#nccOperatingScope[sessionMode="remote"] {
+  color: #6dcb9a;
+}
+QLabel#nccOperatingScope[sessionMode="pending"],
+QLabel#nccOperatingScope[sessionMode="connecting"] {
+  color: #e0b84a;
+}
+QLabel#nccOperatingScope[sessionMode="failed"] {
+  color: #e07070;
 }
 QLabel#nccTargetStatus {
   font-size: 12px;

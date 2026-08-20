@@ -1,5 +1,5 @@
 # Library exports for system-manager
-# Note: homelab-utils.nix has been moved to modules/homelab-manager/lib/
+# Note: homelab-utils.nix has been moved to modules/infrastructure/stack-manager/lib/
 
 rec {
   # Version management helpers (for module version checking)

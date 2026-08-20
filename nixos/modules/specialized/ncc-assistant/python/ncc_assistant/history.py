@@ -97,33 +97,22 @@ def delete_session(session_id: str) -> bool:
 
 
 def session_plaintext(session_id: str, *, include_system: bool = False) -> str:
-    """Plaintext transcript for clipboard copy."""
+    """Plaintext transcript for clipboard copy (disk session → shared formatter)."""
+    from .transcript import format_messages_plaintext
+
     data = load_session(session_id)
     if not data:
         return ""
-    lines: list[str] = [
-        data.get("title") or "Untitled",
-        f"model={data.get('model') or '?'}  provider={data.get('provider') or data.get('endpoint') or '?'}",
-        "",
-    ]
-    for msg in data.get("messages") or []:
-        if not isinstance(msg, dict):
-            continue
-        role = msg.get("role") or "?"
-        if role == "system" and not include_system:
-            continue
-        content = msg.get("content") or ""
-        if isinstance(content, list):
-            parts = []
-            for p in content:
-                if isinstance(p, dict) and p.get("type") == "text":
-                    parts.append(str(p.get("text") or ""))
-            content = "\n".join(parts)
-        if role == "tool":
-            lines.append(f"[tool {msg.get('name') or ''}]\n{content}\n")
-        else:
-            lines.append(f"[{role}]\n{content}\n")
-    return "\n".join(lines).strip() + "\n"
+    header = (
+        f"{data.get('title') or 'Untitled'}\n"
+        f"model={data.get('model') or '?'}  "
+        f"provider={data.get('provider') or data.get('endpoint') or '?'}"
+    )
+    return format_messages_plaintext(
+        list(data.get("messages") or []),
+        include_system=include_system,
+        header=header,
+    )
 
 
 def title_from_messages(messages: list[dict[str, Any]]) -> str:

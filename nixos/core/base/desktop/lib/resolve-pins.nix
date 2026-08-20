@@ -9,7 +9,7 @@
   pinnedAppsAuto,
   packageModules,
   systemPackages,
-  userPackagesFlat,
+  userPackagesFlat ? [ ],
   environment,
 }:
 let

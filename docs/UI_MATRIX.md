@@ -52,7 +52,6 @@ Modules may set a preferred layout via `buildDomainTui { layout = "medium"; }` w
 | `nixos/modules/security/ssh-manager` | ✅ | — | — | — | — | ✅ ok | Low |
 | `nixos/modules/specialized/ai-workspace` | — | — | — | — | — | ✅ ok | Low |
 | `nixos/modules/specialized/chronicle` | ✅ | — | — | ✅ | — | ✅ ok | Low |
-| `nixos/modules/specialized/hackathon` | — | — | — | — | — | ✅ ok | Low |
 | `nixos/modules/specialized/nixify` | ✅ | — | — | — | — | ⚠️ CLI commands only (no scripts/ dir) | Medium |
 | `nixos/modules/system/lock-manager` | ✅ | — | ✅ | — | — | ⚠️ CLI commands only (no scripts/ dir) | Medium |
 
@@ -103,5 +102,4 @@ Modules may set a preferred layout via `buildDomainTui { layout = "medium"; }` w
 15. `nixos/modules/infrastructure/bootentry-manager`
 16. `nixos/modules/specialized/nixify` (evtl. Web-UI wichtiger)
 17. `nixos/modules/specialized/chronicle` (GUI vorhanden)
-18. `nixos/modules/specialized/hackathon`
 19. `nixos/modules/specialized/ai-workspace`

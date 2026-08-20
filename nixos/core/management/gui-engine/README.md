@@ -27,7 +27,7 @@ class HomelabPage(DomainPage):
         super().__init__("Homelab", "Short end-user sentence.", parent=parent)
         form = self.add_form_block("Status")
         _, stacks = self.add_list_block("Stacks")
-        self.add_action("Refresh", self.reload, primary=True)
+        self.add_action("Refresh", self.reload, primary=True, local=True)
 ```
 
 ### DomainPage API (short)

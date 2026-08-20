@@ -37,12 +37,24 @@ class VmPage(DomainPage):
         self.detail.setWordWrap(True)
         dl.addWidget(self.detail)
 
-        self.add_action("Start", lambda: self._dom("start"), primary=True)
-        self.add_action("Shutdown", lambda: self._dom("stop"))
-        self.add_action("Force off", lambda: self._dom("destroy"))
-        self.add_action("Refresh", self.reload)
-        self.add_action("Full status", lambda: self._run(("status",), "Full status"))
-        self.add_action("Test distros", lambda: self._run(("list",), "Test distros"))
+        self.add_action(
+            "Start", lambda: self._dom("start"), primary=True, ncc=("vm", "start")
+        )
+        self.add_action("Shutdown", lambda: self._dom("stop"), ncc=("vm", "stop"))
+        self.add_action(
+            "Force off", lambda: self._dom("destroy"), ncc=("vm", "destroy")
+        )
+        self.add_action("Refresh", self.reload, local=True)
+        self.add_action(
+            "Full status",
+            lambda: self._run(("status",), "Full status"),
+            ncc=("vm", "status"),
+        )
+        self.add_action(
+            "Test distros",
+            lambda: self._run(("list",), "Test distros"),
+            ncc=("vm", "list"),
+        )
 
         target_bus().changed.connect(lambda _t: self.reload())
         self.reload()

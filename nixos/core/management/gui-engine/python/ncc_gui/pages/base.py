@@ -29,6 +29,7 @@ class DomainActionsPage(DomainPage):
                 label,
                 lambda a=args, l=label: self._run(a, l),
                 primary=(i == 0),
+                ncc=(domain, *args),
             )
 
     def _run(self, args: tuple[str, ...], label: str) -> None:

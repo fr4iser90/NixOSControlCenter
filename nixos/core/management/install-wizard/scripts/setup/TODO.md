@@ -14,12 +14,12 @@ Siehe Analyse: Preset-`features`/`overrides` oft ungenutzt, Memory/Storage-Check
 ## Phase 1 — Quick Wins (P0)
 
 ### [INST-01] Preset `features` / `overrides` wirklich anwenden
-- [ ] In `apply-install-template.sh` `features { ... }` parsen
-- [ ] Mapping auf bestehende Writer (`write_ssh_config`, `write_homelab_config`, `write_vm_config`, `write_bootentry_config`, …)
-- [ ] `overrides` (z.B. `enableSSH`) anwenden
-- [ ] Optional: `email` / `domain` schreiben falls Writer existiert
+- [x] In `apply-install-template` `features { ... }` via nix eval parsen
+- [x] Mapping via discovery → `write_module_config` (soft-skip missing modules)
+- [x] `overrides` (z.B. `enableSSH`) anwenden
+- [x] Optional: `email` / `domain` schreiben falls Writer existiert
 - [ ] Test: Preset mit Features → Config enthält erwartete Flags (dry-run)
-- **Files:** `setup/config/apply-install-template.sh`, `setup/config/config-writer.sh`, `tests/test-presets-dry-run.sh`
+- **Files:** `setup/config/apply-install-template.nix`, `setup/config/config-writer.nix`, `tests/test-presets-dry-run.nix`
 - **Done when:** Desktop/Server-Preset-Features landen in der generierten Config
 
 ### [INST-02] Memory-Detection + `MEMORY_GB`
@@ -34,7 +34,7 @@ Siehe Analyse: Preset-`features`/`overrides` oft ungenutzt, Memory/Storage-Check
 - [ ] `ui-aliases.nix`: tote `install-quick-*` / fehlende Scripts entfernen oder fixen
 - [ ] Fehlende Targets prüfen (`gaming-setup.sh`, `workstation-setup.sh`, …)
 - [ ] Entscheiden: `state-machine.sh` verdrahten (INST-10) oder löschen
-- [ ] Hackathon: ins Menü oder aus Docs/Imports klar als experimental markieren
+- [ ] Hackathon: entfernt (kein Mode mehr)
 - **Files:** `shell/hooks/ui-aliases.nix`, ggf. `lib/state-machine.sh`, mode menus
 - **Done when:** `install*` Aliases zeigen nur auf existierende Pfade
 
@@ -95,9 +95,9 @@ Siehe Analyse: Preset-`features`/`overrides` oft ungenutzt, Memory/Storage-Check
 - **Done when:** Kein toter State-Machine-Code mehr
 
 ### [INST-11] Legacy Desktop/Server Modes konsolidieren
-- [ ] Entscheiden: Preset-Pfad ist SSOT; Legacy `modes/desktop|server/setup.sh` deprecaten
-- [ ] Dispatch in `init.sh` vereinfachen
-- [ ] Tests auf einen Happy-Path fokussieren, Legacy smoke behalten bis Removal
+- [x] Preset-Pfad ist SSOT; Legacy `modes/desktop|server|homelab|custom` entfernt
+- [x] Dispatch in `init.sh` → nur `apply_install_template` (+ From Scratch temp preset)
+- [ ] Tests auf einen Happy-Path fokussieren (legacy smoke entfernen/anpassen)
 - **Done when:** Ein klarer Primary-Path + dokumentierter Legacy-Exit
 
 ### [INST-12] Profiles als First-Class Presets

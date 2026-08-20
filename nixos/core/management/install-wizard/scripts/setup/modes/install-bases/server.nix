@@ -62,7 +62,7 @@
     # enable = sshd+unlock; client.enable separate (default false)
     ssh-manager = true;
     bootentry-manager = false; 
-    homelab-manager = false;    
+    stack-manager = false;
     vm-manager = false;         
     ai-workspace = false;       
   };
@@ -79,8 +79,7 @@
   # Profile Overrides
   #
   overrides = {
-    # Prefer features.ssh-manager (INST-01 still pending for apply).
-    # Maps to: keep sshd enabled — never silently disable during setup.
+    # Prefer features.ssh-manager; overrides.enableSSH still applied via INST-01.
     enableSSH = true;
   };
 

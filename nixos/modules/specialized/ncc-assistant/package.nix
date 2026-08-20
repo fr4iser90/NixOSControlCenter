@@ -6,7 +6,6 @@ let
     inherit pkgs;
   };
 
-  knowledgeSrc = ./knowledge;
   aiKnowledgeSrc = ./AI_KNOWLEDGE.md;
 
   guiEngine = (getModuleApi "gui-engine").package pkgs;
@@ -15,15 +14,25 @@ let
     inherit lib pkgs getModuleMetadata;
   };
 
-  appRoot = pkgs.runCommand "ncc-assistant-src" { } ''
+  modulesIndex = import ./lib/discover-modules-index.nix {
+    inherit lib pkgs getModuleMetadata;
+  };
+
+    appRoot = pkgs.runCommand "ncc-assistant-src" { } ''
     mkdir -p $out
     cp -r ${./python/ncc_assistant} $out/ncc_assistant
     cp -r ${./prompts} $out/prompts
-    cp -r ${knowledgeSrc} $out/knowledge
-    # Domain ai/docs fragments (e.g. ai-user-accounts.md)
-    mkdir -p $out/knowledge/domains
-    cp -r ${domainAi.docsRoot}/domains/. $out/knowledge/domains/ || true
-    cp ${aiKnowledgeSrc} $out/AI_KNOWLEDGE.md
+    # Knowledge = ONLY discovered <module>/ai/ packs. Module inventory is live via ncc.
+    mkdir -p $out/knowledge
+    cp -a ${domainAi.knowledgeRoot}/. $out/knowledge/
+    # Principles-only doc + generated inventory note (docs; list_modules does not read this)
+    {
+      cat ${aiKnowledgeSrc}
+      echo
+      echo "---"
+      echo
+      cat ${modulesIndex.inventoryFile}
+    } > $out/AI_KNOWLEDGE.md
     cp -r ${guiEngine.src}/ncc_gui $out/ncc_gui
   '';
 

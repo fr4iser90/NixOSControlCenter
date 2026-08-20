@@ -426,6 +426,7 @@ in {
             --verbose, -v        Show verbose output during update
             --force-migration    Force migration even if versions match
             --force-update       Force update even if versions match
+            --allow-flake-extras Overwrite flake.nix even if host has extra inputs (destructive)
             --cleanup            Remove modules that no longer exist in source
 
           Examples:
@@ -448,6 +449,7 @@ in {
             sudo ncc system update --yes --channels
 
           Note: Requires root (sudo / pkexec). Canonical path is `ncc system update` (not bare system-update).
+          Host-only flake inputs (private flakes, jetpack, …) block replacing flake.nix unless --allow-flake-extras.
         '';
         requiresSudo = true;
       }

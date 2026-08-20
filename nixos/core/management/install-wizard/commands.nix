@@ -74,17 +74,26 @@ EOF
         exec ${installer.ncc-install-dry}/bin/ncc-install-dry "$@"
         ;;
       shell)
-        repo="$(_ncc_install_repo)" || {
-          echo "Could not find NixOSControlCenter checkout (set repoPath or NCC_INSTALL_REPO)" >&2
-          exit 1
-        }
-        echo "NCC_INSTALL_SHELL_ONLY=1 nix-shell \"$repo/shell.nix\""
+        shift || true
+        exec ${shellHint}/bin/ncc-install-shell "$@"
         ;;
       *)
         echo "Unknown: ncc install $1" >&2
         exit 1
         ;;
     esac
+  '';
+
+  # Registered as `parent = "install"` so `ncc install shell` resolves via
+  # cli-registry (`install-shell`). Entry-only verbs are invisible to `ncc`.
+  shellHint = pkgs.writeShellScriptBin "ncc-install-shell" ''
+    set -euo pipefail
+    ${resolveRepoSnippet}
+    repo="$(_ncc_install_repo)" || {
+      echo "Could not find NixOSControlCenter checkout (set repoPath or NCC_INSTALL_REPO)" >&2
+      exit 1
+    }
+    echo "NCC_INSTALL_SHELL_ONLY=1 nix-shell \"$repo/shell.nix\""
   '';
 in
 {
@@ -110,6 +119,33 @@ in
           ncc install --gui
           ncc install wizard|dry-run|shell
         '';
+      }
+      {
+        name = "wizard";
+        parent = "install";
+        domain = "install";
+        description = "PySide6 install wizard";
+        category = "management";
+        script = "${installer.ncc-install-wizard}/bin/ncc-install-wizard";
+        shortHelp = "wizard - Install wizard window";
+      }
+      {
+        name = "dry-run";
+        parent = "install";
+        domain = "install";
+        description = "Dry-run install flow";
+        category = "management";
+        script = "${installer.ncc-install-dry}/bin/ncc-install-dry";
+        shortHelp = "dry-run - Dry-run install";
+      }
+      {
+        name = "shell";
+        parent = "install";
+        domain = "install";
+        description = "Print nix-shell invocation";
+        category = "management";
+        script = "${shellHint}/bin/ncc-install-shell";
+        shortHelp = "shell - Print install nix-shell command";
       }
     ])
   ];
