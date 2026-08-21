@@ -17,8 +17,7 @@ pkgs.writeScriptBin "module-manager-tui" ''
 
   set -euo pipefail
 
-  # Starting message
-  echo "📦 Module Manager TUI Starting"
+  ${ui.messages.loading "Module Manager TUI starting…"}
 
   # Global state
   cursor_pos=0
@@ -27,16 +26,16 @@ pkgs.writeScriptBin "module-manager-tui" ''
   filter_category="all"
 
   # Load modules
-  echo "ℹ Loading modules..."
+  ${ui.messages.loading "Loading modules…"}
   modules=$(${actions.getModuleList})
 
   if [[ -z "$modules" ]]; then
-      echo "✗ No modules found!"
+      ${ui.messages.error "No modules found"}
       exit 1
   fi
 
   count=$(echo "$modules" | wc -l)
-  echo "✓ Loaded $count modules"
+  ${ui.messages.success "Loaded $count modules"}
 
   # Interactive Gum main function - RICHTIG INTERAKTIV!
   main() {

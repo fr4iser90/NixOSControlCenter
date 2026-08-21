@@ -117,7 +117,9 @@ in
         esac
       done
       if [ "${requiresSudo}" = "true" ] && [ "$_ncc_dry" != "true" ]; then
-        exec sudo "${cmd.script}" "$@"
+        # Preserve nested/quiet/verbose markers so system-update → build keeps one CLI chrome
+        exec sudo --preserve-env=NCC_CLI_NESTED,NCC_QUIET_SWITCH,NCC_PREFLIGHT_VERBOSE,NCC_CLI_VERBOSE \
+          "${cmd.script}" "$@"
       else
         exec "${cmd.script}" "$@"
       fi

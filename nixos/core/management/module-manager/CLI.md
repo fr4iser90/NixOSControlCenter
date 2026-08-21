@@ -2,35 +2,33 @@
 
 > SSOT: [STANDARDS](../cli-formatter/doc/STANDARDS.md) · [COPY](../cli-formatter/doc/COPY.md)
 
-**Status:** `partial`
+**Status:** `compliant`
 
 ## Commands
 
 | Command | Purpose | Dry-run | Needs root |
 |---------|---------|---------|------------|
-| `ncc modules migrate` | Named plans (rename/merge) + orphan cleanup | `--dry-run` | yes (except dry-run) |
-| `ncc modules …` (TUI / discovery) | Module UI / helpers | N/A / varies | varies |
+| `ncc modules list` | Discover + list modules | N/A (`--json` machine) | no |
+| `ncc modules show NAME` | Module details | N/A | no |
+| `ncc modules enable\|disable NAME` | Toggle in systemConfig | no | yes |
+| `ncc modules migrate` | Named plans + orphan cleanup | `--dry-run` | yes (except dry-run) |
+| `ncc modules --tui` | Modules TUI | N/A | yes |
 
-## How migrate should look
+## Output contract
 
-```text
-Checking module config migrations…
-Scanning module migration plans…
-Plan stack-manager-rename-v1: rename … → …
-Would rename (dry-run) — no changes written   # or success when applying
-… orphans …
-Dry-run: N plan(s) would run                  # or complete
-```
-
-`-v`: layout, JSON previews, full paths.
+- Normal: header → loading → facts → success/error → `Next:` (skip header/next when `NCC_CLI_NESTED=1`)
+- migrate dry-run: dry banner + no writes
+- `--json` on list: stdout JSON only
 
 ## Self-audit
 
-- [x] `ncc_backup_config_file` (no `BACKUP_ROOT` unbound under `set -u`)
-- [x] Plans use `ui.messages.*`; JSON preview behind `-v`
-- [ ] TUI / other scripts full COPY pass
-- [ ] README links here
+- [x] `ui = getModuleApi "cli-formatter"` in `commands.nix` + migrate runner
+- [x] list / show / enable|disable / migrate follow §3 skeleton
+- [x] Nested `NCC_CLI_NESTED=1` respected
+- [x] Dry-run on migrate documented
+- [ ] TUI (BubbleTea / Gum) — **out of scope for compliant**; start/load/error/success on Gum path use formatter
+- [x] README links here
 
 ## Notes
 
-Never touches `custom/` or `systemConfig/users/`.
+Never touches `custom/` or `systemConfig/users/`. Compliant covers main `ncc modules` CLI verbs only.

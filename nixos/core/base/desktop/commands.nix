@@ -95,10 +95,12 @@ in
             type = "manager";
             shortHelp = "desktop - Desktop Manager";
             longHelp = ''
-              ncc desktop                 CLI help
-              ncc desktop --gui|--tui
-              ncc desktop status
-              ncc desktop set … [--rebuild]
+              Configure desktop environment, display manager, and theme.
+
+              Examples:
+                ncc desktop status
+                ncc desktop --gui
+                sudo ncc desktop set environment=plasma manager=sddm
             '';
           }
           {
@@ -109,7 +111,12 @@ in
             category = "base";
             script = "${desktopStatus}/bin/ncc-desktop-status";
             shortHelp = "status - Desktop settings";
-            longHelp = "ncc desktop status";
+            longHelp = ''
+              Show current desktop settings as key=value.
+
+              Examples:
+                ncc desktop status
+            '';
           }
           {
             name = "set";
@@ -121,8 +128,12 @@ in
             requiresSudo = true;
             shortHelp = "set - Change desktop settings";
             longHelp = ''
-              sudo ncc desktop set environment=plasma manager=sddm server=wayland dark=true
-              sudo ncc desktop set environment=gnome manager=gdm --rebuild
+              Write desktop settings to systemConfig (optional --rebuild / --dry-run).
+
+              Examples:
+                sudo ncc desktop set environment=plasma manager=sddm server=wayland dark=true
+                sudo ncc desktop set environment=gnome manager=gdm --rebuild
+                sudo ncc desktop set environment=plasma --dry-run
             '';
           }
         ]
@@ -136,7 +147,12 @@ in
             script = "${desktopTui}/bin/ncc-desktop-tui";
             type = "manager";
             shortHelp = "tui - Desktop TUI (prefer: ncc desktop --tui)";
-            longHelp = "ncc desktop --tui";
+            longHelp = ''
+              Open the desktop terminal UI.
+
+              Examples:
+                ncc desktop --tui
+            '';
           }
         ]
       ))

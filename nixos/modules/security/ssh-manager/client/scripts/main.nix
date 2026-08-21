@@ -117,9 +117,12 @@ in {
                   # Delete server from credentials file
                   if [[ "$selection" != "Add new server" ]]; then
                       local server=''${selection%% *}
-                      ${ui.messages.loading "Deleting server..."}
+                      ${ui.messages.loading "Deleting server…"}
                       sed -i "/^$server=/d" "$CREDS_FILE"
                       ${ui.messages.success "Server deleted successfully."}
+                      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                        ${ui.messages.info "Next: ncc ssh client list"}
+                      fi
                   fi
                   ;;
               "edit")
@@ -131,8 +134,12 @@ in {
                       
                       local new_user="$(get_user_input "Enter new username (current: $old_user): ")"
                       if [[ -n "$new_user" ]]; then
+                          ${ui.messages.loading "Updating $server…"}
                           sed -i "s/$server=$old_user/$server=$new_user/" "$CREDS_FILE"
                           ${ui.messages.success "Server updated successfully."}
+                          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                            ${ui.messages.info "Next: ncc ssh client connect $server $new_user"}
+                          fi
                       fi
                   fi
                   ;;
@@ -170,6 +177,10 @@ in {
 
       # Interactive fzf flow (no CLI verb)
       main_interactive() {
+          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+            ${ui.text.header "SSH client"}
+          fi
+          ${ui.messages.loading "Loading saved servers…"}
           local servers_list="$(load_saved_servers)"
           local selection
           local action
@@ -178,10 +189,17 @@ in {
 
           if [[ -z "$selection" && "$action" != "new" ]]; then
               ${ui.messages.error "No server selected"}
+              if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                ${ui.messages.info "Next: ncc ssh client list"}
+              fi
               exit 0
           fi
 
           handle_action "$selection" "$action"
+          # connect/new end in an SSH session; print Next once the shell returns
+          if [[ "$action" == "connect" || "$action" == "new" ]] && [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+            ${ui.messages.info "Next: ncc ssh client list"}
+          fi
       }
 
       # Non-interactive verbs for GUI / scripts: list|add|edit|delete|connect
@@ -199,51 +217,76 @@ in {
                   local server_ip="''${1:-}"
                   local username="''${2:-}"
                   if [[ -z "$server_ip" || -z "$username" ]]; then
-                      echo "Usage: ncc ssh client add HOST USER" >&2
+                      ${ui.messages.error "Usage: ncc ssh client add HOST USER"}
                       exit 2
+                  fi
+                  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                    ${ui.text.header "SSH client add"}
                   fi
                   load_saved_servers >/dev/null
                   if grep -q "^''${server_ip}=" "$CREDS_FILE" 2>/dev/null; then
                       ${ui.messages.error "Server already exists: $server_ip"}
                       exit 1
                   fi
+                  ${ui.messages.loading "Saving $username@$server_ip…"}
                   save_new_server "$server_ip" "$username"
+                  ${ui.messages.success "Server added: $username@$server_ip"}
+                  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                    ${ui.messages.info "Next: ncc ssh client connect $server_ip $username"}
+                  fi
                   ;;
               edit)
                   local server_ip="''${1:-}"
                   local new_user="''${2:-}"
                   if [[ -z "$server_ip" || -z "$new_user" ]]; then
-                      echo "Usage: ncc ssh client edit HOST USER" >&2
+                      ${ui.messages.error "Usage: ncc ssh client edit HOST USER"}
                       exit 2
+                  fi
+                  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                    ${ui.text.header "SSH client edit"}
                   fi
                   load_saved_servers >/dev/null
                   if ! grep -q "^''${server_ip}=" "$CREDS_FILE" 2>/dev/null; then
                       ${ui.messages.error "Server not found: $server_ip"}
                       exit 1
                   fi
+                  ${ui.messages.loading "Updating $server_ip…"}
                   sed -i "s/^''${server_ip}=.*/''${server_ip}=''${new_user}/" "$CREDS_FILE"
                   ${ui.messages.success "Server updated successfully."}
+                  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                    ${ui.messages.info "Next: ncc ssh client connect $server_ip $new_user"}
+                  fi
                   ;;
               delete)
                   local server_ip="''${1:-}"
                   if [[ -z "$server_ip" ]]; then
-                      echo "Usage: ncc ssh client delete HOST" >&2
+                      ${ui.messages.error "Usage: ncc ssh client delete HOST"}
                       exit 2
+                  fi
+                  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                    ${ui.text.header "SSH client delete"}
                   fi
                   load_saved_servers >/dev/null
                   if ! grep -q "^''${server_ip}=" "$CREDS_FILE" 2>/dev/null; then
                       ${ui.messages.error "Server not found: $server_ip"}
                       exit 1
                   fi
+                  ${ui.messages.loading "Deleting $server_ip…"}
                   sed -i "/^''${server_ip}=/d" "$CREDS_FILE"
                   ${ui.messages.success "Server deleted successfully."}
+                  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                    ${ui.messages.info "Next: ncc ssh client list"}
+                  fi
                   ;;
               connect)
                   local server_ip="''${1:-}"
                   local username="''${2:-}"
                   if [[ -z "$server_ip" ]]; then
-                      echo "Usage: ncc ssh client connect HOST [USER]" >&2
+                      ${ui.messages.error "Usage: ncc ssh client connect HOST [USER]"}
                       exit 2
+                  fi
+                  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                    ${ui.text.header "SSH client connect"}
                   fi
                   load_saved_servers >/dev/null
                   if [[ -z "$username" ]]; then
@@ -251,9 +294,26 @@ in {
                   fi
                   if [[ -z "$username" ]]; then
                       ${ui.messages.error "No username for $server_ip (pass USER or add the server first)"}
+                      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                        ${ui.messages.info "Next: ncc ssh client add $server_ip USER"}
+                      fi
                       exit 1
                   fi
-                  connect_to_server "$username@$server_ip"
+                  ${ui.messages.loading "Connecting to $username@$server_ip…"}
+                  ${ui.tables.keyValue "Host" "$server_ip"}
+                  ${ui.tables.keyValue "User" "$username"}
+                  if connect_to_server "$username@$server_ip"; then
+                    ${ui.messages.success "SSH session ended ($username@$server_ip)"}
+                    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                      ${ui.messages.info "Next: ncc ssh client list"}
+                    fi
+                  else
+                    ${ui.messages.error "Connection failed: $username@$server_ip"}
+                    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                      ${ui.messages.info "Next: ncc ssh client add $server_ip $username"}
+                    fi
+                    exit 1
+                  fi
                   ;;
               *)
                   ${ui.messages.error "Unknown action: $verb"}

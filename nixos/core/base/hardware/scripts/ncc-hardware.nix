@@ -21,8 +21,8 @@ pkgs.writeShellScriptBin "ncc-hardware" ''
 ncc hardware — Hardware inventory and auto-detection
 
 Usage:
-  ncc hardware status [--json]
-  ncc hardware set autoDetect=true|false
+  ncc hardware status [--json] [-v]
+  ncc hardware set autoDetect=true|false [--dry-run] [-v]
 
 status   Configured enums vs check enums + live probe (models); autoDetect (= enableChecks)
 set      Toggle hardware auto-detection checks (writes enableChecks; needs root)
@@ -117,7 +117,6 @@ EOF
     local gpus_json
     gpus_json=$(
       lspci -nn 2>/dev/null | grep -iE 'VGA|3D|Display' | while IFS= read -r line; do
-        # "00:02.0 VGA compatible controller [0300]: Intel Corporation ... [8086:xxxx] (rev xx)"
         addr=$(echo "$line" | awk '{print $1}')
         name=$(echo "$line" | sed -E 's/^[0-9a-f:.]+[[:space:]]+([^:]+:[[:space:]]*)?//; s/[[:space:]]*\[[0-9a-f]{4}:[0-9a-f]{4}\].*$//; s/[[:space:]]*\(rev [^)]*\)[[:space:]]*$//')
         vendor="other"
@@ -153,10 +152,20 @@ EOF
   }
 
   cmd_status() {
-    local json_out=false
+    local json_out=false verbose=false
     for a in "$@"; do
-      case "$a" in --json|-j) json_out=true ;; esac
+      case "$a" in
+        --json|-j) json_out=true ;;
+        --verbose|-v) verbose=true ;;
+      esac
     done
+
+    if [[ "$json_out" != true && -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "Hardware status"}
+    fi
+    if [[ "$json_out" != true ]]; then
+      ${ui.messages.loading "Reading hardware configuration and probing…"}
+    fi
 
     local hw sm
     hw=$(read_hw_json)
@@ -200,48 +209,86 @@ EOF
           probed: $probed
         }'
     else
-      echo "autoDetect=$auto"
-      echo "configured.cpu=$cpu_cfg"
-      echo "configured.gpu=$gpu_cfg"
-      echo "configured.ramGB=$ram_cfg"
-      echo "detected.cpu=$cpu_det"
-      echo "detected.gpu=$gpu_det"
-      echo "detected.ramGB=$ram_det"
-      echo "probed.cpu.model=$(echo "$probed" | jq -r '.cpu.model')"
-      echo "probed.cpu.cores=$(echo "$probed" | jq -r '.cpu.cores')"
-      echo "probed.cpu.threads=$(echo "$probed" | jq -r '.cpu.threads')"
-      echo "probed.cpu.maxMHz=$(echo "$probed" | jq -r '.cpu.maxMHz // "null"')"
-      echo "probed.ram.totalGiB=$(echo "$probed" | jq -r '.ram.totalGiB')"
-      local i n
-      n=$(echo "$probed" | jq '.gpus | length')
-      for ((i=0; i<n; i++)); do
-        echo "probed.gpu.$i=$(echo "$probed" | jq -r --argjson i "$i" '.gpus[$i] | "\(.vendor): \(.name)"')"
-      done
+      ${ui.tables.keyValue "autoDetect" "$auto"}
+      ${ui.tables.keyValue "configured.cpu" "$cpu_cfg"}
+      ${ui.tables.keyValue "configured.gpu" "$gpu_cfg"}
+      ${ui.tables.keyValue "configured.ramGB" "$ram_cfg"}
+      ${ui.tables.keyValue "detected.cpu" "$cpu_det"}
+      ${ui.tables.keyValue "detected.gpu" "$gpu_det"}
+      ${ui.tables.keyValue "detected.ramGB" "$ram_det"}
+      if [[ "$verbose" == true ]]; then
+        _m=$(echo "$probed" | jq -r '.cpu.model')
+        _c=$(echo "$probed" | jq -r '.cpu.cores')
+        _t=$(echo "$probed" | jq -r '.cpu.threads')
+        _mhz=$(echo "$probed" | jq -r '.cpu.maxMHz // "null"')
+        _ram=$(echo "$probed" | jq -r '.ram.totalGiB')
+        ${ui.tables.keyValue "probed.cpu.model" "$_m"}
+        ${ui.tables.keyValue "probed.cpu.cores" "$_c"}
+        ${ui.tables.keyValue "probed.cpu.threads" "$_t"}
+        ${ui.tables.keyValue "probed.cpu.maxMHz" "$_mhz"}
+        ${ui.tables.keyValue "probed.ram.totalGiB" "$_ram"}
+        local i n
+        n=$(echo "$probed" | jq '.gpus | length')
+        for ((i=0; i<n; i++)); do
+          _g=$(echo "$probed" | jq -r --argjson i "$i" '.gpus[$i] | "\(.vendor): \(.name)"')
+          ${ui.tables.keyValue "probed.gpu.$i" "$_g"}
+        done
+      fi
+      ${ui.messages.success "Hardware status ready"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc hardware set autoDetect=true|false"}
+      fi
     fi
   }
 
   cmd_set() {
-    local auto=""
+    local auto="" dry_run=false verbose=false
     for arg in "$@"; do
       case "$arg" in
         autoDetect=true|autoDetect=false) auto="''${arg#autoDetect=}" ;;
         enableChecks=true|enableChecks=false) auto="''${arg#enableChecks=}" ;;
+        --dry-run|-d) dry_run=true ;;
+        --verbose|-v) verbose=true ;;
         --help|-h) usage; exit 0 ;;
         *)
           ${ui.messages.error "Unknown: $arg"}
           usage >&2
+          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+            ${ui.messages.info "Next: sudo ncc hardware set autoDetect=true|false"}
+          fi
           exit 2
           ;;
       esac
     done
-    [[ -n "$auto" ]] || {
+    if [[ -z "$auto" ]]; then
       ${ui.messages.error "Usage: ncc hardware set autoDetect=true|false"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: sudo ncc hardware set autoDetect=true|false"}
+      fi
       exit 2
-    }
+    fi
 
-    if [[ "''${EUID:-$(id -u)}" -ne 0 ]]; then
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      if [[ "$dry_run" == true ]]; then
+        ${ui.text.header "Hardware set (dry-run)"}
+        ${ui.messages.info "Preview only — nothing will be written…"}
+      else
+        ${ui.text.header "Hardware set"}
+      fi
+    fi
+
+    if [[ "''${EUID:-$(id -u)}" -ne 0 ]] && [[ "$dry_run" != true ]]; then
       ${ui.messages.error "Run as root: sudo ncc hardware set autoDetect=$auto"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: sudo ncc hardware set autoDetect=$auto"}
+      fi
       exit 1
+    fi
+
+    ${ui.messages.loading "Updating autoDetect (enableChecks)…"}
+    ${ui.tables.keyValue "autoDetect" "$auto"}
+    if [[ "$verbose" == true ]]; then
+      ${ui.tables.keyValue "NIXOS_DIR" "$NIXOS_DIR"}
     fi
 
     local sm
@@ -255,8 +302,20 @@ EOF
     else
       sm=$(printf '%s\n' "$sm" | sed "\$ i\\  enableChecks = $auto;")
     fi
+
+    if [[ "$dry_run" == true ]]; then
+      ${ui.messages.success "Would set autoDetect=$auto (dry-run) — no changes written"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: sudo ncc hardware set autoDetect=$auto"}
+      fi
+      exit 0
+    fi
+
     ncc_write_module_config "core/management/system-manager" "$sm"
     ${ui.messages.success "autoDetect=$auto (system-manager.enableChecks)"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: ncc hardware status"}
+    fi
   }
 
   case "''${1:-}" in
@@ -266,6 +325,9 @@ EOF
     *)
       ${ui.messages.error "Unknown: ncc hardware $1"}
       usage >&2
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc hardware status"}
+      fi
       exit 2
       ;;
   esac

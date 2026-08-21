@@ -11,7 +11,8 @@ in
     if [ $# -eq 0 ]; then
       ${ui.messages.info "Usage: build <command> [options]"}
       ${ui.messages.info "Commands: switch, boot, test, build"}
-      ${ui.messages.info "Options: --force (skip checks)  --verbose (preflight details)"}
+      ${ui.messages.info "Options: --force (skip checks)  --verbose (preflight + rebuild log)"}
+      ${ui.messages.info "Next: ncc system build switch"}
       exit 1
     fi
 
@@ -26,6 +27,20 @@ in
       esac
     done
 
+    # Parent update -v → NCC_CLI_VERBOSE=1 (preserved through sudo)
+    if [ -n "''${NCC_CLI_VERBOSE:-}" ]; then
+      VERBOSE=true
+    fi
+
+    NESTED=false
+    if [ -n "''${NCC_CLI_NESTED:-}" ]; then
+      NESTED=true
+    fi
+
+    if [ "$NESTED" != true ]; then
+      ${ui.text.header "NixOS Build"}
+    fi
+
     if [ "$FORCE" = true ]; then
       ${ui.badges.warning "Bypassing preflight checks"}
       exec ${pkgs.nixos-rebuild}/bin/nixos-rebuild "''${REBUILD_ARGS[@]}"
@@ -37,73 +52,76 @@ in
       export NCC_PREFLIGHT_VERBOSE=0
     fi
 
-    ${ui.text.header "Preflight"}
-
     checks_failed=0
+    preflight_log=$(mktemp /tmp/ncc-preflight.XXXXXX.log)
 
-    ${ui.badges.info "Platform"}
-    if ! prebuild-check-platform; then
-      ${ui.badges.error "Platform: check failed"}
-      checks_failed=1
-    fi
+    run_check() {
+      local name="$1"
+      shift
+      if [ "$VERBOSE" = true ]; then
+        if ! "$@"; then
+          checks_failed=1
+        fi
+      else
+        if ! "$@" >>"$preflight_log" 2>&1; then
+          checks_failed=1
+          cat "$preflight_log"
+        fi
+      fi
+    }
 
-    ${ui.badges.info "CPU"}
-    if ! prebuild-check-cpu; then
-      ${ui.badges.error "CPU: check failed"}
-      checks_failed=1
-    fi
-
-    ${ui.badges.info "GPU"}
-    if ! prebuild-check-gpu; then
-      ${ui.badges.error "GPU: check failed"}
-      checks_failed=1
-    fi
-
-    ${ui.badges.info "Memory"}
-    if ! prebuild-check-memory; then
-      ${ui.badges.error "Memory: check failed"}
-      checks_failed=1
-    fi
-
-    ${ui.badges.info "Users"}
-    if ! prebuild-check-users; then
-      ${ui.badges.error "Users: check failed"}
-      checks_failed=1
-    fi
+    run_check platform prebuild-check-platform
+    run_check cpu prebuild-check-cpu
+    run_check gpu prebuild-check-gpu
+    run_check memory prebuild-check-memory
+    run_check users prebuild-check-users
+    rm -f "$preflight_log"
 
     if [ "$checks_failed" -eq 1 ]; then
-      ${ui.badges.error "Preflight failed"}
+      ${ui.badges.error "Preflight"}
       printf "Continue with build anyway? [y/N] "
       read -r response || response=""
       if [[ ! "$response" =~ ^[Yy]$ ]]; then
         ${ui.badges.error "Build aborted"}
+        ${ui.messages.info "Next: fix the failing checks, or re-run with --force"}
         exit 1
       fi
       ${ui.badges.warning "Continuing despite preflight failures"}
     else
-      ${ui.badges.success "Preflight passed"}
+      ${ui.badges.success "Preflight"}
     fi
 
-    ${ui.text.header "Build"}
-    ${ui.badges.info "nixos-rebuild"}
-    if [ "''${#REBUILD_ARGS[@]}" -gt 0 ]; then
-      echo "  args: ''${REBUILD_ARGS[*]}"
+    ${ui.messages.loading "Building…"}
+    if [ "$VERBOSE" = true ] && [ "''${#REBUILD_ARGS[@]}" -gt 0 ]; then
+      ${ui.messages.info "Rebuild args:"}
+      printf '  %s\n' "''${REBUILD_ARGS[*]}"
     fi
 
     build_log=$(mktemp /tmp/ncc-build.XXXXXX.log)
     trap 'rm -f "$build_log"' EXIT
 
     set +e
-    ${pkgs.nixos-rebuild}/bin/nixos-rebuild "''${REBUILD_ARGS[@]}" 2>&1 | tee "$build_log"
-    rebuild_rc=''${PIPESTATUS[0]}
+    if [ "$VERBOSE" = true ]; then
+      ${pkgs.nixos-rebuild}/bin/nixos-rebuild "''${REBUILD_ARGS[@]}" 2>&1 | tee "$build_log"
+      rebuild_rc=''${PIPESTATUS[0]}
+    else
+      ${pkgs.nixos-rebuild}/bin/nixos-rebuild "''${REBUILD_ARGS[@]}" >"$build_log" 2>&1
+      rebuild_rc=$?
+    fi
     set -e
 
     if [ "$rebuild_rc" -eq 0 ]; then
-      ${ui.badges.success "Build successful"}
+      ${ui.badges.success "Switch"}
+      if [ "$NESTED" != true ]; then
+        ${ui.badges.success "Build complete"}
+        if [ "$VERBOSE" = true ]; then
+          ${ui.messages.info "Next: ncc system report   # optional full report"}
+        fi
+      fi
       exit 0
     fi
 
-    ${ui.badges.error "Build failed"}
+    ${ui.badges.error "Switch"}
     echo ""
     echo "======== COPYABLE ERROR (start) ========"
     if grep -q 'error:' "$build_log" 2>/dev/null; then
@@ -114,18 +132,16 @@ in
     echo "======== COPYABLE ERROR (end) ========"
     fail_log="/tmp/ncc-build-failed.log"
     cp -f "$build_log" "$fail_log" 2>/dev/null || true
-    echo "full log: $fail_log"
+    ${ui.messages.info "Full log: $fail_log"}
 
     if grep -qiE 'unfree license|allowUnfree|NIXPKGS_ALLOW_UNFREE' "$build_log"; then
       ${ui.badges.warning "Unfree package blocked the build (e.g. zoom, steam)"}
-      ${ui.messages.info "Flag: system-manager.allowUnfree (via getModuleConfig)"}
-      ${ui.messages.info "Fix:  sudo ncc system allow-unfree"}
-      ${ui.messages.info "Or:   sudo ncc system allow-unfree --rebuild"}
-    fi
-
-    if grep -qiE 'system\.platform is unset|system\.platform is missing|currentSystem' "$build_log"; then
-      ${ui.badges.warning "Platform unresolved — run: sudo ncc system-update"}
-      ${ui.messages.info "Update heals system.platform from uname; flake also reads hardware-configuration.nix."}
+      ${ui.messages.info "Next: sudo ncc system allow-unfree"}
+    elif grep -qiE 'system\.platform is unset|system\.platform is missing|currentSystem' "$build_log"; then
+      ${ui.badges.warning "Platform unresolved"}
+      ${ui.messages.info "Next: sudo ncc system update  (heals system.platform)"}
+    else
+      ${ui.messages.info "Next: fix the error above, then: ncc system build switch"}
     fi
 
     exit "$rebuild_rc"

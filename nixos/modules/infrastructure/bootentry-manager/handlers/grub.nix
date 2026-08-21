@@ -1,8 +1,11 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, getModuleApi, ... }:
 
 with lib;
 
 let
+  ui = getModuleApi "cli-formatter";
+  common = import ../lib/common.nix { inherit lib getModuleApi; };
+
   # Konstanten
   entriesDir = "/boot/grub/custom_entries";
   entriesFile = "${entriesDir}/grub-entries.json";
@@ -73,20 +76,49 @@ let
 
     listEntries = pkgs.writeScriptBin "list-grub-entries" ''
       #!${pkgs.bash}/bin/bash
+      set -euo pipefail
+      ${common.validatePermissions}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.text.header "GRUB boot entries"}
+      fi
+      ${ui.messages.loading "Reading ${entriesDir}…"}
+      found=0
       for entry in ${entriesDir}/nixos-generation-*.cfg; do
         if [ -f "$entry" ] && [ ! -h "$entry" ]; then
-          gen_number=$(basename "$entry" | ${pkgs.gnugrep}/bin/grep -o '[0-9]\+')
+          found=1
           cat "$entry"
+          echo ""
         fi
       done
+      if [[ "$found" -eq 0 ]]; then
+        ${ui.messages.warning "No nixos-generation-*.cfg entries found"}
+      else
+        ${ui.messages.success "GRUB entries listed"}
+      fi
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc bootentry rename GEN TITLE   or   ncc bootentry reset GEN"}
+      fi
     '';
 
     renameEntry = pkgs.writeScriptBin "rename-grub-entry" ''
       #!${pkgs.bash}/bin/bash
       set -euo pipefail
-      
+      ${common.validatePermissions}
+
+      if [ $# -ne 2 ]; then
+        ${ui.messages.error "Usage: rename-grub-entry GENERATION TITLE"}
+        exit 2
+      fi
+
       gen="$1"
       new_name="$2"
+
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.text.header "Rename GRUB entry"}
+      fi
+      ${ui.messages.loading "Renaming generation $gen…"}
+      ${ui.tables.keyValue "Generation" "$gen"}
+      ${ui.tables.keyValue "Title" "$new_name"}
       
       ${utils.updateEntryFile {
         generation = "$gen";
@@ -104,17 +136,29 @@ let
            }' "${entriesFile}" > "${entriesFile}.tmp" \
            && mv "${entriesFile}.tmp" "${entriesFile}"
       fi
+      ${ui.messages.success "GRUB entry $gen renamed"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc bootentry list"}
+      fi
     '';
     
     resetEntry = pkgs.writeScriptBin "reset-grub-entry" ''
       #!${pkgs.bash}/bin/bash
       set -euo pipefail
+      ${common.validatePermissions}
       
       if [ $# -ne 1 ]; then
-        exit 1
+        ${ui.messages.error "Usage: reset-grub-entry GENERATION"}
+        exit 2
       fi
 
       gen="$1"
+
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.text.header "Reset GRUB entry"}
+      fi
+      ${ui.messages.loading "Resetting generation $gen title…"}
+      ${ui.tables.keyValue "Generation" "$gen"}
       
       ${utils.updateEntryFile {
         generation = "$gen";
@@ -126,6 +170,10 @@ let
          --arg time "$(date -Iseconds)" \
          'del(.generations[$gen])' "${entriesFile}" > "${entriesFile}.tmp"
       mv "${entriesFile}.tmp" "${entriesFile}"
+      ${ui.messages.success "GRUB entry $gen reset"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc bootentry list"}
+      fi
     '';
   };
 
@@ -141,8 +189,8 @@ in {
       for entry in ${entriesDir}/nixos-generation-*.cfg; do
         if [ -f "$entry" ] && [ ! -h "$entry" ]; then
           gen_number=$(basename "$entry" | ${pkgs.gnugrep}/bin/grep -o '[0-9]\+')
-          system_path=$(${pkgs.gnugrep}/bin/grep "^linux" "$entry" | \
-                       ${pkgs.gnugrep}/bin/grep -o "/nix/store/[^/]*-nixos-system-[^/]*/")
+          system_path=$(${pkgs.gnugrep}/bin/grep "^linux" "$entry" | 
+                       ${pkgs.gnugrep}/bin/grep -o "/nix/store/[^/]*-nixos-system-[^/]*/" || true)
           
           if [[ "$system_path" =~ -system-([^-]+)- ]]; then
             system_type="''${BASH_REMATCH[1]}"
@@ -152,7 +200,6 @@ in {
               sortKey = "$system_type";
             }}
             
-            # Update JSON
             if [ -f "${entriesFile}" ]; then
               ${pkgs.jq}/bin/jq --arg gen "$gen_number" \
                  --arg title "\"$system_type\"Setup" \
@@ -169,7 +216,6 @@ in {
         fi
       done
 
-      # Cleanup alte Einträge
       ${utils.cleanupOldEntries}
     '';
   };

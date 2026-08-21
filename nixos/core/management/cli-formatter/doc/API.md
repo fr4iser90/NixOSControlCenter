@@ -7,11 +7,9 @@ Complete API reference for the CLI Formatter module.
 ## Accessing the API
 
 ```nix
-# Runtime access (when config is available)
-api = config.core.management.cli-formatter.api;
-
-# Build-time access (direct import)
-api = getModuleApi "cli-formatter";
+# Discovery only — never config.core.management.* or systemConfig.${configPath}
+ui = getModuleApi "cli-formatter";
+# ui.messages.* / ui.badges.* / ui.text.* / ui.tables.* / …
 ```
 
 ## API Functions
@@ -27,7 +25,7 @@ api = getModuleApi "cli-formatter";
 **Returns**: Colored text string
 **Example**:
 ```nix
-api.color "red" "Error message"
+ui.color "red" "Error message"
 ```
 
 #### `style styleName text`
@@ -39,7 +37,7 @@ api.color "red" "Error message"
 **Returns**: Styled text string
 **Example**:
 ```nix
-api.style "bold" "Important text"
+ui.style "bold" "Important text"
 ```
 
 ### Layout Functions
@@ -53,7 +51,7 @@ api.style "bold" "Important text"
 **Returns**: Formatted box string
 **Example**:
 ```nix
-api.box "Status" "System is running"
+ui.box "Status" "System is running"
 ```
 
 #### `section title items`
@@ -65,7 +63,7 @@ api.box "Status" "System is running"
 **Returns**: Formatted section string
 **Example**:
 ```nix
-api.section "Options" [ "Option 1" "Option 2" ]
+ui.section "Options" [ "Option 1" "Option 2" ]
 ```
 
 ### Interactive Components
@@ -79,7 +77,7 @@ api.section "Options" [ "Option 1" "Option 2" ]
 **Returns**: Menu component
 **Example**:
 ```nix
-api.menu {
+ui.menu {
   title = "Select Option";
   items = [ "Option 1" "Option 2" ];
 }
@@ -93,7 +91,7 @@ api.menu {
 **Returns**: Prompt component
 **Example**:
 ```nix
-api.prompt "Enter value:"
+ui.prompt "Enter value:"
 ```
 
 ### Component Functions
@@ -107,7 +105,7 @@ api.prompt "Enter value:"
 **Returns**: Progress bar component
 **Example**:
 ```nix
-api.progress 50 100
+ui.progress 50 100
 ```
 
 #### `table headers rows`
@@ -119,7 +117,7 @@ api.progress 50 100
 **Returns**: Table component
 **Example**:
 ```nix
-api.table [ "Name" "Value" ] [ [ "Item" "Value" ] ]
+ui.table [ "Name" "Value" ] [ [ "Item" "Value" ] ]
 ```
 
 ## See Also

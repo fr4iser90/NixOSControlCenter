@@ -2,7 +2,6 @@
 
 let
   ui = getModuleApi "cli-formatter";
-  c = ui.colors;
   smRoot = (getModuleMetadata "system-manager").path;
   facade = import "${smRoot}/lib/config-facade.nix" { inherit pkgs; };
   catalogFile = import ../lib/mk-catalog-json.nix { inherit pkgs; };
@@ -27,13 +26,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   JQ="${pkgs.jq}/bin/jq"
   NIX_SHELL_BIN="${pkgs.nix}/bin/nix-shell"
 
-  # (path helpers below stage monolith edits and flush on EXIT)
-  # Dynamic log_* use formatter palette / badge style; JSON/raw paths stay plain.
-
-  log_info()    { printf '%b\n' "${c.blue}[INFO]${c.reset} $*"; }
-  log_success() { printf '%b\n' "${c.green}[ OK ]${c.reset} $*"; }
-  log_warn()    { printf '%b\n' "${c.yellow}[WARN]${c.reset} $*"; }
-  log_error()   { printf '%b\n' "${c.red}[ERROR]${c.reset} $*" >&2; }
+  # User-facing status via ui.messages.* (spliced at Nix eval; keep JSON/raw plain).
 
   COMMAND=""
   SUBCOMMAND=""
@@ -48,6 +41,8 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   SKIP_BUILD_PROMPT=false
   AUTO_BUILD=false
   CONFIG_CHANGED=false
+  VERBOSE=false
+  DRY_RUN=false
 
   usage() {
       cat << EOF
@@ -55,8 +50,8 @@ pkgs.writeShellScriptBin "ncc-packages" ''
 
   Usage:
     Single packages (nixpkgs):
-      $SCRIPT_NAME add <package>... [--user <name>] [--system]
-      $SCRIPT_NAME remove <package>... [--user <name>] [--system]
+      $SCRIPT_NAME add <package>... [--user <name>] [--system] [--dry-run]
+      $SCRIPT_NAME remove <package>... [--user <name>] [--system] [--dry-run]
       $SCRIPT_NAME list [--system] [--json]
 
     Store (intent search / try) — individual apps → userPackages:
@@ -68,8 +63,8 @@ pkgs.writeShellScriptBin "ncc-packages" ''
     Module sets and presets (packageModules / userPackages):
       $SCRIPT_NAME module list                 List active packageModules
       $SCRIPT_NAME module available            Show sets and presets (system|user)
-      $SCRIPT_NAME module add <name>...        Add set(s) and/or preset(s)
-      $SCRIPT_NAME module remove <name>...     Remove set(s) or user-preset packages
+      $SCRIPT_NAME module add <name>... [--dry-run]
+      $SCRIPT_NAME module remove <name>... [--dry-run]
       $SCRIPT_NAME module info <name>          Show details for a set or preset
 
     User presets (scope = \"user\") write users.<you>.userPackages via ncc-priv.
@@ -79,6 +74,8 @@ pkgs.writeShellScriptBin "ncc-packages" ''
     --system       Target systemPackages (global, all users)
     --user <name>  Target a specific user's userPackages
     --json         Machine-readable list output
+    -d, --dry-run  Preview mutate — nothing written
+    --verbose      Extra paths / layout (not -v)
     -y, --yes      After changes, build+switch without asking
     --no-build     After changes, skip rebuild prompt
     -h, --help     Show this help message
@@ -152,11 +149,11 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           -h|--help|help) usage ;;
           -v|--version) version ;;
           gui)
-              log_error "Open the GUI with: ncc packages"
+              ${ui.messages.error "Open the GUI with: ncc packages"}
               exit 1
               ;;
           *)
-              log_error "Unknown command: $COMMAND"
+              ${ui.messages.error "Unknown command: $COMMAND"}
               echo "Valid commands: add, remove, list, search, resolve, try, categories, module"
               echo "GUI: ncc packages"
               exit 1
@@ -171,6 +168,12 @@ pkgs.writeShellScriptBin "ncc-packages" ''
               ;;
           --no-build)
               SKIP_BUILD_PROMPT=true
+              ;;
+          --verbose)
+              VERBOSE=true
+              ;;
+          -d|--dry-run)
+              DRY_RUN=true
               ;;
           *)
               return 1
@@ -188,7 +191,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                   ;;
               --user)
                   if [[ $# -lt 2 ]] || [[ -z "$2" ]]; then
-                      log_error "--user requires a username argument"
+                      ${ui.messages.error "--user requires a username argument"}
                       exit 1
                   fi
                   TARGET_USER="$2"
@@ -198,14 +201,14 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                   JSON_OUT=true
                   shift
                   ;;
-              -y|--yes|--no-build)
+              -y|--yes|--no-build|--verbose|-d|--dry-run)
                   parse_build_flag "$1"
                   shift
                   ;;
               -h|--help) usage ;;
               -v|--version) version ;;
               -*)
-                  log_error "Unknown flag: $1"
+                  ${ui.messages.error "Unknown flag: $1"}
                   exit 1
                   ;;
               *)
@@ -219,7 +222,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       done
 
       if [[ "$COMMAND" != "list" ]] && [[ ''${#PACKAGES[@]} -eq 0 ]]; then
-          log_error "Missing package name. Usage: $SCRIPT_NAME $COMMAND <package>... [flags]"
+          ${ui.messages.error "Missing package name. Usage: $SCRIPT_NAME $COMMAND <package>... [flags]"}
           exit 1
       fi
   }
@@ -233,7 +236,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                   ;;
               -h|--help) usage ;;
               -*)
-                  log_error "Unknown flag: $1"
+                  ${ui.messages.error "Unknown flag: $1"}
                   exit 1
                   ;;
               *)
@@ -252,7 +255,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           esac
       done
       if [[ -z "$QUERY" ]]; then
-          log_error "Missing query. Usage: $SCRIPT_NAME $COMMAND <query>"
+          ${ui.messages.error "Missing query. Usage: $SCRIPT_NAME $COMMAND <query>"}
           exit 1
       fi
   }
@@ -266,11 +269,11 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                   ;;
               -h|--help) usage ;;
               -*)
-                  log_error "Unknown flag: $1"
+                  ${ui.messages.error "Unknown flag: $1"}
                   exit 1
                   ;;
               *)
-                  log_error "Unexpected argument: $1"
+                  ${ui.messages.error "Unexpected argument: $1"}
                   exit 1
                   ;;
           esac
@@ -279,7 +282,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
 
   parse_module_args() {
       if [[ $# -eq 0 ]]; then
-          log_error "Missing module subcommand"
+          ${ui.messages.error "Missing module subcommand"}
           echo "Valid subcommands: list, available, add, remove, info"
           exit 1
       fi
@@ -293,11 +296,11 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                   case "$1" in
                       -h|--help) usage ;;
                       -*)
-                          log_error "Unknown flag: $1"
+                          ${ui.messages.error "Unknown flag: $1"}
                           exit 1
                           ;;
                       *)
-                          log_error "Unexpected argument: $1"
+                          ${ui.messages.error "Unexpected argument: $1"}
                           exit 1
                           ;;
                   esac
@@ -306,13 +309,14 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           add|remove|info)
               while [[ $# -gt 0 ]]; do
                   case "$1" in
-                      -y|--yes|--no-build)
+                      -y|--yes|--no-build|--verbose|-d|--dry-run)
                           parse_build_flag "$1"
                           shift
                           ;;
                       -h|--help) usage ;;
+                      -v|--version) version ;;
                       -*)
-                          log_error "Unknown flag: $1"
+                          ${ui.messages.error "Unknown flag: $1"}
                           exit 1
                           ;;
                       *)
@@ -322,17 +326,17 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                   esac
               done
               if [[ ''${#NAMES[@]} -eq 0 ]]; then
-                  log_error "Missing name argument for: module $SUBCOMMAND"
+                  ${ui.messages.error "Missing name argument for: module $SUBCOMMAND"}
                   exit 1
               fi
               if [[ "$SUBCOMMAND" == "info" ]] && [[ ''${#NAMES[@]} -ne 1 ]]; then
-                  log_error "module info accepts exactly one name"
+                  ${ui.messages.error "module info accepts exactly one name"}
                   exit 1
               fi
               ;;
           -h|--help) usage ;;
           *)
-              log_error "Unknown module subcommand: $SUBCOMMAND"
+              ${ui.messages.error "Unknown module subcommand: $SUBCOMMAND"}
               echo "Valid subcommands: list, available, add, remove, info"
               exit 1
               ;;
@@ -347,6 +351,18 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   _NCC_USER_TMPS=()
 
   _ncc_packages_flush() {
+      # Dry-run: discard staged temps — never write systemConfig
+      if [[ "''${DRY_RUN:-false}" == true ]]; then
+          [[ -n "''${_NCC_PKG_TMP:-}" ]] && rm -f "$_NCC_PKG_TMP"
+          _NCC_PKG_TMP=""
+          local entry
+          for entry in "''${_NCC_USER_TMPS[@]:-}"; do
+              [[ -z "$entry" ]] && continue
+              rm -f "''${entry#*:}"
+          done
+          _NCC_USER_TMPS=()
+          return 0
+      fi
       if [[ -n "''${_NCC_PKG_TMP:-}" && -f "$_NCC_PKG_TMP" ]]; then
           ncc_write_module_config "core/base/packages" "$(cat "$_NCC_PKG_TMP")"
           rm -f "$_NCC_PKG_TMP"
@@ -400,6 +416,10 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   prompt_rebuild_after_change() {
       local reason="$1"
 
+      if [[ "$DRY_RUN" == true ]]; then
+          return 0
+      fi
+
       _ncc_packages_flush
 
       # Steam / Brave / gaming / common unfree need allowUnfree in system-manager
@@ -413,35 +433,46 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                       sm=$(echo "$sm" | sed -E 's/(systemType[[:space:]]*=[[:space:]]*"[^"]*"[[:space:]]*;)/\1\n  allowUnfree = true;/')
                   fi
                   ncc_write_module_config "core/management/system-manager" "$sm"
-                  log_info "Enabled allowUnfree (required by selected unfree packages)"
+                  ${ui.messages.info "Enabled allowUnfree (required by selected unfree packages)"}
               fi
           fi
       fi
 
-      log_warn "New build required to use package '$reason'"
+      ${ui.messages.warning "New build required to use package '$reason'"}
 
       local hostname build_cmd
       hostname=$(resolve_hostname)
       build_cmd="sudo ncc system build switch --flake $NIXOS_DIR#$hostname"
 
       if [[ "$SKIP_BUILD_PROMPT" == true ]]; then
-          log_info "Skipping build. You can manually run: $build_cmd"
+          ${ui.messages.info "Skipping build"}
+          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+              ${ui.messages.info "Next: $build_cmd"}
+          fi
           return 0
       fi
 
       if [[ "$AUTO_BUILD" == true ]]; then
-          log_info "Building system configuration..."
+          ${ui.messages.loading "Building system configuration…"}
           if sh -c "$build_cmd" 2>&1; then
-              log_success "System successfully updated and rebuilt!"
+              ${ui.messages.success "System successfully updated and rebuilt!"}
+              if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                  ${ui.messages.info "Next: reboot if the kernel or drivers changed"}
+              fi
           else
-              log_error "Build/switch failed (exit $?). Retry: $build_cmd"
+              ${ui.messages.error "Build/switch failed (exit $?)"}
+              if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                  ${ui.messages.info "Next: $build_cmd"}
+              fi
           fi
           return 0
       fi
 
       if [[ ! -t 0 ]]; then
-          log_info "Non-interactive session — skipping build prompt."
-          log_info "You can manually run: $build_cmd"
+          ${ui.messages.info "Non-interactive session — skipping build prompt"}
+          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+              ${ui.messages.info "Next: $build_cmd"}
+          fi
           return 0
       fi
 
@@ -450,21 +481,29 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           read -r build_choice
           case "$build_choice" in
               y|Y)
-                  log_info "Building system configuration..."
+                  ${ui.messages.loading "Building system configuration…"}
                   if sh -c "$build_cmd" 2>&1; then
-                      log_success "System successfully updated and rebuilt!"
+                      ${ui.messages.success "System successfully updated and rebuilt!"}
+                      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                          ${ui.messages.info "Next: reboot if the kernel or drivers changed"}
+                      fi
                   else
-                      log_warn "Build/switch exited with code $?"
-                      log_info "You can retry with: $build_cmd"
+                      ${ui.messages.warning "Build/switch exited with code $?"}
+                      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                          ${ui.messages.info "Next: $build_cmd"}
+                      fi
                   fi
                   break
                   ;;
               n|N)
-                  log_info "Skipping build. You can manually run: $build_cmd"
+                  ${ui.messages.info "Skipping build"}
+                  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                      ${ui.messages.info "Next: $build_cmd"}
+                  fi
                   break
                   ;;
               *)
-                  log_error "Invalid choice, please enter y or n"
+                  ${ui.messages.error "Invalid choice, please enter y or n"}
                   ;;
           esac
       done
@@ -557,15 +596,22 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       local package="$2"
       local option_name="$3"
 
-      if package_in_config "$config_path" "$package"; then
-          log_warn "'$package' already in $option_name, skipping"
+      if [[ -f "$config_path" ]] && package_in_config "$config_path" "$package"; then
+          ${ui.messages.warning "'$package' already in $option_name, skipping"}
+          return 0
+      fi
+
+      if [[ "$DRY_RUN" == true ]]; then
+          _disp=$(config_display_path "$config_path")
+          ${ui.messages.success "Would add '$package' to $option_name in $_disp (dry-run) — no changes written"}
           return 0
       fi
 
       if ! config_exists "$config_path"; then
           ensure_dir "$config_path"
           printf '{\n  %s = [ "%s" ];\n}\n' "$option_name" "$package" > "$config_path"
-          log_success "Created $(config_display_path "$config_path") with $option_name = [ \"$package\" ]"
+          _disp=$(config_display_path "$config_path")
+          ${ui.messages.success "Created $_disp with $option_name = [ \"$package\" ]"}
           CONFIG_CHANGED=true
           return 0
       fi
@@ -611,7 +657,8 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           fi
       fi
 
-      log_success "Added '$package' to $option_name in $(config_display_path "$config_path")"
+      _disp=$(config_display_path "$config_path")
+      ${ui.messages.success "Added '$package' to $option_name in $_disp"}
       CONFIG_CHANGED=true
   }
 
@@ -621,13 +668,19 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       local option_name="$3"
 
       if ! config_exists "$config_path"; then
-          log_error "Config file not found: $config_path"
+          ${ui.messages.error "Config file not found: $config_path"}
           exit 1
       fi
 
       if ! package_in_config "$config_path" "$package"; then
-          log_error "'$package' not found in $config_path"
+          ${ui.messages.error "'$package' not found in $config_path"}
           exit 1
+      fi
+
+      if [[ "$DRY_RUN" == true ]]; then
+          _disp=$(config_display_path "$config_path")
+          ${ui.messages.success "Would remove '$package' from $option_name in $_disp (dry-run) — no changes written"}
+          return 0
       fi
 
       local temp_file
@@ -663,7 +716,8 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       done < "$config_path"
 
       mv "$temp_file" "$config_path"
-      log_success "Removed '$package' from $option_name in $(config_display_path "$config_path")"
+      _disp=$(config_display_path "$config_path")
+      ${ui.messages.success "Removed '$package' from $option_name in $_disp"}
       CONFIG_CHANGED=true
   }
 
@@ -866,7 +920,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
 
   _catalog_ok() {
       if [[ ! -f "$CATALOG_JSON" ]]; then
-          log_error "Catalog not found: $CATALOG_JSON"
+          ${ui.messages.error "Catalog not found: $CATALOG_JSON"}
           exit 1
       fi
   }
@@ -902,8 +956,10 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           "$JQ" -c '{categories: (.categories // [])}' "$CATALOG_JSON"
           return 0
       fi
-      echo "=== Store categories ==="
       "$JQ" -r '.categories[]? | "  \(.id)\t\(.title)\t\(.description // "")"' "$CATALOG_JSON"
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.messages.info "Next: ncc packages search <query>"}
+      fi
   }
 
   cmd_search() {
@@ -917,12 +973,18 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       fi
       local count
       count=$("$JQ" -r 'length' <<<"$matches")
-      echo "=== Search: $QUERY ($count hit(s)) ==="
+      ${ui.messages.info "Search: $QUERY ($count hit(s))"}
       if [[ "$count" -eq 0 ]]; then
-          echo "  (no curated intent — try exact nixpkgs attr with: $SCRIPT_NAME add <attr>)"
+          ${ui.messages.warning "No curated intent — try exact nixpkgs attr with: $SCRIPT_NAME add <attr>"}
+          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+              ${ui.messages.info "Next: ncc packages add <nixpkgs-attr>"}
+          fi
           return 0
       fi
       "$JQ" -r '.[] | "  \(.title)  [\(.kind)/\(.scope)]  \(.description // "")\n    id=\(.id)  action=\(if .kind == "attr" then ("add " + (.attr // "?")) elif .module then ("module add " + .module) else "guided" end)\(if .tryable then "  (tryable)" else "" end)"' <<<"$matches"
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.messages.info "Next: ncc packages resolve \"$QUERY\""}
+      fi
   }
 
   cmd_resolve() {
@@ -935,8 +997,11 @@ pkgs.writeShellScriptBin "ncc-packages" ''
               "$JQ" -nc --arg q "$QUERY" \
                 '{query:$q, match:null, action:{type:"unknown", argv:[], message:"No curated intent; use add <nixpkgs-attr> if you know the attribute name."}}'
           else
-              log_warn "No curated intent for: $QUERY"
-              echo "Hint: $SCRIPT_NAME search \"$QUERY\"  or  $SCRIPT_NAME add <nixpkgs-attr>"
+              ${ui.messages.warning "No curated intent for: $QUERY"}
+              ${ui.messages.info "Hint: $SCRIPT_NAME search \"$QUERY\"  or  $SCRIPT_NAME add <nixpkgs-attr>"}
+              if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                  ${ui.messages.info "Next: ncc packages search \"$QUERY\""}
+              fi
           fi
           return 0
       fi
@@ -964,7 +1029,6 @@ pkgs.writeShellScriptBin "ncc-packages" ''
             '{query:$q, match:$match, action:$action}'
           return 0
       fi
-      echo "=== Resolve: $QUERY ==="
       "$JQ" -r '"Title: \(.title)\nKind:  \(.kind) / scope=\(.scope)\nDesc:  \(.description // "")\nNotes: \(.notes // "")"' <<<"$best"
       echo ""
       "$JQ" -r '
@@ -976,12 +1040,17 @@ pkgs.writeShellScriptBin "ncc-packages" ''
         + (if .requiresAdmin then "\nNeeds:  administrator" else "\nNeeds:  your user account" end)
         + (if .message then "\n\(.message)" else "" end)
       ' <<<"$action_json"
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          local next_cli
+          next_cli=$("$JQ" -r '"ncc packages " + (.argv | join(" "))' <<<"$action_json")
+          ${ui.messages.info "Next: $next_cli"}
+      fi
   }
 
   cmd_try() {
       local attr="$PACKAGE"
       if [[ ! "$attr" =~ ^[a-zA-Z0-9][a-zA-Z0-9._+-]*$ ]]; then
-          log_error "Invalid package attribute: $attr"
+          ${ui.messages.error "Invalid package attribute: $attr"}
           exit 1
       fi
       # If query looks like a product name, resolve to attr when tryable
@@ -997,13 +1066,13 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           elif "$JQ" -e --arg a "$attr" '
               [.intents[] | select((.attr == $a) and (.tryable == false))] | length > 0
             ' "$CATALOG_JSON" >/dev/null 2>&1; then
-              log_error "'$attr' is not safe to try in nix-shell (needs a module/rebuild)."
+              ${ui.messages.error "'$attr' is not safe to try in nix-shell (needs a module/rebuild)."}
               echo "Hint: $SCRIPT_NAME resolve \"$QUERY\""
               exit 1
           fi
       fi
-      log_info "Trying $attr in a temporary nix-shell (no config write)…"
-      log_info "Exit the shell when done. To install permanently: $SCRIPT_NAME add $attr"
+      ${ui.messages.info "Trying $attr in a temporary nix-shell (no config write)…"}
+      ${ui.messages.info "Exit the shell when done. To install permanently: $SCRIPT_NAME add $attr"}
       exec "$NIX_SHELL_BIN" -p "$attr"
   }
 
@@ -1012,9 +1081,11 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   module_list() {
       local cfg
       cfg=$(get_modules_config_path)
-      echo "=== Active packageModules ==="
       if [[ ! -f "$cfg" ]]; then
-          echo "  (config file does not exist yet: $cfg)"
+          ${ui.messages.info "No packageModules config yet"}
+          if [[ "$VERBOSE" == true ]]; then
+              ${ui.tables.keyValue "path" "$cfg"}
+          fi
           return 0
       fi
       list_packages_from_config "$cfg" "packageModules" "packageModules"
@@ -1026,7 +1097,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       recipes_dir=$(get_recipes_dir)
       user_presets_dir=$(get_user_presets_dir)
 
-      echo "=== Available sets (individual modules) ==="
+      ${ui.text.section "Available sets (individual modules)"}
       if [[ -d "$sets_dir" ]]; then
           for f in "$sets_dir"/*.nix; do
               [[ -e "$f" ]] || continue
@@ -1041,11 +1112,11 @@ pkgs.writeShellScriptBin "ncc-packages" ''
               fi
           done
       else
-          echo "  (sets directory not found: $sets_dir)"
+          ${ui.messages.warning "sets directory not found: $sets_dir"}
       fi
 
       echo ""
-      echo "=== System recipes (→ packageModules) ==="
+      ${ui.text.section "System recipes (→ packageModules)"}
       if [[ -d "$recipes_dir" ]]; then
           for f in "$recipes_dir"/*.nix; do
               [[ -e "$f" ]] || continue
@@ -1059,11 +1130,11 @@ pkgs.writeShellScriptBin "ncc-packages" ''
               fi
           done
       else
-          echo "  (recipes directory not found: $recipes_dir)"
+          ${ui.messages.warning "recipes directory not found: $recipes_dir"}
       fi
 
       echo ""
-      echo "=== User presets (→ userPackages) ==="
+      ${ui.text.section "User presets (→ userPackages)"}
       if [[ -d "$user_presets_dir" ]]; then
           for f in "$user_presets_dir"/*.nix; do
               [[ -e "$f" ]] || continue
@@ -1077,7 +1148,10 @@ pkgs.writeShellScriptBin "ncc-packages" ''
               fi
           done
       else
-          echo "  (user-presets directory not found: $user_presets_dir)"
+          ${ui.messages.warning "user-presets directory not found: $user_presets_dir"}
+      fi
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.messages.info "Next: ncc packages module add <set-or-preset>"}
       fi
   }
 
@@ -1122,7 +1196,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           [[ -n "$types" ]] && echo "  System types: $types"
           return 0
       fi
-      log_error "Unknown name: '$name' (not a known set or preset)"
+      ${ui.messages.error "Unknown name: '$name' (not a known set or preset)"}
       echo "Hint: try '$SCRIPT_NAME module available' to see valid names" >&2
       exit 1
   }
@@ -1131,48 +1205,66 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       local preset="$1"
       local target_user pkg
       target_user=$(resolve_target_user)
-      log_info "User preset '$preset' → users.$target_user.userPackages"
+      ${ui.messages.info "User preset '$preset' → users.$target_user.userPackages"}
       local count=0
       while IFS= read -r pkg; do
           [[ -z "$pkg" ]] && continue
           PACKAGE="$pkg"
           count=$((count + 1))
+          if [[ "$DRY_RUN" == true ]]; then
+              ${ui.messages.success "Would add '$PACKAGE' to users.$target_user.userPackages (dry-run) — no changes written"}
+              continue
+          fi
           if command -v ncc-priv-run >/dev/null 2>&1; then
               ncc-priv-run user-pkg add "$PACKAGE" --user "$target_user"
               CONFIG_CHANGED=false
           elif [[ "$(id -u)" -eq 0 ]]; then
               add_package "$(get_user_config_path "$target_user")" "$PACKAGE" "userPackages"
           else
-              log_error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"
+              ${ui.messages.error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"}
               exit 1
           fi
       done < <(preset_packages "$preset")
       if [[ "$count" -eq 0 ]]; then
-          log_error "User preset '$preset' has no packages = [ … ]"
+          ${ui.messages.error "User preset '$preset' has no packages = [ … ]"}
           exit 1
       fi
-      log_success "User preset '$preset' applied for $target_user ($count packages)"
+      if [[ "$DRY_RUN" == true ]]; then
+          ${ui.messages.success "Would apply user preset '$preset' for $target_user ($count packages) — no changes written"}
+      else
+          ${ui.messages.success "User preset '$preset' applied for $target_user ($count packages)"}
+      fi
   }
 
   module_remove_user_preset() {
       local preset="$1"
       local target_user pkg
       target_user=$(resolve_target_user)
-      log_info "Removing user preset '$preset' from users.$target_user"
+      ${ui.messages.info "Removing user preset '$preset' from users.$target_user"}
       while IFS= read -r pkg; do
           [[ -z "$pkg" ]] && continue
           PACKAGE="$pkg"
+          if [[ "$DRY_RUN" == true ]]; then
+              ${ui.messages.success "Would remove '$PACKAGE' from users.$target_user.userPackages (dry-run) — no changes written"}
+              continue
+          fi
           if command -v ncc-priv-run >/dev/null 2>&1; then
-              ncc-priv-run user-pkg remove "$PACKAGE" --user "$target_user" || log_warn "skip $PACKAGE"
+              if ! ncc-priv-run user-pkg remove "$PACKAGE" --user "$target_user"; then
+                  ${ui.messages.warning "skip $PACKAGE"}
+              fi
               CONFIG_CHANGED=false
           elif [[ "$(id -u)" -eq 0 ]]; then
               remove_package "$(get_user_config_path "$target_user")" "$PACKAGE" "userPackages" || true
           else
-              log_error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"
+              ${ui.messages.error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"}
               exit 1
           fi
       done < <(preset_packages "$preset")
-      log_success "User preset '$preset' packages removed for $target_user"
+      if [[ "$DRY_RUN" == true ]]; then
+          ${ui.messages.success "Would remove user preset '$preset' packages for $target_user — no changes written"}
+      else
+          ${ui.messages.success "User preset '$preset' packages removed for $target_user"}
+      fi
   }
 
   module_add() {
@@ -1189,8 +1281,12 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           return 0
       fi
 
-      if [[ "$(id -u)" -ne 0 ]]; then
-          log_error "Changing system package modules/sets requires administrator rights"
+      if [[ "$(id -u)" -ne 0 && "$DRY_RUN" != true ]]; then
+          ${ui.messages.error "Changing system package modules/sets requires administrator rights"}
+          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+              _n="''${NAMES[*]}"
+              ${ui.messages.info "Next: sudo ncc packages module add $_n"}
+          fi
           exit 1
       fi
       local cfg
@@ -1200,7 +1296,7 @@ pkgs.writeShellScriptBin "ncc-packages" ''
       for arg in "''${system_names[@]}"; do
           local expanded
           if ! expanded=$(expand_name "$arg"); then
-              log_error "Unknown name: '$arg' (not a known set or system preset)"
+              ${ui.messages.error "Unknown name: '$arg' (not a known set or system preset)"}
               echo "Hint: try '$SCRIPT_NAME module available' to see valid names" >&2
               exit 1
           fi
@@ -1208,13 +1304,14 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           while IFS= read -r line; do
               [[ -z "$line" ]] && continue
               if ! is_set_name "$line"; then
-                  log_error "Preset '$arg' references unknown set '$line'"
+                  ${ui.messages.error "Preset '$arg' references unknown set '$line'"}
                   exit 1
               fi
               resolved+=("$line")
           done <<< "$expanded"
           if is_preset_name "$arg"; then
-              log_info "Preset '$arg' expands to: $(preset_modules "$arg" | tr '\n' ' ')"
+              _exp=$(preset_modules "$arg" | tr '\n' ' ')
+              ${ui.messages.info "Preset '$arg' expands to: $_exp"}
           fi
       done
 
@@ -1238,33 +1335,38 @@ pkgs.writeShellScriptBin "ncc-packages" ''
           return 0
       fi
 
-      if [[ "$(id -u)" -ne 0 ]]; then
-          log_error "Changing system package modules/sets requires administrator rights"
+      if [[ "$(id -u)" -ne 0 && "$DRY_RUN" != true ]]; then
+          ${ui.messages.error "Changing system package modules/sets requires administrator rights"}
+          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+              _n="''${NAMES[*]}"
+              ${ui.messages.info "Next: sudo ncc packages module remove $_n"}
+          fi
           exit 1
       fi
       local cfg
       cfg=$(get_modules_config_path)
       if [[ ! -f "$cfg" ]]; then
-          log_error "Config file not found: $cfg"
+          ${ui.messages.error "Config file not found: $cfg"}
           exit 1
       fi
       for arg in "''${system_names[@]}"; do
           if is_preset_name "$arg"; then
-              log_info "Preset '$arg' will remove sets: $(preset_modules "$arg" | tr '\n' ' ')"
+              _exp=$(preset_modules "$arg" | tr '\n' ' ')
+              ${ui.messages.info "Preset '$arg' will remove sets: $_exp"}
               local m
               while IFS= read -r m; do
                   [[ -z "$m" ]] && continue
                   if package_in_config "$cfg" "$m"; then
                       remove_package "$cfg" "$m" "packageModules"
                   else
-                      log_warn "'$m' not in packageModules, skipping"
+                      ${ui.messages.warning "'$m' not in packageModules, skipping"}
                   fi
               done < <(preset_modules "$arg")
           else
               if package_in_config "$cfg" "$arg"; then
                   remove_package "$cfg" "$arg" "packageModules"
               else
-                  log_warn "'$arg' not in packageModules, skipping"
+                  ${ui.messages.warning "'$arg' not in packageModules, skipping"}
               fi
           fi
       done
@@ -1277,6 +1379,118 @@ pkgs.writeShellScriptBin "ncc-packages" ''
   main() {
       parse_args "$@"
 
+      # Machine JSON: no human chrome
+      if [[ "$JSON_OUT" != true ]]; then
+          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+              case "$COMMAND" in
+                  add)
+                      if [[ "$DRY_RUN" == true ]]; then
+                          ${ui.text.header "NCC packages add (dry-run)"}
+                      else
+                          ${ui.text.header "NCC packages add"}
+                      fi
+                      ;;
+                  remove)
+                      if [[ "$DRY_RUN" == true ]]; then
+                          ${ui.text.header "NCC packages remove (dry-run)"}
+                      else
+                          ${ui.text.header "NCC packages remove"}
+                      fi
+                      ;;
+                  list) ${ui.text.header "NCC packages list"} ;;
+                  search) ${ui.text.header "NCC packages search"} ;;
+                  resolve) ${ui.text.header "NCC packages resolve"} ;;
+                  try) ${ui.text.header "NCC packages try"} ;;
+                  categories) ${ui.text.header "NCC packages categories"} ;;
+                  module)
+                      case "$SUBCOMMAND" in
+                          list) ${ui.text.header "NCC packages module list"} ;;
+                          available) ${ui.text.header "NCC packages module available"} ;;
+                          add)
+                              if [[ "$DRY_RUN" == true ]]; then
+                                  ${ui.text.header "NCC packages module add (dry-run)"}
+                              else
+                                  ${ui.text.header "NCC packages module add"}
+                              fi
+                              ;;
+                          remove)
+                              if [[ "$DRY_RUN" == true ]]; then
+                                  ${ui.text.header "NCC packages module remove (dry-run)"}
+                              else
+                                  ${ui.text.header "NCC packages module remove"}
+                              fi
+                              ;;
+                          info) ${ui.text.header "NCC packages module info"} ;;
+                          *) ${ui.text.header "NCC packages module"} ;;
+                      esac
+                      ;;
+              esac
+              if [[ "$DRY_RUN" == true ]]; then
+                  case "$COMMAND/$SUBCOMMAND" in
+                      add/*|remove/*|module/add|module/remove)
+                          ${ui.messages.info "Preview only — nothing will be written…"}
+                          ;;
+                  esac
+              fi
+          fi
+
+          case "$COMMAND" in
+              add|remove)
+                  if [[ "$DRY_RUN" == true ]]; then
+                      ${ui.messages.loading "Previewing package configuration changes…"}
+                  else
+                      ${ui.messages.loading "Updating package configuration…"}
+                  fi
+                  _pkgs="''${PACKAGES[*]}"
+                  ${ui.tables.keyValue "packages" "$_pkgs"}
+                  if [[ "$TARGET_SYSTEM" == true ]]; then
+                      ${ui.tables.keyValue "target" "systemPackages"}
+                  else
+                      _tu=$(resolve_target_user)
+                      ${ui.tables.keyValue "target" "userPackages ($_tu)"}
+                  fi
+                  if [[ "$VERBOSE" == true ]]; then
+                      ${ui.tables.keyValue "NIXOS_DIR" "$NIXOS_DIR"}
+                      _layout="$(ncc_detect_layout 2>/dev/null || echo unknown)"
+                      ${ui.tables.keyValue "layout" "$_layout"}
+                  fi
+                  ;;
+              module)
+                  case "$SUBCOMMAND" in
+                      add|remove)
+                          if [[ "$DRY_RUN" == true ]]; then
+                              ${ui.messages.loading "Previewing package module changes…"}
+                          else
+                              ${ui.messages.loading "Updating package modules…"}
+                          fi
+                          _names="''${NAMES[*]}"
+                          ${ui.tables.keyValue "names" "$_names"}
+                          if [[ "$VERBOSE" == true ]]; then
+                              ${ui.tables.keyValue "NIXOS_DIR" "$NIXOS_DIR"}
+                          fi
+                          ;;
+                      list|available|info)
+                          ${ui.messages.loading "Reading package modules…"}
+                          ;;
+                  esac
+                  ;;
+              search|resolve)
+                  ${ui.messages.loading "Looking up Store intents…"}
+                  ${ui.tables.keyValue "query" "$QUERY"}
+                  ;;
+              try)
+                  ${ui.messages.loading "Preparing temporary nix-shell…"}
+                  ${ui.tables.keyValue "package" "$PACKAGE"}
+                  ;;
+              list)
+                  ${ui.messages.loading "Reading package configuration…"}
+                  ;;
+              categories)
+                  ${ui.messages.loading "Reading Store categories…"}
+                  ;;
+          esac
+      fi
+
       case "$COMMAND" in
           add)
               local target_user pkg
@@ -1284,13 +1498,18 @@ pkgs.writeShellScriptBin "ncc-packages" ''
               for pkg in "''${PACKAGES[@]}"; do
                   PACKAGE="$pkg"
                   if [[ "$TARGET_SYSTEM" == true ]]; then
-                      if [[ "$(id -u)" -ne 0 ]]; then
-                          log_error "System packages require administrator rights"
+                      if [[ "$(id -u)" -ne 0 && "$DRY_RUN" != true ]]; then
+                          ${ui.messages.error "System packages require administrator rights"}
+                          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                              ${ui.messages.info "Next: sudo ncc packages add $PACKAGE --system"}
+                          fi
                           exit 1
                       fi
                       add_package "$(get_system_config_path)" "$PACKAGE" "systemPackages"
                   else
-                          if command -v ncc-priv-run >/dev/null 2>&1; then
+                      if [[ "$DRY_RUN" == true ]]; then
+                          ${ui.messages.success "Would add '$PACKAGE' to users.$target_user.userPackages (dry-run) — no changes written"}
+                      elif command -v ncc-priv-run >/dev/null 2>&1; then
                           local args=(user-pkg add "$PACKAGE" --user "$target_user")
                           local last="''${PACKAGES[-1]}"
                           [[ "$AUTO_BUILD" == true && "$pkg" == "$last" ]] && args+=(--rebuild)
@@ -1299,11 +1518,30 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                       elif [[ "$(id -u)" -eq 0 ]]; then
                           add_package "$(get_user_config_path "$target_user")" "$PACKAGE" "userPackages"
                       else
-                          log_error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"
+                          ${ui.messages.error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"}
+                          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                              ${ui.messages.info "Next: sudo ncc system update --local --source-dir /path/to/NixOSControlCenter/nixos"}
+                          fi
                           exit 1
                       fi
                   fi
               done
+              if [[ "$DRY_RUN" == true ]]; then
+                  ${ui.messages.success "Dry-run OK — safe to run the real command when ready"}
+                  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                      if [[ "$TARGET_SYSTEM" == true ]]; then
+                          _p="''${PACKAGES[*]}"
+                          ${ui.messages.info "Next: sudo ncc packages add $_p --system"}
+                      else
+                          _p="''${PACKAGES[*]}"
+                          ${ui.messages.info "Next: ncc packages add $_p"}
+                      fi
+                  fi
+              elif [[ "$CONFIG_CHANGED" != true && "$JSON_OUT" != true ]]; then
+                  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                      ${ui.messages.info "Next: ncc packages list"}
+                  fi
+              fi
               ;;
 
           remove)
@@ -1312,13 +1550,18 @@ pkgs.writeShellScriptBin "ncc-packages" ''
               for pkg in "''${PACKAGES[@]}"; do
                   PACKAGE="$pkg"
                   if [[ "$TARGET_SYSTEM" == true ]]; then
-                      if [[ "$(id -u)" -ne 0 ]]; then
-                          log_error "System packages require administrator rights"
+                      if [[ "$(id -u)" -ne 0 && "$DRY_RUN" != true ]]; then
+                          ${ui.messages.error "System packages require administrator rights"}
+                          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                              ${ui.messages.info "Next: sudo ncc packages remove $PACKAGE --system"}
+                          fi
                           exit 1
                       fi
                       remove_package "$(get_system_config_path)" "$PACKAGE" "systemPackages"
                   else
-                      if command -v ncc-priv-run >/dev/null 2>&1; then
+                      if [[ "$DRY_RUN" == true ]]; then
+                          ${ui.messages.success "Would remove '$PACKAGE' from users.$target_user.userPackages (dry-run) — no changes written"}
+                      elif command -v ncc-priv-run >/dev/null 2>&1; then
                           local args=(user-pkg remove "$PACKAGE" --user "$target_user")
                           local last="''${PACKAGES[-1]}"
                           [[ "$AUTO_BUILD" == true && "$pkg" == "$last" ]] && args+=(--rebuild)
@@ -1327,11 +1570,26 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                       elif [[ "$(id -u)" -eq 0 ]]; then
                           remove_package "$(get_user_config_path "$target_user")" "$PACKAGE" "userPackages"
                       else
-                          log_error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"
+                          ${ui.messages.error "Cannot write user packages (ncc-priv-run missing; rebuild NCC)"}
+                          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                              ${ui.messages.info "Next: sudo ncc system update --local --source-dir /path/to/NixOSControlCenter/nixos"}
+                          fi
                           exit 1
                       fi
                   fi
               done
+              if [[ "$DRY_RUN" == true ]]; then
+                  ${ui.messages.success "Dry-run OK — safe to run the real command when ready"}
+                  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                      if [[ "$TARGET_SYSTEM" == true ]]; then
+                          _p="''${PACKAGES[*]}"
+                          ${ui.messages.info "Next: sudo ncc packages remove $_p --system"}
+                      else
+                          _p="''${PACKAGES[*]}"
+                          ${ui.messages.info "Next: ncc packages remove $_p"}
+                      fi
+                  fi
+              fi
               ;;
 
           list)
@@ -1382,8 +1640,6 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                       fi
                   fi
               else
-                  echo "=== NCC Package Configuration ==="
-                  echo ""
                   if [[ "$TARGET_SYSTEM" == true ]]; then
                       list_packages_from_config "$(get_system_config_path)" "systemPackages" "System Packages"
                   else
@@ -1394,6 +1650,9 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                       list_packages_from_config "$user_config_path" "userPackages" "User Packages ($target_user)"
                       list_packages_from_config "$user_config_path" "systemPackages" "User environment.systemPackages ($target_user)"
                       list_packages_from_config "$(get_system_config_path)" "systemPackages" "System Packages"
+                  fi
+                  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                      ${ui.messages.info "Next: ncc packages search <query>  or  ncc packages add <attr>"}
                   fi
               fi
               ;;
@@ -1419,10 +1678,17 @@ pkgs.writeShellScriptBin "ncc-packages" ''
                   remove)    module_remove "''${NAMES[@]}" ;;
                   info)      module_info "''${NAMES[0]}" ;;
               esac
+              if [[ "$DRY_RUN" == true && ( "$SUBCOMMAND" == "add" || "$SUBCOMMAND" == "remove" ) ]]; then
+                  ${ui.messages.success "Dry-run OK — safe to run the real command when ready"}
+                  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+                      _n="''${NAMES[*]}"
+                      ${ui.messages.info "Next: sudo ncc packages module $SUBCOMMAND $_n"}
+                  fi
+              fi
               ;;
       esac
 
-      if [[ "$CONFIG_CHANGED" == true ]]; then
+      if [[ "$CONFIG_CHANGED" == true && "$DRY_RUN" != true ]]; then
           local reason
           case "$COMMAND" in
               add|remove)

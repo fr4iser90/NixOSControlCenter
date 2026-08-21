@@ -22,8 +22,10 @@ in {
     ./scripts/grant-access.nix
     ./scripts/lockdown.nix
   ] ++ optionals workflowOn [
-    # Request/approve/monitor workflow — not yet ported cleanly after merge.
-    # Keep enable for config compatibility; tools stay off until rewritten.
+    ./scripts/request-access.nix
+    ./scripts/approve-request.nix
+    ./scripts/list-requests.nix
+    ./scripts/monitor.nix
   ] ++ optionals clientOn [
     ./client/config.nix
     ./client/commands.nix
@@ -33,9 +35,6 @@ in {
     ssh-manager: PasswordAuthentication is enabled (bootstrap-safe default).
     After pubkey login works: ncc ssh lockdown
     Temporary reopen later: ncc ssh temp-open / grant-access.
-  '' ++ optional workflowOn ''
-    ssh-manager: workflow.enable is set, but request/approve/monitor scripts
-    are not loaded yet (post-merge cleanup). Use temp-open / grant-access / lockdown.
   '';
 
   services.openssh = mkIf on {

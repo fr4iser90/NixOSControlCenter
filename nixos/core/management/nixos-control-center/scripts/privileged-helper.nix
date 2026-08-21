@@ -185,6 +185,12 @@ let
     # shellcheck disable=SC1091
     source "${policyLib}"
 
+    ncc_cli_next() {
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        printf '%b\n' "${c.blue}Next: $*${c.reset}"
+      fi
+    }
+
     ${facade.sourcePreamble { nixosRoot = "/etc/nixos"; }}
     export NIXOS_ROOT="$NIXOS_DIR"
     export CONFIGS_BASE="$NCC_CONFIGS_BASE"
@@ -229,6 +235,7 @@ EOF
     require_root() {
       if [[ "$(id -u)" -ne 0 ]]; then
         ${ui.messages.error "ncc-priv: must run as root (use pkexec)"}
+        ncc_cli_next "ncc-priv-run …   # or: sudo ncc-priv …"
         exit 1
       fi
     }
@@ -289,6 +296,7 @@ NIX
       printf '%s\n' "$full_json" > "$tmp_json"
       if ! jq -e . "$tmp_json" >/dev/null 2>&1; then
         ${ui.messages.error "ncc-priv: refusing to write invalid JSON"}
+        ncc_cli_next "fix the JSON payload, then retry the same ncc-priv command"
         rm -f "$tmp_json"
         return 1
       fi
@@ -390,8 +398,16 @@ NIX
 
     remove_user_pkg_file() {
       local path="$1" pkg="$2"
-      [[ -f "$path" ]] || { printf '%b\n' "${c.red}no config: $path${c.reset}" >&2; exit 1; }
-      grep -qE "\"$pkg\"" "$path" || { printf '%b\n' "${c.red}not found: $pkg${c.reset}" >&2; exit 1; }
+      [[ -f "$path" ]] || {
+        ${ui.messages.error "no config: $path"}
+        ncc_cli_next "ncc-priv user-pkg add $pkg --user …"
+        exit 1
+      }
+      grep -qE "\"$pkg\"" "$path" || {
+        ${ui.messages.error "not found: $pkg"}
+        ncc_cli_next "ncc-priv user-pkg add $pkg"
+        exit 1
+      }
       local tmp
       tmp=$(mktemp)
       sed -E "s|[[:space:]]*\"$pkg\"||g" "$path" > "$tmp"
@@ -422,29 +438,53 @@ NIX
           --help|-h) usage; exit 0 ;;
           *)
             if [[ -z "$pkg" ]]; then pkg="$1"; shift
-            else printf '%b\n' "${c.red}unexpected: $1${c.reset}" >&2; exit 2
+            else
+              ${ui.messages.error "unexpected: $1"}
+              ncc_cli_next "ncc-priv user-pkg add|remove <pkg> [--user NAME] [--rebuild]"
+              exit 2
             fi
             ;;
         esac
       done
 
-      [[ -n "$action" && -n "$pkg" ]] || { printf '%b\n' "${c.red}usage: ncc-priv user-pkg add|remove <pkg> [--user NAME] [--rebuild]${c.reset}" >&2; exit 2; }
-      ncc_priv_valid_pkg "$pkg" || { printf '%b\n' "${c.red}invalid package name: $pkg${c.reset}" >&2; exit 1; }
+      [[ -n "$action" && -n "$pkg" ]] || {
+        ${ui.messages.error "usage: ncc-priv user-pkg add|remove <pkg> [--user NAME] [--rebuild]"}
+        ncc_cli_next "ncc-priv user-pkg add firefox"
+        exit 2
+      }
+      ncc_priv_valid_pkg "$pkg" || {
+        ${ui.messages.error "invalid package name: $pkg"}
+        ncc_cli_next "use a simple package attribute (letters, digits, ._+-)"
+        exit 1
+      }
 
       require_root
       local invoker
       invoker=$(resolve_invoker)
       [[ -n "$target" ]] || target="$invoker"
-      ncc_priv_valid_username "$target" || { printf '%b\n' "${c.red}invalid username: $target${c.reset}" >&2; exit 1; }
+      ncc_priv_valid_username "$target" || {
+        ${ui.messages.error "invalid username: $target"}
+        ncc_cli_next "ncc-priv whoami"
+        exit 1
+      }
 
       if ! ncc_priv_can_user_pkg "$invoker" "$target"; then
         ${ui.messages.error "Permission denied: $invoker cannot modify userPackages for $target"}
+        ncc_cli_next "ncc-priv whoami   # check role; ask an admin if needed"
         exit 1
       fi
 
       local leaf
-      leaf=$(ncc_priv_user_leaf_path "$target") || { printf '%b\n' "${c.red}refusing unsafe path${c.reset}" >&2; exit 1; }
-      ncc_priv_assert_leaf_safe "$target" "$leaf" || { printf '%b\n' "${c.red}path safety check failed${c.reset}" >&2; exit 1; }
+      leaf=$(ncc_priv_user_leaf_path "$target") || {
+        ${ui.messages.error "refusing unsafe path"}
+        ncc_cli_next "ncc-priv whoami"
+        exit 1
+      }
+      ncc_priv_assert_leaf_safe "$target" "$leaf" || {
+        ${ui.messages.error "path safety check failed"}
+        ncc_cli_next "ncc-priv whoami"
+        exit 1
+      }
 
       local layout
       layout=$(ncc_detect_layout 2>/dev/null || echo split)
@@ -457,7 +497,11 @@ NIX
           case "$action" in
             add) add_user_pkg_file "$tmp" "$pkg" ;;
             remove) remove_user_pkg_file "$tmp" "$pkg" ;;
-            *) printf '%b\n' "${c.red}unknown action: $action${c.reset}" >&2; exit 2 ;;
+            *)
+              ${ui.messages.error "unknown action: $action"}
+              ncc_cli_next "ncc-priv user-pkg add|remove <pkg>"
+              exit 2
+              ;;
           esac
           content=$(cat "$tmp")
           rm -f "$tmp"
@@ -467,13 +511,20 @@ NIX
           case "$action" in
             add) add_user_pkg_file "$leaf" "$pkg" ;;
             remove) remove_user_pkg_file "$leaf" "$pkg" ;;
-            *) printf '%b\n' "${c.red}unknown action: $action${c.reset}" >&2; exit 2 ;;
+            *)
+              ${ui.messages.error "unknown action: $action"}
+              ncc_cli_next "ncc-priv user-pkg add|remove <pkg>"
+              exit 2
+              ;;
           esac
           ;;
       esac
 
       ${ui.messages.success "user-pkg $action $pkg → users/$target (invoker=$invoker)"}
       maybe_rebuild
+      if [[ "''${DO_REBUILD:-false}" != true ]]; then
+        ncc_cli_next "sudo ncc system build switch"
+      fi
     }
 
     cmd_user_account() {
@@ -491,7 +542,10 @@ NIX
           --help|-h) usage; exit 0 ;;
           *)
             if [[ -z "$name" ]]; then name="$1"; shift
-            else printf '%b\n' "${c.red}unexpected: $1${c.reset}" >&2; exit 2
+            else
+              ${ui.messages.error "unexpected: $1"}
+              ncc_cli_next "ncc-priv user-account create|set|delete <name> [options]"
+              exit 2
             fi
             ;;
         esac
@@ -499,11 +553,13 @@ NIX
 
       [[ -n "$action" && -n "$name" ]] || {
         ${ui.messages.error "usage: ncc-priv user-account create|set|delete <name> [options]"}
+        ncc_cli_next "ncc-priv user-account create alice --role guest"
         exit 2
       }
       name=$(ncc_priv_normalize_username "$name")
       ncc_priv_valid_username "$name" || {
         ${ui.messages.error "invalid username: $name (use lowercase a-z, 0-9, _, -)"}
+        ncc_cli_next "ncc-priv user-account create <name> --role guest"
         exit 1
       }
 
@@ -513,6 +569,7 @@ NIX
 
       if ! ncc_priv_can_user_manage "$invoker"; then
         ${ui.messages.error "Permission denied: $invoker cannot manage user accounts"}
+        ncc_cli_next "ncc-priv whoami   # need admin or restricted-admin"
         exit 1
       fi
 
@@ -520,6 +577,7 @@ NIX
       full=$(read_user_module_json)
       if ! printf '%s' "$full" | jq -e . >/dev/null 2>&1; then
         ${ui.messages.error "ncc-priv: failed to read core.base.user as JSON"}
+        ncc_cli_next "fix systemConfig user module, then retry"
         exit 1
       fi
       accounts=$(users_accounts_json)
@@ -529,15 +587,28 @@ NIX
           [[ -n "$role" ]] || role="guest"
           [[ -n "$shell" ]] || shell="bash"
           [[ -n "$autologin" ]] || autologin="false"
-          ncc_priv_valid_role "$role" || { printf '%b\n' "${c.red}invalid role: $role${c.reset}" >&2; exit 1; }
-          ncc_priv_valid_shell "$shell" || { printf '%b\n' "${c.red}invalid shell: $shell${c.reset}" >&2; exit 1; }
-          case "$autologin" in true|false) ;; *) printf '%b\n' "${c.red}auto-login must be true|false${c.reset}" >&2; exit 1 ;; esac
+          ncc_priv_valid_role "$role" || {
+            ${ui.messages.error "invalid role: $role"}
+            ncc_cli_next "use role: admin|restricted-admin|virtualization|guest"
+            exit 1
+          }
+          ncc_priv_valid_shell "$shell" || {
+            ${ui.messages.error "invalid shell: $shell"}
+            ncc_cli_next "use shell: bash|zsh|fish"
+            exit 1
+          }
+          case "$autologin" in true|false) ;; *)
+            ${ui.messages.error "auto-login must be true|false"}
+            exit 1
+          ;; esac
           if ! ncc_priv_can_assign_role "$invoker" "$role"; then
             ${ui.messages.error "Permission denied: cannot assign role $role"}
+            ncc_cli_next "ncc-priv whoami"
             exit 1
           fi
           if echo "$accounts" | jq -e --arg n "$name" 'has($n)' >/dev/null; then
             ${ui.messages.error "user already exists: $name"}
+            ncc_cli_next "ncc-priv user-account set $name --role $role"
             exit 1
           fi
           full=$(printf '%s' "$full" | jq -c --arg n "$name" --arg r "$role" --arg s "$shell" --arg a "$autologin" '
@@ -553,26 +624,40 @@ NIX
         set)
           if ! echo "$accounts" | jq -e --arg n "$name" 'has($n)' >/dev/null; then
             ${ui.messages.error "user not found: $name"}
+            ncc_cli_next "ncc-priv user-account create $name --role guest"
             exit 1
           fi
           local cur_role
           cur_role=$(echo "$accounts" | jq -r --arg n "$name" '.[$n].role')
           if [[ -n "$role" ]]; then
-            ncc_priv_valid_role "$role" || { printf '%b\n' "${c.red}invalid role: $role${c.reset}" >&2; exit 1; }
+            ncc_priv_valid_role "$role" || {
+              ${ui.messages.error "invalid role: $role"}
+              ncc_cli_next "use role: admin|restricted-admin|virtualization|guest"
+              exit 1
+            }
             if ! ncc_priv_can_assign_role "$invoker" "$role"; then
               ${ui.messages.error "Permission denied: cannot assign role $role"}
+              ncc_cli_next "ncc-priv whoami"
               exit 1
             fi
             if ! ncc_priv_can_drop_privileged "$name" "$cur_role" "$accounts" "$role"; then
               ${ui.messages.error "refusing: cannot demote the last admin/restricted-admin"}
+              ncc_cli_next "create another admin first, then retry"
               exit 1
             fi
           fi
           if [[ -n "$shell" ]]; then
-            ncc_priv_valid_shell "$shell" || { printf '%b\n' "${c.red}invalid shell: $shell${c.reset}" >&2; exit 1; }
+            ncc_priv_valid_shell "$shell" || {
+              ${ui.messages.error "invalid shell: $shell"}
+              ncc_cli_next "use shell: bash|zsh|fish"
+              exit 1
+            }
           fi
           if [[ -n "$autologin" ]]; then
-            case "$autologin" in true|false) ;; *) printf '%b\n' "${c.red}auto-login must be true|false${c.reset}" >&2; exit 1 ;; esac
+            case "$autologin" in true|false) ;; *)
+              ${ui.messages.error "auto-login must be true|false"}
+              exit 1
+            ;; esac
           fi
           full=$(echo "$full" | jq --arg n "$name" \
             --arg r "$role" --arg s "$shell" --arg a "$autologin" '
@@ -589,16 +674,19 @@ NIX
         delete)
           if ! echo "$accounts" | jq -e --arg n "$name" 'has($n)' >/dev/null; then
             ${ui.messages.error "user not found: $name"}
+            ncc_cli_next "ncc-priv whoami"
             exit 1
           fi
           cur_role=$(echo "$accounts" | jq -r --arg n "$name" '.[$n].role')
           if ! ncc_priv_can_drop_privileged "$name" "$cur_role" "$accounts"; then
             ${ui.messages.error "refusing: cannot delete the last admin/restricted-admin"}
+            ncc_cli_next "create another admin first, then retry"
             exit 1
           fi
           # restricted-admin cannot delete an admin
           if [[ "$(ncc_priv_role_of "$invoker")" == "restricted-admin" && "$cur_role" == "admin" ]]; then
             ${ui.messages.error "Permission denied: restricted-admin cannot delete admin users"}
+            ncc_cli_next "ncc-priv whoami"
             exit 1
           fi
           full=$(echo "$full" | jq --arg n "$name" 'del(.[$n])')
@@ -609,10 +697,14 @@ NIX
           ;;
         *)
           ${ui.messages.error "unknown action: $action"}
+          ncc_cli_next "ncc-priv user-account create|set|delete <name>"
           exit 2
           ;;
       esac
       maybe_rebuild
+      if [[ "''${DO_REBUILD:-false}" != true ]]; then
+        ncc_cli_next "sudo ncc system build switch"
+      fi
     }
 
     if [[ "''${NCC_PRIV_POLICY_ONLY:-0}" == 1 ]]; then
@@ -640,6 +732,7 @@ NIX
       *)
         ${ui.messages.error "Unknown: ncc-priv $1"}
         usage >&2
+        ncc_cli_next "ncc-priv help"
         exit 2
         ;;
     esac
@@ -678,6 +771,7 @@ NIX
       exec sudo ${helper}/bin/ncc-priv "$@" "''${EXTRA[@]}"
     fi
     ${ui.messages.error "Need pkexec or sudo to apply config changes."}
+    ${ui.messages.info "Next: install polkit/pkexec, or: sudo ncc-priv …"}
     exit 1
   '';
 

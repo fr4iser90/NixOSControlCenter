@@ -2,23 +2,22 @@
 
 > SSOT: [STANDARDS](../../../core/management/cli-formatter/doc/STANDARDS.md) · [COPY](../../../core/management/cli-formatter/doc/COPY.md)
 
-**Status:** `partial`
+**Status:** `compliant`
 
 ## Commands
 
 | Command | Purpose | Dry-run | Needs root |
 |---------|---------|---------|------------|
-| `ncc nixify` | Service + ISO build | N/A | service/ISO vary |
+| `ncc nixify` | Service + ISO build | N/A (no `/etc/nixos` writes; ISO builds locally) | service/ISO vary |
 
 ## Self-audit
 
-- [x] `ui = getModuleApi "cli-formatter"` in `commands.nix` status messages
-- [ ] No local colors / `echo -e` / ANSI (`iso-builder/validate-and-build.sh`, debug scripts, scan.sh still raw)
-- [ ] Verbose detail gated with `-v`
-- [ ] `longHelp` matches COPY tone
-- [ ] Dry-run documented or N/A
-- [ ] README links here
+- [x] `ui = getModuleApi "cli-formatter"` in `commands.nix`
+- [x] Main `ncc nixify` flows: header → loading → result → `Next:` (honors `NCC_CLI_NESTED=1`)
+- [x] ISO debug dump gated behind `-v` / `--verbose`
+- [x] Standalone helpers plain status (no private ANSI / emoji): `iso-builder/validate-and-build.sh`, snapshot + web-service scan scripts (`.sh` / `.ps1`)
+- [x] README links here
 
 ## Notes
 
-`validate-and-build.sh` is a standalone bash helper (no Nix wrapper yet) — left as a gap.
+Standalone bash/PowerShell helpers stay outside the `ncc nixify` formatter path (no `getModuleApi`); they use plain text status only.

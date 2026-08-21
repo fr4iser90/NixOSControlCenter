@@ -54,7 +54,7 @@ let
       local share_id=$(echo -n "$session_id$(date +%s)" | ${pkgs.coreutils}/bin/sha256sum | cut -d' ' -f1 | cut -c1-12)
       
       echo ""
-      echo "✅ Session is now shared!"
+      echo "OK: Session is now shared"
       echo ""
       echo "Share Link: http://$SERVER_HOST:$SERVER_PORT/share/$share_id"
       echo "Share ID: $share_id"
@@ -86,7 +86,7 @@ let
       
       # In production, would connect via WebRTC
       echo ""
-      echo "✅ Connected to shared session!"
+      echo "OK: Connected to shared session"
       echo ""
       echo "View-only mode: You can see the session in real-time"
       echo "Use 'chronicle-collab annotate' to add comments"
@@ -104,7 +104,7 @@ let
       
       echo "Stopping sharing for session: $session_id"
       # In production, would stop WebRTC server
-      echo "✅ Session sharing stopped"
+      echo "OK: Session sharing stopped"
     }
     
     # List viewers
@@ -124,7 +124,7 @@ let
       
       echo "Adding collaborative annotation..."
       echo "Text: $text"
-      echo "✅ Annotation added and broadcast to all viewers"
+      echo "OK: Annotation added and broadcast to all viewers"
     }
     
     # Main command dispatcher

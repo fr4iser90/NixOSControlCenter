@@ -38,7 +38,8 @@ let
     [[ -n "$IR" ]] && ROOT="$ROOT/$IR"
     BIN="$ROOT/docker-scripts/bin/${name}"
     if [[ ! -x "$BIN" && ! -f "$BIN" ]]; then
-      echo "Catalog script missing: $BIN — run: ncc stacks fetch" >&2
+      ${ui.messages.error "Catalog script missing: $BIN"}
+      ${ui.messages.info "Next: ncc stacks fetch"}
       exit 1
     fi
     exec bash "$BIN" "$@"
@@ -106,7 +107,10 @@ let
       exit 0
     fi
 
-    ${ui.text.header "Stacks Status"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "Stacks Status"}
+    fi
+    ${ui.messages.loading "Checking Docker / Swarm…"}
     if [[ "$DOCKER_INSTALLED" == true ]]; then
       ${ui.tables.keyValue "Docker" "available"}
       if [[ "$DOCKER_RUNNING" == true ]]; then
@@ -123,11 +127,18 @@ let
     [[ -n "$DOMAIN" ]] && ${ui.tables.keyValue "Domain" "$DOMAIN"}
     [[ -n "$EMAIL" ]] && ${ui.tables.keyValue "Email" "$EMAIL"}
     [[ -n "$VIRT_USER" ]] && ${ui.tables.keyValue "Virt user" "$VIRT_USER"}
+    ${ui.messages.success "Stacks status ready"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: ncc stacks fetch   or   ncc stacks ops status"}
+    fi
   '';
 
   stacksInitSwarmFallback = pkgs.writeShellScriptBin "ncc-stacks-swarm" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "Stacks swarm"}
+    fi
     VIRT=${lib.escapeShellArg virtUser}
     ROOT="/home/$VIRT"
     IR=${lib.escapeShellArg installRoot}
@@ -143,14 +154,17 @@ let
         if docker swarm init "$@" >/dev/null 2>&1; then
           ${ui.messages.success "Swarm initialized"}
           docker swarm join-token worker
+          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+            ${ui.messages.info "Next: ncc stacks ops status"}
+          fi
         else
           ${ui.messages.error "Failed to initialize Swarm"}
           exit 1
         fi
         ;;
       *)
-        echo "Catalog swarm.sh not found — run: ncc stacks fetch" >&2
-        echo "Or: docker swarm $*" >&2
+        ${ui.messages.error "Catalog swarm.sh not found"}
+        ${ui.messages.info "Next: ncc stacks fetch"}
         exit 1
         ;;
     esac
@@ -158,11 +172,19 @@ let
 
   stacksListStacks = pkgs.writeShellScriptBin "ncc-stacks-list-stacks" ''
     #!${pkgs.bash}/bin/bash
-    ${ui.text.header "Docker Stacks"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "Docker Stacks"}
+    fi
+    ${ui.messages.loading "Listing Docker stacks…"}
     if docker stack ls >/dev/null 2>&1; then
       docker stack ls --format "table {{.Name}}\t{{.Services}}"
+      ${ui.messages.success "Stack list ready"}
     else
       ${ui.messages.error "Cannot list stacks — check Docker/Swarm"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc stacks status"}
+      fi
+      exit 1
     fi
   '';
 
@@ -287,7 +309,7 @@ EOF
         if command -v ncc-stacks-fetch >/dev/null 2>&1; then
           exec ncc-stacks-fetch "$@"
         else
-          echo "ncc-stacks-fetch not installed (enable stack-manager)" >&2
+          ${ui.messages.error "ncc-stacks-fetch not installed (enable stack-manager)"}
           exit 1
         fi
         ;;
@@ -295,7 +317,7 @@ EOF
         if command -v ncc-stacks-init >/dev/null 2>&1; then
           exec ncc-stacks-init "$@"
         else
-          echo "ncc-stacks-init not installed" >&2
+          ${ui.messages.error "ncc-stacks-init not installed"}
           exit 1
         fi
         ;;
@@ -310,7 +332,8 @@ EOF
         ${if tuiOn then ''exec ${tuiActions}/bin/homelab-tui-actions menu'' else tuiOff}
         ;;
       *)
-        echo "Unknown: ncc stacks $cmd" >&2
+        ${ui.messages.error "Unknown: ncc stacks $cmd"}
+        ${ui.messages.info "Next: ncc stacks  (help)"}
         exit 1
         ;;
     esac

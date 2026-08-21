@@ -51,10 +51,22 @@ let
     export CONFIGS_BASE="$NIXOS_DIR/systemConfig"
     export MONOLITH_FILE="$NIXOS_DIR/systemConfig.nix"
 
+    ncc_cli_header() {
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.text.header "$*"}
+      fi
+    }
+    ncc_cli_next() {
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: $*"}
+      fi
+    }
+
     usage() {
-      echo "Usage: ncc ai config-helper read <module_path>" >&2
-      echo "       ncc-assistant-config write <module_path>   # content on stdin" >&2
-      echo "       ncc-assistant-config validate               # Nix fragment on stdin" >&2
+      ${ui.messages.error "Usage: ncc-assistant-config read|write|validate …"}
+      ${ui.messages.info "  read <module_path>"}
+      ${ui.messages.info "  write <module_path>   # content on stdin"}
+      ${ui.messages.info "  validate               # Nix fragment on stdin"}
       exit 2
     }
 
@@ -62,26 +74,41 @@ let
     case "$cmd" in
       read)
         [[ $# -ge 2 ]] || usage
+        ncc_cli_header "NCC Assistant Config"
+        ${ui.messages.loading "Reading module config…"}
         ncc_read_module_config "$2"
+        ${ui.messages.success "Read $2"}
+        ncc_cli_next "ncc-assistant-config write $2"
         ;;
       write)
         [[ $# -ge 2 ]] || usage
+        ncc_cli_header "NCC Assistant Config"
+        ${ui.messages.loading "Writing module config…"}
         content=$(cat)
         ncc_write_module_config "$2" "$content"
+        ${ui.messages.success "Wrote $2"}
+        ncc_cli_next "ncc-assistant-config read $2"
         ;;
       validate)
+        ncc_cli_header "NCC Assistant Config"
+        ${ui.messages.loading "Validating Nix fragment…"}
         content=$(cat)
         if ${pkgs.nix}/bin/nix-instantiate --parse -E "$content" >/dev/null 2>&1; then
           echo "valid"
+          ${ui.messages.success "Fragment is valid"}
+          ncc_cli_next "ncc ai"
           exit 0
         fi
         if ${pkgs.nix}/bin/nix-instantiate --eval --strict -E "$content" >/dev/null 2>&1; then
           echo "valid"
+          ${ui.messages.success "Fragment is valid"}
+          ncc_cli_next "ncc ai"
           exit 0
         fi
         ${ui.messages.error "Invalid Nix fragment"}
+        ncc_cli_next "fix the fragment, then: ncc-assistant-config validate"
         exit 1
-        ;;
+      ;;
       *)
         usage
         ;;
@@ -185,7 +212,51 @@ let
   nccAssistant = pkgs.writeShellScriptBin "ncc-assistant" ''
     set -euo pipefail
     ${envExports}
-    exec ${pythonEnv}/bin/python -m ncc_assistant "$@"
+
+    # Nix-facing entry owns §3 skeleton. Python (chat/agent/tools) prints plain;
+    # see CLI.md — secondary surface.
+    cmd="''${1:-}"
+    interactive=0
+    case "$cmd" in
+      ""|gui|chat|cli|mcp|tray|serve-openapi|help|-h|--help) interactive=1 ;;
+    esac
+
+    if [ -z "''${NCC_CLI_NESTED:-}" ] && [ "$cmd" != "mcp" ]; then
+      ${ui.text.header "NCC AI Assistant"}
+    fi
+
+    # Long-running / interactive / binary protocols: hand off (no trailing Next)
+    if [ "$interactive" -eq 1 ]; then
+      if [ -z "''${NCC_CLI_NESTED:-}" ] && [ "$cmd" != "mcp" ]; then
+        case "$cmd" in
+          ""|gui) ${ui.messages.loading "Starting GUI…"} ;;
+          chat|cli) ${ui.messages.loading "Starting chat…"} ;;
+          tray) ${ui.messages.loading "Starting tray…"} ;;
+          serve-openapi) ${ui.messages.loading "Starting OpenAPI server…"} ;;
+        esac
+      fi
+      exec ${pythonEnv}/bin/python -m ncc_assistant "$@"
+    fi
+
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.messages.loading "Running command…"}
+    fi
+    set +e
+    ${pythonEnv}/bin/python -m ncc_assistant "$@"
+    rc=$?
+    set -e
+    if [ "$rc" -eq 0 ]; then
+      ${ui.messages.success "Done"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: ncc ai --help"}
+      fi
+    else
+      ${ui.messages.error "Command failed (exit $rc)"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: ncc ai --help"}
+      fi
+    fi
+    exit "$rc"
   '';
 
   nccAssistantMcp = pkgs.writeShellScriptBin "ncc-assistant-mcp" ''

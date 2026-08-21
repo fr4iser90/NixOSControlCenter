@@ -84,11 +84,13 @@ in
           type = "manager";
           shortHelp = "network - Network Manager";
           longHelp = ''
-            ncc network                 CLI help
-            ncc network --gui|--tui
-            ncc network status [--json]
-            ncc network wifi …
-            ncc network ethernet …
+            Manage Wi-Fi, ethernet, and network overview.
+
+            Examples:
+              ncc network status
+              ncc network wifi scan
+              ncc network ethernet status
+              ncc network --gui
           '';
         }
         {
@@ -99,6 +101,13 @@ in
           category = "base";
           script = "${netCli.statusScript}/bin/ncc-network-status";
           shortHelp = "status - Overview (devices, online)";
+          longHelp = ''
+            Show devices and online status.
+
+            Examples:
+              ncc network status
+              ncc network status --json
+          '';
         }
         {
           name = "wifi";
@@ -109,7 +118,15 @@ in
           script = "${wifiCli.wifiRouter}/bin/ncc-wifi-router";
           type = "manager";
           shortHelp = "wifi - WiFi management";
-          longHelp = "ncc network wifi scan|list|status|connect|disconnect|forget";
+          longHelp = ''
+            Scan, connect, and manage saved Wi-Fi networks.
+
+            Examples:
+              ncc network wifi scan
+              ncc network wifi list
+              ncc network wifi connect "MySSID"
+              ncc network wifi disconnect
+          '';
         }
         {
           name = "ethernet";
@@ -120,7 +137,14 @@ in
           script = "${netCli.ethernetRouter}/bin/ncc-ethernet-router";
           type = "manager";
           shortHelp = "ethernet - Wired link";
-          longHelp = "ncc network ethernet status|disconnect|reconnect";
+          longHelp = ''
+            Check or cycle the wired link.
+
+            Examples:
+              ncc network ethernet status
+              ncc network ethernet disconnect
+              ncc network ethernet reconnect
+          '';
         }
       ]
       ++ lib.optionals tuiOn [
@@ -133,7 +157,12 @@ in
           script = "${networkTui}/bin/ncc-network-tui";
           type = "manager";
           shortHelp = "tui - Network TUI (prefer: ncc network --tui)";
-          longHelp = "ncc network --tui";
+          longHelp = ''
+            Open the network terminal UI.
+
+            Examples:
+              ncc network --tui
+          '';
         }
       ]
     )

@@ -11,9 +11,14 @@ pkgs.writeScriptBin "enable-desktop" ''
   #!${pkgs.bash}/bin/bash
   set -e
 
+  if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+    ${ui.text.header "Desktop Enable/Disable"}
+  fi
+
   # Sudo check
   if [ "$EUID" -ne 0 ]; then
     ${ui.messages.error "This script must be run as root (use sudo)"}
+    ${ui.messages.info "Next: sudo ncc system enable-desktop enable|disable"}
     exit 1
   fi
 
@@ -26,6 +31,7 @@ pkgs.writeScriptBin "enable-desktop" ''
     ${updateDesktopConfig}/bin/update-desktop-config "true"
   else
     ${ui.messages.error "Invalid option. Use 'enable' or 'disable'."}
+    ${ui.messages.info "Next: sudo ncc system enable-desktop enable"}
     exit 1
   fi
 
@@ -34,4 +40,7 @@ pkgs.writeScriptBin "enable-desktop" ''
   sudo nixos-rebuild switch --flake /etc/nixos#${hostname}
 
   ${ui.messages.success "Desktop configuration updated successfully!"}
+  if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+    ${ui.messages.info "Next: reboot if the display manager changed"}
+  fi
 ''

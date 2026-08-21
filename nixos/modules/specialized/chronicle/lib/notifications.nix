@@ -19,7 +19,7 @@
           "$message"
       else
         # Fallback to echo if notify-send not available
-        echo "📢 $title: $message"
+        echo "$title: $message"
       fi
     }
     
@@ -27,7 +27,7 @@
     notify_recording_started() {
       local session_id="$1"
       send_notification \
-        "🔴 Recording Started" \
+        "Recording Started" \
         "Session: $session_id\nPress F7 or run 'chronicle stop' to end" \
         "normal" \
         "media-record"
@@ -38,7 +38,7 @@
       local session_id="$1"
       local step_count="$2"
       send_notification \
-        "⏹️  Recording Stopped" \
+        "Recording Stopped" \
         "Session: $session_id\nTotal steps: $step_count\nExporting..." \
         "normal" \
         "media-playback-stop"
@@ -49,7 +49,7 @@
       local step_num="$1"
       local description="$2"
       send_notification \
-        "📸 Step $step_num Captured" \
+        "Step $step_num Captured" \
         "$description" \
         "low" \
         "camera-photo"
@@ -61,7 +61,7 @@
       local format="$2"
       local output_path="$3"
       send_notification \
-        "✅ Export Complete" \
+        "Export Complete" \
         "Format: $format\nLocation: $output_path" \
         "normal" \
         "emblem-default"
@@ -71,7 +71,7 @@
     notify_error() {
       local error_msg="$1"
       send_notification \
-        "❌ Step Recorder Error" \
+        "Step Recorder Error" \
         "$error_msg" \
         "critical" \
         "dialog-error"
@@ -81,7 +81,7 @@
     notify_warning() {
       local warning_msg="$1"
       send_notification \
-        "⚠️  Step Recorder Warning" \
+        "Step Recorder Warning" \
         "$warning_msg" \
         "normal" \
         "dialog-warning"
@@ -92,13 +92,13 @@
       local paused="$1"
       if [ "$paused" = "true" ]; then
         send_notification \
-          "⏸️  Recording Paused" \
+          "Recording Paused" \
           "Press F9 to resume" \
           "low" \
           "media-playback-pause"
       else
         send_notification \
-          "▶️  Recording Resumed" \
+          "Recording Resumed" \
           "Continuing session..." \
           "low" \
           "media-playback-start"
@@ -109,7 +109,7 @@
     notify_max_steps() {
       local max_steps="$1"
       send_notification \
-        "⚠️  Maximum Steps Reached" \
+        "Maximum Steps Reached" \
         "Reached limit of $max_steps steps.\nRecording will stop automatically." \
         "normal" \
         "dialog-warning"
@@ -119,7 +119,7 @@
     notify_comment_added() {
       local step_num="$1"
       send_notification \
-        "💬 Comment Added" \
+        "Comment Added" \
         "Comment added to step $step_num" \
         "low" \
         "text-x-generic"
@@ -129,7 +129,7 @@
     notify_cleanup() {
       local count="$1"
       send_notification \
-        "🗑️  Cleanup Complete" \
+        "Cleanup Complete" \
         "Removed $count old session(s)" \
         "low" \
         "user-trash"

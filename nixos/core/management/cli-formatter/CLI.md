@@ -24,5 +24,5 @@ See [STANDARDS §2](./doc/STANDARDS.md) — messages, badges, text, tables, list
 
 - [x] Single palette in `colors.nix`
 - [x] API exported via `api.nix` / `getModuleApi`
-- [ ] Keep API.md in sync with `api.nix` (USAGE.md still has outdated `config.core.management…` examples — fix in rollout)
+- [x] Docs (`API.md` / `ARCHITECTURE.md` / `USAGE.md`) use `getModuleApi "cli-formatter"` only
 - [x] COPY + STANDARDS for other modules

@@ -44,9 +44,18 @@ let
     WARNINGS=0
 
     if ! ncc_config_present && [ ! -f "$SYSTEM_CONFIG_LEGACY" ]; then
-      ${formatter.messages.error "No configuration found"}
-      ${formatter.messages.info "Expected monolith: $MONOLITH_FILE"}
-      ${formatter.messages.info "Or split leaves under: $CONFIGS_BASE/**/config.nix"}
+      if [ -e "$MONOLITH_FILE" ] && [ ! -r "$MONOLITH_FILE" ]; then
+        ${formatter.messages.error "Configuration exists but is not readable"}
+        ${formatter.messages.info "Path: $MONOLITH_FILE"}
+        ${formatter.messages.info "Next: fix permissions, or run with sufficient rights to read /etc/nixos"}
+      elif [ -d "/etc/nixos" ] && [ ! -r "/etc/nixos" ]; then
+        ${formatter.messages.error "/etc/nixos is not readable"}
+        ${formatter.messages.info "Next: fix permissions so dry-run can read the live config"}
+      else
+        ${formatter.messages.error "No configuration found"}
+        ${formatter.messages.info "Expected monolith: $MONOLITH_FILE"}
+        ${formatter.messages.info "Or split leaves under: $CONFIGS_BASE/**/config.nix"}
+      fi
       exit 1
     fi
 

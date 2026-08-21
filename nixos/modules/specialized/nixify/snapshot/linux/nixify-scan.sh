@@ -15,7 +15,7 @@ echo ""
 declare -a programs=()
 
 # Distro-Erkennung
-echo "📊 Detecting distribution..."
+echo "Detecting distribution..."
 
 if [ -f /etc/os-release ]; then
     . /etc/os-release
@@ -28,10 +28,10 @@ else
     DISTRO_NAME="unknown"
 fi
 
-echo "  ✓ Distribution: $DISTRO_NAME ($DISTRO_ID $DISTRO_VERSION)"
+echo "  OK: Distribution: $DISTRO_NAME ($DISTRO_ID $DISTRO_VERSION)"
 
 # Hardware-Info
-echo "📊 Collecting hardware information..."
+echo "Collecting hardware information..."
 
 CPU="unknown"
 RAM=0
@@ -56,10 +56,10 @@ if command -v lspci &> /dev/null; then
     GPU=$(lspci | grep -i "vga\|3d\|display" | head -1 | cut -d: -f3 | xargs || echo "unknown")
 fi
 
-echo "  ✓ Hardware information collected"
+echo "  OK: Hardware information collected"
 
 # Package Manager Detection
-echo "📦 Detecting package manager..."
+echo "Detecting package manager..."
 
 PACKAGE_MANAGER="unknown"
 PACKAGE_COUNT=0
@@ -72,7 +72,7 @@ if command -v apt &> /dev/null || command -v apt-get &> /dev/null; then
         programs+=("{\"name\":\"$PKG_ESCAPED\",\"source\":\"apt\"}")
         ((PACKAGE_COUNT++))
     done < <(dpkg-query -W -f='${Package}\n' 2>/dev/null | head -100)
-    echo "  ✓ APT packages: $PACKAGE_COUNT"
+    echo "  OK: APT packages: $PACKAGE_COUNT"
 elif command -v dnf &> /dev/null; then
     PACKAGE_MANAGER="dnf"
     while IFS= read -r pkg; do
@@ -82,7 +82,7 @@ elif command -v dnf &> /dev/null; then
         programs+=("{\"name\":\"$PKG_ESCAPED\",\"source\":\"dnf\"}")
         ((PACKAGE_COUNT++))
     done < <(rpm -qa 2>/dev/null | head -100)
-    echo "  ✓ DNF packages: $PACKAGE_COUNT"
+    echo "  OK: DNF packages: $PACKAGE_COUNT"
 elif command -v pacman &> /dev/null; then
     PACKAGE_MANAGER="pacman"
     while IFS= read -r line; do
@@ -92,7 +92,7 @@ elif command -v pacman &> /dev/null; then
         programs+=("{\"name\":\"$PKG_ESCAPED\",\"source\":\"pacman\"}")
         ((PACKAGE_COUNT++))
     done < <(pacman -Q 2>/dev/null | head -100)
-    echo "  ✓ Pacman packages: $PACKAGE_COUNT"
+    echo "  OK: Pacman packages: $PACKAGE_COUNT"
 elif command -v zypper &> /dev/null; then
     PACKAGE_MANAGER="zypper"
     while IFS= read -r pkg; do
@@ -102,10 +102,10 @@ elif command -v zypper &> /dev/null; then
         programs+=("{\"name\":\"$PKG_ESCAPED\",\"source\":\"zypper\"}")
         ((PACKAGE_COUNT++))
     done < <(rpm -qa 2>/dev/null | head -100)
-    echo "  ✓ Zypper packages: $PACKAGE_COUNT"
+    echo "  OK: Zypper packages: $PACKAGE_COUNT"
 elif command -v nix &> /dev/null; then
     PACKAGE_MANAGER="nix"
-    echo "  ℹ NixOS detected - this script is for migrating TO NixOS"
+    echo "  INFO: NixOS detected - this script is for migrating TO NixOS"
     echo "  Use nixos-rebuild or nix-collect-garbage for NixOS systems"
 fi
 
@@ -119,7 +119,7 @@ if command -v flatpak &> /dev/null; then
         ((FLATPAK_COUNT++))
     done < <(flatpak list --app --columns=application 2>/dev/null | tail -n +2)
     if [ $FLATPAK_COUNT -gt 0 ]; then
-        echo "  ✓ Flatpak apps: $FLATPAK_COUNT"
+        echo "  OK: Flatpak apps: $FLATPAK_COUNT"
     fi
 fi
 
@@ -134,12 +134,12 @@ if command -v snap &> /dev/null; then
         ((SNAP_COUNT++))
     done < <(snap list 2>/dev/null | tail -n +2)
     if [ $SNAP_COUNT -gt 0 ]; then
-        echo "  ✓ Snap packages: $SNAP_COUNT"
+        echo "  OK: Snap packages: $SNAP_COUNT"
     fi
 fi
 
 # Desktop Environment
-echo "⚙️  Detecting desktop environment..."
+echo "Detecting desktop environment..."
 
 DESKTOP_ENV="${XDG_CURRENT_DESKTOP:-unknown}"
 if [ "$DESKTOP_ENV" = "unknown" ] || [ -z "$DESKTOP_ENV" ]; then
@@ -180,11 +180,11 @@ elif [ -f /etc/default/locale ]; then
     LOCALE=$(grep "^LANG=" /etc/default/locale | cut -d= -f2 | cut -d. -f1 || echo "unknown")
 fi
 
-echo "  ✓ System settings collected"
+echo "  OK: System settings collected"
 
 # JSON-Report generieren
 echo ""
-echo "📄 Generating report..."
+echo "Generating report..."
 
 # Create programs JSON array
 # Security: IFS is set locally for this command only, not globally
@@ -218,7 +218,7 @@ cat > "$OUTPUT_FILE" <<EOF
 }
 EOF
 
-echo "  ✓ Report saved to: $OUTPUT_FILE"
+echo "  OK: Report saved to: $OUTPUT_FILE"
 echo ""
 
 # Summary
@@ -234,21 +234,21 @@ echo ""
 
 # Upload option
 if [ "$UPLOAD" = "true" ] && [ -n "$SERVER_URL" ]; then
-    echo "📤 Uploading report to server..."
+    echo "Uploading report to server..."
     if curl -s -X POST "$SERVER_URL/api/v1/upload" \
         -H "Content-Type: application/json" \
         -d @"$OUTPUT_FILE" > /tmp/nixify-upload-response.json 2>&1; then
         SESSION_ID=$(cat /tmp/nixify-upload-response.json | grep -o '"session_id":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
-        echo "  ✓ Upload successful! Session ID: $SESSION_ID"
+        echo "  OK: Upload successful! Session ID: $SESSION_ID"
     else
-        echo "  ✗ Upload failed. Check server URL and network connection."
+        echo "  ERROR: Upload failed. Check server URL and network connection."
     fi
 elif [ "$UPLOAD" = "true" ]; then
-    echo "  ⚠ Upload requested but no server URL provided"
+    echo "  WARN: Upload requested but no server URL provided"
     echo "  Use: ./nixify-scan.sh report.json true http://your-nixos-server:8080"
 fi
 
 echo ""
-echo "✅ Snapshot complete!"
+echo "OK: Snapshot complete"
 echo "  Review the report and upload manually if needed:"
 echo "  curl -X POST http://your-server:8080/api/v1/upload -H 'Content-Type: application/json' -d @$OUTPUT_FILE"

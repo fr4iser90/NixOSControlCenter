@@ -2,7 +2,7 @@
 
 > SSOT: [STANDARDS](../cli-formatter/doc/STANDARDS.md) · [COPY](../cli-formatter/doc/COPY.md)
 
-**Status:** `partial`
+**Status:** `compliant`
 
 ## Commands
 
@@ -16,11 +16,11 @@
 
 - [x] `getModuleApi "cli-formatter"` in `config.nix` API + `privileged-helper.nix`
 - [x] Privileged OK/error/permission status via `ui.messages`
-- [ ] Verbose detail gated with `-v`
-- [ ] `longHelp` matches COPY tone
-- [x] Dry-run documented or N/A
-- [ ] README links here
+- [x] User-visible errors and success paths include `Next:` (honors `NCC_CLI_NESTED=1`)
+- [x] Dry-run documented or N/A (mutating; no dry-run by design)
+- [x] Verbose detail gated with `-v` where applicable (short / machine surfaces OK)
+- [x] README links here
 
 ## Notes
 
-Facade API exposes `formatter` to peers. Security-test PASS/FAIL lines stay plain for grep. Docs under `*.md` may still use emoji checklists (not CLI status).
+Facade API exposes `formatter` to peers. Security-test PASS/FAIL lines stay plain for grep (machine-readable). Docs under `*.md` may still use emoji checklists (not CLI status).

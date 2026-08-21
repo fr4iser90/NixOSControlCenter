@@ -8,12 +8,22 @@ in
   # Dynamic log helpers — must use colors + printf on ONE line (messages.* end
   # with a newline and break `fn() { ${ui.messages…}; }` → `; }` syntax errors).
   shellHelpers = ''
-    log() { printf '%b\n' "${c.green}[StepRecorder] $*${c.reset}"; }
-    warn() { printf '%b\n' "${c.yellow}[StepRecorder] $*${c.reset}"; }
-    error() { printf '%b\n' "${c.red}[StepRecorder] $*${c.reset}" >&2; }
+    log() { printf '%b\n' "${c.green}[ OK ] $*${c.reset}"; }
+    warn() { printf '%b\n' "${c.yellow}[WARN] $*${c.reset}"; }
+    error() { printf '%b\n' "${c.red}[ERROR] $*${c.reset}" >&2; }
     debug() {
-      if [ "''${DEBUG_MODE:-false}" = "true" ]; then
+      if [ "''${DEBUG_MODE:-false}" = "true" ] || [ "''${NCC_VERBOSE:-0}" = "1" ]; then
         printf '%b\n' "${c.dim}[DEBUG] $*${c.reset}" >&2
+      fi
+    }
+    ncc_cli_header() {
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        printf '%b\n' "\n${c.blue}=== $* ===${c.reset}"
+      fi
+    }
+    ncc_cli_next() {
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        printf '%b\n' "${c.blue}Next: $*${c.reset}"
       fi
     }
   '';

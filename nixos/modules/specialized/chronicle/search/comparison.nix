@@ -326,11 +326,11 @@ HTMLEOF
     echo ""
     
     if [ "$REGRESSIONS" -eq 0 ]; then
-      echo "✓ No regressions detected"
+      echo "OK: No regressions detected"
       exit 0
     else
-      echo "⚠ $REGRESSIONS potential regression(s) detected:"
-      echo -e "$REGRESSION_DETAILS"
+      echo "WARN: $REGRESSIONS potential regression(s) detected:"
+      echo "$REGRESSION_DETAILS"
       exit 1
     fi
   '';
@@ -389,9 +389,9 @@ HTMLEOF
       
       # Run regression detection
       if ${regressionDetection}/bin/chronicle-detect-regression "$BASELINE" "$session" >> "$REPORT_DIR/report.txt" 2>&1; then
-        echo "  ✓ No regressions" | tee -a "$REPORT_DIR/report.txt"
+        echo "  OK: No regressions" | tee -a "$REPORT_DIR/report.txt"
       else
-        echo "  ⚠ Regressions detected" | tee -a "$REPORT_DIR/report.txt"
+        echo "  WARN: Regressions detected" | tee -a "$REPORT_DIR/report.txt"
       fi
       
       echo "" >> "$REPORT_DIR/report.txt"

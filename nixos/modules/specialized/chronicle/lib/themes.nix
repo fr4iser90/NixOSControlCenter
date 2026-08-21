@@ -185,7 +185,7 @@ in {
           local theme_desc=$(${pkgs.jq}/bin/jq -r '.description' "$theme_file")
           local theme_author=$(${pkgs.jq}/bin/jq -r '.author' "$theme_file")
           
-          echo "📦 $theme_name"
+          echo "Theme: $theme_name"
           echo "   Name: $theme_title"
           echo "   Description: $theme_desc"
           echo "   Author: $theme_author"

@@ -92,9 +92,15 @@ pkgs.writeShellScriptBin "download-from-github" ''
   fi
   
   mkdir -p "$OUTPUT_DIR"
+
+  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+    ${ui.text.header "Lock fetch"}
+  fi
   
   # List snapshots
-  ${ui.messages.loading "Fetching snapshots from GitHub..."}
+  ${ui.messages.loading "Fetching snapshots from GitHub…"}
+  ${ui.tables.keyValue "Repository" "$REPOSITORY"}
+  ${ui.tables.keyValue "Branch" "$BRANCH"}
   
   # Use GitHub API to list files in snapshots directory
   API_URL="https://api.github.com/repos/$REPOSITORY/contents/snapshots?ref=$BRANCH"
@@ -115,9 +121,7 @@ pkgs.writeShellScriptBin "download-from-github" ''
   fi
   
   # List snapshots
-  echo ""
-  echo "Available snapshots:"
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  ${ui.text.subHeader "Available snapshots"}
   
   SNAPSHOT_LIST=()
   while IFS= read -r filename; do
@@ -134,15 +138,14 @@ pkgs.writeShellScriptBin "download-from-github" ''
         SIZE_MB="?"
       fi
       
-      ${ui.messages.info "$filename"}
-      echo "     Size: $SIZE_MB MB | Updated: $DATE"
-      echo ""
+      ${ui.tables.keyValue "$filename" "$SIZE_MB MB · $DATE"}
       
       SNAPSHOT_LIST+=("$filename")
     fi
   done <<< "$SNAPSHOT_FILES"
   
   if [ "$LIST_ONLY" = "true" ]; then
+    ${ui.messages.success "Snapshot list ready"}
     exit 0
   fi
   
@@ -156,8 +159,6 @@ pkgs.writeShellScriptBin "download-from-github" ''
     # Check if snapshot exists
     if ! printf '%s\n' "''${SNAPSHOT_LIST[@]}" | grep -q "^$SNAPSHOT_NAME$"; then
       ${ui.messages.error "Snapshot '$SNAPSHOT_NAME' not found"}
-      echo "Available snapshots:"
-      printf '  - %s\n' "''${SNAPSHOT_LIST[@]}"
       exit 1
     fi
     ${ui.messages.loading "Downloading snapshot: $SNAPSHOT_NAME"}
@@ -176,9 +177,9 @@ pkgs.writeShellScriptBin "download-from-github" ''
   
   if ${pkgs.curl}/bin/curl -s -H "Authorization: token $GITHUB_TOKEN" -L "$DOWNLOAD_URL" -o "$OUTPUT_FILE"; then
     ${ui.messages.success "Downloaded: $OUTPUT_FILE"}
-    echo ""
-    echo "To restore, run:"
-    echo "  ncc-restore --snapshot $OUTPUT_FILE --all"
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: ncc lock restore --snapshot $OUTPUT_FILE --all"}
+    fi
   else
     ${ui.messages.error "Failed to download snapshot"}
     exit 1

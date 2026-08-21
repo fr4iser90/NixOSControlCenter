@@ -62,9 +62,9 @@ Custom components can be defined with:
 ### Decision 1: API-First Design
 
 **Context**: Need to provide formatting capabilities to all modules
-**Decision**: Comprehensive API accessible via `config.core.management.cli-formatter.api`
-**Rationale**: Easy integration, consistent formatting, reusable components
-**Alternatives**: Per-module formatting (rejected - inconsistent)
+**Decision**: Comprehensive API accessible only via `getModuleApi "cli-formatter"`
+**Rationale**: Discovery-law safe, easy integration, consistent formatting, reusable components
+**Alternatives**: Per-module formatting (rejected — inconsistent); reading `config.core.management…` (forbidden)
 
 ### Decision 2: Component System
 
@@ -82,7 +82,7 @@ Module Request → API → Component Selection → Formatting → Output
 ## Dependencies
 
 ### Internal Dependencies
-- `core.management.module-manager` - Module configuration management
+- `module-manager` — module discovery / metadata (via helpers, not hardcoded paths)
 
 ### External Dependencies
 - `nixpkgs.fzf` - fzf-based menus

@@ -15,7 +15,7 @@
 - [x] No shipped CLI scripts with user-facing status
 - [x] No local colors / `echo -e` / ANSI in module scripts
 - [x] Dry-run documented or N/A
-- [ ] README links here
+- [x] README links here
 
 ## Notes
 

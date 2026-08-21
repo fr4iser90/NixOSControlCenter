@@ -42,7 +42,7 @@
           > "$session_dir/audio.log" 2>&1 &
       else
         log "Error: No audio recording system found"
-        ${pkgs.libnotify}/bin/notify-send "❌ Audio Recording" "No audio system detected" -u critical
+        ${pkgs.libnotify}/bin/notify-send "Audio Recording" "No audio system detected" -u critical
         return 1
       fi
       
@@ -50,7 +50,7 @@
       echo "$audio_pid" > "$audio_pid_file"
       
       log "Audio recording started (PID: $audio_pid)"
-      ${pkgs.libnotify}/bin/notify-send "🎤 Audio Commentary" "Recording started" -u low
+      ${pkgs.libnotify}/bin/notify-send "Audio Commentary" "Recording started" -u low
       
       return 0
     }
@@ -97,7 +97,7 @@
         if [ -n "$audio_file" ] && [ -f "$audio_file" ]; then
           local audio_size=$(du -h "$audio_file" | cut -f1)
           log "Audio recording saved: $audio_file ($audio_size)"
-          ${pkgs.libnotify}/bin/notify-send "🎤 Audio Commentary" "Recording saved ($audio_size)" -u low
+          ${pkgs.libnotify}/bin/notify-send "Audio Commentary" "Recording saved ($audio_size)" -u low
         else
           log "Warning: Audio file not found after stopping recording"
         fi
@@ -127,7 +127,7 @@
         log "Pausing audio recording..."
         kill -STOP "$audio_pid"
         echo "paused" > "$session_dir/.audio.state"
-        ${pkgs.libnotify}/bin/notify-send "⏸️ Audio Commentary" "Recording paused" -u low
+        ${pkgs.libnotify}/bin/notify-send "Audio Commentary" "Recording paused" -u low
       fi
       
       return 0
@@ -151,7 +151,7 @@
         log "Resuming audio recording..."
         kill -CONT "$audio_pid"
         rm -f "$session_dir/.audio.state"
-        ${pkgs.libnotify}/bin/notify-send "▶️ Audio Commentary" "Recording resumed" -u low
+        ${pkgs.libnotify}/bin/notify-send "Audio Commentary" "Recording resumed" -u low
       fi
       
       return 0
@@ -307,13 +307,13 @@ EOF
         local sources=$(pactl list sources short 2>/dev/null)
         if [ -z "$sources" ]; then
           log "Error: No audio input devices found"
-          ${pkgs.libnotify}/bin/notify-send "❌ Microphone Test" "No input devices found" -u critical
+          ${pkgs.libnotify}/bin/notify-send "Microphone Test" "No input devices found" -u critical
           return 1
         fi
         
         log "Available audio sources:"
         echo "$sources"
-        ${pkgs.libnotify}/bin/notify-send "✅ Microphone Test" "Audio input available" -u low
+        ${pkgs.libnotify}/bin/notify-send "Microphone Test" "Audio input available" -u low
         return 0
       else
         log "Warning: Could not test microphone (pactl not available)"

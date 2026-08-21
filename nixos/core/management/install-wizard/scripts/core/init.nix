@@ -1,5 +1,240 @@
 # Install wizard init — preset-first (no legacy mode setup_*).
 { pkgs, getModuleApi ? null, ... }:
-pkgs.writeText "init.sh" (builtins.fromJSON ''
-"#!/usr/bin/env bash\nset -euo pipefail\n\n# Source core components\nsource \"\u0024CORE_DIR/imports.sh\"\n\n# Parse install flags early (before mutating work)\nfor arg in \"\u0024@\"; do\n    case \"\u0024arg\" in\n        --dry-run|--dry|dry-run)\n            ncc_dry_enable\n            ;;\n        --help|-h)\n            echo \"Usage: install [--dry-run]\"\n            echo \"  --dry-run   Run wizard + validate writes; touch nothing on disk\"\n            exit 0\n            ;;\n    esac\ndone\n\nmain() {\n    log_header \"NixOS System Setup\"\n    ncc_dry_banner\n    \n    check_hardware_config\n    \n    # Collect system information\n    collect_system_data || {\n        log_error \"System data collection failed\"\n        exit 1\n    }\n    \n    # Get user's setup mode selection\n    log_section \"Setup Mode\"\n\n    # Answers file MUST be created in this shell before \u0024(select_setup_mode):\n    # command substitution runs the wizard in a subshell \u2014 exports there are lost.\n    if declare -F ncc_gui_ensure_answers_file >/dev/null 2>&1; then\n        ncc_gui_ensure_answers_file\n    fi\n    \n    if ! selected_modules_raw=\u0024(select_setup_mode); then\n        log_error \"Setup mode selection failed\"\n        exit 1\n    fi\n    \n    if [[ -z \"\u0024selected_modules_raw\" ]]; then\n        log_error \"No setup mode selected\"\n        exit 1\n    fi\n    \n    log_info \"Selected modules: \u0024selected_modules_raw\"\n    \n    # Check for Advanced Options first (LOAD_BLUEPRINT: / legacy LOAD_PROFILE: / IMPORT_CONFIG:)\n    if [[ \"\u0024selected_modules_raw\" =~ ^LOAD_BLUEPRINT: ]] || [[ \"\u0024selected_modules_raw\" =~ ^LOAD_PROFILE: ]]; then\n        local profile_path=\"\u0024{selected_modules_raw#LOAD_BLUEPRINT:}\"\n        profile_path=\"\u0024{profile_path#LOAD_PROFILE:}\"\n        apply_install_template \"\u0024profile_path\" || exit 1\n        \n    elif [[ \"\u0024selected_modules_raw\" =~ ^IMPORT_CONFIG: ]]; then\n        # Import from existing config\n        local config_path=\"\u0024{selected_modules_raw#IMPORT_CONFIG:}\"\n        log_info \"Importing configuration from: \u0024config_path\"\n        if [[ -f \"\u0024config_path\" ]]; then\n            if ncc_dry_run; then\n                ncc_dry_skip \"import config\" \"\u0024config_path \u2192 \u0024SYSTEM_CONFIG_FILE\"\n                ncc_dry_skip \"deploy_config\" \"/etc/nixos\"\n            else\n                backup_file \"\u0024SYSTEM_CONFIG_FILE\" 2>/dev/null || true\n                ensure_dir \"\u0024(dirname \"\u0024SYSTEM_CONFIG_FILE\")\"\n                cp \"\u0024config_path\" \"\u0024SYSTEM_CONFIG_FILE\" || {\n                    log_error \"Failed to import configuration\"\n                    exit 1\n                }\n                log_success \"Configuration imported successfully\"\n                \n                # Export system type for deployment\n                local system_type\n                system_type=\u0024(grep -m 1 'systemType = ' \"\u0024SYSTEM_CONFIG_FILE\" | sed 's/.*systemType = \"\\(.*\\)\";.*/\\1/' || echo \"desktop\")\n                export SYSTEM_TYPE=\"\u0024system_type\"\n                deploy_config\n            fi\n        else\n            log_error \"Configuration file not found: \u0024config_path\"\n            exit 1\n        fi\n        \n    # Check if this is a predefined profile (legacy support)\n    elif profile_file=\u0024(get_predefined_profile_file \"\u0024selected_modules_raw\"); then\n        # This is a predefined profile - load it directly\n        apply_install_template \"\u0024profile_file\" || exit 1\n        \n    elif [[ \"\u0024selected_modules_raw\" == \"Desktop\" ]]; then\n        # Desktop preset - load desktop preset file\n        local desktop_preset=\"\u0024SETUP_DIR/modes/install-bases/desktop.nix\"\n        if [[ -f \"\u0024desktop_preset\" ]]; then\n            apply_install_template \"\u0024desktop_preset\" || exit 1\n        else\n            log_error \"Desktop preset not found: \u0024desktop_preset\"\n            exit 1\n        fi\n        \n    elif [[ \"\u0024selected_modules_raw\" == \"Server\" ]]; then\n        # Server preset - load server preset file\n        local server_preset=\"\u0024SETUP_DIR/modes/install-bases/server.nix\"\n        if [[ -f \"\u0024server_preset\" ]]; then\n            apply_install_template \"\u0024server_preset\" || exit 1\n        else\n            log_error \"Server preset not found: \u0024server_preset\"\n            exit 1\n        fi\n        \n    elif [[ \"\u0024selected_modules_raw\" == \"Homelab Server\" ]]; then\n        local homelab_preset=\"\u0024SETUP_DIR/modes/install-bases/homelab-server.nix\"\n        if [[ -f \"\u0024homelab_preset\" ]]; then\n            apply_install_template \"\u0024homelab_preset\" || exit 1\n        else\n            log_error \"Homelab Server preset not found: \u0024homelab_preset\"\n            exit 1\n        fi\n\n    elif [[ \"\u0024selected_modules_raw\" == \"Jetson Nano\" || \"\u0024selected_modules_raw\" == \"Fr4iser Jetson Orin Nano\" ]]; then\n        local jetson_profile=\"\u0024SETUP_DIR/modes/host-blueprints/fr4iser-jetson-orin\"\n        if [[ -f \"\u0024jetson_profile\" ]]; then\n            apply_install_template \"\u0024jetson_profile\" || exit 1\n        else\n            log_error \"Jetson profile not found: \u0024jetson_profile\"\n            exit 1\n        fi\n\n    else\n        # From Scratch / custom: systemType + optional package modules \u2192 temp preset \u2192 apply\n        IFS=' ' read -ra selected_modules <<< \"\u0024selected_modules_raw\"\n        local first_selection=\"\u0024{selected_modules[0]}\"\n\n        if [[ \"\u0024first_selection\" =~ ^(desktop|server)\u0024 ]]; then\n            local system_type=\"\u0024first_selection\"\n            local packages=( \"\u0024{selected_modules[@]:1}\" )\n            local tmp_preset\n            tmp_preset=\u0024(mktemp \"\u0024{TMPDIR:-/tmp}/ncc-from-scratch.XXXXXX.nix\")\n            {\n                echo \"{\"\n                echo \"  systemType = \\\"\u0024system_type\\\";\"\n                echo \"  hostName = null;\"\n                echo \"  system = { channel = \\\"stable\\\"; bootloader = \\\"systemd-boot\\\"; };\"\n                echo -n \"  packageModules = [\"\n                local p\n                for p in \"\u0024{packages[@]}\"; do\n                    [[ -n \"\u0024p\" ]] || continue\n                    # Desktop envs are not packageModules\n                    case \"\u0024p\" in\n                        plasma|gnome|xfce) continue ;;\n                    esac\n                    echo -n \" \\\"\u0024p\\\"\"\n                done\n                echo \" ];\"\n                # DE from selection\n                local de=\"\"\n                for p in \"\u0024{packages[@]}\"; do\n                    case \"\u0024p\" in plasma|gnome|xfce) de=\"\u0024p\" ;; esac\n                done\n                if [[ -n \"\u0024de\" ]]; then\n                    echo \"  desktop = { enable = true; environment = \\\"\u0024de\\\"; display = { manager = \\\"sddm\\\"; server = \\\"wayland\\\"; session = \\\"\u0024de\\\"; }; theme = { dark = true; }; audio = \\\"pipewire\\\"; };\"\n                else\n                    echo \"  desktop = { enable = false; environment = null; display = { manager = null; server = null; session = null; }; theme = { dark = null; }; audio = null; };\"\n                fi\n                echo \"  users = {};\"\n                echo \"  hardware = { cpu = null; gpu = null; };\"\n                echo \"  allowUnfree = true;\"\n                echo \"  buildLogLevel = \\\"minimal\\\";\"\n                echo \"  features = { ssh-manager = false; stack-manager = false; bootentry-manager = false; vm-manager = false; ai-workspace = false; };\"\n                echo \"  timeZone = \\\"Europe/Berlin\\\";\"\n                echo \"  locales = [ \\\"en_US.UTF-8\\\" ];\"\n                echo \"  keyboardLayout = \\\"de\\\";\"\n                echo \"  overrides = { enableSSH = null; };\"\n                echo \"}\"\n            } > \"\u0024tmp_preset\"\n            apply_install_template \"\u0024tmp_preset\" || { rm -f \"\u0024tmp_preset\"; exit 1; }\n            rm -f \"\u0024tmp_preset\"\n        elif [[ \"\u0024first_selection\" == \"Desktop\" ]]; then\n            apply_install_template \"\u0024SETUP_DIR/modes/install-bases/desktop.nix\" || exit 1\n        elif [[ \"\u0024first_selection\" == \"Server\" ]]; then\n            apply_install_template \"\u0024SETUP_DIR/modes/install-bases/server.nix\" || exit 1\n        elif [[ \"\u0024first_selection\" == \"Homelab\" ]]; then\n            apply_install_template \"\u0024SETUP_DIR/modes/install-bases/homelab-server.nix\" || exit 1\n        else\n            log_error \"Invalid setup type: \u0024first_selection\"\n            exit 1\n        fi\n    fi\n    \n    if ncc_dry_run; then\n        log_success \"[DRY-RUN] Setup path OK \u2014 no files were written or deployed\"\n    else\n        log_success \"Setup complete! \ud83c\udf89\"\n    fi\n}\n\n# Map predefined profile names to file names\nget_predefined_profile_file() {\n    local profile_name=\"\u00241\"\n    local profile_file=\"\"\n\n    case \"\u0024profile_name\" in\n        \"Fr4iser Personal Desktop\") profile_file=\"fr4iser-home\" ;;\n        \"Gira Personal Desktop\") profile_file=\"gira-home\" ;;\n        \"Fr4iser Jetson Nano\"|\"Fr4iser Jetson Orin Nano\"|\"Jetson Nano\")\n            profile_file=\"fr4iser-jetson-orin\" ;;\n        \"Homelab Server\")\n            local base=\"\u0024SETUP_DIR/modes/install-bases/homelab-server.nix\"\n            if [[ -f \"\u0024base\" ]]; then\n                echo \"\u0024base\"\n                return 0\n            fi\n            return 1\n            ;;\n        *)\n            return 1\n            ;;\n    esac\n\n    local profile_path=\"\u0024SETUP_DIR/modes/host-blueprints/\u0024profile_file\"\n    if [[ -f \"\u0024profile_path\" ]]; then\n        echo \"\u0024profile_path\"\n        return 0\n    else\n        log_error \"Profile file not found: \u0024profile_path\"\n        return 1\n    fi\n}\n\n# Execute main function if script is run directly\ncheck_script_execution \"CORE_DIR\" \"main\"\n"
-'')
+pkgs.writeText "init.sh" ''
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Source core components
+source "$CORE_DIR/imports.sh"
+
+# Parse install flags early (before mutating work)
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run|--dry|dry-run)
+            ncc_dry_enable
+            ;;
+        --help|-h)
+            echo "Usage: ncc install [--dry-run]"
+            echo "  --dry-run   Preview only — nothing written under /etc/nixos"
+            exit 0
+            ;;
+    esac
+done
+
+main() {
+    log_header "NixOS System Setup"
+    ncc_dry_banner
+    
+    check_hardware_config
+    
+    # Collect system information
+    collect_system_data || {
+        log_error "System data collection failed"
+        exit 1
+    }
+    
+    # Get user's setup mode selection
+    log_section "Setup Mode"
+
+    # Answers file MUST be created in this shell before $(select_setup_mode):
+    # command substitution runs the wizard in a subshell — exports there are lost.
+    if declare -F ncc_gui_ensure_answers_file >/dev/null 2>&1; then
+        ncc_gui_ensure_answers_file
+    fi
+    
+    if ! selected_modules_raw=$(select_setup_mode); then
+        log_error "Setup mode selection failed"
+        exit 1
+    fi
+    
+    if [[ -z "$selected_modules_raw" ]]; then
+        log_error "No setup mode selected"
+        exit 1
+    fi
+    
+    log_info "Selected modules: $selected_modules_raw"
+    
+    # Check for Advanced Options first (LOAD_BLUEPRINT: / legacy LOAD_PROFILE: / IMPORT_CONFIG:)
+    if [[ "$selected_modules_raw" =~ ^LOAD_BLUEPRINT: ]] || [[ "$selected_modules_raw" =~ ^LOAD_PROFILE: ]]; then
+        local profile_path="''${selected_modules_raw#LOAD_BLUEPRINT:}"
+        profile_path="''${profile_path#LOAD_PROFILE:}"
+        apply_install_template "$profile_path" || exit 1
+        
+    elif [[ "$selected_modules_raw" =~ ^IMPORT_CONFIG: ]]; then
+        # Import from existing config
+        local config_path="''${selected_modules_raw#IMPORT_CONFIG:}"
+        log_info "Importing configuration from: $config_path"
+        if [[ -f "$config_path" ]]; then
+            if ncc_dry_run; then
+                ncc_dry_skip "import config" "$config_path → $SYSTEM_CONFIG_FILE"
+                ncc_dry_skip "deploy_config" "/etc/nixos"
+            else
+                backup_file "$SYSTEM_CONFIG_FILE" 2>/dev/null || true
+                ensure_dir "$(dirname "$SYSTEM_CONFIG_FILE")"
+                cp "$config_path" "$SYSTEM_CONFIG_FILE" || {
+                    log_error "Failed to import configuration"
+                    exit 1
+                }
+                log_success "Configuration imported successfully"
+                
+                # Export system type for deployment
+                local system_type
+                system_type=$(grep -m 1 'systemType = ' "$SYSTEM_CONFIG_FILE" | sed 's/.*systemType = "\(.*\)";.*/\1/' || echo "desktop")
+                export SYSTEM_TYPE="$system_type"
+                deploy_config
+            fi
+        else
+            log_error "Configuration file not found: $config_path"
+            exit 1
+        fi
+        
+    # Check if this is a predefined profile (legacy support)
+    elif profile_file=$(get_predefined_profile_file "$selected_modules_raw"); then
+        # This is a predefined profile - load it directly
+        apply_install_template "$profile_file" || exit 1
+        
+    elif [[ "$selected_modules_raw" == "Desktop" ]]; then
+        # Desktop preset - load desktop preset file
+        local desktop_preset="$SETUP_DIR/modes/install-bases/desktop.nix"
+        if [[ -f "$desktop_preset" ]]; then
+            apply_install_template "$desktop_preset" || exit 1
+        else
+            log_error "Desktop preset not found: $desktop_preset"
+            exit 1
+        fi
+        
+    elif [[ "$selected_modules_raw" == "Server" ]]; then
+        # Server preset - load server preset file
+        local server_preset="$SETUP_DIR/modes/install-bases/server.nix"
+        if [[ -f "$server_preset" ]]; then
+            apply_install_template "$server_preset" || exit 1
+        else
+            log_error "Server preset not found: $server_preset"
+            exit 1
+        fi
+        
+    elif [[ "$selected_modules_raw" == "Homelab Server" ]]; then
+        local homelab_preset="$SETUP_DIR/modes/install-bases/homelab-server.nix"
+        if [[ -f "$homelab_preset" ]]; then
+            apply_install_template "$homelab_preset" || exit 1
+        else
+            log_error "Homelab Server preset not found: $homelab_preset"
+            exit 1
+        fi
+
+    elif [[ "$selected_modules_raw" == "Jetson Nano" || "$selected_modules_raw" == "Fr4iser Jetson Orin Nano" ]]; then
+        local jetson_profile="$SETUP_DIR/modes/host-blueprints/fr4iser-jetson-orin"
+        if [[ -f "$jetson_profile" ]]; then
+            apply_install_template "$jetson_profile" || exit 1
+        else
+            log_error "Jetson profile not found: $jetson_profile"
+            exit 1
+        fi
+
+    else
+        # From Scratch / custom: systemType + optional package modules → temp preset → apply
+        IFS=' ' read -ra selected_modules <<< "$selected_modules_raw"
+        local first_selection="''${selected_modules[0]}"
+
+        if [[ "$first_selection" =~ ^(desktop|server)$ ]]; then
+            local system_type="$first_selection"
+            local packages=( "''${selected_modules[@]:1}" )
+            local tmp_preset
+            tmp_preset=$(mktemp "''${TMPDIR:-/tmp}/ncc-from-scratch.XXXXXX.nix")
+            {
+                echo "{"
+                echo "  systemType = \"$system_type\";"
+                echo "  hostName = null;"
+                echo "  system = { channel = \"stable\"; bootloader = \"systemd-boot\"; };"
+                echo -n "  packageModules = ["
+                local p
+                for p in "''${packages[@]}"; do
+                    [[ -n "$p" ]] || continue
+                    # Desktop envs are not packageModules
+                    case "$p" in
+                        plasma|gnome|xfce) continue ;;
+                    esac
+                    echo -n " \"$p\""
+                done
+                echo " ];"
+                # DE from selection
+                local de=""
+                for p in "''${packages[@]}"; do
+                    case "$p" in plasma|gnome|xfce) de="$p" ;; esac
+                done
+                if [[ -n "$de" ]]; then
+                    echo "  desktop = { enable = true; environment = \"$de\"; display = { manager = \"sddm\"; server = \"wayland\"; session = \"$de\"; }; theme = { dark = true; }; audio = \"pipewire\"; };"
+                else
+                    echo "  desktop = { enable = false; environment = null; display = { manager = null; server = null; session = null; }; theme = { dark = null; }; audio = null; };"
+                fi
+                echo "  users = {};"
+                echo "  hardware = { cpu = null; gpu = null; };"
+                echo "  allowUnfree = true;"
+                echo "  buildLogLevel = \"minimal\";"
+                echo "  features = { ssh-manager = false; stack-manager = false; bootentry-manager = false; vm-manager = false; ai-workspace = false; };"
+                echo "  timeZone = \"Europe/Berlin\";"
+                echo "  locales = [ \"en_US.UTF-8\" ];"
+                echo "  keyboardLayout = \"de\";"
+                echo "  overrides = { enableSSH = null; };"
+                echo "}"
+            } > "$tmp_preset"
+            apply_install_template "$tmp_preset" || { rm -f "$tmp_preset"; exit 1; }
+            rm -f "$tmp_preset"
+        elif [[ "$first_selection" == "Desktop" ]]; then
+            apply_install_template "$SETUP_DIR/modes/install-bases/desktop.nix" || exit 1
+        elif [[ "$first_selection" == "Server" ]]; then
+            apply_install_template "$SETUP_DIR/modes/install-bases/server.nix" || exit 1
+        elif [[ "$first_selection" == "Homelab" ]]; then
+            apply_install_template "$SETUP_DIR/modes/install-bases/homelab-server.nix" || exit 1
+        else
+            log_error "Invalid setup type: $first_selection"
+            exit 1
+        fi
+    fi
+    
+    if ncc_dry_run; then
+        log_success "Dry-run OK — safe to run the real install when ready"
+        log_next "sudo ncc install"
+    else
+        log_success "Setup complete"
+        log_next "sudo ncc system build switch"
+    fi
+}
+
+# Map predefined profile names to file names
+get_predefined_profile_file() {
+    local profile_name="$1"
+    local profile_file=""
+
+    case "$profile_name" in
+        "Fr4iser Personal Desktop") profile_file="fr4iser-home" ;;
+        "Gira Personal Desktop") profile_file="gira-home" ;;
+        "Fr4iser Jetson Nano"|"Fr4iser Jetson Orin Nano"|"Jetson Nano")
+            profile_file="fr4iser-jetson-orin" ;;
+        "Homelab Server")
+            local base="$SETUP_DIR/modes/install-bases/homelab-server.nix"
+            if [[ -f "$base" ]]; then
+                echo "$base"
+                return 0
+            fi
+            return 1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    local profile_path="$SETUP_DIR/modes/host-blueprints/$profile_file"
+    if [[ -f "$profile_path" ]]; then
+        echo "$profile_path"
+        return 0
+    else
+        log_error "Profile file not found: $profile_path"
+        return 1
+    fi
+}
+
+# Execute main function if script is run directly
+check_script_execution "CORE_DIR" "main"
+
+''

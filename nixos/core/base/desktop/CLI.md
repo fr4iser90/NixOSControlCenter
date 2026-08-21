@@ -2,7 +2,7 @@
 
 > SSOT: [STANDARDS](../../management/cli-formatter/doc/STANDARDS.md) · [COPY](../../management/cli-formatter/doc/COPY.md)
 
-**Status:** `partial`
+**Status:** `compliant`
 
 ## Commands
 
@@ -10,17 +10,18 @@
 |---------|---------|---------|------------|
 | `ncc desktop` | Help / `--gui` / `--tui` | N/A | no |
 | `ncc desktop status` | Current settings (`key=value`) | N/A | no |
-| `ncc desktop set …` | Write desktop settings (+ optional `--rebuild`) | no | yes |
+| `ncc desktop set …` | Write desktop settings (+ optional `--rebuild`) | yes (`--dry-run`) | yes (skipped on dry-run) |
 
 ## Self-audit
 
 - [x] `ui = getModuleApi "cli-formatter"` in `scripts/desktop-set.nix`
-- [x] No local colors / `echo -e` / ANSI in set script
-- [ ] Verbose detail gated with `-v`
-- [ ] `longHelp` matches COPY tone
-- [x] Dry-run documented or N/A
-- [ ] README links here
+- [x] Skeleton: header → dry banner → loading/facts → work → result → Next
+- [x] Honor `NCC_CLI_NESTED`
+- [x] `--verbose` gates paths/layout
+- [x] No local colors / `echo -e` / ANSI
+- [x] `longHelp` matches COPY tone
+- [x] README links here
 
 ## Notes
 
-`status` stays machine-friendly `key=value`. Mutating `set` uses `ui.messages` / `ui.tables`.
+`status` stays machine-friendly `key=value`. Mutating `set` owns the UX skeleton.

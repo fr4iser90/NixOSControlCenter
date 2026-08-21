@@ -8,7 +8,7 @@
       local session_path="$1"
       local session_id=$(basename "$session_path")
       
-      log "📦 Exporting all formats for: $session_id"
+      log "Exporting all formats for: $session_id"
       
       # Export to each format
       local formats=("html" "markdown" "json" "zip")
@@ -20,30 +20,30 @@
         case "$format" in
           html)
             if export_html "$session_path"; then
-              export_results+=("✅ HTML: $session_path/report.html")
+              export_results+=("OK: HTML: $session_path/report.html")
             else
-              export_results+=("❌ HTML: failed")
+              export_results+=("ERROR: HTML: failed")
             fi
             ;;
           markdown)
             if export_markdown "$session_path"; then
-              export_results+=("✅ Markdown: $session_path/report.md")
+              export_results+=("OK: Markdown: $session_path/report.md")
             else
-              export_results+=("❌ Markdown: failed")
+              export_results+=("ERROR: Markdown: failed")
             fi
             ;;
           json)
             if export_json "$session_path"; then
-              export_results+=("✅ JSON: $session_path/report.json")
+              export_results+=("OK: JSON: $session_path/report.json")
             else
-              export_results+=("❌ JSON: failed")
+              export_results+=("ERROR: JSON: failed")
             fi
             ;;
           zip)
             if export_zip "$session_path"; then
-              export_results+=("✅ ZIP: $session_path.zip")
+              export_results+=("OK: ZIP: $session_path.zip")
             else
-              export_results+=("❌ ZIP: failed")
+              export_results+=("ERROR: ZIP: failed")
             fi
             ;;
         esac

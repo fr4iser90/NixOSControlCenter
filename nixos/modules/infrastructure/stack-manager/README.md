@@ -12,6 +12,9 @@ Manages **catalog-based Docker workloads** (homelab gateways/media **and** compu
 
 ## CLI
 
+CLI contract: [CLI.md](./CLI.md)
+
+
 ```
 ncc stacks --gui
 ncc stacks status [--json]

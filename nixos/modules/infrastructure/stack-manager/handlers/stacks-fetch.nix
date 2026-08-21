@@ -32,12 +32,19 @@ let
     INSTALL_ROOT=${lib.escapeShellArg installRoot}
     TEMP_DIR="/tmp/ncc-stacks-fetch"
 
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "Stacks fetch"}
+    fi
+
     if [[ -z "$VIRT_USER" ]]; then
-      ${ui.messages.error "Error: no virtualization/admin user configured"}
+      ${ui.messages.error "No virtualization/admin user configured"}
       exit 1
     fi
     if [[ "$(whoami)" != "$VIRT_USER" ]]; then
-      ${ui.messages.error "Error: run as $VIRT_USER (e.g. sudo -u $VIRT_USER ncc stacks fetch)"}
+      ${ui.messages.error "Run as $VIRT_USER (e.g. sudo -u $VIRT_USER ncc stacks fetch)"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: sudo -u $VIRT_USER ncc stacks fetch"}
+      fi
       exit 1
     fi
 
@@ -48,8 +55,8 @@ let
     fi
 
     ${ui.messages.loading "Fetching stack catalog…"}
-    echo "  repo: $REPO_URL ($REPO_REF)"
-    echo "  dest: $DEST"
+    ${ui.tables.keyValue "Repo" "$REPO_URL ($REPO_REF)"}
+    ${ui.tables.keyValue "Dest" "$DEST"}
     rm -rf "$TEMP_DIR"
     mkdir -p "$TEMP_DIR"
 
@@ -83,7 +90,9 @@ let
 
     rm -rf "$TEMP_DIR"
     ${ui.messages.success "Stack catalog fetch completed"}
-    echo "Next: ncc stacks init --profile <name>   or   bash $DEST/docker-scripts/bin/init-homelab.sh"
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: ncc stacks init --profile <name>"}
+    fi
   '';
 
   # Back-compat name

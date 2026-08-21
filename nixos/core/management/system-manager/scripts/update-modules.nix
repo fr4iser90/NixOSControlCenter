@@ -42,10 +42,14 @@ let
       esac
     done
     
-    ${ui.text.header "Module Update"}
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.text.header "Module Update"}
+    fi
     
     if [ "$DRY_RUN" = "true" ]; then
-      ${ui.messages.info "DRY RUN MODE - No changes will be made"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Preview only — nothing will be written under /etc/nixos"}
+      fi
     fi
     
     # Get modules directory
@@ -114,27 +118,30 @@ let
     echo ""
     if [ ''${#MODULES_AUTO[@]} -eq 0 ] && [ ''${#MODULES_MANUAL[@]} -eq 0 ]; then
       ${ui.messages.success "All modules are up to date!"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: ncc system update --dry-run --local --source-dir /path/to/NixOSControlCenter/nixos"}
+      fi
       exit 0
     fi
     
     ${ui.messages.info "Modules with automatic migration available:"}
     if [ ''${#MODULES_AUTO[@]} -eq 0 ]; then
-      echo "  (none)"
+      ${ui.messages.info "  (none)"}
     else
       for module_info in "''${MODULES_AUTO[@]}"; do
         IFS=':' read -r module from to <<< "$module_info"
-        echo "  - $module: $from → $to (auto-update)"
+        ${ui.messages.info "  - $module: $from → $to (auto-update)"}
       done
     fi
     
     echo ""
     ${ui.messages.warning "Modules requiring manual update:"}
     if [ ''${#MODULES_MANUAL[@]} -eq 0 ]; then
-      echo "  (none)"
+      ${ui.messages.info "  (none)"}
     else
       for module_info in "''${MODULES_MANUAL[@]}"; do
         IFS=':' read -r module from to <<< "$module_info"
-        echo "  - $module: $from → $to (manual update required)"
+        ${ui.messages.info "  - $module: $from → $to (manual update required)"}
       done
     fi
     
@@ -151,11 +158,14 @@ let
     
     # Perform updates
     if [ "$DRY_RUN" = "true" ]; then
-      ${ui.messages.info "DRY RUN: Would update the following modules:"}
+      ${ui.messages.info "Would update the following modules (dry-run — no changes written):"}
       for module_info in "''${MODULES_AUTO[@]}"; do
         IFS=':' read -r module from to <<< "$module_info"
-        echo "  - $module: $from → $to"
+        ${ui.messages.info "  - $module: $from → $to"}
       done
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: sudo ncc system update-modules"}
+      fi
       exit 0
     fi
     
@@ -205,6 +215,9 @@ let
       done
       
       ${ui.messages.success "Modules updated successfully!"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: sudo ncc system build switch"}
+      fi
     fi
     
     # Warn about manual updates
@@ -213,9 +226,12 @@ let
       ${ui.messages.warning "The following modules require manual update:"}
       for module_info in "''${MODULES_MANUAL[@]}"; do
         IFS=':' read -r module from to <<< "$module_info"
-        echo "  - $module: $from → $to"
+        ${ui.messages.info "  - $module: $from → $to"}
         ${ui.messages.info "  → No migration available. Please update manually or create migration file."}
       done
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: review module migrations under each module's migrations/"}
+      fi
     fi
   '';
 

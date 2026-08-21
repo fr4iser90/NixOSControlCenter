@@ -84,10 +84,13 @@ in
           type = "manager";
           shortHelp = "hardware - Hardware";
           longHelp = ''
-            ncc hardware                 CLI help
-            ncc hardware --gui
-            ncc hardware status [--json]
-            ncc hardware set autoDetect=true|false
+            Show hardware inventory and toggle auto-detection.
+
+            Examples:
+              ncc hardware status
+              ncc hardware status --json
+              ncc hardware --gui
+              sudo ncc hardware set autoDetect=true
           '';
         }
         {
@@ -98,7 +101,13 @@ in
           category = "base";
           script = "${statusBin}/bin/ncc-hardware-status";
           shortHelp = "status - Hardware inventory";
-          longHelp = "ncc hardware status [--json]";
+          longHelp = ''
+            Show configured vs detected hardware (optional live probe JSON).
+
+            Examples:
+              ncc hardware status
+              ncc hardware status --json
+          '';
         }
         {
           name = "set";
@@ -109,7 +118,13 @@ in
           script = "${setBin}/bin/ncc-hardware-set";
           requiresSudo = true;
           shortHelp = "set - Toggle autoDetect";
-          longHelp = "sudo ncc hardware set autoDetect=true|false";
+          longHelp = ''
+            Toggle hardware auto-detection (system-manager enableChecks).
+
+            Examples:
+              sudo ncc hardware set autoDetect=true
+              sudo ncc hardware set autoDetect=false
+          '';
         }
       ]
     ))

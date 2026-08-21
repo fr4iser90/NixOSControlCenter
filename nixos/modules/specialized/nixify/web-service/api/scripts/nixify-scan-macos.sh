@@ -15,16 +15,16 @@ echo ""
 declare -a programs=()
 
 # Hardware-Info
-echo "📊 Collecting system information..."
+echo "Collecting system information..."
 
 CPU=$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo "unknown")
 RAM=$(sysctl -n hw.memsize 2>/dev/null || echo "0")
 GPU=$(system_profiler SPDisplaysDataType 2>/dev/null | grep "Chipset Model" | head -1 | cut -d: -f2 | xargs || echo "unknown")
 
-echo "  ✓ Hardware information collected"
+echo "  OK: Hardware information collected"
 
 # Installierte Programme
-echo "📦 Collecting installed programs..."
+echo "Collecting installed programs..."
 
 # Applications
 APP_COUNT=0
@@ -36,7 +36,7 @@ if [ -d "/Applications" ]; then
         programs+=("{\"name\":\"$APP_NAME\",\"version\":\"$APP_VERSION\",\"source\":\"applications\"}")
         ((APP_COUNT++))
     done < <(find /Applications -maxdepth 1 -name "*.app" -type d 2>/dev/null)
-    echo "  ✓ Applications: $APP_COUNT"
+    echo "  OK: Applications: $APP_COUNT"
 fi
 
 # Homebrew
@@ -49,7 +49,7 @@ if command -v brew &> /dev/null; then
         programs+=("{\"name\":\"$PKG_ESCAPED\",\"source\":\"homebrew\"}")
         ((BREW_COUNT++))
     done < <(brew list --formula 2>/dev/null)
-    echo "  ✓ Homebrew packages: $BREW_COUNT"
+    echo "  OK: Homebrew packages: $BREW_COUNT"
 fi
 
 # Mac App Store (via mas)
@@ -66,18 +66,18 @@ if command -v mas &> /dev/null; then
         fi
     done < <(mas list 2>/dev/null || true)
     if [ $MAS_COUNT -gt 0 ]; then
-        echo "  ✓ Mac App Store apps: $MAS_COUNT"
+        echo "  OK: Mac App Store apps: $MAS_COUNT"
     fi
 fi
 
 # System-Einstellungen
-echo "⚙️  Collecting system settings..."
+echo "Collecting system settings..."
 
 TIMEZONE=$(systemsetup -gettimezone 2>/dev/null | cut -d: -f2 | xargs || echo "unknown")
 LOCALE=$(defaults read -g AppleLocale 2>/dev/null || echo "en_US")
 DESKTOP="macos"
 
-echo "  ✓ System settings collected"
+echo "  OK: System settings collected"
 
 # macOS Version
 MACOS_VERSION=$(sw_vers -productVersion 2>/dev/null || echo "unknown")
@@ -85,7 +85,7 @@ BUILD_VERSION=$(sw_vers -buildVersion 2>/dev/null || echo "unknown")
 
 # JSON-Report generieren
 echo ""
-echo "📄 Generating report..."
+echo "Generating report..."
 
 # Create programs JSON array
 # Security: IFS is set locally for this command only (IFS=,; command), not globally
@@ -114,7 +114,7 @@ cat > "$OUTPUT_FILE" <<EOF
 }
 EOF
 
-echo "  ✓ Report saved to: $OUTPUT_FILE"
+echo "  OK: Report saved to: $OUTPUT_FILE"
 echo ""
 
 # Summary
@@ -127,21 +127,21 @@ echo ""
 
 # Upload option
 if [ "$UPLOAD" = "true" ] && [ -n "$SERVER_URL" ]; then
-    echo "📤 Uploading report to server..."
+    echo "Uploading report to server..."
     if curl -s -X POST "$SERVER_URL/api/v1/upload" \
         -H "Content-Type: application/json" \
         -d @"$OUTPUT_FILE" > /tmp/nixify-upload-response.json 2>&1; then
         SESSION_ID=$(cat /tmp/nixify-upload-response.json | grep -o '"session_id":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
-        echo "  ✓ Upload successful! Session ID: $SESSION_ID"
+        echo "  OK: Upload successful! Session ID: $SESSION_ID"
     else
-        echo "  ✗ Upload failed. Check server URL and network connection."
+        echo "  ERROR: Upload failed. Check server URL and network connection."
     fi
 elif [ "$UPLOAD" = "true" ]; then
-    echo "  ⚠ Upload requested but no server URL provided"
+    echo "  WARN: Upload requested but no server URL provided"
     echo "  Use: ./nixify-scan.sh report.json true http://your-nixos-server:8080"
 fi
 
 echo ""
-echo "✅ Snapshot complete!"
+echo "OK: Snapshot complete"
 echo "  Review the report and upload manually if needed:"
 echo "  curl -X POST http://your-server:8080/api/v1/upload -H 'Content-Type: application/json' -d @$OUTPUT_FILE"

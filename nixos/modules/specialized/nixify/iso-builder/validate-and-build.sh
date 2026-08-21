@@ -12,23 +12,17 @@ echo "=== NixOS ISO Validierung und Build ==="
 echo "Desktop Environment: ${DESKTOP_ENV}"
 echo ""
 
-# Farben für Output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-# Funktionen
+# Plain status helpers (no private ANSI — cli-formatter SSOT)
 print_success() {
-    echo -e "${GREEN}✓${NC} $1"
+    echo "OK: $1"
 }
 
 print_error() {
-    echo -e "${RED}✗${NC} $1"
+    echo "ERROR: $1"
 }
 
 print_info() {
-    echo -e "${YELLOW}ℹ${NC} $1"
+    echo "INFO: $1"
 }
 
 # Schritt 1: Prüfe, ob iso-config.nix existiert

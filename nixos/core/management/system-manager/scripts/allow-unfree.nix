@@ -42,13 +42,21 @@ EOF
 
   if [ "''${EUID:-$(id -u)}" -ne 0 ]; then
     ${ui.messages.error "Run as root: sudo ncc system allow-unfree"}
+    ${ui.messages.info "Next: sudo ncc system allow-unfree"}
     exit 1
+  fi
+
+  if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+    ${ui.text.header "Allow Unfree Packages"}
   fi
 
   sm=$(ncc_read_module_config "core/management/system-manager" 2>/dev/null || echo "{}")
 
   if echo "$sm" | grep -qE 'allowUnfree[[:space:]]*=[[:space:]]*true'; then
     ${ui.messages.success "allowUnfree is already true"}
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.messages.info "Next: sudo ncc system build switch"}
+    fi
     exit 0
   fi
 
@@ -77,7 +85,9 @@ EOF
     ${ui.messages.loading "Building with allowUnfree enabled..."}
     exec ncc system build switch --flake "$NIXOS_DIR#$host"
   else
-    ${ui.messages.info "Next: sudo ncc system build switch"}
-    ${ui.messages.info "Or:    sudo ncc system allow-unfree --rebuild"}
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.messages.info "Next: sudo ncc system build switch"}
+      ${ui.messages.info "Or:    sudo ncc system allow-unfree --rebuild"}
+    fi
   fi
 ''

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 from .auth import with_cached_credentials
 from .chat import run_chat
+from .cli_print import print_err, print_info, print_ok
 from .config import Settings
 from .runtime import TOOL_DEFINITIONS, ToolRuntime
 
@@ -45,7 +45,7 @@ def _cmd_tool(args: argparse.Namespace) -> int:
     try:
         payload = json.loads(args.args)
     except json.JSONDecodeError as exc:
-        print(f"Invalid --args JSON: {exc}", file=sys.stderr)
+        print_err(f"Invalid --args JSON: {exc}")
         return 2
     result = runtime.call(args.name, payload)
     print(json.dumps(result, indent=2, ensure_ascii=False))
@@ -63,7 +63,7 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
         from .playbooks import get_playbook
         pb = get_playbook(args.playbook)
         if not pb:
-            print(f"Playbook not found: {args.playbook}", file=sys.stderr)
+            print_err(f"Playbook not found: {args.playbook}")
             return 1
         playbook_goal = pb.goal
         if not args.profile and pb.profile:
@@ -73,14 +73,14 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
 
     goal = args.goal or playbook_goal
     if not goal:
-        print("Error: --goal or --playbook required", file=sys.stderr)
+        print_err("--goal or --playbook required")
         return 1
 
     max_steps = args.max_steps or settings.agent_max_steps
 
-    print(f"Starting agent with goal: {goal}")
-    print(f"Max steps: {max_steps}, Dry run: {args.dry_run}, Profile: {args.profile or 'default'}")
-    print("-" * 60)
+    print_info(f"Starting agent with goal: {goal}")
+    print_info(f"Max steps: {max_steps}, Dry run: {args.dry_run}, Profile: {args.profile or 'default'}")
+    print_info("---")
 
     for event in run_agent(
         goal,
@@ -92,27 +92,27 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
     ):
         kind = event.get("kind")
         if kind == "job_started":
-            print(f"Job started: {event.get('job_id')}")
+            print_info(f"Job started: {event.get('job_id')}")
         elif kind == "step":
-            print(f"\n--- Step {event.get('step')}/{event.get('max_steps')} ---")
+            print_info(f"Step {event.get('step')}/{event.get('max_steps')}")
         elif kind == "assistant":
-            print(f"Assistant: {event.get('text', '')[:500]}")
+            print_info(f"Assistant: {event.get('text', '')[:500]}")
         elif kind == "tool":
-            print(f"Tool: {event.get('name')}({json.dumps(event.get('args', {}))})")
+            print_info(f"Tool: {event.get('name')}({json.dumps(event.get('args', {}))})")
         elif kind == "tool_result":
             text = event.get("text", "")
-            print(f"Result: {text[:300]}{'...' if len(text) > 300 else ''}")
+            print_info(f"Result: {text[:300]}{'...' if len(text) > 300 else ''}")
         elif kind == "agent_finish":
-            print(f"\nAgent finished: {event.get('summary')}")
-            print(f"Success: {event.get('success')}")
+            print_ok(f"Agent finished: {event.get('summary')}")
+            print_info(f"Success: {event.get('success')}")
         elif kind == "error":
-            print(f"Error: {event.get('text')}", file=sys.stderr)
+            print_err(event.get("text", ""))
         elif kind == "job_finished":
-            print(f"\nJob {event.get('job_id')} completed (success={event.get('success')})")
+            print_ok(f"Job {event.get('job_id')} completed (success={event.get('success')})")
         elif kind == "job_failed":
-            print(f"\nJob {event.get('job_id')} failed: {event.get('error')}", file=sys.stderr)
+            print_err(f"Job {event.get('job_id')} failed: {event.get('error')}")
         elif kind == "job_cancelled":
-            print(f"\nJob {event.get('job_id')} cancelled")
+            print_info(f"Job {event.get('job_id')} cancelled")
 
     return 0
 
@@ -138,12 +138,12 @@ def _cmd_jobs_show(args: argparse.Namespace) -> int:
     store = get_job_store()
     job = store.get(args.job_id)
     if not job:
-        print(f"Job not found: {args.job_id}", file=sys.stderr)
+        print_err(f"Job not found: {args.job_id}")
         return 1
     print(json.dumps(job.to_dict(), indent=2))
     result = store.get_result(args.job_id)
     if result:
-        print("\nResult:")
+        print_info("Result:")
         print(json.dumps(result.to_dict(), indent=2))
     return 0
 
@@ -177,7 +177,7 @@ def _cmd_playbook_run(args: argparse.Namespace) -> int:
 
     pb = get_playbook(args.name)
     if not pb:
-        print(f"Playbook not found: {args.name}", file=sys.stderr)
+        print_err(f"Playbook not found: {args.name}")
         return 1
 
     run_args = argparse.Namespace(
@@ -202,7 +202,7 @@ def _cmd_presence_pause(args: argparse.Namespace) -> int:
     """Pause agent."""
     from .presence import pause
     presence = pause(reason=args.reason)
-    print(f"Agent paused: {presence.state}")
+    print_ok(f"Agent paused: {presence.state}")
     return 0
 
 
@@ -210,7 +210,7 @@ def _cmd_presence_resume(args: argparse.Namespace) -> int:
     """Resume agent."""
     from .presence import resume
     presence = resume(reason=args.reason)
-    print(f"Agent resumed: {presence.state}")
+    print_ok(f"Agent resumed: {presence.state}")
     return 0
 
 
@@ -228,7 +228,7 @@ def _cmd_approve(args: argparse.Namespace) -> int:
         return 0
 
     if not args.decision_id:
-        print("Error: decision_id required for allow/block", file=sys.stderr)
+        print_err("decision_id required for allow/block")
         return 1
 
     if args.action == "allow":
@@ -237,9 +237,9 @@ def _cmd_approve(args: argparse.Namespace) -> int:
         result = service.block(args.decision_id)
 
     if result:
-        print(f"Decision {args.decision_id}: {result.result}")
+        print_ok(f"Decision {args.decision_id}: {result.result}")
     else:
-        print(f"Decision not found: {args.decision_id}", file=sys.stderr)
+        print_err(f"Decision not found: {args.decision_id}")
         return 1
     return 0
 
@@ -249,13 +249,13 @@ def _cmd_knowledge_sync(args: argparse.Namespace) -> int:
     from .paths import knowledge_overlay_dir
 
     overlay = knowledge_overlay_dir()
-    print(f"Knowledge overlay directory: {overlay}")
+    print_info(f"Knowledge overlay directory: {overlay}")
 
     if args.note:
         note_file = overlay / "user-notes.md"
         with note_file.open("a", encoding="utf-8") as f:
             f.write(f"\n- {args.note}\n")
-        print(f"Added note to {note_file}")
+        print_ok(f"Added note to {note_file}")
 
     return 0
 
@@ -268,7 +268,7 @@ def _cmd_export_session(args: argparse.Namespace) -> int:
 
     if args.output:
         path = export_to_file(content, args.output)
-        print(f"Exported to {path}")
+        print_ok(f"Exported to {path}")
     else:
         print(content)
     return 0
@@ -282,7 +282,7 @@ def _cmd_export_job(args: argparse.Namespace) -> int:
 
     if args.output:
         path = export_to_file(content, args.output)
-        print(f"Exported to {path}")
+        print_ok(f"Exported to {path}")
     else:
         print(content)
     return 0
@@ -299,27 +299,27 @@ def _cmd_eval_run(args: argparse.Namespace) -> int:
     cases = load_eval_cases(cases_path)
 
     if not cases:
-        print("No evaluation cases found", file=sys.stderr)
+        print_err("No evaluation cases found")
         return 1
 
-    print(f"Running {len(cases)} evaluation cases...")
+    print_info(f"Running {len(cases)} evaluation cases...")
 
     def on_result(result):
         status = "PASS" if result.passed else "FAIL"
-        print(f"[{status}] {result.case_name} ({result.duration_ms:.0f}ms)")
+        print_info(f"[{status}] {result.case_name} ({result.duration_ms:.0f}ms)")
         if not result.passed:
             for detail in result.details:
                 print(f"       {detail}")
             if result.error:
-                print(f"       Error: {result.error}")
+                print_err(result.error)
 
     report = harness.run_all(cases, on_result=on_result)
 
-    print(f"\nResults: {report.passed}/{report.total} passed, {report.failed} failed")
+    print_ok(f"Results: {report.passed}/{report.total} passed, {report.failed} failed")
 
     if args.output:
         Path(args.output).write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")
-        print(f"Report written to {args.output}")
+        print_ok(f"Report written to {args.output}")
 
     return 0 if report.failed == 0 else 1
 
@@ -355,16 +355,16 @@ def _cmd_serve_openapi(args: argparse.Namespace) -> int:
             else:
                 self.send_error(404, "Not Found")
 
-    print(f"Starting HTTP server on localhost:{port}")
-    print("Endpoints: /health, /tools")
+    print_info(f"Starting HTTP server on localhost:{port}")
+    print_info("Endpoints: /health, /tools")
     if token:
-        print("Token authentication enabled")
+        print_info("Token authentication enabled")
 
     with socketserver.TCPServer(("127.0.0.1", port), Handler) as httpd:
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
-            print("\nShutting down")
+            print_info("Shutting down")
     return 0
 
 
@@ -386,7 +386,7 @@ def _cmd_watchdog(args: argparse.Namespace) -> int:
         result = fire_event(args.event, force=bool(args.force))
         print(json.dumps(result, indent=2))
         return 0 if result.get("ok") else 1
-    print("Usage: ncc ai watchdog list|fire EVENT", file=sys.stderr)
+    print_err("Usage: ncc ai watchdog list|fire EVENT")
     return 1
 
 
@@ -649,7 +649,7 @@ def main(argv: list[str] | None = None) -> int:
     if command == "probe":
         if args.probe_cmd == "disk":
             return _cmd_probe_disk(args)
-        print("Usage: ncc ai probe disk [--threshold 85] [--escalate]", file=sys.stderr)
+        print_err("Usage: ncc ai probe disk [--threshold 85] [--escalate]")
         return 1
 
     if command == "rollback":

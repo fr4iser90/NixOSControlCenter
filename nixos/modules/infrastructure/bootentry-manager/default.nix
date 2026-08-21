@@ -10,21 +10,25 @@ let
   # Importiere die benötigten Module
   common = import ./lib/common.nix { inherit lib getModuleApi; };
 
-  # Wähle Provider basierend auf dem Bootloader
   providers = {
-    grub = import ./handlers/grub.nix { inherit config lib pkgs; };
-    refind = import ./handlers/refind.nix { inherit config lib pkgs; };
-    "systemd-boot" = import ./handlers/systemd-boot.nix { inherit config lib pkgs; };
+    grub = import ./handlers/grub.nix { inherit config lib pkgs getModuleApi; };
+    "systemd-boot" = import ./handlers/systemd-boot.nix { inherit config lib pkgs getModuleApi; };
+    refind = import ./handlers/refind.nix { inherit config lib pkgs getModuleApi; };
   };
 
-  selectedProvider = if config.boot.loader.systemd-boot.enable then providers."systemd-boot"
-                     else if config.boot.loader.grub.enable then providers.grub
-                     else providers."systemd-boot";  # Default fallback
+  refindOn = attrByPath [ "boot" "loader" "refind" "enable" ] false config;
+
+  selectedProvider =
+    if config.boot.loader.systemd-boot.enable then providers."systemd-boot"
+    else if config.boot.loader.grub.enable then providers.grub
+    else if refindOn then providers.refind
+    else providers."systemd-boot";
 
 in
 {
   imports = [
     (import ./options.nix { inherit lib moduleName; })
+    ./commands.nix
   ] ++ optional (cfg.enable or false) ./config.nix;
 
   # Don't use top-level config = when you have _module!

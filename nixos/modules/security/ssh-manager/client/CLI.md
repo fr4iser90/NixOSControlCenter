@@ -2,7 +2,7 @@
 
 > SSOT: [STANDARDS](../../../../core/management/cli-formatter/doc/STANDARDS.md) · [COPY](../../../../core/management/cli-formatter/doc/COPY.md)
 
-**Status:** `partial`
+**Status:** `compliant`
 
 ## Commands
 
@@ -12,16 +12,23 @@
 | `ncc ssh client --tui\|--gui` | TUI / domain GUI | N/A | no |
 | `ncc ssh client list\|add\|edit\|delete\|connect` | Direct actions | N/A | no |
 
+## Output contract
+
+- Mutating verbs (`add` / `edit` / `delete` / `connect`): header → loading → success/error → `Next:`
+- Interactive entry (`ncc ssh client`): header → loading → fzf → work → result → `Next:` on mutate/cancel
+- `list`: machine `host=user` lines (intentional)
+- `NCC_CLI_NESTED=1` skips header / next
+- Go BubbleTea TUI (`--tui`): separate binary — formatter out of scope (same as other domain TUIs)
+
 ## Self-audit
 
 - [x] `ui = getModuleApi "cli-formatter"` in main / keys / remote-hosts / handlers
-- [x] `connection-preview.nix` human chrome → `ui.text` / `ui.tables` / `ui.badges` / `ui.messages`
-- [x] No private ANSI / emoji status (`★`/`✓`/`✗` / `echo -e`) in preview
-- [ ] Verbose detail gated with `-v`
-- [ ] `longHelp` matches COPY tone
-- [x] Dry-run documented or N/A
-- [ ] README links here
+- [x] add / edit / delete / connect follow §3 skeleton
+- [x] Interactive fzf entry follows §3 skeleton
+- [x] Dry-run N/A (documented)
+- [ ] Go TUI full formatter redesign — out of scope (separate binary)
+- [x] README links here
 
 ## Notes
 
-Preview cache stores `ok`/`fail` + details (not colored strings). TUI Go code may still use Lipgloss / comment glyphs — out of NCC shell CLI formatter scope.
+Compliant covers shell CLI verbs + interactive fzf entry. Parent `ssh-manager` CLI.md is `compliant` for server verbs.

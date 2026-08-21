@@ -32,6 +32,10 @@ If OpenSSH is on and `network.services.ssh` is unset, port 22 is opened publicly
 | `enable` | false | true |
 | `client.enable` | false | false |
 
+## Documentation
+
+CLI contract: [CLI.md](./CLI.md) · client: [client/CLI.md](./client/CLI.md)
+
 ## Related
 
 - Network module — firewall exposure

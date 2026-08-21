@@ -81,7 +81,7 @@ fi
 section "5) Private ANSI (\\033 / \\e[) outside allowlist — HARD FAIL"
 # Allow: formatter SSOT, GUI terminal glue, user shell PS1
 allow_re='/(cli-formatter/|gui-engine/|shellInit/)'
-suspects=$(rg -l '\\033\[|\\e\[' "$ROOT/nixos" --glob '*.nix' 2>/dev/null || true)
+suspects=$(rg -l '\\033\[|\\e\[' "$ROOT/nixos" --glob '*.nix' --glob '*.sh' 2>/dev/null || true)
 bad=""
 while IFS= read -r f; do
   [[ -z "$f" ]] && continue
@@ -90,6 +90,18 @@ while IFS= read -r f; do
   fi
   bad+="$f"$'\n'
 done <<< "$suspects"
+# Shell scripts: also flag echo -e with private color vars / escapes
+sh_echo_e=$(rg -l 'echo -e .*(\\033|\\e\[|\$\{?(RED|GREEN|YELLOW|BLUE|CYAN|NC|COLOR))' \
+  "$ROOT/nixos" --glob '*.sh' 2>/dev/null || true)
+while IFS= read -r f; do
+  [[ -z "$f" ]] && continue
+  if echo "$f" | grep -Eq "$allow_re"; then
+    continue
+  fi
+  if ! echo "$bad" | grep -qxF "$f"; then
+    bad+="$f"$'\n'
+  fi
+done <<< "$sh_echo_e"
 if [[ -n "$(echo "$bad" | sed '/^$/d')" ]]; then
   echo "$bad" | sed '/^$/d'
   fail=1
@@ -189,13 +201,24 @@ fi
 section "11) Flake-extras unit (related to system update dry-run)"
 if [[ -x "$ROOT/tests/install-wizard/test-flake-extras.sh" ]]; then
   if bash "$ROOT/tests/install-wizard/test-flake-extras.sh"; then
-    echo "OK flake-extras"
+    echo "OK flake-extras (generic)"
   else
-    echo "FAIL flake-extras"
+    echo "FAIL flake-extras (generic)"
     fail=1
   fi
 else
   echo "SKIP test-flake-extras.sh"
+  warn=1
+fi
+if [[ -x "$ROOT/tests/hardware/jetson/test-flake-extras-jetson.sh" ]]; then
+  if bash "$ROOT/tests/hardware/jetson/test-flake-extras-jetson.sh"; then
+    echo "OK flake-extras (jetson/jetpack)"
+  else
+    echo "FAIL flake-extras (jetson/jetpack)"
+    fail=1
+  fi
+else
+  echo "SKIP test-flake-extras-jetson.sh"
   warn=1
 fi
 
@@ -212,9 +235,13 @@ else
   warn=1
 fi
 
-section "13) No ui.messages splice inside one-line braces (bash ; } bug)"
-# Antipattern: `fn() { ${ui.messages…}; }` or `|| { ${ui.messages…}; exit 1; }`
-hits=$(rg -n '\|\|\s*\{\s*\$\{ui\.messages\.|\*\)\s*\$\{ui\.messages\.[a-z]+ "[^"]*"\}\s*;\s*exit|\w+\(\)\s*\{\s*\$\{ui\.messages\.' \
+section "13) No ui.messages splice on one-line braces / case arms (bash ; } bug)"
+# Antipatterns:
+#   fn() { ${ui.messages…}; }
+#   || { ${ui.messages…}; exit 1; }
+#   *) ${ui.messages…}; anything…
+hits=$(rg -n \
+  '\|\|\s*\{\s*\$\{ui\.messages\.|\*\)\s*\$\{ui\.messages\.|\w+\(\)\s*\{\s*\$\{ui\.messages\.' \
   "$ROOT/nixos" --glob '*.nix' 2>/dev/null || true)
 if [[ -n "$hits" ]]; then
   echo "$hits"

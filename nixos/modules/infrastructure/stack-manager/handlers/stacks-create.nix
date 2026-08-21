@@ -30,12 +30,19 @@ let
     INSTALL_ROOT=${lib.escapeShellArg installRoot}
     CONFIG_PROFILES=( ${lib.concatMapStringsSep " " (p: lib.escapeShellArg p) profiles} )
 
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "Stacks init"}
+    fi
+
     if [[ -z "$VIRT_USER" ]]; then
-      ${ui.messages.error "Error: no virtualization/admin user configured"}
+      ${ui.messages.error "No virtualization/admin user configured"}
       exit 1
     fi
     if [[ "$(whoami)" != "$VIRT_USER" ]]; then
-      ${ui.messages.error "Error: run as $VIRT_USER"}
+      ${ui.messages.error "Run as $VIRT_USER"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: sudo -u $VIRT_USER ncc stacks init"}
+      fi
       exit 1
     fi
 
@@ -45,7 +52,9 @@ let
 
     if [[ ! -d "$BASE/catalog" || ! -d "$SCRIPTS" ]]; then
       ${ui.messages.error "Catalog not found under $BASE"}
-      ${ui.messages.warning "Run: ncc stacks fetch"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc stacks fetch"}
+      fi
       exit 1
     fi
 
@@ -99,8 +108,13 @@ let
     fi
 
     ${ui.messages.loading ''Running $(basename "$INIT") ''${EXTRA[*]}…''}
+    ${ui.tables.keyValue "Family" "$FAMILY"}
+    ${ui.tables.keyValue "Script" "$INIT"}
     bash "$INIT" "''${EXTRA[@]}"
     ${ui.messages.success "Stack init finished"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: ncc stacks status   or   ncc stacks ops status"}
+    fi
   '';
 
   # Back-compat

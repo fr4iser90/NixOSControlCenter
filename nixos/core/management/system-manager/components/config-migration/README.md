@@ -441,3 +441,7 @@ This system enables:
 - ✅ **Auto-Discovery** (no manual registration needed)
 
 **Adding new versions**: Simply create schema + migration plan, the rest happens automatically!
+
+## Documentation
+
+CLI contract: [CLI.md](./CLI.md)

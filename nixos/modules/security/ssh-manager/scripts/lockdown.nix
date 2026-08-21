@@ -43,11 +43,20 @@ EOF
           exit 0
           ;;
         *)
-          echo "Unknown option: $a (try --help)" >&2
+          ${ui.messages.error "Unknown option: $a (try --help)"}
           exit 2
           ;;
       esac
     done
+
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      if [[ "$DRY" -eq 1 ]]; then
+        ${ui.text.header "SSH lockdown (dry-run)"}
+        ${ui.messages.info "Preview only — nothing will be written under /etc/nixos"}
+      else
+        ${ui.text.header "SSH lockdown"}
+      fi
+    fi
 
     ${ui.messages.loading "Checking SSH key readiness for lockdown…"}
 
@@ -96,25 +105,29 @@ EOF
       fi
     fi
 
-    echo "Authorized key files: $KEY_HITS"
+    ${ui.tables.keyValue "Authorized key files" "$KEY_HITS"}
     if [[ -n "$KEY_REPORT" ]]; then
       echo "$KEY_REPORT"
     fi
     if [[ "$PUBKEY_LOGINS" -eq 1 ]]; then
-      echo "Recent pubkey login: yes (journal)"
+      ${ui.tables.keyValue "Recent pubkey login" "yes (journal)"}
     else
-      echo "Recent pubkey login: not seen in last 30d"
+      ${ui.tables.keyValue "Recent pubkey login" "not seen in last 30d"}
     fi
 
     if [[ "$FORCE" -ne 1 ]]; then
       if [[ "$KEY_HITS" -lt 1 ]]; then
         ${ui.messages.error "No authorized keys found. Add a key first, then retry."}
-        ${ui.messages.info "Or use --force if you have console access and accept lockout risk."}
+        if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.messages.info "Next: add a key, or re-run with --force if you have console access"}
+        fi
         exit 1
       fi
       if [[ "$PUBKEY_LOGINS" -ne 1 ]]; then
         ${ui.messages.error "No recent successful publickey SSH login in the journal."}
-        ${ui.messages.info "Log in once with your key, then re-run. Or pass --force (console recommended)."}
+        if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.messages.info "Next: log in once with your key, then re-run (or pass --force)"}
+        fi
         exit 1
       fi
     else
@@ -150,17 +163,22 @@ EOF
     }
     rm -f "$TMP_JSON"
 
-    echo ""
-    echo "Planned config (${modulePath}):"
+    ${ui.messages.info "Planned config (${modulePath}):"}
     echo "$NEW_NIX"
 
     if [[ "$DRY" -eq 1 ]]; then
-      ${ui.messages.info "Dry-run only — no files written."}
+      ${ui.messages.success "Dry-run only — no files written"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: sudo ncc ssh lockdown"}
+      fi
       exit 0
     fi
 
     if [[ "''${EUID:-$(id -u)}" -ne 0 ]]; then
       ${ui.messages.error "Writing systemConfig needs root. Re-run with sudo."}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: sudo ncc ssh lockdown"}
+      fi
       exit 1
     fi
 
@@ -169,8 +187,9 @@ EOF
     if [[ "$KEEP_ROOT" -ne 1 ]]; then
       ${ui.messages.success "permitRootLogin set to \"no\""}
     fi
-    ${ui.messages.info "Apply with: sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}
-    ${ui.messages.info "Later reopen: ncc ssh temp-open USER | ncc ssh grant-access USER"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: sudo nixos-rebuild switch --flake /etc/nixos#${hostname}"}
+    fi
   '';
 in {
   config = lib.mkMerge [

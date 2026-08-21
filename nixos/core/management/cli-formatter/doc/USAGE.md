@@ -40,18 +40,16 @@ ui = getModuleApi "cli-formatter";
 
 ### Use Case 3: Custom Component
 
+User values live in systemConfig and are read with `getModuleConfig "cli-formatter"`
+(merged with `template-config.nix`). Do not hardcode `config.core.management…`.
+
 ```nix
-{
-  cli-formatter = {
-    components = {
-      custom-status = {
-        enable = true;
-        refreshInterval = 5;
-        template = "...";
-      };
-    };
-  };
-}
+# In the module’s systemConfig fragment (short name / template shape):
+components.custom-status = {
+  enable = true;
+  refreshInterval = 5;
+  template = "...";
+};
 ```
 
 ## Configuration Options
@@ -59,12 +57,14 @@ ui = getModuleApi "cli-formatter";
 ### `config`
 
 **Type**: `attrs`
-**Default**: `{}`
-**Description**: CLI formatter configuration options
+**Default**: `{}` (see `template-config.nix`)
+**Description**: Theme / formatting knobs under the module’s systemConfig
 **Example**:
 ```nix
 config = {
-  # Custom configuration
+  # theme = "dark";
+  # enableUnicode = true;
+  # tableStyle = "unicode";
 };
 ```
 
@@ -85,10 +85,10 @@ components.custom = {
 
 ### Component Templates
 
-Components use templates with CLI formatter API:
+Components use templates with the formatter API (`ui = getModuleApi "cli-formatter"`):
 ```nix
 template = ''
-  ${formatter.box "Status" "System is running"}
+  ${ui.boxes.box "Status" "System is running"}
 '';
 ```
 

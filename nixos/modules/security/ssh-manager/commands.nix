@@ -15,7 +15,10 @@ let
 
   sshStatusScript = pkgs.writeShellScriptBin "ncc-ssh-status" ''
     #!/usr/bin/env bash
-    ${ui.text.header "SSH Status"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "SSH Status"}
+    fi
+    ${ui.messages.loading "Checking SSH daemon…"}
     if systemctl is-active --quiet sshd 2>/dev/null || systemctl is-active --quiet ssh 2>/dev/null; then
       ${ui.tables.keyValue "Daemon" "active"}
     else
@@ -37,10 +40,13 @@ let
     ${ui.tables.keyValue "Workflow" (if workflowOn then "enabled" else "disabled")}
     SESSIONS=$(ss -tn state established '( dport = :ssh )' 2>/dev/null | wc -l)
     ${ui.tables.keyValue "Active Sessions" "$SESSIONS"}
-    if ${if passwordAuth then "true" else "false"}; then
-      echo ""
-      ${ui.messages.info "Next: ncc ssh lockdown   (checks keys + recent pubkey login, then writes config)"}
-      ${ui.messages.info "Temporary reopen later: ncc ssh temp-open USER | ncc ssh grant-access USER"}
+    ${ui.messages.success "SSH status ready"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      if ${if passwordAuth then "true" else "false"}; then
+        ${ui.messages.info "Next: ncc ssh lockdown   (checks keys + recent pubkey login, then writes config)"}
+      else
+        ${ui.messages.info "Next: ncc ssh grant-access USER   (temporary password reopen)"}
+      fi
     fi
   '';
 

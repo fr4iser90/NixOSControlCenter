@@ -37,15 +37,18 @@ let
 
     if [ "$EUID" -ne 0 ]; then
       ${ui.messages.error "This script must be run as root (use sudo)"}
-      ${ui.messages.info "Usage: sudo $0"}
+      ${ui.messages.info "Next: sudo ncc system update-channels"}
       exit 1
     fi
 
-    ${ui.text.header "NixOS Channel Update"}
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.text.header "NixOS Channel Update"}
+    fi
 
     FLAKE_FILE="$FLAKE_DIR/flake.nix"
     if [ ! -f "$FLAKE_FILE" ]; then
       ${ui.messages.error "Flake not found: $FLAKE_FILE"}
+      ${ui.messages.info "Next: pass --flake /path/to/nixos"}
       exit 1
     fi
 
@@ -80,6 +83,9 @@ let
 
     if [ "$SKIP_REBUILD" -eq 1 ]; then
       ${ui.messages.info "Skipping rebuild (--skip-rebuild)."}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: sudo ncc system build switch"}
+      fi
       exit 0
     fi
 
@@ -93,6 +99,9 @@ let
 
     if [ "$EXIT_CODE" -eq 0 ]; then
       ${ui.messages.success "System successfully rebuilt!"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: reboot if the kernel or drivers changed"}
+      fi
       exit 0
     fi
 
@@ -103,12 +112,17 @@ let
         ${ui.messages.info "Current generation: $CURRENT_GEN"}
         ${ui.messages.info "Some services may have failed to reload (e.g., dbus-broker.service)"}
         ${ui.messages.info "This is often harmless - the system should still work correctly."}
-        ${ui.messages.info "You can verify with: nixos-rebuild switch --flake /etc/nixos#${hostname}"}
+        if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+          ${ui.messages.info "Next: nixos-rebuild switch --flake /etc/nixos#${hostname}"}
+        fi
         exit 0
       fi
     fi
 
     ${ui.messages.error "Rebuild failed! Check logs for details."}
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.messages.info "Next: sudo ncc system build switch --flake /etc/nixos#${hostname}"}
+    fi
     exit 1
   '';
 in {

@@ -60,72 +60,97 @@ Until helpers land: **copy the patterns** from `system-manager` / `COPY.md`.
 
 ---
 
-## 3. Command UX skeleton (every mutating `ncc …` command)
+## 3. Command UX skeleton (every `ncc …` command)
+
+**Mandatory** for user-facing scripts (update, migrate, config-check, packages, …):
 
 ```
 1. header          ui.text.header "…"
-2. (optional) dry  banner if --dry-run
+2. dry-run banner  ui.messages.info "Preview only — nothing will be written…"   # if --dry-run
 3. loading         ui.messages.loading "…"
 4. facts           ui.tables.keyValue / short info  (−v for more)
 5. work            …
 6. result          success | warning | error
-7. next            one clear next command (info)
+7. next            one clear next command (info)   # always on success / actionable failure
 ```
+
+**Nested calls** (e.g. `system update` → `ncc-config-check` → `ncc-module-migrate`):
+set `NCC_CLI_NESTED=1` so children **skip** their own header / dry banner / next
+(parent owns the skeleton). Children still use `ui.messages` for work + result lines.
 
 **Forbidden in normal mode:** raw `Layout: monolith`, full jq dumps, store paths, stack traces.
 **Allowed in `-v`:** all of the above.
 
-**Dry-run:** never write `/etc/nixos` (or other live roots). Skip dangerous prompts. Skip sudo when `--dry-run` (cli-registry already does this).
+**Dry-run:** never write `/etc/nixos` (or other live roots). Skip dangerous prompts. Skip sudo when `--dry-run` (cli-registry already does this). Needs **read** access to `/etc/nixos`; if unreadable, say so and hint `sudo -n true` / fix perms — do not claim “no configuration”.
 
 ---
 
 ## 4. How `ncc system update` MUST look
 
-### Dry-run (validate)
+**Voice:** default = short **checklist** (`[ OK ]` / `[WARN]` / `[ERROR]`).  
+`-v` = same checklist **plus** every copy/preserve line, paths, JSON, and full `nixos-rebuild`/activation noise.
+
+**One** `===` header for the whole run. No mid-flow `=== Build ===`, no `---` phases, no activation System Report (`ncc system report`).
+
+### Default (what users should see)
 
 ```text
-=== NixOS System Update (dry-run) ===
-Preview only — nothing will be written under /etc/nixos
+WARNING: …                         # registry; skipped with --yes
+Do you want to continue? (yes/no): y
 
-Checking system configuration…
-Configuration is valid
-Checking module config migrations…
-Plan …: rename … → …          # short
-Would rename (dry-run) — no changes written
-…                             # JSON only with -v
-
-=== Extra software sources on this machine ===
-These will be kept and merged into the update.
-  • jetpack
-Preparing merged update preview…
-Preview ready — extras will be kept
-Preview: /tmp/ncc-flake-update-preview.nix
-
-Dry-run OK — safe to run the real update when ready
-Next: sudo ncc system update --local --source-dir "…"
-```
-
-### Real update
-
-```text
 === NixOS System Update ===
-(dangerous confirm unless --yes)
-… config check / migrations (may write) …
-… source resolve …
-=== Extra software sources … ===   # if any; always keep unless --drop-flake-extras
-Continue update? [Y/n]
-Creating a safety backup…          # path only with -v
-… sync / copy …
-… build prompt or --auto-build …
-success / clear failure + next hint
+[ OK ] Config
+[ OK ] Migrations
+Source: local — /home/…/NixOSControlCenter/nixos
+[ OK ] Flake extras
+[ OK ] Backup
+[ OK ] Files synced
+[ OK ] Passwords
+[ OK ] Platform
+[ OK ] Channel
+Do you want to build and switch…? (y/n): y
+[ OK ] Preflight
+Building…
+[ OK ] Switch
+[ OK ] Update complete
 ```
 
-### Flags users care about
+| Line | Meaning |
+|------|---------|
+| `[ OK ] Config` | schema / heal OK |
+| `[ OK ] Migrations` | module renames/orphans OK (no work or done) |
+| `Source: …` | fact (not a check) — one line only |
+| `[ OK ] Flake extras` | kept none, or merge ready |
+| `[ OK ] Backup` | safety copy done (path only with `-v`) |
+| `[ OK ] Files synced` | tree copy done (per-dir chatter only with `-v`) |
+| `[ OK ] Passwords` / Platform / Channel | post-sync checks |
+| `[ OK ] Preflight` | hardware/users (individual check lines only with `-v`) |
+| `Building…` | wait; **no** rebuild dump |
+| `[ OK ] Switch` | rebuild+activate succeeded |
+| `[ OK ] Update complete` | parent final line |
+
+Skip-build → one `Next: sudo ncc system build switch …`. Failure → `[ERROR]` + copyable log (always).
+
+### With `-v` / `--verbose` (extra)
+
+Everything above, plus:
+
+- backup path, layout, per-module skip/copy, preserve notes, permissions
+- migration “Scanning…” / “No pending…” detail
+- each preflight check line (`[ OK ] CPU: …`)
+- **full** `nixos-rebuild` + activation stdout
+- optional `Next: ncc system report`
+
+### Dry-run
+
+Same checklist voice; banner `Preview only — nothing will be written…`; end with success + `Next: sudo ncc system update …`. Extras preview path OK in default; diffs only with `-v`.
+
+### Flags
 
 | Flag | Effect |
 |------|--------|
-| `--dry-run` / `-d` | Validate only, no sudo |
-| `-v` | Technical detail |
+| `--dry-run` / `-d` | Validate only, no writes / no sudo |
+| `-v` | Technical detail + rebuild noise |
 | `--yes` | Skip confirms (still merges extras) |
 | `--drop-flake-extras` | Discard host flake extras (rare) |
 

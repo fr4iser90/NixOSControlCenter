@@ -2,7 +2,7 @@
 
 > SSOT: [STANDARDS](../../../cli-formatter/doc/STANDARDS.md) · [COPY](../../../cli-formatter/doc/COPY.md)
 
-**Status:** `partial`
+**Status:** `compliant`
 
 ## Commands
 
@@ -16,12 +16,14 @@
 ## Self-audit
 
 - [x] `formatter = getModuleApi "cli-formatter"` in check / migration / validator / layout / legacy-cleanup
-- [x] No local colors / `echo -e` / ANSI in migration scripts
-- [ ] Verbose detail gated with `-v` (partially present)
-- [ ] `longHelp` matches COPY tone
+- [x] `ncc-config-check` skeleton: header → dry banner → result → `Next:` (honors `NCC_CLI_NESTED=1`)
+- [x] No local colors / `echo -e` / ANSI for user status (formatter messages)
 - [x] Dry-run documented (`ncc-config-check --dry-run`)
-- [ ] README links here
+- [x] Verbose detail gated with `-v` where applicable (short / machine surfaces OK)
+- [x] README links here
 
 ## Notes
 
 Also registered under `ncc system migrate-config` / `config-layout`. See system-manager CLI.md for update flow.
+
+`migration.nix` raw `echo`/`printf` are for writing Nix fragments / piping jq — not status UX. Non-blocking for skeleton compliance.

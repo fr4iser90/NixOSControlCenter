@@ -1,14 +1,14 @@
-{ config, lib, pkgs, cfg, ... }:
+{ config, lib, pkgs, getModuleApi, ... }:
 
 with lib;
 
 let
-  # monitorCfg.monitor is passed from parent module
-  monitorCfg = monitorCfg.monitor or {};
   ui = getModuleApi "cli-formatter";
+  cliRegistry = getModuleApi "cli-registry";
 
   monitorScript = pkgs.writeScriptBin "ssh-monitor" ''
     #!${pkgs.bash}/bin/bash
+    set -euo pipefail
 
     LOCKFILE="/tmp/ssh-monitor.lock"
     exec 200>"$LOCKFILE"
@@ -17,82 +17,71 @@ let
       exit 1
     fi
 
-    ${ui.messages.loading "Starting SSH connection monitoring..."}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "SSH monitor"}
+    fi
 
-    # Initialize connection tracking
-    declare -A CONNECTIONS
+    ${ui.messages.loading "Following sshd journal (Ctrl+C to stop)…"}
+    ${ui.tables.keyValue "Source" "journalctl -f -u sshd"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: ncc ssh status   (after stopping monitor)"}
+    fi
+
     ACTIVE=0
     TOTAL=0
+    FAILED=0
 
-    # Start monitoring SSH connections
     ${pkgs.systemd}/bin/journalctl -f -u sshd | while read -r line; do
-      # Connection established
       if echo "$line" | grep -q "Accepted \(password\|publickey\|keyboard-interactive\) for"; then
-        USER=$(echo "$line" | grep -oP "for \K[^ ]+")
-        IP=$(echo "$line" | grep -oP "from \K[^ ]+")
-        METHOD=$(echo "$line" | grep -oP "Accepted \K[^ ]+")
-        
+        USER=$(echo "$line" | grep -oP "for \K[^ ]+" || true)
+        IP=$(echo "$line" | grep -oP "from \K[^ ]+" || true)
+        METHOD=$(echo "$line" | grep -oP "Accepted \K[^ ]+" || true)
         ACTIVE=$((ACTIVE + 1))
         TOTAL=$((TOTAL + 1))
-        CONNECTIONS["$USER@$IP"]="$METHOD"
-        
         ${ui.messages.success "New SSH connection: $USER@$IP ($METHOD)"}
-        ${ui.tables.update "ssh-status" "Active Connections" "$ACTIVE"}
-        ${ui.tables.update "ssh-status" "Total Connections" "$TOTAL"}
+        ${ui.tables.keyValue "Active" "$ACTIVE"}
+        ${ui.tables.keyValue "Total" "$TOTAL"}
       fi
-      
-      # Disconnected
+
       if echo "$line" | grep -q "Disconnected from"; then
-        USER=$(echo "$line" | grep -oP "Disconnected from user \K[^ ]+")
-        IP=$(echo "$line" | grep -oP "Disconnected from [^ ]+ port [^ ]+ \K\[.*?\]" | tr -d '[]')
-        
-        if [ -n "$USER" ] && [ -n "$IP" ]; then
+        USER=$(echo "$line" | grep -oP "Disconnected from user \K[^ ]+" || true)
+        IP=$(echo "$line" | grep -oP "from \K[^ ]+" || true)
+        if [ -n "''${USER:-}" ]; then
           ACTIVE=$((ACTIVE - 1))
-          unset CONNECTIONS["$USER@$IP"]
-          
+          if [ "$ACTIVE" -lt 0 ]; then ACTIVE=0; fi
           ${ui.messages.info "SSH disconnected: $USER@$IP"}
-          ${ui.tables.update "ssh-status" "Active Connections" "$ACTIVE"}
+          ${ui.tables.keyValue "Active" "$ACTIVE"}
         fi
       fi
 
-      # Failed attempts
-      if echo "$line" | grep -q "\(Failed password for\|Failed publickey for\|Invalid user\)"; then
+      if echo "$line" | grep -qE "(Failed password for|Failed publickey for|Invalid user)"; then
+        REASON=""
+        USER=""
         if echo "$line" | grep -q "Invalid user"; then
-          USER=$(echo "$line" | grep -oP "Invalid user \K[^ ]+")
+          USER=$(echo "$line" | grep -oP "Invalid user \K[^ ]+" || true)
           REASON="invalid user"
         elif echo "$line" | grep -q "Failed password for"; then
-          USER=$(echo "$line" | grep -oP "Failed password for \K[^ ]+")
+          USER=$(echo "$line" | grep -oP "Failed password for \K[^ ]+" || true)
           REASON="wrong password"
         elif echo "$line" | grep -q "Failed publickey for"; then
-          USER=$(echo "$line" | grep -oP "Failed publickey for \K[^ ]+")
+          USER=$(echo "$line" | grep -oP "Failed publickey for \K[^ ]+" || true)
           REASON="wrong publickey"
         fi
-        
-        IP=$(echo "$line" | grep -oP "from \K[^ ]+")
-        
-        if [ -n "$USER" ] && [ -n "$IP" ] && [ -n "$REASON" ]; then
+        IP=$(echo "$line" | grep -oP "from \K[^ ]+" || true)
+        if [ -n "''${USER:-}" ] && [ -n "''${REASON:-}" ]; then
+          FAILED=$((FAILED + 1))
           ${ui.messages.warning "Failed SSH attempt: $USER@$IP ($REASON)"}
-          ${ui.tables.update "ssh-status" "Failed Attempts" "$((FAILED + 1))"}
+          ${ui.tables.keyValue "Failed" "$FAILED"}
         fi
       fi
     done
   '';
 in {
-  options.modules.security.ssh-manager.monitor = {
-    enable = mkEnableOption "SSH connection monitoring";
-    
-    logLevel = mkOption {
-      type = types.enum ["minimal" "normal" "verbose"];
-      default = "normal";
-      description = "Level of detail for monitoring logs";
-    };
-  };
-
-  config = mkIf monitorCfg.enable {
-    environment.systemPackages = [ monitorScript ];
-
-    config = lib.mkMerge [
-      cliRegistry.registerCommandsFor "ssh-server-monitor" [
+  config = lib.mkMerge [
+    {
+      environment.systemPackages = [ monitorScript ];
+    }
+    (cliRegistry.registerCommandsFor "ssh-server-monitor" [
       {
         name = "monitor";
         parent = "ssh";
@@ -103,13 +92,11 @@ in {
         dependencies = [ "systemd" ];
         shortHelp = "monitor - Monitor SSH connections";
         longHelp = ''
-          Monitors SSH connections in real-time, tracking active connections,
-          total connections, and failed attempts. Integrates with the terminal UI.
+          Monitors SSH connections in real-time via journalctl -f -u sshd.
 
           Usage: ncc ssh monitor
         '';
       }
-      ])
-    ];
-  };
+    ])
+  ];
 }

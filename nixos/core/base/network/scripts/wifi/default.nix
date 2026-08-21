@@ -3,7 +3,6 @@
 
 let
   ui = getModuleApi "cli-formatter";
-  c = ui.colors;
   nmcli = "${pkgs.networkmanager}/bin/nmcli";
   embedPsk = import ../../lib/embed-psk.nix { inherit pkgs; };
   python3 = "${pkgs.python3}/bin/python3";
@@ -92,7 +91,10 @@ let
     persist_connection() {
       local ssid="$1" psk="$2"
       local stem out_file live_name conn_name
-      valid_psk "$psk" || { printf '%b\n' "${c.red}invalid password${c.reset}" >&2; return 1; }
+      if ! valid_psk "$psk"; then
+        ${ui.messages.error "invalid password"}
+        return 1
+      fi
       stem="$(sanitize_name "$ssid")"
       out_file="$PERSIST/$stem.nmconnection"
       live_name="$stem.nmconnection"
@@ -158,6 +160,9 @@ Usage:
 Connect options:
   --psk <password>               Password on command line (avoid in shared history)
   --psk-file <path>              Read password from file
+  --dry-run, -d                  Preview only — nothing will be written
+
+Mutating commands also accept --dry-run: connect, disconnect, forget.
 
 Secrets are stored only on this system:
   /etc/nixos/secrets/wifi/<name>.psk
@@ -178,16 +183,30 @@ HELP
       disconnect) exec ${wifiDisconnect}/bin/ncc-wifi-disconnect "$@" ;;
       forget) exec ${wifiForget}/bin/ncc-wifi-forget "$@" ;;
       on|radio-on)
+        if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.text.header "WiFi radio on"}
+        fi
         ${pkgs.networkmanager}/bin/nmcli radio wifi on
         ${ui.messages.success "wifi radio=enabled"}
+        if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.messages.info "Next: ncc network wifi scan"}
+        fi
         ;;
       off|radio-off)
+        if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.text.header "WiFi radio off"}
+        fi
         ${pkgs.networkmanager}/bin/nmcli radio wifi off
         ${ui.messages.success "wifi radio=disabled"}
+        if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.messages.info "Next: ncc network wifi on"}
+        fi
         ;;
       *)
         ${ui.messages.error "Unknown: ncc network wifi $cmd"}
-        ${ui.messages.info "Try: ncc network wifi help"}
+        if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.messages.info "Next: ncc network wifi help"}
+        fi
         exit 1
         ;;
     esac
@@ -201,13 +220,20 @@ HELP
     for a in "$@"; do
       case "$a" in --json|-j) JSON=true ;; esac
     done
+    if [ "$JSON" != true ] && [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.text.header "WiFi scan"}
+    fi
     dev="$(wifi_device)"
     if [ -z "$dev" ]; then
       ${ui.messages.error "no WiFi device found"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: ncc network status"}
+      fi
       exit 1
     fi
     if [ "$JSON" != true ]; then
       ${ui.messages.loading "Scanning on $dev …"}
+      ${ui.tables.keyValue "device" "$dev"}
     fi
     "$NMCLI" device wifi rescan ifname "$dev" 2>/dev/null || true
     sleep 2
@@ -227,12 +253,20 @@ HELP
           '
     else
       "$NMCLI" -f IN-USE,SSID,BSSID,CHAN,SIGNAL,SECURITY device wifi list ifname "$dev"
+      ${ui.messages.success "Scan complete"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: ncc network wifi connect <SSID>"}
+      fi
     fi
   '';
 
   wifiList = pkgs.writeShellScriptBin "ncc-wifi-list" ''
     #!${pkgs.bash}/bin/bash
     ${commonShell}
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.text.header "WiFi list"}
+    fi
+    ${ui.messages.loading "Listing saved WiFi profiles…"}
     ${ui.text.section "NetworkManager WiFi connections"}
     while IFS= read -r line; do
       [ -n "$line" ] || continue
@@ -265,11 +299,19 @@ HELP
         echo "  $(basename "$f")"
       done
     fi
+    ${ui.messages.success "WiFi list ready"}
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.messages.info "Next: ncc network wifi connect <SSID>"}
+    fi
   '';
 
   wifiStatus = pkgs.writeShellScriptBin "ncc-wifi-status" ''
     #!${pkgs.bash}/bin/bash
     ${commonShell}
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.text.header "WiFi status"}
+    fi
+    ${ui.messages.loading "Reading WiFi status…"}
     ${ui.text.section "NetworkManager"}
     "$NMCLI" general status 2>/dev/null || true
     echo ""
@@ -281,6 +323,10 @@ HELP
       ${ui.text.section "Active connection on $dev"}
       "$NMCLI" -f GENERAL.CONNECTION,IP4.ADDRESS device show "$dev" 2>/dev/null || true
     fi
+    ${ui.messages.success "WiFi status ready"}
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.messages.info "Next: ncc network wifi scan"}
+    fi
   '';
 
   wifiConnect = pkgs.writeShellScriptBin "ncc-wifi-connect" ''
@@ -290,30 +336,73 @@ HELP
     ssid=""
     psk=""
     psk_file=""
+    DRY_RUN=false
 
     while [ $# -gt 0 ]; do
       case "$1" in
         --psk) psk="$2"; shift 2 ;;
         --psk-file) psk_file="$2"; shift 2 ;;
+        --dry-run|-d) DRY_RUN=true; shift ;;
         -h|--help)
-          echo "usage: ncc network wifi connect <SSID> [--psk PASS | --psk-file PATH]"
+          echo "usage: ncc network wifi connect <SSID> [--psk PASS | --psk-file PATH] [--dry-run]"
           exit 0
           ;;
         *)
-          if [ -z "$ssid" ]; then ssid="$1"; else printf '%b\n' "${c.red}unexpected argument: $1${c.reset}" >&2; exit 1; fi
+          if [ -z "$ssid" ]; then
+            ssid="$1"
+          else
+            ${ui.messages.error "unexpected argument: $1"}
+            exit 1
+          fi
           shift
           ;;
       esac
     done
 
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      if [ "$DRY_RUN" = true ]; then
+        ${ui.text.header "WiFi connect (dry-run)"}
+        ${ui.messages.info "Preview only — nothing will be written…"}
+      else
+        ${ui.text.header "WiFi connect"}
+      fi
+    fi
+
     if [ -z "$ssid" ]; then
       ${ui.messages.error "SSID required"}
-      echo "usage: ncc network wifi connect <SSID> [--psk PASS | --psk-file PATH]" >&2
+      echo "usage: ncc network wifi connect <SSID> [--psk PASS | --psk-file PATH] [--dry-run]" >&2
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: ncc network wifi scan"}
+      fi
       exit 1
     fi
 
+    if [ "$DRY_RUN" = true ]; then
+      ${ui.messages.loading "Previewing WiFi connect…"}
+      ${ui.tables.keyValue "ssid" "$ssid"}
+      if [ -n "$psk_file" ]; then
+        ${ui.tables.keyValue "psk-file" "$psk_file"}
+      elif [ -n "$psk" ]; then
+        ${ui.tables.keyValue "psk" "(provided on CLI)"}
+      else
+        ${ui.tables.keyValue "psk" "(would prompt)"}
+      fi
+      dev="$(wifi_device || true)"
+      if [ -n "$dev" ]; then
+        ${ui.tables.keyValue "device" "$dev"}
+      fi
+      ${ui.messages.success "Would connect to '$ssid' and save system secret (dry-run) — no changes written"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: sudo ncc network wifi connect $ssid"}
+      fi
+      exit 0
+    fi
+
     if [ -n "$psk_file" ]; then
-      [ -f "$psk_file" ] || { printf '%b\n' "${c.red}psk file not found: $psk_file${c.reset}" >&2; exit 1; }
+      if [ ! -f "$psk_file" ]; then
+        ${ui.messages.error "psk file not found: $psk_file"}
+        exit 1
+      fi
       psk="$(cat "$psk_file")"
     elif [ -z "$psk" ]; then
       printf "WiFi password for '%s': " "$ssid" >&2
@@ -321,44 +410,113 @@ HELP
       echo >&2
     fi
 
-    valid_psk "$psk" || { printf '%b\n' "${c.red}invalid password (WPA needs 8-63 chars)${c.reset}" >&2; exit 1; }
+    if ! valid_psk "$psk"; then
+      ${ui.messages.error "invalid password (WPA needs 8-63 chars)"}
+      exit 1
+    fi
 
     dev="$(wifi_device)"
     if [ -z "$dev" ]; then
       ${ui.messages.error "no WiFi device found"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: ncc network status"}
+      fi
       exit 1
     fi
 
     ${ui.messages.loading "Connecting to '$ssid' on $dev …"}
+    ${ui.tables.keyValue "ssid" "$ssid"}
+    ${ui.tables.keyValue "device" "$dev"}
     conn_name="$(connect_wifi "$ssid" "$psk" "$dev" || true)"
     if [ -z "$conn_name" ]; then
       ${ui.messages.error "connection failed"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: ncc network wifi scan"}
+      fi
       exit 1
     fi
 
     persist_connection "$ssid" "$psk"
     ${ui.messages.success "connected: $ssid"}
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.messages.info "Next: ncc network wifi status"}
+    fi
   '';
 
   wifiDisconnect = pkgs.writeShellScriptBin "ncc-wifi-disconnect" ''
     #!${pkgs.bash}/bin/bash
     ${commonShell}
+    DRY_RUN=false
+    for a in "$@"; do
+      case "$a" in --dry-run|-d) DRY_RUN=true ;; esac
+    done
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      if [ "$DRY_RUN" = true ]; then
+        ${ui.text.header "WiFi disconnect (dry-run)"}
+        ${ui.messages.info "Preview only — nothing will be written…"}
+      else
+        ${ui.text.header "WiFi disconnect"}
+      fi
+    fi
     dev="$(wifi_device)"
     if [ -z "$dev" ]; then
       ${ui.messages.error "no WiFi device found"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: ncc network status"}
+      fi
       exit 1
+    fi
+    ${ui.messages.loading "Disconnecting $dev…"}
+    ${ui.tables.keyValue "device" "$dev"}
+    if [ "$DRY_RUN" = true ]; then
+      ${ui.messages.success "Would disconnect $dev (dry-run) — no changes written"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: ncc network wifi disconnect"}
+      fi
+      exit 0
     fi
     "$NMCLI" device disconnect "$dev"
     ${ui.messages.success "disconnected $dev"}
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.messages.info "Next: ncc network wifi scan"}
+    fi
   '';
 
   wifiForget = pkgs.writeShellScriptBin "ncc-wifi-forget" ''
     #!${pkgs.bash}/bin/bash
     ${commonShell}
 
-    name="$1"
+    name=""
+    DRY_RUN=false
+    for a in "$@"; do
+      case "$a" in
+        --dry-run|-d) DRY_RUN=true ;;
+        -h|--help)
+          echo "usage: ncc network wifi forget <connection-name|SSID> [--dry-run]"
+          exit 0
+          ;;
+        *)
+          if [ -z "$name" ]; then name="$a"; else
+            ${ui.messages.error "unexpected argument: $a"}
+            exit 1
+          fi
+          ;;
+      esac
+    done
+
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      if [ "$DRY_RUN" = true ]; then
+        ${ui.text.header "WiFi forget (dry-run)"}
+        ${ui.messages.info "Preview only — nothing will be written…"}
+      else
+        ${ui.text.header "WiFi forget"}
+      fi
+    fi
     if [ -z "$name" ]; then
-      ${ui.messages.error "usage: ncc wifi forget <connection-name|SSID>"}
+      ${ui.messages.error "usage: ncc wifi forget <connection-name|SSID> [--dry-run]"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: ncc network wifi list"}
+      fi
       exit 1
     fi
 
@@ -377,14 +535,29 @@ HELP
 
     if [ -z "$conn_name" ]; then
       ${ui.messages.error "no WiFi profile matching '$name'"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: ncc network wifi list"}
+      fi
       exit 1
     fi
 
+    ${ui.messages.loading "Forgetting $conn_name…"}
+    ${ui.tables.keyValue "profile" "$conn_name"}
     stem="$(sanitize_name "$conn_name")"
+    if [ "$DRY_RUN" = true ]; then
+      ${ui.messages.success "Would forget $conn_name and remove system secret (dry-run) — no changes written"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: sudo ncc network wifi forget $conn_name"}
+      fi
+      exit 0
+    fi
     "$NMCLI" connection delete "$conn_name" 2>/dev/null || true
     rm -f "$SECRETS_WIFI/$stem.psk" "$PERSIST/$stem.psk" \
       "$PERSIST/$stem.nmconnection" "$LIVE/$stem.nmconnection" 2>/dev/null || true
     ${ui.messages.success "forgot: $conn_name"}
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.messages.info "Next: ncc network wifi list"}
+    fi
   '';
 
   commands = [

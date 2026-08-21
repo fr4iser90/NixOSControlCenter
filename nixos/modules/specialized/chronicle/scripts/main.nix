@@ -110,19 +110,23 @@ in pkgs.writeShellScriptBin "chronicle" ''
   # Main command handling
   case "''${1-help}" in
     "start")
+      ncc_cli_header "Chronicle"
       # Check for flags
       DAEMON_MODE=false
+      DEBUG_MODE=false
       for arg in "''${@:2}"; do
         case "$arg" in
           "--daemon"|"-d")
             DAEMON_MODE=true
             ;;
-          "--debug")
+          "--debug"|"-v"|"--verbose")
             DEBUG_MODE=true
+            export NCC_VERBOSE=1
             ;;
         esac
       done
 
+      ${ui.messages.loading "Starting recording…"}
       if [ "$DAEMON_MODE" = "true" ]; then
         # Fork to background
         if [ "$DEBUG_MODE" = "true" ]; then
@@ -135,51 +139,63 @@ in pkgs.writeShellScriptBin "chronicle" ''
         load_state || true
         if [ "$RECORDING" = "true" ]; then
           log "Recording started in background (PID: $(cat "$PID_FILE" 2>/dev/null || echo 'unknown'))"
-          log "Session: $SESSION_ID"
-          log "Use 'chronicle status' to check progress"
-          log "Use 'chronicle stop' to end recording"
+          ${ui.messages.info "Session: $SESSION_ID"}
+          ncc_cli_next "ncc chronicle status"
           if [ "$DEBUG_MODE" = "true" ]; then
-            log "Debug output: tail -f /tmp/chronicle-debug.log"
+            debug "Debug log: /tmp/chronicle-debug.log"
           fi
         else
           error "Failed to start recording in background"
+          ncc_cli_next "ncc chronicle test"
           exit 1
         fi
       else
         start_recording
+        ncc_cli_next "ncc chronicle stop"
       fi
       ;;
       
     "start-foreground")
-      if [ "''${2-}" = "--debug" ]; then
+      if [ "''${2-}" = "--debug" ] || [ "''${2-}" = "-v" ]; then
         DEBUG_MODE=true
+        export NCC_VERBOSE=1
       fi
       start_recording
       ;;
       
     "stop")
+      ncc_cli_header "Chronicle"
+      ${ui.messages.loading "Stopping recording…"}
       stop_recording
+      ncc_cli_next "ncc chronicle list"
       ;;
       
     "capture")
+      ncc_cli_header "Chronicle"
       capture_manual_step
+      ncc_cli_next "ncc chronicle stop"
       ;;
       
     "status")
+      ncc_cli_header "Chronicle"
       load_state || true
       if [ "$RECORDING" = "true" ]; then
         ${ui.messages.success "Recording active: $SESSION_ID (Step $STEP_COUNT)"}
         ${ui.messages.info "State file: $STATE_FILE"}
         ${ui.messages.info "Output directory: $OUTPUT_DIR/$SESSION_ID"}
+        ncc_cli_next "ncc chronicle stop"
       else
         ${ui.messages.warning "No active recording"}
+        ncc_cli_next "ncc chronicle start"
       fi
       ;;
       
     "list")
+      ncc_cli_header "Chronicle"
       ${ui.messages.info "Available recordings in $OUTPUT_DIR:"}
       if [ ! -d "$OUTPUT_DIR" ]; then
         warn "Output directory does not exist: $OUTPUT_DIR"
+        ncc_cli_next "ncc chronicle start"
         exit 1
       fi
       find "$OUTPUT_DIR" -maxdepth 1 -type d -name "session_*" 2>/dev/null | sort -r | while read session_path; do
@@ -190,13 +206,16 @@ in pkgs.writeShellScriptBin "chronicle" ''
           ${ui.messages.info "$session — Started: $start_time | Steps: $total_steps"}
         fi
       done
+      ncc_cli_next "ncc chronicle cleanup"
       ;;
       
     "cleanup")
+      ncc_cli_header "Chronicle"
       if [ ! -d "$OUTPUT_DIR" ]; then
         warn "Output directory does not exist: $OUTPUT_DIR"
         exit 1
       fi
+      ${ui.messages.loading "Cleaning recordings older than 30 days…"}
       count=$(find "$OUTPUT_DIR" -type d -name "session_*" -mtime +30 2>/dev/null | wc -l)
       if [ "$count" -eq 0 ]; then
         log "No recordings older than 30 days found"
@@ -209,10 +228,12 @@ in pkgs.writeShellScriptBin "chronicle" ''
           log "Cleaned up stale state file"
         }
       fi
+      ncc_cli_next "ncc chronicle list"
       ;;
       
     "test")
-      ${ui.messages.loading "Running Step Recorder System Tests..."}
+      ncc_cli_header "Chronicle"
+      ${ui.messages.loading "Running Step Recorder System Tests…"}
       # Simplified test - just check if tools are available
       missing_tools=""
       for tool in bash date jq mkdir cat; do
@@ -231,10 +252,12 @@ in pkgs.writeShellScriptBin "chronicle" ''
       
       if [ -n "$missing_tools" ]; then
         error "Missing required tools:$missing_tools"
+        ncc_cli_next "install missing tools, then: ncc chronicle test"
         exit 1
       else
         log "All required tools are available"
         log "Step Recorder is ready to use"
+        ncc_cli_next "ncc chronicle start"
       fi
       ;;
       
@@ -243,28 +266,29 @@ in pkgs.writeShellScriptBin "chronicle" ''
         exec chronicle-gui
       else
         error "chronicle-gui not installed (enable modules.specialized.chronicle.gui.enableQt)"
+        ncc_cli_next "enable chronicle GUI in systemConfig, then rebuild"
         exit 1
       fi
       ;;
 
     "help"|*)
       cat << EOF
-📝 Step Recorder - NixOS Problem Steps Recorder
+Chronicle — workflow step recorder
 
 Usage: ncc chronicle <command> [options]
 
 Commands:
-  start [options]   - Start a new recording session
-                      --daemon or -d: Run in background
-                      --debug: Enable debug output
-  stop              - Stop the current recording session
-  capture           - Capture a manual step (Wayland-compatible)
-  status            - Show current recording status
-  list              - List all available recordings
-  cleanup           - Clean up recordings older than 30 days
-  test              - Run system tests
-  gui               - Open PySide6 control window
-  help              - Show this help message
+  start [options]   Start a new recording session
+                      --daemon / -d   Run in background
+                      --debug / -v    Verbose debug output
+  stop              Stop the current recording session
+  capture           Capture a manual step (Wayland-compatible)
+  status            Show current recording status
+  list              List all available recordings
+  cleanup           Clean up recordings older than 30 days
+  test              Run system tests
+  gui               Open PySide6 control window
+  help              Show this help message
 
 Configuration:
   Backend:  $backend
@@ -273,25 +297,12 @@ Configuration:
   Format:   ${cfg.format}
 
 Examples:
-  # Start recording (foreground)
   ncc chronicle start
-
-  # Start in background
   ncc chronicle start --daemon
-
-  # Check status
   ncc chronicle status
-
-  # Stop and export
   ncc chronicle stop
-
-  # Manual capture
   ncc chronicle capture
-
-  # GUI
   ncc chronicle gui
-
-For more information, see the module documentation.
 EOF
       ;;
   esac

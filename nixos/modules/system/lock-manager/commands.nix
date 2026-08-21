@@ -115,11 +115,16 @@ in
     discoverScript = pkgs.writeScriptBin "ncc-discover-main" ''
       set -euo pipefail
 
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.text.header "Lock discover"}
+      fi
+
       SNAPSHOT_DIR="${cfg.snapshotDir}"
       TIMESTAMP=$(date +%Y%m%d_%H%M%S)
       SNAPSHOT_FILE="$SNAPSHOT_DIR/system-snapshot_$TIMESTAMP.json"
 
-      ${ui.messages.info "Starting system discovery..."}
+      ${ui.messages.loading "Starting system discovery…"}
+      ${ui.tables.keyValue "Snapshot dir" "$SNAPSHOT_DIR"}
 
       # Run all enabled scanners
       ${snapshotGenerator}/bin/generate-snapshot \
@@ -135,7 +140,7 @@ in
 
       # Encrypt if enabled
       if [ "${if cfg.encryption.enable then "true" else "false"}" = "true" ]; then
-        ${ui.messages.info "Encrypting snapshot..."}
+        ${ui.messages.loading "Encrypting snapshot…"}
         ${encryptionHandler}/bin/encrypt-snapshot \
           --input "$SNAPSHOT_FILE" \
           --method "${cfg.encryption.method}" \
@@ -150,7 +155,7 @@ in
 
       # Upload to GitHub if enabled
       if [ "${if cfg.github.enable then "true" else "false"}" = "true" ] && [ -n "${cfg.github.repository}" ]; then
-        ${ui.messages.info "Uploading to GitHub..."}
+        ${ui.messages.loading "Uploading to GitHub…"}
         ${githubHandler}/bin/upload-to-github \
           --repository "${cfg.github.repository}" \
           --branch "${cfg.github.branch}" \
@@ -160,27 +165,18 @@ in
         ${ui.messages.success "Uploaded to GitHub"}
       fi
 
-      ${ui.messages.success "System discovery complete!"}
+      ${ui.messages.success "System discovery complete"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc lock restore --snapshot <file> --all"}
+      fi
     '';
 
     restoreScript = pkgs.writeScriptBin "ncc-restore-main" ''
       set -euo pipefail
 
       if [ $# -eq 0 ]; then
-        echo "Usage: ncc lock restore --snapshot <file> [options]"
-        echo ""
-        echo "Options:"
-        echo "  --snapshot <file>    Snapshot file to restore from (required)"
-        echo "  --browsers           Restore browser bookmarks and extensions list"
-        echo "  --ides               Restore IDE settings and extensions list"
-        echo "  --desktop            Restore desktop settings"
-        echo "  --all                Restore everything"
-        echo "  --dry-run            Show what would be restored without actually restoring"
-        echo ""
-        echo "Examples:"
-        echo "  ncc-restore --snapshot /path/to/snapshot.json.encrypted --all"
-        echo "  ncc-restore --snapshot snapshot.json --browsers --ides"
-        echo "  ncc-restore --snapshot snapshot.json.encrypted --all --dry-run"
+        ${ui.messages.error "Usage: ncc lock restore --snapshot <file> [options]"}
+        ${ui.messages.info "Options: --browsers --ides --desktop --all --dry-run"}
         exit 1
       fi
 
@@ -191,20 +187,8 @@ in
       set -euo pipefail
 
       if [ $# -eq 0 ]; then
-        echo "Usage: ncc lock fetch [options]"
-        echo ""
-        echo "Options:"
-        echo "  --repository <owner/repo>  GitHub repository (default: from config)"
-        echo "  --branch <branch>          Git branch (default: main)"
-        echo "  --snapshot <name>          Specific snapshot to download (default: latest)"
-        echo "  --output <dir>             Output directory (default: snapshotDir from config)"
-        echo "  --list                     List available snapshots only"
-        echo "  --token-file <file>        Path to GitHub token file (default: from config)"
-        echo ""
-        echo "Examples:"
-        echo "  ncc-fetch --list"
-        echo "  ncc-fetch --snapshot system-snapshot_20240101_120000.json.encrypted"
-        echo "  ncc-fetch --repository user/repo --snapshot latest"
+        ${ui.messages.error "Usage: ncc lock fetch [options]"}
+        ${ui.messages.info "Options: --list --snapshot <name> --repository <owner/repo> --output <dir>"}
         exit 1
       fi
 
@@ -213,6 +197,10 @@ in
 
     restoreFromGitHubScript = pkgs.writeScriptBin "ncc-restore-from-github-main" ''
       set -euo pipefail
+
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.text.header "Lock restore-from-github"}
+      fi
 
       # Convenience command: fetch and restore in one go
       SNAPSHOT_NAME=""
@@ -237,7 +225,7 @@ in
       done
 
       # Download snapshot
-      ${ui.messages.loading "Fetching snapshot from GitHub..."}
+      ${ui.messages.loading "Fetching snapshot from GitHub…"}
       TEMP_DIR=$(mktemp -d)
       trap "rm -rf $TEMP_DIR" EXIT
 
@@ -257,8 +245,16 @@ in
 
         if [ -n "$DOWNLOADED_SNAPSHOT" ] && [ -f "$DOWNLOADED_SNAPSHOT" ]; then
           echo ""
-          ${ui.messages.loading "Restoring from downloaded snapshot..."}
-          ${restoreHandler}/bin/restore-snapshot --snapshot "$DOWNLOADED_SNAPSHOT" $RESTORE_OPTIONS
+          ${ui.messages.loading "Restoring from downloaded snapshot…"}
+          if NCC_CLI_NESTED=1 ${restoreHandler}/bin/restore-snapshot --snapshot "$DOWNLOADED_SNAPSHOT" $RESTORE_OPTIONS; then
+            ${ui.messages.success "Restore-from-github complete"}
+            if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+              ${ui.messages.info "Next: verify apps/settings, or ncc lock discover for a fresh snapshot"}
+            fi
+          else
+            ${ui.messages.error "Restore failed"}
+            exit 1
+          fi
         else
           ${ui.messages.error "Could not find downloaded snapshot"}
           exit 1

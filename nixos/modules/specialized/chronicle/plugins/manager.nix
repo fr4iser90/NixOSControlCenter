@@ -73,7 +73,7 @@ let
               status="enabled"
             fi
             
-            echo "📦 $plugin_name (v$version) - $status"
+            echo "Plugin: $plugin_name (v$version) - $status"
             plugin_count=$((plugin_count + 1))
           fi
         done
@@ -99,17 +99,17 @@ let
       
       # Placeholder - in production, would query actual marketplace
       cat << 'EOF'
-    📦 screenshot-enhancer (v1.2.0)
+    screenshot-enhancer (v1.2.0)
        Enhanced screenshot processing with filters
        Author: StepRecorder Community
        Downloads: 1,234
        
-    📦 pdf-advanced (v2.1.0)
+    pdf-advanced (v2.1.0)
        Advanced PDF generation with templates
        Author: PDF Team
        Downloads: 856
        
-    📦 ai-summarizer (v0.9.0)
+    ai-summarizer (v0.9.0)
        AI-powered session summarization
        Author: AI Labs
        Downloads: 432
@@ -152,7 +152,7 @@ let
       chmod +x "$plugin_dir/main.sh"
       
       echo ""
-      echo "✅ Plugin installed: $plugin_name"
+      echo "OK: Plugin installed: $plugin_name"
       echo "   Enable with: chronicle-plugins enable $plugin_name"
     }
     
@@ -170,7 +170,7 @@ let
       # Remove plugin directory
       if [ -d "$PLUGINS_DIR/installed/$plugin_name" ]; then
         rm -rf "$PLUGINS_DIR/installed/$plugin_name"
-        echo "✅ Plugin uninstalled: $plugin_name"
+        echo "OK: Plugin uninstalled: $plugin_name"
       else
         echo "Error: Plugin not found: $plugin_name" >&2
         exit 1
@@ -187,7 +187,7 @@ let
       fi
       
       ln -sf "$PLUGINS_DIR/installed/$plugin_name" "$PLUGINS_DIR/enabled/$plugin_name"
-      echo "✅ Plugin enabled: $plugin_name"
+      echo "OK: Plugin enabled: $plugin_name"
     }
     
     # Disable plugin
@@ -196,7 +196,7 @@ let
       
       if [ -L "$PLUGINS_DIR/enabled/$plugin_name" ]; then
         rm "$PLUGINS_DIR/enabled/$plugin_name"
-        echo "✅ Plugin disabled: $plugin_name"
+        echo "OK: Plugin disabled: $plugin_name"
       else
         echo "Plugin not enabled: $plugin_name"
       fi

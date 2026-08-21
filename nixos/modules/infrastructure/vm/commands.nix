@@ -66,7 +66,7 @@ EOF
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
     if ! command -v virsh >/dev/null 2>&1; then
-      echo "virsh not found" >&2
+      ${ui.messages.error "virsh not found"} >&2
       exit 1
     fi
     while IFS= read -r name; do
@@ -81,10 +81,23 @@ EOF
     set -euo pipefail
     name="''${1:-}"
     if [[ -z "$name" ]]; then
-      echo "Usage: ncc vm start NAME" >&2
+      ${ui.messages.error "Usage: ncc vm start NAME"}
       exit 2
     fi
-    virsh start "$name"
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "VM start"}
+    fi
+    ${ui.messages.loading "Starting domain $name…"}
+    ${ui.tables.keyValue "Domain" "$name"}
+    if virsh start "$name"; then
+      ${ui.messages.success "Domain $name started"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc vm status"}
+      fi
+    else
+      ${ui.messages.error "Failed to start $name"}
+      exit 1
+    fi
   '';
 
   vmStop = pkgs.writeShellScriptBin "ncc-vm-stop" ''
@@ -92,10 +105,23 @@ EOF
     set -euo pipefail
     name="''${1:-}"
     if [[ -z "$name" ]]; then
-      echo "Usage: ncc vm stop NAME" >&2
+      ${ui.messages.error "Usage: ncc vm stop NAME"}
       exit 2
     fi
-    virsh shutdown "$name"
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "VM stop"}
+    fi
+    ${ui.messages.loading "Shutting down domain $name…"}
+    ${ui.tables.keyValue "Domain" "$name"}
+    if virsh shutdown "$name"; then
+      ${ui.messages.success "Domain $name shutdown requested"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc vm status"}
+      fi
+    else
+      ${ui.messages.error "Failed to shut down $name"}
+      exit 1
+    fi
   '';
 
   vmDestroy = pkgs.writeShellScriptBin "ncc-vm-destroy" ''
@@ -103,44 +129,72 @@ EOF
     set -euo pipefail
     name="''${1:-}"
     if [[ -z "$name" ]]; then
-      echo "Usage: ncc vm destroy NAME" >&2
+      ${ui.messages.error "Usage: ncc vm destroy NAME"}
       exit 2
     fi
-    virsh destroy "$name"
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "VM destroy"}
+    fi
+    ${ui.messages.loading "Force-off domain $name…"}
+    ${ui.tables.keyValue "Domain" "$name"}
+    if virsh destroy "$name"; then
+      ${ui.messages.success "Domain $name destroyed (forced off)"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc vm status"}
+      fi
+    else
+      ${ui.messages.error "Failed to destroy $name"}
+      exit 1
+    fi
   '';
 
   vmStatus = pkgs.writeShellScriptBin "ncc-vm-status" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
-    ${ui.badges.info "VM Manager Status"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "VM Manager Status"}
+    fi
+    ${ui.messages.loading "Checking libvirt…"}
     if ! systemctl cat libvirtd.service >/dev/null 2>&1; then
-      ${ui.badges.error "Libvirt is not installed"}
+      ${ui.messages.error "Libvirt is not installed"}
       exit 1
     fi
     if systemctl is-active --quiet libvirtd.service; then
       ${ui.tables.keyValue "Libvirt Daemon" "Running"}
     else
-      ${ui.badges.warning "Libvirt daemon not running"}
+      ${ui.messages.warning "Libvirt daemon not running"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: sudo systemctl start libvirtd"}
+      fi
       exit 1
     fi
     echo ""
-    ${ui.badges.info "Running VMs:"}
+    ${ui.messages.info "Running VMs:"}
     virsh list --state-running 2>/dev/null || true
     echo ""
-    ${ui.badges.info "All VMs:"}
+    ${ui.messages.info "All VMs:"}
     virsh list --all 2>/dev/null || true
+    ${ui.messages.success "VM status ready"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: ncc vm list   or   ncc vm start NAME"}
+    fi
   '';
 
   vmList = pkgs.writeShellScriptBin "ncc-vm-list" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
-    ${ui.badges.info "Available VM Test Distros"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "Available VM Test Distros"}
+    fi
     echo ""
     ${lib.concatMapStringsSep "\n" (distro: ''
       ${ui.tables.keyValue "${distro}" "ncc vm test run ${distro}"}
     '') availableDistros}
     echo ""
-    ${ui.messages.info "ncc vm test run <distro> | ncc vm test reset <distro>"}
+    ${ui.messages.success "Distro list ready"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: ncc vm test run <distro>"}
+    fi
   '';
 
   # Per-distro runners (internal binaries)
@@ -150,21 +204,27 @@ EOF
       run = pkgs.writeShellScriptBin "ncc-vm-test-${distro}-run" ''
         #!${pkgs.bash}/bin/bash
         set -euo pipefail
-        ${ui.badges.info "Starting ${distro} test VM"}
+        if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.text.header "VM test run (${distro})"}
+        fi
+        ${ui.messages.loading "Starting ${distro} test VM…"}
         if command -v vm-test-${distro}-run >/dev/null 2>&1; then
           exec vm-test-${distro}-run "$@"
         fi
-        ${ui.badges.error "VM test script not found"}
+        ${ui.messages.error "VM test script not found"}
         exit 1
       '';
       reset = pkgs.writeShellScriptBin "ncc-vm-test-${distro}-reset" ''
         #!${pkgs.bash}/bin/bash
         set -euo pipefail
-        ${ui.badges.warning "Resetting ${distro} test VM"}
+        if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.text.header "VM test reset (${distro})"}
+        fi
+        ${ui.messages.warning "Resetting ${distro} test VM"}
         if command -v vm-test-${distro}-reset >/dev/null 2>&1; then
           exec vm-test-${distro}-reset
         fi
-        ${ui.badges.error "VM reset script not found"}
+        ${ui.messages.error "VM reset script not found"}
         exit 1
       '';
     };

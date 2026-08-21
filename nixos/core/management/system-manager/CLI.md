@@ -2,7 +2,7 @@
 
 > SSOT: [STANDARDS](../cli-formatter/doc/STANDARDS.md) · [COPY](../cli-formatter/doc/COPY.md)
 
-**Status:** `partial`
+**Status:** `compliant`
 
 ## Commands (high traffic)
 
@@ -16,25 +16,28 @@
 
 ## How update should look
 
-See [STANDARDS §4](../cli-formatter/doc/STANDARDS.md).
-
-Quick validate:
+See [STANDARDS §4](../cli-formatter/doc/STANDARDS.md) — **default = `[ OK ]` checklist**, **`-v` = details + rebuild noise**.
 
 ```bash
-ncc system update --dry-run --local --source-dir /path/to/NixOSControlCenter/nixos
-ncc system update --dry-run -v --local --source-dir /path/to/NixOSControlCenter/nixos
+ncc system update --local                    # short checklist
+ncc system update --local -v                 # + copy steps + nixos-rebuild log
+ncc system update --dry-run --local --source-dir /path/to/nixos
 ```
 
 ## Self-audit
 
-- [x] `system-update.nix` uses `ui.messages` / headers / dry-run / `-v` gating for extras
+- [x] Skeleton on main paths: **one** header → work → result (honors `NCC_CLI_NESTED` / `NCC_QUIET_SWITCH`)
+- [x] No mid-flow `=== Build ===` / `--- Preflight ---` / activation System Report under update
+- [x] No duplicate `Next: reboot…` after successful update+build
 - [x] `config-migration/check.nix` supports `--dry-run` (no writes)
 - [x] Host flake extras merge + preview path
-- [x] `enable-desktop.nix` wired to `ui.messages`
-- [x] `postbuild-checks.nix` uses `ui.messages` / `ui.badges` (no private ANSI)
-- [ ] Full pass: channel-manager copy, migration.nix verbosity, allow-unfree copy
-- [ ] Replace remaining raw `echo` dumps with `-v` gates
-- [ ] README links here
+- [x] cli-registry preserves `NCC_CLI_NESTED` / `NCC_QUIET_SWITCH` through sudo
+- [x] README links here
+
+## Notes
+
+`migration.nix` still uses raw `echo`/`printf` for **config file writes and internal jq plumbing** — not user-facing status lines.
+Activation System Report is **off by default** (env does not reach activation). Full dump: `ncc system report`, or `NCC_SYSTEM_REPORT=1` before a bare switch.
 
 ## Validate (automated)
 

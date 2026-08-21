@@ -150,6 +150,10 @@ let
       exit 0
     fi
 
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "Network status"}
+    fi
+    ${ui.messages.loading "Reading NetworkManager status…"}
     echo "hostname=$HN"
     echo "online=$ONLINE"
     echo "wifi.present=$wifi_present"
@@ -164,6 +168,10 @@ let
     echo "ethernet.connection=$eth_conn"
     echo "ethernet.ipv4=$eth_ip"
     echo "ethernet.gateway=$eth_gw"
+    ${ui.messages.success "Network status ready"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: ncc network wifi scan"}
+    fi
   '';
 
   ethernetRouter = pkgs.writeShellScriptBin "ncc-ethernet-router" ''
@@ -171,6 +179,15 @@ let
     ${common}
     cmd="''${1:-}"
     shift || true
+    DRY_RUN=false
+    REST=()
+    for a in "$@"; do
+      case "$a" in
+        --dry-run|-d) DRY_RUN=true ;;
+        *) REST+=("$a") ;;
+      esac
+    done
+    set -- "''${REST[@]}"
     case "$cmd" in
       ""|help|-h|--help)
         cat <<EOF
@@ -178,8 +195,8 @@ ncc network ethernet — wired link (NetworkManager)
 
 Usage:
   ncc network ethernet status [--json]
-  ncc network ethernet disconnect
-  ncc network ethernet reconnect
+  ncc network ethernet disconnect [--dry-run]
+  ncc network ethernet reconnect [--dry-run]
 EOF
         exit 0
         ;;
@@ -188,12 +205,22 @@ EOF
         for a in "$@"; do
           case "$a" in --json|-j) JSON=true ;; esac
         done
+        if [[ "$JSON" != true && -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.text.header "Ethernet status"}
+        fi
+        if [[ "$JSON" != true ]]; then
+          ${ui.messages.loading "Reading ethernet link…"}
+        fi
         ETH_DEV="$(device_of_type ethernet || true)"
         if [[ -z "$ETH_DEV" ]]; then
           if [[ "$JSON" == true ]]; then
             echo '{"present":false}'
           else
             echo "ethernet.present=false"
+            ${ui.messages.warning "No ethernet device"}
+            if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+              ${ui.messages.info "Next: ncc network status"}
+            fi
           fi
           exit 0
         fi
@@ -218,33 +245,89 @@ EOF
           echo "ethernet.connection=$conn"
           echo "ethernet.ipv4=$ip"
           echo "ethernet.gateway=$gw"
+          ${ui.messages.success "Ethernet status ready"}
+          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+            ${ui.messages.info "Next: ncc network ethernet reconnect"}
+          fi
         fi
         ;;
       disconnect)
+        if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          if [[ "$DRY_RUN" == true ]]; then
+            ${ui.text.header "Ethernet disconnect (dry-run)"}
+            ${ui.messages.info "Preview only — nothing will be written…"}
+          else
+            ${ui.text.header "Ethernet disconnect"}
+          fi
+        fi
         ETH_DEV="$(device_of_type ethernet || true)"
         if [[ -z "$ETH_DEV" ]]; then
           ${ui.messages.error "no ethernet device"}
+          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+            ${ui.messages.info "Next: ncc network status"}
+          fi
           exit 1
+        fi
+        ${ui.messages.loading "Disconnecting $ETH_DEV…"}
+        ${ui.tables.keyValue "device" "$ETH_DEV"}
+        if [[ "$DRY_RUN" == true ]]; then
+          ${ui.messages.success "Would disconnect $ETH_DEV (dry-run) — no changes written"}
+          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+            ${ui.messages.info "Next: ncc network ethernet disconnect"}
+          fi
+          exit 0
         fi
         "$NMCLI" device disconnect "$ETH_DEV"
         ${ui.messages.success "disconnected $ETH_DEV"}
+        if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.messages.info "Next: ncc network ethernet reconnect"}
+        fi
         ;;
       reconnect|connect)
+        if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          if [[ "$DRY_RUN" == true ]]; then
+            ${ui.text.header "Ethernet reconnect (dry-run)"}
+            ${ui.messages.info "Preview only — nothing will be written…"}
+          else
+            ${ui.text.header "Ethernet reconnect"}
+          fi
+        fi
         ETH_DEV="$(device_of_type ethernet || true)"
         if [[ -z "$ETH_DEV" ]]; then
           ${ui.messages.error "no ethernet device"}
+          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+            ${ui.messages.info "Next: ncc network status"}
+          fi
           exit 1
         fi
+        ${ui.messages.loading "Connecting $ETH_DEV…"}
+        ${ui.tables.keyValue "device" "$ETH_DEV"}
         conn="$(device_connection "$ETH_DEV")"
+        if [[ "$DRY_RUN" == true ]]; then
+          if [[ -n "$conn" && "$conn" != "--" ]]; then
+            ${ui.tables.keyValue "connection" "$conn"}
+          fi
+          ${ui.messages.success "Would connect $ETH_DEV (dry-run) — no changes written"}
+          if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+            ${ui.messages.info "Next: ncc network ethernet reconnect"}
+          fi
+          exit 0
+        fi
         if [[ -n "$conn" && "$conn" != "--" ]]; then
           "$NMCLI" connection up "$conn" ifname "$ETH_DEV" || "$NMCLI" device connect "$ETH_DEV"
         else
           "$NMCLI" device connect "$ETH_DEV"
         fi
         ${ui.messages.success "connected $ETH_DEV"}
+        if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.messages.info "Next: ncc network status"}
+        fi
         ;;
       *)
         ${ui.messages.error "Unknown: ncc network ethernet $cmd"}
+        if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+          ${ui.messages.info "Next: ncc network ethernet status"}
+        fi
         exit 1
         ;;
     esac

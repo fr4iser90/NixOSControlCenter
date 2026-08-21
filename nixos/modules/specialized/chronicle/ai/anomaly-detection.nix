@@ -87,11 +87,11 @@ let
       
       if [ ''${#anomalies[@]} -eq 0 ]; then
         echo ""
-        echo "✅ No anomalies detected"
+        echo "OK: No anomalies detected"
         return 0
       else
         echo ""
-        echo "⚠️  Anomalies detected:"
+        echo "WARN: Anomalies detected:"
         for anomaly in "''${anomalies[@]}"; do
           echo "  - $anomaly"
         done
@@ -152,7 +152,7 @@ let
     EOF
       
       echo ""
-      echo "✅ Model trained and saved to: $DB_PATH"
+      echo "OK: Model trained and saved to: $DB_PATH"
     }
     
     # Generate anomaly report
@@ -182,10 +182,10 @@ let
     
     ANALYSIS
     ───────────────────────────────────────────────
-    ✓ Step rate: Normal
-    ✓ Error rate: Normal
-    ✓ Duration: Normal
-    ✓ Pattern matching: No unusual patterns detected
+    OK: Step rate: Normal
+    OK: Error rate: Normal
+    OK: Duration: Normal
+    OK: Pattern matching: No unusual patterns detected
     
     RECOMMENDATIONS
     ───────────────────────────────────────────────

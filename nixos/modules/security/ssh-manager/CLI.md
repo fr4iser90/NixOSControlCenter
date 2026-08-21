@@ -2,7 +2,7 @@
 
 > SSOT: [STANDARDS](../../../core/management/cli-formatter/doc/STANDARDS.md) · [COPY](../../../core/management/cli-formatter/doc/COPY.md)
 
-**Status:** `partial`
+**Status:** `compliant`
 
 ## Commands
 
@@ -11,19 +11,32 @@
 | `ncc ssh` | Help / `--gui` / client router | N/A | no |
 | `ncc ssh status` | Daemon / auth mode summary | N/A | no |
 | `ncc ssh lockdown` | Disable password auth after checks | `--dry-run` | yes |
-| `ncc ssh temp-open\|force-open\|grant-access` | Timed password reopen | no | yes |
-| `ncc ssh request-access\|approve-request\|…` | Optional workflow | varies | varies |
+| `ncc ssh grant-access USER …` | Timed password reopen | no | yes |
+| `ncc ssh temp-open\|force-open` | Timed reopen variants | no | yes |
+| `ncc ssh request-access USER REASON [DUR]` | Submit access request (`workflow.enable`) | no | yes |
+| `ncc ssh approve-request ID [DUR]` | Approve pending request | no | yes |
+| `ncc ssh deny-request ID REASON` | Deny pending request | no | yes |
+| `ncc ssh list-requests [STATUS]` | List / filter requests | N/A | no |
+| `ncc ssh cleanup-requests [DAYS]` | Prune old request files | no | no |
+| `ncc ssh monitor` | Follow sshd journal | N/A | no |
+
+Workflow verbs load only when `workflow.enable = true` (with server `enable`).
+
+## Output contract
+
+- status / lockdown / grant-access / workflow scripts: header → loading → facts → result → `Next:`
+- lockdown dry-run: dry banner + no writes under `/etc/nixos`
+- `NCC_CLI_NESTED=1` skips header / dry banner / next
 
 ## Self-audit
 
-- [x] `ui = getModuleApi "cli-formatter"` in commands + server scripts
-- [x] Status / lockdown / grant use `ui.messages` / tables
-- [x] `monitoring.nix` no longer uses `echo -e` for connection list filter
-- [ ] Verbose detail gated with `-v`
-- [ ] `longHelp` matches COPY tone
-- [x] Dry-run documented (lockdown)
-- [ ] README links here
+- [x] `ui = getModuleApi "cli-formatter"` in commands + lockdown / grant-access / workflow scripts
+- [x] status / lockdown / grant-access follow §3 skeleton
+- [x] Dry-run on lockdown
+- [x] Workflow scripts (`request-access` / `approve-request` / `deny-request` / `list-requests` / `cleanup-requests` / `monitor`) wired when `workflow.enable`
+- [x] README links here
 
 ## Notes
 
-Client preview chrome lives under `client/` (see client/CLI.md). Template/options may still mention `✓` as fzf marker glyph (not CLI status).
+Compliant covers main server-side `ncc ssh` verbs (status, lockdown, grant-access) and optional workflow.
+Client verbs / Go TUI: see [client/CLI.md](./client/CLI.md).

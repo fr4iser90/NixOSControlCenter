@@ -51,6 +51,15 @@ EOF
     STATE_FILE="''${CONFIGS_BASE}/.ncc-module-migrations.json"
     mkdir -p "$CONFIGS_BASE" 2>/dev/null || sudo mkdir -p "$CONFIGS_BASE"
 
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      if [[ "$DRY" -eq 1 ]]; then
+        ${ui.text.header "Module migrate (dry-run)"}
+        ${ui.messages.info "Preview only — nothing will be written under $NIXOS_ROOT"}
+      else
+        ${ui.text.header "Module migrate"}
+      fi
+    fi
+
     if [[ -f "$STATE_FILE" ]]; then
       APPLIED=$(${pkgs.jq}/bin/jq -c '.applied // []' "$STATE_FILE" 2>/dev/null || echo '[]')
     else
@@ -497,6 +506,15 @@ EOF
       cleanup_orphans || exit 1
     else
       log "skipping orphan cleanup (--skip-orphans)"
+    fi
+
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      if [[ "$DRY" -eq 1 ]]; then
+        ${ui.messages.success "Dry-run migrate finished"}
+        ${ui.messages.info "Next: sudo ncc modules migrate"}
+      else
+        ${ui.messages.success "Module migrate finished"}
+      fi
     fi
   '';
 in {

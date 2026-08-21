@@ -86,7 +86,7 @@ let
       mkdir -p "$(dirname "$PATTERNS_DB")"
       echo "{\"patterns\": [], \"learned_at\": \"$(date -Iseconds)\", \"session_count\": $session_count}" > "$PATTERNS_DB"
       
-      echo "✅ Learned $pattern_count patterns"
+      echo "OK: Learned $pattern_count patterns"
       echo "Saved to: $PATTERNS_DB"
     }
     
@@ -111,19 +111,19 @@ let
       
       # Pattern: Login workflow
       if echo "$actions" | grep -q "click.*login"; then
-        echo "✓ Login Workflow (confidence: 0.85)"
+        echo "OK: Login Workflow (confidence: 0.85)"
         echo "  Steps: navigate → enter credentials → click login"
       fi
       
       # Pattern: File operations
       if echo "$actions" | grep -q "click.*file"; then
-        echo "✓ File Operation Workflow (confidence: 0.75)"
+        echo "OK: File Operation Workflow (confidence: 0.75)"
         echo "  Steps: open menu → select file → perform action"
       fi
       
       # Pattern: Configuration changes
       if echo "$actions" | grep -q "settings\|preferences"; then
-        echo "✓ Configuration Workflow (confidence: 0.80)"
+        echo "OK: Configuration Workflow (confidence: 0.80)"
         echo "  Steps: open settings → modify → save"
       fi
       

@@ -1,5 +1,63 @@
-# Migrated from lib/dry-run.sh — body via fromJSON (Nix-safe).
+# Dry-run helpers — banner aligned to cli-formatter STANDARDS §3.
 { pkgs, getModuleApi ? null, ... }:
-pkgs.writeText "dry-run.sh" (builtins.fromJSON ''
-"#!/usr/bin/env bash\n# Dry-run helpers for the install shell.\n# Enable with: NCC_DRY_RUN=1  |  install --dry-run  |  install-dry\n#\n# When active: wizard + validation still run; no writes to /etc/nixos,\n# no password files, no deploy copy, no nixos-rebuild.\n\nncc_dry_run() {\n    case \"\u0024{NCC_DRY_RUN:-0}\" in\n        1|true|TRUE|yes|YES|on|ON) return 0 ;;\n        *) return 1 ;;\n    esac\n}\n\nncc_dry_enable() {\n    export NCC_DRY_RUN=1\n}\n\nncc_dry_banner() {\n    if ncc_dry_run; then\n        if declare -F log_warn >/dev/null 2>&1; then\n            log_warn \"\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\"\n            log_warn \" DRY-RUN MODE \u2014 nothing will be copied or written\"\n            log_warn \" Wizard + validation only; /etc/nixos untouched\"\n            log_warn \"\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\"\n        else\n            echo \"[DRY-RUN] Nothing will be copied or written\" >&2\n        fi\n    fi\n}\n\n# Log a skipped mutation. Usage: ncc_dry_skip \"write\" \"/path\" \"optional detail\"\nncc_dry_skip() {\n    local action=\"\u00241\"\n    local target=\"\u0024{2:-}\"\n    local detail=\"\u0024{3:-}\"\n    if declare -F log_info >/dev/null 2>&1; then\n        log_info \"[DRY-RUN] would \u0024{action}\u0024{target:+: \u0024target}\"\n        if [[ -n \"\u0024detail\" ]]; then\n            # indent multi-line preview\n            while IFS= read -r line; do\n                log_info \"           \u0024line\"\n            done <<< \"\u0024detail\"\n        fi\n    else\n        echo \"[DRY-RUN] would \u0024{action}\u0024{target:+: \u0024target}\" >&2\n        [[ -n \"\u0024detail\" ]] && echo \"\u0024detail\" | sed 's/^/           /' >&2\n    fi\n    return 0\n}\n\nexport -f ncc_dry_run\nexport -f ncc_dry_enable\nexport -f ncc_dry_banner\nexport -f ncc_dry_skip\n"
-'')
+pkgs.writeText "dry-run.sh" ''
+#!/usr/bin/env bash
+# Dry-run helpers for the install shell.
+# Enable with: NCC_DRY_RUN=1  |  install --dry-run  |  install-dry
+#
+# When active: wizard + validation still run; no writes to /etc/nixos,
+# no password files, no deploy copy, no nixos-rebuild.
+
+ncc_dry_run() {
+    case "''${NCC_DRY_RUN:-0}" in
+        1|true|TRUE|yes|YES|on|ON) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+ncc_dry_enable() {
+    export NCC_DRY_RUN=1
+}
+
+# STANDARDS: dry-run banner via info line (parent owns skeleton; skip if nested)
+ncc_dry_banner() {
+    if ! ncc_dry_run; then
+        return 0
+    fi
+    if [[ -n "''${NCC_CLI_NESTED:-}" ]]; then
+        return 0
+    fi
+    # Same wording as ui.messages.info (no [INFO] badge — matches STANDARDS §3/§4)
+    if [[ -n "''${BLUE:-}" ]]; then
+        printf '%b\n' "''${BLUE}Preview only — nothing will be written under /etc/nixos''${NC}"
+    elif declare -F log_info >/dev/null 2>&1; then
+        log_info "Preview only — nothing will be written under /etc/nixos"
+    else
+        echo "Preview only — nothing will be written under /etc/nixos" >&2
+    fi
+}
+
+# Log a skipped mutation. Usage: ncc_dry_skip "write" "/path" "optional detail"
+ncc_dry_skip() {
+    local action="$1"
+    local target="''${2:-}"
+    local detail="''${3:-}"
+    if declare -F log_info >/dev/null 2>&1; then
+        log_info "[DRY-RUN] would ''${action}''${target:+: $target}"
+        if [[ -n "$detail" ]]; then
+            while IFS= read -r line; do
+                log_info "           $line"
+            done <<< "$detail"
+        fi
+    else
+        echo "[DRY-RUN] would ''${action}''${target:+: $target}" >&2
+        [[ -n "$detail" ]] && echo "$detail" | sed 's/^/           /' >&2
+    fi
+    return 0
+}
+
+export -f ncc_dry_run
+export -f ncc_dry_enable
+export -f ncc_dry_banner
+export -f ncc_dry_skip
+''

@@ -23,17 +23,22 @@ let
     REASON="$3"
 
     if [ -z "$USER" ]; then
-      ${ui.messages.error "Usage: ssh-grant-access USERNAME [DURATION] [REASON]"}
-      ${ui.messages.info "Example: ssh-grant-access fr4iser 300 'Emergency access for key setup'"}
+      ${ui.messages.error "Usage: ncc ssh grant-access USERNAME [DURATION] [REASON]"}
+      ${ui.messages.info "Example: ncc ssh grant-access fr4iser 300 'Emergency access for key setup'"}
       exit 1
+    fi
+
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "SSH grant-access"}
     fi
 
     DURATION=''${DURATION:-300}
     REASON=''${REASON:-"Direct admin grant"}
 
-    ${ui.messages.loading "Granting temporary SSH password authentication for $USER..."}
-    ${ui.messages.info "Duration: $DURATION seconds"}
-    ${ui.messages.info "Reason: $REASON"}
+    ${ui.messages.loading "Granting temporary SSH password authentication for $USER…"}
+    ${ui.tables.keyValue "User" "$USER"}
+    ${ui.tables.keyValue "Duration" "$DURATION seconds"}
+    ${ui.tables.keyValue "Reason" "$REASON"}
 
     ${backupHelpers.backupSSHConfig "/etc/ssh/sshd_config"} >/dev/null 2>&1 || true
 
@@ -53,7 +58,6 @@ let
     fi
 
     ${ui.messages.success "SSH password authentication granted for $USER for $DURATION seconds"}
-    ${ui.messages.info "User can now connect using password authentication"}
 
     (
       sleep $DURATION
@@ -64,6 +68,9 @@ let
     ) &
 
     ${ui.messages.info "Auto-disable timer set for $DURATION seconds"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: connect as $USER with password, then wait for auto-disable (or ncc ssh lockdown)"}
+    fi
   '';
 in {
   config = lib.mkMerge [

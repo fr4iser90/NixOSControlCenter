@@ -51,14 +51,23 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
   done
   
   if [ -z "$SNAPSHOT_FILE" ] || [ ! -f "$SNAPSHOT_FILE" ]; then
-    echo "Error: --snapshot file is required and must exist"
+    ${ui.messages.error "--snapshot file is required and must exist"}
     exit 1
+  fi
+
+  if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+    if [ "$DRY_RUN" = "true" ]; then
+      ${ui.text.header "Lock restore (dry-run)"}
+      ${ui.messages.info "Preview only — nothing will be written"}
+    else
+      ${ui.text.header "Lock restore"}
+    fi
   fi
   
   # Decrypt if encrypted
   DECRYPTED_FILE="$SNAPSHOT_FILE"
   if [[ "$SNAPSHOT_FILE" == *.encrypted ]]; then
-    ${ui.messages.info "Decrypting snapshot..."}
+    ${ui.messages.loading "Decrypting snapshot…"}
     DECRYPTED_FILE=$(mktemp)
     trap "rm -f $DECRYPTED_FILE" EXIT
     
@@ -82,7 +91,7 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
   # Load snapshot data
   SNAPSHOT_DATA=$(cat "$DECRYPTED_FILE")
   
-  ${ui.text.header "Restoring from Snapshot"}
+  ${ui.messages.loading "Preparing restore…"}
   ${ui.tables.keyValue "Snapshot" "$SNAPSHOT_FILE"}
   ${ui.tables.keyValue "Timestamp" "$(echo \"$SNAPSHOT_DATA\" | ${jq} -r '.metadata.timestamp // \"unknown\"')"}
   
@@ -317,11 +326,16 @@ pkgs.writeShellScriptBin "restore-snapshot" ''
   fi
   
   ${ui.text.newline}
-  ${ui.messages.success "Restore complete!"}
-  
+  ${ui.messages.success "Restore complete"}
   if [ "$DRY_RUN" = "true" ]; then
-    ${ui.text.newline}
     ${ui.messages.info "This was a dry-run. Use without --dry-run to actually restore."}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: ncc lock restore --snapshot $SNAPSHOT_FILE --all"}
+    fi
+  else
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: ncc lock discover   (optional fresh snapshot)"}
+    fi
   fi
 ''
 

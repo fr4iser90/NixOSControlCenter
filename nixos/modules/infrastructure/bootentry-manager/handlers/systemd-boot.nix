@@ -1,8 +1,11 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, getModuleApi, ... }:
 
 with lib;
 
 let
+  ui = getModuleApi "cli-formatter";
+  common = import ../lib/common.nix { inherit lib getModuleApi; };
+
   # Konstanten
   entriesDir = "/boot/loader/entries";
   entriesFile = "${entriesDir}/bootloader-entries.json";
@@ -73,21 +76,50 @@ let
 
     listEntries = pkgs.writeScriptBin "list-boot-entries" ''
       #!${pkgs.bash}/bin/bash
+      set -euo pipefail
+      ${common.validatePermissions}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.text.header "Boot entries"}
+      fi
+      ${ui.messages.loading "Reading ${entriesDir}…"}
+      found=0
       for entry in ${entriesDir}/nixos-generation-*.conf; do
         if [ -f "$entry" ] && [ ! -h "$entry" ]; then
-          gen_number=$(basename "$entry" | ${pkgs.gnugrep}/bin/grep -o '[0-9]\+')
+          found=1
           cat "$entry"
+          echo ""
         fi
       done
+      if [[ "$found" -eq 0 ]]; then
+        ${ui.messages.warning "No nixos-generation-*.conf entries found"}
+      else
+        ${ui.messages.success "Boot entries listed"}
+      fi
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc bootentry rename GEN TITLE   or   ncc bootentry reset GEN"}
+      fi
     '';
 
     renameEntry = pkgs.writeScriptBin "rename-boot-entry" ''
       #!${pkgs.bash}/bin/bash
       set -euo pipefail
-      
+      ${common.validatePermissions}
+
+      if [ $# -ne 2 ]; then
+        ${ui.messages.error "Usage: rename-boot-entry GENERATION TITLE"}
+        exit 2
+      fi
+
       gen="$1"
       new_name="$2"
-      
+
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.text.header "Rename boot entry"}
+      fi
+      ${ui.messages.loading "Renaming generation $gen…"}
+      ${ui.tables.keyValue "Generation" "$gen"}
+      ${ui.tables.keyValue "Title" "$new_name"}
+
       ${utils.updateEntryFile {
         generation = "$gen";
         title = "$new_name";
@@ -104,17 +136,29 @@ let
            }' "${entriesFile}" > "${entriesFile}.tmp" \
            && mv "${entriesFile}.tmp" "${entriesFile}"
       fi
+      ${ui.messages.success "Boot entry $gen renamed"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc bootentry list"}
+      fi
     '';
     
     resetEntry = pkgs.writeScriptBin "reset-boot-entry" ''
       #!${pkgs.bash}/bin/bash
       set -euo pipefail
+      ${common.validatePermissions}
       
       if [ $# -ne 1 ]; then
-        exit 1
+        ${ui.messages.error "Usage: reset-boot-entry GENERATION"}
+        exit 2
       fi
 
       gen="$1"
+
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.text.header "Reset boot entry"}
+      fi
+      ${ui.messages.loading "Resetting generation $gen title…"}
+      ${ui.tables.keyValue "Generation" "$gen"}
       
       ${utils.updateEntryFile {
         generation = "$gen";
@@ -126,6 +170,10 @@ let
          --arg time "$(date -Iseconds)" \
          'del(.generations[$gen])' "${entriesFile}" > "${entriesFile}.tmp"
       mv "${entriesFile}.tmp" "${entriesFile}"
+      ${ui.messages.success "Boot entry $gen reset"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc bootentry list"}
+      fi
     '';
   };
 

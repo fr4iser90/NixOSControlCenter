@@ -34,32 +34,39 @@ let
   configLayout = lib.attrByPath [ "layout" ] "monolith" (getModuleConfig "system-manager");
   isSplitLayout = configLayout == "split";
   configFacade = import ../lib/config-facade.nix { inherit pkgs; };
-  # Function to prompt for build - with conditional build command and better error handling
+  # Nested build: preserve quiet/nested/verbose env through sudo.
+  nccBuildSwitchCmd = ''sudo --preserve-env=NCC_CLI_NESTED,NCC_QUIET_SWITCH,NCC_CLI_VERBOSE,NCC_PREFLIGHT_VERBOSE env NCC_CLI_NESTED=1 NCC_QUIET_SWITCH=1 ncc system build switch --flake /etc/nixos#${hostname}'';
+
   prompt_build = ''
     while true; do
       printf "Do you want to build and switch to the new configuration? (y/n): "
       read build_choice
       case $build_choice in
         y|Y)
-          ${ui.messages.loading "Building system configuration..."}
-          BUILD_CMD="sudo ncc system build switch --flake /etc/nixos#${hostname}"
+          BUILD_CMD="${nccBuildSwitchCmd}"
+          if [ "''${VERBOSE:-false}" = "true" ] || [ -n "''${NCC_CLI_VERBOSE:-}" ]; then
+            BUILD_CMD="$BUILD_CMD --verbose"
+            export NCC_CLI_VERBOSE=1
+          fi
           BUILD_LOG=$(mktemp /tmp/ncc-update-build.XXXXXX.log)
           set +e
           sh -c "$BUILD_CMD" 2>&1 | tee "$BUILD_LOG"
           EXIT_CODE=''${PIPESTATUS[0]}
           set -e
           if [ "$EXIT_CODE" -eq 0 ]; then
-            ${ui.messages.success "System successfully updated and rebuilt!"}
+            ${ui.badges.success "Update complete"}
             rm -f "$BUILD_LOG"
           else
+            ${ui.badges.error "Update incomplete"}
             ${ui.messages.error "Build FAILED (exit $EXIT_CODE) — files were updated, but the running system was NOT switched."}
             print_copyable_build_error "$BUILD_LOG" "$EXIT_CODE"
-            ${ui.messages.info "Retry: sudo ncc system build switch --flake /etc/nixos#${hostname}"}
+            ${ui.messages.info "Next: sudo ncc system build switch --flake /etc/nixos#${hostname}"}
           fi
           break
           ;;
         n|N)
-          ${ui.messages.info "Skipping build. You can manually run: sudo ncc system build switch --flake /etc/nixos#${hostname}"}
+          ${ui.messages.info "Skipping build"}
+          ${ui.messages.info "Next: sudo ncc system build switch --flake /etc/nixos#${hostname}"}
           break
           ;;
         *)
@@ -162,6 +169,10 @@ let
       shift || true
     done
 
+    if [ "$VERBOSE" = "true" ]; then
+      export NCC_CLI_VERBOSE=1
+    fi
+
     # Sudo-Check (dry-run is read-only — allow non-root)
     if [ "$EUID" -ne 0 ] && [ "$DRY_RUN" != "true" ]; then
       ${ui.messages.error "Root required for a real update"}
@@ -196,7 +207,9 @@ let
         have=$(echo "$current" | grep -E '^[[:space:]]*platform[[:space:]]*=' | head -1 | cut -d'"' -f2 || true)
       fi
       if [ "$have" = "$platform" ]; then
-        ${ui.messages.info "system.platform already $platform"}
+        if [ "$VERBOSE" = "true" ]; then
+          ${ui.messages.info "system.platform already $platform"}
+        fi
         return 0
       fi
       if echo "$current" | grep -qE 'system\.platform[[:space:]]*='; then
@@ -365,10 +378,11 @@ let
 
     # Step 1: Check system configuration
     # dry-run → validate + migration preview only (ncc-config-check --dry-run)
+    # Nested: child owns work lines only; this script owns header / dry banner / next
     _cfg_flags=""
     [ "$VERBOSE" = "true" ] && _cfg_flags="$_cfg_flags --verbose"
     [ "$DRY_RUN" = "true" ] && _cfg_flags="$_cfg_flags --dry-run"
-    if ! ${configModule.configCheck}/bin/ncc-config-check $_cfg_flags 2>&1; then
+    if ! NCC_CLI_NESTED=1 ${configModule.configCheck}/bin/ncc-config-check $_cfg_flags 2>&1; then
       ${ui.messages.warning "Configuration has issues"}
       if [ "$DRY_RUN" = "true" ]; then
         ${ui.messages.info "Dry-run continues so you can still review flake extras"}
@@ -437,7 +451,6 @@ let
           REPO_URL="https://github.com/fr4iser90/NixOSControlCenter.git"
           TEMP_DIR="/tmp/nixos-update"
           
-          ${ui.text.header "NixOS System Update - Remote"}
           ${ui.messages.info "Available branches:"}
           
           if [ -n "$AUTO_BRANCH" ]; then
@@ -499,11 +512,11 @@ let
           fi
           
           SOURCE_DIR="$TEMP_DIR/nixos"
+          ${ui.messages.info "Source: remote — $SELECTED_BRANCH ($SOURCE_DIR)"}
           break
           ;;
         2)
           # Local update configuration
-          ${ui.text.header "NixOS System Update - Local"}
           if [ -n "$SOURCE_DIR_OVERRIDE" ]; then
             SOURCE_DIR="$SOURCE_DIR_OVERRIDE"
           else
@@ -587,12 +600,12 @@ let
             done
           fi
           
-          ${ui.tables.keyValue "Using local directory" "$SOURCE_DIR"}
+          ${ui.messages.info "Source: local — $SOURCE_DIR"}
           break
           ;;
         3)
           # Execute the separate channel update script
-          ${ui.text.header "NixOS Channel Update"}
+          ${ui.messages.info "Source: channels"}
           ${ui.messages.info "Executing ncc-update-channels..."}
           # The ncc-update-channels script should handle its own sudo checks and messages
           if sudo ncc-update-channels; then
@@ -986,27 +999,37 @@ EOF
       FLAKE_COPY_SRC="$SOURCE_DIR/flake.nix"
       FLAKE_MERGED_TMP=""
       FLAKE_PREVIEW_PATH="/tmp/ncc-flake-update-preview.nix"
-      if [ ! -f "$NIXOS_DIR/flake.nix" ] || [ ! -f "$SOURCE_DIR/flake.nix" ]; then
+      if [ ! -f "$SOURCE_DIR/flake.nix" ]; then
+        ${ui.messages.error "Incoming flake missing: $SOURCE_DIR/flake.nix"}
+        return 1
+      fi
+      if [ ! -e "$NIXOS_DIR/flake.nix" ]; then
         ${ui.messages.info "No existing system flake to compare — using the new one as-is"}
         return 0
       fi
-      ${ui.messages.loading "Checking whether this machine has extra flake inputs…"}
+      if [ ! -r "$NIXOS_DIR/flake.nix" ]; then
+        ${ui.messages.error "Live flake exists but is not readable: $NIXOS_DIR/flake.nix"}
+        ${ui.messages.info "Next: fix /etc/nixos permissions so dry-run can read it"}
+        return 1
+      fi
+      if [ "$VERBOSE" = "true" ]; then
+        ${ui.messages.loading "Checking whether this machine has extra flake inputs…"}
+      fi
       set +e
       EXTRAS_JSON=$(${flakeExtrasCheck}/bin/ncc-check-flake-extras --live "$NIXOS_DIR/flake.nix" --incoming "$SOURCE_DIR/flake.nix" --json 2>/dev/null)
       FLAKE_EXTRAS_RC=$?
       set -e
       if [ "''${FLAKE_EXTRAS_RC:-0}" -eq 0 ]; then
-        ${ui.messages.success "Nothing extra to keep — standard update flake"}
+        ${ui.badges.success "Flake extras"}
         return 0
       fi
       if [ "''${FLAKE_EXTRAS_RC:-0}" -ne 2 ]; then
-        ${ui.messages.error "Could not check flake extras"}
+        ${ui.badges.error "Flake extras"}
         [ "$VERBOSE" = "true" ] && ${ui.messages.info "check rc=$FLAKE_EXTRAS_RC"}
         return 1
       fi
       EXTRAS_LIST=$(echo "$EXTRAS_JSON" | ${pkgs.jq}/bin/jq -r '.hostOnlyExtras // [] | join(", ")' 2>/dev/null || echo "unknown")
-      ${ui.text.header "Extra software sources on this machine"}
-      ${ui.messages.info "These will be kept and merged into the update."}
+      ${ui.badges.info "Flake extras — will keep and merge"}
       echo "$EXTRAS_JSON" | ${pkgs.jq}/bin/jq -r '.hostOnlyExtras[]?' 2>/dev/null | while read -r x; do
         [ -n "$x" ] && echo "    • $x"
       done
@@ -1072,13 +1095,14 @@ EOF
     }
 
     if [ "$DRY_RUN" = "true" ]; then
-      ${ui.text.header "Update dry-run"}
-      ${ui.messages.info "No files will be written. This only shows what would happen."}
+      # Header + dry banner already printed at start — do not repeat
       if [ "$VERBOSE" = "true" ]; then
         ${ui.tables.keyValue "Source" "$SOURCE_DIR"}
         ${ui.tables.keyValue "Target" "$NIXOS_DIR"}
       fi
       if ! ncc_flake_extras_prepare; then
+        ${ui.messages.error "Dry-run failed at flake extras"}
+        ${ui.messages.info "Next: fix the issue above, or retry with --drop-flake-extras after reviewing"}
         exit 1
       fi
       ${ui.messages.success "Dry-run OK — safe to run the real update when ready"}
@@ -1094,8 +1118,8 @@ EOF
     
     # Create backup directory and perform backup
     BACKUP_DIR="$BACKUP_ROOT/$(date +%Y-%m-%d_%H-%M-%S)"
-    ${ui.messages.loading "Creating a safety backup…"}
     if [ "$VERBOSE" = "true" ]; then
+      ${ui.messages.loading "Creating a safety backup…"}
       ${ui.messages.info "Backup path: $BACKUP_DIR"}
     fi
     
@@ -1111,21 +1135,25 @@ EOF
     
     # Perform backup
     if cp -r "$NIXOS_DIR" "$BACKUP_DIR"; then
-      ${ui.messages.success "Backup created"}
+      ${ui.badges.success "Backup"}
       cleanup_old_backups
     else
-      ${ui.messages.error "Backup failed — update stopped"}
+      ${ui.badges.error "Backup"}
       exit 1
     fi
     
     # Update files
-    ${ui.messages.loading "Updating system files…"}
+    if [ "$VERBOSE" = "true" ]; then
+      ${ui.messages.loading "Updating system files…"}
+    fi
     
     # Copy defined directories and files
     # IMPORTANT: systemConfig/ and custom/ are NEVER overwritten - user-specific
     for item in "''${COPY_ITEMS[@]}"; do
       if [ -e "$SOURCE_DIR/$item" ] || { [ "$item" = "flake.nix" ] && [ -n "''${FLAKE_COPY_SRC:-}" ] && [ -f "$FLAKE_COPY_SRC" ]; }; then
-        ${ui.messages.loading "Copying $item..."}
+        if [ "$VERBOSE" = "true" ]; then
+          ${ui.messages.loading "Copying $item..."}
+        fi
         # Use cp with --update to only copy new files (no overwrite)
         # But for directories we need to be more careful
         if [ -d "$SOURCE_DIR/$item" ]; then
@@ -1133,14 +1161,20 @@ EOF
           if [ "$item" = "custom" ]; then
             # custom/ is NEVER overwritten (user-specific)
             if [ ! -d "$NIXOS_DIR/$item" ]; then
-              ${ui.messages.loading "Copying $item... ($item/ does not exist)"}
+              if [ "$VERBOSE" = "true" ]; then
+                ${ui.messages.loading "Copying $item... ($item/ does not exist)"}
+              fi
               sudo cp -r "$SOURCE_DIR/$item" "$NIXOS_DIR/"
             else
-              ${ui.messages.info "$item exists, skipping (preserving existing $item)..."}
+              if [ "$VERBOSE" = "true" ]; then
+                ${ui.messages.info "$item exists, skipping (preserving existing $item)..."}
+              fi
             fi
           elif [ "$item" = "core" ] || [ "$item" = "modules" ]; then
             # CRITICAL: Selective copying module-by-module (NEVER rm -rf!)
-            ${ui.messages.loading "Updating $item/ modules (preserving systemConfig)..."}
+            if [ "$VERBOSE" = "true" ]; then
+              ${ui.messages.loading "Updating $item/ modules (preserving systemConfig)..."}
+            fi
             
             # Create target_dir if it doesn't exist
             mkdir -p "$NIXOS_DIR/$item"
@@ -1164,7 +1198,9 @@ EOF
               fi
             done
             
-            ${ui.messages.success "$item/ updated (systemConfig preserved)"}
+            if [ "$VERBOSE" = "true" ]; then
+              ${ui.messages.success "$item/ updated (systemConfig preserved)"}
+            fi
             
             # Always drop leaf modules missing from source (renames/removals)
             cleanup_stale_leaf_modules "$item"
@@ -1184,7 +1220,9 @@ EOF
             fi
           elif [ "$item" = "packages" ]; then
             # CRITICAL: packages/ is a single module - use SAME GENERIC LOGIC as core/modules
-            ${ui.messages.loading "Updating packages/ (preserving systemConfig)..."}
+            if [ "$VERBOSE" = "true" ]; then
+              ${ui.messages.loading "Updating packages/ (preserving systemConfig)..."}
+            fi
             
             # Create target_dir if it doesn't exist
             mkdir -p "$NIXOS_DIR/$item"
@@ -1203,7 +1241,9 @@ EOF
               handle_stage0_module "$SOURCE_MODULE" "$TARGET_MODULE" "$MODULE_NAME" "$item"
             fi
             
-            ${ui.messages.success "packages/ updated (systemConfig preserved)"}
+            if [ "$VERBOSE" = "true" ]; then
+              ${ui.messages.success "packages/ updated (systemConfig preserved)"}
+            fi
           else
             # Other directories: recursive copy of new files only
             sudo cp -rn "$SOURCE_DIR/$item/." "$NIXOS_DIR/$item/" 2>/dev/null || sudo cp -r "$SOURCE_DIR/$item" "$NIXOS_DIR/"
@@ -1443,28 +1483,38 @@ EOF
      # ADDITIONAL PROTECTION: Ensure protected directories are not overwritten
      # Even if they were accidentally in COPY_ITEMS or copied through another directory
      if [ -d "$NIXOS_DIR/systemConfig" ] && [ -d "$SOURCE_DIR/systemConfig" ]; then
-      ${ui.messages.info "systemConfig/ exists in both locations - preserving existing systemConfig (not overwriting)"}
+      if [ "$VERBOSE" = "true" ]; then
+        ${ui.messages.info "systemConfig/ exists in both locations - preserving existing systemConfig (not overwriting)"}
+      fi
     fi
     if [ -d "$NIXOS_DIR/custom" ] && [ -d "$SOURCE_DIR/custom" ]; then
-      ${ui.messages.info "custom/ exists in both locations - preserving existing custom modules (not overwriting)"}
+      if [ "$VERBOSE" = "true" ]; then
+        ${ui.messages.info "custom/ exists in both locations - preserving existing custom modules (not overwriting)"}
+      fi
     fi
 
     # Purge leftover pre-v1 configs/ (never leave dead legacy trees)
     if [ -d "$NIXOS_DIR/configs" ]; then
-      ${ui.messages.loading "Cleaning leftover legacy configs/ directory..."}
+      if [ "$VERBOSE" = "true" ]; then
+        ${ui.messages.loading "Cleaning leftover legacy configs/ directory..."}
+      fi
       NIXOS_CONFIG_DIR="$NIXOS_DIR" ${configModule.cleanupLegacyConfigs}/bin/ncc-cleanup-legacy-configs $([ "$VERBOSE" = "true" ] && echo "--verbose") 2>&1 || true
     fi
     
     # PROTECT: hardware-configuration.nix and flake.lock (never overwrite)
-    if [ -f "$NIXOS_DIR/hardware-configuration.nix" ]; then
-      ${ui.messages.info "Preserving hardware-configuration.nix (system-specific, never overwritten)"}
-    fi
-    if [ -f "$NIXOS_DIR/flake.lock" ]; then
-      ${ui.messages.info "Preserving flake.lock (generated file, never overwritten)"}
+    if [ "$VERBOSE" = "true" ]; then
+      if [ -f "$NIXOS_DIR/hardware-configuration.nix" ]; then
+        ${ui.messages.info "Preserving hardware-configuration.nix (system-specific, never overwritten)"}
+      fi
+      if [ -f "$NIXOS_DIR/flake.lock" ]; then
+        ${ui.messages.info "Preserving flake.lock (generated file, never overwritten)"}
+      fi
     fi
     
     # Set permissions
-    ${ui.messages.loading "Setting permissions..."}
+    if [ "$VERBOSE" = "true" ]; then
+      ${ui.messages.loading "Setting permissions..."}
+    fi
     for dir in core modules desktop packages modules lib; do
       if [ -d "$NIXOS_DIR/$dir" ]; then
         chown -R root:root "$NIXOS_DIR/$dir"
@@ -1480,14 +1530,16 @@ EOF
       fi
     done
     
-    ${ui.messages.success "Module/tree files updated successfully"}
-    ${ui.tables.keyValue "Backup created in" "$BACKUP_DIR"}
-    ${ui.messages.info "Note: running system is not switched until build succeeds."}
+    ${ui.badges.success "Files synced"}
+    if [ "$VERBOSE" = "true" ]; then
+      ${ui.tables.keyValue "Backup" "$BACKUP_DIR"}
+      ${ui.messages.info "Note: running system is not switched until build succeeds."}
+    fi
     
-    # PASSWORT-INTEGRITAET: Pruefe ob konfigurierte User Passwort-Dateien haben
-    # Secrets werden nie vom Update ueberschrieben (nicht in COPY_ITEMS),
-    # aber koennen durch Config-Fehler in vorherigen Builds verloren gegangen sein.
-    ${ui.messages.loading "Checking password file integrity..."}
+    # PASSWORT-INTEGRITAET
+    if [ "$VERBOSE" = "true" ]; then
+      ${ui.messages.loading "Checking password file integrity..."}
+    fi
     PASSWORD_DIR="$NIXOS_DIR/secrets/passwords"
     pw_issues=0
     if [ -d "$PASSWORD_DIR" ]; then
@@ -1504,19 +1556,21 @@ EOF
       done
     fi
     if [ "$pw_issues" -gt 0 ]; then
-      ${ui.badges.warning "$pw_issues user(s) have password issues - they will be prompted during prebuild checks"}
+      ${ui.badges.warning "Passwords — $pw_issues issue(s)"}
     else
-      ${ui.badges.success "Password files OK"}
+      ${ui.badges.success "Passwords"}
     fi
 
     # After copying a flake that requires system.platform, heal before rebuild
-    # (old preflight on PATH may not include check-platform yet — chicken/egg).
-    ${ui.messages.loading "Ensuring system.platform is set for flake eval..."}
+    if [ "$VERBOSE" = "true" ]; then
+      ${ui.messages.loading "Ensuring system.platform is set for flake eval..."}
+    fi
     if ! ensure_system_platform; then
-      ${ui.messages.error "Cannot set system.platform — refusing auto-build"}
+      ${ui.badges.error "Platform"}
       ${ui.messages.info "Retry heal: sudo ncc-migrate-config --verbose"}
       exit 1
     fi
+    ${ui.badges.success "Platform"}
 
     # After config update (opt 1/2): offer channel bump when a newer stable pin exists
     CHANNELS_UPDATED=false
@@ -1528,8 +1582,7 @@ EOF
       if [ "$CHECK_RC" -eq 10 ]; then
         CURRENT_PIN=$(echo "$CHECK_JSON" | ${pkgs.jq}/bin/jq -r '.current // empty' 2>/dev/null || true)
         LATEST_PIN=$(echo "$CHECK_JSON" | ${pkgs.jq}/bin/jq -r '.latest // empty' 2>/dev/null || true)
-        ${ui.text.header "Channel Update Available"}
-        ${ui.messages.warning "Newer NixOS stable pin available"}
+        ${ui.messages.warning "Channel update available"}
         echo "  nixos-''${CURRENT_PIN:-unknown} → nixos-''${LATEST_PIN:-unknown}"
         ${ui.messages.info "This bumps flake input URLs and runs nix flake update (stateVersion unchanged)."}
         do_channels=false
@@ -1547,7 +1600,9 @@ EOF
             case "$channel_choice" in
               y|Y) do_channels=true; break ;;
               n|N) do_channels=false; break ;;
-              *) ${ui.messages.warning "Please answer y or n"} ;;
+              *)
+                ${ui.messages.warning "Please answer y or n"}
+                ;;
             esac
           done
         fi
@@ -1559,8 +1614,9 @@ EOF
             fi
             if ncc-update-channels "''${BUMP_ARGS[@]}"; then
               CHANNELS_UPDATED=true
-              ${ui.messages.success "Channel/flake inputs updated (rebuild follows next)"}
+              ${ui.badges.success "Channel"}
             else
+              ${ui.badges.error "Channel"}
               ${ui.messages.error "Channel update failed — continuing with config-only rebuild"}
             fi
           else
@@ -1568,21 +1624,26 @@ EOF
           fi
         fi
       elif [ "$CHECK_RC" -eq 0 ]; then
-        ${ui.messages.info "Channel pin is up to date"}
+        ${ui.badges.success "Channel"}
       else
-        ${ui.messages.info "Channel check skipped or failed"}
-        echo "  exit code: $CHECK_RC"
+        ${ui.badges.warning "Channel"}
+        if [ "$VERBOSE" = "true" ]; then
+          ${ui.messages.info "Channel check skipped or failed (exit $CHECK_RC)"}
+        fi
       fi
     fi
 
-    if [ "$CHANNELS_UPDATED" = "true" ]; then
+    if [ "$CHANNELS_UPDATED" = "true" ] && [ "$VERBOSE" = "true" ]; then
       ${ui.messages.info "Config + channel updates ready — one rebuild applies both"}
     fi
     
     # Check if auto-build or --auto-build flag is enabled
     if [ "$AUTO_BUILD" = "true" ] || [ "$autoBuild" = "true" ]; then
-      ${ui.messages.loading "Auto-build enabled, building configuration..."}
-      BUILD_CMD="sudo ncc system build switch --flake /etc/nixos#${hostname}"
+      BUILD_CMD="${nccBuildSwitchCmd}"
+      if [ "$VERBOSE" = "true" ] || [ -n "''${NCC_CLI_VERBOSE:-}" ]; then
+        BUILD_CMD="$BUILD_CMD --verbose"
+        export NCC_CLI_VERBOSE=1
+      fi
       BUILD_LOG=$(mktemp /tmp/ncc-autobuild.XXXXXX.log)
 
       set +e
@@ -1591,7 +1652,7 @@ EOF
       set -e
 
       if [ "$EXIT_CODE" -eq 0 ]; then
-        ${ui.messages.success "System successfully updated and rebuilt!"}
+        ${ui.badges.success "Update complete"}
         rm -f "$BUILD_LOG"
         # Tree sync preserves systemConfig — schema bump is migrate-config (1.0→2.1…)
         ${ui.messages.loading "Migrating config schema if needed..."}
@@ -1612,13 +1673,13 @@ EOF
         fi
         ${ui.messages.loading "Migrating module configs if needed..."}
         if command -v ncc-module-migrate >/dev/null 2>&1; then
-          if ncc-module-migrate; then
+          if NCC_CLI_NESTED=1 ncc-module-migrate; then
             ${ui.messages.success "Module configs are current"}
           else
             ${ui.messages.warning "ncc-module-migrate failed — run: sudo ncc modules migrate"}
           fi
         elif command -v ncc >/dev/null 2>&1; then
-          if ncc modules migrate; then
+          if NCC_CLI_NESTED=1 ncc modules migrate; then
             ${ui.messages.success "Module configs are current"}
           else
             ${ui.messages.warning "modules migrate failed — run: sudo ncc modules migrate"}
@@ -1635,7 +1696,8 @@ EOF
       fi
     elif [ "$AUTO_CONFIRM" = "true" ]; then
       # Auto-confirm enabled but no auto-build - skip build prompt
-      ${ui.messages.info "Skipping build. You can manually run: sudo ncc system build switch --flake /etc/nixos#${hostname}"}
+      ${ui.messages.info "Skipping build"}
+      ${ui.messages.info "Next: sudo ncc system build switch --flake /etc/nixos#${hostname}"}
       ${ui.messages.info "Then migrate schema: sudo ncc system migrate-config"}
     else
       ${prompt_build}

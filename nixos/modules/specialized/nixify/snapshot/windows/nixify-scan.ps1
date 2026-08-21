@@ -10,7 +10,7 @@ param(
 # Error handling
 $ErrorActionPreference = "Stop"
 
-Write-Host "=== Nixify Windows Snapshot ===" -ForegroundColor Cyan
+Write-Host "=== Nixify Windows Snapshot ==="
 Write-Host ""
 
 # Initialize report
@@ -25,7 +25,7 @@ $report = @{
     settings = @{}
 }
 
-Write-Host "📊 Collecting system information..." -ForegroundColor Yellow
+Write-Host "Collecting system information..."
 
 # Hardware-Info
 try {
@@ -39,13 +39,13 @@ try {
         gpu = $gpu
     }
     
-    Write-Host "  ✓ Hardware information collected" -ForegroundColor Green
+    Write-Host "  OK: Hardware information collected"
 } catch {
-    Write-Host "  ⚠ Warning: Could not collect all hardware information" -ForegroundColor Yellow
+    Write-Host "  WARN: Could not collect all hardware information"
 }
 
 # Installierte Programme erfassen
-Write-Host "📦 Collecting installed programs..." -ForegroundColor Yellow
+Write-Host "Collecting installed programs..."
 
 $programsList = @()
 
@@ -63,9 +63,9 @@ try {
             source = "registry"
         }
     }
-    Write-Host "  ✓ Registry programs: $($registryPrograms.Count)" -ForegroundColor Green
+    Write-Host "  OK: Registry programs: $($registryPrograms.Count)"
 } catch {
-    Write-Host "  ⚠ Warning: Could not read registry" -ForegroundColor Yellow
+    Write-Host "  WARN: Could not read registry"
 }
 
 # Program Files
@@ -80,9 +80,9 @@ try {
             source = "programfiles"
         }
     }
-    Write-Host "  ✓ Program Files directories scanned" -ForegroundColor Green
+    Write-Host "  OK: Program Files directories scanned"
 } catch {
-    Write-Host "  ⚠ Warning: Could not scan Program Files" -ForegroundColor Yellow
+    Write-Host "  WARN: Could not scan Program Files"
 }
 
 # Chocolatey
@@ -97,9 +97,9 @@ if (Get-Command choco -ErrorAction SilentlyContinue) {
             }
         }
         $programsList += $chocoPackages
-        Write-Host "  ✓ Chocolatey packages: $($chocoPackages.Count)" -ForegroundColor Green
+        Write-Host "  OK: Chocolatey packages: $($chocoPackages.Count)"
     } catch {
-        Write-Host "  ⚠ Warning: Could not read Chocolatey packages" -ForegroundColor Yellow
+        Write-Host "  WARN: Could not read Chocolatey packages"
     }
 }
 
@@ -115,16 +115,16 @@ if (Get-Command scoop -ErrorAction SilentlyContinue) {
             }
         }
         $programsList += $scoopApps
-        Write-Host "  ✓ Scoop packages: $($scoopApps.Count)" -ForegroundColor Green
+        Write-Host "  OK: Scoop packages: $($scoopApps.Count)"
     } catch {
-        Write-Host "  ⚠ Warning: Could not read Scoop packages" -ForegroundColor Yellow
+        Write-Host "  WARN: Could not read Scoop packages"
     }
 }
 
 $report.programs = $programsList
 
 # System-Einstellungen
-Write-Host "⚙️  Collecting system settings..." -ForegroundColor Yellow
+Write-Host "Collecting system settings..."
 
 try {
     $timezone = (Get-TimeZone).Id
@@ -138,44 +138,44 @@ try {
         desktop = "windows"
     }
     
-    Write-Host "  ✓ System settings collected" -ForegroundColor Green
+    Write-Host "  OK: System settings collected"
 } catch {
-    Write-Host "  ⚠ Warning: Could not collect all settings" -ForegroundColor Yellow
+    Write-Host "  WARN: Could not collect all settings"
 }
 
 # JSON-Report generieren
 Write-Host ""
-Write-Host "📄 Generating report..." -ForegroundColor Yellow
+Write-Host "Generating report..."
 
 $json = $report | ConvertTo-Json -Depth 10 -Compress
 $json | Out-File -FilePath $OutputFile -Encoding UTF8
 
-Write-Host "  ✓ Report saved to: $OutputFile" -ForegroundColor Green
+Write-Host "  OK: Report saved to: $OutputFile"
 Write-Host ""
 
 # Summary
-Write-Host "=== Summary ===" -ForegroundColor Cyan
-Write-Host "  Programs found: $($programsList.Count)" -ForegroundColor White
-Write-Host "  CPU: $($report.hardware.cpu)" -ForegroundColor White
-Write-Host "  RAM: $([math]::Round($report.hardware.ram / 1GB, 2)) GB" -ForegroundColor White
-Write-Host "  GPU: $($report.hardware.gpu)" -ForegroundColor White
+Write-Host "=== Summary ==="
+Write-Host "  Programs found: $($programsList.Count)"
+Write-Host "  CPU: $($report.hardware.cpu)"
+Write-Host "  RAM: $([math]::Round($report.hardware.ram / 1GB, 2)) GB"
+Write-Host "  GPU: $($report.hardware.gpu)"
 Write-Host ""
 
 # Upload option
 if ($Upload -and $ServerUrl) {
-    Write-Host "📤 Uploading report to server..." -ForegroundColor Yellow
+    Write-Host "Uploading report to server..."
     try {
         $response = Invoke-RestMethod -Uri "$ServerUrl/api/v1/upload" -Method Post -Body $json -ContentType "application/json"
-        Write-Host "  ✓ Upload successful! Session ID: $($response.session_id)" -ForegroundColor Green
+        Write-Host "  OK: Upload successful! Session ID: $($response.session_id)"
     } catch {
-        Write-Host "  ✗ Upload failed: $_" -ForegroundColor Red
+        Write-Host "  ERROR: Upload failed: $_"
     }
 } elseif ($Upload) {
-    Write-Host "  ⚠ Upload requested but no server URL provided" -ForegroundColor Yellow
-    Write-Host "  Use: -ServerUrl 'http://your-nixos-server:8080'" -ForegroundColor Yellow
+    Write-Host "  WARN: Upload requested but no server URL provided"
+    Write-Host "  Use: -ServerUrl 'http://your-nixos-server:8080'"
 }
 
 Write-Host ""
-Write-Host "✅ Snapshot complete!" -ForegroundColor Green
-Write-Host "  Review the report and upload manually if needed:" -ForegroundColor White
-Write-Host "  curl -X POST http://your-server:8080/api/v1/upload -H 'Content-Type: application/json' -d @$OutputFile" -ForegroundColor Gray
+Write-Host "OK: Snapshot complete"
+Write-Host "  Review the report and upload manually if needed:"
+Write-Host "  curl -X POST http://your-server:8080/api/v1/upload -H 'Content-Type: application/json' -d @$OutputFile"

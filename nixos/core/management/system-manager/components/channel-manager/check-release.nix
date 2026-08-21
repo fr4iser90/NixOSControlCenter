@@ -41,6 +41,9 @@ let
 
     if [ ! -f "$FLAKE_FILE" ]; then
       ${ui.messages.error "Flake not found: $FLAKE_FILE"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: pass --flake /path/to/flake.nix"}
+      fi
       exit 1
     fi
 
@@ -51,13 +54,18 @@ let
 
     if [ -z "''${CURRENT:-}" ]; then
       ${ui.messages.error "Could not detect current nixos-YY.MM pin in $FLAKE_FILE"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.messages.info "Next: ensure flake.nix pins nixos-YY.MM"}
+      fi
       exit 1
     fi
 
     RUNNING=$(${pkgs.coreutils}/bin/cat /run/current-system/nixos-version 2>/dev/null || true)
 
     if [ "$QUIET" -eq 0 ] && [ "$JSON" -eq 0 ]; then
-      ${ui.text.header "NixOS Release Check"}
+      if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+        ${ui.text.header "NixOS Release Check"}
+      fi
       ${ui.messages.info "Configured channel: $CHANNEL"}
       ${ui.messages.info "Flake stable pin: nixos-$CURRENT"}
       if [ -n "''${RUNNING:-}" ]; then
@@ -115,15 +123,15 @@ let
       echo ""
       if [ "$STATUS" = "update-available" ]; then
         ${ui.messages.warning "Update available: nixos-$CURRENT → nixos-$LATEST"}
-        ${ui.messages.info "Next steps:"}
-        echo "  1. Bump flake inputs (nixpkgs-stable / home-manager-stable) to $LATEST"
-        echo "  2. Review release notes: https://nixos.org/manual/nixos/stable/release-notes.html"
-        echo "  3. Apply package updates: sudo ncc system update-channels"
-        echo "     or: sudo ncc system update --channels"
+        if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+          ${ui.messages.info "Next: sudo ncc system update-channels --bump-to $LATEST"}
+        fi
       else
         ${ui.messages.success "Already on latest stable pin: nixos-$CURRENT"}
         if [ "$CHANNEL" = "unstable" ]; then
-          ${ui.messages.info "Channel is unstable — run: sudo ncc system update-channels"}
+          if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+            ${ui.messages.info "Next: sudo ncc system update-channels"}
+          fi
         fi
       fi
     fi

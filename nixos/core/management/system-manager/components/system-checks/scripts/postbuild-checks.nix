@@ -125,16 +125,23 @@ in
     #!${pkgs.bash}/bin/bash
     set -e
 
-    ${ui.text.header "NixOS postbuild checks"}
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.text.header "NixOS postbuild checks"}
+    else
+      ${ui.messages.loading "Running postbuild checks…"}
+    fi
 
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: check:
       if check.enable then
         ''
-          ${ui.badges.info "Running ${name} check…"}
           ${check.script} || exit 1
+          ${ui.badges.success "${name}"}
         ''
       else ""
     ) postbuildChecks)}
 
     ${ui.messages.success "All postbuild checks passed"}
+    if [ -z "''${NCC_CLI_NESTED:-}" ]; then
+      ${ui.messages.info "Next: ncc system build switch  (if you still need a rebuild)"}
+    fi
   ''

@@ -76,14 +76,13 @@ in
             type = "manager";
             shortHelp = "user - Users";
             longHelp = ''
-              ncc user                 CLI help
-              ncc user --gui|--tui
-              ncc user list [--json]
-              ncc user show NAME
-              ncc user whoami
-              ncc user create NAME --role ROLE …
-              ncc user set NAME [--role ROLE] …
-              ncc user delete NAME
+              Manage local user accounts in systemConfig.
+
+              Examples:
+                ncc user list
+                ncc user whoami
+                ncc user create alice --role user
+                ncc user --gui
             '';
           }
           {
@@ -94,7 +93,13 @@ in
             category = "base";
             script = "${listBin}/bin/ncc-user-list";
             shortHelp = "list - List users";
-            longHelp = "ncc user list [--json]";
+            longHelp = ''
+              List configured users.
+
+              Examples:
+                ncc user list
+                ncc user list --json
+            '';
           }
           {
             name = "show";
@@ -104,7 +109,13 @@ in
             category = "base";
             script = "${showBin}/bin/ncc-user-show";
             shortHelp = "show - User details";
-            longHelp = "ncc user show NAME [--json]";
+            longHelp = ''
+              Show one user's role, shell, and flags.
+
+              Examples:
+                ncc user show alice
+                ncc user show alice --json
+            '';
           }
           {
             name = "whoami";
@@ -114,7 +125,13 @@ in
             category = "base";
             script = "${whoamiBin}/bin/ncc-user-whoami";
             shortHelp = "whoami - Current role";
-            longHelp = "ncc user whoami [--json]";
+            longHelp = ''
+              Show the current user and role.
+
+              Examples:
+                ncc user whoami
+                ncc user whoami --json
+            '';
           }
           {
             name = "create";
@@ -125,7 +142,13 @@ in
             script = "${createBin}/bin/ncc-user-create";
             permission = "user.create";
             shortHelp = "create - Create user";
-            longHelp = "ncc user create NAME --role ROLE [--shell SHELL] [--auto-login true|false] [--rebuild]";
+            longHelp = ''
+              Create a user account in systemConfig.
+
+              Examples:
+                ncc user create alice --role user
+                ncc user create bob --role admin --shell zsh --rebuild
+            '';
           }
           {
             name = "set";
@@ -136,7 +159,13 @@ in
             script = "${setBin}/bin/ncc-user-set";
             permission = "user.set";
             shortHelp = "set - Update user";
-            longHelp = "ncc user set NAME [--role ROLE] [--shell SHELL] [--auto-login true|false] [--rebuild]";
+            longHelp = ''
+              Update an existing user account.
+
+              Examples:
+                ncc user set alice --role admin
+                ncc user set alice --shell fish --auto-login false --rebuild
+            '';
           }
           {
             name = "delete";
@@ -147,7 +176,13 @@ in
             script = "${deleteBin}/bin/ncc-user-delete";
             permission = "user.delete";
             shortHelp = "delete - Delete user";
-            longHelp = "ncc user delete NAME [--rebuild]";
+            longHelp = ''
+              Delete a user account from systemConfig.
+
+              Examples:
+                ncc user delete alice
+                ncc user delete alice --rebuild
+            '';
           }
         ]
         ++ lib.optionals tuiOn [
@@ -160,7 +195,12 @@ in
             script = "${userTui}/bin/ncc-user-tui";
             type = "manager";
             shortHelp = "tui - User TUI (prefer: ncc user --tui)";
-            longHelp = "ncc user --tui";
+            longHelp = ''
+              Open the user terminal UI.
+
+              Examples:
+                ncc user --tui
+            '';
           }
         ]
       ))

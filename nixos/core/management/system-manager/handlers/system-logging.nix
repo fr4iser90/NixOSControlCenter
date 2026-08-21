@@ -46,16 +46,17 @@ let
 in {
   # System Logging Component Implementation
 
-  # System Report activation script
+  # System Report on activation — OFF by default.
+  # Reason: nixos-rebuild switch does not reliably pass NCC_* env into activation,
+  # so quiet-via-env failed on live Gaming. Full dump: `ncc system report` or
+  # set NCC_SYSTEM_REPORT=1 before a bare switch.
   system.activationScripts.systemReport = {
     deps = [];
     text = let
-      # Sortiere Collectors nach Priorität
       sortedCollectors = lib.sort (a: b:
         defaultCollectors.${a}.priority < defaultCollectors.${b}.priority
       ) availableCollectors;
 
-      # Generiere Reports
       reports = lib.map (name:
         if collectors ? ${name} && collectors.${name} ? collect
         then collectors.${name}.collect
@@ -63,12 +64,16 @@ in {
       ) sortedCollectors;
 
     in ''
-      ${ui.text.header "NixOS System Report"}
-      ${ui.tables.keyValue "Hostname" config.networking.hostName}
-      ${ui.tables.keyValue "Generation" "$(readlink /nix/var/nix/profiles/system | cut -d'-' -f2)"}
-      ${ui.layout.separator "-" 50}
+      if [ -z "''${NCC_SYSTEM_REPORT:-}" ]; then
+        : # silent — update/build CLI owns the chrome
+      else
+        ${ui.text.header "NixOS System Report"}
+        ${ui.tables.keyValue "Hostname" config.networking.hostName}
+        ${ui.tables.keyValue "Generation" "$(readlink /nix/var/nix/profiles/system | cut -d'-' -f2)"}
+        ${ui.layout.separator "-" 50}
 
-      ${lib.concatStringsSep "\n" reports}
+        ${lib.concatStringsSep "\n" reports}
+      fi
     '';
   };
 

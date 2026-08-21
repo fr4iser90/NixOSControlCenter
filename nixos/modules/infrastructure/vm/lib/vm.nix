@@ -92,7 +92,7 @@ in
     }
 
     function prepare_ovmf() {
-      echo "🔧 Preparing OVMF VARS..."
+      echo "Preparing OVMF VARS..."
       if [ ! -f "${vars_path}" ]; then
         echo "  Creating new VARS file..."
         install -Dm644 ${ovmfVarsTemplate} "${vars_path}" 2>/dev/null \
@@ -109,7 +109,7 @@ in
     }
 
     function create_disk() {
-      echo "💾 Checking VM disk..."
+      echo "Checking VM disk..."
       ensure_writable_dir "$(dirname "${image.path}")"
       if [ ! -f "${image.path}" ]; then
         echo "  Creating new ${toString image.size}GB disk..."
@@ -180,7 +180,7 @@ in
       fi
       for pid in $pids; do
         port=$(spice_port_of_pid "$pid" || true)
-        echo "🛑 Stopping ${name} (PID $pid''${port:+, SPICE :$port})..."
+        echo "Stopping ${name} (PID $pid''${port:+, SPICE :$port})..."
         kill "$pid" 2>/dev/null || true
       done
       # Wait for disk lock to release
@@ -233,7 +233,7 @@ in
 
     ${lib.optionalString isWindows ''
     function prepare_tpm() {
-      echo "🔐 Preparing software TPM (required for Windows)..."
+      echo "Preparing software TPM (required for Windows)..."
       mkdir -p "$SWTPM_DIR"
       rm -f "$SWTPM_DIR/swtpm-sock" 2>/dev/null || true
       # Kill stale swtpm for this VM if still running
@@ -334,7 +334,7 @@ while True:
         continue
     # Drop CD from the machine so the next boot uses the disk
     send({"execute": "device_del", "arguments": {"id": "cdrom0"}})
-    print("💿 Installer reboot detected — ISO detached, next boot from disk", flush=True)
+    print("Installer reboot detected — ISO detached, next boot from disk", flush=True)
     break
 sock.close()
 PY
@@ -352,7 +352,7 @@ PY
       local qmp_sock="$runtime_dir/qmp.sock"
       local eject_helper_pid=""
       
-      echo "🚀 Starting VM..."
+      echo "Starting VM..."
       echo "  Name: ${name}"
       echo "  Distro: ${distroName}"
       echo "  Boot: $boot_mode"
@@ -360,14 +360,14 @@ PY
       echo "  Cores: ${toString cores}"
       echo "  SPICE Display: spice://localhost:$spice_port"
       echo ""
-      echo "💡 To connect: remote-viewer spice://localhost:$spice_port"
+      echo "To connect: remote-viewer spice://localhost:$spice_port"
       echo "              (or: spicy -h localhost -p $spice_port)"
       if [ "$boot_mode" = "iso" ]; then
-        echo "💡 After install: reboot in the guest → boots installed OS (same session)"
-        echo "💡 Force installer anytime: ncc vm test-${distro}-run --iso"
-        echo "💡 Force disk boot:         ncc vm test-${distro}-run --disk"
+        echo "After install: reboot in the guest → boots installed OS (same session)"
+        echo "Force installer anytime: ncc vm test-${distro}-run --iso"
+        echo "Force disk boot:         ncc vm test-${distro}-run --disk"
       fi
-      echo "⏳ Starting QEMU (this might take a moment)..."
+      echo "Starting QEMU (this might take a moment)..."
       echo ""
 
       if [ "$boot_mode" = "iso" ] && { [ -z "$iso_path" ] || [ ! -f "$iso_path" ]; }; then
@@ -517,7 +517,7 @@ PY
     # Bare-QEMU VMs are not libvirt domains — detect by -name before allocating ports
     ensure_no_conflicting_vm
 
-    echo "🖥️  ${distroName} Test VM Setup"
+    echo "${distroName} Test VM Setup"
     echo "========================"
     prepare_dirs
     prepare_ovmf
@@ -538,18 +538,18 @@ PY
     if [ "$boot_mode" = "auto" ]; then
       if disk_looks_installed; then
         boot_mode=disk
-        echo "✓ Disk looks installed → booting from disk"
+        echo "OK: Disk looks installed → booting from disk"
       else
         boot_mode=iso
-        echo "○ Disk empty/fresh → booting installer ISO"
+        echo "Disk empty/fresh → booting installer ISO"
       fi
     fi
 
     if [ "$boot_mode" = "disk" ]; then
-      echo "💾 Booting from installed disk (no ISO)..."
+      echo "Booting from installed disk (no ISO)..."
       start_vm "" disk
     else
-      echo "💿 Checking ISO..."
+      echo "Checking ISO..."
       echo "Debug: Distro = ${distro}"
       echo "Debug: Version = ${versionString}"
       ${if localOnly then ''

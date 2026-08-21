@@ -58,7 +58,7 @@ let
       exec ${packagesCli}/bin/ncc-packages ${name} "$@"
     ''}/bin/ncc-packages-${name}";
     shortHelp = "${name} - packages ${name}";
-    longHelp = "ncc packages ${name} …";
+    longHelp = "See: ncc packages ${name} --help";
   };
 
   # Duplicate name= strings below are intentional (static discovery for tests).
@@ -71,7 +71,14 @@ let
       category = "base";
       script = (packagesChild "add").script;
       shortHelp = "add - packages add";
-      longHelp = "ncc packages add …";
+      longHelp = ''
+        Add packages to systemConfig (current user by default).
+
+        Examples:
+          ncc packages add firefox
+          ncc packages add nginx --system
+          ncc packages add code --user alice
+      '';
     }
     {
       name = "remove";
@@ -81,7 +88,13 @@ let
       category = "base";
       script = (packagesChild "remove").script;
       shortHelp = "remove - packages remove";
-      longHelp = "ncc packages remove …";
+      longHelp = ''
+        Remove packages from systemConfig (same defaults as add).
+
+        Examples:
+          ncc packages remove firefox
+          ncc packages remove nginx --system
+      '';
     }
     {
       name = "list";
@@ -91,7 +104,13 @@ let
       category = "base";
       script = (packagesChild "list").script;
       shortHelp = "list - packages list";
-      longHelp = "ncc packages list …";
+      longHelp = ''
+        List configured user and/or system packages.
+
+        Examples:
+          ncc packages list
+          ncc packages list --system
+      '';
     }
     {
       name = "search";
@@ -101,7 +120,13 @@ let
       category = "base";
       script = (packagesChild "search").script;
       shortHelp = "search - packages search";
-      longHelp = "ncc packages search …";
+      longHelp = ''
+        Search the package store by intent / keyword.
+
+        Examples:
+          ncc packages search editor
+          ncc packages search "video player"
+      '';
     }
     {
       name = "resolve";
@@ -111,7 +136,12 @@ let
       category = "base";
       script = (packagesChild "resolve").script;
       shortHelp = "resolve - packages resolve";
-      longHelp = "ncc packages resolve …";
+      longHelp = ''
+        Resolve a store intent to concrete package names.
+
+        Examples:
+          ncc packages resolve editor
+      '';
     }
     {
       name = "try";
@@ -121,7 +151,12 @@ let
       category = "base";
       script = (packagesChild "try").script;
       shortHelp = "try - packages try";
-      longHelp = "ncc packages try …";
+      longHelp = ''
+        Try a package in a temporary shell (does not write systemConfig).
+
+        Examples:
+          ncc packages try htop
+      '';
     }
     {
       name = "categories";
@@ -131,7 +166,12 @@ let
       category = "base";
       script = (packagesChild "categories").script;
       shortHelp = "categories - packages categories";
-      longHelp = "ncc packages categories …";
+      longHelp = ''
+        List package-store categories.
+
+        Examples:
+          ncc packages categories
+      '';
     }
     {
       name = "module";
@@ -141,10 +181,17 @@ let
       category = "base";
       script = (packagesChild "module").script;
       shortHelp = "module - packages module";
-      longHelp = "ncc packages module …";
+      longHelp = ''
+        Manage feature/module package sets.
+
+        Examples:
+          ncc packages module list
+          ncc packages module available
+          ncc packages module add gaming
+          ncc packages module info docker
+      '';
     }
-  ];
-in
+  ];in
 {
   config = lib.mkIf (cfg.enable or true)
     (lib.mkMerge [
@@ -167,17 +214,15 @@ in
             type = "manager";
             shortHelp = "packages - Package Management";
             longHelp = ''
-              ncc packages                 CLI help
-              ncc packages --gui           Packages GUI
+              Manage packages and module package sets in systemConfig.
 
-              CLI — single packages (nixpkgs):
-                ncc packages add|remove|list …
-
-              CLI — Store (intent search / try):
-                ncc packages search|resolve|try|categories …
-
-              CLI — module sets:
-                ncc packages module list|available|add|remove|info …
+              Examples:
+                ncc packages                 CLI help
+                ncc packages --gui           Packages GUI
+                ncc packages add firefox
+                ncc packages list --system
+                ncc packages search editor
+                ncc packages module add gaming
             '';
           }
         ]

@@ -3,6 +3,7 @@
 with lib;
 
 let
+  ui = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
   tuiOn = (getModuleApi "tui-engine").isEnabled getModuleConfig;
   tuiOff = (getModuleApi "tui-engine").disabledHint;
@@ -42,18 +43,26 @@ let
       esac
     done
 
+    if [[ "$JSON_OUT" != true && -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "Modules list"}
+    fi
+
     tmp=$(mktemp)
     err=$(mktemp)
     trap 'rm -f "$tmp" "$err"' EXIT
 
+    if [[ "$JSON_OUT" != true ]]; then
+      ${ui.messages.loading "Discovering modules…"}
+    fi
+
     if ! ${discoverBin} >"$tmp" 2>"$err"; then
-      echo "Failed to discover modules." >&2
+      ${ui.messages.error "Failed to discover modules"}
       [[ -s "$err" ]] && cat "$err" >&2
       exit 1
     fi
 
     if ! ${pkgs.jq}/bin/jq -e 'type == "array"' "$tmp" >/dev/null 2>&1; then
-      echo "Failed to discover modules (invalid JSON)." >&2
+      ${ui.messages.error "Failed to discover modules (invalid JSON)"}
       [[ -s "$err" ]] && cat "$err" >&2
       exit 1
     fi
@@ -63,29 +72,42 @@ let
       exit 0
     fi
 
+    count=$(${pkgs.jq}/bin/jq 'length' "$tmp")
+    ${ui.tables.keyValue "Modules" "$count"}
     ${pkgs.jq}/bin/jq -r '
       .[] |
       "\(.name)\t\(.status)\t\(.category)\t\(.version // "1.0")\t\(.description // "")"
     ' "$tmp"
+    ${ui.messages.success "Module list ready"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: ncc modules show NAME   or   sudo ncc modules enable|disable NAME"}
+    fi
   '';
 
   showScript = pkgs.writeShellScriptBin "ncc-modules-show" ''
     set -euo pipefail
     name="''${1:-}"
     if [[ -z "$name" ]]; then
-      echo "Usage: ncc modules show NAME" >&2
+      ${ui.messages.error "Usage: ncc modules show NAME"}
       exit 2
     fi
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "Module details"}
+    fi
+    ${ui.messages.loading "Looking up $name…"}
     tmp=$(mktemp)
     trap 'rm -f "$tmp"' EXIT
     if ! ${discoverBin} >"$tmp" 2>/dev/null; then
-      echo "Failed to discover modules." >&2
+      ${ui.messages.error "Failed to discover modules"}
       exit 1
     fi
 
     row=$(${pkgs.jq}/bin/jq -c --arg n "$name" '.[] | select(.name == $n or .id == $n)' "$tmp" | head -1)
     if [[ -z "$row" ]]; then
-      echo "Module not found: $name" >&2
+      ${ui.messages.error "Module not found: $name"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc modules list"}
+      fi
       exit 1
     fi
     echo "$row" | ${pkgs.jq}/bin/jq -r '
@@ -96,6 +118,10 @@ let
       "path=\(.path // "")",
       "description=\(.description // "")"
     '
+    ${ui.messages.success "Module details ready"}
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: sudo ncc modules enable|disable $name"}
+    fi
   '';
 
   setEnableScript = pkgs.writeShellScriptBin "ncc-modules-set-enable" ''
@@ -115,12 +141,16 @@ let
     done
 
     if [[ "$action" != "enable" && "$action" != "disable" ]]; then
-      echo "Internal: bad action" >&2
+      ${ui.messages.error "Internal: bad action"}
       exit 2
     fi
     if [[ -z "$name" ]]; then
-      echo "Usage: ncc modules $action NAME [--rebuild]" >&2
+      ${ui.messages.error "Usage: ncc modules $action NAME [--rebuild]"}
       exit 2
+    fi
+
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.text.header "Module $action"}
     fi
 
     value=true
@@ -129,15 +159,26 @@ let
     PROTECTED="${protected}"
     for p in $PROTECTED; do
       if [[ "$name" == "$p" && "$value" == "false" ]]; then
-        echo "Refusing to disable protected module: $name" >&2
+        ${ui.messages.error "Refusing to disable protected module: $name"}
         exit 1
       fi
     done
 
+    ${ui.messages.loading "Setting $name.enable = $value…"}
+    ${ui.tables.keyValue "Module" "$name"}
+    ${ui.tables.keyValue "Action" "$action"}
     ${updateBin} "$name" "$value"
+    if [[ "$action" == "enable" ]]; then
+      ${ui.messages.success "Module $name enabled"}
+    else
+      ${ui.messages.success "Module $name disabled"}
+    fi
 
     if [[ "$DO_REBUILD" == true ]]; then
       exec ncc system build switch
+    fi
+    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+      ${ui.messages.info "Next: sudo ncc system build switch"}
     fi
   '';
 
@@ -193,8 +234,8 @@ EOF
       migrate) shift; exec ${moduleMigrateBin} "$@" ;;
       help|-h|--help) exec "$0" ;;
       *)
-        echo "Unknown: ncc modules $1" >&2
-        echo "Try: ncc modules  (help)" >&2
+        ${ui.messages.error "Unknown: ncc modules $1"}
+        ${ui.messages.info "Next: ncc modules  (help)"}
         exit 1
         ;;
     esac

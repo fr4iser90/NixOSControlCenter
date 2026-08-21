@@ -19,6 +19,7 @@ The Desktop System module is a **core module** that manages desktop environment 
 For detailed documentation, see:
 - [Architecture](./doc/ARCHITECTURE.md) - System architecture and design decisions
 - [Usage Guide](./doc/USAGE.md) - Detailed usage examples and best practices
+- [CLI contract](./CLI.md) - Command output / formatter standards
 
 ## Related Components
 

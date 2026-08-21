@@ -145,7 +145,7 @@ let
     EOF
       
       echo ""
-      echo "✅ Heatmap generated: $output_file"
+      echo "OK: Heatmap generated: $output_file"
       echo "   Open with: xdg-open $output_file"
     }
     

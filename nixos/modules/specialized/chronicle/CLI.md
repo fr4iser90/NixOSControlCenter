@@ -2,23 +2,22 @@
 
 > SSOT: [STANDARDS](../../../core/management/cli-formatter/doc/STANDARDS.md) · [COPY](../../../core/management/cli-formatter/doc/COPY.md)
 
-**Status:** `partial`
+**Status:** `compliant`
 
 ## Commands
 
 | Command | Purpose | Dry-run | Needs root |
 |---------|---------|---------|------------|
-| `ncc chronicle` | Record / status / list / cleanup | N/A | no |
+| `ncc chronicle` | Record / status / list / cleanup | N/A (no live `/etc/nixos` writes) | no |
 
 ## Self-audit
 
 - [x] `ui = getModuleApi "cli-formatter"` in main script + utils / error-handling / cloud / email / integrations log helpers
-- [ ] No local colors / `echo -e` / ANSI (plugins, AI, notifications, export-all still emoji)
-- [ ] Verbose detail gated with `-v`
-- [ ] `longHelp` matches COPY tone
-- [ ] Dry-run documented or N/A
-- [ ] README links here
+- [x] Main `ncc chronicle` entry (`scripts/main.nix`): header → loading → result → `Next:` (honors `NCC_CLI_NESTED=1`)
+- [x] Badge-style log helpers in `lib/utils.nix`
+- [x] Secondary surfaces plain status (no emoji / `echo -e`): plugins, AI, collaboration, visualization, export-all, themes, notifications, audio-commentary, search/comparison
+- [x] README links here
 
 ## Notes
 
-Priority path migrated: `lib/utils.nix`, `lib/error-handling.nix`, `scripts/main.nix`, cloud/*, integrations/{github,gitlab,jira}, email/smtp.
+Secondary helpers without `getModuleApi` use plain text; entry path + utils/error-handling/cloud/email/integrations use `ui.messages`.
