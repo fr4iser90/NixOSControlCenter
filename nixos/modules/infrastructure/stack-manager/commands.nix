@@ -417,7 +417,7 @@ EOF
         exec ncc-stacks-list-profiles "$@"
       ''}/bin/ncc-stacks-list-profiles-cmd";
       shortHelp = "list-profiles - Compatible profiles";
-      longHelp = "ncc stacks list-profiles [--remote] [--all] [-v]";
+      longHelp = "ncc stacks list-profiles [--remote] [--all] [--plain] [-v]";
     }
     {
       name = "list-catalog";
@@ -429,7 +429,7 @@ EOF
         exec ncc-stacks-list-catalog "$@"
       ''}/bin/ncc-stacks-list-catalog-cmd";
       shortHelp = "list-catalog - Catalog group/service list";
-      longHelp = "ncc stacks list-catalog [--remote] [--family homelab|compute] [-v]";
+      longHelp = "ncc stacks list-catalog [--remote] [--family homelab|compute] [--plain] [-v]";
     }
     {
       name = "install";

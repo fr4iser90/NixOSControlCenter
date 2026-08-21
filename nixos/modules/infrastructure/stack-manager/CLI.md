@@ -22,7 +22,9 @@
 ```bash
 # Ephemeral clone — does not write virt home
 ncc stacks list-profiles --remote
+ncc stacks list-profiles --remote --plain   # name|family|arch|ok
 ncc stacks list-catalog --remote
+ncc stacks list-catalog --remote --plain    # group/service|variants
 ncc stacks list-catalog --remote --family compute -v
 
 # Or point at a checkout

@@ -33,6 +33,7 @@ let
     REMOTE=false
     VERBOSE=false
     SHOW_ALL=false
+    PLAIN=false
     FAMILY_FILTER=""
     _ncc_browse_tmp=""
 
@@ -108,30 +109,33 @@ let
       case "$a" in
         --remote|-r) REMOTE=true ;;
         --all|-a) SHOW_ALL=true ;;
+        --plain) PLAIN=true ;;
         --verbose|-v) VERBOSE=true ;;
         --help|-h)
-          echo "Usage: ncc stacks list-profiles [--remote] [--all] [-v]"
+          echo "Usage: ncc stacks list-profiles [--remote] [--all] [--plain] [-v]"
           echo "  Default: only profiles compatible with this host arch"
           echo "  --all    include arch-mismatched (marked)"
+          echo "  --plain  name|family|arch|ok  (machine-readable)"
           echo "  --remote ephemeral clone (no fetch into virt home)"
           exit 0
           ;;
       esac
     done
 
-    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+    if [[ "$PLAIN" != true && -z "''${NCC_CLI_NESTED:-}" ]]; then
       ${ui.text.header "Stack profiles"}
     fi
 
     ncc_resolve_catalog_root || exit 1
     HOST_ARCH=$(ncc_host_arch)
-    ${ui.tables.keyValue "Host arch" "$HOST_ARCH"}
-    ${ui.tables.keyValue "Catalog" "$CATALOG_SOURCE"}
-    if [[ "$VERBOSE" == true ]]; then
-      ${ui.tables.keyValue "Root" "$CATALOG_ROOT"}
+    if [[ "$PLAIN" != true ]]; then
+      ${ui.tables.keyValue "Host arch" "$HOST_ARCH"}
+      ${ui.tables.keyValue "Catalog" "$CATALOG_SOURCE"}
+      if [[ "$VERBOSE" == true ]]; then
+        ${ui.tables.keyValue "Root" "$CATALOG_ROOT"}
+      fi
+      ${ui.messages.loading "Scanning profiles…"}
     fi
-
-    ${ui.messages.loading "Scanning profiles…"}
     count=0
     skipped=0
     while IFS= read -r f; do
@@ -141,25 +145,35 @@ let
       arch=$(ncc_profile_field "$f" "arch")
       [[ -z "$arch" ]] && arch="any"
       if ncc_arch_ok "$f"; then
-        ${ui.badges.success "$name"}
-        echo "         family=$family  arch=$arch"
+        if [[ "$PLAIN" == true ]]; then
+          echo "''${name}|''${family}|''${arch}|ok"
+        else
+          ${ui.badges.success "$name"}
+          echo "         family=$family  arch=$arch"
+        fi
         count=$((count + 1))
       else
         skipped=$((skipped + 1))
         if [[ "$SHOW_ALL" == true ]]; then
-          ${ui.badges.warning "$name (arch=$arch — host $HOST_ARCH)"}
-        elif [[ "$VERBOSE" == true ]]; then
+          if [[ "$PLAIN" == true ]]; then
+            echo "''${name}|''${family}|''${arch}|skip"
+          else
+            ${ui.badges.warning "$name (arch=$arch — host $HOST_ARCH)"}
+          fi
+        elif [[ "$VERBOSE" == true && "$PLAIN" != true ]]; then
           ${ui.messages.info "skip $name (arch=$arch)"}
         fi
       fi
     done < <(find "$CATALOG_ROOT/profiles" -maxdepth 1 -type f -name '*.yml' | sort)
 
-    ${ui.messages.success "Profiles listed ($count compatible)"}
-    if [[ "$VERBOSE" == true || "$SHOW_ALL" == true ]]; then
-      ${ui.messages.info "Skipped (arch): $skipped"}
-    fi
-    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
-      ${ui.messages.info "Next: ncc stacks install --profile <name>   or   ncc stacks list-catalog"}
+    if [[ "$PLAIN" != true ]]; then
+      ${ui.messages.success "Profiles listed ($count compatible)"}
+      if [[ "$VERBOSE" == true || "$SHOW_ALL" == true ]]; then
+        ${ui.messages.info "Skipped (arch): $skipped"}
+      fi
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc stacks install --profile <name>   or   ncc stacks list-catalog"}
+      fi
     fi
   '';
 
@@ -173,32 +187,35 @@ let
       case "''${_args[$i]}" in
         --remote|-r) REMOTE=true ;;
         --verbose|-v) VERBOSE=true ;;
+        --plain) PLAIN=true ;;
         --family=*) FAMILY_FILTER="''${_args[$i]#--family=}" ;;
         --family)
           FAMILY_FILTER="''${_args[$((i+1))]:-}"
           ;;
         --help|-h)
-          echo "Usage: ncc stacks list-catalog [--remote] [--family homelab|compute] [-v]"
+          echo "Usage: ncc stacks list-catalog [--remote] [--family homelab|compute] [--plain] [-v]"
           echo "  Lists individual catalog services (group/service), not profile bundles"
+          echo "  --plain  group/service|variants  (machine-readable)"
           echo "  --remote ephemeral clone (no fetch into virt home)"
           exit 0
           ;;
       esac
     done
 
-    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+    if [[ "$PLAIN" != true && -z "''${NCC_CLI_NESTED:-}" ]]; then
       ${ui.text.header "Stack catalog"}
     fi
 
     ncc_resolve_catalog_root || exit 1
-    ${ui.tables.keyValue "Catalog" "$CATALOG_SOURCE"}
-    [[ -n "$FAMILY_FILTER" ]] && ${ui.tables.keyValue "Family filter" "$FAMILY_FILTER"}
-    if [[ "$VERBOSE" == true ]]; then
-      ${ui.tables.keyValue "Root" "$CATALOG_ROOT"}
-      ${ui.tables.keyValue "Host arch" "$(ncc_host_arch)"}
+    if [[ "$PLAIN" != true ]]; then
+      ${ui.tables.keyValue "Catalog" "$CATALOG_SOURCE"}
+      [[ -n "$FAMILY_FILTER" ]] && ${ui.tables.keyValue "Family filter" "$FAMILY_FILTER"}
+      if [[ "$VERBOSE" == true ]]; then
+        ${ui.tables.keyValue "Root" "$CATALOG_ROOT"}
+        ${ui.tables.keyValue "Host arch" "$(ncc_host_arch)"}
+      fi
+      ${ui.messages.loading "Scanning catalog services…"}
     fi
-
-    ${ui.messages.loading "Scanning catalog services…"}
     count=0
     while IFS= read -r dir; do
       [ -d "$dir" ] || continue
@@ -225,16 +242,23 @@ let
       for v in arm cpu rocm; do
         [[ -d "$dir/$v" ]] && variants="$variants$v "
       done
-      ${ui.badges.success "$rel"}
-      if [[ "$VERBOSE" == true && -n "$variants" ]]; then
-        echo "         variants: $variants"
+      variants=''${variants%% }
+      if [[ "$PLAIN" == true ]]; then
+        echo "''${rel}|''${variants}"
+      else
+        ${ui.badges.success "$rel"}
+        if [[ "$VERBOSE" == true && -n "$variants" ]]; then
+          echo "         variants: $variants"
+        fi
       fi
       count=$((count + 1))
     done < <(find "$CATALOG_ROOT/catalog" -mindepth 2 -maxdepth 2 -type d | sort)
 
-    ${ui.messages.success "Catalog services listed ($count)"}
-    if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
-      ${ui.messages.info "Next: ncc stacks install <group/service>   or   ncc stacks install --profile <name>"}
+    if [[ "$PLAIN" != true ]]; then
+      ${ui.messages.success "Catalog services listed ($count)"}
+      if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
+        ${ui.messages.info "Next: ncc stacks install <group/service>   or   ncc stacks install --profile <name>"}
+      fi
     fi
   '';
 
