@@ -34,11 +34,11 @@ in {
       description = "Docker Swarm role for homelab family; null = single-node. Compute profiles never use Swarm.";
     };
 
-    # NCC-HomeLab / NCC-Stacks catalog
+    # External catalog (Docker stacks / profiles) — default NCC-Stacks
     catalog = {
       repoUrl = lib.mkOption {
         type = lib.types.str;
-        default = "https://github.com/fr4iser90/NCC-HomeLab.git";
+        default = "https://github.com/fr4iser90/NCC-Stacks.git";
         description = "Git URL of the stack catalog repository";
       };
       ref = lib.mkOption {

@@ -1,8 +1,9 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, isSwarmMode, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 let
   cfg = getModuleConfig "stack-manager";
   ui = getModuleApi "cli-formatter";
+  isSwarmMode = (cfg.swarm or null) != null;
 
   virtUsers = lib.filterAttrs
     (name: user: user.role == "virtualization")
@@ -18,7 +19,7 @@ let
     else if (hasAdminUsers && !isSwarmMode) then (lib.head (lib.attrNames adminUsers))
     else null;
 
-  repoUrl = cfg.catalog.repoUrl or "https://github.com/fr4iser90/NCC-HomeLab.git";
+  repoUrl = cfg.catalog.repoUrl or "https://github.com/fr4iser90/NCC-Stacks.git";
   repoRef = cfg.catalog.ref or "main";
   installRoot = cfg.catalog.installRoot or "";
 
@@ -101,7 +102,7 @@ let
     exec ${stacks-fetch}/bin/ncc-stacks-fetch "$@"
   '';
 in {
-  config = lib.mkIf (hasVirtUsers || hasAdminUsers) {
+  config = lib.mkIf ((cfg.enable or false) && (hasVirtUsers || hasAdminUsers)) {
     environment.systemPackages = [ stacks-fetch homelab-fetch ];
   };
 }

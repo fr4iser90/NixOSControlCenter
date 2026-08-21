@@ -3,6 +3,8 @@
 let
   formatter = getModuleApi "cli-formatter";
   convertLib = ../../lib/layout-convert.nix;
+  smRoot = (getModuleMetadata "system-manager").path;
+  facade = import "${smRoot}/lib/config-facade.nix" { inherit pkgs; };
 
   # Discovery via module-manager path (no relative ../module-manager, no bare discovery arg)
   discovery = import "${(getModuleMetadata "module-manager").path}/lib/discovery.nix" { inherit lib; };
@@ -14,8 +16,11 @@ let
     set -euo pipefail
 
     NIXOS_CONFIG_DIR="''${NIXOS_CONFIG_DIR:-/etc/nixos}"
+    export NIXOS_ROOT="$NIXOS_CONFIG_DIR"
     MONOLITH_FILE="$NIXOS_CONFIG_DIR/systemConfig.nix"
     CONFIGS_DIR="$NIXOS_CONFIG_DIR/systemConfig"
+    export CONFIGS_BASE="$CONFIGS_DIR"
+    export MONOLITH_FILE
     NIX_BIN="${pkgs.nix}/bin/nix"
     NIX_INSTANTIATE="${pkgs.nix}/bin/nix-instantiate"
     CONVERT_LIB="${convertLib}"
@@ -25,6 +30,8 @@ let
 ${modulePathsText}
 EOF
     trap 'rm -f "$MODULE_PATHS_FILE"' EXIT
+
+    ${facade.sourcePreamble { nixosRoot = "/etc/nixos"; }}
 
     usage() {
       cat <<EOF
@@ -36,16 +43,17 @@ Usage:
   ncc-config-layout convert --to split [--force]
 
 Layouts:
-  monolith  $MONOLITH_FILE (nested .nix attrset)
-  split     $CONFIGS_DIR/**/config.nix
+  monolith  $MONOLITH_FILE only (users + modules in one file; state in /var/lib/ncc)
+  split     $CONFIGS_DIR/**/config.nix (no systemConfig.nix)
 
 Convert is pure Nix (import + toPretty). No JSON config files are written.
 EOF
     }
 
     has_split_configs() {
-      [[ -d "$CONFIGS_DIR" ]] || return 1
-      "$FIND_BIN" "$CONFIGS_DIR" -name 'config.nix' -type f 2>/dev/null | head -1 | grep -q .
+      [[ -d "$CONFIGS_DIR/core" ]] && "$FIND_BIN" "$CONFIGS_DIR/core" -name 'config.nix' -type f 2>/dev/null | head -1 | grep -q . && return 0
+      [[ -d "$CONFIGS_DIR/modules" ]] && "$FIND_BIN" "$CONFIGS_DIR/modules" -name 'config.nix' -type f 2>/dev/null | head -1 | grep -q . && return 0
+      return 1
     }
 
     detect_layout() {
@@ -90,11 +98,11 @@ EOF
       local current
       current=$(detect_layout)
       if [[ "$current" == "monolith" && "$force" != "true" ]]; then
-        # Already monolith — still scrub leftover split leaves so the tree cannot confuse tools/humans
-        if has_split_configs; then
-          backup_tree >/dev/null
-          "$FIND_BIN" "$CONFIGS_DIR" -name 'config.nix' -type f -delete
-          ${formatter.messages.info "Already monolith — removed leftover split config.nix leaves under $CONFIGS_DIR"}
+        # Already monolith — scrub hybrid systemConfig/ (users fold + leaves + state move)
+        backup_tree >/dev/null 2>&1 || true
+        SCRUB=$(ncc_scrub_split_leaves_if_monolith || true)
+        if [[ -n "''${SCRUB:-}" ]]; then
+          ${formatter.messages.info "Already monolith — scrubbed hybrid tree ($SCRUB)"}
         else
           ${formatter.messages.info "Already monolith"}
         fi
@@ -139,13 +147,14 @@ EOF
         exit 1
       fi
 
-      mkdir -p "$CONFIGS_DIR"
+      mkdir -p "$(dirname "$MONOLITH_FILE")"
       cp "$tmp_nix" "$MONOLITH_FILE"
       rm -f "$tmp_nix"
 
-      if has_split_configs; then
-        "$FIND_BIN" "$CONFIGS_DIR" -name 'config.nix' -type f -delete
-        ${formatter.messages.info "Removed split config.nix leaves"}
+      # Fold/remove hybrid tree; state → /var/lib/ncc
+      SCRUB=$(ncc_scrub_split_leaves_if_monolith || true)
+      if [[ -n "''${SCRUB:-}" ]]; then
+        ${formatter.messages.info "Scrubbed leftover systemConfig/ ($SCRUB)"}
       fi
       ${formatter.badges.success "Converted to monolith: $MONOLITH_FILE"}
     }

@@ -27,12 +27,15 @@ let
 ncc-module-migrate — migrate / clean legacy module configs
 
 Runs module migration plans (renames, merges) then orphan cleanup
-under systemConfig/{core,modules}. Never touches:
+under systemConfig/{core,modules} (split layout). Never touches:
   - \$NIXOS_ROOT/custom/     (userspace NixOS modules)
-  - systemConfig/users/      (per-user leaves)
   - systemConfig/custom/     (if present)
 
-Idempotent; state: \$NIXOS_ROOT/systemConfig/.ncc-module-migrations.json
+Monolith: module + user config live only in systemConfig.nix;
+migration state is /var/lib/ncc/module-migrations.json (not under /etc/nixos).
+
+Idempotent; state: /var/lib/ncc/module-migrations.json
+  (legacy: \$NIXOS_ROOT/systemConfig/.ncc-module-migrations.json — migrated automatically)
 
 Usage:
   ncc modules migrate [--dry-run] [--verbose] [--skip-orphans]
@@ -48,8 +51,15 @@ EOF
     ${backupHelpers.backupConfigFileFn}
 
     PLANS_JSON='${plansJson}'
-    STATE_FILE="''${CONFIGS_BASE}/.ncc-module-migrations.json"
-    mkdir -p "$CONFIGS_BASE" 2>/dev/null || sudo mkdir -p "$CONFIGS_BASE"
+    NCC_STATE_DIR="''${NCC_STATE_DIR:-/var/lib/ncc}"
+    STATE_FILE="$NCC_STATE_DIR/module-migrations.json"
+    LEGACY_STATE="''${CONFIGS_BASE}/.ncc-module-migrations.json"
+    mkdir -p "$NCC_STATE_DIR" 2>/dev/null || sudo mkdir -p "$NCC_STATE_DIR"
+    # One-time move from hybrid path under /etc/nixos
+    if [[ -f "$LEGACY_STATE" && ! -f "$STATE_FILE" ]]; then
+      cp -a "$LEGACY_STATE" "$STATE_FILE" 2>/dev/null || sudo cp -a "$LEGACY_STATE" "$STATE_FILE"
+      rm -f "$LEGACY_STATE" 2>/dev/null || sudo rm -f "$LEGACY_STATE"
+    fi
 
     if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
       if [[ "$DRY" -eq 1 ]]; then
@@ -103,9 +113,14 @@ EOF
     write_leaf_json() {
       local p="$1"
       local json="$2"
-      local tmp nix_out
+      local tmp nix_out cleaned
+      # User systemConfig must stay lean — migration state lives in
+      # /var/lib/ncc/module-migrations.json, not in leaf attrs.
+      cleaned=$(echo "$json" | ${pkgs.jq}/bin/jq -c '
+        del(._migratedFrom, ._version, ._dependencies, ._conflicts)
+      ') || cleaned="$json"
       tmp=$(mktemp --suffix=.json)
-      printf '%s\n' "$json" > "$tmp"
+      printf '%s\n' "$cleaned" > "$tmp"
       nix_out=$(_ncc_json_to_nix "$tmp") || { rm -f "$tmp"; return 1; }
       rm -f "$tmp"
       ncc_write_module_config "$p" "$nix_out"
@@ -137,6 +152,32 @@ EOF
           rm -f "$tmp"
           ;;
       esac
+    }
+
+    # Strip migration/engine meta that must not live in user systemConfig leaves.
+    # Applied state: /var/lib/ncc/module-migrations.json only.
+    strip_leaf_internal_meta() {
+      local p="$1"
+      local j cleaned
+      path_exists "$p" || return 0
+      j=$(read_leaf_json "$p")
+      cleaned=$(echo "$j" | ${pkgs.jq}/bin/jq -c '
+        del(._migratedFrom, ._version, ._dependencies, ._conflicts)
+      ')
+      if [[ "$j" == "$cleaned" ]]; then
+        return 0
+      fi
+      if [[ "$DRY" -eq 1 ]]; then
+        log "would strip internal meta from $p"
+        return 0
+      fi
+      ${ui.messages.loading "Cleaning internal meta from $p"}
+      write_leaf_json "$p" "$cleaned" || true
+    }
+
+    strip_known_leaves_internal_meta() {
+      strip_leaf_internal_meta "modules/infrastructure/stack-manager"
+      strip_leaf_internal_meta "modules/security/ssh-manager"
     }
 
     mark_applied() {
@@ -172,11 +213,13 @@ EOF
       local id="$1" to_path="$2"
       local server_p="modules/security/ssh-server-manager"
       local client_p="modules/security/ssh-client-manager"
-      local has_s=0 has_c=0 has_t=0
+      local client_spec_p="modules/specialized/ssh-client-manager"
+      local has_s=0 has_c=0 has_cs=0 has_t=0
       local has_code=0
 
       path_exists "$server_p" && has_s=1
       path_exists "$client_p" && has_c=1
+      path_exists "$client_spec_p" && has_cs=1
       path_exists "$to_path" && has_t=1
       [[ -d "$NIXOS_ROOT/$server_p" || -d "$NIXOS_ROOT/$client_p" ]] && has_code=1
 
@@ -196,7 +239,20 @@ EOF
         done
       }
 
-      if [[ "$has_s" -eq 0 && "$has_c" -eq 0 ]]; then
+      drop_specialized_ssh_client_leaf() {
+        path_exists "$client_spec_p" || return 0
+        if [[ "$DRY" -eq 1 ]]; then
+          ${ui.messages.info "Would remove orphan leaf $client_spec_p"}
+          return 0
+        fi
+        ${ui.messages.loading "Removing leftover $client_spec_p"}
+        local sf
+        sf=$(ncc_module_config_path "$client_spec_p")
+        [[ -f "$sf" ]] && ncc_backup_config_file "$sf" "module-migrate-ssh-orphan" >/dev/null 2>&1 || true
+        delete_leaf "$client_spec_p"
+      }
+
+      if [[ "$has_s" -eq 0 && "$has_c" -eq 0 && "$has_cs" -eq 0 ]]; then
         if [[ "$has_code" -eq 1 ]]; then
           ${ui.messages.loading "Plan $id: configs already merged — removing leftover module trees"}
           remove_legacy_ssh_code
@@ -205,23 +261,65 @@ EOF
           return 0
         fi
         log "ssh-merge: no legacy leaves — skip"
-        # Still mark applied if target already modern (fresh installs)
         if [[ "$has_t" -eq 1 ]] || already_applied "$id"; then
           mark_applied "$id" || true
         fi
         return 0
       fi
 
+      # Only specialized orphan left (common after earlier security-path merge)
+      if [[ "$has_s" -eq 0 && "$has_c" -eq 0 && "$has_cs" -eq 1 ]]; then
+        ${ui.messages.loading "Plan $id: removing specialized ssh-client-manager orphan"}
+        if [[ "$has_t" -eq 1 && "$DRY" -eq 0 ]]; then
+          local spec_j tgt_j folded
+          spec_j=$(read_leaf_json "$client_spec_p")
+          tgt_j=$(read_leaf_json "$to_path")
+          folded=$(${pkgs.jq}/bin/jq -nc --argjson s "$spec_j" --argjson t "$tgt_j" '
+            ($t.client // {}) as $cli |
+            ($s | del(.enable, ._version, ._dependencies, ._conflicts, ._migratedFrom)) as $spec |
+            $t + {
+              client: (
+                $cli + $spec + {
+                  enable: ($cli.enable // $spec.enable // false),
+                  connections: (($cli.connections // {}) + ($spec.connections // {})),
+                  settings: (($cli.settings // {}) + ($spec.settings // {}))
+                }
+              )
+            }
+            | del(._migratedFrom, ._version, ._dependencies, ._conflicts)
+          ')
+          write_leaf_json "$to_path" "$folded" || true
+        fi
+        drop_specialized_ssh_client_leaf
+        mark_applied "$id"
+        ${ui.messages.success "Removed specialized ssh-client-manager orphan"}
+        return 0
+      fi
+
       ${ui.messages.loading "Plan $id: merge SSH server/client → ssh-manager"}
       if [[ "$VERBOSE" -eq 1 ]]; then
         echo "  legacy server config: $([[ $has_s -eq 1 ]] && echo yes || echo no)"
-        echo "  legacy client config: $([[ $has_c -eq 1 ]] && echo yes || echo no)"
+        echo "  legacy client (security): $([[ $has_c -eq 1 ]] && echo yes || echo no)"
+        echo "  legacy client (specialized): $([[ $has_cs -eq 1 ]] && echo yes || echo no)"
         echo "  target ssh-manager:   $([[ $has_t -eq 1 ]] && echo exists || echo new)"
       fi
 
       local server_j client_j target_j merged
+      local has_c_eff=0
+      [[ "$has_c" -eq 1 || "$has_cs" -eq 1 ]] && has_c_eff=1
       server_j=$([[ "$has_s" -eq 1 ]] && read_leaf_json "$server_p" || echo '{}')
-      client_j=$([[ "$has_c" -eq 1 ]] && read_leaf_json "$client_p" || echo '{}')
+      if [[ "$has_c" -eq 1 && "$has_cs" -eq 1 ]]; then
+        client_j=$(${pkgs.jq}/bin/jq -nc \
+          --argjson a "$(read_leaf_json "$client_p")" \
+          --argjson b "$(read_leaf_json "$client_spec_p")" \
+          '$a * $b')
+      elif [[ "$has_c" -eq 1 ]]; then
+        client_j=$(read_leaf_json "$client_p")
+      elif [[ "$has_cs" -eq 1 ]]; then
+        client_j=$(read_leaf_json "$client_spec_p")
+      else
+        client_j='{}'
+      fi
       target_j=$([[ "$has_t" -eq 1 ]] && read_leaf_json "$to_path" || echo '{}')
 
       merged=$(${pkgs.jq}/bin/jq -nc \
@@ -229,14 +327,13 @@ EOF
         --argjson c "$client_j" \
         --argjson t "$target_j" \
         --argjson has_s "$has_s" \
-        --argjson has_c "$has_c" '
+        --argjson has_c "$has_c_eff" '
         def as_bool($x; $d): if $x == null then $d else $x end;
         ($t // {}) as $base |
         ($s // {}) as $srv |
         ($c // {}) as $cli |
-        # client nested object from legacy client leaf (enable → client.enable)
         (if $has_c == 1 then
-            (($cli | del(.enable) | del(._version) | del(._dependencies) | del(._conflicts))
+            (($cli | del(.enable) | del(._version) | del(._dependencies) | del(._conflicts) | del(._migratedFrom))
               + { enable: as_bool($cli.enable; false) })
           else ($base.client // { enable: false }) end) as $client_obj |
         ($base + $srv + {
@@ -246,13 +343,9 @@ EOF
           permitRootLogin: ($srv.permitRootLogin // $base.permitRootLogin // "yes"),
           workflow: ($srv.workflow // $base.workflow // { enable: false }),
           client: $client_obj,
-          banner: ($srv.banner // $base.banner // null),
-          _version: "2.0",
-          _migratedFrom: (
-            [ (if $has_s == 1 then "ssh-server-manager" else empty end),
-              (if $has_c == 1 then "ssh-client-manager" else empty end) ]
-          )
-        } | with_entries(select(.value != null)))
+          banner: ($srv.banner // $base.banner // null)
+        } | with_entries(select(.value != null))
+          | del(._migratedFrom, ._version, ._dependencies, ._conflicts))
       ')
 
       if [[ "$VERBOSE" -eq 1 ]]; then
@@ -284,6 +377,11 @@ EOF
         cf=$(ncc_module_config_path "$client_p")
         [[ -f "$cf" ]] && ncc_backup_config_file "$cf" "module-migrate-ssh" >/dev/null 2>&1 || true
       fi
+      if [[ "$has_cs" -eq 1 ]]; then
+        local csf
+        csf=$(ncc_module_config_path "$client_spec_p")
+        [[ -f "$csf" ]] && ncc_backup_config_file "$csf" "module-migrate-ssh" >/dev/null 2>&1 || true
+      fi
 
       write_leaf_json "$to_path" "$merged" || {
         ${ui.messages.error "Failed to write $to_path"}
@@ -291,6 +389,7 @@ EOF
       }
       delete_leaf "$server_p"
       delete_leaf "$client_p"
+      drop_specialized_ssh_client_leaf
       remove_legacy_ssh_code
       mark_applied "$id"
       ${ui.messages.success "Migrated → $to_path (legacy SSH module configs removed)"}
@@ -326,11 +425,9 @@ EOF
         local src_j tgt_j merged
         src_j=$(read_leaf_json "$from_p")
         tgt_j=$([[ "$has_to" -eq 1 ]] && read_leaf_json "$to_p" || echo '{}')
-        merged=$(${pkgs.jq}/bin/jq -nc --argjson s "$src_j" --argjson t "$tgt_j" --arg from "$from_p" '
-          ($t + $s) + {
-            _version: ($s._version // $t._version // "2.0.0"),
-            _migratedFrom: (( $t._migratedFrom // [] ) + [ ($from | split("/") | .[-1]) ] | unique)
-          }
+        merged=$(${pkgs.jq}/bin/jq -nc --argjson s "$src_j" --argjson t "$tgt_j" '
+          ($t + $s)
+          | del(._migratedFrom, ._version, ._dependencies, ._conflicts)
         ')
         if [[ "$VERBOSE" -eq 1 ]]; then
           echo "  preview:"
@@ -507,6 +604,9 @@ EOF
     else
       log "skipping orphan cleanup (--skip-orphans)"
     fi
+
+    # Drop leftover _migratedFrom / _version from leaves (user systemConfig stays lean)
+    strip_known_leaves_internal_meta
 
     if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
       if [[ "$DRY" -eq 1 ]]; then

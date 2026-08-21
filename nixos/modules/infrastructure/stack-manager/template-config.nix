@@ -5,7 +5,7 @@
   swarm = null; # "manager" | "worker" | null
 
   catalog = {
-    repoUrl = "https://github.com/fr4iser90/NCC-HomeLab.git";
+    repoUrl = "https://github.com/fr4iser90/NCC-Stacks.git";
     ref = "main";
     installRoot = "";
   };

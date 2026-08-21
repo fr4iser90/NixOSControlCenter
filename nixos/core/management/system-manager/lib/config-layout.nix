@@ -40,7 +40,8 @@ let
   splitConfigFile = modulePath:
     "${absolute.split}/${listToSlash (pathToList modulePath)}/config.nix";
 
-  # Recursively check if any config.nix exists under a directory
+  # Recursively check if any config.nix exists under core/ or modules/ only
+  # (users/ is legacy hybrid under monolith and must not imply split)
   hasSplitConfigs = configsPath:
     let
       findConfigs = currentDir:
@@ -51,8 +52,13 @@ let
           subDirs = builtins.filter (n: dir.${n} == "directory") names;
         in
           hasConfig || builtins.any (d: findConfigs (currentDir + "/${d}")) subDirs;
+      core = configsPath + "/core";
+      modules = configsPath + "/modules";
     in
-      pathExists configsPath && findConfigs configsPath;
+      pathExists configsPath && (
+        (pathExists core && findConfigs core)
+        || (pathExists modules && findConfigs modules)
+      );
 
   # Detect layout from paths (flake-relative or absolute)
   # Prefer explicit layout field when loading monolith/split content separately

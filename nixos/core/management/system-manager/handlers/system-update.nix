@@ -1268,9 +1268,9 @@ EOF
       if [ "$(ncc_detect_layout)" = "monolith" ]; then
         SCRUBBED=$(ncc_scrub_split_leaves_if_monolith || true)
         if [ -n "''${SCRUBBED:-}" ]; then
-          ${ui.messages.info "Monolith layout: removed $SCRUBBED leftover split config.nix leaf/leaves under $CONFIGS_BASE"}
+          ${ui.messages.info "Monolith: scrubbed hybrid systemConfig/ ($SCRUBBED)"}
         elif [ "$VERBOSE" = "true" ]; then
-          ${ui.messages.info "Monolith layout: skipping split template sync (SSOT: $MONOLITH_FILE)"}
+          ${ui.messages.info "Monolith layout: SSOT is $MONOLITH_FILE only (no systemConfig/ tree)"}
         fi
       else
       if [ "$VERBOSE" = "true" ]; then

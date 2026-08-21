@@ -20,7 +20,8 @@ The User System module is a **core module** that manages all system user account
 
 ### Central User Config (Fallback)
 
-Basic user definitions go in `systemConfig/core/base/user/config.nix`:
+**Split:** `systemConfig/core/base/user/config.nix`  
+**Monolith:** `systemConfig.nix` → `core.base.user.<name>`
 
 ```nix
 {
@@ -34,21 +35,21 @@ Basic user definitions go in `systemConfig/core/base/user/config.nix`:
 
 ### Per-User Configs (Recommended)
 
-User-specific overrides go in `systemConfig/users/<username>/config.nix`:
+**Split:** `systemConfig/users/<username>/config.nix`  
+**Monolith:** same attrs under `users.<username>` inside `systemConfig.nix` (no `systemConfig/` directory).
 
 ```
+# Split layout
 systemConfig/
   users/
     fr4iser/
       config.nix          # Per-user: packages, home-manager, overrides
-    alice/
-      config.nix
 ```
 
 **Per-user config supports ALL NixOS options:**
 
 ```nix
-# systemConfig/users/fr4iser/config.nix
+# Split leaf — or monolith attr users.fr4iser = { … };
 
 # User packages (per-user, not global)
 userPackages = [ "vscode" "firefox" ];

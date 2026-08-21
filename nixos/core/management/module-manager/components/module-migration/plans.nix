@@ -1,5 +1,5 @@
 # Module migration plans (rename / merge / orphan cleanup).
-# Applied by ncc-module-migrate; tracked in systemConfig/.ncc-module-migrations.json
+# Applied by ncc-module-migrate; tracked in /var/lib/ncc/module-migrations.json
 { lib }:
 
 {
@@ -10,6 +10,8 @@
       fromPaths = [
         "modules/security/ssh-server-manager"
         "modules/security/ssh-client-manager"
+        # Pre-security layout leftover (monolith often kept this after merge)
+        "modules/specialized/ssh-client-manager"
       ];
       toPath = "modules/security/ssh-manager";
       kind = "ssh-merge";

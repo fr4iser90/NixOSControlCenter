@@ -35,9 +35,17 @@ let
     JQ_BIN="''${JQ_BIN:-jq}"
     SERIALIZE_NIX="''${SERIALIZE_NIX:-${serializeFile}}"
 
+    # Split layout = leaf configs under core/ or modules/ only.
+    # users/ leaves (legacy hybrid) and migration JSON must NOT imply "split".
     _ncc_has_split_configs() {
       [[ -d "$CONFIGS_BASE" ]] || return 1
-      find "$CONFIGS_BASE" -name 'config.nix' -type f 2>/dev/null | head -1 | grep -q .
+      if [[ -d "$CONFIGS_BASE/core" ]] && find "$CONFIGS_BASE/core" -name 'config.nix' -type f 2>/dev/null | head -1 | grep -q .; then
+        return 0
+      fi
+      if [[ -d "$CONFIGS_BASE/modules" ]] && find "$CONFIGS_BASE/modules" -name 'config.nix' -type f 2>/dev/null | head -1 | grep -q .; then
+        return 0
+      fi
+      return 1
     }
 
     ncc_detect_layout() {
@@ -77,18 +85,80 @@ let
       return 1
     }
 
-    # When layout is monolith, remove leftover split config.nix leaves (dirs may remain).
-    # Prints count of deleted files to stdout when > 0.
+    # Pure monolith: SSOT is systemConfig.nix only.
+    # Wipe leftover hybrid trees (not just config.nix) so /etc/nixos/systemConfig
+    # does not linger as empty dirs or junk after update.
+    # Prints a short summary to stdout when anything changed.
     ncc_scrub_split_leaves_if_monolith() {
-      local layout count
+      local layout count=0 folded=0 moved_state=0 wiped=0
+      local NCC_STATE_DIR="''${NCC_STATE_DIR:-/var/lib/ncc}"
+      local OLD_STATE="$CONFIGS_BASE/.ncc-module-migrations.json"
+      local NEW_STATE="$NCC_STATE_DIR/module-migrations.json"
+      local _rm _rmdir _mkdir _cp
+
+      _rm() { rm -rf "$@" 2>/dev/null || sudo rm -rf "$@" 2>/dev/null || true; }
+      _rmdir() { rmdir "$@" 2>/dev/null || sudo rmdir "$@" 2>/dev/null || true; }
+      _mkdir() { mkdir -p "$@" 2>/dev/null || sudo mkdir -p "$@" 2>/dev/null || true; }
+      _cp() { cp -a "$@" 2>/dev/null || sudo cp -a "$@" 2>/dev/null || true; }
+
       layout=$(ncc_detect_layout)
       [[ "$layout" == "monolith" ]] || return 0
-      [[ -d "$CONFIGS_BASE" ]] || return 0
-      count=$(find "$CONFIGS_BASE" -name 'config.nix' -type f 2>/dev/null | wc -l)
-      count=''${count// /}
-      if [[ "''${count:-0}" -gt 0 ]]; then
-        find "$CONFIGS_BASE" -name 'config.nix' -type f -delete
-        echo "$count"
+      [[ -f "$MONOLITH_FILE" ]] || return 0
+
+      # 1) Fold legacy users/ leaves into monolith, then drop the tree
+      if [[ -d "$CONFIGS_BASE/users" ]]; then
+        local uf name leaf_nix
+        while IFS= read -r -d $'\0' uf; do
+          name=$(basename "$(dirname "$uf")")
+          [[ -n "$name" && "$name" != "users" ]] || continue
+          leaf_nix=$(cat "$uf" 2>/dev/null || echo "{}")
+          if ncc_write_module_config "users/$name" "$leaf_nix" 2>/dev/null; then
+            folded=$((folded + 1))
+          fi
+        done < <(find "$CONFIGS_BASE/users" -name 'config.nix' -type f -print0 2>/dev/null || true)
+        if [[ -d "$CONFIGS_BASE/users" ]]; then
+          _rm "$CONFIGS_BASE/users"
+          wiped=$((wiped + 1))
+        fi
+      fi
+
+      # 2) Count leftover leaves (for message), then wipe core/ + modules/ entirely
+      if [[ -d "$CONFIGS_BASE/core" || -d "$CONFIGS_BASE/modules" ]]; then
+        count=$(find "$CONFIGS_BASE/core" "$CONFIGS_BASE/modules" -name 'config.nix' -type f 2>/dev/null | wc -l)
+        count=''${count// /}
+        count=''${count:-0}
+        [[ -d "$CONFIGS_BASE/core" ]] && { _rm "$CONFIGS_BASE/core"; wiped=$((wiped + 1)); }
+        [[ -d "$CONFIGS_BASE/modules" ]] && { _rm "$CONFIGS_BASE/modules"; wiped=$((wiped + 1)); }
+      fi
+
+      # 3) Migration state → /var/lib/ncc (not under /etc/nixos)
+      if [[ -f "$OLD_STATE" ]]; then
+        _mkdir "$NCC_STATE_DIR"
+        if [[ ! -f "$NEW_STATE" ]]; then
+          _cp "$OLD_STATE" "$NEW_STATE"
+          moved_state=1
+        fi
+        _rm "$OLD_STATE"
+      fi
+
+      # 4) Drop leftover systemConfig dir (keep systemConfig/custom/ if present)
+      if [[ -d "$CONFIGS_BASE" ]]; then
+        find "$CONFIGS_BASE" -name '.keep' -type f -delete 2>/dev/null || true
+        find "$CONFIGS_BASE" -type d -empty -delete 2>/dev/null || true
+        if [[ -d "$CONFIGS_BASE/custom" ]]; then
+          # Only custom userspace left — OK
+          :
+        elif [[ -z "$(find "$CONFIGS_BASE" -mindepth 1 2>/dev/null | head -1)" ]]; then
+          _rmdir "$CONFIGS_BASE"
+        else
+          # Non-empty junk under monolith → wipe whole tree (SSOT is monolith file)
+          _rm "$CONFIGS_BASE"
+          wiped=$((wiped + 1))
+        fi
+      fi
+
+      if [[ "$count" -gt 0 || "$folded" -gt 0 || "$moved_state" -gt 0 || "$wiped" -gt 0 ]]; then
+        echo "leaves=$count folded_users=$folded state_moved=$moved_state wiped_trees=$wiped"
       fi
       return 0
     }
@@ -133,7 +203,7 @@ let
       local nix_out
       nix_out=$(_ncc_json_to_nix "$json_file") || return 1
       mkdir -p "$(dirname "$MONOLITH_FILE")"
-      mkdir -p "$CONFIGS_BASE"
+      # Pure monolith — do not create systemConfig/ hybrid tree
       printf '%s\n' "$nix_out" > "$MONOLITH_FILE"
     }
 
@@ -145,6 +215,28 @@ let
       module_path="''${module_path#/}"
       module_path="''${module_path%.nix}"
       module_path="''${module_path%/config}"
+
+      if declare -F ncc_dry_run >/dev/null 2>&1 && ncc_dry_run; then
+        local target
+        if [[ "$layout" == "split" ]]; then
+          target=$(ncc_module_config_path "$module_path")
+        else
+          target="''${MONOLITH_FILE:-/etc/nixos/systemConfig.nix} (path: $module_path)"
+        fi
+        if ! _ncc_eval_nix_to_json "$content" >/dev/null; then
+          echo "[DRY-RUN] INVALID Nix content for $module_path" >&2
+          return 1
+        fi
+        local preview
+        preview=$(printf '%s\n' "$content" | head -n 40)
+        if declare -F ncc_dry_skip >/dev/null 2>&1; then
+          ncc_dry_skip "write module config" "$target" "$preview"
+        else
+          echo "[DRY-RUN] would write module config → $target" >&2
+        fi
+        return 0
+      fi
+
       case "$layout" in
         split)
           local config_file

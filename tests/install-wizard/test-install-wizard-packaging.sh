@@ -19,6 +19,10 @@ grep -q 'fa ? getModuleApi' "$DEFAULT" || {
   echo "FAIL: getModuleApi only when declared"
   exit 1
 }
+grep -q 'fa ? getModuleMetadata' "$DEFAULT" || {
+  echo "FAIL: getModuleMetadata only when declared"
+  exit 1
+}
 echo "OK static guards"
 
 echo "== dynamic: leftover { pkgs }: + skipDir(checks) =="
@@ -126,8 +130,13 @@ nix-build --no-out-link -E "
       inherit (status) messages badges;
     };
     getModuleApi = name: assert name == \"cli-formatter\"; ui;
+    helpers = import $ROOT/nixos/core/management/module-manager/lib/module-config.nix {
+      inherit lib;
+      systemConfig = {};
+    };
+    inherit (helpers) getModuleMetadata;
   in
-  (import $SCRIPTS { inherit pkgs getModuleApi; }).scriptTree
+  (import $SCRIPTS { inherit pkgs getModuleApi getModuleMetadata; }).scriptTree
 " >/dev/null
 echo "OK: real scripts/default.nix scriptTree builds"
 

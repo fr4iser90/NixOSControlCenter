@@ -1,6 +1,6 @@
 # Install-wizard script tree — bash bodies in sibling *.nix (no repo .sh).
 # Packaging is a recursive walk: add/remove a script under scripts/ without editing this file.
-{ pkgs, getModuleApi }:
+{ pkgs, getModuleApi, getModuleMetadata }:
 
 let
   inherit (pkgs) lib;
@@ -54,17 +54,17 @@ let
 
   bashScripts = collectBashScripts ./. "";
 
-  # Only pass getModuleApi when the script declares it (legacy `{ pkgs }:` leftovers
-  # under /etc/nixos after sync-without-delete must not break the build).
+  # Only pass helpers the script declares (legacy leftovers must not break the build).
   callScript = path:
     let
       fn = import path;
       fa = builtins.functionArgs fn;
+      args =
+        { inherit pkgs; }
+        // lib.optionalAttrs (fa ? getModuleApi) { inherit getModuleApi; }
+        // lib.optionalAttrs (fa ? getModuleMetadata) { inherit getModuleMetadata; };
     in
-    if fa ? getModuleApi then
-      fn { inherit pkgs getModuleApi; }
-    else
-      fn { inherit pkgs; };
+    fn args;
 
   scriptDrvs = map (s: {
     inherit (s) outRel;

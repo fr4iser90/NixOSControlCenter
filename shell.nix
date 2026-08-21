@@ -2,7 +2,16 @@
 { pkgs ? import <nixpkgs> {} }:
 
 let
-  installer = import ./nixos/core/management/install-wizard/scripts { inherit pkgs; };
+  lib = pkgs.lib;
+  # Discovery helpers (same shape as flake specialArgs) so config-facade can resolve system-manager
+  helpers = import ./nixos/core/management/module-manager/lib/module-config.nix {
+    inherit lib;
+    systemConfig = { };
+  };
+  installer = import ./nixos/core/management/install-wizard/scripts {
+    inherit pkgs;
+    inherit (helpers) getModuleApi getModuleMetadata;
+  };
 in
 
 pkgs.mkShell {

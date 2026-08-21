@@ -1,6 +1,6 @@
 # ncc-priv — privileged config apply (leaf + account writes under /etc/nixos)
-# User packages: systemConfig/users/<name>/config.nix
-# Account defs:  systemConfig/core/base/user/config.nix (role, shell, autoLogin)
+# User packages: users/<name> (split: systemConfig/users/.../config.nix; monolith: attr in systemConfig.nix)
+# Account defs:  core/base/user (same dual-layout rules)
 { pkgs, lib, getModuleConfig, getModuleMetadata, getModuleApi }:
 
 let

@@ -292,6 +292,9 @@ Usage:
   ncc stacks --gui           Domain GUI
   ncc stacks status [--json]
   ncc stacks fetch           Clone/update catalog (as virt user)
+  ncc stacks list-profiles   Compatible profiles (use --remote to browse without fetch)
+  ncc stacks list-catalog    Individual catalog services (group/service)
+  ncc stacks install …       --profile NAME  or  group/service
   ncc stacks init […]        init-homelab / init-compute (--profile …)
   ncc stacks ops …           stacks.sh status|start|stop|restart
   ncc stacks swarm …         swarm.sh (homelab family)
@@ -310,6 +313,30 @@ EOF
           exec ncc-stacks-fetch "$@"
         else
           ${ui.messages.error "ncc-stacks-fetch not installed (enable stack-manager)"}
+          exit 1
+        fi
+        ;;
+      list-profiles)
+        if command -v ncc-stacks-list-profiles >/dev/null 2>&1; then
+          exec ncc-stacks-list-profiles "$@"
+        else
+          ${ui.messages.error "ncc-stacks-list-profiles not installed (enable stack-manager)"}
+          exit 1
+        fi
+        ;;
+      list-catalog)
+        if command -v ncc-stacks-list-catalog >/dev/null 2>&1; then
+          exec ncc-stacks-list-catalog "$@"
+        else
+          ${ui.messages.error "ncc-stacks-list-catalog not installed (enable stack-manager)"}
+          exit 1
+        fi
+        ;;
+      install)
+        if command -v ncc-stacks-install >/dev/null 2>&1; then
+          exec ncc-stacks-install "$@"
+        else
+          ${ui.messages.error "ncc-stacks-install not installed (enable stack-manager)"}
           exit 1
         fi
         ;;
@@ -379,6 +406,42 @@ EOF
       ''}/bin/ncc-stacks-init-cmd";
       shortHelp = "init - Run catalog installer";
       longHelp = "ncc stacks init [--profile NAME …]";
+    }
+    {
+      name = "list-profiles";
+      parent = "stacks";
+      domain = "stacks";
+      description = "List catalog profiles for this host";
+      category = "infrastructure";
+      script = "${pkgs.writeShellScriptBin "ncc-stacks-list-profiles-cmd" ''
+        exec ncc-stacks-list-profiles "$@"
+      ''}/bin/ncc-stacks-list-profiles-cmd";
+      shortHelp = "list-profiles - Compatible profiles";
+      longHelp = "ncc stacks list-profiles [--remote] [--all] [-v]";
+    }
+    {
+      name = "list-catalog";
+      parent = "stacks";
+      domain = "stacks";
+      description = "List individual catalog services";
+      category = "infrastructure";
+      script = "${pkgs.writeShellScriptBin "ncc-stacks-list-catalog-cmd" ''
+        exec ncc-stacks-list-catalog "$@"
+      ''}/bin/ncc-stacks-list-catalog-cmd";
+      shortHelp = "list-catalog - Catalog group/service list";
+      longHelp = "ncc stacks list-catalog [--remote] [--family homelab|compute] [-v]";
+    }
+    {
+      name = "install";
+      parent = "stacks";
+      domain = "stacks";
+      description = "Install profile bundle or single catalog service";
+      category = "infrastructure";
+      script = "${pkgs.writeShellScriptBin "ncc-stacks-install-cmd" ''
+        exec ncc-stacks-install "$@"
+      ''}/bin/ncc-stacks-install-cmd";
+      shortHelp = "install - Profile or group/service";
+      longHelp = "ncc stacks install --profile NAME | group/service";
     }
     {
       name = "ops";

@@ -10,35 +10,20 @@ let
   virtUsers = filterAttrs
     (name: user: user.role == "virtualization")
     (getModuleConfig "user");
-  adminUsers = filterAttrs
-    (name: user: user.role == "admin")
-    (getModuleConfig "user");
-
   hasVirtUsers = (length (attrNames virtUsers)) > 0;
-  hasAdminUsers = (length (attrNames adminUsers)) > 0;
-
-  hasDockerUser = if isSwarmMode then hasVirtUsers
-    else (hasVirtUsers || hasAdminUsers);
-
-  virtUser = if hasVirtUsers then (head (attrNames virtUsers))
-    else if (hasAdminUsers && !isSwarmMode) then (head (attrNames adminUsers))
-    else null;
 
   stacksUtils = import ./lib/stacks-utils.nix {
     inherit config lib pkgs systemConfig getModuleConfig getModuleApi;
   };
 in {
-  _module.args = {
-    isSwarmMode = isSwarmMode;
-  };
-
+  # Unconditional imports — never gate imports on cfg/config (_module.args / infinite recursion).
+  # Handlers wrap packages in mkIf; config seeding is module-manager's job (not legacy configHelpers).
   imports = [
     ./options.nix
     ./commands.nix
-  ] ++ optionals (cfg.enable or false) [
-    ./config.nix
     ./handlers/stacks-fetch.nix
     ./handlers/stacks-create.nix
+    ./handlers/stacks-catalog.nix
   ];
 
   environment.systemPackages = mkIf (cfg.enable or false) (

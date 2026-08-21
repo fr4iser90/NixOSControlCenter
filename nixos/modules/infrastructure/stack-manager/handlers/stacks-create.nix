@@ -1,8 +1,9 @@
-{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, isSwarmMode, ... }:
+{ config, lib, pkgs, systemConfig, getModuleConfig, getModuleApi, ... }:
 
 let
   cfg = getModuleConfig "stack-manager";
   ui = getModuleApi "cli-formatter";
+  isSwarmMode = (cfg.swarm or null) != null;
 
   virtUsers = lib.filterAttrs
     (name: user: user.role == "virtualization")
@@ -123,7 +124,7 @@ let
     exec ${stacks-create}/bin/ncc-stacks-init "$@"
   '';
 in {
-  config = lib.mkIf (hasVirtUsers || hasAdminUsers) {
+  config = lib.mkIf ((cfg.enable or false) && (hasVirtUsers || hasAdminUsers)) {
     environment.systemPackages = [ stacks-create homelab-create ];
   };
 }
