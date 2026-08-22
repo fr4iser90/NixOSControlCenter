@@ -198,9 +198,9 @@ main() {
     else
         log_success "Setup complete"
         log_next "sudo ncc system-update"
-        if [[ -n "${NCC_GUI_ANSWERS_FILE:-}" && -f "${NCC_GUI_ANSWERS_FILE}" ]]; then
-            if grep -q '^STACK_PROFILES=' "${NCC_GUI_ANSWERS_FILE}" 2>/dev/null \
-                || grep -q '^HOMELAB_TYPE=' "${NCC_GUI_ANSWERS_FILE}" 2>/dev/null; then
+        if [[ -n "''${NCC_GUI_ANSWERS_FILE:-}" && -f "''${NCC_GUI_ANSWERS_FILE}" ]]; then
+            if grep -q '^STACK_PROFILES=' "''${NCC_GUI_ANSWERS_FILE}" 2>/dev/null \
+                || grep -q '^HOMELAB_TYPE=' "''${NCC_GUI_ANSWERS_FILE}" 2>/dev/null; then
                 log_next "Phase 2 (as virt user): ncc stacks fetch && ncc stacks init"
             fi
         fi

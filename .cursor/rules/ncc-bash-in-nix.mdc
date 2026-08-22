@@ -1,0 +1,16 @@
+# NCC: Bash embedded in `.nix`
+
+When editing `pkgs.writeText` / `pkgs.writeShellScriptBin` with `''` multiline strings:
+
+- **Bash** variable / default: `''${VAR:-}` (two single quotes before `$`)
+- **Nix** store paths / options: `${pkgs.bash}`, `${lib.escapeShellArg x}`
+
+Never raw `${NCC_…}` or `${selected_modules` in `''` strings.
+
+Large install-wizard scripts: use `builtins.fromJSON` like `config-writer.nix` — no `.sh` files in `nixos/`.
+
+Before claiming installer/Nix bash changes work, run:
+
+```bash
+bash tests/install-wizard/validate-bash-embedding.sh
+```
