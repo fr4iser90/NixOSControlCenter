@@ -435,6 +435,17 @@ labels. Prefer **restore last geometry**; first open uses a sane default. Modals
 stay modals for chrome prefs; a full Settings *page* is optional later if the
 dialog keeps growing.
 
+### What the GUI remembers (SSOT)
+
+| Kind | Where | Examples |
+|------|--------|----------|
+| Chrome / comfort | `QSettings` (`NixOSControlCenter` / `ncc-gui`) + `~/.config/ncc/gui-chrome.json` | Activity mode, show Target, Settings geometry, Safety draft toggles |
+| Fleet reconnect | `~/.config/ncc/active-target` | Last Connect host — **cleared** when user picks This machine, Clear, or Disconnect |
+| Host policy | `systemConfig` (declarative) | `dangerousIgnore`, `autoBuild` — needs rebuild to activate |
+
+Rule: user “clear / this machine” must persist (delete active-target). Do not
+re-bootstrap a forgotten host on next launch.
+
 **Host safety (declarative, Core):**
 
 | Option | Module short name | Effect |

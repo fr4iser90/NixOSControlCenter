@@ -60,7 +60,7 @@ sudo -u <virt> ncc stacks install media/jellyfin
 
 ## Notes
 
-Alias: `ncc homelab` → `ncc stacks`.
+Canonical CLI: `ncc stacks` (no `ncc homelab` alias).
 
 Default catalog: `https://github.com/fr4iser90/NCC-Stacks.git`.
 

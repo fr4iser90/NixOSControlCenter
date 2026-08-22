@@ -300,8 +300,6 @@ Usage:
   ncc stacks swarm …         swarm.sh (homelab family)
   ncc stacks list-stacks|list-containers|list-ports|list-domains
   ncc stacks manager         TUI
-
-Alias: ncc homelab → ncc stacks
 EOF
             ;;
         esac
@@ -364,12 +362,6 @@ EOF
         exit 1
         ;;
     esac
-  '';
-
-  # Alias entry: ncc homelab → same as stacks
-  homelabAlias = pkgs.writeShellScriptBin "ncc-homelab" ''
-    #!${pkgs.bash}/bin/bash
-    exec ${stacksEntry}/bin/ncc-stacks "$@"
   '';
 
   childCmds = [
@@ -527,14 +519,6 @@ mkMerge [
     group = "features";
   })
   (cliRegistry.registerGuiPage "stacks" ./ui/gui)
-  # Legacy GUI domain id so old bookmarks / ncc-domain-gui homelab still resolve
-  (cliRegistry.registerGuiDomain "homelab" {
-    label = "Stacks (alias)";
-    description = "Alias for stacks — use ncc stacks --gui";
-    enabled = cfg.enable or false;
-    group = "features";
-  })
-  (cliRegistry.registerGuiPage "homelab" ./ui/gui)
   (mkIf (cfg.enable or false) (cliRegistry.registerCommandsFor "stacks" (
     [
       {
@@ -548,18 +532,7 @@ mkMerge [
         longHelp = ''
           ncc stacks --gui
           ncc stacks status|fetch|init|ops|swarm|…
-          Alias: ncc homelab
         '';
-      }
-      {
-        name = "homelab";
-        domain = "stacks";
-        type = "manager";
-        description = "Alias for ncc stacks (legacy)";
-        category = "infrastructure";
-        script = "${homelabAlias}/bin/ncc-homelab";
-        shortHelp = "homelab - Alias for stacks";
-        longHelp = "ncc homelab … → ncc stacks …";
       }
     ] ++ childCmds
   )))

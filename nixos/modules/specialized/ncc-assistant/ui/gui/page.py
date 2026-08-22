@@ -1,11 +1,12 @@
-"""AI — DomainPage kit fallback when assistant panel cannot embed."""
+"""AI — embed assistant panel in Control Center shell."""
 
 from __future__ import annotations
 
 import subprocess
 import traceback
 
-from PySide6.QtWidgets import QLabel
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QTextEdit
 
 from ncc_gui.scaffold import DomainPage
 
@@ -20,18 +21,23 @@ def create_page(parent=None):
             def __init__(self, p=None) -> None:
                 super().__init__(
                     "AI Assistant",
-                    "Could not embed the assistant panel. "
-                    "Usually the LLM endpoint is unreachable or auth is missing.",
+                    "Could not open the assistant panel.",
                     activity=False,
                     parent=p,
                 )
-                body = QLabel(
+                detail = (
                     f"{type(exc).__name__}: {exc}\n\n"
-                    "Start Ollama / fix api.endpoint, then retry.\n\n"
+                    "Check api.endpoint and network access, then retry.\n\n"
                     f"{traceback.format_exc()}"
                 )
+                body = QTextEdit()
+                body.setReadOnly(True)
+                body.setPlainText(detail)
+                body.setTextInteractionFlags(
+                    Qt.TextInteractionFlag.TextSelectableByMouse
+                    | Qt.TextInteractionFlag.TextSelectableByKeyboard
+                )
                 body.setObjectName("nccMuted")
-                body.setWordWrap(True)
                 self.add_content_widget(body)
                 self.add_action(
                     "Open NCC AI window",

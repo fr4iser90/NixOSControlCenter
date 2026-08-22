@@ -134,6 +134,8 @@ class TargetSessionController(QObject):
         want = (target or "").strip() or None
         cur = self._session
         if want is None:
+            # User chose This machine / Clear — forget reconnect candidate on disk
+            set_active_target(None)
             if cur.connected:
                 self.disconnect_target()
                 return
@@ -296,9 +298,10 @@ class TargetSessionController(QObject):
         )
 
     def disconnect_target(self) -> TargetSession:
-        """Drop remote session; keep saved candidate file for reconnect."""
+        """Drop remote session and forget the saved reconnect candidate."""
         self._probe_gen += 1
         self._auth_prompt_pending = False
+        set_active_target(None)
         apply_env(None)
         self._emit(
             TargetSession(

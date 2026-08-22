@@ -29,8 +29,12 @@ let
   userCfg = getModuleConfig "user";
   username = if attrNames userCfg == [] then "root" else head (attrNames userCfg);
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
-  # Host policy: systemConfig → system-manager.autoBuild (template default false)
+  # Host policy (systemConfig) — baked into ncc-system-update-main at rebuild
+  nccHostCfg = getModuleConfig "nixos-control-center";
+  dangerousIgnore = nccHostCfg.dangerousIgnore or false;
   autoBuild = (getModuleConfig "system-manager").autoBuild or false;
+  hostAutoBuild = if autoBuild then "true" else "false";
+  hostDangerousIgnore = if dangerousIgnore then "true" else "false";
   systemChecks = lib.attrByPath ["enable"] false (getModuleConfig "system-checks");
   configLayout = lib.attrByPath [ "layout" ] "monolith" (getModuleConfig "system-manager");
   isSplitLayout = configLayout == "split";
@@ -169,6 +173,16 @@ let
       esac
       shift || true
     done
+
+    # Host policy from systemConfig (rebuild required after changing Safety settings)
+    NCC_HOST_DANGEROUS_IGNORE="${hostDangerousIgnore}"
+    NCC_HOST_AUTO_BUILD="${hostAutoBuild}"
+    if [ "$NCC_HOST_DANGEROUS_IGNORE" = "true" ] || [ -n "''${NCC_ASSUME_YES:-}" ]; then
+      AUTO_CONFIRM=true
+    fi
+    if [ "$NCC_HOST_AUTO_BUILD" = "true" ]; then
+      AUTO_BUILD=true
+    fi
 
     if [ "$VERBOSE" = "true" ]; then
       export NCC_CLI_VERBOSE=1
@@ -1639,7 +1653,7 @@ EOF
     fi
     
     # Check if auto-build or --auto-build flag is enabled
-    if [ "$AUTO_BUILD" = "true" ] || [ "$autoBuild" = "true" ]; then
+    if [ "$AUTO_BUILD" = "true" ] || [ "$NCC_HOST_AUTO_BUILD" = "true" ]; then
       BUILD_CMD="${nccBuildSwitchCmd}"
       if [ "$VERBOSE" = "true" ] || [ -n "''${NCC_CLI_VERBOSE:-}" ]; then
         BUILD_CMD="$BUILD_CMD --verbose"

@@ -122,7 +122,7 @@ ncc vm test reset <distro>
 ncc ai …                                   # keep argparse tree; docs must say ncc ai
 ncc ssh client list|add|edit|delete|connect|…
 ncc ssh status|monitor|request|grant|approve|deny|…
-ncc homelab status|init-swarm|list-stacks|minimize|…
+ncc stacks status|init-swarm|list-stacks|minimize|…
 ncc nixify …
 ncc chronicle …
 ```
@@ -174,13 +174,13 @@ The root shell (`ncc` / `ncc gui`) builds its sidebar from **`NCC_GUI_CATALOG`**
 Without a registered page → **generic** page (actions from child commands).
 
 ```nix
-(cliRegistry.registerGuiDomain "homelab" {
-  label = "Homelab";
-  description = "Docker Swarm and stacks";
+(cliRegistry.registerGuiDomain "stacks" {
+  label = "Stacks";
+  description = "Docker Swarm and catalog stacks";
   enabled = cfg.enable or false;
   group = "features";  # sidebar: "core" | "features"
 })
-(cliRegistry.registerGuiPage "homelab" ./ui/gui)
+(cliRegistry.registerGuiPage "stacks" ./ui/gui)
 ```
 
 Adding a module = register a top-level command (+ optional GUI page). **Do not** edit `gui-engine` for new domains. Root sidebar sections: **Core** / **Features** from `group`.
@@ -204,6 +204,6 @@ When adding or renaming a command:
 1. [x] This document — naming locked.
 2. [x] Sweep help strings to `ncc …`.
 3. [x] `packages`: Nix lib + PySide6 GUI; `ncc packages` → GUI.
-4. [x] Fix `homelab` registration under `ncc homelab …`.
+4. [x] `stack-manager`: canonical `ncc stacks` only (no `homelab` alias).
 5. [x] Nest `lock` / `ssh` / `network wifi` (no aliases).
 6. [x] Chronicle → PySide6; shared NCC Qt shell with embedded domain pages.

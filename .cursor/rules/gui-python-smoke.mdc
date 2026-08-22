@@ -18,6 +18,7 @@ It catches:
 - `SettingsTabSpec` / dataclass field-order `TypeError` (AST, no Qt needed)
 - `SyntaxError` via `compileall` on `ncc_gui/` and every `ui/gui/settings.py`
 - Full `import ncc_gui.settings` when PySide6 is available
+- Every `ui/gui/page.py` `create_page()` when PySide6 is available (incl. AI assistant)
 
 **Do not** claim the GUI works after only a partial edit or after
 `system-update` without this smoke (or equivalent import) succeeding.

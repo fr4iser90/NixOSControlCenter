@@ -25,8 +25,6 @@ ncc stacks list-catalog [--remote] [--family …] [-v]
 ncc stacks fetch | install | init | ops | swarm | list-*
 ```
 
-Alias: `ncc homelab` → `ncc stacks`
-
 ## Config sketch
 
 ```nix

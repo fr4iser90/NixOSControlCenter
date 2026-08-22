@@ -44,8 +44,8 @@ gui = getModuleApi "gui-engine";
 cli = getModuleApi "cli-registry";
 domainGui = gui.domainGui pkgs config;
 (cli.registerGuiPage "homelab" ./ui/gui)
-(cli.registerGuiDomain "homelab" {
-  label = "Homelab";
+(cli.registerGuiDomain "stacks" {
+  label = "Stacks";
   description = "…";
   enabled = cfg.enable or false;
   group = "features";

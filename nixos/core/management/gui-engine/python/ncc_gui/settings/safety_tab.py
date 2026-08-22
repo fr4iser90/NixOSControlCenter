@@ -7,8 +7,15 @@ import os
 import subprocess
 from typing import Any
 
-from PySide6.QtCore import QProcess, QProcessEnvironment, QSettings
-from PySide6.QtWidgets import QApplication, QCheckBox, QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import QProcess, QProcessEnvironment, QSettings, Qt
+from PySide6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QLabel,
+    QProgressDialog,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ncc_gui.commit_bar import offer_rebuild_after_apply
 from ncc_gui.dialogs import confirm, error, info
@@ -21,8 +28,9 @@ _APP = "ncc-gui"
 _KEY_DANGER = "safety/dangerousIgnore"
 _KEY_AUTO = "safety/autoBuild"
 
-# Keep a process ref so GC does not kill an async rebuild.
+# Keep refs so GC does not kill async rebuild / progress UI.
 _rebuild_proc: QProcess | None = None
+_rebuild_progress: QProgressDialog | None = None
 
 
 def load_host_policy() -> dict[str, Any]:
@@ -145,14 +153,34 @@ class _SafetyPage(QWidget):
 
 
 def _start_rebuild_async(parent: QWidget | None) -> None:
-    """Non-blocking rebuild — never freeze the settings modal."""
-    global _rebuild_proc
+    """Non-blocking rebuild with a visible progress dialog."""
+    global _rebuild_proc, _rebuild_progress
     args = ["system", "build", "switch"]
     try:
         prog, argv = build_elevated_ncc_argv(args, noninteractive=True)
     except PermissionError as exc:
-        error(parent, "Rebuild", str(exc))
+        error(
+            parent,
+            "Could not rebuild",
+            f"{exc}\n\nTry again from a terminal: sudo ncc system build switch",
+        )
         return
+
+    progress = QProgressDialog(
+        "Rebuilding the system…\nThis can take a few minutes.",
+        None,
+        0,
+        0,
+        parent,
+    )
+    progress.setWindowTitle("Rebuild")
+    progress.setWindowModality(Qt.WindowModality.ApplicationModal)
+    progress.setMinimumDuration(0)
+    progress.setCancelButton(None)
+    progress.setRange(0, 0)
+    progress.show()
+    _rebuild_progress = progress
+
     env = QProcessEnvironment.systemEnvironment()
     env.insert("NCC_ASSUME_YES", "1")
     env.insert("NCC_CLI_NESTED", "1")
@@ -161,7 +189,10 @@ def _start_rebuild_async(parent: QWidget | None) -> None:
     proc.setProcessEnvironment(env)
 
     def _done(code: int, _status: object) -> None:
-        global _rebuild_proc
+        global _rebuild_proc, _rebuild_progress
+        if _rebuild_progress is not None:
+            _rebuild_progress.close()
+            _rebuild_progress = None
         _rebuild_proc = None
         if code == 0:
             info(
@@ -175,13 +206,16 @@ def _start_rebuild_async(parent: QWidget | None) -> None:
             error(
                 parent,
                 "Rebuild failed",
-                (out or f"exit {code}")[:1500],
+                (out or f"Something went wrong (exit {code}).")[:1500],
             )
 
     proc.finished.connect(_done)
     _rebuild_proc = proc
     proc.start(prog, list(argv))
     if not proc.waitForStarted(5000):
+        if _rebuild_progress is not None:
+            _rebuild_progress.close()
+            _rebuild_progress = None
         _rebuild_proc = None
         error(
             parent,
@@ -275,17 +309,19 @@ def _apply(data: dict) -> None:
         error(parent, "Could not save", err[:2000])
         return
 
-    info(
-        parent,
-        "Settings saved",
-        "Your safety settings are saved in the system configuration. "
-        "They are not active yet until you rebuild.",
-    )
+    # No extra “saved” popup — the rebuild dialog already explains that.
     if offer_rebuild_after_apply(
         parent,
         f"Skip risky prompts: {skip}. Auto rebuild after update: {auto}.",
     ):
         _start_rebuild_async(parent)
+    else:
+        info(
+            parent,
+            "Settings saved",
+            "Saved. Rebuild later when you want them to take effect "
+            "(System page → rebuild, or: sudo ncc system build switch).",
+        )
 
 
 def safety_settings_tab() -> SettingsTabSpec:

@@ -8,8 +8,8 @@ let
 
   # Helper function to execute CLI commands
   executeCommand = action: args: ''
-    ${ui.badges.info "Executing: ncc homelab ${action} ${lib.concatStringsSep " " args}"}
-    if ncc homelab "${action}" ${lib.concatStringsSep " " args}; then
+    ${ui.badges.info "Executing: ncc stacks ${action} ${lib.concatStringsSep " " args}"}
+    if ncc stacks "${action}" ${lib.concatStringsSep " " args}; then
       ${ui.badges.success "Command completed successfully"}
     else
       ${ui.badges.error "Command failed"}

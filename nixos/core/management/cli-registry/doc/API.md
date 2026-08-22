@@ -21,9 +21,9 @@ api = getModuleApi "cli-registry";
 Register CLI commands for a module. Top-level commands (no `parent`) automatically appear in the root GUI catalog.
 
 ```nix
-cliRegistry.registerCommandsFor "homelab" [
-  { name = "homelab"; domain = "homelab"; type = "manager"; ... }
-  { name = "status"; parent = "homelab"; domain = "homelab"; ... }
+cliRegistry.registerCommandsFor "stacks" [
+  { name = "stacks"; domain = "stacks"; type = "manager"; ... }
+  { name = "status"; parent = "stacks"; domain = "stacks"; ... }
 ]
 ```
 
@@ -32,9 +32,9 @@ cliRegistry.registerCommandsFor "homelab" [
 Optional sidebar stub (useful when the module is disabled and has no commands yet).
 
 ```nix
-cliRegistry.registerGuiDomain "homelab" {
-  label = "Homelab";
-  description = "Docker Swarm and stacks";
+cliRegistry.registerGuiDomain "stacks" {
+  label = "Stacks";
+  description = "Docker Swarm and catalog stacks";
   enabled = cfg.enable or false;
 }
 ```

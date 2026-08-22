@@ -1570,6 +1570,8 @@ class ChatPage(QWidget):
         self.sidebar.refresh(self.session.session_id)
         self._maybe_refresh_transcript()
 
+    @Slot()
+    def on_open_session(self) -> None:
         if self._busy:
             return
         picker = SessionPicker(self)
@@ -1620,6 +1622,8 @@ class ChatPage(QWidget):
         self.sidebar.refresh(self.session.session_id)
         self._maybe_refresh_transcript()
 
+    @Slot(dict)
+    def on_confirm_request(self, payload: dict) -> None:
         detail = payload.get("detail") or ""
         text = f"{payload.get('summary', '')}\n\n{detail}"
         box = QMessageBox(self)

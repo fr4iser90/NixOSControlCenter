@@ -10,7 +10,9 @@ from collections.abc import Sequence
 def target_from_env() -> str | None:
     """Connected fleet target from the GUI session env only.
 
-    Persistence (``~/.config/ncc/active-target``) is a reconnect candidate;
+    Persistence (``~/.config/ncc/active-target``) is a reconnect candidate
+    until the user clears Target / chooses This machine / Disconnect —
+    then the file is removed so the next start stays local.
     Connect must set ``NCC_TARGET_HOST`` before remote ``ncc`` runs.
     """
     raw = (os.environ.get("NCC_TARGET_HOST") or "").strip()
