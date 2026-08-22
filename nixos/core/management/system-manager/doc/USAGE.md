@@ -93,15 +93,21 @@ enableDeprecationWarnings = true;
 enableUpdates = true;
 ```
 
-### `auto-build`
+### `autoBuild`
 
-**Type**: `bool`
-**Default**: `false`
-**Description**: Automatically build after updates
-**Example**:
+**Type**: `bool`  
+**Default**: `false`  
+**Where**: `systemConfig` → **`system-manager`** (not nixos-control-center)  
+**Effect**: After `ncc system update` finishes syncing, run build+switch and skip the build `y/n` prompt.  
+**Per run**: `--auto-build`. Pair with `-y` / `dangerousIgnore` to skip the earlier dangerous prompt too.
+
 ```nix
-auto-build = true;
+system-manager = {
+  autoBuild = true;
+};
 ```
+
+Legacy name `auto-build` was renamed to `autoBuild`.
 
 ### `enableChecks`
 

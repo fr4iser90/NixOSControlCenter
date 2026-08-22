@@ -21,11 +21,18 @@ in {
       description = "NCC API for other modules";
     };
 
-    # ⚠️ Dangerous Operations - überspringt Bestätigungen
+    # Host policy: skip cli-registry “dangerous command” yes/no for all marked cmds.
+    # Per-run: --yes / -y / --auto, or env NCC_ASSUME_YES=1.
+    # Does NOT imply system-manager.autoBuild (build+switch is separate).
     dangerousIgnore = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Ignore dangerous command warnings (for automation/scripting)";
+      description = ''
+        Skip dangerous-command confirmation prompts (cli-registry).
+        For unattended hosts / scripting. Prefer per-run `--yes` when possible.
+        Rebuild after changing systemConfig. Pair with system-manager.autoBuild
+        only if updates should also build+switch without a second prompt.
+      '';
       example = true;
     };
 

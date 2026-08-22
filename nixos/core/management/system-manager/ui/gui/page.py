@@ -35,6 +35,7 @@ from ncc_gui.system_fs_status import (
     parse_fs_status_stdout,
     release_from_fs,
 )
+from ncc_gui.settings.safety_tab import load_host_policy
 from ncc_gui.target_bus import bus as target_bus
 from ncc_gui.target_probe import EXPECTED_CONFIG_VERSION
 from ncc_gui.theme import APP_STYLE
@@ -106,8 +107,10 @@ class SystemSettingsDialog(QDialog):
 
         opts = QHBoxLayout()
         self.auto_build = QCheckBox("Build && switch after sync")
+        # Prefer last GUI choice; else host policy system-manager.autoBuild
+        _host_auto = bool(load_host_policy().get("autoBuild"))
         self.auto_build.setChecked(
-            bool(self._settings.value(_KEY_AUTO_BUILD, True, type=bool))
+            bool(self._settings.value(_KEY_AUTO_BUILD, _host_auto, type=bool))
         )
         self.with_channels = QCheckBox("Also bump channels when newer")
         self.with_channels.setChecked(
@@ -158,7 +161,10 @@ class SystemPage(DomainPage):
         self._settings = QSettings(_SETTINGS_ORG, _SETTINGS_APP)
         self._local_path = str(self._settings.value(_KEY_LOCAL, _default_local_nixos()))
         self._branch = str(self._settings.value(_KEY_BRANCH, "main"))
-        self._auto_build = bool(self._settings.value(_KEY_AUTO_BUILD, True, type=bool))
+        _host_auto = bool(load_host_policy().get("autoBuild"))
+        self._auto_build = bool(
+            self._settings.value(_KEY_AUTO_BUILD, _host_auto, type=bool)
+        )
         self._with_channels = bool(
             self._settings.value(_KEY_WITH_CHANNELS, False, type=bool)
         )

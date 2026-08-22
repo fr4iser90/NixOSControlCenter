@@ -15,7 +15,6 @@ import subprocess
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFontMetrics, QIcon
 from PySide6.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -31,9 +30,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ncc_gui.chrome_prefs import load_chrome_prefs, set_show_target, show_target_enabled
+from ncc_gui.chrome_prefs import (
+    show_target_enabled,
+)
 from ncc_gui.dialogs import error
 from ncc_gui.session_ux import chip_text, session_mode
+from ncc_gui.settings import open_settings_dialog
 from ncc_gui.target_bus import bus as target_bus
 from ncc_gui.target_session import TargetSession, session_controller
 from ncc_gui.target_state import list_host_targets
@@ -134,39 +136,6 @@ class _EditHostDialog(QDialog):
 
     def values(self) -> tuple[str, str]:
         return self.host_edit.text().strip(), self.user_edit.text().strip()
-
-
-class _ChromeSettingsDialog(QDialog):
-    """Root shell chrome preferences."""
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Control Center settings")
-        self.setModal(True)
-        self.setMinimumWidth(400)
-        layout = QVBoxLayout(self)
-        prefs = load_chrome_prefs()
-        self.show_target = QCheckBox("Show Target selector (fleet)")
-        self.show_target.setChecked(bool(prefs.get("show_target", True)))
-        self.show_target.setToolTip(
-            "When off, the header hides host Connect/Disconnect and stays on "
-            "this machine. Only the settings button remains."
-        )
-        layout.addWidget(self.show_target)
-        note = QLabel(
-            "Target uses the SSH client list (~/.creds via ncc ssh client). "
-            "Turning it off disconnects any remote session."
-        )
-        note.setObjectName("nccTargetStatus")
-        note.setWordWrap(True)
-        layout.addWidget(note)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
 
 
 class TargetBar(QWidget):
@@ -386,12 +355,10 @@ class TargetBar(QWidget):
             self.targetChanged.emit(None)
 
     def _on_settings(self) -> None:
-        dlg = _ChromeSettingsDialog(self)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        set_show_target(dlg.show_target.isChecked())
-        self.apply_chrome_prefs()
-        self.chromeChanged.emit()
+        if open_settings_dialog(self):
+            self.apply_chrome_prefs()
+            self.chromeChanged.emit()
+            # chromePrefsChanged already emitted by SettingsDialog on OK
 
     def _on_edit_targets(self) -> None:
         """Edit selected target in-place — no domain switch."""

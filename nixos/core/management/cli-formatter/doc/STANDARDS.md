@@ -95,7 +95,7 @@ set `NCC_CLI_NESTED=1` so children **skip** their own header / dry banner / next
 ### Default (what users should see)
 
 ```text
-WARNING: …                         # registry; skipped with --yes
+WARNING: …                         # registry; skipped with --yes / -y / dangerousIgnore / NCC_ASSUME_YES
 Do you want to continue? (yes/no): y
 
 === NixOS System Update ===

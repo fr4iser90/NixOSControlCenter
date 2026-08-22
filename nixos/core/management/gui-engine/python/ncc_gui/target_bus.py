@@ -20,6 +20,8 @@ class TargetBus(QObject):
     systemAction = Signal(str)
     # SSH client page: open edit modal for ``user@host`` (or empty = current selection).
     sshClientEdit = Signal(object)
+    # Root ⚙ settings saved (activity_mode, show_target, …) — pages re-apply chrome.
+    chromePrefsChanged = Signal()
 
 
 _bus: TargetBus | None = None

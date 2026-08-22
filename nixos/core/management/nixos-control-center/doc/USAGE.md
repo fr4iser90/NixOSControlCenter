@@ -51,13 +51,20 @@ ncc module-enable module-name
 
 ### `dangerousIgnore`
 
-**Type**: `bool`
-**Default**: `false`
-**Description**: Ignore dangerous command warnings
-**Example**:
+**Type**: `bool`  
+**Default**: `false`  
+**Where**: `systemConfig` → **`nixos-control-center`** (Core CLI host policy)  
+**Effect**: Skip cli-registry dangerous yes/no for all commands marked `dangerous`.  
+**Per run** (no rebuild): `--yes` / `-y` / `--auto`, or `NCC_ASSUME_YES=1`.  
+**Does not** turn on build+switch — that is `system-manager.autoBuild`.
+
 ```nix
-dangerousIgnore = true;  # For automation/scripting
+nixos-control-center = {
+  dangerousIgnore = true;  # unattended / scripting hosts
+};
 ```
+
+Also see **system-manager.autoBuild** and Control Center ⚙ → **Safety**.
 
 ## Advanced Topics
 

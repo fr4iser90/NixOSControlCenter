@@ -12,6 +12,8 @@
   # write from live uname. Flake also reads hardware-configuration.nix (pure; no --impure).
   # Nix Config
   allowUnfree = true;
+  # Host policy: skip build y/n after system update and run build+switch
+  autoBuild = false;
   # Modules are managed via systemConfig (monolith nested attrs or split leaf files).
   # Each module has its own 'enable' option
 }

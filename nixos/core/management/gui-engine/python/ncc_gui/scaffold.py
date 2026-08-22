@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from ncc_gui.ansi import strip_ansi
+from ncc_gui.chrome_prefs import activity_mode as chrome_activity_mode
 from ncc_gui.commit_bar import CommitController
 from ncc_gui.dialogs import confirm, error, summarize_command_failure
 from ncc_gui.reload import generation_bus, load_activity, save_activity
@@ -137,26 +138,42 @@ class DomainPage(QWidget):
         root.addWidget(self._content_scroll, stretch=1)
 
         # 3. Activity (above footer — capped height so it cannot shove footer)
+        # Visibility follows chrome prefs activity_mode (collapsed|hidden|open).
         self._activity_box: QGroupBox | None = None
         self.log: QTextEdit | None = None
+        self._activity_cap = 180 if activity_max_height is None else activity_max_height
+        self._activity_session_open = chrome_activity_mode() == "open"
+        self._btn_log: QPushButton | None = None
         if activity:
             self._activity_box = QGroupBox("Activity")
             self._activity_box.setSizePolicy(
-                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum
             )
             log_l = QVBoxLayout(self._activity_box)
+            toggle_row = QHBoxLayout()
+            self._activity_hint = QLabel("")
+            self._activity_hint.setObjectName("nccPageSubtitle")
+            self._activity_hint.setWordWrap(True)
+            toggle_row.addWidget(self._activity_hint, stretch=1)
+            self._btn_activity_toggle = QToolButton()
+            self._btn_activity_toggle.setObjectName("nccHeaderAction")
+            self._btn_activity_toggle.clicked.connect(self._toggle_activity_log)
+            toggle_row.addWidget(self._btn_activity_toggle, stretch=0)
+            log_l.addLayout(toggle_row)
             self.log = QTextEdit()
             self.log.setObjectName("nccActivityLog")
             self.log.setReadOnly(True)
             self.log.setPlaceholderText("Command output appears here after an action…")
-            cap = 180 if activity_max_height is None else activity_max_height
+            cap = max(80, self._activity_cap)
             self.log.setMinimumHeight(80)
-            self.log.setMaximumHeight(max(80, cap))
+            self.log.setMaximumHeight(cap)
             log_l.addWidget(self.log)
             root.addWidget(self._activity_box, stretch=0)
             restored = load_activity(self._activity_key)
             if restored.strip():
                 self.log.setPlainText(restored)
+            self._apply_activity_chrome()
+            target_bus().chromePrefsChanged.connect(self._on_chrome_prefs_changed)
 
         # Soft generation switch: refresh widgets, keep Activity / window.
         generation_bus().soft_switched.connect(self._on_soft_generation)
@@ -194,11 +211,85 @@ class DomainPage(QWidget):
         self._actions_col.addLayout(footer_row)
         root.addWidget(self._actions_box, stretch=0)
 
+        if activity:
+            self._ensure_log_action()
+            self._apply_activity_chrome()
+
     def sizeHint(self) -> QSize:  # noqa: N802
         return QSize(0, 0)
 
     def minimumSizeHint(self) -> QSize:  # noqa: N802
         return QSize(0, 0)
+
+    # ----- Activity chrome (prefs: collapsed | hidden | open) -----
+
+    def _on_chrome_prefs_changed(self) -> None:
+        mode = chrome_activity_mode()
+        if mode == "open":
+            self._activity_session_open = True
+        elif mode == "hidden":
+            self._activity_session_open = False
+        self._apply_activity_chrome()
+
+    def _activity_expanded(self) -> bool:
+        return bool(self._activity_session_open)
+
+    def _toggle_activity_log(self) -> None:
+        self._activity_session_open = not self._activity_session_open
+        self._apply_activity_chrome()
+
+    def _reveal_activity(self) -> None:
+        """Open the log for this session (e.g. when a command writes output)."""
+        if self.log is None:
+            return
+        if not self._activity_session_open:
+            self._activity_session_open = True
+            self._apply_activity_chrome()
+
+    def _ensure_log_action(self) -> None:
+        if self.log is None or self._btn_log is not None:
+            return
+        # Local footer control — not a domain CLI verb
+        self._btn_log = self.add_action("Log", self._toggle_activity_log, local=True)
+
+    def _apply_activity_chrome(self) -> None:
+        if self._activity_box is None or self.log is None:
+            return
+        mode = chrome_activity_mode()
+        expanded = self._activity_expanded()
+        cap = max(80, self._activity_cap)
+
+        if mode == "hidden" and not expanded:
+            self._activity_box.setVisible(False)
+        else:
+            self._activity_box.setVisible(True)
+
+        self.log.setVisible(expanded)
+        if expanded:
+            self.log.setMinimumHeight(80)
+            self.log.setMaximumHeight(cap)
+            self._activity_hint.setText("Command output")
+            if hasattr(self, "_btn_activity_toggle"):
+                self._btn_activity_toggle.setText("Hide log")
+                self._btn_activity_toggle.setToolTip("Collapse the command log")
+        else:
+            self.log.setMinimumHeight(0)
+            self.log.setMaximumHeight(0)
+            if mode == "collapsed":
+                self._activity_hint.setText(
+                    "Log collapsed — Show log, or it opens when a command runs"
+                )
+            else:
+                self._activity_hint.setText("")
+            if hasattr(self, "_btn_activity_toggle"):
+                self._btn_activity_toggle.setText("Show log")
+                self._btn_activity_toggle.setToolTip("Expand the command log")
+
+        if self._btn_log is not None:
+            # Footer Log mirrors toggle; useful when panel is fully hidden
+            self._btn_log.setVisible(True)
+            self._btn_log.setText("Hide log" if expanded else "Log")
+            self._ensure_actions_visible()
 
     # ----- header -----
 
@@ -432,6 +523,7 @@ class DomainPage(QWidget):
     def log_append(self, text: str) -> None:
         if self.log is None:
             return
+        self._reveal_activity()
         self.log.append(strip_ansi(text))
         self._persist_activity()
 
@@ -439,6 +531,7 @@ class DomainPage(QWidget):
         """Append without extra bullet formatting; strips ANSI."""
         if self.log is None:
             return
+        self._reveal_activity()
         plain = strip_ansi(text)
         self.log.moveCursor(self.log.textCursor().MoveOperation.End)
         self.log.insertPlainText(plain)

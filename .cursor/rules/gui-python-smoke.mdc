@@ -1,0 +1,26 @@
+---
+description: After GUI Python changes, run import/dataclass smoke before claiming done
+globs: nixos/core/management/gui-engine/python/**/*.py,nixos/**/ui/gui/**/*.py
+alwaysApply: false
+---
+
+# GUI Python smoke (mandatory before “done”)
+
+If you changed any file under `ncc_gui/` or any module `ui/gui/**/*.py`, you
+**must** run this before saying the task is finished:
+
+```bash
+bash tests/gui/validate-gui-python.sh
+```
+
+It catches:
+
+- `SettingsTabSpec` / dataclass field-order `TypeError` (AST, no Qt needed)
+- `SyntaxError` via `compileall` on `ncc_gui/` and every `ui/gui/settings.py`
+- Full `import ncc_gui.settings` when PySide6 is available
+
+**Do not** claim the GUI works after only a partial edit or after
+`system-update` without this smoke (or equivalent import) succeeding.
+
+If the smoke fails, fix it in the same turn — the previous failure mode was
+“rebuild succeeds, `ncc` GUI crashes on import”.

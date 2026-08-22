@@ -16,6 +16,7 @@ icons, root shell. Domain **content** stays in each module’s `ui/gui/page.py`.
 | Target session | `ncc_gui.target_session` — Connect / probe / gate |
 | Form / wrap text | `FormValueLabel` / `page.add_form_value` — **not** automatic for all QLabels |
 | Spec | [doc/GUI-DESIGN.md](./doc/GUI-DESIGN.md) |
+| Settings dialog | `ncc_gui.settings` — discovery tabs; module `ui/gui/settings.py` |
 | Perf / cache | [doc/PERFORMANCE.md](./doc/PERFORMANCE.md) |
 | Shell model | Chrome + one Document (`shell.py` / `shell_state.py`) |
 

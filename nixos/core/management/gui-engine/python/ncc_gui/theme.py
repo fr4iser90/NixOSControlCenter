@@ -33,6 +33,25 @@ QListWidget#nccNav::item:selected {
 QListWidget#nccNav::item:disabled {
   color: palette(placeholder-text);
 }
+QListWidget#nccSettingsNav {
+  background: palette(base);
+  border: 1px solid palette(mid);
+  border-radius: 8px;
+  padding: 6px 4px;
+  outline: none;
+  font-size: 13px;
+  color: palette(window-text);
+}
+QListWidget#nccSettingsNav::item {
+  padding: 10px 12px;
+  border-radius: 6px;
+  margin: 2px 4px;
+  color: palette(window-text);
+}
+QListWidget#nccSettingsNav::item:selected {
+  background: palette(highlight);
+  color: palette(highlighted-text);
+}
 QLabel#nccPageTitle {
   font-size: 20px;
   font-weight: 700;

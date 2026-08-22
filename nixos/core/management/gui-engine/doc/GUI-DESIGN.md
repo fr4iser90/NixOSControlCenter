@@ -411,8 +411,73 @@ Desktop entry: `ncc.desktop`, exec `ncc`, icon name `ncc` (hicolor from gui-engi
 **Never** put stretch between the session chip and the combo — that shoved the
 combo to the right. Stretch belongs only between the left cluster and Settings.
 
-Settings (`~/.config/ncc/gui-chrome.json`): `show_target` toggles the Target
-cluster. When off → this machine only, gate hidden, header ≈ Settings button.
+Settings (`~/.config/ncc/gui-chrome.json`):
+
+| Key | Meaning |
+|-----|---------|
+| `show_target` | Target cluster on/off (fleet). When off → this machine only |
+| `activity_mode` | `collapsed` (default) \| `hidden` \| `open` — command log on domain pages |
+
+### Control Center settings dialog (⚙)
+
+Multi-section dialog (`ncc_gui.settings`): left nav + stacked pages — **not** a
+single flat list.
+
+| Source | When shown |
+|--------|------------|
+| **General** (gui-engine) | Always — Activity / shell chrome |
+| **Safety** (gui-engine) | Always — host policy; OK = CommitBar-shaped Apply (write `host-policy`, then shared rebuild modal). Never blocks UI on rebuild. |
+| Module `ui/gui/settings.py` | If `get_settings_tab()` returns a `SettingsTabSpec` and `requires_domains` are enabled |
+
+**Window geometry (kit):** Root shell and Settings dialog restore last size via
+`ncc_gui.window_geom` / QSettings (`geometry/…`). Minimum sizes prevent clipped
+labels. Prefer **restore last geometry**; first open uses a sane default. Modals
+stay modals for chrome prefs; a full Settings *page* is optional later if the
+dialog keeps growing.
+
+**Host safety (declarative, Core):**
+
+| Option | Module short name | Effect |
+|--------|-------------------|--------|
+| `dangerousIgnore` | `nixos-control-center` | Skip cli-registry dangerous yes/no |
+| `autoBuild` | `system-manager` | After `system update`, build+switch without y/n |
+
+Per run: `-y` / `--yes` / `NCC_ASSUME_YES=1`, and `--auto-build`. Baked into `NCC_HOST_POLICY` for the ⚙ Safety tab.
+
+Example: **SSH** tab (Target selector, skip-key offers) lives in
+`ssh-manager/client/ui/gui/settings.py` — not in gui-engine — because it depends
+on the SSH module / `~/.creds`.
+
+Discovery:
+
+1. `mk-domain-pages.nix` copies all `*.py` beside `page.py` into `ncc_domain_page.<id>`.
+2. Engine imports `ncc_domain_page.<id>.settings` and calls `get_settings_tab()`.
+3. Tabs with unmet `requires_domains` are omitted (no bloat for disabled modules).
+
+Example module file:
+
+```python
+# modules/…/ui/gui/settings.py
+from ncc_gui.settings.protocol import SettingsTabSpec
+
+def get_settings_tab() -> SettingsTabSpec:
+    return SettingsTabSpec(
+        id="my-domain",
+        title="My domain",
+        order=40,
+        requires_domains=("my-domain",),
+        build=lambda parent: MyPage(parent),
+        collect=lambda w: w.collect(),
+        apply=lambda data: …,
+    )
+```
+
+**Target bar** itself is gated by `show_target_enabled()` = user pref **and**
+enabled `ssh` domain — no fleet chrome without SSH.
+
+Activity stays the command log (not a status dashboard). Collapsed/hidden open via
+**Log** / **Show log**, or automatically when a command writes output.
+Pages with `activity=False` never create a log.
 
 Session (`ncc_gui.target_session` + `session_ux`): candidate → Connect → probe →
 `blocked` | `needs_install` | `needs_update` | `ready` (local ready ≈ `idle`).

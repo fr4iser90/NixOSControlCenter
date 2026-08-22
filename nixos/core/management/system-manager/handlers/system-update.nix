@@ -29,7 +29,8 @@ let
   userCfg = getModuleConfig "user";
   username = if attrNames userCfg == [] then "root" else head (attrNames userCfg);
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
-  autoBuild = lib.attrByPath ["autoBuild"] false (getModuleConfig "system-manager");
+  # Host policy: systemConfig → system-manager.autoBuild (template default false)
+  autoBuild = (getModuleConfig "system-manager").autoBuild or false;
   systemChecks = lib.attrByPath ["enable"] false (getModuleConfig "system-checks");
   configLayout = lib.attrByPath [ "layout" ] "monolith" (getModuleConfig "system-manager");
   isSplitLayout = configLayout == "split";

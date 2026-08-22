@@ -92,7 +92,17 @@ in
         fi
       '' else ""}
 
-      if [ "${dangerous}" = "true" ] && [ "${dangerousIgnore}" != "true" ]; then
+      # Host policy (systemConfig nixos-control-center.dangerousIgnore), env, or --yes/-y/--auto
+      _ncc_assume_yes=false
+      if [ "${dangerousIgnore}" = "true" ] || [ -n "''${NCC_ASSUME_YES:-}" ]; then
+        _ncc_assume_yes=true
+      fi
+      for _ncc_arg in "$@"; do
+        case "$_ncc_arg" in
+          --yes|-y|--auto) _ncc_assume_yes=true ;;
+        esac
+      done
+      if [ "${dangerous}" = "true" ] && [ "$_ncc_assume_yes" != "true" ]; then
         ${ui.messages.warning "⚠️  WARNING: This command is potentially dangerous!"}
         ${ui.messages.info "This may cause system instability or data loss."}
         printf "Do you want to continue? (yes/no): "

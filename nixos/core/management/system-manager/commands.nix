@@ -24,6 +24,7 @@ let
   enableDesktopScript = import ./scripts/enable-desktop.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   updateDesktopConfig = import ./scripts/update-desktop-config.nix { inherit config lib pkgs systemConfig; };
   allowUnfreeScript = import ./scripts/allow-unfree.nix { inherit pkgs getModuleApi; };
+  hostPolicyScript = import ./scripts/host-policy.nix { inherit pkgs getModuleApi; };
   systemStatusScript = import ./scripts/ncc-system-status.nix {
     inherit pkgs getModuleMetadata;
   };
@@ -203,6 +204,31 @@ in {
           Examples:
             sudo ncc system allow-unfree
             sudo ncc system allow-unfree --rebuild
+        '';
+      }
+      {
+        name = "host-policy";
+        domain = "system";
+        parent = "system";
+        description = "Set dangerousIgnore / autoBuild host policy in systemConfig";
+        category = "system";
+        script = "${hostPolicyScript}/bin/ncc-host-policy";
+        arguments = [
+          "--dangerous-ignore=true"
+          "--auto-build=true"
+          "--rebuild"
+        ];
+        requiresSudo = true;
+        dangerous = true;
+        shortHelp = "host-policy - Confirm / auto-build host policy";
+        longHelp = ''
+          Write host safety policy into systemConfig (facade):
+            nixos-control-center.dangerousIgnore
+            system-manager.autoBuild
+
+          Examples:
+            sudo ncc system host-policy --dangerous-ignore=true --auto-build=true
+            sudo ncc system host-policy --dangerous-ignore=true --auto-build=true --rebuild
         '';
       }
       # Subcommand: check-versions

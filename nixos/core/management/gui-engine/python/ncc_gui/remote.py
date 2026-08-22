@@ -86,10 +86,12 @@ def build_elevated_ncc_argv(
     args: Sequence[str],
     *,
     target: str | None = None,
+    noninteractive: bool = False,
 ) -> tuple[str, list[str]]:
     """Return ``(program, argv)`` for elevated ``ncc``.
 
-    Local: prefer passwordless sudo, then pkexec, then interactive sudo.
+    Local: prefer passwordless sudo, then pkexec, then interactive sudo
+    (unless ``noninteractive=True`` — GUI must never block on a password prompt).
     Remote: ``ssh host -- sudo -n ncc …`` (requires NOPASSWD on the target).
     """
     import shutil
@@ -123,9 +125,23 @@ def build_elevated_ncc_argv(
         check=False,
         capture_output=True,
     ).returncode == 0:
-        return "sudo", ["-n", ncc, *argv_tail]
+        # Preserve assume-yes / nested chrome through sudo
+        return (
+            "sudo",
+            [
+                "-n",
+                "--preserve-env=NCC_ASSUME_YES,NCC_CLI_NESTED,NCC_QUIET_SWITCH",
+                ncc,
+                *argv_tail,
+            ],
+        )
     if shutil.which("pkexec"):
         return "pkexec", [ncc, *argv_tail]
+    if noninteractive:
+        raise PermissionError(
+            "Need passwordless sudo (sudo -n) for GUI Apply. "
+            "Or run the same command in a terminal."
+        )
     if shutil.which("sudo"):
         return "sudo", [ncc, *argv_tail]
     raise PermissionError("Need sudo or pkexec for elevated ncc")

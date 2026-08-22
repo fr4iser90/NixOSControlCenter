@@ -12,6 +12,11 @@ let
   apiValue = backupHelpersValue;
 in
 {
+  imports = [
+    # Legacy hyphenated name in older systemConfig trees
+    (lib.mkRenamedOptionModule [ configPath "auto-build" ] [ configPath "autoBuild" ])
+  ];
+
   options.${configPath} = {
     _version = lib.mkOption {
       type = lib.types.str;
@@ -47,11 +52,15 @@ in
       description = "Enable system health checks component";
     };
 
-    # Auto-build nach Updates
-    auto-build = lib.mkOption {
+    # After `ncc system update`: build+switch without the y/n prompt (host policy).
+    # Per-run override: --auto-build. Distinct from nixos-control-center.dangerousIgnore.
+    autoBuild = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Automatically build after updates";
+      description = ''
+        Automatically build and switch after `ncc system update` (skips the build y/n prompt).
+        Set in systemConfig under system-manager. CLI flag: --auto-build.
+      '';
     };
 
     # API for other modules - always available

@@ -132,9 +132,19 @@ let
   guiCatalogJson = builtins.toJSON (lib.attrValues catalogById);
   guiCatalog = pkgs.writeText "ncc-gui-catalog.json" guiCatalogJson;
 
+  # Declarative host policy for CLI/GUI parity (⚙ Safety tab reads NCC_HOST_POLICY)
+  nccHostCfg = getModuleConfig "nixos-control-center";
+  systemMgrCfg = getModuleConfig "system-manager";
+  hostPolicyJson = builtins.toJSON {
+    dangerousIgnore = nccHostCfg.dangerousIgnore or false;
+    autoBuild = systemMgrCfg.autoBuild or false;
+  };
+  hostPolicyFile = pkgs.writeText "ncc-host-policy.json" hostPolicyJson;
+
   launchGui =
     if guiOn then ''
     export NCC_GUI_CATALOG="$(cat ${guiCatalog})"
+    export NCC_HOST_POLICY="$(cat ${hostPolicyFile})"
     ${lib.optionalString assistantOn ''
       # Embed AI with the same env as `ncc ai` (endpoint, prompts, knowledge, …)
       # shellcheck disable=SC1091
@@ -147,6 +157,7 @@ let
 in
   pkgs.writeScriptBin "ncc" ''
     #!/usr/bin/env bash
+    export NCC_HOST_POLICY="$(cat ${hostPolicyFile})"
 
     function handle_interrupt() {
       ${ui.badges.error "Operation cancelled"}
