@@ -151,5 +151,6 @@ Available through ncc command-center:
 
 ## See Also
 
+- [SETUP-FLOW.md](./SETUP-FLOW.md) - Two-phase setup ADR, NCC ↔ NCC-Stacks contract, phased tasks
 - [Architecture](./ARCHITECTURE.md) - System architecture
 - [README.md](../README.md) - Module overview

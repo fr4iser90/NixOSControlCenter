@@ -16,6 +16,8 @@ Manages **catalog-based Docker workloads** (homelab gateways/media **and** compu
 
 CLI contract: [CLI.md](./CLI.md)
 
+Setup architecture (host vs workloads, NCC ↔ NCC-Stacks contract): [doc/SETUP-FLOW.md](./doc/SETUP-FLOW.md)
+
 
 ```
 ncc stacks --gui

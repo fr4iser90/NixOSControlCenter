@@ -66,9 +66,14 @@
     system-updater = true;
     ssh-manager = true;
     bootentry-manager = false;
-    stack-manager = false;
+    stack-manager = true;
     vm-manager = false;
     ai-workspace = true;
+  };
+
+  stackManager = {
+    profiles = [ "compute-llm-arm" ];
+    swarm = null;
   };
 
   sudo = {

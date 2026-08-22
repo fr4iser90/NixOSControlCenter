@@ -567,6 +567,7 @@ class InstallWizard(QMainWindow):
     def _capture_hl_type(self) -> bool:
         t = self._state.get("hl_type") or "single"
         self._answers["HOMELAB_TYPE"] = t
+        self._answers.setdefault("STACK_PROFILES", "homelab-core")
         if t == "single":
             self._answers["SWARM_ROLE"] = "none"
         return True
@@ -999,14 +1000,35 @@ class InstallWizard(QMainWindow):
         else:
             self._add(QLabel(f"No host blueprints in {plist}"))
 
+    def _needs_stack_phase2_hint(self) -> bool:
+        sel = self._state.get("pending_selection") or ""
+        if sel == "Homelab Server":
+            return True
+        if self._answers.get("STACK_PROFILES") or self._answers.get("HOMELAB_TYPE"):
+            return True
+        mods = (self._answers.get("PACKAGE_MODULES") or "").split()
+        return "docker" in mods and bool(self._answers.get("DOMAIN"))
+
     def _screen_confirm(self) -> None:
         dry = _is_dry_run()
         self.header.setText("Confirm" + (" (DRY-RUN)" if dry else ""))
-        self.subheader.setText(
-            "DRY-RUN: validate path only — nothing will be written or deployed."
-            if dry
-            else "Review selection and answers, then start install."
+        phase2 = (
+            "\n\nAfter rebuild: Phase 2 — workloads\n"
+            "  sudo -u <virt-user> ncc stacks fetch\n"
+            "  sudo -u <virt-user> ncc stacks init\n"
+            "  (or ncc stacks --gui → Catalog → Install)\n"
+            "  Single stack: ncc stacks install group/service"
         )
+        if dry:
+            sub = "DRY-RUN: validate path only — nothing will be written or deployed."
+        elif self._needs_stack_phase2_hint():
+            sub = (
+                "Review selection and answers, then start install."
+                + phase2
+            )
+        else:
+            sub = "Review selection and answers, then start install."
+        self.subheader.setText(sub)
         self.btn_next.setText("Dry-run" if dry else "Install")
         sel = self._state.get("pending_selection", "")
         self._add(QLabel("Selection"))

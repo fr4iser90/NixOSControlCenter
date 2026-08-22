@@ -59,4 +59,9 @@
 
   email = "example@example.com";
   domain = "example.com";
+
+  stackManager = {
+    profiles = [ "homelab-core" ];
+    swarm = null;
+  };
 }
