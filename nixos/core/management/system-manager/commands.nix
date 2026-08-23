@@ -28,6 +28,7 @@ let
   systemStatusScript = import ./scripts/ncc-system-status.nix {
     inherit pkgs getModuleMetadata;
   };
+  storeGcScripts = import ./scripts/ncc-store-gc.nix { inherit pkgs getModuleApi; };
   
   # Import config migration and validation
   # CLI APIs - elegant registration
@@ -129,6 +130,8 @@ in {
           updateDesktopConfig
           allowUnfreeScript
           systemStatusScript
+          storeGcScripts.storeStatusScript
+          storeGcScripts.gcScript
         ] ++ lib.optionals (cfg.components.configMigration.enable or false) [
           configMigration.check.configCheck
           configMigration.validator.validateSystemConfig
@@ -183,6 +186,44 @@ in {
           Examples:
             ncc system status
             ncc system status --json
+        '';
+      }
+      {
+        name = "store-status";
+        domain = "system";
+        parent = "system";
+        description = "Nix store size, generations, and GC preview";
+        category = "system";
+        script = "${storeGcScripts.storeStatusScript}/bin/ncc-store-status";
+        arguments = [ "--json" ];
+        shortHelp = "store-status - Nix store health";
+        longHelp = ''
+          Show /nix/store size, system generations, and a dry-run preview of
+          paths removable by nix-collect-garbage (no deletes).
+
+          Examples:
+            ncc system store-status
+            ncc system store-status --json
+        '';
+      }
+      {
+        name = "gc";
+        domain = "system";
+        parent = "system";
+        description = "Nix store garbage collection (dry-run or run)";
+        category = "system";
+        script = "${storeGcScripts.gcScript}/bin/ncc-gc";
+        arguments = [ "--dry-run" "--run" "--optimise" ];
+        requiresSudo = true;
+        shortHelp = "gc - Nix store garbage collection";
+        longHelp = ''
+          Preview or run nix-collect-garbage on the store.
+
+          Examples:
+            ncc system gc                  # dry-run (default)
+            ncc system gc --dry-run
+            sudo ncc system gc --run
+            sudo ncc system gc --run --optimise
         '';
       }
       {

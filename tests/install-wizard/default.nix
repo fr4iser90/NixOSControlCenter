@@ -6,6 +6,7 @@ let
   shellTests = [
     "validate-no-hardcoded-paths"
     "validate-module-imports"
+    "validate-bash-embedding"
     "test-presets-dry-run"
     "test-installer-full"
     "test-installer-remaining"

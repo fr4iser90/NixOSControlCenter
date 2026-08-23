@@ -1,16 +1,32 @@
-# NCC: Bash embedded in `.nix`
+# NCC: Bash-in-Nix + **repo-wide** Nix hard gate
+
+## Bash in `''` strings
 
 When editing `pkgs.writeText` / `pkgs.writeShellScriptBin` with `''` multiline strings:
 
 - **Bash** variable / default: `''${VAR:-}` (two single quotes before `$`)
 - **Nix** store paths / options: `${pkgs.bash}`, `${lib.escapeShellArg x}`
+- Prefer `builtins.fromJSON` with `\u0024` for large bash blobs (never raw `${…}` in the Nix source)
 
 Never raw `${NCC_…}` or `${selected_modules` in `''` strings.
 
-Large install-wizard scripts: use `builtins.fromJSON` like `config-writer.nix` — no `.sh` files in `nixos/`.
+## Layer
 
-Before claiming installer/Nix bash changes work, run:
+- Never `import …/packages/lib/…` from outside `packages/` — use `getModuleApi "packages"`
+- Feature catalog: `(getModuleApi "packages").installerFeaturesBash` only
+
+## Before claiming **any** `nixos/` change works
+
+**Mandatory** (exit 0). Wizard-only or single-file parse is **not** enough:
 
 ```bash
-bash tests/install-wizard/validate-bash-embedding.sh
+bash tests/validate-ncc-nix.sh
 ```
+
+This runs:
+
+1. bash-in-nix across **all of `nixos/`**
+2. repo-wide layer (no foreign `packages/lib` imports)
+3. install-wizard packaging (`scriptTree`, same path as `ncc system-update`)
+
+**Forbidden:** telling the user to `ncc system-update` / claiming “validated” if this gate did not exit 0 in this turn.

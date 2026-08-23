@@ -7,7 +7,7 @@ in {
   options.${configPath} = {
     _version = lib.mkOption {
       type = lib.types.str;
-      default = "1.0.0";
+      default = "1.1.0";
       internal = true;
       description = "Module version";
     };

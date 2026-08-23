@@ -1,6 +1,7 @@
-{ config, lib, pkgs, getModuleConfig, moduleName, systemConfig, ... }:
+{ config, lib, pkgs, getModuleConfig, moduleName, systemConfig, getModuleApi, ... }:
 let
   cfg = getModuleConfig moduleName;
+  packageModules = (getModuleApi "packages").modules;
 
   # Per-user configs from users/<name>/config.nix
   # These merge into systemConfig.users.<name>
@@ -86,7 +87,7 @@ let
   resolvedUserPackages = lib.mapAttrs (name: packages:
     map (pkgName:
       let
-        meta = (import ../packages/lib/metadata.nix).modules.${pkgName} or {};
+        meta = packageModules.${pkgName} or {};
       in
         if meta ? package then meta.package
         else if builtins.hasAttr pkgName pkgs then pkgs.${pkgName}

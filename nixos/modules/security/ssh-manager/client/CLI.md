@@ -12,6 +12,10 @@
 | `ncc ssh client --tui\|--gui` | TUI / domain GUI | N/A | no |
 | `ncc ssh client list\|add\|edit\|delete\|connect` | Direct actions | N/A | no |
 
+Display aliases (optional) are stored in `~/.config/ncc/ssh-host-labels.json`
+(keyed by `user@host`). Edit them in the SSH GUI or Target “+ / edit” dialogs.
+Connect identity remains `user@host` / `~/.creds`.
+
 ## Output contract
 
 - Mutating verbs (`add` / `edit` / `delete` / `connect`): header → loading → success/error → `Next:`

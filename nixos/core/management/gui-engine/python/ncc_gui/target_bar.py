@@ -38,11 +38,17 @@ from ncc_gui.session_ux import chip_text, session_mode
 from ncc_gui.settings import open_settings_dialog
 from ncc_gui.target_bus import bus as target_bus
 from ncc_gui.target_session import TargetSession, session_controller
+from ncc_gui.ssh_labels import (
+    display_for_target,
+    get_alias,
+    migrate_key,
+    set_alias,
+)
 from ncc_gui.target_state import list_host_targets
 from ncc_gui.theme import APP_STYLE
 
 _BAR_HEIGHT = 48
-_COMBO_W = 220
+_COMBO_W = 280
 
 
 class _AddHostDialog(QDialog):
@@ -66,8 +72,11 @@ class _AddHostDialog(QDialog):
         self.host_edit.setPlaceholderText("hostname or IP")
         self.user_edit = QLineEdit()
         self.user_edit.setPlaceholderText("ssh user")
+        self.alias_edit = QLineEdit()
+        self.alias_edit.setPlaceholderText("optional — shown in Target list")
         form.addRow("Host", self.host_edit)
         form.addRow("User", self.user_edit)
+        form.addRow("Alias", self.alias_edit)
         layout.addLayout(form)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
@@ -86,17 +95,18 @@ class _AddHostDialog(QDialog):
         self._open_hosts_clicked = True
         self.reject()
 
-    def values(self) -> tuple[str, str]:
+    def values(self) -> tuple[str, str, str]:
         host = self.host_edit.text().strip()
         user = self.user_edit.text().strip()
+        alias = self.alias_edit.text().strip()
         if "@" in host and not user:
             user, _, host = host.rpartition("@")
             user, host = user.strip(), host.strip()
-        return host, user
+        return host, user, alias
 
 
 class _EditHostDialog(QDialog):
-    """Edit username for an SSH client entry (~/.creds via ncc ssh client edit)."""
+    """Edit username/alias for an SSH client entry (~/.creds + labels)."""
 
     def __init__(
         self,
@@ -104,6 +114,7 @@ class _EditHostDialog(QDialog):
         *,
         host: str,
         user: str,
+        alias: str = "",
     ) -> None:
         win = parent.window() if parent is not None else None
         super().__init__(win if win is not None else parent)
@@ -113,7 +124,8 @@ class _EditHostDialog(QDialog):
         self.setStyleSheet(APP_STYLE)
         layout = QVBoxLayout(self)
         hint = QLabel(
-            "Updates the SSH client list (ncc ssh client edit → ~/.creds)."
+            "Updates the SSH client list (ncc ssh client edit → ~/.creds). "
+            "Alias is display-only (Target list / SSH page)."
         )
         hint.setObjectName("nccTargetStatus")
         hint.setWordWrap(True)
@@ -122,8 +134,11 @@ class _EditHostDialog(QDialog):
         self.host_edit = QLineEdit(host)
         self.host_edit.setEnabled(False)
         self.user_edit = QLineEdit(user)
+        self.alias_edit = QLineEdit(alias)
+        self.alias_edit.setPlaceholderText("optional — e.g. Jetson, Homelab")
         form.addRow("Host", self.host_edit)
         form.addRow("User", self.user_edit)
+        form.addRow("Alias", self.alias_edit)
         layout.addLayout(form)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
@@ -134,8 +149,12 @@ class _EditHostDialog(QDialog):
         layout.addWidget(buttons)
         self.user_edit.setFocus()
 
-    def values(self) -> tuple[str, str]:
-        return self.host_edit.text().strip(), self.user_edit.text().strip()
+    def values(self) -> tuple[str, str, str]:
+        return (
+            self.host_edit.text().strip(),
+            self.user_edit.text().strip(),
+            self.alias_edit.text().strip(),
+        )
 
 
 class TargetBar(QWidget):
@@ -279,6 +298,7 @@ class TargetBar(QWidget):
         self.combo.currentIndexChanged.connect(self._on_index)
         self._ctrl.sessionChanged.connect(self._on_session)
         self._ctrl.authNeeded.connect(self._on_auth_needed)
+        target_bus().inventoryChanged.connect(self.reload_hosts)
         self._ctrl.bootstrap_from_disk()
         self._sync_combo_from_session(self._ctrl.session())
         self.apply_chrome_prefs()
@@ -311,7 +331,8 @@ class TargetBar(QWidget):
         self.combo.clear()
         self.combo.addItem("This machine", None)
         for target in list_host_targets():
-            self.combo.addItem(target, target)
+            # Display = alias/hostname hint; data = user@host (connect identity)
+            self.combo.addItem(display_for_target(target), target)
         idx = 0
         if pick:
             for i in range(self.combo.count()):
@@ -345,7 +366,7 @@ class TargetBar(QWidget):
                 break
         else:
             if want:
-                self.combo.addItem(want, want)
+                self.combo.addItem(display_for_target(want), want)
                 self.combo.setCurrentIndex(self.combo.count() - 1)
             else:
                 self.combo.setCurrentIndex(0)
@@ -377,10 +398,12 @@ class TargetBar(QWidget):
         if not host or not user:
             error(self, "Edit target", f"Invalid target: {cand}")
             return
-        dlg = _EditHostDialog(self, host=host, user=user)
+        dlg = _EditHostDialog(
+            self, host=host, user=user, alias=get_alias(user, host)
+        )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
-        new_host, new_user = dlg.values()
+        new_host, new_user, alias = dlg.values()
         if not new_user:
             error(self, "Edit target", "Username is required.")
             return
@@ -399,10 +422,13 @@ class TargetBar(QWidget):
             err = (proc.stderr or proc.stdout or "ncc ssh client edit failed").strip()
             error(self, "Edit target", err)
             return
+        migrate_key(user, host, new_user, new_host)
+        set_alias(new_user, new_host, alias)
         target = f"{new_user}@{new_host}"
         self.reload_hosts()
         self.set_target(target, emit=False)
         self._apply_session_ui(self._ctrl.session())
+        target_bus().inventoryChanged.emit()
 
     def _on_add(self) -> None:
         dlg = _AddHostDialog(self)
@@ -412,7 +438,7 @@ class TargetBar(QWidget):
             return
         if result != QDialog.DialogCode.Accepted:
             return
-        host, user = dlg.values()
+        host, user, alias = dlg.values()
         if not host or not user:
             error(self, "Add host", "Host and user are required.")
             return
@@ -431,10 +457,15 @@ class TargetBar(QWidget):
             err = (proc.stderr or proc.stdout or "ncc ssh client add failed").strip()
             error(self, "Add host", err)
             return
+        if alias:
+            set_alias(user, host, alias)
+        else:
+            set_alias(user, host, "")
         target = f"{user}@{host}"
         self.reload_hosts()
         self.set_target(target, emit=False)
         self._apply_session_ui(self._ctrl.session())
+        target_bus().inventoryChanged.emit()
 
     def _on_auth_needed(self, host: object, detail: object) -> None:
         """BatchMode probe failed auth — password + Connect / Cancel only."""

@@ -1,10 +1,9 @@
-# Installer UI options — feature catalog from packages metadata (generated).
+# Installer UI options — feature catalog from packages API (no packages wiring here).
 { pkgs, getModuleApi ? null, ... }:
+assert getModuleApi != null;
 let
   inherit (pkgs) lib;
-  # prompts → … → core/base/packages (stay under core/, no ../core/ jump)
-  meta = import ../../../../../base/packages/lib/metadata.nix;
-  featuresBash = import ./gen-features-from-metadata.nix { inherit lib meta; };
+  featuresBash = (getModuleApi "packages").installerFeaturesBash;
   headBash = builtins.fromJSON ''
 "#!/usr/bin/env bash\n\n# Am Anfang der Datei:\ndeclare -g -A SUB_OPTIONS\ndeclare -g -A MODULE_OPTIONS\n\n# Neue Struktur f\u00fcr die Auswahl\nINSTALL_TYPE_OPTIONS=(\n    \"\ud83d\udce6 Install bases\"\n    \"\u2699\ufe0f Advanced Options\"\n)\n\n# Install bases (Desktop/Server starters) \u2014 NOT package recipes/sets\n# Install bases = systemType starters only (Desktop / Server / blank)\nINSTALL_BASES=(\n    \"Desktop\"\n    \"Server\"\n    \"From Scratch\"\n)\n\n# Optional starters (applied after base). Homelab = software starter; devices = hardware blueprints.\nINSTALL_STARTERS=(\n    \"None\"\n    \"Homelab Server\"\n)\n\n# Device targets: discovered from host-blueprints/*/deviceTarget.enable\n# (load_discovered_device_targets from checks/hardware/device-targets.sh)\nDEVICE_TARGETS=()\ndeclare -A -g DEVICE_BLUEPRINT_MAP=()\nif declare -F load_discovered_device_targets >/dev/null 2>&1; then\n    load_discovered_device_targets\nelif [[ -n \"\u0024{SCRIPT_ROOT:-}\" && -f \"\u0024SCRIPT_ROOT/ui/gui/device_discover.py\" ]]; then\n    eval \"\u0024(python3 \"\u0024SCRIPT_ROOT/ui/gui/device_discover.py\" export-bash)\"\nfi\n\nif declare -F load_discovered_device_targets >/dev/null 2>&1; then\n    load_discovered_device_targets\nelif [[ -n \"\u0024{SCRIPT_ROOT:-}\" && -f \"\u0024SCRIPT_ROOT/ui/gui/device_discover.py\" ]]; then\n    eval \"\u0024(python3 \"\u0024SCRIPT_ROOT/ui/gui/device_discover.py\" export-bash)\"\nfi\n\n# Default package modules per install base / starter (space-separated).\ndeclare -A -g INSTALL_BASE_DEFAULT_PACKAGES=(\n    [\"Desktop\"]=\"\"\n    [\"Server\"]=\"\"\n    [\"From Scratch\"]=\"\"\n    [\"Homelab Server\"]=\"docker database web-server\"\n)\n\n# Advanced Options\nADVANCED_OPTIONS=(\n    \"\ud83d\udcc1 Load host blueprint from file\"\n    \"\ud83d\udccb Show available host blueprints\"\n    \"\ud83d\udd04 Import from Existing Config\"\n)\n\n# Legacy lists (compat)\nLEGACY_SERVER_BLUEPRINTS=(\n    \"Homelab Server\"\n    \"Fr4iser Jetson Orin Nano\"\n)\n\nLEGACY_DESKTOP_BLUEPRINTS=(\n)\n\nLEGACY_BLUEPRINT_OPTIONS=(\n    \"\u0024{LEGACY_SERVER_BLUEPRINTS[@]}\"\n    \"\u0024{LEGACY_DESKTOP_BLUEPRINTS[@]}\"\n)\n\n"
 '';

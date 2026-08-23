@@ -1,13 +1,16 @@
-# Build installer feature catalog from packages metadata (SSOT).
-# `meta` is passed by setup-options.nix (no cross-module relative import here).
-{ lib, meta }:
+# Packages-owned installer feature catalog → bash (SSOT for install-wizard).
+# Consumers (install-wizard) must obtain this via getModuleApi "packages", not by
+# re-implementing group/module wiring or importing metadata across layers.
+{ lib, metadata ? import ./metadata.nix }:
 
 let
-  modules = meta.modules;
+  modules = metadata.modules;
 
-  # Skip deprecated aliases (e.g. game-dev → game-engines)
-  activeNames = lib.filter (n: !(modules.${n} ? deprecatedAliasOf)) (lib.attrNames modules);
+  activeNames = lib.filter (
+    n: !(modules.${n} ? deprecatedAliasOf) && !(modules.${n}.wizardHide or false)
+  ) (lib.attrNames modules);
 
+  # Taxonomy labels live with packages (not in install-wizard).
   groupDisplay = {
     desktop-environment = "Desktop Environment";
     development = "Development";
@@ -16,10 +19,21 @@ let
     server = "Services";
   };
 
-  # UI split: container engines vs VMs (metadata group is shared "virtualization")
-  uiGroupOf = name: m:
-    if lib.elem name [ "docker" "docker-rootless" "podman" ] then "Containerization"
-    else groupDisplay.${m.group or "other"} or (m.group or "Other");
+  uiGroupOf =
+    name: m:
+    if m ? uiGroup then
+      m.uiGroup
+    else
+      groupDisplay.${m.group or "other"} or (m.group or "Other");
+
+  exclusiveKeyOf =
+    m:
+    if m ? exclusiveGroup then
+      m.exclusiveGroup
+    else if (m.group or "") == "desktop-environment" then
+      "desktop-environment"
+    else
+      null;
 
   sortedNames = lib.sort (a: b: a < b) activeNames;
 
@@ -28,7 +42,6 @@ let
     + lib.concatMapStrings (n: "    \"${n}\"\n") sortedNames
     + ")\n";
 
-  # name → ui group label
   byUiGroup = lib.foldl' (
     acc: name:
     let
@@ -40,7 +53,6 @@ let
     }
   ) { } sortedNames;
 
-  # Stable group order for UI
   groupOrder = [
     "Desktop Environment"
     "Development"
@@ -65,24 +77,29 @@ let
     ) orderedGroups
     + ")\n";
 
-  # Exclusive: desktop-environment group + container engines
-  deMembers = lib.filter (n: (modules.${n}.group or "") == "desktop-environment") sortedNames;
-  containerMembers = lib.filter (n: lib.elem n [ "docker" "docker-rootless" "podman" ]) sortedNames;
+  byExclusive = lib.foldl' (
+    acc: name:
+    let
+      key = exclusiveKeyOf modules.${name};
+    in
+    if key == null then
+      acc
+    else
+      acc
+      // {
+        ${key} = (acc.${key} or [ ]) ++ [ name ];
+      }
+  ) { } sortedNames;
 
   exclusiveBash =
     "declare -A -g EXCLUSIVE_GROUPS=(\n"
-    + (
-      if deMembers != [ ] then
-        "    [\"desktop-environment\"]=\"${lib.concatStringsSep "|" deMembers}\"\n"
-      else
-        ""
-    )
-    + (
-      if containerMembers != [ ] then
-        "    [\"containerization\"]=\"${lib.concatStringsSep "|" containerMembers}\"\n"
-      else
-        ""
-    )
+    + lib.concatMapStrings (
+      key:
+      let
+        members = lib.sort (a: b: a < b) byExclusive.${key};
+      in
+      "    [\"${key}\"]=\"${lib.concatStringsSep "|" members}\"\n"
+    ) (lib.sort (a: b: a < b) (lib.attrNames byExclusive))
     + ")\n";
 
   depsBash =
@@ -120,17 +137,16 @@ let
 
 in
 ''
-# ---- Generated from nixos/core/base/packages/lib/metadata.nix (do not edit) ----
+# ---- packages installer feature catalog (getModuleApi "packages") — do not edit ----
 ${allFeaturesBash}
 ${featureGroupsBash}
 ${exclusiveBash}
 ${depsBash}
 ${conflictsBash}
 ${systemTypesBash}
-# Pre-baked systemTypes — load_feature_system_types becomes a no-op when already filled.
+# Pre-baked systemTypes — load_feature_system_types is a no-op when already filled.
 load_feature_system_types() {
-    # FEATURE_SYSTEM_TYPES already set from metadata at package build time.
     return 0
 }
-# ---- end generated feature catalog ----
+# ---- end packages feature catalog ----
 ''

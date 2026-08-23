@@ -8,8 +8,10 @@ let
   # Paths that are Nix data / helpers (presets, generators), not bash wrappers.
   isDataNix = rel:
     rel == "setup/config/system-config.template.nix"
-    || rel == "ui/prompts/gen-features-from-metadata.nix"
-    || lib.hasPrefix "setup/modes/install-bases/" rel;
+    || lib.hasPrefix "setup/modes/install-bases/" rel
+    # Removed v1.1 → packages.installerFeaturesBash.
+    # Orphan until install-wizard/migrations/v1.0.0-to-v1.1.0 runs (local discovery).
+    || rel == "ui/prompts/gen-features-from-metadata.nix";
 
   # Skip entire trees (copied separately, obsolete, or not packaged as scripts).
   skipDir = rel:
@@ -54,21 +56,38 @@ let
 
   bashScripts = collectBashScripts ./. "";
 
-  # Only pass helpers the script declares (legacy leftovers must not break the build).
-  callScript = path:
+  # Only pass helpers the script declares. Required args outside this set mean
+  # a data/helper .nix leaked into the bash walk (e.g. gen-features { lib, meta })
+  # — fail here, not at nixos-rebuild.
+  allowedScriptArgs = [
+    "pkgs"
+    "getModuleApi"
+    "getModuleMetadata"
+  ];
+
+  callScript = s:
     let
-      fn = import path;
+      fn = import s.path;
       fa = builtins.functionArgs fn;
+      required = lib.attrNames (lib.filterAttrs (_: optional: !optional) fa);
+      badRequired = lib.filter (n: !(lib.elem n allowedScriptArgs)) required;
       args =
         { inherit pkgs; }
         // lib.optionalAttrs (fa ? getModuleApi) { inherit getModuleApi; }
         // lib.optionalAttrs (fa ? getModuleMetadata) { inherit getModuleMetadata; };
     in
-    fn args;
+    if badRequired != [ ] then
+      throw ''
+        install-wizard scripts/${s.rel}: required argument(s) [${lib.concatStringsSep ", " badRequired}]
+        cannot be injected by packaging (allowed: ${lib.concatStringsSep ", " allowedScriptArgs}).
+        This file is not a bash wrapper — delete it, move it out of scripts/, or add it to isDataNix.
+      ''
+    else
+      fn args;
 
   scriptDrvs = map (s: {
     inherit (s) outRel;
-    drv = callScript s.path;
+    drv = callScript s;
   }) bashScripts;
 
   installBasesDir = ./setup/modes/install-bases;

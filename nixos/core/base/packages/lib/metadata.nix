@@ -83,18 +83,24 @@
     docker = {
       systemTypes = [ "desktop" "server" ];
       group = "virtualization";
-      description = "Root Docker (Swarm / AI-Workspace). Prefer rootless when possible.";
+      uiGroup = "Containerization";
+      exclusiveGroup = "containerization";
+      description = "Docker (rootless by default; root only for Swarm / AI-Workspace). Safer for a normal desktop admin account.";
       dependencies = [];
       conflicts = [ "podman" "docker-rootless" ];
       legacyPath = "server.docker";  # Migration: server.docker → docker (smart rootless/root)
     };
 
+    # Kept for existing systemConfig packageModules; hidden in install wizard (use "docker" + smart mode).
     docker-rootless = {
       systemTypes = [ "desktop" "server" ];
       group = "virtualization";
-      description = "Rootless Docker (per-user daemon)";
+      uiGroup = "Containerization";
+      exclusiveGroup = "containerization";
+      description = "Legacy: force rootless Docker set — prefer packageModules = [ \"docker\" ] (smart mode).";
       dependencies = [];
       conflicts = [ "docker" "podman" ];
+      wizardHide = true;
     };
     
     qemu-vm = {
@@ -177,6 +183,8 @@
     podman = {
       systemTypes = [ "server" ];
       group = "virtualization";
+      uiGroup = "Containerization";
+      exclusiveGroup = "containerization";
       description = "Podman containerization";
       dependencies = [];
       conflicts = [ "docker" "docker-rootless" ];

@@ -20,6 +20,8 @@ class TargetBus(QObject):
     systemAction = Signal(str)
     # SSH client page: open edit modal for ``user@host`` (or empty = current selection).
     sshClientEdit = Signal(object)
+    # SSH inventory / labels changed — Target bar should reload_hosts().
+    inventoryChanged = Signal()
     # Root ⚙ settings saved (activity_mode, show_target, …) — pages re-apply chrome.
     chromePrefsChanged = Signal()
 

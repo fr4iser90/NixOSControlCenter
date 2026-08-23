@@ -31,6 +31,10 @@ let
   profilesStr = concatStringsSep "," (cfg.profiles or []);
   installRoot = cfg.catalog.installRoot or "";
 
+  stacksOperator = import ./handlers/stacks-operator-scripts.nix {
+    inherit config lib pkgs systemConfig getModuleConfig getModuleApi;
+  };
+
   catalogBin = name: ''
     VIRT=${lib.escapeShellArg virtUser}
     ROOT="/home/$VIRT"
@@ -83,11 +87,24 @@ let
     VIRT_USER=${lib.escapeShellArg virtUser}
     SWARM_ROLE=${lib.escapeShellArg swarmRole}
     PROFILES=${lib.escapeShellArg profilesStr}
+    INSTALL_ROOT=${lib.escapeShellArg installRoot}
+
+    CATALOG_PRESENT=false
+    if [[ -n "$VIRT_USER" ]]; then
+      CAT_ROOT="/home/$VIRT_USER"
+      if [[ -n "$INSTALL_ROOT" ]]; then
+        CAT_ROOT="$CAT_ROOT/$INSTALL_ROOT"
+      fi
+      if [[ -d "$CAT_ROOT/docker-scripts" || -d "$CAT_ROOT/catalog" ]]; then
+        CATALOG_PRESENT=true
+      fi
+    fi
 
     if [[ "$JSON" == true ]]; then
       ${pkgs.jq}/bin/jq -n \
         --argjson docker_installed "$DOCKER_INSTALLED" \
         --argjson docker_running "$DOCKER_RUNNING" \
+        --argjson catalog_present "$CATALOG_PRESENT" \
         --arg swarm_status "$SWARM_STATUS" \
         --arg swarm_role "$SWARM_ROLE" \
         --arg domain "$DOMAIN" \
@@ -97,6 +114,7 @@ let
         '{
           docker_installed: $docker_installed,
           docker_running: $docker_running,
+          catalog_present: $catalog_present,
           swarm_status: $swarm_status,
           swarm_role: $swarm_role,
           domain: $domain,
@@ -398,6 +416,40 @@ EOF
       ''}/bin/ncc-stacks-init-cmd";
       shortHelp = "init - Run catalog installer";
       longHelp = "ncc stacks init [--profile NAME …]";
+    }
+    {
+      name = "fleet-tags";
+      parent = "stacks";
+      domain = "stacks";
+      description = "Declarative fleet host tags from systemConfig";
+      category = "infrastructure";
+      script = "${stacksOperator.stacksFleetTags}/bin/ncc-stacks-fleet-tags";
+      arguments = [ "--json" ];
+      shortHelp = "fleet-tags - Declarative fleet labels (JSON)";
+      longHelp = ''
+        Read stack-manager.fleetTags from systemConfig (creds key user@host).
+
+        Examples:
+          ncc stacks fleet-tags
+          ncc stacks fleet-tags --json
+      '';
+    }
+    {
+      name = "dns-env";
+      parent = "stacks";
+      domain = "stacks";
+      description = "Write Cloudflare DNS env for homelab gateway";
+      category = "infrastructure";
+      script = "${stacksOperator.stacksDnsEnv}/bin/ncc-stacks-dns-env";
+      arguments = [ "--cf-email=" "--cf-token=" "--json" ];
+      shortHelp = "dns-env - Write ddns-updater.env (virt user)";
+      longHelp = ''
+        Write catalog/gateway/ddns-updater/ddns-updater.env on the Target.
+
+        Examples:
+          sudo -u <virt> ncc stacks dns-env --cf-email=you@mail.com --cf-token=TOKEN
+          ncc stacks dns-env --json   # stdin: {"cfEmail":"…","cfToken":"…"}
+      '';
     }
     {
       name = "list-profiles";

@@ -27,6 +27,13 @@ from ncc_gui.commit_bar import PendingChange
 from ncc_gui.dialogs import confirm, error, info
 from ncc_gui.pty_terminal import PtyTerminal
 from ncc_gui.scaffold import DomainPage
+from ncc_gui.ssh_labels import (
+    clear_label,
+    display_label,
+    get_alias,
+    migrate_key,
+    set_alias,
+)
 from ncc_gui.target_bus import bus as target_bus
 from ncc_gui.theme import APP_STYLE
 
@@ -37,10 +44,14 @@ _OP = "ssh-client"
 class ServerEntry:
     host: str
     user: str
+    alias: str = ""
 
     @property
     def label(self) -> str:
-        return f"{self.host} ({self.user})"
+        # Prefer staged/draft alias, else file overlay, else host (user)
+        if self.alias.strip():
+            return f"{self.alias.strip()} · {self.user}@{self.host}"
+        return display_label(self.user, self.host)
 
 
 def _run_client(*args: str) -> subprocess.CompletedProcess[str]:
@@ -73,7 +84,9 @@ def load_servers() -> list[ServerEntry]:
         host, user = line.split("=", 1)
         host, user = host.strip(), user.strip()
         if host and user:
-            out.append(ServerEntry(host=host, user=user))
+            out.append(
+                ServerEntry(host=host, user=user, alias=get_alias(user, host))
+            )
     return out
 
 
@@ -102,6 +115,7 @@ class _ServerDialog(QDialog):
         title: str,
         host: str = "",
         user: str = "",
+        alias: str = "",
         host_editable: bool = True,
     ) -> None:
         # Prefer top-level window so the dialog is not buried under the shell.
@@ -116,8 +130,11 @@ class _ServerDialog(QDialog):
         self.host = QLineEdit(host)
         self.host.setEnabled(host_editable)
         self.user = QLineEdit(user)
+        self.alias = QLineEdit(alias)
+        self.alias.setPlaceholderText("optional — e.g. Jetson, Homelab")
         form.addRow("Host", self.host)
         form.addRow("Username", self.user)
+        form.addRow("Alias", self.alias)
         layout.addLayout(form)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -127,8 +144,12 @@ class _ServerDialog(QDialog):
         layout.addWidget(buttons)
         self.user.setFocus()
 
-    def values(self) -> tuple[str, str]:
-        return self.host.text().strip(), self.user.text().strip()
+    def values(self) -> tuple[str, str, str]:
+        return (
+            self.host.text().strip(),
+            self.user.text().strip(),
+            self.alias.text().strip(),
+        )
 
     def exec(self) -> int:  # noqa: A003
         self.show()
@@ -268,8 +289,10 @@ class SshPage(DomainPage):
                 return
         # Not in list yet — still set selection so Edit can offer a dialog.
         if host and user:
-            self._selected = ServerEntry(host=host, user=user)
-            self.detail.setText(f"Host: {host}\nUser: {user}")
+            alias = get_alias(user, host)
+            self._selected = ServerEntry(host=host, user=user, alias=alias)
+            alias_line = f"\nAlias: {alias}" if alias else ""
+            self.detail.setText(f"Host: {host}\nUser: {user}{alias_line}")
 
     def _pending_by_host(self) -> dict[str, PendingChange]:
         assert self.commit is not None
@@ -287,7 +310,8 @@ class SshPage(DomainPage):
         user = str(ch.meta.get("user") or "")
         if not host or not user:
             return None
-        return ServerEntry(host=host, user=user)
+        alias = str(ch.meta.get("alias") or "")
+        return ServerEntry(host=host, user=user, alias=alias)
 
     def reload(self) -> None:
         self._live = load_servers()
@@ -355,7 +379,11 @@ class SshPage(DomainPage):
         extra = ""
         if kind in ("add", "edit", "delete"):
             extra = f"\nDraft: pending {kind} — Apply to write; Connect needs a saved entry."
-        self.detail.setText(f"Host: {entry.host}\nUser: {entry.user}{extra}")
+        self.detail.setText(
+            f"Host: {entry.host}\nUser: {entry.user}"
+            + (f"\nAlias: {entry.alias}" if entry.alias else "")
+            + extra
+        )
 
     @staticmethod
     def _same_host(a: PendingChange, b: PendingChange) -> bool:
@@ -372,19 +400,26 @@ class SshPage(DomainPage):
         dlg = _ServerDialog(self, title="Add SSH server")
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
-        host, user = dlg.values()
+        host, user, alias = dlg.values()
         if not host or not user:
             info(self, "Add", "Host and username are required.")
             return
         if any(e.host == host for e in self._live) or host in self._pending_by_host():
             error(self, "Add", f"Host already listed (live or draft): {host}")
             return
+        label = f"{alias} · " if alias else ""
         self._stage_replace(
             PendingChange(
-                summary=f"ssh client add {host} ({user})",
+                summary=f"ssh client add {label}{host} ({user})",
                 argv=["ssh", "client", "add", host, user],
                 elevated=False,
-                meta={"op": _OP, "action": "add", "host": host, "user": user},
+                meta={
+                    "op": _OP,
+                    "action": "add",
+                    "host": host,
+                    "user": user,
+                    "alias": alias,
+                },
             )
         )
 
@@ -396,16 +431,20 @@ class SshPage(DomainPage):
         if pending is not None and pending.meta.get("action") == "delete":
             error(self, "Edit", "Marked for delete — Undo first.")
             return
+        old_user = self._selected.user
         dlg = _ServerDialog(
             self,
             title="Edit SSH server",
             host=self._selected.host,
             user=self._selected.user,
+            alias=self._selected.alias or get_alias(
+                self._selected.user, self._selected.host
+            ),
             host_editable=False,
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
-        host, user = dlg.values()
+        host, user, alias = dlg.values()
         if not user:
             info(self, "Edit", "Username is required.")
             return
@@ -415,12 +454,20 @@ class SshPage(DomainPage):
             if action == "add"
             else ["ssh", "client", "edit", host, user]
         )
+        label = f"{alias} · " if alias else ""
         self._stage_replace(
             PendingChange(
-                summary=f"ssh client {action} {host} ({user})",
+                summary=f"ssh client {action} {label}{host} ({user})",
                 argv=argv,
                 elevated=False,
-                meta={"op": _OP, "action": action, "host": host, "user": user},
+                meta={
+                    "op": _OP,
+                    "action": action,
+                    "host": host,
+                    "user": user,
+                    "alias": alias,
+                    "old_user": old_user,
+                },
             )
         )
 
@@ -466,8 +513,22 @@ class SshPage(DomainPage):
             proc = self.run_ncc(*ch.argv, log=True, show_error=True)
             if proc.returncode != 0:
                 return
+            action = str(ch.meta.get("action") or "")
+            host = str(ch.meta.get("host") or "")
+            user = str(ch.meta.get("user") or "")
+            alias = str(ch.meta.get("alias") or "")
+            old_user = str(ch.meta.get("old_user") or user)
+            if not host or not user:
+                continue
+            if action == "delete":
+                clear_label(user, host)
+            elif action in ("add", "edit"):
+                if old_user and old_user != user:
+                    migrate_key(old_user, host, user, host)
+                set_alias(user, host, alias)
         self.commit.notify_apply_finished(True, summary, offer_rebuild=False)
         self.reload()
+        target_bus().inventoryChanged.emit()
 
     def _connect_embedded(self) -> None:
         if not self._selected:

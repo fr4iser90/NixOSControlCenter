@@ -183,6 +183,11 @@ class SystemPage(DomainPage):
         self.lbl_layout = self.add_form_value(status, "Config layout")
         self.lbl_checks = self.add_form_value(status, "Preflight checks")
 
+        store = self.add_form_block("Nix store")
+        self.lbl_store_size = self.add_form_value(store, "Store size")
+        self.lbl_generations = self.add_form_value(store, "Generations")
+        self.lbl_gc_preview = self.add_form_value(store, "GC preview")
+
         self._elevated_btns: list = []
         self.add_action("Refresh status", self.reload, local=True)
         self._elevated_btns.append(
@@ -229,6 +234,23 @@ class SystemPage(DomainPage):
             lambda: self._run_quick(("report",), "System report", False),
             ncc=("system", "report"),
         )
+        self.add_action(
+            "Store status",
+            lambda: self._run_quick(("store-status",), "Store status", False),
+            ncc=("system", "store-status"),
+        )
+        self.add_action(
+            "GC dry-run",
+            lambda: self._run_quick(("gc", "--dry-run"), "GC dry-run", False),
+            ncc=("system", "gc"),
+        )
+        self._elevated_btns.append(
+            self.add_action(
+                "Run GC",
+                lambda: self._run_gc_run(),
+                ncc=("system", "gc"),
+            )
+        )
         self._elevated_btns.append(
             self.add_action(
                 "Rebuild only",
@@ -250,6 +272,7 @@ class SystemPage(DomainPage):
         )
 
         self._status_proc: QProcess | None = None
+        self._store_proc: QProcess | None = None
         self._reload_timer = QTimer(self)
         self._reload_timer.setSingleShot(True)
         self._reload_timer.setInterval(150)
@@ -550,6 +573,80 @@ class SystemPage(DomainPage):
         self.lbl_system_type.setText("…")
         self.lbl_layout.setText("…")
         self.lbl_checks.setText("…")
+        self.lbl_store_size.setText("…")
+        self.lbl_generations.setText("…")
+        self.lbl_gc_preview.setText("…")
+
+    def _apply_store_json(self, raw: str) -> None:
+        import json
+
+        text = (raw or "").strip()
+        if not text:
+            self.lbl_store_size.setText("—")
+            self.lbl_generations.setText("—")
+            self.lbl_gc_preview.setText("—")
+            return
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            self.lbl_store_size.setText("error: invalid JSON")
+            return
+        size = data.get("storeSize")
+        self.lbl_store_size.setText(_dash(size))
+        gens = data.get("generations")
+        cur = data.get("currentGeneration")
+        if gens is not None:
+            gen_txt = str(gens)
+            if cur is not None:
+                gen_txt = f"{gens} (current {cur})"
+            self.lbl_generations.setText(gen_txt)
+        else:
+            self.lbl_generations.setText("—")
+        dead = data.get("gcDeadPaths")
+        freed = data.get("gcFreedEstimate")
+        if dead is not None:
+            preview = str(dead)
+            if freed:
+                preview = f"{dead} paths (~{freed})"
+            self.lbl_gc_preview.setText(preview)
+        else:
+            self.lbl_gc_preview.setText("—")
+
+    def _run_gc_run(self) -> None:
+        if self.set_busy():
+            return
+        t = target_from_env()
+        where = t or "this machine"
+        if not confirm(
+            self,
+            "Run GC",
+            f"Delete unreachable Nix store paths on {where}?\n\n"
+            "Boot profiles and active generations are kept.",
+        ):
+            return
+        if not can_elevate(target=target_from_env()):
+            error(
+                self,
+                "Run GC",
+                "Passwordless sudo required on the Target "
+                "(ssh … sudo -n true).",
+            )
+            self._refresh_elevated_actions()
+            return
+
+        def _done(code: int) -> None:
+            if code == 0:
+                info(self, "Run GC", "Garbage collection finished.")
+                self._start_store_status_probe()
+            else:
+                error(self, "Run GC", "Garbage collection failed.")
+
+        self.run_ncc_root(
+            ["system", "gc", "--run"],
+            label="run GC",
+            follow_target=True,
+            on_done=_done,
+        )
 
     def _apply_fs_status(self, raw: str, *, code: int) -> None:
         """Fill Status from Target /etc/nixos (real config + flake values)."""
@@ -609,6 +706,42 @@ class SystemPage(DomainPage):
         self._set_status_loading()
         self._refresh_elevated_actions()
         self._start_fs_status_probe()
+        self._start_store_status_probe()
+
+    def _start_store_status_probe(self) -> None:
+        if self._store_proc is not None:
+            if self._store_proc.state() != QProcess.ProcessState.NotRunning:
+                self._store_proc.kill()
+            self._store_proc = None
+
+        from ncc_gui.remote import build_ncc_argv
+
+        argv = build_ncc_argv(
+            ["system", "store-status", "--json"],
+            target=target_from_env(),
+        )
+        proc = QProcess(self)
+        self._store_proc = proc
+        proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        proc.finished.connect(self._on_store_status_finished)
+        prog, *args = argv
+        proc.start(prog, args)
+        if not proc.waitForStarted(3000):
+            self.lbl_store_size.setText("error: probe failed to start")
+            self._store_proc = None
+
+    def _on_store_status_finished(self, code: int, _status) -> None:
+        proc = self._store_proc
+        self._store_proc = None
+        if proc is None:
+            return
+        raw = strip_ansi(
+            bytes(proc.readAllStandardOutput()).decode("utf-8", errors="replace")
+        )
+        if code != 0 and not raw.strip():
+            self.lbl_store_size.setText(f"error (exit {code})")
+            return
+        self._apply_store_json(raw)
 
     def _start_fs_status_probe(self) -> None:
         if self._status_proc is not None:
@@ -752,6 +885,10 @@ class SystemPage(DomainPage):
             timeout=timeout,
             need_confirm=None,
         )
+        if args == ("store-status",) and proc.returncode == 0:
+            self._apply_store_json(proc.stdout or "")
+        if args[:2] == ("gc", "--dry-run") and proc.returncode == 0:
+            self._start_store_status_probe()
         if args == ("config-layout", "detect") and proc.returncode == 0:
             for line in reversed((proc.stdout or "").strip().splitlines()):
                 tline = line.strip().strip('"')

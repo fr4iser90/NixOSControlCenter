@@ -24,6 +24,7 @@ in {
     ./handlers/stacks-fetch.nix
     ./handlers/stacks-create.nix
     ./handlers/stacks-catalog.nix
+    ./handlers/stacks-operator.nix
   ];
 
   environment.systemPackages = mkIf (cfg.enable or false) (

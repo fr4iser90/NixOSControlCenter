@@ -14,4 +14,16 @@
   profiles = [];
 
   stacks = [];
+
+  # Declarative fleet labels (creds key user@host) — merged with GUI cockpit tags
+  fleetTags = {};
+
+  dns = {
+    enable = false;
+    provider = "cloudflare";
+    cloudflare = {
+      apiEmail = "";
+      apiToken = "";
+    };
+  };
 }

@@ -1,0 +1,39 @@
+---
+description: Before every ncc system-update / claiming Nix works — run the hard gate (migrations + layers)
+alwaysApply: true
+---
+
+# NCC: Pre-update hard gate
+
+## You (and agents) before `ncc system-update`
+
+Run and get **exit 0**:
+
+```bash
+bash tests/validate-ncc-nix.sh
+```
+
+Still small (~seconds). **Do this before every local/remote update** that deploys `nixos/` changes. Do not skip “because it’s only a small edit.”
+
+**Forbidden:** telling the user to `ncc system-update` / claiming “validated” if this did not exit 0 **in this turn**.
+
+## What it already auto-detects
+
+| Check | Catches |
+|-------|---------|
+| bash-in-nix | `${…}` footguns in `''` strings across `nixos/` |
+| packages/lib layer | relative imports into foreign `packages/lib` |
+| module layer | install-wizard paths in system-update/plans; cross-module imports under `nixos/modules/` |
+| **migrations auto-detect** | packaging-sensitive deletes without `<module>/migrations/`; version `< migration to`; `isDataNix` orphans without migration |
+| install-wizard packaging | same path as system-update `scriptTree` |
+
+Version bump is **only required when that gate (or a broken rebuild) says so** — see `ncc-module-migrations.mdc`. Not every file edit needs a bump.
+
+## Optional extras (not a substitute)
+
+```bash
+bash tests/install-wizard/validate-no-hardcoded-paths.sh
+bash tests/gui/validate-gui-python.sh   # if GUI touched
+```
+
+`nix-instantiate --parse` on one file is **never** enough.

@@ -153,7 +153,7 @@ class InstallPage(DomainPage):
         elif mode == "migrate":
             self.lbl_next.setText(
                 "1) Backup /etc/nixos  →  2) Start wizard  →  3) finish in "
-                "nix-shell. Device starters appear only if hardware matches."
+                "nix-shell. On Server, device starters (e.g. Jetson) sit next to Homelab."
             )
         elif mode == "reconfigure":
             self.lbl_next.setText(

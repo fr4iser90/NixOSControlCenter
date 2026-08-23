@@ -1,7 +1,25 @@
+# Secure Node/npm/npx + Playwright browsers (Nix-managed).
+#
+# Activation: copy/rename to e.g. `node.nix` (files prefixed `example_` are
+# NOT auto-imported by custom/default.nix), then rebuild.
+#
+# Playwright: do NOT `npm install -g playwright` / `npx playwright install
+# --with-deps`. Browsers come from nixpkgs; npm packages stay per-project.
+#
+# Agent / AI escape hatches (opt-in, never default-on):
+#   NPM_SECURITY_ALLOW_AUDIT_FAIL=1   — warn + continue install if audit fails
+#   NPM_SECURITY_ALLOW_NPX_UNAUDITED=1 — skip npx package audit (broad; prefer local .bin)
+#   NPM_SECURITY_ALLOW_GLOBAL=1       — allow `npm -g` (still discouraged)
+# Do not teach agents to call /nix/store/.../bin/npm directly — that bypasses
+# the wrapper entirely.
 { pkgs, lib, ... }:
 
 let
   node = pkgs.nodejs_22 or pkgs.nodejs;
+
+  # Official Playwright browser cache from nixpkgs (matches driver ~1.59.x).
+  # Pin project @playwright/test near this version, or launch via executablePath.
+  playwrightBrowsers = pkgs.playwright-driver.browsers-chromium;
 
   secureNpm = pkgs.writeShellApplication {
     name = "npm";
@@ -23,8 +41,23 @@ let
       if [[ "$is_global" == "1" && "''${NPM_SECURITY_ALLOW_GLOBAL:-0}" != "1" ]]; then
         echo "Blocked: global npm installs are disabled by secure npm wrapper." >&2
         echo "Use NPM_SECURITY_ALLOW_GLOBAL=1 only if you really trust this install." >&2
+        echo "For Playwright browsers, use Nix (PLAYWRIGHT_BROWSERS_PATH) — not npm -g." >&2
         exit 42
       fi
+
+      run_audit() {
+        if "$real_npm" audit --audit-level="$audit_level"; then
+          return 0
+        fi
+        local status=$?
+        if [[ "''${NPM_SECURITY_ALLOW_AUDIT_FAIL:-0}" == "1" ]]; then
+          echo "secure-npm: WARNING: audit failed (exit $status) but NPM_SECURITY_ALLOW_AUDIT_FAIL=1 — continuing." >&2
+          return 0
+        fi
+        echo "secure-npm: audit failed (level=$audit_level, exit $status)." >&2
+        echo "Fix vulnerabilities, lower NPM_AUDIT_LEVEL, or set NPM_SECURITY_ALLOW_AUDIT_FAIL=1 for agents." >&2
+        return "$status"
+      }
 
       case "$cmd" in
         install|i|add|update)
@@ -45,15 +78,18 @@ let
           "$real_npm" "$@" --package-lock-only --ignore-scripts --no-audit
 
           echo "secure-npm: auditing dependency tree, level=$audit_level..."
-          "$real_npm" audit --audit-level="$audit_level"
+          run_audit
 
           cd "$project_root"
+          # Clear EXIT trap before exec so tmp cleanup does not race the real install.
+          trap - EXIT
+          rm -rf "$tmp"
           exec "$real_npm" "$@"
           ;;
 
         ci)
           echo "secure-npm: auditing package-lock before npm ci, level=$audit_level..."
-          "$real_npm" audit --audit-level="$audit_level"
+          run_audit
           exec "$real_npm" "$@"
           ;;
 
@@ -138,9 +174,20 @@ let
       "$real_npm" install --package-lock-only --ignore-scripts --no-audit "''${packages[@]}"
 
       echo "secure-npx: auditing dependency tree, level=$audit_level..."
-      "$real_npm" audit --audit-level="$audit_level"
+      if ! "$real_npm" audit --audit-level="$audit_level"; then
+        status=$?
+        if [[ "''${NPM_SECURITY_ALLOW_AUDIT_FAIL:-0}" == "1" ]]; then
+          echo "secure-npx: WARNING: audit failed (exit $status) but NPM_SECURITY_ALLOW_AUDIT_FAIL=1 — continuing." >&2
+        else
+          echo "secure-npx: audit failed (level=$audit_level, exit $status)." >&2
+          echo "Fix vulnerabilities or set NPM_SECURITY_ALLOW_AUDIT_FAIL=1 for agents." >&2
+          exit "$status"
+        fi
+      fi
 
-      echo "secure-npx: audit passed, executing npx..."
+      echo "secure-npx: audit passed (or allow-fail), executing npx..."
+      trap - EXIT
+      rm -rf "$tmp"
       exec "$real_npx" "$@"
     '';
   };
@@ -160,6 +207,8 @@ in
     secureNode
     pkgs.pnpm
     pkgs.yarn
+    # System Chromium as fallback launch target (version-flexible).
+    pkgs.chromium
   ];
 
   # Some tools spawn /usr/bin/bash with a minimal PATH and miss the NixOS
@@ -173,6 +222,11 @@ in
 
   environment.sessionVariables = {
     NPM_AUDIT_LEVEL = "moderate";
+
+    # Browsers from Nix — npm postinstall must not download Chromium.
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
+    PLAYWRIGHT_BROWSERS_PATH = "${playwrightBrowsers}";
+    # Project configs / agents can also point launchOptions.executablePath here.
+    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH = "${pkgs.chromium}/bin/chromium";
   };
 }

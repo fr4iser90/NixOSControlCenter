@@ -1,4 +1,5 @@
-# Module migration plans (rename / merge / orphan cleanup).
+# Cross-module migration plans ONLY (rename / merge).
+# Single-module code cleanup lives in <module>/migrations/v*-to-v*.nix — never here.
 # Applied by ncc-module-migrate; tracked in /var/lib/ncc/module-migrations.json
 { lib }:
 

@@ -17,7 +17,14 @@ Wire token: `LOAD_BLUEPRINT:` (legacy `LOAD_PROFILE:` still accepted).
 
 ## Device targets (discovery)
 
-Hardware starters are **not** listed in `setup-options`. Put this in a host-blueprint file:
+Hardware starters are **not** listed in `INSTALL_STARTERS` (that stays software-only, e.g. Homelab).
+Each host-blueprint with `deviceTarget.enable` is discovered automatically.
+
+Wizard UX (Server base): **all** device targets appear next to Homelab (selectable even without a match).
+Auto-detect only marks / pre-selects. Desktop/other bases: matched targets only.
+Always also under Advanced → blueprints.
+
+Put this in a host-blueprint file:
 
 ```nix
 deviceTarget = {

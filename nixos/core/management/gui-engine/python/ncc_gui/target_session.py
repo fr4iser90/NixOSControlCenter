@@ -260,6 +260,13 @@ class TargetSessionController(QObject):
             return
 
         set_active_target(want)
+        # Cache live hostname for Target / SSH list display (alias still wins).
+        if want and "@" in want and (probe.hostname or "").strip():
+            from ncc_gui.ssh_labels import parse_target, set_cached_hostname
+
+            parsed = parse_target(want)
+            if parsed is not None:
+                set_cached_hostname(parsed[0], parsed[1], probe.hostname.strip())
         self._emit(
             TargetSession(
                 state=gate,

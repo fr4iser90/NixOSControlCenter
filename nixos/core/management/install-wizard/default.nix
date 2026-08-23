@@ -11,7 +11,7 @@ in {
     category = "management";
     subcategory = "install";
     stability = "stable";
-    version = "1.0.0";
+    version = "1.1.0";
   };
 
   imports = [

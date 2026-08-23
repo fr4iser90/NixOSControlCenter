@@ -75,5 +75,42 @@ in {
         }
       ];
     };
+
+    fleetTags = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.listOf lib.types.str);
+      default = {};
+      example = {
+        "admin@jetson" = [ "gpu" "arm" "compute" ];
+        "admin@homelab" = [ "swarm" "edge" ];
+      };
+      description = ''
+        Declarative operator labels for fleet hosts (SSH creds key ``user@host``).
+        Merged in the Stacks GUI with cockpit tags in ~/.config/ncc/stacks-ui.json.
+      '';
+    };
+
+    dns = {
+      enable = lib.mkEnableOption "pre-seed Cloudflare DNS credentials for homelab gateway";
+
+      provider = lib.mkOption {
+        type = lib.types.str;
+        default = "cloudflare";
+        description = "DNS provider code (only cloudflare implemented in NCC adapter)";
+      };
+
+      cloudflare = {
+        apiEmail = lib.mkOption {
+          type = lib.types.str;
+          default = "";
+          description = "Cloudflare API email for Traefik ACME / DDNS";
+        };
+
+        apiToken = lib.mkOption {
+          type = lib.types.str;
+          default = "";
+          description = "Cloudflare API token (sensitive — prefer cockpit dns-env for secrets)";
+        };
+      };
+    };
   };
 }

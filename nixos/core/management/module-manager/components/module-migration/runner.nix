@@ -10,9 +10,14 @@ let
   discoveryPkg = import ../../lib/runtime_discovery.nix { inherit lib pkgs; };
   discoverBin = "${discoveryPkg.discoveryBin}/bin/ncc-modules-discover";
 
+  applyMigrations = import ./apply-migrations.nix { inherit pkgs; };
+
   moduleMigrate = pkgs.writeShellScriptBin "ncc-module-migrate" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
+
+    APPLY_MIGRATIONS="${applyMigrations}/bin/ncc-apply-migrations"
+    PLANS_NIX="${./plans.nix}"
 
     DRY=0
     VERBOSE=0
@@ -561,6 +566,10 @@ EOF
           # Config may already be merged while module *code* tree still lingers
           [[ -d "$NIXOS_ROOT/$fp" ]] && need=1
         done < <(echo "$plan" | ${pkgs.jq}/bin/jq -r '.fromPaths[]?')
+        while IFS= read -r cp; do
+          [[ -z "$cp" || "$cp" == "null" ]] && continue
+          [[ -e "$NIXOS_ROOT/$cp" ]] && need=1
+        done < <(echo "$plan" | ${pkgs.jq}/bin/jq -r '.paths[]?')
         if [[ "$need" -eq 0 ]]; then
           log "already applied: $id"
           continue
@@ -581,12 +590,21 @@ EOF
             FAILED=$((FAILED + 1))
           fi
           ;;
+        code-cleanup)
+          ${ui.messages.warning "kind=code-cleanup in central plans.nix is forbidden — put removeRelativePaths in <module>/migrations/"}
+          ;;
         *)
           ${ui.messages.warning "Unknown migration plan — skipped"}
           [[ "$VERBOSE" -eq 1 ]] && ${ui.messages.info "kind=$kind id=$id"}
           ;;
       esac
     done < <(echo "$PLANS_JSON" | ${pkgs.jq}/bin/jq -c '.[]')
+
+    # Module migrations: <module>/migrations/v*-to-v*.nix (discovered, not hardwired)
+    PENDING=$((PENDING + 1))
+    if ! "$APPLY_MIGRATIONS" "$NIXOS_ROOT" "$DRY" "$STATE_FILE"; then
+      FAILED=$((FAILED + 1))
+    fi
 
     if [[ "$FAILED" -gt 0 ]]; then
       ${ui.messages.error "$FAILED module migration(s) failed"}

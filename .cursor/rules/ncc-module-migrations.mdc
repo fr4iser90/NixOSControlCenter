@@ -1,0 +1,73 @@
+---
+description: NCC module version bumps + migrations — only when needed; migrations live in the module
+alwaysApply: true
+---
+
+# NCC: Module versioning + migrations
+
+## When to bump `_module.metadata.version` / `_version`
+
+**Bump (and add a migration) only when hosts would break or need a transform without it:**
+
+- Removed / renamed files under the module tree that sync-without-delete (or packaging) would leave as orphans
+- Renamed / merged module identity or `systemConfig` leaf paths
+- Breaking option renames / removals that need config rewrite
+- Feature moved to another module’s API and old code paths must disappear
+
+**Do NOT bump for:**
+
+- Docs, comments, formatting
+- Pure additive options with defaults
+- Internal refactors that leave on-disk paths and public options unchanged
+- Test / gate / rule-only changes
+
+Default: **no version bump**. If unsure: no bump unless a host rebuild fails without cleanup.
+
+## Where migrations live
+
+| Kind | Location |
+|------|----------|
+| Single-module code/config cleanup | `<that-module>/migrations/vFROM-to-vTO.nix` |
+| Cross-module rename/merge only | `module-manager/.../plans.nix` |
+
+**Forbidden:** hardcoding peer module paths in `system-update.nix` or central `plans.nix` for single-module cleanup.
+
+Naming: helper is **`apply-migrations.nix`** / **`ncc-apply-migrations`**. Never “local migrations”, “code-cleanup plans”, or invent new names.
+
+## Migration file shape
+
+```nix
+# <module>/migrations/v1.0.0-to-v1.1.0.nix
+{ lib }: {
+  id = "module-name-1.0.0-to-1.1.0";
+  from = "1.0.0";
+  to = "1.1.0";
+  description = "Why this exists";
+  removeRelativePaths = [ "scripts/obsolete.nix" ];  # relative to module root
+}
+```
+
+Bump metadata `version` / options `_version` to match `to`.
+
+## Checklist (breaking module change)
+
+1. Put cleanup in **that** module’s `migrations/`
+2. Bump version only if step 1 is needed
+3. Keep packaging bootstrap guards temporary if orphans can block rebuild once
+4. Run: `bash tests/validate-ncc-nix.sh` (includes **migration auto-detect**) — exit 0 before claiming done / telling user to system-update
+
+## Auto-detect gate
+
+`tests/validate-module-migrations.sh` (step in `validate-ncc-nix.sh`) fails when:
+
+- Git deleted **packaging-sensitive** paths (`**/scripts/**`, `**/ui/prompts/**`, `**/ui/gui/**`) without a matching `removeRelativePaths` entry in that module’s `migrations/`
+- A migration’s `to` is **newer** than the module’s `version` / `_version` (forgot bump)
+- Migration filename `vFROM-to-vTO` disagrees with `from` / `to` attrs
+- `scripts/default.nix` `isDataNix` lists a **missing** path with no matching migration
+
+Normal module code deletions (covered by `rsync --delete`) do **not** require a migration. Additive/docs-only edits never do.
+
+## Layer
+
+- `nixos/modules/*`: no cross-module `import` of peer trees — `getModuleApi` / `getModuleConfig`
+- Core may discover `*/migrations/`; must not list install-wizard (or other) script paths by name

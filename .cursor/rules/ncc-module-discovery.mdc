@@ -74,10 +74,14 @@ NOT OK: `cfg = systemConfig.${configPath};` (reading).
 Prefer: `imports = [ ./commands.nix ];` (flake specialArgs inject helpers).
 Never: `(import ./commands.nix { inherit … })` — drops helpers and breaks rebuild.
 
-```bash
-bash tests/install-wizard/validate-no-hardcoded-paths.sh
-# prefer: nix-build -E 'with import <nixpkgs> {}; import ./tests/install-wizard { inherit pkgs; }'
+For **any** `nixos/` change, agents **must** run and get exit 0:
 
+```bash
+bash tests/validate-ncc-nix.sh
 ```
 
-Agents **must** run this (or at least `validate-no-hardcoded-paths.sh`) before claiming a Nix change works.
+That gate includes module-layer (migrations in modules; no peer hardwires) and install-wizard packaging.
+
+**Breaking module changes:** see `.cursor/rules/ncc-module-migrations.mdc` — bump version + `<module>/migrations/` only when hosts need cleanup; naming is `apply-migrations` / `ncc-apply-migrations` only.
+
+**Forbidden:** claiming “validated” or telling the user to `ncc system-update` if `tests/validate-ncc-nix.sh` did not exit 0 in this turn. `nix-instantiate --parse` on a single file is **not** enough.

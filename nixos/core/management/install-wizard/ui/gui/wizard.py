@@ -676,9 +676,9 @@ class InstallWizard(QMainWindow):
         base = self._state.get("preset") or "Desktop"
         self.header.setText("Optional starter")
         self.subheader.setText(
-            f"Base: {base}. Homelab is a software starter (Server). "
-            "Hardware blueprints appear only when this machine matches "
-            "(discovered device targets). All blueprints stay under Advanced."
+            f"Base: {base}. Homelab = software starter (Server). "
+            "Device targets (e.g. Jetson) = host blueprints — always listed for Server; "
+            "auto-detect only pre-selects / marks them. All blueprints also under Advanced."
         )
         self.btn_next.setText("Next")
         from device_detect import detect_matched_device_targets
@@ -689,14 +689,26 @@ class InstallWizard(QMainWindow):
             if s == "Homelab Server" and base != "Server":
                 continue
             starters.append(s)
+        # Device blueprints: always offer on Server (next to Homelab); on other
+        # bases only when hardware matches (so a Jetson can still pick its target).
         for d in self.opts.device_presets:
-            if d in matched and d not in starters:
+            if d in starters:
+                continue
+            if base == "Server" or d in matched:
                 starters.append(d)
         if "None" not in starters:
             starters.insert(0, "None")
         default = self._state.get("starter") or "None"
         if default not in starters:
-            default = "None"
+            # Prefer a detected device target when present
+            if len(matched) == 1:
+                only = next(iter(matched))
+                if only in starters:
+                    default = only
+                else:
+                    default = "None"
+            else:
+                default = "None"
         opts = []
         for name in starters:
             if name == "None":
@@ -712,11 +724,20 @@ class InstallWizard(QMainWindow):
                         else "Defaults: (none)"
                     )
                 )
+                if name in matched:
+                    extra = f"Detected on this machine.\n{extra}"
                 d = self.opts.desc(name)
                 desc = f"{d}\n{extra}" if d else extra
             opts.append((name, name, desc))
         if matched:
             hint = QLabel("Detected hardware: " + ", ".join(sorted(matched)))
+            hint.setObjectName("nccPageSubtitle")
+            self._add(hint)
+        elif base == "Server" and self.opts.device_presets:
+            hint = QLabel(
+                "No device auto-match — pick a hardware starter below "
+                "(e.g. Jetson) or leave None / Homelab."
+            )
             hint.setObjectName("nccPageSubtitle")
             self._add(hint)
         else:

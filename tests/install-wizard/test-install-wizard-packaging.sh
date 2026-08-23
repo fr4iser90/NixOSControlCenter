@@ -112,32 +112,20 @@ nix-instantiate --eval --strict -E "
 " >/dev/null
 echo "OK: skipDir excludes checks/ even when present on disk"
 
-# 4) Real repo packaging still builds (no leftovers required)
+# 4) Real repo packaging still builds (needs getModuleApi "packages" + "cli-formatter")
 nix-build --no-out-link -E "
   let
     pkgs = import <nixpkgs> {};
     lib = pkgs.lib;
-    colors = import $ROOT/nixos/core/management/cli-formatter/colors.nix;
-    core = import $ROOT/nixos/core/management/cli-formatter/core { inherit lib colors; config = {}; };
-    components = import $ROOT/nixos/core/management/cli-formatter/components { inherit lib colors; config = {}; };
-    interactive = import $ROOT/nixos/core/management/cli-formatter/interactive { inherit lib colors; config = {}; };
-    status = import $ROOT/nixos/core/management/cli-formatter/status { inherit lib colors; config = {}; };
-    ui = {
-      inherit colors;
-      inherit (core) text layout;
-      inherit (components) lists tables progress boxes;
-      inherit (interactive) prompts spinners fzf menus tui;
-      inherit (status) messages badges;
-    };
-    getModuleApi = name: assert name == \"cli-formatter\"; ui;
     helpers = import $ROOT/nixos/core/management/module-manager/lib/module-config.nix {
       inherit lib;
       systemConfig = {};
     };
-    inherit (helpers) getModuleMetadata;
+    inherit (helpers) getModuleApi getModuleMetadata;
   in
   (import $SCRIPTS { inherit pkgs getModuleApi getModuleMetadata; }).scriptTree
 " >/dev/null
 echo "OK: real scripts/default.nix scriptTree builds"
+
 
 echo "PASS: install-wizard packaging regression"

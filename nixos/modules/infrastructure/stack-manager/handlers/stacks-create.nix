@@ -22,6 +22,9 @@ let
   profiles = cfg.profiles or [];
   profileArgs = lib.concatMapStringsSep " " (p: "--profile ${lib.escapeShellArg p}") profiles;
   installRoot = cfg.catalog.installRoot or "";
+  dnsEnabled = cfg.dns.enable or false;
+  dnsEmail = cfg.dns.cloudflare.apiEmail or "";
+  dnsToken = cfg.dns.cloudflare.apiToken or "";
 
   stacks-create = pkgs.writeScriptBin "ncc-stacks-init" ''
     #!${pkgs.bash}/bin/bash
@@ -83,6 +86,26 @@ let
     export USER_UID USER_GID
     export DOMAIN=${lib.escapeShellArg (systemConfig.domain or "")}
     export EMAIL=${lib.escapeShellArg (systemConfig.email or "")}
+
+    DNS_ENV_FILE="$BASE/catalog/gateway/ddns-updater/ddns-updater.env"
+    DNS_CFG_ENABLE=${if dnsEnabled then "true" else "false"}
+    DNS_CFG_EMAIL=${lib.escapeShellArg dnsEmail}
+    DNS_CFG_TOKEN=${lib.escapeShellArg dnsToken}
+    if [[ "$DNS_CFG_ENABLE" == "true" && -n "$DNS_CFG_EMAIL" && -n "$DNS_CFG_TOKEN" ]]; then
+      mkdir -p "$(dirname "$DNS_ENV_FILE")"
+      cat > "$DNS_ENV_FILE" <<EOF
+DNS_PROVIDER_CODE=cloudflare
+CF_API_EMAIL=$DNS_CFG_EMAIL
+CF_TOKEN=$DNS_CFG_TOKEN
+CLOUDFLARE_EMAIL=$DNS_CFG_EMAIL
+CLOUDFLARE_DNS_API_TOKEN=$DNS_CFG_TOKEN
+EOF
+      export NCC_NON_INTERACTIVE=1
+      export NCC_ASSUME_YES=1
+    elif [[ -f "$DNS_ENV_FILE" ]] && grep -q '^DNS_PROVIDER_CODE=' "$DNS_ENV_FILE" 2>/dev/null; then
+      export NCC_NON_INTERACTIVE=1
+      export NCC_ASSUME_YES=1
+    fi
 
     # Substitute placeholders in yml/env under catalog
     if [[ -d "$BASE/catalog" ]]; then

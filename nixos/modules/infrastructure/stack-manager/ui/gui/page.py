@@ -17,9 +17,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, Signal
+from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, Signal, QTimer
 from PySide6.QtWidgets import (
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -83,6 +86,79 @@ def _pin_set() -> set[str]:
     if isinstance(pins, list):
         return {str(p) for p in pins}
     return set()
+
+
+def _toggle_pin(key: str) -> bool:
+    data = _prefs()
+    pins = set(str(p) for p in (data.get("pins") or []) if p)
+    if key in pins:
+        pins.discard(key)
+        now = False
+    else:
+        pins.add(key)
+        now = True
+    data["pins"] = sorted(pins)
+    _set_prefs(data)
+    return now
+
+
+def _tags_map() -> dict[str, list[str]]:
+    raw = _prefs().get("tags")
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, list[str]] = {}
+    for key, val in raw.items():
+        if not key:
+            continue
+        if isinstance(val, list):
+            out[str(key)] = sorted({str(t).strip() for t in val if str(t).strip()})
+    return out
+
+
+def _host_tags(key: str) -> list[str]:
+    return list(_tags_map().get(key) or [])
+
+
+def _merged_host_tags(key: str, declarative: dict[str, list[str]]) -> list[str]:
+    merged = set(_host_tags(key))
+    for t in declarative.get(key) or []:
+        if str(t).strip():
+            merged.add(str(t).strip())
+    return sorted(merged, key=str.lower)
+
+
+def _set_host_tags(key: str, tags: list[str]) -> None:
+    data = _prefs()
+    tags_map = _tags_map()
+    clean = sorted({t.strip() for t in tags if t.strip()})
+    if clean:
+        tags_map[key] = clean
+    else:
+        tags_map.pop(key, None)
+    data["tags"] = tags_map
+    _set_prefs(data)
+
+
+def _all_tag_names() -> list[str]:
+    names: set[str] = set()
+    for vals in _tags_map().values():
+        names.update(vals)
+    return sorted(names, key=str.lower)
+
+
+def _setup_dismissed() -> bool:
+    return bool(_prefs().get("setup_dismissed"))
+
+
+def _setup_complete() -> bool:
+    return bool(_prefs().get("setup_complete"))
+
+
+def _mark_setup_complete() -> None:
+    data = _prefs()
+    data["setup_complete"] = True
+    data.pop("setup_dismissed", None)
+    _set_prefs(data)
 
 
 def _toggle_pin(key: str) -> bool:
@@ -272,6 +348,117 @@ class _CatalogJob(QRunnable):
         )
 
 
+class _StacksSetupDialog(QDialog):
+    """First-run: pick profile → fetch (if needed) → init with Activity log on parent."""
+
+    def __init__(self, parent: StacksPage, profiles: list[str]) -> None:
+        super().__init__(parent)
+        self._page = parent
+        self.setWindowTitle("Stacks setup")
+        self.resize(480, 360)
+        root = QVBoxLayout(self)
+        root.addWidget(
+            QLabel(
+                "Phase 2: fetch catalog on the Target, then run the profile installer. "
+                "Output appears in Activity below the page."
+            )
+        )
+        self.lbl_preflight = QLabel("Preflight: …")
+        self.lbl_preflight.setWordWrap(True)
+        root.addWidget(self.lbl_preflight)
+        form = QFormLayout()
+        self.profile = QComboBox()
+        for name in profiles:
+            self.profile.addItem(name)
+        if profiles:
+            self.profile.setCurrentIndex(0)
+        form.addRow("Profile", self.profile)
+        self.dns_box = QWidget()
+        dns_form = QFormLayout(self.dns_box)
+        dns_hint = QLabel(
+            "Optional Cloudflare credentials for homelab gateway (writes ddns-updater.env). "
+            "Skip for compute profiles."
+        )
+        dns_hint.setWordWrap(True)
+        dns_form.addRow(dns_hint)
+        self.cf_email = QLineEdit()
+        self.cf_email.setPlaceholderText("CF API email")
+        dns_form.addRow("CF email", self.cf_email)
+        self.cf_token = QLineEdit()
+        self.cf_token.setEchoMode(QLineEdit.EchoMode.Password)
+        self.cf_token.setPlaceholderText("CF API token")
+        dns_form.addRow("CF token", self.cf_token)
+        root.addWidget(self.dns_box)
+        self.profile.currentIndexChanged.connect(self._sync_dns_visibility)
+        self._sync_dns_visibility()
+        root.addLayout(form)
+        buttons = QDialogButtonBox()
+        run_btn = buttons.addButton("Run setup", QDialogButtonBox.ButtonRole.AcceptRole)
+        dismiss_btn = buttons.addButton(
+            "Dismiss", QDialogButtonBox.ButtonRole.RejectRole
+        )
+        cancel_btn = buttons.addButton(
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        run_btn.clicked.connect(self._on_run)
+        dismiss_btn.clicked.connect(self._on_dismiss)
+        cancel_btn.clicked.connect(self.reject)
+        root.addWidget(buttons)
+        self._refresh_preflight()
+
+    def _sync_dns_visibility(self) -> None:
+        profile = self.profile.currentText().strip()
+        homelab = not profile.startswith("compute-")
+        self.dns_box.setVisible(homelab)
+
+    def _refresh_preflight(self) -> None:
+        status = self._page._host_status_from_cache()
+        if not status:
+            self.lbl_preflight.setText(
+                "Preflight: status unknown — Refresh on Host tab, then try again."
+            )
+            return
+        docker = "ok" if status.get("docker_running") else "needs docker"
+        cat = "ok" if status.get("catalog_present") else "needs fetch"
+        prof = str(status.get("profiles") or "").strip() or "none declared"
+        virt = str(status.get("virt_user") or "—")
+        self.lbl_preflight.setText(
+            f"Docker: {docker} · Catalog: {cat} · "
+            f"Declared profiles: {prof} · Virt user: {virt}"
+        )
+
+    def _on_dismiss(self) -> None:
+        data = _prefs()
+        data["setup_dismissed"] = True
+        _set_prefs(data)
+        self.reject()
+
+    def _on_run(self) -> None:
+        profile = self.profile.currentText().strip()
+        if not profile:
+            info(self, "Stacks setup", "Pick a profile first.")
+            return
+        cf_email = self.cf_email.text().strip()
+        cf_token = self.cf_token.text().strip()
+        if (
+            not profile.startswith("compute-")
+            and (cf_email or cf_token)
+            and not (cf_email and cf_token)
+        ):
+            info(
+                self,
+                "Stacks setup",
+                "Provide both CF email and token, or leave both empty.",
+            )
+            return
+        self.accept()
+        self._page._run_setup_chain(
+            profile,
+            cf_email=cf_email,
+            cf_token=cf_token,
+        )
+
+
 class StacksPage(DomainPage):
     def __init__(self, parent=None) -> None:
         super().__init__(
@@ -293,6 +480,7 @@ class StacksPage(DomainPage):
         self._catalog_gen = 0
         self._fleet_pending = 0
         self._loading_depth = 0
+        self._declarative_tags: dict[str, list[str]] = {}
 
         self.loading = QLabel("")
         self.loading.setObjectName("nccOperatingScope")
@@ -304,13 +492,29 @@ class StacksPage(DomainPage):
         self._build_fleet_tab()
         self._build_host_tab()
         self._build_catalog_tab()
+        self._build_metrics_tab()
         self.add_content_widget(self.tabs, stretch=1)
 
         self.add_action("Refresh", self.reload, primary=True, local=True)
+        self.btn_fetch = self.add_action(
+            "Fetch catalog",
+            self._run_fetch,
+            ncc=("stacks", "fetch"),
+        )
+        self.btn_setup = self.add_action(
+            "Start setup…",
+            self._open_setup_wizard,
+            local=True,
+        )
         self.btn_use_target = self.add_action(
             "Use as Target…", self._fleet_use_target, local=True
         )
         self.btn_pin = self.add_action("Pin / Unpin", self._toggle_selected_pin, local=True)
+        self.btn_edit_tags = self.add_action(
+            "Edit tags…",
+            self._edit_fleet_tags,
+            local=True,
+        )
         self.btn_init_swarm = self.add_action(
             "Init Swarm",
             lambda: self._run(("swarm", "init"), "Init Swarm", confirm=True),
@@ -328,7 +532,11 @@ class StacksPage(DomainPage):
         # Instant paint from cache — no network on construct
         self._paint_fleet(cache_only=True)
         self._paint_host_from_cache()
+        self._paint_metrics_from_cache()
         self._sync_actions()
+        if not _setup_complete() and not _setup_dismissed():
+            QTimer.singleShot(600, self._maybe_first_run_hint)
+        QTimer.singleShot(0, self._load_declarative_tags)
 
     # ----- loading banner -----
 
@@ -365,6 +573,15 @@ class StacksPage(DomainPage):
         tip.setObjectName("nccPageSubtitle")
         tip.setWordWrap(True)
         lay.addWidget(tip)
+        filt = QHBoxLayout()
+        self.fleet_tag_filter = QComboBox()
+        self.fleet_tag_filter.addItem("All tags", "")
+        for tag in _all_tag_names():
+            self.fleet_tag_filter.addItem(f"tag:{tag}", tag)
+        self.fleet_tag_filter.currentIndexChanged.connect(self._paint_fleet_filtered)
+        filt.addWidget(self.fleet_tag_filter)
+        filt.addStretch(1)
+        lay.addLayout(filt)
         self.fleet_list = QListWidget()
         self.fleet_list.itemDoubleClicked.connect(lambda _i: self._fleet_use_target())
         self.fleet_list.currentItemChanged.connect(self._on_fleet_select)
@@ -431,6 +648,15 @@ class StacksPage(DomainPage):
         tip.setObjectName("nccPageSubtitle")
         tip.setWordWrap(True)
         lay.addWidget(tip)
+        setup = QVBoxLayout()
+        setup_title = QLabel("First-run setup")
+        setup_title.setObjectName("nccPageSubtitle")
+        setup.addWidget(setup_title)
+        self.setup_preflight = QLabel("Preflight: Refresh Host tab for status")
+        self.setup_preflight.setObjectName("nccPageSubtitle")
+        self.setup_preflight.setWordWrap(True)
+        setup.addWidget(self.setup_preflight)
+        lay.addLayout(setup)
         row = QHBoxLayout()
         self.catalog_mode = QComboBox()
         self.catalog_mode.addItem("Profiles", "profiles")
@@ -457,24 +683,67 @@ class StacksPage(DomainPage):
         lay.addWidget(self.catalog_detail)
         self.tabs.addTab(w, "Catalog")
 
+    def _build_metrics_tab(self) -> None:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        tip = QLabel(
+            "Fleet metrics from cached status (no extra probes). "
+            "Refresh on Fleet tab updates this dashboard."
+        )
+        tip.setObjectName("nccPageSubtitle")
+        tip.setWordWrap(True)
+        lay.addWidget(tip)
+        form = QFormLayout()
+        self.met_hosts = QLabel("—")
+        self.met_docker_up = QLabel("—")
+        self.met_swarm = QLabel("—")
+        self.met_profiles = QLabel("—")
+        self.met_tags = QLabel("—")
+        self.met_catalog = QLabel("—")
+        for lab in (
+            self.met_hosts,
+            self.met_docker_up,
+            self.met_swarm,
+            self.met_profiles,
+            self.met_tags,
+            self.met_catalog,
+        ):
+            lab.setWordWrap(True)
+        form.addRow("Hosts cached", self.met_hosts)
+        form.addRow("Docker up", self.met_docker_up)
+        form.addRow("Swarm active", self.met_swarm)
+        form.addRow("Declared profiles", self.met_profiles)
+        form.addRow("Fleet tags (cockpit + config)", self.met_tags)
+        form.addRow("Catalog on host", self.met_catalog)
+        lay.addLayout(form)
+        lay.addStretch(1)
+        self.tabs.addTab(w, "Metrics")
+
     # ----- reload orchestration -----
 
     def reload(self) -> None:
         """User Refresh: re-paint from cache, then async probe current tab scope."""
         tab = self.tabs.currentIndex()
         self._paint_fleet(cache_only=True)
+        self._paint_metrics_from_cache()
+        self._update_setup_preflight()
+        self._load_declarative_tags()
         if tab == 0:
             self._probe_fleet_async()
         elif tab == 1:
             self._reload_host_async()
-        else:
+        elif tab == 2:
             self._reload_catalog_async()
+        else:
+            self._paint_metrics_from_cache()
         self._sync_actions()
 
     def _on_target_changed(self, _t) -> None:
         # Instant — never re-probe entire fleet on Connect
         self._paint_fleet(cache_only=True)
         self._paint_host_from_cache()
+        self._paint_metrics_from_cache()
+        self._update_setup_preflight()
         if self.tabs.currentIndex() == 1:
             self._reload_host_async()
         self._sync_actions()
@@ -485,16 +754,38 @@ class StacksPage(DomainPage):
             self._reload_host_async()
         if self.tabs.currentIndex() == 2 and self.catalog_list.count() == 0:
             self._reload_catalog_async()
+        if self.tabs.currentIndex() == 3:
+            self._paint_metrics_from_cache()
+
+    def _paint_fleet_filtered(self) -> None:
+        self._paint_fleet(cache_only=True)
 
     # ----- fleet -----
 
     def _paint_fleet(self, *, cache_only: bool) -> None:
         del cache_only  # always cache-only for paint
+        cur_tag = self.fleet_tag_filter.currentData()
+        self.fleet_tag_filter.blockSignals(True)
+        self.fleet_tag_filter.clear()
+        self.fleet_tag_filter.addItem("All tags", "")
+        for tag in _all_tag_names():
+            self.fleet_tag_filter.addItem(f"tag:{tag}", tag)
+        if cur_tag:
+            idx = self.fleet_tag_filter.findData(cur_tag)
+            if idx >= 0:
+                self.fleet_tag_filter.setCurrentIndex(idx)
+        self.fleet_tag_filter.blockSignals(False)
+
         self.fleet_list.clear()
         pins = _pin_set()
         active = get_active_target()
+        tag_filter = str(self.fleet_tag_filter.currentData() or "")
 
         def add(key: str, title: str) -> None:
+            if tag_filter and tag_filter not in _merged_host_tags(
+                key, self._declarative_tags
+            ):
+                return
             status, stale = _cache_entry(key)
             self._add_fleet_item(
                 key=key,
@@ -560,6 +851,7 @@ class StacksPage(DomainPage):
                 active is not None and active == cache_key
             )
             label, detail = self._fleet_label(
+                key=cache_key,
                 title=title,
                 status=st,
                 stale=False,
@@ -582,6 +874,8 @@ class StacksPage(DomainPage):
             break
         if self._fleet_pending <= 0:
             self._set_loading("")
+            self._paint_metrics_from_cache()
+            self._update_setup_preflight()
 
     def _add_fleet_item(
         self,
@@ -595,6 +889,7 @@ class StacksPage(DomainPage):
         grey: bool = False,
     ) -> None:
         label, detail = self._fleet_label(
+            key=key,
             title=title,
             status=status,
             stale=stale,
@@ -614,6 +909,7 @@ class StacksPage(DomainPage):
     def _fleet_label(
         self,
         *,
+        key: str,
         title: str,
         status: dict[str, Any] | None,
         stale: bool,
@@ -628,9 +924,42 @@ class StacksPage(DomainPage):
         grey_s = " · no stacks agent" if grey else ""
         stale_s = " · cached" if stale and status else ""
         miss = " · not probed" if status is None else ""
-        label = f"{star}{title}  [{docker} · {mode}]{cur}{grey_s}{stale_s}{miss}"
-        detail = self._status_detail(title, status)
+        tag_s = ""
+        tags = _merged_host_tags(key, self._declarative_tags)
+        if tags:
+            tag_s = f" · tags:{','.join(tags)}"
+        label = f"{star}{title}  [{docker} · {mode}]{cur}{tag_s}{grey_s}{stale_s}{miss}"
+        detail = self._status_detail(title, status, key=key)
         return label, detail
+
+    def _merged_tags_for(self, key: str) -> list[str]:
+        return _merged_host_tags(key, self._declarative_tags)
+
+    def _load_declarative_tags(self) -> None:
+        from ncc_gui.remote import run_ncc
+
+        try:
+            proc = run_ncc("stacks", "fleet-tags", "--json", target=None, timeout=20)
+        except Exception:
+            return
+        raw = (proc.stdout or "").strip()
+        if proc.returncode != 0 or not raw:
+            return
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return
+        ft = data.get("fleetTags")
+        if isinstance(ft, dict):
+            clean: dict[str, list[str]] = {}
+            for k, v in ft.items():
+                if isinstance(v, list):
+                    clean[str(k)] = sorted(
+                        {str(t).strip() for t in v if str(t).strip()}
+                    )
+            self._declarative_tags = clean
+            self._paint_fleet(cache_only=True)
+            self._paint_metrics_from_cache()
 
     @staticmethod
     def _status_implies_stacks(status: dict[str, Any] | None) -> bool:
@@ -660,23 +989,32 @@ class StacksPage(DomainPage):
             return "swarm"
         return "single"
 
-    @staticmethod
-    def _status_detail(title: str, status: dict[str, Any] | None) -> str:
+    def _status_detail(
+        self,
+        title: str,
+        status: dict[str, Any] | None,
+        *,
+        key: str = "",
+    ) -> str:
         if not status:
             return (
                 f"{title}\nNo cached status yet. Press Refresh to probe "
                 "(selection never blocks)."
             )
         profiles = str(status.get("profiles") or "").strip() or "—"
+        cat = "yes" if status.get("catalog_present") else "no"
+        tags = ", ".join(self._merged_tags_for(key)) if key else "—"
         return (
             f"{title}\n"
             f"Docker installed: {status.get('docker_installed')}\n"
             f"Docker running: {status.get('docker_running')}\n"
+            f"Catalog present: {cat}\n"
             f"Swarm: {status.get('swarm_status')} "
             f"(declared role: {status.get('swarm_role') or '—'})\n"
             f"Profiles: {profiles}\n"
             f"Domain: {status.get('domain') or '—'}\n"
-            f"Virt user: {status.get('virt_user') or '—'}"
+            f"Virt user: {status.get('virt_user') or '—'}\n"
+            f"Tags: {tags}"
         )
 
     # ----- host -----
@@ -797,6 +1135,8 @@ class StacksPage(DomainPage):
             )
         self._workloads = rows
         self._apply_host_filter()
+        self._update_setup_preflight()
+        self._paint_metrics_from_cache()
 
     def _apply_host_filter(self) -> None:
         self.host_list.clear()
@@ -921,7 +1261,10 @@ class StacksPage(DomainPage):
         tab = self.tabs.currentIndex()
         self.btn_use_target.setVisible(tab == 0)
         self.btn_pin.setVisible(tab in (0, 1))
+        self.btn_edit_tags.setVisible(tab == 0)
         self.btn_init_swarm.setVisible(tab == 1)
+        self.btn_fetch.setVisible(tab in (1, 2))
+        self.btn_setup.setVisible(tab in (1, 2))
         self.btn_install.setVisible(tab == 2)
 
     def _on_fleet_select(self, current: QListWidgetItem | None, _prev) -> None:
@@ -1023,6 +1366,229 @@ class StacksPage(DomainPage):
         self.run_ncc("stacks", *args, follow_target=True, need_confirm=need)
         if self.tabs.currentIndex() == 1:
             self._reload_host_async()
+
+    def _host_status_from_cache(self) -> dict[str, Any] | None:
+        active = get_active_target()
+        status, _ = _cache_entry(active or "local")
+        return status
+
+    def _update_setup_preflight(self) -> None:
+        status = self._host_status_from_cache()
+        if not status:
+            self.setup_preflight.setText(
+                "Preflight: unknown — open Host tab and Refresh."
+            )
+            return
+        docker = "ok" if status.get("docker_running") else "needs docker"
+        cat = "ok" if status.get("catalog_present") else "needs fetch"
+        prof = str(status.get("profiles") or "").strip() or "none"
+        self.setup_preflight.setText(
+            f"Preflight on Target: docker {docker} · catalog {cat} · profiles {prof}"
+        )
+
+    def _paint_metrics_from_cache(self) -> None:
+        keys = ["local"]
+        for host, user in list_host_pairs():
+            keys.append(f"{user}@{host}")
+        probed = 0
+        docker_up = 0
+        swarm_active = 0
+        catalog_hosts = 0
+        profile_set: set[str] = set()
+        for key in keys:
+            status, _ = _cache_entry(key)
+            if status is None:
+                continue
+            probed += 1
+            if status.get("docker_running"):
+                docker_up += 1
+            if str(status.get("swarm_status") or "") == "active":
+                swarm_active += 1
+            if status.get("catalog_present"):
+                catalog_hosts += 1
+            prof = str(status.get("profiles") or "")
+            for p in prof.replace(",", " ").split():
+                if p.strip():
+                    profile_set.add(p.strip())
+        tags_map = _tags_map()
+        decl = self._declarative_tags
+        parts: list[str] = []
+        keys = sorted(set(tags_map.keys()) | set(decl.keys()))
+        for k in keys:
+            merged = _merged_host_tags(k, decl)
+            if merged:
+                parts.append(f"{k}=[{','.join(merged)}]")
+        tag_summary = ", ".join(parts) if parts else "—"
+        total = len(keys)
+        self.met_hosts.setText(f"{probed} of {total} hosts cached")
+        self.met_docker_up.setText(f"{docker_up}/{probed or total}")
+        self.met_swarm.setText(f"{swarm_active}/{probed or total}")
+        self.met_profiles.setText(
+            ", ".join(sorted(profile_set, key=str.lower)) if profile_set else "—"
+        )
+        self.met_tags.setText(tag_summary)
+        self.met_catalog.setText(f"{catalog_hosts}/{probed or total} with catalog")
+
+    def _maybe_first_run_hint(self) -> None:
+        status = self._host_status_from_cache()
+        if status and status.get("catalog_present") and self._workloads:
+            _mark_setup_complete()
+            return
+        info(
+            self,
+            "Stacks setup",
+            "Phase 2: Catalog tab → Fetch catalog → Start setup → pick profile. "
+            "Activity shows the install log.",
+        )
+        self.tabs.setCurrentIndex(2)
+
+    def _collect_profile_names(self) -> list[str]:
+        names: list[str] = []
+        for i in range(self.catalog_list.count()):
+            item = self.catalog_list.item(i)
+            if item is None:
+                continue
+            data = item.data(Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("kind") == "profile":
+                key = str(data.get("key") or "").strip()
+                if key:
+                    names.append(key)
+        status = self._host_status_from_cache()
+        if status:
+            prof = str(status.get("profiles") or "")
+            for p in prof.replace(",", " ").split():
+                p = p.strip()
+                if p and p not in names:
+                    names.append(p)
+        return sorted(set(names), key=str.lower)
+
+    def _open_setup_wizard(self) -> None:
+        profiles = self._collect_profile_names()
+        if not profiles:
+            self._reload_catalog_async()
+            info(
+                self,
+                "Stacks setup",
+                "Loading catalog… Press Start setup again when profiles appear.",
+            )
+            return
+        dlg = _StacksSetupDialog(self, profiles)
+        dlg.exec()
+
+    def _run_fetch(self) -> None:
+        where = get_active_target() or "this machine"
+        if not confirm(
+            self,
+            "Fetch catalog",
+            f"Clone/update NCC-Stacks on {where}?\n\n"
+            "Runs as the virt user on the Target (see Activity if it fails).",
+        ):
+            return
+        self.log_append("• fetch catalog\n")
+        proc = self.run_ncc("stacks", "fetch", follow_target=True, need_confirm=None)
+        if proc.returncode == 0:
+            info(self, "Fetch catalog", "Catalog updated.")
+            self._reload_host_async()
+            self._paint_metrics_from_cache()
+            self._update_setup_preflight()
+        else:
+            err = (proc.stderr or proc.stdout or "failed").strip()
+            info(self, "Fetch catalog", err[:500])
+
+    def _run_setup_chain(
+        self,
+        profile: str,
+        *,
+        cf_email: str = "",
+        cf_token: str = "",
+    ) -> None:
+        status = self._host_status_from_cache()
+        needs_fetch = not (status and status.get("catalog_present"))
+        where = get_active_target() or "this machine"
+        self.log_append(f"• setup profile {profile} on {where}\n")
+
+        if needs_fetch:
+            self.log_append("• fetch catalog (required before init)\n")
+            proc = self.run_ncc(
+                "stacks",
+                "fetch",
+                follow_target=True,
+                need_confirm=None,
+                timeout=600,
+            )
+            if proc.returncode != 0:
+                self.log_append((proc.stderr or proc.stdout or "fetch failed") + "\n")
+                return
+
+        if (
+            not profile.startswith("compute-")
+            and cf_email
+            and cf_token
+        ):
+            self.log_append("• write DNS env (Cloudflare)\n")
+            proc = self.run_ncc(
+                "stacks",
+                "dns-env",
+                f"--cf-email={cf_email}",
+                f"--cf-token={cf_token}",
+                follow_target=True,
+                need_confirm=None,
+                timeout=120,
+            )
+            if proc.returncode != 0:
+                self.log_append((proc.stderr or proc.stdout or "dns-env failed") + "\n")
+                return
+
+        self.log_append(f"• init --profile {profile}\n")
+        proc = self.run_ncc(
+            "stacks",
+            "init",
+            "--profile",
+            profile,
+            follow_target=True,
+            need_confirm=None,
+            timeout=3600,
+        )
+        if proc.returncode == 0:
+            _mark_setup_complete()
+            info(self, "Stacks setup", f"Profile {profile} installed.")
+            self._reload_host_async()
+            self._paint_metrics_from_cache()
+            self._update_setup_preflight()
+        else:
+            self.log_append((proc.stderr or proc.stdout or "init failed") + "\n")
+
+    def _edit_fleet_tags(self) -> None:
+        item = self.fleet_list.currentItem()
+        if item is None:
+            info(self, "Tags", "Select a fleet host first.")
+            return
+        data = item.data(Qt.ItemDataRole.UserRole)
+        if not isinstance(data, dict):
+            return
+        key = str(data.get("key") or "")
+        if not key:
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Tags — {key}")
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(QLabel("Comma-separated operator tags (cockpit only):"))
+        edit = QLineEdit(",".join(_host_tags(key)))
+        lay.addWidget(edit)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        lay.addWidget(buttons)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        raw = edit.text()
+        tags = [t.strip() for t in raw.replace(";", ",").split(",") if t.strip()]
+        _set_host_tags(key, tags)
+        self.log_append(f"• tags {key}: {', '.join(tags) or 'cleared'}\n")
+        self._paint_fleet(cache_only=True)
+        self._paint_metrics_from_cache()
 
 
 def create_page() -> StacksPage:

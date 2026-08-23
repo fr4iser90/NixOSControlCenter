@@ -24,6 +24,10 @@ let
 
   ui = getModuleApi "cli-formatter";
   commandCenter = getModuleConfig "cli-registry";
+  # Discovers <module>/migrations/ — never hardcodes peer module paths
+  applyMigrations = import ../../module-manager/components/module-migration/apply-migrations.nix {
+    inherit pkgs;
+  };
 
   # Extract configuration values
   userCfg = getModuleConfig "user";
@@ -675,7 +679,8 @@ let
       return 1
     }
     
-    # Update module code (config files are now directly in module directory)
+    # Mirror module code from source. --delete drops files removed in source;
+    # without it, stale paths under /etc/nixos break Nix eval after renames/removals.
     update_module_code() {
       local source_module="$1"
       local target_module="$2"
@@ -683,15 +688,13 @@ let
       # Create target_module if it doesn't exist
       mkdir -p "$target_module"
 
-      # Copy everything (no user-configs/ to exclude anymore)
       if [ "$VERBOSE" = "true" ]; then
-        rsync -av "$source_module/" "$target_module/" || {
-          # Fallback: recursively copy
+        rsync -av --delete "$source_module/" "$target_module/" || {
+          # Fallback: recursively copy (no orphan cleanup on failure)
           cp -r "$source_module"/* "$target_module/" 2>/dev/null || true
         }
       else
-        rsync -aq "$source_module/" "$target_module/" >/dev/null 2>&1 || {
-          # Fallback: recursively copy
+        rsync -aq --delete "$source_module/" "$target_module/" >/dev/null 2>&1 || {
           cp -r "$source_module"/* "$target_module/" 2>/dev/null || true
         }
       fi
@@ -730,15 +733,16 @@ let
             update_module_code "$source_module" "$target_module"
           else
             if [ "$VERBOSE" = "true" ]; then
-              ${ui.messages.info "Module $module_name: No update needed (v$SOURCE_VERSION), skipping"}
+              ${ui.messages.info "Module $module_name: Syncing code (v$SOURCE_VERSION)"}
             fi
+            update_module_code "$source_module" "$target_module"
           fi
         else
-          # Modul-Verzeichnis hat kein config.nix → komplett aus Source kopieren
+          # Modul-Verzeichnis hat kein config.nix → mirror from source
           if [ "$VERBOSE" = "true" ]; then
-            ${ui.messages.info "Module $module_name: No module config file found, copying from source"}
+            ${ui.messages.info "Module $module_name: No module config file found, syncing from source"}
           fi
-          cp -r "$source_module" "$target_module" 2>/dev/null || true
+          update_module_code "$source_module" "$target_module"
         fi
       else
         # KEINE Config in systemConfig/ → Stage 0 → 1 Migration von system-config.nix
@@ -1221,18 +1225,6 @@ EOF
             cleanup_stale_leaf_modules "$item"
             # Aggressive: also drop top-level category dirs (only if --cleanup)
             cleanup_removed_modules "$item"
-
-            # Install-wizard: hardware checks moved to system-manager prebuild.
-            # Sync without --delete leaves scripts/checks/ behind → build break
-            # (getModuleApi passed to legacy `{ pkgs }:`). Remove if gone from source.
-            if [ "$item" = "core" ]; then
-              _iw_checks="$NIXOS_DIR/core/management/install-wizard/scripts/checks"
-              _iw_src_checks="$SOURCE_DIR/core/management/install-wizard/scripts/checks"
-              if [ -d "$_iw_checks" ] && [ ! -e "$_iw_src_checks" ]; then
-                ${ui.messages.warning "Removing obsolete install-wizard scripts/checks/"}
-                rm -rf "$_iw_checks"
-              fi
-            fi
           elif [ "$item" = "packages" ]; then
             # CRITICAL: packages/ is a single module - use SAME GENERIC LOGIC as core/modules
             if [ "$VERBOSE" = "true" ]; then
@@ -1549,6 +1541,20 @@ EOF
     if [ "$VERBOSE" = "true" ]; then
       ${ui.tables.keyValue "Backup" "$BACKUP_DIR"}
       ${ui.messages.info "Note: running system is not switched until build succeeds."}
+    fi
+
+    # Post-sync: discover <module>/migrations/v*-to-v*.nix and apply (before rebuild).
+    # No module names here — discovery only.
+    if [ "$DRY_RUN" != "true" ]; then
+      if [ "$VERBOSE" = "true" ]; then
+        ${ui.messages.loading "Applying module migrations…"}
+      fi
+      if ${applyMigrations}/bin/ncc-apply-migrations "$NIXOS_DIR" 0; then
+        ${ui.badges.success "Migrations"}
+      else
+        ${ui.badges.warning "Migrations"}
+        ${ui.messages.info "Retry: sudo ncc modules migrate"}
+      fi
     fi
     
     # PASSWORT-INTEGRITAET
