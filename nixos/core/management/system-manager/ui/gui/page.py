@@ -50,9 +50,13 @@ _KEY_WITH_CHANNELS = "system/withChannels"
 
 
 def _default_local_nixos() -> str:
-    home = Path.home()
-    candidate = home / "Documents" / "Git" / "NixOSControlCenter" / "nixos"
-    return str(candidate)
+    configured = (load_host_policy().get("localSourceDir") or "").strip()
+    if configured:
+        return configured
+    live = Path("/etc/nixos")
+    if (live / "flake.nix").is_file() and (live / "core" / "management").is_dir():
+        return str(live)
+    return ""
 
 
 def _release_badge(status: str) -> str:
@@ -95,8 +99,8 @@ class SystemSettingsDialog(QDialog):
         self.local_path = QLineEdit(
             str(self._settings.value(_KEY_LOCAL, _default_local_nixos()))
         )
-        self.local_path.setPlaceholderText("…/NixOSControlCenter/nixos")
-        form.addRow("Local repo path", self.local_path)
+        self.local_path.setPlaceholderText("/path/to/nixos or /etc/nixos")
+        form.addRow("Local source path", self.local_path)
 
         self.branch = QComboBox()
         self.branch.setEditable(True)

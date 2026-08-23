@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import platform
 import socket
@@ -17,7 +18,7 @@ class InstallPreflight:
     os_pretty: str = "—"
     etc_nixos: bool = False
     etc_nixos_kind: str = "missing"  # missing | plain | ncc
-    repo: str = ""
+    repo: str = ""  # Host NixOS tree used for rsync (usually /etc/nixos on live NCC)
     device_matched: list[str] = field(default_factory=list)
     device_available: list[str] = field(default_factory=list)
     recommended_mode: str = "unknown"  # fresh | migrate | reconfigure | blocked
@@ -25,23 +26,61 @@ class InstallPreflight:
     remote_target: str = ""
 
 
-def find_install_repo() -> str:
-    for key in ("NCC_INSTALL_REPO",):
-        v = (os.environ.get(key) or "").strip()
-        if v and (Path(v) / "nixos" / "core").is_dir():
-            return v
+_LIVE_NIXOS = Path("/etc/nixos")
+
+
+def _is_ncc_nixos_tree(path: Path) -> bool:
+    """Deployed or checkout nixos tree (flake + core/management)."""
+    return (path / "flake.nix").is_file() and (path / "core" / "management").is_dir()
+
+
+def _configured_local_source() -> str:
+    raw = (os.environ.get("NCC_HOST_POLICY") or "").strip()
+    if not raw:
+        return ""
+    try:
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            return str(data.get("localSourceDir") or "").strip()
+    except json.JSONDecodeError:
+        pass
+    return ""
+
+
+def find_nixos_source() -> str:
+    """Directory to rsync to remote Target (live ``/etc/nixos`` first on NCC hosts)."""
+    override = (os.environ.get("NCC_INSTALL_REPO") or "").strip()
+    if override:
+        cand = Path(override)
+        if _is_ncc_nixos_tree(cand):
+            return str(cand.resolve())
+        nested = cand / "nixos"
+        if _is_ncc_nixos_tree(nested):
+            return str(nested.resolve())
+
+    configured = _configured_local_source()
+    if configured:
+        cand = Path(configured)
+        if _is_ncc_nixos_tree(cand):
+            return str(cand.resolve())
+        nested = cand / "nixos"
+        if _is_ncc_nixos_tree(nested):
+            return str(nested.resolve())
+
+    if _is_ncc_nixos_tree(_LIVE_NIXOS):
+        return str(_LIVE_NIXOS.resolve())
+
     d = Path.cwd().resolve()
     for p in [d, *d.parents]:
-        if (p / "nixos" / "core" / "management").is_dir():
-            return str(p)
-    home = Path.home()
-    for cand in (
-        home / "Documents" / "Git" / "NixOSControlCenter",
-        home / "NixOSControlCenter",
-    ):
-        if (cand / "nixos" / "core" / "management").is_dir():
-            return str(cand)
+        nested = p / "nixos"
+        if _is_ncc_nixos_tree(nested):
+            return str(nested.resolve())
     return ""
+
+
+def find_install_repo() -> str:
+    """Backward-compatible alias — returns the Host NixOS tree path."""
+    return find_nixos_source()
 
 
 def _read_os_release() -> dict[str, str]:
@@ -112,13 +151,12 @@ def gather_preflight(*, remote_target: str = "") -> InstallPreflight:
     )
 
     pf.etc_nixos, pf.etc_nixos_kind = _etc_nixos_kind()
-    pf.repo = find_install_repo()
+    pf.repo = find_nixos_source()
 
-    # Prefer repo blueprints when GUI page is loaded without SCRIPT_ROOT
+    # Host blueprints under deployed core (when present on live /etc/nixos)
     if pf.repo:
         bp = (
             Path(pf.repo)
-            / "nixos"
             / "core"
             / "management"
             / "install-wizard"
@@ -138,12 +176,9 @@ def gather_preflight(*, remote_target: str = "") -> InstallPreflight:
         pf.device_available = [t.label for t in targets]
         pf.device_matched = [t.label for t in match_device_targets(targets)]
     except Exception:
-        # SCRIPT_ROOT / blueprints may be absent outside install shell
         pf.device_available = []
         pf.device_matched = []
 
-    # Live arch → expected system.platform (prebuild syncs like CPU/GPU).
-    # Jetpack for Orin is still a separate flake input — warn, do not hard-block.
     arch_l = pf.arch.lower()
     if arch_l in ("aarch64", "arm64"):
         pf.warnings.append(
@@ -165,12 +200,14 @@ def gather_preflight(*, remote_target: str = "") -> InstallPreflight:
         pf.recommended_mode = "fresh"
 
     if not pf.repo:
-        pf.warnings.append("Repo not found — set NCC_INSTALL_REPO or open from a checkout.")
+        pf.warnings.append(
+            "No Host NixOS tree — need /etc/nixos (NCC) or set NCC_INSTALL_REPO."
+        )
 
     if pf.remote_target:
         pf.warnings.append(
-            f"GUI target is {pf.remote_target!r} — preflight probes are local only; "
-            "wizard/deploy still follow install tooling for the chosen host."
+            f"Target {pf.remote_target!r} connected — install deploy uses "
+            "Host→Target rsync (same as System → Update)."
         )
 
     return pf

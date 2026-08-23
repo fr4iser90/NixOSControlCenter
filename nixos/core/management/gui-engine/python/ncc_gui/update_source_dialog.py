@@ -81,7 +81,7 @@ class UpdateSourceDialog(QDialog):
         pc_box = QVBoxLayout()
         pc_box.addWidget(self.radio_pc)
         self.path_edit = QLineEdit(local_path)
-        self.path_edit.setPlaceholderText("…/NixOSControlCenter/nixos")
+        self.path_edit.setPlaceholderText("/path/to/nixos or /etc/nixos")
         pc_row = QHBoxLayout()
         pc_row.addWidget(QLabel("Path"))
         pc_row.addWidget(self.path_edit, stretch=1)

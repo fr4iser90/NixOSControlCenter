@@ -53,12 +53,12 @@ Nested (`NCC_CLI_NESTED=1`): work + result lines only.
 bash tests/cli-formatter/validate-cli.sh
 
 # 2) On the target host (readable /etc/nixos)
-ncc system update --dry-run --local --source-dir ~/Documents/Git/NixOSControlCenter/nixos
-ncc system update --dry-run -v --local --source-dir ~/Documents/Git/NixOSControlCenter/nixos
+ncc system update --dry-run --local --source-dir /path/to/nixos
+ncc system update --dry-run -v --local --source-dir /path/to/nixos
 ncc modules migrate --dry-run
 
 # 3) Only if dry-run looks right
-sudo ncc system update --local --source-dir ~/Documents/Git/NixOSControlCenter/nixos
+sudo ncc system update --local --source-dir /path/to/nixos
 ```
 
 Expect one header, one dry-run banner, one **Next:** line — not nested duplicate headers.

@@ -25,13 +25,16 @@ main() {
     log_header "NixOS System Setup"
     ncc_dry_banner
     
-    check_hardware_config
-    
-    # Collect system information
-    collect_system_data || {
-        log_error "System data collection failed"
-        exit 1
-    }
+    if [[ "''${NCC_INSTALL_SKIP_COLLECT:-0}" == "1" ]]; then
+        log_info "Skipping hardware/collect (apply-only / remote staging)"
+    else
+        check_hardware_config
+
+        collect_system_data || {
+            log_error "System data collection failed"
+            exit 1
+        }
+    fi
     
     # Get user's setup mode selection
     log_section "Setup Mode"
@@ -42,17 +45,22 @@ main() {
         ncc_gui_ensure_answers_file
     fi
     
-    if ! selected_modules_raw=$(select_setup_mode); then
+    if [[ -n "''${NCC_INSTALL_SELECTION:-}" ]]; then
+        selected_modules_raw="''${NCC_INSTALL_SELECTION}"
+        log_info "Using pre-selected modules: $selected_modules_raw"
+    elif ! selected_modules_raw=$(select_setup_mode); then
         log_error "Setup mode selection failed"
         exit 1
     fi
-    
+
     if [[ -z "$selected_modules_raw" ]]; then
         log_error "No setup mode selected"
         exit 1
     fi
-    
-    log_info "Selected modules: $selected_modules_raw"
+
+    if [[ -z "''${NCC_INSTALL_SELECTION:-}" ]]; then
+        log_info "Selected modules: $selected_modules_raw"
+    fi
     
     # Check for Advanced Options first (LOAD_BLUEPRINT: / legacy LOAD_PROFILE: / IMPORT_CONFIG:)
     if [[ "$selected_modules_raw" =~ ^LOAD_BLUEPRINT: ]] || [[ "$selected_modules_raw" =~ ^LOAD_PROFILE: ]]; then

@@ -16,9 +16,9 @@ in {
       type = lib.types.str;
       default = "";
       description = ''
-        Absolute path to the NixOSControlCenter repository checkout.
-        Used by `ncc install` when not running inside the install nix-shell.
-        Empty = auto-detect from cwd / common locations.
+        Override for the Host NixOS tree used by `ncc install` (rsync source on remote deploy).
+        Live NCC hosts: usually `/etc/nixos` (auto-detected). Dev checkout: repo root or
+        path with `nixos/` subdir. Empty = `/etc/nixos` then cwd walk. Env: `NCC_INSTALL_REPO`.
       '';
     };
   };

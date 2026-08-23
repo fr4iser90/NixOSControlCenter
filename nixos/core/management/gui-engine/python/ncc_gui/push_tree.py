@@ -169,3 +169,105 @@ def apply_staged_tree_on_target(
     if proc.returncode != 0:
         return False, (out or f"apply exit {proc.returncode}")[:500]
     return True, out or "ok"
+
+
+def sync_system_config_to_target(
+    local_staging_etc: str,
+    target: str,
+    *,
+    timeout: float = 300,
+) -> tuple[bool, str]:
+    """Copy generated systemConfig tree from PC staging → Target ``/etc/nixos``."""
+    src = Path(local_staging_etc).expanduser()
+    host = (target or "").strip()
+    if not host:
+        return False, "No remote target"
+    if not src.is_dir():
+        return False, f"Staging path not found:\n{src}"
+
+    lines: list[str] = []
+    for name in ("systemConfig", "systemConfig.nix", "system-config.nix"):
+        item = src / name
+        if item.exists():
+            lines.append(f"Applying {name} to /etc/nixos/...")
+            if item.is_dir():
+                dest = f"{host}:/etc/nixos/{name}/"
+                cmd = [
+                    "rsync",
+                    "-a",
+                    "--delete",
+                    "-e",
+                    "ssh -o BatchMode=yes -o ConnectTimeout=8",
+                    f"{item}/",
+                    dest,
+                ]
+            else:
+                cmd = [
+                    "scp",
+                    "-o",
+                    "BatchMode=yes",
+                    "-o",
+                    "ConnectTimeout=8",
+                    str(item),
+                    f"{host}:/etc/nixos/{name}",
+                ]
+            try:
+                proc = subprocess.run(
+                    cmd,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
+            except (OSError, subprocess.TimeoutExpired) as e:
+                return False, str(e)
+            if proc.returncode != 0:
+                err = (proc.stderr or proc.stdout or f"exit {proc.returncode}").strip()
+                return False, err[:500]
+            lines.append(f"{name}: ok")
+
+    if not lines:
+        return False, f"No systemConfig output under:\n{src}"
+    return True, "\n".join(lines)
+
+
+def remote_nixos_rebuild_switch(
+    target: str,
+    flake_attr: str,
+    *,
+    timeout: float = 7200,
+) -> tuple[bool, str]:
+    """Run ``nixos-rebuild switch`` on Target (first install before ``ncc`` exists)."""
+    host = (target or "").strip()
+    attr = (flake_attr or "nixos").strip()
+    if not host:
+        return False, "No remote target"
+    flake_ref = f"/etc/nixos#{attr}"
+    try:
+        proc = subprocess.run(
+            [
+                "ssh",
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ConnectTimeout=8",
+                host,
+                "--",
+                "sudo",
+                "-n",
+                "nixos-rebuild",
+                "switch",
+                "--flake",
+                flake_ref,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return False, str(e)
+    out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+    if proc.returncode != 0:
+        return False, (out or f"nixos-rebuild exit {proc.returncode}")[:2000]
+    return True, out or "ok"

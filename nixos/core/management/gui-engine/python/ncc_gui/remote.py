@@ -132,7 +132,9 @@ def build_elevated_ncc_argv(
             "sudo",
             [
                 "-n",
-                "--preserve-env=NCC_ASSUME_YES,NCC_CLI_NESTED,NCC_QUIET_SWITCH",
+                "--preserve-env=NCC_ASSUME_YES,NCC_CLI_NESTED,NCC_QUIET_SWITCH,"
+                "NCC_INSTALL_SELECTION,NCC_GUI_ANSWERS_FILE,NCC_INSTALL_REPO,"
+                "NCC_INSTALL_SKIP_DEPLOY,NCC_DEPLOY_SKIP_REBUILD,SYSTEM_CONFIG_DIR",
                 ncc,
                 *argv_tail,
             ],

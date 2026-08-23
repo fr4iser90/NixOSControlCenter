@@ -8,17 +8,70 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
+
 from ncc_gui.dialogs import confirm, error, info
 from ncc_gui.remote import target_from_env
 from ncc_gui.scaffold import DomainPage
+from ncc_gui.session_ux import session_mode
 from ncc_gui.target_bus import bus as target_bus
-from ncc_gui.target_session import current_session
+from ncc_gui.target_probe import EXPECTED_CONFIG_VERSION
+from ncc_gui.target_session import current_session, session_controller
 from ncc_gui.widgets import FormValueLabel
 
 try:
-    from .preflight import gather_preflight, mode_label
+    from .preflight import find_nixos_source, gather_preflight, mode_label
+    from .remote_deploy import (
+        execute_remote_deploy,
+        make_staging_dir,
+        run_install_wizard,
+        stage_install_config,
+    )
 except ImportError:  # flat load in unit tests / source tree
-    from preflight import gather_preflight, mode_label
+    from preflight import find_nixos_source, gather_preflight, mode_label
+    from remote_deploy import (
+        execute_remote_deploy,
+        make_staging_dir,
+        run_install_wizard,
+        stage_install_config,
+    )
+
+
+class _RemoteDeployBridge(QObject):
+    log_line = Signal(str)
+    finished = Signal(bool, str)
+
+
+class _RemoteDeployJob(QRunnable):
+    def __init__(
+        self,
+        bridge: _RemoteDeployBridge,
+        *,
+        target: str,
+        selection: str,
+        answers_file: str,
+        nixos_source: str,
+    ) -> None:
+        super().__init__()
+        self._bridge = bridge
+        self._target = target
+        self._selection = selection
+        self._answers_file = answers_file
+        self._nixos_source = nixos_source
+
+    def run(self) -> None:
+        try:
+            ok, detail = execute_remote_deploy(
+                target=self._target,
+                selection=self._selection,
+                answers_file=self._answers_file,
+                nixos_source=self._nixos_source,
+                on_log=self._bridge.log_line.emit,
+            )
+            self._bridge.finished.emit(ok, detail)
+        except Exception as e:
+            self._bridge.log_line.emit(f"ERROR: {e}\n")
+            self._bridge.finished.emit(False, str(e))
 
 
 class InstallPage(DomainPage):
@@ -26,7 +79,7 @@ class InstallPage(DomainPage):
         super().__init__(
             "Install",
             "Adopt or install NCC on the header Target. "
-            "Wizard opens in its own window.",
+            "Remote: same Host→Target chain as System → Update.",
             parent=parent,
         )
 
@@ -36,7 +89,7 @@ class InstallPage(DomainPage):
         self.lbl_platform = self.add_form_value(status, "system.platform")
         self.lbl_os = self.add_form_value(status, "OS")
         self.lbl_etc = self.add_form_value(status, "/etc/nixos")
-        self.lbl_repo = self.add_form_value(status, "NCC repo")
+        self.lbl_repo = self.add_form_value(status, "Host tree")
         self.lbl_hw = self.add_form_value(status, "Device targets")
         self.lbl_mode = self.add_form_value(status, "Recommended")
         self.lbl_warn = self.add_form_value(status, "Notes")
@@ -46,10 +99,10 @@ class InstallPage(DomainPage):
         next_box.addRow(self.lbl_next)
 
         self.add_actions_hint(
-            "Wizard is a separate window (answers → install shell). "
-            "Back up /etc/nixos before migrate. Full deploy: "
-            "nix-shell <repo>/shell.nix. "
-            "Remote Target: Connect first; use wizard / shell on that host."
+            "Start wizard: pick blueprint/answers (local window), then deploy. "
+            "REMOTE Target: rsync tree → apply → systemConfig → rebuild → migrate "
+            "(same as System → Update). LOCAL: apply to this PC's /etc/nixos. "
+            "Back up /etc/nixos before migrate."
         )
         self.btn_wizard = self.add_action(
             "Start wizard", self._wizard, primary=True, ncc=("install", "wizard")
@@ -64,6 +117,19 @@ class InstallPage(DomainPage):
 
         target_bus().changed.connect(lambda _t: self.reload())
         self.reload()
+
+    def _resolve_nixos_source(self) -> str:
+        pf = getattr(self, "_pf", None)
+        source = (pf.repo if pf else "") or find_nixos_source()
+        if source and not os.environ.get("NCC_INSTALL_REPO"):
+            os.environ["NCC_INSTALL_REPO"] = source
+        return source
+
+    def _remote_target(self) -> str | None:
+        sess = current_session()
+        if session_mode(sess) != "remote":
+            return None
+        return target_from_env()
 
     def reload(self) -> None:
         t = target_from_env() or ""
@@ -125,7 +191,7 @@ class InstallPage(DomainPage):
             )
             mode = pf.recommended_mode
 
-        self.lbl_repo.setText(pf.repo or "(not found — set NCC_INSTALL_REPO)")
+        self.lbl_repo.setText(pf.repo or "(not found — need /etc/nixos or NCC_INSTALL_REPO)")
 
         if pf.device_matched:
             hw = "matched: " + ", ".join(pf.device_matched)
@@ -139,11 +205,11 @@ class InstallPage(DomainPage):
             hw = "none discovered (open install shell / set SCRIPT_ROOT)"
         self.lbl_hw.setText(hw)
 
-        if sess.state == "needs_install" and t:
+        if t and session_mode(sess) == "remote":
             self.lbl_next.setText(
-                "1) On the Target: backup /etc/nixos  →  2) Start wizard / "
-                "nix-shell deploy  →  3) Re-probe (Connect). "
-                "Platform stays ARM/x86 from the Target CPU."
+                "1) Backup Target /etc/nixos  →  2) Start wizard  →  "
+                "3) Deploy on Target (rsync / apply / rebuild / migrate). "
+                "Wizard window runs on this PC; writes go to Target only."
             )
         elif sess.state == "needs_update":
             self.lbl_next.setText(
@@ -152,8 +218,8 @@ class InstallPage(DomainPage):
             )
         elif mode == "migrate":
             self.lbl_next.setText(
-                "1) Backup /etc/nixos  →  2) Start wizard  →  3) finish in "
-                "nix-shell. On Server, device starters (e.g. Jetson) sit next to Homelab."
+                "1) Backup /etc/nixos  →  2) Start wizard  →  3) deploy completes "
+                "on the Target (remote) or this PC (local)."
             )
         elif mode == "reconfigure":
             self.lbl_next.setText(
@@ -162,8 +228,7 @@ class InstallPage(DomainPage):
             )
         elif mode == "fresh":
             self.lbl_next.setText(
-                "Fresh path: Start wizard (or dry-run), then deploy from the "
-                "install nix-shell on a NixOS system / ISO."
+                "Fresh path: Start wizard, then deploy (remote Target or this PC)."
             )
         elif mode == "blocked":
             self.lbl_next.setText(
@@ -174,7 +239,7 @@ class InstallPage(DomainPage):
 
         if t:
             self.set_subtitle(
-                f"Preflight for {t}. Use the wizard to adopt or reconfigure."
+                f"Preflight for {t}. Deploy follows System → Update on REMOTE."
             )
         else:
             self.set_subtitle(
@@ -182,33 +247,196 @@ class InstallPage(DomainPage):
                 "to adopt remote NixOS."
             )
 
-    def _wizard(self) -> None:
+    def _confirm_migrate(self) -> bool:
         pf = getattr(self, "_pf", None)
         sess = current_session()
         if sess.state == "needs_install" or (
             pf and pf.etc_nixos and pf.recommended_mode == "migrate"
         ):
-            if not confirm(
+            where = self._remote_target() or "this machine"
+            return confirm(
                 self,
                 "Migrate / install",
-                "Existing /etc/nixos may be overwritten. Prefer Backup first. Continue?",
-            ):
+                f"Existing /etc/nixos on {where} may be overwritten. "
+                "Prefer Backup first. Continue?",
+            )
+        return True
+
+    def _wizard(self) -> None:
+        if not self._confirm_migrate():
+            return
+        if self.set_busy():
+            return
+        self.log_append("• Install wizard (selection window on this PC)\n")
+        code, selection, answers, log = run_install_wizard()
+        if log:
+            self.log_append(log + "\n")
+        if code != 0:
+            error(self, "Install wizard", log or f"Exit code {code}")
+            return
+        self.log_append(f"Selection: {selection}\n")
+        remote = self._remote_target()
+        if remote:
+            self._deploy_remote(remote, selection, answers)
+        else:
+            if not self.confirm_scope_write("Install apply"):
                 return
-        self._run_ncc(["install", "wizard"], "Install wizard")
+            self._deploy_local(selection, answers)
 
     def _dry_run(self) -> None:
-        self._run_ncc(["install", "dry-run"], "Install dry-run")
+        if not self._confirm_migrate():
+            return
+        if self.set_busy():
+            return
+        self.log_append("• Install dry-run (staging only — no Target writes)\n")
+        code, selection, answers, log = run_install_wizard()
+        if log:
+            self.log_append(log + "\n")
+        if code != 0:
+            error(self, "Install dry-run", log or f"Exit code {code}")
+            return
+        nixos_source = self._resolve_nixos_source()
+        if not nixos_source:
+            error(
+                self,
+                "Install dry-run",
+                "No Host NixOS tree — deploy NCC to /etc/nixos or set NCC_INSTALL_REPO.",
+            )
+            return
+        staging = make_staging_dir()
+        ok, detail = stage_install_config(
+            selection=selection,
+            answers_file=answers,
+            nixos_source=nixos_source,
+            staging_etc=staging,
+            dry_run=True,
+        )
+        self.log_append(detail + "\n")
+        if ok:
+            info(
+                self,
+                "Install dry-run",
+                "Preview OK — nothing written to /etc/nixos on any host.",
+            )
+        else:
+            error(self, "Install dry-run", detail)
+
+    def _deploy_local(self, selection: str, answers: str) -> None:
+        nixos_source = self._resolve_nixos_source()
+        if not nixos_source:
+            error(
+                self,
+                "Install",
+                "No Host NixOS tree — deploy NCC to /etc/nixos or set NCC_INSTALL_REPO.",
+            )
+            return
+        env = os.environ.copy()
+        env["NCC_INSTALL_SELECTION"] = selection
+        if answers:
+            env["NCC_GUI_ANSWERS_FILE"] = answers
+
+        def done(code: int) -> None:
+            if code != 0:
+                error(self, "Install", f"Exit code {code}")
+            else:
+                info(
+                    self,
+                    "Install",
+                    "Deploy complete on this PC.\nNext: sudo ncc system-update",
+                )
+                self.reload()
+
+        if self.set_busy():
+            return
+        self.run_ncc_root(
+            ["install", "apply"],
+            label="Install apply (this PC)",
+            on_done=done,
+            env=env,
+        )
+
+    def _deploy_remote(self, target: str, selection: str, answers: str) -> None:
+        nixos_source = self._resolve_nixos_source()
+        if not nixos_source:
+            error(
+                self,
+                "Install",
+                "No Host NixOS tree — deploy NCC to /etc/nixos or set NCC_INSTALL_REPO.",
+            )
+            return
+        if not Path(nixos_source, "flake.nix").is_file():
+            error(self, "Install", f"No flake.nix in Host tree:\n{nixos_source}")
+            return
+
+        from PySide6.QtCore import Qt
+        from ncc_gui.push_tree import remote_staging_dir
+
+        summary = (
+            f"On {target}:\n"
+            f"1) Generate systemConfig on this PC (staging — not /etc/nixos here)\n"
+            f"2) rsync tree → {remote_staging_dir()}\n"
+            f"3) Apply into /etc/nixos (keep hardware-configuration.nix)\n"
+            f"4) Copy generated systemConfig\n"
+            f"5) nixos-rebuild switch\n"
+            f"6) migrate-config → {EXPECTED_CONFIG_VERSION}"
+        )
+        if not confirm(self, "Install on Target", f"{summary}\n\nContinue?"):
+            return
+
+        self.log_append(f"• Install on Target {target} (background — UI stays responsive)\n")
+        bridge = _RemoteDeployBridge()
+        bridge.log_line.connect(self.log_append, Qt.ConnectionType.QueuedConnection)
+        bridge.finished.connect(
+            lambda ok, detail: self._on_remote_deploy_finished(ok, detail, target),
+            Qt.ConnectionType.QueuedConnection,
+        )
+        QThreadPool.globalInstance().start(
+            _RemoteDeployJob(
+                bridge,
+                target=target,
+                selection=selection,
+                answers_file=answers,
+                nixos_source=nixos_source,
+            )
+        )
+
+    def _on_remote_deploy_finished(self, ok: bool, detail: str, target: str) -> None:
+        if not ok:
+            error(self, "Install on Target", detail)
+            return
+
+        def _after_migrate(code: int) -> None:
+            if code == 0:
+                info(
+                    self,
+                    "Install on Target",
+                    f"Done on {target}.\nRe-probe (Connect) to refresh session.",
+                )
+            else:
+                error(
+                    self,
+                    "Install on Target",
+                    "Rebuild OK but migrate-config failed. "
+                    "Try System → Migrate config.",
+                )
+            session_controller().refresh()
+            self.reload()
+
+        if self.set_busy():
+            return
+        self.run_ncc_root(
+            ["system", "migrate-config"],
+            label=f"migrate config → {EXPECTED_CONFIG_VERSION}",
+            on_done=_after_migrate,
+            follow_target=True,
+        )
 
     def _shell_hint(self) -> None:
-        # Sync: show the printed nix-shell line (not a generic "Finished").
         ncc = shutil.which("ncc")
         if not ncc:
             error(self, "ncc missing", "ncc is not on PATH.")
             return
-        repo = getattr(self, "_pf", None)
-        repo_path = repo.repo if repo else ""
-        if repo_path and not os.environ.get("NCC_INSTALL_REPO"):
-            os.environ["NCC_INSTALL_REPO"] = repo_path
+        self._resolve_nixos_source()
         proc = self.run_ncc("install", "shell", log=True, show_error=True)
         if proc.returncode == 0:
             hint = ((proc.stdout or "") + (proc.stderr or "")).strip()
@@ -253,26 +481,6 @@ class InstallPage(DomainPage):
                 return
         self.log_append(f"Backup written: {dest}")
         info(self, "Backup", f"Saved to:\n{dest}")
-
-    def _run_ncc(self, argv: list[str], label: str) -> None:
-        ncc = shutil.which("ncc")
-        if not ncc:
-            error(self, "ncc missing", "ncc is not on PATH.")
-            return
-
-        repo = getattr(self, "_pf", None)
-        repo_path = repo.repo if repo else ""
-        if repo_path and not os.environ.get("NCC_INSTALL_REPO"):
-            os.environ["NCC_INSTALL_REPO"] = repo_path
-
-        def done(code: int) -> None:
-            if code != 0:
-                error(self, label, f"Exit code {code}")
-            else:
-                info(self, label, "Finished.")
-                self.reload()
-
-        self.run_ncc_async(argv, label=label, on_done=done)
 
 
 def create_page() -> InstallPage:

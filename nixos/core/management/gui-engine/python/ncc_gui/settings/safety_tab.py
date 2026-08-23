@@ -36,16 +36,17 @@ _rebuild_progress: QProgressDialog | None = None
 def load_host_policy() -> dict[str, Any]:
     raw = (os.environ.get("NCC_HOST_POLICY") or "").strip()
     if not raw:
-        return {"dangerousIgnore": False, "autoBuild": False}
+        return {"dangerousIgnore": False, "autoBuild": False, "localSourceDir": ""}
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        return {"dangerousIgnore": False, "autoBuild": False}
+        return {"dangerousIgnore": False, "autoBuild": False, "localSourceDir": ""}
     if not isinstance(data, dict):
-        return {"dangerousIgnore": False, "autoBuild": False}
+        return {"dangerousIgnore": False, "autoBuild": False, "localSourceDir": ""}
     return {
         "dangerousIgnore": bool(data.get("dangerousIgnore", False)),
         "autoBuild": bool(data.get("autoBuild", False)),
+        "localSourceDir": str(data.get("localSourceDir") or "").strip(),
     }
 
 

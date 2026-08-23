@@ -154,12 +154,24 @@ let
     export MONOLITH_FILE="$SYSTEM_CONFIG_DIR/systemConfig.nix"
     export CONFIGS_BASE="$SYSTEM_CONFIG_DIR/systemConfig"
     export NCC_DEFAULT_LAYOUT="monolith"
+    if [[ -z "''${NIXOS_CONFIG_DIR:-}" ]] && [[ -d /etc/nixos/core/management ]] && [[ -f /etc/nixos/flake.nix ]]; then
+      export NIXOS_CONFIG_DIR=/etc/nixos
+    fi
     if [[ -z "''${INSTALL_ROOT:-}" ]]; then
-      if [[ -n "''${NCC_INSTALL_REPO:-}" && -d "''${NCC_INSTALL_REPO}/nixos/core" ]]; then
-        export INSTALL_ROOT="$NCC_INSTALL_REPO"
-      else
+      if [[ -n "''${NCC_INSTALL_REPO:-}" ]]; then
+        if [[ -f "''${NCC_INSTALL_REPO}/flake.nix" && -d "''${NCC_INSTALL_REPO}/core/management" ]]; then
+          export NIXOS_CONFIG_DIR="''${NIXOS_CONFIG_DIR:-$NCC_INSTALL_REPO}"
+        elif [[ -d "''${NCC_INSTALL_REPO}/nixos/core" ]]; then
+          export INSTALL_ROOT="$NCC_INSTALL_REPO"
+        fi
+      fi
+      if [[ -z "''${NIXOS_CONFIG_DIR:-}" && -z "''${INSTALL_ROOT:-}" ]]; then
         _d="$(pwd)"
         while [[ "$_d" != "/" ]]; do
+          if [[ -f "$_d/flake.nix" && -d "$_d/core/management" ]]; then
+            export NIXOS_CONFIG_DIR="$_d"
+            break
+          fi
           if [[ -d "$_d/nixos/core/management" ]]; then
             export INSTALL_ROOT="$_d"
             break

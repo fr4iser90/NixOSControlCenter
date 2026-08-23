@@ -1,10 +1,15 @@
-# Utility: first configured user's NCC nixos checkout path
-{ getModuleConfig }:
+# Resolve system-manager.localSourceDir to a nixos tree path (or "" when unset).
+{ lib, getModuleConfig }:
 let
-  userCfg = getModuleConfig "user";
-  names = builtins.attrNames (builtins.removeAttrs userCfg [ "enable" ]);
-  # Prefer attr names that look like usernames (attrs with role)
-  userNames = builtins.filter (n: builtins.isAttrs (userCfg.${n} or null)) names;
-  firstUser = if userNames == [] then "root" else builtins.head userNames;
+  configured = lib.strings.trim (getModuleConfig "system-manager").localSourceDir or "";
 in
-  "/home/${firstUser}/Documents/Git/NixOSControlCenter/nixos"
+  if configured == "" then
+    ""
+  else if builtins.pathExists "${configured}/flake.nix"
+    && builtins.pathExists "${configured}/core/management" then
+    configured
+  else if builtins.pathExists "${configured}/nixos/flake.nix"
+    && builtins.pathExists "${configured}/nixos/core/management" then
+    "${configured}/nixos"
+  else
+    configured

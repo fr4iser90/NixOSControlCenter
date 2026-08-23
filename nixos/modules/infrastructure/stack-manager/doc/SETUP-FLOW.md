@@ -165,7 +165,7 @@ Concrete tasks:
 
 ```bash
 # Dev: use local clone instead of fetch into virt home
-export NCC_STACKS_ROOT=~/Documents/Git/NCC-Stacks
+export NCC_STACKS_ROOT=/path/to/NCC-Stacks
 
 sudo -u <virt-user> ncc stacks fetch
 sudo -u <virt-user> ncc stacks list-profiles

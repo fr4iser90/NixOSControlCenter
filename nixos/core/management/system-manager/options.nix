@@ -63,6 +63,16 @@ in
       '';
     };
 
+    localSourceDir = lib.mkOption {
+      type = lib.types.str;
+      default = "";
+      example = "/path/to/nixos";
+      description = ''
+        Default Host NixOS tree for `ncc system update --local` (same as `--source-dir`).
+        Empty = use `/etc/nixos` when present, otherwise interactive selection.
+      '';
+    };
+
     # API for other modules - always available
     api = lib.mkOption {
       type = lib.types.attrs;

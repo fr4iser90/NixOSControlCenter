@@ -28,7 +28,7 @@ ncc stacks list-catalog --remote --plain    # group/service|variants
 ncc stacks list-catalog --remote --family compute -v
 
 # Or point at a checkout
-NCC_STACKS_ROOT=~/Documents/Git/NCC-Stacks ncc stacks list-profiles
+NCC_STACKS_ROOT=/path/to/NCC-Stacks ncc stacks list-profiles
 ```
 
 After `fetch`, lists use `/home/<virt|admin>/…` automatically.

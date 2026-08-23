@@ -7,6 +7,8 @@ let
   cfg = getModuleConfig moduleName;
   cliRegistry = getModuleApi "cli-registry";
   ui = getModuleApi "cli-formatter";
+  systemMgrCfg = getModuleConfig "system-manager";
+  hostLocalSourceDir = systemMgrCfg.localSourceDir or "";
   
   # Path to ISO builder
   isoBuilderPath = ./iso-builder;
@@ -128,10 +130,12 @@ let
         ISO_BUILDER_DIR=""
         if [ -d "./nixos/modules/specialized/nixify/iso-builder" ]; then
           ISO_BUILDER_DIR="./nixos/modules/specialized/nixify/iso-builder"
-        elif [ -d "$HOME/Documents/Git/NixOSControlCenter/nixos/modules/specialized/nixify/iso-builder" ]; then
-          ISO_BUILDER_DIR="$HOME/Documents/Git/NixOSControlCenter/nixos/modules/specialized/nixify/iso-builder"
-        elif [ -d "$HOME/nixos-control-center/nixos/modules/specialized/nixify/iso-builder" ]; then
-          ISO_BUILDER_DIR="$HOME/nixos-control-center/nixos/modules/specialized/nixify/iso-builder"
+        elif [ -n "${hostLocalSourceDir}" ] && [ -d "${hostLocalSourceDir}/modules/specialized/nixify/iso-builder" ]; then
+          ISO_BUILDER_DIR="${hostLocalSourceDir}/modules/specialized/nixify/iso-builder"
+        elif [ -n "${hostLocalSourceDir}" ] && [ -d "${hostLocalSourceDir}/nixos/modules/specialized/nixify/iso-builder" ]; then
+          ISO_BUILDER_DIR="${hostLocalSourceDir}/nixos/modules/specialized/nixify/iso-builder"
+        elif [ -d "/etc/nixos/modules/specialized/nixify/iso-builder" ]; then
+          ISO_BUILDER_DIR="/etc/nixos/modules/specialized/nixify/iso-builder"
         else
           CURRENT_DIR="$(pwd)"
           while [ "$CURRENT_DIR" != "/" ]; do

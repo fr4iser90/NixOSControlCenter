@@ -138,6 +138,7 @@ let
   hostPolicyJson = builtins.toJSON {
     dangerousIgnore = nccHostCfg.dangerousIgnore or false;
     autoBuild = systemMgrCfg.autoBuild or false;
+    localSourceDir = systemMgrCfg.localSourceDir or "";
   };
   hostPolicyFile = pkgs.writeText "ncc-host-policy.json" hostPolicyJson;
 

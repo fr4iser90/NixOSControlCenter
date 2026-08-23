@@ -577,6 +577,7 @@ class DomainPage(QWidget):
         label: str = "Apply",
         on_done: Callable[[int], None] | None = None,
         follow_target: bool = False,
+        env: dict[str, str] | None = None,
     ) -> None:
         """Async elevated ``ncc …``. Prefer passwordless sudo, then pkexec.
 
@@ -601,7 +602,7 @@ class DomainPage(QWidget):
             return
         where = f" @ {host}" if host else ""
         self._start_ncc_process(
-            program, argv, label=f"{label}{where}", on_done=on_done
+            program, argv, label=f"{label}{where}", on_done=on_done, env=env
         )
 
     def run_ncc_async(

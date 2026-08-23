@@ -11,20 +11,32 @@ let
   installer = import ./scripts { inherit pkgs getModuleApi getModuleMetadata; };
 
   resolveRepoSnippet = ''
-    _ncc_install_repo() {
-      if [[ -n "${cfg.repoPath or ""}" && -d "${cfg.repoPath or ""}/nixos/core" ]]; then
-        printf '%s\n' "${cfg.repoPath or ""}"
+    _ncc_install_nixos_tree() {
+      local cand="''${1:-}"
+      if [[ -f "$cand/flake.nix" && -d "$cand/core/management" ]]; then
+        printf '%s\n' "$cand"
         return 0
       fi
-      if [[ -n "''${NCC_INSTALL_REPO:-}" && -d "''${NCC_INSTALL_REPO}/nixos/core" ]]; then
-        printf '%s\n' "$NCC_INSTALL_REPO"
+      if [[ -f "$cand/nixos/flake.nix" && -d "$cand/nixos/core/management" ]]; then
+        printf '%s\n' "$cand/nixos"
+        return 0
+      fi
+      return 1
+    }
+    _ncc_install_repo() {
+      if [[ -n "${cfg.repoPath or ""}" ]]; then
+        _ncc_install_nixos_tree "${cfg.repoPath or ""}" && return 0
+      fi
+      if [[ -n "''${NCC_INSTALL_REPO:-}" ]]; then
+        _ncc_install_nixos_tree "$NCC_INSTALL_REPO" && return 0
+      fi
+      if _ncc_install_nixos_tree /etc/nixos; then
         return 0
       fi
       local d
       d="$(pwd)"
       while [[ "$d" != "/" ]]; do
-        if [[ -d "$d/nixos/core/management" ]]; then
-          printf '%s\n' "$d"
+        if _ncc_install_nixos_tree "$d"; then
           return 0
         fi
         d="$(dirname "$d")"
@@ -62,6 +74,7 @@ Usage:
   ncc install --gui           Install domain GUI (preflight + actions)
   ncc install wizard          PySide6 wizard (separate window)
   ncc install dry-run         Dry-run install flow
+  ncc install apply           Apply pre-selected install (NCC_INSTALL_SELECTION)
   ncc install shell           Print nix-shell invocation
 EOF
         ;;
@@ -72,6 +85,14 @@ EOF
       dry-run)
         shift || true
         exec ${installer.ncc-install-dry}/bin/ncc-install-dry "$@"
+        ;;
+      apply)
+        shift || true
+        if [[ -z "''${NCC_INSTALL_SELECTION:-}" ]]; then
+          echo "NCC_INSTALL_SELECTION is required for: ncc install apply" >&2
+          exit 1
+        fi
+        exec ${installer.ncc-install}/bin/ncc-install "$@"
         ;;
       shell)
         shift || true
@@ -90,7 +111,7 @@ EOF
     set -euo pipefail
     ${resolveRepoSnippet}
     repo="$(_ncc_install_repo)" || {
-      echo "Could not find NixOSControlCenter checkout (set repoPath or NCC_INSTALL_REPO)" >&2
+      echo "Could not find Host NixOS tree (/etc/nixos or set repoPath / NCC_INSTALL_REPO)" >&2
       exit 1
     }
     echo "NCC_INSTALL_SHELL_ONLY=1 nix-shell \"$repo/shell.nix\""
@@ -117,7 +138,7 @@ in
         longHelp = ''
           ncc install                 Help
           ncc install --gui
-          ncc install wizard|dry-run|shell
+          ncc install wizard|dry-run|apply|shell
         '';
       }
       {
@@ -137,6 +158,15 @@ in
         category = "management";
         script = "${installer.ncc-install-dry}/bin/ncc-install-dry";
         shortHelp = "dry-run - Dry-run install";
+      }
+      {
+        name = "apply";
+        parent = "install";
+        domain = "install";
+        description = "Apply install from NCC_INSTALL_SELECTION (no wizard re-prompt)";
+        category = "management";
+        script = "${installer.ncc-install}/bin/ncc-install";
+        shortHelp = "apply - Apply pre-selected install";
       }
       {
         name = "shell";

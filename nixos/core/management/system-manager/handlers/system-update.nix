@@ -17,7 +17,7 @@ let
     }
     {
       name = "local";
-      url = "/home/${username}/Documents/Git/NixOSControlCenter/nixos";
+      url = if hostLocalSourceDir != "" then hostLocalSourceDir else "/etc/nixos";
       branches = [];
     }
   ];
@@ -35,8 +35,10 @@ let
   hostname = lib.attrByPath ["hostName"] "nixos" (getModuleConfig "network");
   # Host policy (systemConfig) — baked into ncc-system-update-main at rebuild
   nccHostCfg = getModuleConfig "nixos-control-center";
+  systemMgrCfg = getModuleConfig "system-manager";
   dangerousIgnore = nccHostCfg.dangerousIgnore or false;
-  autoBuild = (getModuleConfig "system-manager").autoBuild or false;
+  autoBuild = systemMgrCfg.autoBuild or false;
+  hostLocalSourceDir = systemMgrCfg.localSourceDir or "";
   hostAutoBuild = if autoBuild then "true" else "false";
   hostDangerousIgnore = if dangerousIgnore then "true" else "false";
   systemChecks = lib.attrByPath ["enable"] false (getModuleConfig "system-checks");
@@ -181,6 +183,7 @@ let
     # Host policy from systemConfig (rebuild required after changing Safety settings)
     NCC_HOST_DANGEROUS_IGNORE="${hostDangerousIgnore}"
     NCC_HOST_AUTO_BUILD="${hostAutoBuild}"
+    NCC_HOST_LOCAL_SOURCE_DIR="${hostLocalSourceDir}"
     if [ "$NCC_HOST_DANGEROUS_IGNORE" = "true" ] || [ -n "''${NCC_ASSUME_YES:-}" ]; then
       AUTO_CONFIRM=true
     fi
@@ -536,13 +539,39 @@ let
           ;;
         2)
           # Local update configuration
+          _ncc_resolve_source_dir() {
+            local cand="''${1:-}"
+            [[ -z "$cand" ]] && return 1
+            if [[ -f "$cand/flake.nix" && -d "$cand/core/management" ]]; then
+              printf '%s\n' "$cand"
+              return 0
+            fi
+            if [[ -f "$cand/nixos/flake.nix" && -d "$cand/nixos/core/management" ]]; then
+              printf '%s\n' "$cand/nixos"
+              return 0
+            fi
+            return 1
+          }
           if [ -n "$SOURCE_DIR_OVERRIDE" ]; then
             SOURCE_DIR="$SOURCE_DIR_OVERRIDE"
           else
-            SOURCE_DIR="/home/${username}/Documents/Git/NixOSControlCenter/nixos"
+            _resolved=""
+            if [ -n "$NCC_HOST_LOCAL_SOURCE_DIR" ]; then
+              _resolved="$(_ncc_resolve_source_dir "$NCC_HOST_LOCAL_SOURCE_DIR")"
+            fi
+            if [ -n "$_resolved" ]; then
+              SOURCE_DIR="$_resolved"
+            else
+              _resolved="$(_ncc_resolve_source_dir /etc/nixos)"
+              if [ -n "$_resolved" ]; then
+                SOURCE_DIR="$_resolved"
+              else
+                SOURCE_DIR=""
+              fi
+            fi
           fi
 
-          if [ ! -d "$SOURCE_DIR" ]; then
+          if [ -z "$SOURCE_DIR" ] || [ ! -d "$SOURCE_DIR" ]; then
             if [ -n "$SOURCE_DIR_OVERRIDE" ] || [ "$AUTO_CONFIRM" = "true" ]; then
               ${ui.messages.error "Local source directory not found: $SOURCE_DIR"}
               exit 1

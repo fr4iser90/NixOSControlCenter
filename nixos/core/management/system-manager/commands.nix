@@ -504,14 +504,14 @@ in {
             ncc system update
 
             # Validate before touching the machine (recommended)
-            ncc system update --dry-run --local --source-dir ~/Documents/Git/NixOSControlCenter/nixos
-            ncc system update --dry-run -v --local --source-dir ~/Documents/Git/NixOSControlCenter/nixos
+            ncc system update --dry-run --local --source-dir /path/to/nixos
+            ncc system update --dry-run -v --local --source-dir /path/to/nixos
 
             # Fully automated local update with rebuild
             sudo ncc system update --yes --local --auto-build
 
-            # Local update from a specific checkout
-            sudo ncc system update -y --local --source-dir /home/fr4iser/Documents/Git/NixOSControlCenter/nixos --auto-build
+            # Local update from a configured path (system-manager.localSourceDir)
+            sudo ncc system update -y --local --source-dir /path/to/nixos --auto-build
 
             # Local update + channel bump (when available) + rebuild
             sudo ncc system update --yes --local --with-channels --auto-build
