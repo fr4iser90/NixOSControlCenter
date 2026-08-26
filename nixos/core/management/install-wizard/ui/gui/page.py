@@ -11,7 +11,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
 
 from ncc_gui.dialogs import confirm, error, info
-from ncc_gui.remote import target_from_env
+from ncc_gui.remote import can_elevate, target_from_env
 from ncc_gui.scaffold import DomainPage
 from ncc_gui.session_ux import session_mode
 from ncc_gui.target_bus import bus as target_bus
@@ -51,6 +51,7 @@ class _RemoteDeployJob(QRunnable):
         selection: str,
         answers_file: str,
         nixos_source: str,
+        sudo_password: str | None = None,
     ) -> None:
         super().__init__()
         self._bridge = bridge
@@ -58,6 +59,7 @@ class _RemoteDeployJob(QRunnable):
         self._selection = selection
         self._answers_file = answers_file
         self._nixos_source = nixos_source
+        self._sudo_password = sudo_password
 
     def run(self) -> None:
         try:
@@ -66,6 +68,7 @@ class _RemoteDeployJob(QRunnable):
                 selection=self._selection,
                 answers_file=self._answers_file,
                 nixos_source=self._nixos_source,
+                sudo_password=self._sudo_password,
                 on_log=self._bridge.log_line.emit,
             )
             self._bridge.finished.emit(ok, detail)
@@ -369,6 +372,7 @@ class InstallPage(DomainPage):
             return
 
         from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QDialog
         from ncc_gui.push_tree import remote_staging_dir
 
         summary = (
@@ -382,6 +386,15 @@ class InstallPage(DomainPage):
         )
         if not confirm(self, "Install on Target", f"{summary}\n\nContinue?"):
             return
+
+        sudo_password: str | None = None
+        if not can_elevate(target=target):
+            from ncc_gui.ssh_auth_dialog import TargetSudoDialog
+
+            dlg = TargetSudoDialog(target, self)
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            sudo_password = dlg.password()
 
         self.log_append(f"• Install on Target {target} (background — UI stays responsive)\n")
         bridge = _RemoteDeployBridge()
@@ -397,6 +410,7 @@ class InstallPage(DomainPage):
                 selection=selection,
                 answers_file=answers,
                 nixos_source=nixos_source,
+                sudo_password=sudo_password,
             )
         )
 

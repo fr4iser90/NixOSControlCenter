@@ -3,12 +3,15 @@
 let
   ui = getModuleApi "cli-formatter";
   hw = import ../../../../../lib/hardware-config-writer.nix { inherit pkgs lib systemConfig getModuleConfig; };
+  preflightRemote = import ../../../../lib/preflight-remote.nix { inherit getModuleApi; };
 
   prebuildScript = pkgs.writeScriptBin "prebuild-check-cpu" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
 
     ${hw.preamble}
+
+    ${preflightRemote.bashHelpers}
 
     VERBOSE="''${NCC_PREFLIGHT_VERBOSE:-0}"
 
@@ -53,14 +56,16 @@ let
     fi
 
     CURRENT=$(ncc_read_module_config "core/base/hardware" 2>/dev/null || echo "{}")
+    CONFIGURED=$(echo "$CURRENT" | grep 'cpu =' | head -1 | cut -d'"' -f2 || echo "")
+
+    _ncc_preflight_compare_only "CPU" "$CONFIGURED" "$DETECTED"
+
     if ! echo "$CURRENT" | grep -q 'cpu ='; then
       _update_cpu "$DETECTED"
       ${ui.badges.warning "CPU: was unset → set to $DETECTED"}
       ${ui.badges.success "CPU: $DETECTED"}
       exit 0
     fi
-
-    CONFIGURED=$(echo "$CURRENT" | grep 'cpu =' | head -1 | cut -d'"' -f2 || echo "")
 
     if [ "$VERBOSE" = "1" ]; then
       echo "  detected:   $DETECTED"

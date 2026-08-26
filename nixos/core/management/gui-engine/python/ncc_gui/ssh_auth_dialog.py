@@ -86,6 +86,52 @@ class SshAuthDialog(QDialog):
         return self._choice
 
 
+class TargetSudoDialog(QDialog):
+    """Target administrator password for one remote deploy (not stored)."""
+
+    def __init__(self, host: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Target administrator password")
+        self.setModal(True)
+        self.setMinimumWidth(440)
+        self._password = ""
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        intro = FormValueLabel(
+            f"Install on {host} needs administrator rights on the Target.\n"
+            "Enter your login password once for this deploy.\n"
+            "It is not saved (use SSH keys for login; NOPASSWD sudo avoids this step)."
+        )
+        layout.addWidget(intro)
+
+        form = QFormLayout()
+        self._edit = QLineEdit()
+        self._edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self._edit.returnPressed.connect(self._accept)
+        form.addRow("Password", self._edit)
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self._accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        self._edit.setFocus()
+
+    def _accept(self) -> None:
+        pw = self._edit.text()
+        if not pw:
+            self._edit.setFocus()
+            return
+        self._password = pw
+        self.accept()
+
+    def password(self) -> str:
+        return self._password
+
+
 class SshKeySaveDialog(QDialog):
     """After password Connect: optional key install, with don't-ask-again."""
 

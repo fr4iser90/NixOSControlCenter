@@ -4,12 +4,15 @@ let
   ui = getModuleApi "cli-formatter";
   cliRegistry = getModuleApi "cli-registry";
   hw = import ../../../../../lib/hardware-config-writer.nix { inherit pkgs lib systemConfig getModuleConfig; };
+  preflightRemote = import ../../../../lib/preflight-remote.nix { inherit getModuleApi; };
 
   prebuildScript = pkgs.writeScriptBin "prebuild-check-memory" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
 
     ${hw.preamble}
+
+    ${preflightRemote.bashHelpers}
 
     VERBOSE="''${NCC_PREFLIGHT_VERBOSE:-0}"
 
@@ -50,14 +53,16 @@ let
     fi
 
     CURRENT=$(ncc_read_module_config "core/base/hardware" 2>/dev/null || echo "{}")
+    CONFIGURED_GB=$(echo "$CURRENT" | grep -E 'sizeGB\s*=' | grep -oE '[0-9]+' | head -1 || echo "")
+
+    _ncc_preflight_compare_only "Memory" "$CONFIGURED_GB" "$DETECTED_GB"
+
     if ! echo "$CURRENT" | grep -qE 'sizeGB\s*='; then
       _update_memory "$DETECTED_GB"
       ${ui.badges.warning "Memory: was unset → set to $DETECTED_GB GB"}
       ${ui.badges.success "Memory: $DETECTED_GB GB"}
       exit 0
     fi
-
-    CONFIGURED_GB=$(echo "$CURRENT" | grep -E 'sizeGB\s*=' | grep -oE '[0-9]+' | head -1 || echo "")
 
     if [ "$VERBOSE" = "1" ]; then
       echo "  detected:   $DETECTED_GB GB"

@@ -10,19 +10,15 @@
 #
 # Für mehr Sicherheit: Verwende docker-rootless.nix (aber Swarm ist dann experimentell)
 
-{ config, lib, pkgs, getModuleConfig, ... }:
+{ config, lib, pkgs, ... }:
 with lib;
-let
-  # Jetson/Jetpack still keys CTK off enableNvidia; desktop uses nvidia-container-toolkit alone.
-  isJetson = ((getModuleConfig "hardware").gpu or "") == "jetson";
-in
 {
   # Root Docker aktivieren
   virtualisation.docker = {
     enable = true;
     enableOnBoot = true;
     # Desktop: force off deprecated flag. Jetson: keep on for jetpack CTK defaults.
-    enableNvidia = if isJetson then true else mkForce false;
+    enableNvidia = mkForce false;
     # Optional: Automatisches Cleanup von alten Containern/Images
     autoPrune = {
       enable = true;

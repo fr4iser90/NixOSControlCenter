@@ -159,6 +159,12 @@ class DomainPage(QWidget):
             self._btn_activity_toggle.setObjectName("nccHeaderAction")
             self._btn_activity_toggle.clicked.connect(self._toggle_activity_log)
             toggle_row.addWidget(self._btn_activity_toggle, stretch=0)
+            self._btn_activity_clear = QToolButton()
+            self._btn_activity_clear.setObjectName("nccHeaderAction")
+            self._btn_activity_clear.setText("Clear")
+            self._btn_activity_clear.setToolTip("Clear the command log")
+            self._btn_activity_clear.clicked.connect(self.log_clear)
+            toggle_row.addWidget(self._btn_activity_clear, stretch=0)
             log_l.addLayout(toggle_row)
             self.log = QTextEdit()
             self.log.setObjectName("nccActivityLog")
@@ -525,7 +531,16 @@ class DomainPage(QWidget):
             return
         self._reveal_activity()
         self.log.append(strip_ansi(text))
+        self._scroll_activity_to_end()
         self._persist_activity()
+
+    def _scroll_activity_to_end(self) -> None:
+        if self.log is None:
+            return
+        self.log.moveCursor(self.log.textCursor().MoveOperation.End)
+        sb = self.log.verticalScrollBar()
+        if sb is not None:
+            sb.setValue(sb.maximum())
 
     def log_write(self, text: str) -> None:
         """Append without extra bullet formatting; strips ANSI."""
@@ -535,7 +550,7 @@ class DomainPage(QWidget):
         plain = strip_ansi(text)
         self.log.moveCursor(self.log.textCursor().MoveOperation.End)
         self.log.insertPlainText(plain)
-        self.log.moveCursor(self.log.textCursor().MoveOperation.End)
+        self._scroll_activity_to_end()
         self._persist_activity()
 
     # ----- run ncc -----

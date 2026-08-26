@@ -5,6 +5,7 @@ let
   ui = getModuleApi "cli-formatter";
   facade = import ../../../../../lib/config-facade.nix { inherit pkgs; };
   layout = (getModuleConfig "system-manager").layout or "monolith";
+  preflightRemote = import ../../../../lib/preflight-remote.nix { inherit getModuleApi; };
 
   prebuildScript = pkgs.writeScriptBin "prebuild-check-platform" ''
     #!${pkgs.bash}/bin/bash
@@ -14,6 +15,8 @@ let
       nixosRoot = "/etc/nixos";
       inherit layout;
     }}
+
+    ${preflightRemote.bashHelpers}
 
     VERBOSE="''${NCC_PREFLIGHT_VERBOSE:-0}"
 
@@ -87,6 +90,8 @@ let
       echo "  detected:   $DETECTED"
       echo "  configured: ''${CONFIGURED:-(unset)}"
     fi
+
+    _ncc_preflight_compare_only "Platform" "$CONFIGURED" "$DETECTED"
 
     if [ -z "$CONFIGURED" ]; then
       _update_platform "$DETECTED"

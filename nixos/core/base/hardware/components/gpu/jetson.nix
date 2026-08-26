@@ -13,21 +13,21 @@ let
   containerToolkit = jp.containerToolkit or true;
   nvpmodelProfile = jp.nvpmodelProfile or null;
   onAarch64 = pkgs.stdenv.hostPlatform.isAarch64;
-  hasJetpack = options.hardware ? nvidia-jetpack;
-in
-{
-  config = lib.mkIf (onAarch64 && hasJetpack) {
-    hardware.graphics.enable = true;
+  hasJetpack = lib.hasAttr "nvidia-jetpack" options.hardware;
 
+  jetpackConfig = if hasJetpack then {
     hardware.nvidia-jetpack = {
       enable = true;
       inherit som carrierBoard super;
     };
-
     hardware.nvidia-container-toolkit.enable = containerToolkit;
-
     virtualisation.docker.enableNvidia = lib.mkIf containerToolkit (lib.mkOverride 40 true);
-
     services.nvpmodel.profileNumber = lib.mkIf (nvpmodelProfile != null) nvpmodelProfile;
-  };
-}
+  } else {};
+in
+lib.mkIf onAarch64 (
+  lib.mkMerge [
+    { hardware.graphics.enable = true; }
+    jetpackConfig
+  ]
+)

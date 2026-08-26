@@ -1,6 +1,7 @@
 { config, lib, pkgs, ... }:
 
-let
+lib.mkIf pkgs.stdenv.hostPlatform.isx86_64 (
+  let
   dataDir = "/var/lib/ai-workspace";
   trainingDir = "${dataDir}/training";
   modelsDir = "${dataDir}/models";
@@ -107,7 +108,7 @@ in {
     };
   };
 
-  config.system.activationScripts.trainingSetup = ''
+  system.activationScripts.trainingSetup = ''
     mkdir -p ${modelsDir}
     mkdir -p ${trainingDir}
     mkdir -p ${cacheDir}
@@ -119,3 +120,4 @@ in {
     chmod 777 ${offloadDir}
   '';
 }
+)

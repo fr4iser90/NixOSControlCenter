@@ -12,7 +12,7 @@
       configurationLimit = 15;
       editor = false;
       consoleMode = "auto"; # Can be "auto", "keep", or a specific mode
-      memtest86.enable = true;
+      memtest86.enable = pkgs.stdenv.hostPlatform.isx86_64;
     };
 
     # EFI configuration

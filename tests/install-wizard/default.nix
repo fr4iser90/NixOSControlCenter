@@ -38,5 +38,8 @@ pkgs.runCommand "ncc-install-wizard-tests" {
     NCC_REPO_ROOT="$NCC_REPO_ROOT" bash ${t.drv}
   '') built}
 
+  echo ">>> validate-systemconfig-writes"
+  bash ${../validate-systemconfig-writes.sh}
+
   touch $out
 ''

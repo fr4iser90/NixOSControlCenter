@@ -89,6 +89,7 @@ EOF
   # System Checks Scripts (converted from component)
   postbuildCheckScript = import ./components/system-checks/scripts/postbuild-checks.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   prebuildCheckScript = import ./components/system-checks/scripts/prebuild-checks.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
+  remoteInstallGateMod = import ./components/system-checks/scripts/remote-install-gate.nix { inherit pkgs getModuleApi; };
 
   # System Logging Scripts (converted from component)
   systemReportScript = import ./components/system-logging/scripts/system-report.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
@@ -443,6 +444,25 @@ in {
               --force     Skip safety checks
               --verbose   Show preflight details (detected vs configured)
           '';
+        }
+        {
+          name = "remote-install-gate";
+          domain = "system";
+          parent = "system";
+          internal = true;
+          description = "Remote install gate on this machine (prebuild checks + rebuild)";
+          category = "system";
+          script = "${remoteInstallGateMod.remoteInstallGate}/bin/ncc-remote-install-gate";
+          shortHelp = "remote-install-gate - Target-side install gate (SSOT checks)";
+          longHelp = ''
+            Runs on the Target after Host synced tree + systemConfig.
+            Orchestrates prebuild-check-* (NCC_PREFLIGHT_MODE=compare for hardware),
+            migrate-config, flake-extras, and nixos-rebuild.
+
+            Host GUI typically pipes each check script via push_tree instead
+            (first install before ncc exists on Target).
+          '';
+          requiresSudo = true;
         }
       ]))
     # System Logging Commands (converted from component - always enabled in core)

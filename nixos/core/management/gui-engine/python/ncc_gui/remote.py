@@ -134,7 +134,9 @@ def build_elevated_ncc_argv(
                 "-n",
                 "--preserve-env=NCC_ASSUME_YES,NCC_CLI_NESTED,NCC_QUIET_SWITCH,"
                 "NCC_INSTALL_SELECTION,NCC_GUI_ANSWERS_FILE,NCC_INSTALL_REPO,"
-                "NCC_INSTALL_SKIP_DEPLOY,NCC_DEPLOY_SKIP_REBUILD,SYSTEM_CONFIG_DIR",
+                "NCC_INSTALL_HOST_BLUEPRINT_ONLY,NCC_INSTALL_SKIP_COLLECT,"
+                "NCC_INSTALL_SKIP_DEPLOY,NCC_DEPLOY_SKIP_REBUILD,NCC_REMOTE_NONINTERACTIVE,"
+                "NCC_PREFLIGHT_MODE,SYSTEM_CONFIG_DIR",
                 ncc,
                 *argv_tail,
             ],

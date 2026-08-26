@@ -12,6 +12,7 @@ let
   platformCheck = import ../components/system-checks/prebuild/checks/hardware/platform.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   usersCheck = import ../components/system-checks/prebuild/checks/system/users.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   flakeExtras = import ../components/system-checks/prebuild/checks/system/flake-extras.nix { inherit pkgs getModuleApi; };
+  remoteInstallGateMod = import ../components/system-checks/scripts/remote-install-gate.nix { inherit pkgs getModuleApi; };
 
 in {
   # Merge all check module configs to ensure ALL scripts are available
@@ -24,10 +25,10 @@ in {
     flakeExtras.nixosModule
   ];
 
-  # Base system packages for hardware detection
   environment.systemPackages = with pkgs; [
     pciutils
     usbutils
     lshw
+    remoteInstallGateMod.remoteInstallGate
   ];
 }

@@ -108,7 +108,7 @@
           ./hardware-configuration.nix
           ./core
           (if builtins.pathExists ./modules/default.nix then ./modules else {})
-          ./custom
+          (if builtins.pathExists ./custom then ./custom else {})
         ];
       in
         nixpkgs.lib.nixosSystem {

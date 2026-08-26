@@ -25,8 +25,8 @@ main() {
     log_header "NixOS System Setup"
     ncc_dry_banner
     
-    if [[ "''${NCC_INSTALL_SKIP_COLLECT:-0}" == "1" ]]; then
-        log_info "Skipping hardware/collect (apply-only / remote staging)"
+    if [[ "''${NCC_INSTALL_HOST_BLUEPRINT_ONLY:-''${NCC_INSTALL_SKIP_COLLECT:-0}}" == "1" ]]; then
+        log_info "Host blueprint-only (skip local collect — Target gate runs checks remotely)"
     else
         check_hardware_config
 

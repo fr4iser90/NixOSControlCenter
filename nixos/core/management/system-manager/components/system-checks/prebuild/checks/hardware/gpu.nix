@@ -4,12 +4,15 @@ let
   cliRegistry = getModuleApi "cli-registry";
   ui = getModuleApi "cli-formatter";
   hw = import ../../../../../lib/hardware-config-writer.nix { inherit pkgs lib systemConfig getModuleConfig; };
+  preflightRemote = import ../../../../lib/preflight-remote.nix { inherit getModuleApi; };
 
   prebuildScript = pkgs.writeScriptBin "prebuild-check-gpu" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
 
     ${hw.preamble}
+
+    ${preflightRemote.bashHelpers}
 
     VERBOSE="''${NCC_PREFLIGHT_VERBOSE:-0}"
 
@@ -44,6 +47,16 @@ let
     amd_count=0
     DEVICE_SUMMARY=""
 
+    if [ -f /etc/nv_tegra_release ] \
+      || grep -qiE 'tegra|jetson|orin' /sys/firmware/devicetree/base/compatible 2>/dev/null \
+      || grep -qiE 'tegra|jetson|orin' /sys/firmware/devicetree/base/model 2>/dev/null; then
+      DETECTED="jetson"
+      if [ "$VERBOSE" = "1" ]; then
+        echo "  device: Jetson (Tegra)"
+      fi
+    fi
+
+    if [ "$DETECTED" = "none" ]; then
     while IFS= read -r line; do
         bus_id=$(echo "$line" | cut -d' ' -f1)
         class_code=$(${pkgs.pciutils}/bin/lspci -n -s "$bus_id" | awk '{print $2}' | cut -d':' -f1)
@@ -69,6 +82,7 @@ let
         esac
     done < <(${pkgs.pciutils}/bin/lspci -nn | grep -E "\[0300\]|\[0302\]|\[0380\]" || true)
 
+    if [ "$DETECTED" = "none" ]; then
     if [[ ''${gpu_types["nvidia"]-0} -eq 1 && ''${gpu_types["intel"]-0} -eq 1 ]]; then
         DETECTED="nvidia-intel"
     elif [[ ''${gpu_types["amd"]-0} -eq 1 && ''${gpu_types["intel"]-0} -eq 1 ]]; then
@@ -94,16 +108,20 @@ let
             fi
         fi
     fi
+    fi
+    fi
 
     CURRENT=$(ncc_read_module_config "core/base/hardware" 2>/dev/null || echo "{}")
+    CONFIGURED=$(echo "$CURRENT" | grep 'gpu =' | head -1 | cut -d'"' -f2 || echo "")
+
+    _ncc_preflight_compare_only "GPU" "$CONFIGURED" "$DETECTED"
+
     if ! echo "$CURRENT" | grep -q 'gpu ='; then
       _update_gpu "$DETECTED"
       ${ui.badges.warning "GPU: was unset → set to $DETECTED"}
       ${ui.badges.success "GPU: $DETECTED"}
       exit 0
     fi
-
-    CONFIGURED=$(echo "$CURRENT" | grep 'gpu =' | head -1 | cut -d'"' -f2 || echo "")
 
     if [ "$VERBOSE" = "1" ]; then
       echo "  detected:   $DETECTED"

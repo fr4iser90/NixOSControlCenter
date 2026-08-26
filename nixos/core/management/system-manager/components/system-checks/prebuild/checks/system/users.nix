@@ -71,7 +71,7 @@ let
       fi
     done
 
-    if [ $changes_detected -eq 1 ]; then
+      if [ $changes_detected -eq 1 ]; then
       ${ui.badges.warning "Users: changes detected"}
       if [ -n "$removed_users" ]; then
         echo "  remove:$removed_users"
@@ -85,22 +85,43 @@ let
         exit 1
       fi
 
+      if [ "''${NCC_REMOTE_NONINTERACTIVE:-0}" = "1" ]; then
+        if [ -n "$removed_users" ]; then
+          ${ui.badges.error "Users: would remove users on remote:$removed_users"}
+          exit 1
+        fi
+        ${ui.badges.warning "Users: remote noninteractive — continuing with user adds"}
+      else
       printf "Continue with these user changes? [y/N] "
       read -r response || response=""
       if [[ ! "$response" =~ ^[Yy]$ ]]; then
         ${ui.badges.error "Users: aborted"}
         exit 1
       fi
+      fi
     fi
 
     PASSWORD_DIR="/etc/nixos/secrets/passwords"
     for user in $CONFIGURED_USERS; do
       if [ ! -f "$PASSWORD_DIR/$user/.hashedPassword" ]; then
+        if getent shadow "$user" 2>/dev/null | cut -d: -f2 | grep -q '[^!*]'; then
+          mkdir -p "$PASSWORD_DIR/$user"
+          getent shadow "$user" | cut -d: -f2 > "$PASSWORD_DIR/$user/.hashedPassword"
+          chmod 700 "$PASSWORD_DIR/$user"
+          chmod 600 "$PASSWORD_DIR/$user/.hashedPassword"
+          chown root:root "$PASSWORD_DIR/$user/.hashedPassword" 2>/dev/null || true
+          ${ui.badges.success "Users: copied shadow hash for $user"}
+          continue
+        fi
         users_without_password="$users_without_password $user"
       fi
     done
 
     if [ -n "$users_without_password" ]; then
+      if [ "''${NCC_REMOTE_NONINTERACTIVE:-0}" = "1" ]; then
+        ${ui.badges.error "Users: missing passwords (no shadow hash):$users_without_password"}
+        exit 1
+      fi
       ${ui.badges.warning "Users: missing passwords:$users_without_password"}
       printf "Set missing passwords now? [Y/n] "
       read -r pw_response || pw_response=""

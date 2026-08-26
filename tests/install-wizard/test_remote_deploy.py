@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import shutil
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -14,6 +15,7 @@ def _load_module(name: str, path: Path):
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
+    sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
 
