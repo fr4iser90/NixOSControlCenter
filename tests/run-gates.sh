@@ -3,9 +3,10 @@
 # Agents and CI should get exit 0 from this script.
 #
 # Layout:
-#   validate-ncc-nix.sh     — nixos/ (bash, layer, migrations, wizard packaging, options SSOT)
-#   gui/validate-gui-python.sh — optional GUI smoke (fast; set SKIP_GUI=1 to skip)
+#   validate-ncc-nix.sh          — nixos/ integrity + GUI catalog invariants
+#   gui/validate-gui-python.sh   — GUI Python (required; set SKIP_GUI=1 only in emergencies)
 #
+# Strategy: tests/TESTING.md
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FAIL=0
@@ -31,13 +32,17 @@ if [[ "${SKIP_GUI:-}" != "1" ]]; then
   if command -v python3 >/dev/null 2>&1; then
     run "gui-python" bash "$ROOT/tests/gui/validate-gui-python.sh"
   else
-    echo "SKIP: gui-python (no python3)"
+    echo "FAIL: gui-python required but no python3"
+    FAIL=1
   fi
+else
+  echo "WARN: SKIP_GUI=1 — GUI gate skipped (not for normal commits)"
 fi
 
 echo ""
 if [[ "$FAIL" -ne 0 ]]; then
   echo "GATES FAILED — fix issues above before commit/push/system-update."
+  echo "See tests/TESTING.md"
   exit 1
 fi
 echo "All gates green."

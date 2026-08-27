@@ -393,6 +393,8 @@ in
       group = "features";
     })
     (cliRegistry.registerGuiPage "vm" ./ui/gui)
-    (cliRegistry.registerCommandsFor "vm" allCommands)
+    (lib.mkIf (cfg.enable or false)
+      (cliRegistry.registerCommandsFor "vm" allCommands)
+    )
   ];
 }

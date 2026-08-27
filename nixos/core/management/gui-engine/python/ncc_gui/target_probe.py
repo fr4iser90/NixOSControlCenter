@@ -9,7 +9,8 @@ import re
 import shutil
 import socket
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Mapping
 from pathlib import Path
 
 # Keep in sync with system-manager config-migration schema.currentVersion
@@ -57,6 +58,14 @@ fi
 if [ -z "$HOST" ]; then
   HOST=$(uname -n 2>/dev/null || true)
 fi
+DESKTOP_ENABLE=
+if [ -f /etc/nixos/systemConfig/core/base/desktop/config.nix ]; then
+  DESKTOP_ENABLE=$(sed -n 's/.*enable[[:space:]]*=[[:space:]]*\(true\|false\).*/\1/p' \
+    /etc/nixos/systemConfig/core/base/desktop/config.nix 2>/dev/null | head -1)
+elif [ -f /etc/nixos/systemConfig.nix ]; then
+  _DB=$(awk '/desktop = \{/{flag=1} flag{print} flag && /\};/{exit}' /etc/nixos/systemConfig.nix 2>/dev/null)
+  DESKTOP_ENABLE=$(printf '%s\n' "$_DB" | sed -n 's/.*enable[[:space:]]*=[[:space:]]*\(true\|false\).*/\1/p' | head -1)
+fi
 if [ "$NCC" = 1 ]; then
   RAW=$(ncc system status --json 2>/dev/null || true)
   if [ -n "$RAW" ]; then
@@ -73,6 +82,7 @@ printf 'ncc=%s\n' "$NCC"
 printf 'etc=%s\n' "$ETC"
 printf 'ver=%s\n' "$VER"
 printf 'hostname=%s\n' "$HOST"
+printf 'desktop_enable=%s\n' "$DESKTOP_ENABLE"
 """
 
 
@@ -90,6 +100,8 @@ class TargetProbe:
     ncc_on_path: bool
     etc_nixos_kind: str  # missing | plain | ncc
     config_version: str  # "" if unknown
+    desktop_enable: bool | None = None  # parsed from systemConfig; None = unknown
+    module_enables: Mapping[str, bool] = field(default_factory=dict)
     error: str = ""
     auth_required: bool = False  # SSH up, but key/password auth failed
 
@@ -269,6 +281,8 @@ def probe_local(*, timeout: float = 2.5, invoke_ncc: bool = False) -> TargetProb
                     hostname = host
         except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
             pass
+    enables = _read_module_enables_local()
+    desk = enables.get("desktop")
     return TargetProbe(
         target=None,
         reachable=True,
@@ -280,6 +294,8 @@ def probe_local(*, timeout: float = 2.5, invoke_ncc: bool = False) -> TargetProb
         ncc_on_path=ncc,
         etc_nixos_kind=etc_kind,
         config_version=ver,
+        desktop_enable=desk,
+        module_enables=enables,
     )
 
 
@@ -348,6 +364,24 @@ def _ssh_probe_argv(host: str, *, with_password: bool) -> list[str]:
     return argv
 
 
+def _parse_bool_or_none(raw: str) -> bool | None:
+    s = (raw or "").strip().lower()
+    if s == "true":
+        return True
+    if s == "false":
+        return False
+    return None
+
+
+def _read_module_enables_local() -> dict[str, bool]:
+    from ncc_gui.domain_fs_status import read_module_enables_local
+
+    try:
+        return dict(read_module_enables_local(timeout=2))
+    except Exception:
+        return {}
+
+
 def _failed_probe(host: str, err: str) -> TargetProbe:
     auth = _ssh_error_is_auth(err)
     return TargetProbe(
@@ -361,6 +395,7 @@ def _failed_probe(host: str, err: str) -> TargetProbe:
         ncc_on_path=False,
         etc_nixos_kind="missing",
         config_version="",
+        desktop_enable=None,
         error=(err or "")[:200],
         auth_required=auth,
     )
@@ -400,12 +435,15 @@ def probe_remote(
             env["DISPLAY"] = ":0"
 
     try:
+        from ncc_gui.domain_fs_status import MODULE_ENABLES_SCRIPT
+
+        probe_input = _REMOTE_PROBE_SH + "\n" + MODULE_ENABLES_SCRIPT
         argv = _ssh_probe_argv(host, with_password=use_pw)
         if use_pw and shutil.which("setsid"):
             argv = ["setsid", *argv]
         proc = subprocess.run(
             argv,
-            input=_REMOTE_PROBE_SH,
+            input=probe_input,
             check=False,
             capture_output=True,
             text=True,
@@ -424,6 +462,12 @@ def probe_remote(
         return _failed_probe(host, err)
 
     kv = _parse_kv(proc.stdout or "")
+    from ncc_gui.domain_fs_status import parse_module_enables_stdout
+
+    enables = parse_module_enables_stdout(proc.stdout or "")
+    desk = enables.get("desktop")
+    if desk is None:
+        desk = _parse_bool_or_none(kv.get("desktop_enable", ""))
     os_id = kv.get("os_id") or "unknown"
     is_nixos = os_id == "nixos"
     return TargetProbe(
@@ -437,6 +481,8 @@ def probe_remote(
         ncc_on_path=kv.get("ncc") == "1",
         etc_nixos_kind=kv.get("etc") or "missing",
         config_version=kv.get("ver") or "",
+        desktop_enable=desk,
+        module_enables=enables,
         error="" if proc.returncode == 0 else f"probe rc={proc.returncode}",
         auth_required=False,
     )

@@ -4,7 +4,7 @@ with lib;
 
 let
   ui = getModuleApi "cli-formatter";
-  versionChecker = import ../handlers/module-version-check.nix { inherit config lib; };
+  versionChecker = import ../../module-manager/handlers/module-version-check.nix { inherit config lib; };
   
   # Create the check-versions script
   checkVersionsScript = pkgs.writeShellScriptBin "ncc-check-module-versions" ''

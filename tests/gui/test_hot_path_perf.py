@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock
 
-GUI_PY = Path(__file__).resolve().parent
+GUI_PY = Path(__file__).resolve().parents[2] / "nixos/core/management/gui-engine/python"
 assert (GUI_PY / "ncc_gui" / "scaffold.py").is_file(), GUI_PY
 sys.path.insert(0, str(GUI_PY))
 

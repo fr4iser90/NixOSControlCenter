@@ -16,6 +16,9 @@ _ACTIVITY_MODES = frozenset({"collapsed", "hidden", "open"})
 _DEFAULT: dict = {
     "show_target": True,
     "activity_mode": "collapsed",
+    # When True: hide Features sidebar entries whose module enable is false.
+    # Core domains always stay visible (config manager). Default off.
+    "hide_inactive_features": False,
     # Hosts (user@host) for which we never offer “save SSH key” after password Connect.
     "skip_ssh_key_offer": [],
 }
@@ -31,6 +34,8 @@ def load_chrome_prefs() -> dict:
     out = dict(_DEFAULT)
     if "show_target" in data:
         out["show_target"] = bool(data["show_target"])
+    if "hide_inactive_features" in data:
+        out["hide_inactive_features"] = bool(data["hide_inactive_features"])
     mode = data.get("activity_mode")
     if isinstance(mode, str) and mode.strip() in _ACTIVITY_MODES:
         out["activity_mode"] = mode.strip()
@@ -43,6 +48,9 @@ def load_chrome_prefs() -> dict:
 def save_chrome_prefs(prefs: dict) -> None:
     body = dict(_DEFAULT)
     body["show_target"] = bool(prefs.get("show_target", True))
+    body["hide_inactive_features"] = bool(
+        prefs.get("hide_inactive_features", _DEFAULT["hide_inactive_features"])
+    )
     mode = prefs.get("activity_mode", _DEFAULT["activity_mode"])
     if isinstance(mode, str) and mode.strip() in _ACTIVITY_MODES:
         body["activity_mode"] = mode.strip()
@@ -71,6 +79,16 @@ def show_target_enabled() -> bool:
 def set_show_target(enabled: bool) -> None:
     prefs = load_chrome_prefs()
     prefs["show_target"] = bool(enabled)
+    save_chrome_prefs(prefs)
+
+
+def hide_inactive_features() -> bool:
+    return bool(load_chrome_prefs().get("hide_inactive_features", False))
+
+
+def set_hide_inactive_features(enabled: bool) -> None:
+    prefs = load_chrome_prefs()
+    prefs["hide_inactive_features"] = bool(enabled)
     save_chrome_prefs(prefs)
 
 

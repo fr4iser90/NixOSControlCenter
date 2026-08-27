@@ -20,7 +20,8 @@ from PySide6.QtWidgets import (
 
 from ncc_gui.commit_bar import PendingChange
 from ncc_gui.dialogs import confirm, error
-from ncc_gui.remote import run_ncc
+from ncc_gui.domain_fs_status import read_users_fs
+from ncc_gui.remote import run_ncc, target_from_env
 from ncc_gui.scaffold import DomainPage
 
 ROLES = (
@@ -170,6 +171,20 @@ def _load_users() -> tuple[list[UserRow], str]:
     proc = run_ncc("user", "list", "--json")
     err = ((proc.stderr or "") + (proc.stdout or "")).strip()
     if proc.returncode != 0:
+        fs = read_users_fs(target_from_env())
+        if fs.ok and fs.users:
+            rows = [
+                UserRow(
+                    name=u.name,
+                    role=u.role,
+                    shell=u.shell,
+                    auto_login=u.auto_login,
+                )
+                for u in fs.users
+            ]
+            return rows, ""
+        if fs.ok:
+            return [], ""
         return [], err or "ncc user list failed"
     try:
         data = json.loads(proc.stdout or "[]")

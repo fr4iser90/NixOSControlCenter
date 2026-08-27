@@ -11,6 +11,9 @@
 #   4) auto-detect missing migrations / version bumps (packaging-sensitive deletes)
 #   5) install-wizard packaging + packages catalog (system-update path)
 #   6) staged systemConfig vs module options.nix (wizard write SSOT)
+#   7) static relative import paths exist + nix parse (all nixos/)
+#   8) prebuild module fragments eval (import paths at apply-time)
+#   9) GUI catalog invariants (enable or true, core domain+page, no tests in nixos/)
 #
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,7 +29,7 @@ echo "╚═══════════════════════�
 
 # ── 1) Bash embedding: entire nixos/ ────────────────────────────────────────
 echo ""
-echo "== 1/6  bash-in-nix (all of nixos/) =="
+echo "== 1/9  bash-in-nix (all of nixos/) =="
 if bash "$ROOT/tests/install-wizard/validate-bash-embedding.sh"; then
   pass "validate-bash-embedding.sh (nixos/)"
 else
@@ -35,7 +38,7 @@ fi
 
 # ── 2) Layer: no cross-module relative imports into foreign lib/ ─────────────
 echo ""
-echo "== 2/6  layer: no relative imports into other modules' lib/ =="
+echo "== 2/9  layer: no relative imports into other modules' lib/ =="
 LAYER_OUT=$(mktemp)
 set +e
 python3 - "$NIXOS" "$LAYER_OUT" <<'PY'
@@ -85,7 +88,7 @@ rm -f "$LAYER_OUT"
 
 # ── 3) Module modularity ────────────────────────────────────────────────────
 echo ""
-echo "== 3/6  module layer / modularity =="
+echo "== 3/9  module layer / modularity =="
 if bash "$ROOT/tests/validate-module-layer.sh"; then
   pass "validate-module-layer.sh"
 else
@@ -94,7 +97,7 @@ fi
 
 # ── 4) Auto-detect migrations / version bumps ───────────────────────────────
 echo ""
-echo "== 4/6  module migrations auto-detect =="
+echo "== 4/9  module migrations auto-detect =="
 if bash "$ROOT/tests/validate-module-migrations.sh"; then
   pass "validate-module-migrations.sh"
 else
@@ -103,7 +106,7 @@ fi
 
 # ── 5) Install-wizard packaging ─────────────────────────────────────────────
 echo ""
-echo "== 5/6  install-wizard packaging gate =="
+echo "== 5/9  install-wizard packaging gate =="
 if bash "$ROOT/tests/install-wizard/validate-install-wizard-nix.sh"; then
   pass "validate-install-wizard-nix.sh"
 else
@@ -112,11 +115,38 @@ fi
 
 # ── 6) Wizard writes vs module options.nix ───────────────────────────────────
 echo ""
-echo "== 6/6  systemConfig writes vs options.nix (SSOT) =="
+echo "== 6/9  systemConfig writes vs options.nix (SSOT) =="
 if bash "$ROOT/tests/validate-systemconfig-writes.sh"; then
   pass "validate-systemconfig-writes.sh"
 else
   fail "staged systemConfig violates module options.nix"
+fi
+
+# ── 7) Static relative import paths ──────────────────────────────────────────
+echo ""
+echo "== 7/9  nix import paths + parse (generic) =="
+if bash "$ROOT/tests/validate-nix-import-paths.sh"; then
+  pass "validate-nix-import-paths.sh"
+else
+  fail "broken relative import paths under nixos/"
+fi
+
+# ── 8) Module fragment eval (prebuild checks) ────────────────────────────────
+echo ""
+echo "== 8/9  nix module eval (prebuild fragments) =="
+if bash "$ROOT/tests/validate-nix-module-eval.sh"; then
+  pass "validate-nix-module-eval.sh"
+else
+  fail "prebuild module eval failed (missing import at apply-time)"
+fi
+
+# ── 9) GUI catalog invariants ────────────────────────────────────────────────
+echo ""
+echo "== 9/9  GUI catalog invariants =="
+if bash "$ROOT/tests/validate-gui-catalog.sh"; then
+  pass "validate-gui-catalog.sh"
+else
+  fail "GUI catalog / enable / test-leak invariants"
 fi
 
 echo ""
@@ -126,5 +156,5 @@ if [[ "$FAIL" -ne 0 ]]; then
   echo "Fix issues above, then re-run: bash tests/validate-ncc-nix.sh"
   exit 1
 fi
-echo "OK — bash + layer + modularity + migrations + wizard packaging + options SSOT green."
+echo "OK — bash + layer + modularity + migrations + wizard + options + import paths + module eval + catalog green."
 exit 0

@@ -191,49 +191,51 @@ let
           ncc packages module info docker
       '';
     }
-  ];in
+  ];
+in
 {
-  config = lib.mkIf (cfg.enable or true)
-    (lib.mkMerge [
-      (cliRegistry.registerGuiDomain "packages" {
-        label = "Packages";
-        description = "Package and module package sets";
-        enabled = true;
-        group = "core";
-      })
-      (cliRegistry.registerGuiPage "packages" ./ui/gui)
-      (cliRegistry.registerCommandsFor "packages" (
-        [
-          {
-            name = "packages";
-            domain = "packages";
-            description = "Package management";
-            category = "base";
-            script = "${packagesEntry}/bin/ncc-packages-entry";
-            arguments = [];
-            type = "manager";
-            shortHelp = "packages - Package Management";
-            longHelp = ''
-              Manage packages and module package sets in systemConfig.
+  # Core domain: always in catalog + CLI so GUI can manage packages even if
+  # a host had previously toggled something off (config manager, not viewer).
+  config = lib.mkMerge [
+    (cliRegistry.registerGuiDomain "packages" {
+      label = "Packages";
+      description = "Package and module package sets";
+      enabled = true;
+      group = "core";
+    })
+    (cliRegistry.registerGuiPage "packages" ./ui/gui)
+    (cliRegistry.registerCommandsFor "packages" (
+      [
+        {
+          name = "packages";
+          domain = "packages";
+          description = "Package management";
+          category = "base";
+          script = "${packagesEntry}/bin/ncc-packages-entry";
+          arguments = [];
+          type = "manager";
+          shortHelp = "packages - Package Management";
+          longHelp = ''
+            Manage packages and module package sets in systemConfig.
 
-              Examples:
-                ncc packages                 CLI help
-                ncc packages --gui           Packages GUI
-                ncc packages add firefox
-                ncc packages list --system
-                ncc packages search editor
-                ncc packages module add gaming
-            '';
-          }
-        ]
-        ++ packagesChildren
-      ))
-      {
-        environment.systemPackages = [
-          packagesCli
-          packagesGui.nccPackagesGui
-          packagesEntry
-        ];
-      }
-    ]);
+            Examples:
+              ncc packages                 CLI help
+              ncc packages --gui           Packages GUI
+              ncc packages add firefox
+              ncc packages list --system
+              ncc packages search editor
+              ncc packages module add gaming
+          '';
+        }
+      ]
+      ++ packagesChildren
+    ))
+    {
+      environment.systemPackages = [
+        packagesCli
+        packagesGui.nccPackagesGui
+        packagesEntry
+      ];
+    }
+  ];
 }

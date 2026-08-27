@@ -5,7 +5,7 @@ let
   ui = getModuleApi "cli-formatter";
   facade = import ../../../../../lib/config-facade.nix { inherit pkgs; };
   layout = (getModuleConfig "system-manager").layout or "monolith";
-  preflightRemote = import ../../../../lib/preflight-remote.nix { inherit getModuleApi; };
+  preflightRemote = import ../../../lib/preflight-remote.nix;
 
   prebuildScript = pkgs.writeScriptBin "prebuild-check-platform" ''
     #!${pkgs.bash}/bin/bash

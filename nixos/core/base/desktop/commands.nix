@@ -17,7 +17,7 @@ let
   desktopStatus = pkgs.writeShellScriptBin "ncc-desktop-status" ''
     set -euo pipefail
     cat <<EOF
-enable=${if cfg.enable or true then "true" else "false"}
+enable=${if cfg.enable != false then "true" else "false"}
 environment=${cfg.environment or "plasma"}
 display.manager=${cfg.display.manager or "sddm"}
 display.server=${cfg.display.server or "wayland"}
@@ -79,12 +79,11 @@ in
     (cliRegistry.registerGuiDomain "desktop" {
       label = "Desktop";
       description = "Desktop environment settings";
-      enabled = cfg.enable or true;
+      enabled = cfg.enable != false;
       group = "core";
     })
     (cliRegistry.registerGuiPage "desktop" ./ui/gui)
-    (lib.mkIf (cfg.enable or true)
-      (cliRegistry.registerCommandsFor "desktop" (
+    (cliRegistry.registerCommandsFor "desktop" (
         [
           {
             name = "desktop";
@@ -156,6 +155,5 @@ in
           }
         ]
       ))
-    )
   ];
 }

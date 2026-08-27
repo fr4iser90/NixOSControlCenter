@@ -6,7 +6,7 @@
 let
   # Get APIs
   ui = getModuleApi "cli-formatter";
-  runtimeDiscovery = (import ../lib/runtime_discovery.nix { inherit lib pkgs; }).runtimeDiscovery;
+  runtimeDiscovery = (import ../../lib/runtime_discovery.nix { inherit lib pkgs; }).runtimeDiscovery;
 
   # Create toggle module script
   toggleModuleScript = pkgs.writeScriptBin "toggle-module" ''

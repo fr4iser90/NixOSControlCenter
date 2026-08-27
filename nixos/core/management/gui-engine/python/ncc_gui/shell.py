@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 
 from ncc_gui.branding import app_icon
 from ncc_gui.catalog import DomainInfo
+from ncc_gui.chrome_prefs import hide_inactive_features
 from ncc_gui.reload import generation_bus
 from ncc_gui.shell_state import STICKY_DOMAIN_IDS, ShellChromeState
 from ncc_gui.target_bar import TargetBar
@@ -84,7 +85,8 @@ class NccShell(QMainWindow):
 
         self._build_page = build_page
         self._state = ShellChromeState(domains=list(domains))
-        self._local_enabled = {d.id: d.enabled for d in domains}
+        # Catalog ``enabled`` = module active on the GUI host (cfg.enable at build).
+        self._catalog_active = {d.id: d.enabled for d in domains}
         self._nav_rows: list[_NavRow] = []
         self._current_id: str | None = None
         self._current_page: QWidget | None = None
@@ -123,6 +125,7 @@ class NccShell(QMainWindow):
         self._target = TargetBar(persist=True)
         self._target.targetChanged.connect(self._on_target)
         self._target.chromeChanged.connect(self._on_chrome_prefs)
+        target_bus().chromePrefsChanged.connect(self._on_chrome_prefs)
         session_controller().sessionChanged.connect(self._on_session)
         target_bus().navigate.connect(self._on_navigate)
 
@@ -543,14 +546,18 @@ class NccShell(QMainWindow):
         # Drop parked sticky docs — generation may have new domain page dumps.
         self._drop_sticky()
 
-        self._local_enabled = {d.id: d.enabled for d in self._state.domains}
+        self._catalog_active = {d.id: d.enabled for d in self._state.domains}
         self._rebuild_nav()
         self._apply_nav_for_session(session_controller().session())
 
-        if keep_id and any(
-            i.id == keep_id and self._local_enabled.get(keep_id, False)
-            for i in self._state.domains
-        ):
+        keep_visible = False
+        if keep_id:
+            for i, row in enumerate(self._nav_rows):
+                if row.kind == "domain" and row.info and row.info.id == keep_id:
+                    item = self._nav.item(i)
+                    keep_visible = item is not None and not item.isHidden()
+                    break
+        if keep_id and keep_visible:
             # Remount even if same id — fresh widgets from new catalog paths.
             self._nav.blockSignals(True)
             for i, row in enumerate(self._nav_rows):
@@ -566,32 +573,56 @@ class NccShell(QMainWindow):
             self._select_first_visible()
 
     def _apply_nav_for_session(self, session: TargetSession) -> None:
+        """Project sidebar visibility.
+
+        Rules (config manager):
+        * Core domains: always visible (gate permitting) — enable is a page field.
+        * Feature domains: visible unless Settings → Hide inactive features.
+        * Active/Off badge from Target systemConfig when connected; else catalog.
+        """
         remote = session.connected
         gate = session.state
+        hide_inactive = hide_inactive_features()
 
-        remote_ids: set[str] | None = None
         allow: frozenset[str] | None = None
-
         if remote and gate in _GATE_ALLOW:
             allow = _GATE_ALLOW[gate] | LOCAL_ONLY_DOMAINS
-        elif remote and gate == "ready":
-            remote_ids = None
         elif remote and gate == "connecting":
             allow = LOCAL_ONLY_DOMAINS
 
+        probe = session.probe
+        target_enables: dict[str, bool] = {}
+        if probe is not None and isinstance(probe.module_enables, dict):
+            target_enables = dict(probe.module_enables)
+        elif probe is not None and probe.desktop_enable is not None:
+            target_enables = {"desktop": probe.desktop_enable}
+
+        use_target_active = bool(remote) and gate == "ready" and bool(target_enables)
+
         for info in self._state.domains:
-            local_on = self._local_enabled.get(info.id, False)
-            if info.id in LOCAL_ONLY_DOMAINS:
-                enabled = local_on
-            elif allow is not None:
-                enabled = local_on and info.id in allow
-            elif not remote:
-                enabled = local_on
-            elif remote_ids is None:
-                enabled = local_on
+            catalog_on = self._catalog_active.get(info.id, False)
+            if use_target_active and info.id in target_enables:
+                active = bool(target_enables[info.id])
             else:
-                enabled = info.id in remote_ids
-            info.enabled = enabled
+                active = catalog_on
+
+            # Gate: only allowlisted domains while remote is blocked/install/update.
+            if info.id in LOCAL_ONLY_DOMAINS:
+                # SSH stays local; still respect catalog presence.
+                visible = True
+            elif allow is not None:
+                visible = info.id in allow
+            elif info.group == "core":
+                visible = True
+            elif hide_inactive:
+                visible = active
+            else:
+                visible = True
+
+            info.enabled = visible
+
+            # Stash for badge rendering (not a DomainInfo field).
+            setattr(info, "_active", active)
 
         visible_in_group: dict[str, int] = {"core": 0, "features": 0}
         for i, row in enumerate(self._nav_rows):
@@ -601,19 +632,30 @@ class NccShell(QMainWindow):
             if row.kind == "section":
                 continue
             assert row.info is not None
-            enabled = row.info.enabled
-            item.setHidden(not enabled)
-            if enabled:
+            visible = row.info.enabled
+            active = bool(getattr(row.info, "_active", True))
+            item.setHidden(not visible)
+            if visible:
                 visible_in_group[row.info.group] = (
                     visible_in_group.get(row.info.group, 0) + 1
                 )
-                item.setToolTip("")
+                label = row.info.label
+                if active:
+                    item.setText(f"  {label}")
+                    item.setToolTip("")
+                else:
+                    item.setText(f"  {label} · Off")
+                    where = remote or "this machine"
+                    item.setToolTip(
+                        f"{label} disabled on {where} (systemConfig) — "
+                        "open to review or enable"
+                    )
             elif remote and allow is not None:
+                item.setText(f"  {row.info.label}")
                 item.setToolTip(f"Connect / unlock on {remote} first")
-            elif remote and remote_ids is not None:
-                item.setToolTip(f"Not on {remote}")
             else:
-                item.setToolTip(f"Not enabled locally (“{row.info.id}”)")
+                item.setText(f"  {row.info.label}")
+                item.setToolTip(f"Hidden (“{row.info.id}”)")
 
         for i, row in enumerate(self._nav_rows):
             if row.kind != "section":

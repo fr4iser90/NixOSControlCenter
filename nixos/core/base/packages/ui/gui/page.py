@@ -342,6 +342,12 @@ def load_catalog() -> dict:
     catalog = _catalog_path()
     if catalog.suffix == ".json" and catalog.is_file():
         return json.loads(catalog.read_text(encoding="utf-8"))
+    if not catalog.is_file():
+        raise RuntimeError(
+            f"Packages catalog not found:\n{catalog}\n\n"
+            "Set NIXOS_DIR to your NCC nixos tree, or run system-update so "
+            "/etc/nixos contains core/base/packages/lib/catalog.nix."
+        )
     expr = f"(import {catalog} {{}})"
     # Prefer full JSON builder next to catalog.nix when present
     mk = catalog.parent / "mk-catalog-json.nix"

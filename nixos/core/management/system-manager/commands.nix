@@ -14,7 +14,7 @@ let
   # For components: pass configPath; they MUST read via
   # lib.attrByPath (lib.splitString "." configPath) {} systemConfig
   # or getModuleConfig — NEVER systemConfig.${configPath}
-  versionChecker = import ./handlers/module-version-check.nix { inherit config lib; };
+  versionChecker = import ../module-manager/handlers/module-version-check.nix { inherit config lib; };
   checkVersions = import ./scripts/check-versions.nix { inherit config lib pkgs getModuleApi; };
   updateModules = import ./scripts/update-modules.nix { inherit config lib pkgs getModuleApi; };
   
@@ -418,7 +418,7 @@ in {
       }
       ]))
     # System Checks Commands (enabled by default in core, but configurable)
-    (lib.mkIf (cfg.enableChecks or true)
+    (lib.mkIf (cfg.enableChecks != false)
       (cliRegistry.registerCommandsFor "system-checks" [
         # Subcommand: build
         {

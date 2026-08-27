@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFormLayout,
     QLabel,
@@ -10,7 +11,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ncc_gui.chrome_prefs import activity_mode, load_chrome_prefs, set_activity_mode
+from ncc_gui.chrome_prefs import (
+    activity_mode,
+    hide_inactive_features,
+    load_chrome_prefs,
+    set_activity_mode,
+    set_hide_inactive_features,
+)
 from ncc_gui.settings.protocol import SettingsTabSpec
 from ncc_gui.settings.safety_tab import safety_settings_tab
 from ncc_gui.theme import APP_STYLE
@@ -41,9 +48,20 @@ class _GeneralPage(QWidget):
             "Hidden: panel gone until Log. Open: always visible."
         )
         form.addRow("Command log (Activity)", self.activity_mode)
+
+        self.hide_inactive = QCheckBox("Hide inactive features")
+        self.hide_inactive.setChecked(hide_inactive_features())
+        self.hide_inactive.setToolTip(
+            "When checked, Features with module enable=false are hidden from the "
+            "sidebar. Core domains (Desktop, Network, …) always stay visible so "
+            "you can turn them on. Default: off (config manager)."
+        )
+        form.addRow("Sidebar", self.hide_inactive)
         lay.addLayout(form)
         note = QLabel(
-            "Pages without an Activity log (read-only tools) ignore this setting."
+            "Core stays visible even when disabled (values come from the "
+            "current target’s systemConfig). Inactive features show “· Off” "
+            "unless you hide them here."
         )
         note.setObjectName("nccPageSubtitle")
         note.setWordWrap(True)
@@ -52,13 +70,18 @@ class _GeneralPage(QWidget):
 
     def collect(self) -> dict:
         mode = self.activity_mode.currentData()
-        return {"activity_mode": mode if isinstance(mode, str) else "collapsed"}
+        return {
+            "activity_mode": mode if isinstance(mode, str) else "collapsed",
+            "hide_inactive_features": self.hide_inactive.isChecked(),
+        }
 
 
 def _apply_general(data: dict) -> None:
     mode = data.get("activity_mode")
     if isinstance(mode, str):
         set_activity_mode(mode)
+    if "hide_inactive_features" in data:
+        set_hide_inactive_features(bool(data["hide_inactive_features"]))
 
 
 def core_settings_tabs(*, enabled_domains: set[str] | None = None) -> list[SettingsTabSpec]:

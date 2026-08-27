@@ -64,8 +64,8 @@ in
       group = "core";
     })
     (cliRegistry.registerGuiPage "user" ./ui/gui)
-    (lib.mkIf (cfg.enable or true)
-      (cliRegistry.registerCommandsFor "user" (
+    # Core: commands always registered (config manager — never drop Users CLI).
+    (cliRegistry.registerCommandsFor "user" (
         [
           {
             name = "user";
@@ -204,6 +204,5 @@ in
           }
         ]
       ))
-    )
   ];
 }

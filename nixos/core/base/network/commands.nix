@@ -68,12 +68,12 @@ in
     (cliRegistry.registerGuiDomain "network" {
       label = "Network";
       description = "Network and WiFi";
-      enabled = cfg.enable or true;
+      enabled = cfg.enable != false;
       group = "core";
     })
     (cliRegistry.registerGuiPage "network" ./ui/gui)
-    (lib.mkIf (cfg.enable or true) (
-    cliRegistry.registerCommandsFor "network" (
+    # Core: commands always registered so GUI can manage / re-enable when off.
+    (cliRegistry.registerCommandsFor "network" (
       [
         {
           name = "network";
@@ -165,7 +165,6 @@ in
           '';
         }
       ]
-    )
     ))
   ];
 }

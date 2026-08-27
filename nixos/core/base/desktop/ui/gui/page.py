@@ -5,7 +5,8 @@ from __future__ import annotations
 from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel
 
 from ncc_gui.commit_bar import PendingChange
-from ncc_gui.remote import run_ncc
+from ncc_gui.domain_fs_status import read_desktop_fs
+from ncc_gui.remote import run_ncc, target_from_env
 from ncc_gui.scaffold import DomainPage
 
 _DESKTOP_OP = "desktop-set"
@@ -37,7 +38,7 @@ class DesktopPage(DomainPage):
             parent=parent,
         )
         self._live: dict[str, str] = {
-            "enable": "true",
+            "enable": "false",
             "environment": "plasma",
             "manager": "sddm",
             "server": "wayland",
@@ -80,7 +81,7 @@ class DesktopPage(DomainPage):
         form.addRow("Theme", self.dark)
 
         self.enable = QCheckBox("Desktop module enabled")
-        self.enable.setChecked(True)
+        self.enable.setChecked(False)
         form.addRow("", self.enable)
 
         self.draft_lbl = QLabel("")
@@ -128,7 +129,7 @@ class DesktopPage(DomainPage):
             self._set_combo(self.manager, snap.get("manager", "sddm"))
             self._set_combo(self.server, snap.get("server", "wayland"))
             self._set_combo(self.dark, snap.get("dark", "true"))
-            self.enable.setChecked(snap.get("enable", "true") == "true")
+            self.enable.setChecked(snap.get("enable", "false") == "true")
         finally:
             self._loading = False
 
@@ -220,24 +221,45 @@ class DesktopPage(DomainPage):
                 "Draft settings (not written yet) — Save / Undo, then Apply."
             )
 
-    def reload(self) -> None:
-        proc = run_ncc("desktop", "status")
-        kv = _parse_kv(proc.stdout or "")
-        self._live = {
-            "enable": kv.get("enable", "true"),
+    def _snap_from_ncc_kv(self, kv: dict[str, str]) -> dict[str, str] | None:
+        if not kv or "enable" not in kv:
+            return None
+        return {
+            "enable": kv.get("enable", "false"),
             "environment": kv.get("environment", "plasma"),
             "manager": kv.get("display.manager", "sddm"),
             "server": kv.get("display.server", "wayland"),
             "dark": "true" if kv.get("theme.dark", "true") == "true" else "false",
         }
+
+    def reload(self) -> None:
+        proc = run_ncc("desktop", "status")
+        kv = _parse_kv(proc.stdout or "")
+        snap = self._snap_from_ncc_kv(kv)
+        source = "ncc desktop status"
+        if proc.returncode != 0 or snap is None:
+            fs = read_desktop_fs(target_from_env())
+            if fs.ok:
+                snap = fs.as_snapshot()
+                source = "systemConfig on target"
+            elif snap is None:
+                snap = dict(self._live)
         if proc.returncode != 0:
             from ncc_gui.ansi import strip_ansi
 
-            self.log_append(
-                "• Reload failed\n"
-                + strip_ansi(((proc.stdout or "") + (proc.stderr or "")).strip())
-                + "\n"
-            )
+            detail = strip_ansi(((proc.stdout or "") + (proc.stderr or "")).strip())
+            if snap is not None and source != "ncc desktop status":
+                self.log_append(
+                    f"• Reload: {source} (ncc desktop unavailable)\n"
+                    + (f"  {detail}\n" if detail else "")
+                )
+            else:
+                self.log_append(
+                    "• Reload failed\n" + (detail + "\n" if detail else "")
+                )
+        elif source != "ncc desktop status":
+            self.log_append(f"• Reload: {source}\n")
+        self._live = snap
         # Keep draft if present; otherwise show live
         ch = self._pending_desktop()
         if ch is not None and isinstance(ch.meta.get("snapshot"), dict):

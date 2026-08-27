@@ -15,7 +15,8 @@ from PySide6.QtWidgets import (
 
 from ncc_gui.commit_bar import PendingChange
 from ncc_gui.dialogs import error
-from ncc_gui.remote import run_ncc
+from ncc_gui.domain_fs_status import read_hardware_fs
+from ncc_gui.remote import run_ncc, target_from_env
 from ncc_gui.scaffold import DomainPage
 
 _OP = "hardware-autodetect"
@@ -25,6 +26,16 @@ def _load_status() -> tuple[dict, str]:
     proc = run_ncc("hardware", "status", "--json")
     err = ((proc.stderr or "") + (proc.stdout or "")).strip()
     if proc.returncode != 0:
+        fs = read_hardware_fs(target_from_env())
+        if fs.ok:
+            return {
+                "configured": fs.as_configured(),
+                "detected": {},
+                "match": {},
+                "probed": {},
+                "autoDetect": True,
+                "_source": "systemConfig",
+            }, ""
         return {}, err or "ncc hardware status failed"
     try:
         data = json.loads(proc.stdout or "{}")
@@ -201,7 +212,13 @@ class HardwarePage(DomainPage):
 
         if pending is None:
             self.auto_badge.setText("On" if self._live_auto else "Off")
-            self.hint.setText("Showing live settings (probe refreshed with status).")
+            if self._status.get("_source") == "systemConfig":
+                self.hint.setText(
+                    "Configured from systemConfig (ncc hardware status unavailable). "
+                    "Detection/probe empty until CLI works on target."
+                )
+            else:
+                self.hint.setText("Showing live settings (probe refreshed with status).")
         else:
             self.auto_badge.setText(
                 ("On" if pending else "Off") + " · pending"

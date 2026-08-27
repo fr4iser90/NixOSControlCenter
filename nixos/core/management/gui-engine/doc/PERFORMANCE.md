@@ -72,8 +72,8 @@ Prove hot paths with unit/AST tests (no live rebuild / no real HTTP):
 | Concern | Test location |
 |---------|----------------|
 | Chat switch must not call `list_models` | `ncc-assistant/.../tests/test_chat_switch_blocks_on_list_models.py` |
-| Soft reload visibility / chrome-document + activity cap | `gui-engine/python/test_hot_path_perf.py` |
-| Generation soft vs hard | `gui-engine/python/test_reload_generation.py` |
+| Soft reload visibility / chrome-document + activity cap | `tests/gui/test_hot_path_perf.py` |
+| Generation soft vs hard | `tests/gui/test_reload_generation.py` |
 
 When adding a new sync network or CLI call on a switch/nav/construct path, add a test that **fails if that call runs**.
 

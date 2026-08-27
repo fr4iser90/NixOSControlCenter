@@ -69,12 +69,11 @@ in
     (cliRegistry.registerGuiDomain "hardware" {
       label = "Hardware";
       description = "CPU, GPU, RAM and auto-detection";
-      enabled = cfg.enable or true;
+      enabled = true;
       group = "core";
     })
     (cliRegistry.registerGuiPage "hardware" ./ui/gui)
-    (lib.mkIf (cfg.enable or true) (
-      cliRegistry.registerCommandsFor "hardware" [
+    (cliRegistry.registerCommandsFor "hardware" [
         {
           name = "hardware";
           domain = "hardware";
@@ -127,6 +126,6 @@ in
           '';
         }
       ]
-    ))
+    )
   ];
 }

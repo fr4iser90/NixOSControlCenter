@@ -3,7 +3,7 @@
 let
   ui = getModuleApi "cli-formatter";
   hw = import ../../../../../lib/hardware-config-writer.nix { inherit pkgs lib systemConfig getModuleConfig; };
-  preflightRemote = import ../../../../lib/preflight-remote.nix { inherit getModuleApi; };
+  preflightRemote = import ../../../lib/preflight-remote.nix;
 
   prebuildScript = pkgs.writeScriptBin "prebuild-check-cpu" ''
     #!${pkgs.bash}/bin/bash

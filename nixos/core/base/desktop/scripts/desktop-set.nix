@@ -7,7 +7,7 @@ let
   };
   cfg = getModuleConfig moduleName;
 
-  defEnable = if cfg.enable or true then "true" else "false";
+  defEnable = if cfg.enable != false then "true" else "false";
   defEnv = cfg.environment or "plasma";
   defMgr = cfg.display.manager or "sddm";
   defServer = cfg.display.server or "wayland";

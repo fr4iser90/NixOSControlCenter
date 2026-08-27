@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
 )
 
 from ncc_gui.dialogs import confirm, error, info
+from ncc_gui.domain_fs_status import read_network_fs
+from ncc_gui.remote import target_from_env
 from ncc_gui.scaffold import DomainPage
 
 
@@ -135,7 +137,42 @@ class NetworkPage(DomainPage):
         proc = self.run_ncc("network", "status", "--json", log=False, show_error=False)
         raw = (proc.stdout or "").strip()
         if proc.returncode != 0 or not raw:
-            error(self, "Network", (proc.stderr or proc.stdout or "status failed").strip())
+            fs = read_network_fs(target_from_env())
+            if fs.ok:
+                self.ov_online.setText("—")
+                self.ov_host.setText(fs.hostname or "—")
+                en = (
+                    "enabled"
+                    if fs.enable is True
+                    else "disabled"
+                    if fs.enable is False
+                    else "—"
+                )
+                wifi = (
+                    f"wifi={fs.wifi_enable}"
+                    if fs.wifi_enable is not None
+                    else "wifi=—"
+                )
+                self.ov_summary.setText(
+                    f"Config only ({en}, {wifi}) — live status unavailable"
+                )
+                self.eth_box.setVisible(False)
+                self.wifi_box.setVisible(False)
+                self._wifi_present = False
+                self._eth_present = False
+                self._wifi_radio_on = False
+                self._sync_actions()
+                detail = ((proc.stderr or "") + (proc.stdout or "")).strip()
+                self.log_append(
+                    "• Reload: systemConfig on target (ncc network unavailable)\n"
+                    + (f"  {detail}\n" if detail else "")
+                )
+                return
+            error(
+                self,
+                "Network",
+                (proc.stderr or proc.stdout or "status failed").strip(),
+            )
             return
         try:
             data = json.loads(raw)

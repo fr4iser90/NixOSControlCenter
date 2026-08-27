@@ -1,11 +1,7 @@
 # Shared remote/compare preflight helpers for prebuild-check-* (SSOT).
-{ getModuleApi }:
-
-let
-  ui = getModuleApi "cli-formatter";
-in
 {
   # Inject into prebuild-check-{platform,cpu,gpu,memory} after CONFIGURED + DETECTED are set.
+  # Plain echo — messages use bash vars (must not use ui.badges with ''${label} at Nix eval time).
   bashHelpers = ''
     # NCC_PREFLIGHT_MODE: heal (default, local update) | compare (remote install — no writes)
     _ncc_preflight_is_compare() {
@@ -17,18 +13,18 @@ in
       local label="$1" configured="$2" detected="$3"
       _ncc_preflight_is_compare || return 0
       if [ -z "$configured" ]; then
-        ${ui.badges.error "''${label}: unset in systemConfig (remote compare)"}
+        echo "ERROR: ''${label}: unset in systemConfig (remote compare)" >&2
         exit 1
       fi
       if [ -z "$detected" ] || [ "$detected" = "unknown" ]; then
-        ${ui.badges.error "''${label}: could not detect live value (configured=$configured)"}
+        echo "ERROR: ''${label}: could not detect live value (configured=''${configured})" >&2
         exit 1
       fi
       if [ "$detected" != "$configured" ]; then
-        ${ui.badges.error "''${label}: systemConfig=$configured live=$detected"}
+        echo "ERROR: ''${label}: systemConfig=''${configured} live=''${detected}" >&2
         exit 1
       fi
-      ${ui.badges.success "''${label}: $detected"}
+      echo "OK: ''${label}: ''${detected}"
       exit 0
     }
   '';

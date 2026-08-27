@@ -29,10 +29,16 @@ def _discover_page_files() -> list[Path]:
 def _load_page_module(path: Path):
     rel = path.relative_to(NIXOS)
     mod_name = "ncc_page_" + "_".join(rel.parts).replace(".", "_").replace("-", "_")
+    # Sibling imports (intent_store, preflight, …) live next to page.py
+    sibling = str(path.parent)
+    if sibling not in sys.path:
+        sys.path.insert(0, sibling)
     spec = importlib.util.spec_from_file_location(mod_name, path)
     if spec is None or spec.loader is None:
         raise ImportError(f"cannot load {path}")
     mod = importlib.util.module_from_spec(spec)
+    # dataclasses need the module registered before exec_module
+    sys.modules[mod_name] = mod
     spec.loader.exec_module(mod)
     return mod
 
@@ -59,6 +65,26 @@ class DomainPagesSmoke(unittest.TestCase):
             "NCC_HOST_POLICY", '{"dangerousIgnore":false,"autoBuild":false}'
         )
         os.environ.setdefault("NCC_GUI_CATALOG", "[]")
+        # Point packages/catalog at the *repo* tree — never live /etc/nixos in tests.
+        os.environ["NIXOS_DIR"] = str(NIXOS)
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        # Avoid modal error popups during create_page() (catalog / remote / ncc misses).
+        import ncc_gui.dialogs as dialogs
+
+        cls._orig_error = dialogs.error
+        dialogs.error = lambda *a, **k: None  # type: ignore[assignment]
+        dialogs.info = lambda *a, **k: None  # type: ignore[assignment]
+        dialogs.confirm = lambda *a, **k: False  # type: ignore[assignment]
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        try:
+            import ncc_gui.dialogs as dialogs
+
+            if getattr(cls, "_orig_error", None) is not None:
+                dialogs.error = cls._orig_error
+        except Exception:
+            pass
 
     def test_assistant_chat_page_ast_has_confirm_handler(self) -> None:
         """Regression: ChatPage must define on_confirm_request (no Qt needed)."""

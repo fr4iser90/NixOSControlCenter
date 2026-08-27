@@ -58,9 +58,9 @@ in
     (cliRegistry.registerGuiDomain "chronicle" {
       label = "Chronicle";
       description = "Record and review workflows";
-      enabled = cfg.enable or true;
+      enabled = cfg.enable or false;
       group = "features";
     })
-    registrationResult
+    (mkIf (cfg.enable or false) registrationResult)
   ];
 }

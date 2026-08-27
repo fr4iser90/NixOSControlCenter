@@ -10,10 +10,14 @@ alwaysApply: true
 Run and get **exit 0**:
 
 ```bash
-bash tests/validate-ncc-nix.sh
+bash tests/run-gates.sh
 ```
 
-Still small (~seconds). **Do this before every local/remote update** that deploys `nixos/` changes. Do not skip “because it’s only a small edit.”
+(Or at minimum `bash tests/validate-ncc-nix.sh` — catalog invariants included.)
+
+Strategy: `tests/TESTING.md`. Tests live only under `tests/` — never under `nixos/` (would deploy).
+
+Still small (~seconds–tens). **Do this before every local/remote update** that deploys `nixos/` changes. Do not skip “because it’s only a small edit.”
 
 **Forbidden:** telling the user to `ncc system-update` / claiming “validated” if this did not exit 0 **in this turn**.
 

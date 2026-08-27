@@ -14,8 +14,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-# Workspace gui-engine first
-GUI_PY = Path(__file__).resolve().parent
+# Workspace gui-engine first (tests live under tests/gui/, code under nixos/)
+GUI_PY = Path(__file__).resolve().parents[2] / "nixos/core/management/gui-engine/python"
 assert (GUI_PY / "ncc_gui" / "reload.py").is_file(), GUI_PY
 sys.path.insert(0, str(GUI_PY))
 

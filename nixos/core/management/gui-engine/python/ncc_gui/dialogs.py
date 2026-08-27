@@ -32,24 +32,43 @@ def error(
     details: str | None = None,
     copy_text: str | None = None,
 ) -> None:
-    """Show an error dialog with OK + Copy (clipboard gets full diagnostic)."""
+    """Show an error dialog with OK + Copy (clipboard gets full diagnostic).
+
+    Copy sets the clipboard *on click* (before the dialog tears down) so
+    Wayland/X11 clipboard managers still receive the payload.
+    """
+    from PySide6.QtGui import QClipboard
+
     box = QMessageBox(parent)
     box.setIcon(QMessageBox.Icon.Critical)
     box.setWindowTitle(title)
     box.setText(text)
     detail = (details or "").strip()
     if detail:
-        # Keep detailedText for expand; also used as copy payload fallback.
         box.setDetailedText(detail)
     payload = (copy_text or detail or text).strip()
     copy_btn = box.addButton("Copy", QMessageBox.ButtonRole.ActionRole)
     box.addButton(QMessageBox.StandardButton.Ok)
     box.setDefaultButton(QMessageBox.StandardButton.Ok)
-    box.exec()
-    if box.clickedButton() is copy_btn and payload:
+
+    def _copy_to_clipboard(_checked: bool = False) -> None:
+        if not payload:
+            return
         clip = QGuiApplication.clipboard()
-        if clip is not None:
-            clip.setText(payload)
+        if clip is None:
+            return
+        clip.setText(payload, QClipboard.Mode.Clipboard)
+        # X11 middle-click paste
+        try:
+            clip.setText(payload, QClipboard.Mode.Selection)
+        except Exception:
+            pass
+
+    copy_btn.clicked.connect(_copy_to_clipboard)
+    box.exec()
+    # Fallback if clickedButton identity differs across Qt builds
+    if box.clickedButton() is copy_btn:
+        _copy_to_clipboard()
 
 
 def confirm_rebuild(parent: QWidget | None, summary: str) -> bool:
