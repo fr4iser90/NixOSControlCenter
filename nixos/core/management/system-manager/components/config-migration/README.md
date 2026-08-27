@@ -444,4 +444,4 @@ This system enables:
 
 ## Documentation
 
-CLI contract: [CLI.md](./CLI.md)
+CLI contract: [cli.md](./doc/cli.md)

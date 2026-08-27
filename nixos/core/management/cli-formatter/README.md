@@ -18,13 +18,13 @@ The CLI Formatter module is a **core module** that is always active and provides
 ## Documentation
 
 For detailed documentation, see:
-- [Architecture](./doc/ARCHITECTURE.md) - System architecture and design decisions
-- [Usage Guide](./doc/USAGE.md) - Detailed usage examples and best practices
-- [API Reference](./doc/API.md) - Complete API documentation
-- [Standards](./doc/STANDARDS.md) - What to offer, how update/other CLIs must look, audit
-- [Copy rules](./doc/COPY.md) - GUI vs CLI vs `--verbose` wording
-- [CLI.md](./CLI.md) - This module’s CLI contract
-- Template for other modules: [CLI.md.template](./doc/CLI.md.template)
+- [Architecture](./doc/architecture.md) - System architecture and design decisions
+- [Usage Guide](./doc/usage.md) - Detailed usage examples and best practices
+- [API Reference](./doc/api.md) - Complete API documentation
+- [Standards](./doc/standards.md) - What to offer, how update/other CLIs must look, audit
+- [Copy rules](./doc/copy.md) - GUI vs CLI vs `--verbose` wording
+- [cli.md](./doc/cli.md) - This module’s CLI contract
+- Template for other modules: [cli.md.template](./doc/cli.md.template)
 
 Audit: `bash tests/cli-formatter/validate-cli.sh`  
 Manual vs auto: [tests/cli-formatter/MANUAL.md](../../../../tests/cli-formatter/MANUAL.md)

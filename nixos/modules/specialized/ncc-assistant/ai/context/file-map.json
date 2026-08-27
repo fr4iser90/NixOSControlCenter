@@ -4,7 +4,7 @@
   "root": {
     "flake.nix": "nixos/flake.nix — Flake entry point, imports config-loader",
     "shell.nix": "shell.nix — Dev shell entry point",
-    "AI_KNOWLEDGE.md": "AI_KNOWLEDGE.md — Source AI knowledge (302 lines, keep as reference)",
+    "ai-knowledge.md": "ai-knowledge.md — Source AI knowledge (302 lines, keep as reference)",
     ".gitignore": ".gitignore — Git ignore rules"
   },
   "systemManager": {

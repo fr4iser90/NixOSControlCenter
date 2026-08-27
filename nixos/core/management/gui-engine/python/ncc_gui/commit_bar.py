@@ -1,7 +1,7 @@
 """Commit bar — pending changes → Save / Undo → Apply → optional rebuild.
 
 Used by every ``DomainPage``. Domain pages stage changes; they must not
-write config until ``Apply``. See doc/GUI-DESIGN.md (§ Commit bar).
+write config until ``Apply``. See doc/gui-design.md (§ Commit bar).
 """
 
 from __future__ import annotations

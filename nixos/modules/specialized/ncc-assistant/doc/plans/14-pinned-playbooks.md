@@ -1,9 +1,9 @@
 # Phase 14 — Pinned prompts / playbooks
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned (backlog)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 2 (agent), phase 3 (jobs)  
 **Related:** [10-config-drift-health.md](./10-config-drift-health.md), [18-safe-tool-profiles.md](./18-safe-tool-profiles.md)
 

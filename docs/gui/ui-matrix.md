@@ -42,8 +42,8 @@ Legend: `✓` present · `~` partial / empty stub · `—` none
 
 ## GUI design
 
-- Page scaffold: `nixos/core/management/gui-engine/doc/PAGE-TEMPLATE.md`
-- Design / perf: `gui-engine/doc/GUI-DESIGN.md`, `PERFORMANCE.md`
+- Page scaffold: `nixos/core/management/gui-engine/doc/page-template.md`
+- Design / perf: `gui-engine/doc/gui-design.md`, `performance.md`
 
 ## TUI notes
 

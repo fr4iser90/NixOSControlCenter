@@ -1,9 +1,9 @@
 # Phase 5 — UI integration
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phases 1–4 for full IA; **can stub navigation early**  
 **Toolkit:** Qt6 / PySide6 (Plasma-friendly), existing `gui.py`
 

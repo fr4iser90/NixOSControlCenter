@@ -1,9 +1,9 @@
 # Phase 16 — Visible budgets
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned (backlog)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 2–3, phase 7  
 **Related:** [02-agent-mode.md](./02-agent-mode.md)
 

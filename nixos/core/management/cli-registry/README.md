@@ -18,10 +18,10 @@ The CLI Registry module is a **core module** that is always active and manages a
 ## Documentation
 
 For detailed documentation, see:
-- [Usage Guide](./doc/USAGE.md) — includes CLI schema checklist
-- [Architecture](./doc/ARCHITECTURE.md) - System architecture and design decisions
-- [API Reference](./doc/API.md) - Complete API documentation
-- Canonical schema: [`../nixos-control-center/doc/CLI-SCHEMA.md`](../nixos-control-center/doc/CLI-SCHEMA.md)
+- [Usage Guide](./doc/usage.md) — includes CLI schema checklist
+- [Architecture](./doc/architecture.md) - System architecture and design decisions
+- [API Reference](./doc/api.md) - Complete API documentation
+- Canonical schema: [`../nixos-control-center/doc/cli-schema.md`](../nixos-control-center/doc/cli-schema.md)
 
 ## Related Components
 

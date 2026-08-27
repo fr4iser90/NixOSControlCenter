@@ -4,5 +4,5 @@ Outbound SSH connection manager (`ncc ssh client`): hosts, keys, and connection 
 
 ## Documentation
 
-- CLI contract: [CLI.md](./CLI.md)
+- CLI contract: [cli.md](./doc/cli.md)
 - Parent module: [../README.md](../README.md)

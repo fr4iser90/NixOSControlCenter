@@ -4,6 +4,6 @@ AI assistant for NixOS Control Center (`ncc ai` / `ncc-assistant`): chat, agent 
 
 ## Documentation
 
-- CLI contract: [CLI.md](./CLI.md)
-- Usage: [doc/USAGE.md](./doc/USAGE.md)
-- Roadmap: [doc/ROADMAP.md](./doc/ROADMAP.md)
+- CLI contract: [cli.md](./doc/cli.md)
+- Usage: [doc/usage.md](./doc/usage.md)
+- Roadmap: [doc/roadmap.md](./doc/roadmap.md)

@@ -1,9 +1,9 @@
 # Phase 6 — Hardening & audit
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 2 (+ 4 for schedule-specific rules)
 
 ## Problem

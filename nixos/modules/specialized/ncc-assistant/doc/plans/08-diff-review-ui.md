@@ -1,9 +1,9 @@
 # Phase 8 — Diff-Review UI
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned (backlog)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 1–2 (propose/apply tools), phase 5 (GUI shell)  
 **Related:** [09-rollback-assistant.md](./09-rollback-assistant.md)
 

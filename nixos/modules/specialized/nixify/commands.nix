@@ -234,7 +234,7 @@ Examples:
   ncc nixify build-iso plasma6
   ncc nixify build-iso gnome --force-rebuild
 
-See: doc/NIXIFY_ARCHITECTURE.md
+See: doc/nixify-architecture.md
 EOF
         exit 0
         ;;
@@ -270,7 +270,7 @@ in
             ncc nixify download <id>     # Download config/ISO
           
           For detailed documentation, see:
-          - doc/NIXIFY_ARCHITECTURE.md
+          - doc/nixify-architecture.md
           - doc/NIXIFY_WORKFLOW.md
         '';
       }

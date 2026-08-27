@@ -51,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 1. ✅ **DONE**: Fix modules.conf - wird im Live-System unter `/etc/calamares/modules.conf` verfügbar sein
 2. ✅ **DONE**: Create Module Symlinks - Symlinks von `/usr/lib/calamares/modules/` zu Store-Pfaden
 3. 🔄 **IN PROGRESS**: Test Module Loading - Calamares Module-Loading auf Live-ISO testen
-4. ⏳ **TODO**: Document Solution - Lösung in PROBLEMS.md dokumentieren
+4. ⏳ **TODO**: Document Solution - Lösung in problems.md dokumentieren
 
 ### Work in Progress
 - **ISO Builder**: ~90% complete (Module-Loading fehlt)
@@ -80,11 +80,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 - README.md - Quick Start Guide
-- doc/MIGRATION_SERVICE_ARCHITECTURE.md - Complete architecture overview
+- doc/MIGRATION_SERVICE_architecture.md - Complete architecture overview
 - doc/MIGRATION_SERVICE_STRUCTURE.md - Repository structure decision
 - doc/MIGRATION_SERVICE_WORKFLOW.md - Detailed workflow explanation
-- doc/MODULE_STRUCTURE_ANALYSIS.md - Structure analysis vs MODULE_TEMPLATE
-- doc/DOCUMENTATION_CHECKLIST.md - Documentation completeness checklist
+- doc/module-structure-analysis.md - Structure analysis vs MODULE_TEMPLATE
+- doc/documentation-checklist.md - Documentation completeness checklist
 
 ### Status
 - **Phase:** Planning & Documentation ✅

@@ -19,7 +19,7 @@ Registration: `cli-registry` + each module’s `commands.nix`.
 | `modules` | `core/management/module-manager` | enable/discover modules |
 | `install` | `core/management/install-wizard` | guided install (also nix-shell) |
 
-Exact verb names: run `ncc` / `ncc <domain>` or read that module’s `CLI.md`.
+Exact verb names: run `ncc` / `ncc <domain>` or read that module’s `cli.md`.
 
 ## Feature domains (optional modules)
 

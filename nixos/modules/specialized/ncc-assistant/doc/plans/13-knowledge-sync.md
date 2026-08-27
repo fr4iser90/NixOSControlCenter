@@ -1,9 +1,9 @@
 # Phase 13 — Knowledge sync (GUI)
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned (backlog)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** packaged knowledge under module; optional repo generators  
 **Related:** [10-config-drift-health.md](./10-config-drift-health.md), [26-eval-harness.md](./26-eval-harness.md)
 

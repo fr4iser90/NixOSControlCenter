@@ -34,7 +34,7 @@ If OpenSSH is on and `network.services.ssh` is unset, port 22 is opened publicly
 
 ## Documentation
 
-CLI contract: [CLI.md](./CLI.md) · client: [client/CLI.md](./client/CLI.md)
+CLI contract: [cli.md](./doc/cli.md) · client: [client/doc/cli.md](./client/doc/cli.md)
 
 ## Related
 

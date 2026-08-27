@@ -33,7 +33,7 @@ No long-lived aliases as the end state — domains own verbs.
 
 1. Move it under the owning module’s `commands.nix`
 2. Register through cli-registry
-3. Update that module’s `CLI.md`
+3. Update that module’s `cli.md`
 4. Run `bash tests/run-gates.sh`
 
 ## Original plan text

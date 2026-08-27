@@ -1,9 +1,9 @@
 # Phase 18 — Safe tool profiles
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned (backlog)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 1 (registry), phase 2 (agent)  
 **Related:** [11-preflight-as-tool.md](./11-preflight-as-tool.md), [14-pinned-playbooks.md](./14-pinned-playbooks.md)
 

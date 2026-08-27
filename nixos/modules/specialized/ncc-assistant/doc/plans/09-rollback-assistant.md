@@ -1,9 +1,9 @@
 # Phase 9 — Rollback assistant
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned (backlog)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 2–3; system-manager backups / generations  
 **Related:** [08-diff-review-ui.md](./08-diff-review-ui.md)
 

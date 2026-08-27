@@ -9,7 +9,7 @@ Laws live in `.cursor/rules/`; this page is the human checklist. Gates enforce t
 |------|-----------|
 | Small feature + GUI | `nixos/modules/system/lock-manager/` |
 | Core domain (always in catalog) | `nixos/core/base/network/` or `hardware/` |
-| GUI page only | `nixos/core/management/gui-engine/doc/PAGE-TEMPLATE.md` |
+| GUI page only | `nixos/core/management/gui-engine/doc/page-template.md` |
 
 ---
 
@@ -31,17 +31,32 @@ Modules under `nixos/modules/` are discovered by the tree; do **not** hardcode p
 
 ```
 <module>/
-  default.nix            # entry; imports; enable-gated wiring
-  options.nix            # options.${metadata.configPath} …
-  template-config.nix    # systemConfig defaults (merged by getModuleConfig)
-  commands.nix           # CLI (+ optional GUI domain/page registration)
-  config.nix             # NixOS config when enabled (optional but usual)
-  README.md
-  doc/USAGE.md           # optional but expected for non-trivial modules
-  ui/gui/page.py         # optional GUI
-  ui/tui/                # optional TUI
-  migrations/            # only on breaking changes (see §6)
+  default.nix
+  options.nix
+  template-config.nix
+  commands.nix
+  config.nix                 # optional
+  api.nix                    # optional
+  README.md                  # short stub only (links into doc/)
+  doc/                       # ONLY docs home for this module
+    usage.md
+    cli.md
+    architecture.md
+    ai-overview.md           # optional — assistant blurbs (ai-*.md)
+    …
+  ui/gui/page.py             # optional
+  ui/tui/
+  ai/                        # tools pack — NOT markdown docs
+    manifest.nix
+    tools/*.json
+  migrations/
 ```
+
+**One docs home: `doc/`.** No `ai/docs/`, no root `cli.md`.  
+Assistant reads `doc/ai-*.md`. Tools stay in `ai/tools/`.  
+Law: `.cursor/rules/ncc-docs-layout.mdc` · Gate: `tests/validate-docs-layout.sh`.
+
+SSOT for AI packs: [`domain-ai-packs.md`](../../nixos/modules/specialized/ncc-assistant/doc/domain-ai-packs.md).
 
 Tests go under **`tests/`** only — never `nixos/**/test_*.py`.
 
@@ -150,7 +165,7 @@ Keep help text short; elevated ops go through existing NCC root patterns used by
 
 ## 5. GUI (optional)
 
-1. Copy [`PAGE-TEMPLATE.md`](../../nixos/core/management/gui-engine/doc/PAGE-TEMPLATE.md) → `ui/gui/page.py`.
+1. Copy [`page-template.md`](../../nixos/core/management/gui-engine/doc/page-template.md) → `ui/gui/page.py`.
 2. Register domain + page (feature: usually behind enable; **core**: always register):
 
 ```nix
@@ -163,8 +178,36 @@ Keep help text short; elevated ops go through existing NCC root patterns used by
 (cliRegistry.registerGuiPage "mymod" ./ui/gui)
 ```
 
-Design notes: `gui-engine/doc/GUI-DESIGN.md`.  
+Design notes: `gui-engine/doc/gui-design.md`.  
 Do not put unit tests next to `page.py`.
+
+---
+
+## 5b. Domain AI pack (optional)
+
+```
+<module>/
+  doc/ai-overview.md      # assistant blurb (ai-*.md)
+  ai/
+    manifest.nix
+    tools/<verb>.json
+```
+
+Example tool (`ai/tools/status.json`):
+
+```json
+{
+  "name": "domain.desktop.status",
+  "description": "Show current desktop settings.",
+  "risk": "read",
+  "permission": "desktop.read",
+  "confirm": false,
+  "inputSchema": { "type": "object", "properties": {} },
+  "argv": ["ncc", "desktop", "status"]
+}
+```
+
+Full contract: [`domain-ai-packs.md`](../../nixos/modules/specialized/ncc-assistant/doc/domain-ai-packs.md).
 
 ---
 
@@ -197,6 +240,7 @@ Gate: `tests/validate-module-migrations.sh` (via `validate-ncc-nix.sh`).
 3. [ ] `template-config.nix` defaults align with options  
 4. [ ] Config reads only via `getModuleConfig` / APIs via `getModuleApi`  
 5. [ ] CLI registered; GUI registered if you shipped a page  
+5b. [ ] If assistant should call this domain: `ai/manifest.nix` (+ `tools/` as needed)  
 6. [ ] No `test_*.py` under `nixos/`  
 7. [ ] Migration only if breaking; version matches `to`  
 8. [ ] **`bash tests/run-gates.sh`** exits 0  
@@ -210,6 +254,7 @@ Do **not** tell anyone to `ncc system-update` until step 8 is green in this turn
 | Topic | Where |
 |-------|--------|
 | Testing strategy | [`testing.md`](./testing.md) → `tests/TESTING.md` |
+| Domain AI packs | `nixos/modules/specialized/ncc-assistant/doc/domain-ai-packs.md` |
 | Product overview | [`../../README.md`](../../README.md) |
 | Install bootstrap | [`../install.md`](../install.md) |
 | Agent rules | `.cursor/rules/ncc-*.mdc` |

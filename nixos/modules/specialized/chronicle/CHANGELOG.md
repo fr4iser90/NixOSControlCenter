@@ -81,9 +81,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 - Complete API documentation (400+ lines in `api/README.md`)
-- Updated ROADMAP.md marking Phase 5 complete
+- Updated roadmap.md marking Phase 5 complete
 - This CHANGELOG entry
-- V2.0.0_RELEASE.md with comprehensive release notes
+- doc/releases/v2.0.0-release.md with comprehensive release notes
 
 ### Migration Notes
 - All features are opt-in via configuration
@@ -260,7 +260,7 @@ Phase 5 begins! First major feature of v2.0 - Complete REST API implementation.
 - CI/CD automation examples
 - Security best practices
 - Troubleshooting guide
-- Updated ROADMAP.md to mark REST API complete
+- Updated roadmap.md to mark REST API complete
 
 ### Developer Experience
 - Auto-generated interactive documentation
@@ -438,7 +438,7 @@ Phase 4 COMPLETE! All v1.2.0 features fully implemented and production-ready.
 - Smart throttling to prevent excessive step creation
 
 ### Documentation
-- Updated ROADMAP.md to reflect v1.2.0 progress
+- Updated roadmap.md to reflect v1.2.0 progress
 - Comprehensive smart detection configuration guide
 - Integration examples for custom workflows
 
@@ -463,7 +463,7 @@ This is the first production-ready stable release of NixOS Step Recorder!
   - USER_MANUAL.md - Complete user guide (10 chapters)
   - INSTALLATION.md - Detailed installation instructions
   - TROUBLESHOOTING.md - Diagnostic tools and solutions
-  - API.md - Complete API reference and integration examples
+  - api.md - Complete API reference and integration examples
   
 - **Performance Configuration Options**
   - `performance.enableOptimization` - Toggle screenshot optimization
@@ -661,7 +661,7 @@ This release brings major multimedia recording capabilities and modern UI improv
 - All multimedia features are opt-in
 
 ### Documentation
-- Updated ROADMAP.md with Phase 3 progress
+- Updated roadmap.md with Phase 3 progress
 - Added comprehensive feature documentation
 - Configuration examples for all new options
 - Privacy guidelines for keyboard recording
@@ -725,7 +725,7 @@ This release brings major multimedia recording capabilities and modern UI improv
 
 ### Documentation
 - Added PHASE2_IMPLEMENTATION.md with comprehensive feature documentation
-- Updated ROADMAP.md to reflect Phase 2 completion status
+- Updated roadmap.md to reflect Phase 2 completion status
 - All Phase 2 features fully documented with usage examples
 
 ## [0.8.0-beta] - 2026-01-02

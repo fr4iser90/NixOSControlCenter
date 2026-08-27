@@ -1,9 +1,9 @@
 # Phase 7 — System notifications, presence & interactive approvals
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 2 (agent), phase 3 (jobs); pairs with phase 6 (approval queue)  
 **UI:** desktop **system notifications** (Plasma/`notify-send` / D-Bus), not only in-app dialogs
 

@@ -1,9 +1,9 @@
 # Phase 3 — Jobs & history
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 2  
 **Unblocks:** phase 4 (schedules need last-run visibility), phase 5 (Jobs UI)
 

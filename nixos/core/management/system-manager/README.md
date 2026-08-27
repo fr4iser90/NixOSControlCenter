@@ -19,10 +19,10 @@ The System Manager module is a **core module** that provides system-level manage
 ## Documentation
 
 For detailed documentation, see:
-- [Architecture](./doc/ARCHITECTURE.md) - System architecture and design decisions
-- [Usage Guide](./doc/USAGE.md) - Detailed usage examples and best practices
-- [API Reference](./doc/API.md) - Complete API documentation
-- [CLI contract](./CLI.md) - How update / migrate / checks must look (formatter standards)
+- [Architecture](./doc/architecture.md) - System architecture and design decisions
+- [Usage Guide](./doc/usage.md) - Detailed usage examples and best practices
+- [API Reference](./doc/api.md) - Complete API documentation
+- [CLI contract](./doc/cli.md) - How update / migrate / checks must look (formatter standards)
 
 ## Related Components
 

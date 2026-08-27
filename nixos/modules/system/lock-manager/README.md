@@ -21,10 +21,10 @@ The Lock Manager (System Discovery) module enables automatic scanning, documenta
 ## Documentation
 
 For detailed documentation, see:
-- [Architecture](./doc/ARCHITECTURE.md) - System architecture and design decisions
-- [Usage Guide](./doc/USAGE.md) - Detailed usage examples and best practices
-- [Security](./doc/SECURITY.md) - Security considerations and threat model
-- [CLI contract](./CLI.md) - Command output / formatter standards
+- [Architecture](./doc/architecture.md) - System architecture and design decisions
+- [Usage Guide](./doc/usage.md) - Detailed usage examples and best practices
+- [Security](./doc/security.md) - Security considerations and threat model
+- [CLI contract](./doc/cli.md) - Command output / formatter standards
 
 ## Related Components
 

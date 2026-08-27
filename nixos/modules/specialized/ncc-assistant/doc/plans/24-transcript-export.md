@@ -1,9 +1,9 @@
 # Phase 24 — Transcript export
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned (backlog)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 0 sessions, phase 3 jobs  
 **Related:** [05-ui-integration.md](./05-ui-integration.md)
 

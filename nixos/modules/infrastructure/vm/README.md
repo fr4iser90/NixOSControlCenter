@@ -17,9 +17,9 @@ The VM Manager is a **module** that provides comprehensive virtual machine manag
 ## Documentation
 
 For detailed documentation, see:
-- [Architecture](./doc/ARCHITECTURE.md) - System architecture and design decisions
-- [Usage Guide](./doc/USAGE.md) - Detailed usage examples and best practices
-- [CLI contract](./CLI.md) - Command output / formatter standards
+- [Architecture](./doc/architecture.md) - System architecture and design decisions
+- [Usage Guide](./doc/usage.md) - Detailed usage examples and best practices
+- [CLI contract](./doc/cli.md) - Command output / formatter standards
 
 ## Related Components
 

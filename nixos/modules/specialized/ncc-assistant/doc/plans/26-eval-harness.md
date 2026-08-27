@@ -1,9 +1,9 @@
 # Phase 26 — Eval harness
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned (backlog)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** knowledge + tools stable; helpful after phase 13  
 **Related:** [13-knowledge-sync.md](./13-knowledge-sync.md), [27-red-team-mode.md](./27-red-team-mode.md)
 

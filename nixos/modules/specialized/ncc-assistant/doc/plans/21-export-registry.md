@@ -1,9 +1,9 @@
 # Phase 21 — Export registry (MCP + OpenAPI)
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned (backlog)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 1  
 **Related:** [19-mcp-marketplace.md](./19-mcp-marketplace.md)
 

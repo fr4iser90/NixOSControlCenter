@@ -1,6 +1,6 @@
 """NCC GUI page kit — Header → Content → Activity → Footer (Actions).
 
-Use ``DomainPage`` for every domain ``ui/gui/page.py``. See doc/GUI-DESIGN.md.
+Use ``DomainPage`` for every domain ``ui/gui/page.py``. See doc/gui-design.md.
 """
 
 from __future__ import annotations

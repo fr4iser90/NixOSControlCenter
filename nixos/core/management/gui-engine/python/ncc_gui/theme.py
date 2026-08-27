@@ -1,6 +1,6 @@
 """Shared stylesheet + helpers for end-user friendly NCC GUI.
 
-Layout rules: see doc/GUI-DESIGN.md (binding).
+Layout rules: see doc/gui-design.md (binding).
 """
 
 from __future__ import annotations

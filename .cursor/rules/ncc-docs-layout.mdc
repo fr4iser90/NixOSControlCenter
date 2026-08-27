@@ -1,0 +1,30 @@
+---
+description: ONE docs home per module — doc/ only; kebab-case
+alwaysApply: true
+---
+
+# NCC: Documentation layout
+
+## Law
+
+**One docs home per module: `doc/`.**
+
+| Allowed | |
+|---------|--|
+| `nixos/<module>/doc/**/*.md` | all human + assistant markdown |
+| `README.md` / `CHANGELOG.md` at module root | entry stubs only |
+| `<module>/ai/tools/*.json` + `ai/manifest.nix` | **not** docs — tool contracts |
+| `<module>/prompts/` | runtime prompts (product), not manuals |
+
+**Forbidden**
+
+- `ai/docs/`
+- `cli.md` / `usage.md` / `todo.md` / … at module root
+- Parallel doc trees for the same module
+
+Assistant markdown: `doc/ai-*.md` (discovered with the AI pack).
+
+Repo-level cross-cutting docs stay in repo-root **`docs/`**.
+
+Gate: `tests/validate-docs-layout.sh`.  
+Guide: `docs/developing/docs-conventions.md`.

@@ -1,9 +1,9 @@
 # Phase 4 — Schedules & timers (cron-like)
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 2 + 3  
 **Related UI:** phase 5 Schedules section
 

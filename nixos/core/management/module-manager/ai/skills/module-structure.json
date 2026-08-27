@@ -10,7 +10,8 @@
     { "file": "config.nix", "purpose": "Implementation logic (move here if default.nix has config = {...})", "condition": "has implementation logic" },
     { "file": "commands.nix", "purpose": "CLI command registration via cliRegistry", "condition": "has CLI commands" },
     { "file": "api.nix", "purpose": "Public API for getModuleApi access", "condition": "other modules need build-time access" },
-    { "file": "ai/manifest.nix", "purpose": "Domain AI pack for ncc-assistant tools+docs", "condition": "module exposes AI tools" },
+    { "file": "doc/cli.md", "purpose": "CLI contract (under doc/ — only docs home)", "condition": "has CLI commands" },
+    { "file": "ai/manifest.nix", "purpose": "Domain AI pack for ncc-assistant tools", "condition": "module exposes AI tools" },
     { "file": "types.nix", "purpose": "Custom NixOS types", "condition": "custom types needed" },
     { "file": "systemd.nix", "purpose": "Systemd services/timers", "condition": "has systemd services" },
     { "file": "lib/default.nix", "purpose": "Helper functions library", "condition": "has reusable helpers" }
@@ -23,10 +24,9 @@
     { "dir": "validators/", "purpose": "Input validation — check format, constraints, rules" },
     { "dir": "formatters/", "purpose": "Output formatting — convert to text/JSON/tables" },
     { "dir": "ui/", "purpose": "Multi-interface UI support (cli/fzf, tui, gui, web)" },
-    { "dir": "ai/", "purpose": "Domain AI pack — manifest.nix, tools/*.json, docs/*.md for ncc-assistant" },
+    { "dir": "ai/", "purpose": "Domain AI pack — manifest.nix, tools/*.json (markdown lives in doc/ai-*.md)" },
     { "dir": "migrations/", "purpose": "Version migrations (v1.0-to-v1.1.nix)" },
-    { "dir": "tests/", "purpose": "Module test suite" },
-    { "dir": "doc/", "purpose": "Detailed documentation (ARCHITECTURE.md, API.md, USAGE.md)" }
+    { "dir": "doc/", "purpose": "ONLY human+assistant markdown home (usage.md, cli.md, ai-overview.md, …)" }
   ],
   "defaultNix": {
     "must": [

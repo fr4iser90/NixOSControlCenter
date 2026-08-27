@@ -4,5 +4,5 @@ Guided NixOS Control Center install (`ncc install …`), including dry-run previ
 
 ## Documentation
 
-- CLI contract: [CLI.md](./CLI.md)
+- CLI contract: [cli.md](./doc/cli.md)
 - Scripts overview: [scripts/README.md](./scripts/README.md)

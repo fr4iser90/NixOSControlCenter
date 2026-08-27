@@ -1,9 +1,9 @@
 # Phase 22 — System tray daemon
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned (backlog)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 7 (notifications/presence), phase 3 (jobs)  
 **Related:** [23-global-shortcuts.md](./23-global-shortcuts.md)
 

@@ -1,9 +1,9 @@
 # Phase 15 — Watchdogs (event triggers)
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned (backlog)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 2–4, phase 7 (notify)  
 **Related:** [10-config-drift-health.md](./10-config-drift-health.md), [14-pinned-playbooks.md](./14-pinned-playbooks.md)
 

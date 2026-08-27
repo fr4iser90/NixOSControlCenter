@@ -17,8 +17,8 @@ The AI Workspace module provides comprehensive AI development and deployment cap
 ## Documentation
 
 For detailed documentation, see:
-- [Architecture](./doc/ARCHITECTURE.md) - System architecture and design decisions
-- [Usage Guide](./doc/USAGE.md) - Detailed usage examples and best practices
+- [Architecture](./doc/architecture.md) - System architecture and design decisions
+- [Usage Guide](./doc/usage.md) - Detailed usage examples and best practices
 
 ## Related Components
 

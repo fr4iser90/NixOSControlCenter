@@ -1,9 +1,9 @@
 # Phase 19 — Tool marketplace / MCP templates
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned (backlog)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 1 (MCP client + Tools UI)  
 **Related:** [21-export-registry.md](./21-export-registry.md)
 

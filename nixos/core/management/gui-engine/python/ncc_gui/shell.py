@@ -1,6 +1,6 @@
 """Multi-domain shell: Chrome (nav/target/gate) + one Document (domain page).
 
-Architecture (see doc/PERFORMANCE.md, GUI-DESIGN §12):
+Architecture (see doc/performance.md, GUI-DESIGN §12):
 
 * **Process** — soft/hard generation in ``ncc_gui.reload`` (kit hash).
 * **State** — catalog in ``ShellChromeState``; target in ``target_session``.

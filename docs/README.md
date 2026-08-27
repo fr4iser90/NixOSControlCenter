@@ -8,11 +8,11 @@ Cross-cutting human docs. Product pitch: [root README](../README.md).
 
 | Rule | |
 |------|--|
-| Filenames | **kebab-case**, lowercase (`features.md`, not `FEATURES.md`) |
-| Exception | only `README.md` (GitHub/index convention) |
-| Folders | group by topic: `cli/`, `gui/`, `tui/`, `developing/` |
-| What belongs in `docs/` | install, feature overview, domains, surfaces, limits, contributor guides |
-| What does **not** | module USAGE/ARCHITECTURE (→ module `doc/`), agent rules (→ `.cursor/rules/`), test suites (→ `tests/`) |
+| Filenames | **kebab-case** |
+| Module docs | **only** `nixos/<module>/doc/` (+ root `README.md` stub) |
+| Forbidden | `ai/docs/`, root `cli.md` / loose manuals |
+| Gate | `tests/validate-docs-layout.sh` |
+| Rules | `.cursor/rules/ncc-docs-layout.mdc`, `docs/developing/docs-conventions.md` |
 
 ## Target tree
 
@@ -35,6 +35,7 @@ docs/
   developing/
     new-module.md
     testing.md
+    docs-conventions.md
 ```
 
 ## Index
@@ -64,6 +65,7 @@ docs/
 |-----|---------|
 | [developing/new-module.md](./developing/new-module.md) | Add a module |
 | [developing/testing.md](./developing/testing.md) | Gates → `tests/TESTING.md` |
+| [developing/docs-conventions.md](./developing/docs-conventions.md) | Where docs go + kebab naming |
 
 ### Also trust (outside `docs/`)
 

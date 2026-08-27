@@ -1,9 +1,9 @@
 # Phase 2 — Agent mode
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 1 (registry) strongly recommended; can prototype on builtins only  
 **Unblocks:** phase 3 (jobs), phase 4 (schedules)
 

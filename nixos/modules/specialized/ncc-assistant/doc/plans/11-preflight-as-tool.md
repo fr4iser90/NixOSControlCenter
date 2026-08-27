@@ -1,9 +1,9 @@
 # Phase 11 — Preflight as tool
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned (backlog)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 1–2; existing `prebuild-checks` / system-checks  
 **Related:** [18-safe-tool-profiles.md](./18-safe-tool-profiles.md) (`ops` profile)
 

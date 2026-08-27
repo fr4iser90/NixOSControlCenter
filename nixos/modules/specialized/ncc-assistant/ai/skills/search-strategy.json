@@ -6,7 +6,7 @@
       "priority": 1,
       "when": "question is about architecture, flow, config system, update process",
       "read": ["context/architecture.json"],
-      "alsoRead": ["AI_KNOWLEDGE.md"],
+      "alsoRead": ["ai-knowledge.md"],
       "searchCodebase": false
     },
     {
@@ -98,11 +98,11 @@
     }
   ],
   "goldenRules": [
-    "Docs (AI_KNOWLEDGE.md, MODULE_TEMPLATE.md) define the WHAT and WHY",
+    "Docs (ai-knowledge.md, MODULE_TEMPLATE.md) define the WHAT and WHY",
     "Codebase (nixos/) is the ground truth for the actual current state",
     "Knowledge JSON files are compact summaries — verify against code when in doubt",
     "If knowledge JSON says a file exists but glob returns nothing → it's stale, regenerate with sync hooks",
     "For code changes: always read the existing file first, then modify",
-    "For Nix files: always check AI_KNOWLEDGE.md for escaping rules before generating code"
+    "For Nix files: always check ai-knowledge.md for escaping rules before generating code"
   ]
 }

@@ -18,9 +18,9 @@ The TUI Engine module is a **core module** that provides a comprehensive TUI fra
 ## Documentation
 
 For detailed documentation, see:
-- [Architecture](./doc/ARCHITECTURE.md) - System architecture and design decisions
-- [Usage Guide](./doc/USAGE.md) - Detailed usage examples and best practices
-- [API Reference](./doc/API.md) - Complete API documentation
+- [Architecture](./doc/architecture.md) - System architecture and design decisions
+- [Usage Guide](./doc/usage.md) - Detailed usage examples and best practices
+- [API Reference](./doc/api.md) - Complete API documentation
 
 ## Related Components
 

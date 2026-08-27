@@ -3,7 +3,7 @@
 Inventory = SSH client list via gui-engine ``target_state`` (no hard-coded hosts).
 Pins/filters/cache = cockpit under ``~/.config/ncc/``.
 
-Perf (gui-engine PERFORMANCE.md):
+Perf (gui-engine performance.md):
   - Never sync-probe the whole fleet on the UI thread
   - Paint from cache immediately; Refresh probes async with Loading banner
   - Click / selection never triggers network

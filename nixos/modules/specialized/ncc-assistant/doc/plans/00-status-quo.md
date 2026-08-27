@@ -1,9 +1,9 @@
 # Phase 0 — Status quo
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** done (baseline for roadmap)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)
+**Parent:** [roadmap.md](../doc/roadmap.md)
 
 ## What exists today
 
@@ -21,7 +21,7 @@ Module: `nixos/modules/specialized/ncc-assistant/`
 | LLM | `llm.py` | OpenAI-compatible (+ Anthropic), stream, `/models`, vision heuristics |
 | Tools | `runtime.py` | fixed `TOOL_DEFINITIONS` + `ToolRuntime.call` |
 | MCP server | `mcp_server.py` | exposes built-ins over stdio for Cursor/Claude Code |
-| Docs | `USAGE.md` | operator guide |
+| Docs | `usage.md` | operator guide |
 
 ## Built-in tools
 

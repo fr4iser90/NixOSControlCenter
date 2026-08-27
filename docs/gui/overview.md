@@ -4,7 +4,7 @@ Domain GUIs are **PySide6** pages hosted by **gui-engine**.
 
 ## How a domain gets a GUI
 
-1. `ui/gui/page.py` implementing a `DomainPage` (see `gui-engine/doc/PAGE-TEMPLATE.md`)
+1. `ui/gui/page.py` implementing a `DomainPage` (see `gui-engine/doc/page-template.md`)
 2. Register in `commands.nix`:
 
 ```nix
@@ -20,9 +20,9 @@ See [`ui-matrix.md`](./ui-matrix.md) (GUI column). Core examples: hardware, pack
 
 | File | Topic |
 |------|--------|
-| `nixos/core/management/gui-engine/doc/PAGE-TEMPLATE.md` | Copy-paste page |
-| `gui-engine/doc/GUI-DESIGN.md` | UX rules |
-| `gui-engine/doc/PERFORMANCE.md` | Hot path / reload |
+| `nixos/core/management/gui-engine/doc/page-template.md` | Copy-paste page |
+| `gui-engine/doc/gui-design.md` | UX rules |
+| `gui-engine/doc/performance.md` | Hot path / reload |
 
 ## Catalog behavior
 

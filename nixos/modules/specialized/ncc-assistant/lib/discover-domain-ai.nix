@@ -46,11 +46,10 @@ let
       ) entries
     );
 
-  readDocs = aiDir: readJsonDir "${aiDir}/docs" ".md";
-  # readJsonDir for .md uses suffix .md but reads as path refs — OK (no fromJSON)
-  readDocs' = aiDir:
+  # Assistant-facing markdown lives in <module>/doc/ai-*.md (ONE docs home).
+  readDocs' = modulePath:
     let
-      docsPath = "${aiDir}/docs";
+      docsPath = "${modulePath}/doc";
       entries =
         if builtins.pathExists docsPath
         then builtins.readDir docsPath
@@ -59,10 +58,13 @@ let
     lib.filter (d: d != null) (
       lib.mapAttrsToList (
         name: type:
-        if type == "regular" && lib.hasSuffix ".md" name then {
+        if type == "regular"
+          && lib.hasSuffix ".md" name
+          && lib.hasPrefix "ai-" name
+        then {
           file = name;
           path = "${docsPath}/${name}";
-          id = lib.removeSuffix ".md" name;
+          id = lib.removeSuffix ".md" (lib.removePrefix "ai-" name);
         } else null
       ) entries
     );
@@ -91,7 +93,7 @@ let
         description = manifest.description or "";
         path = m.path;
         tools = readTools aiDir;
-        docs = readDocs' aiDir;
+        docs = readDocs' m.path;
         skills = readSkills aiDir;
         domains = readDomains aiDir;
         context = readContext aiDir;
@@ -150,7 +152,7 @@ let
   knowledgeIndex = {
     _schema = "ncc-knowledge/1.0";
     _version = "2.0.0";
-    _source = "discovered from <module>/ai/ packs";
+    _source = "discovered from <module>/ai/ packs + <module>/doc/ai-*.md";
     tokenBudget = {
       strategy = "load-skill-on-demand";
     };
@@ -190,9 +192,7 @@ let
     ${lib.concatMapStrings (
       p:
       lib.concatMapStrings (d: ''
-        cp ${lib.escapeShellArg d.path} $out/domains/ai-${p.domain}-${
-          lib.removeSuffix ".md" d.file
-        }.md
+        cp ${lib.escapeShellArg d.path} $out/domains/ai-${p.domain}-${d.id}.md
       '') p.docs
     ) packs}
     touch $out/domains/.keep
@@ -213,9 +213,7 @@ let
     ${lib.concatMapStrings (
       p:
       lib.concatMapStrings (d: ''
-        cp ${lib.escapeShellArg d.path} $out/domains/ai-${p.domain}-${
-          lib.removeSuffix ".md" d.file
-        }.md
+        cp ${lib.escapeShellArg d.path} $out/domains/ai-${p.domain}-${d.id}.md
       '') p.docs
     ) packs}
     cp ${pkgs.writeText "knowledge-index.json" (builtins.toJSON knowledgeIndex)} $out/index.json

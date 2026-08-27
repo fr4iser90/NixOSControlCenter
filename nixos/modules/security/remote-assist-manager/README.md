@@ -19,9 +19,9 @@ Remote Assist Manager lets a host share their session with a guest for troublesh
 ## Documentation
 
 For detailed documentation, see:
-- [Architecture](./doc/ARCHITECTURE.md) - Modes, trust model, data flow, design decisions
-- [Usage Guide](./doc/USAGE.md) - Planned configuration and workflows
-- [Security](./doc/SECURITY.md) - Threat model and hardening guidance
+- [Architecture](./doc/architecture.md) - Modes, trust model, data flow, design decisions
+- [Usage Guide](./doc/usage.md) - Planned configuration and workflows
+- [Security](./doc/security.md) - Threat model and hardening guidance
 
 ## Related Components
 

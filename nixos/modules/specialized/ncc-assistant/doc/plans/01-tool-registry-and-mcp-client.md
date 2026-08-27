@@ -1,9 +1,9 @@
 # Phase 1 — Tool registry & MCP client
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 0  
 **Unblocks:** phase 2 (agent), phase 5 (Tools UI)
 

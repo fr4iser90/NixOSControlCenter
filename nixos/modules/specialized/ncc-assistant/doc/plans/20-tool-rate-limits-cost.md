@@ -1,9 +1,9 @@
 # Phase 20 — Per-tool rate limits & cost estimates
 
-Status: **done** (see ROADMAP.md)
+Status: **done** (see roadmap.md)
 
 **Status:** planned (backlog)  
-**Parent:** [ROADMAP.md](../ROADMAP.md)  
+**Parent:** [roadmap.md](../doc/roadmap.md)  
 **Depends on:** phase 1–3, phase 16 (budgets)  
 **Related:** [18-safe-tool-profiles.md](./18-safe-tool-profiles.md)
 
