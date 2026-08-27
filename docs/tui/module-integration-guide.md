@@ -1,5 +1,7 @@
 # Module Integration Guide - Bubble Tea TUI
 
+> **Draft / verify against tree.** Prefer [`../gui/ui-matrix.md`](../gui/ui-matrix.md) and a real module’s `ui/tui/` (e.g. `network`, `lock-manager`). Some paths below may still say old layouts (`homelab-manager`, etc.).
+
 ## Overview
 
 This guide explains how to integrate Bubble Tea TUI interfaces into existing NixOS Control Center modules. The process maintains backward compatibility while adding modern TUI capabilities.

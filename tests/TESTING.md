@@ -56,11 +56,15 @@ Skip nix-build: `NCC_GUI_SKIP_NIX_PYTHON=1` (Qt tests skip; AST/smokes still run
 | `gui/validate-gui-python.sh` | page smoke, argv, fs_status, session_ux, hot-path; optional soak |
 | `cli-formatter/validate-cli.sh` | CLI docs/formatter (via `tests/default.nix` / optional) |
 
-Enable hook once:
+Enable Git pre-commit (automatic):
 
 ```bash
-git config core.hooksPath .githooks
+# Usually unnecessary — Cursor sessionStart + run-gates.sh call:
+bash scripts/install-git-hooks.sh
 ```
+
+That sets `core.hooksPath=.githooks` and installs `.git/hooks/pre-commit` (idempotent).  
+No manual `git config` needed for normal clones.
 
 ## Soft / optional
 

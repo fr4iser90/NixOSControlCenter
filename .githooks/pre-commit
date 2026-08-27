@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Optional local hook — enable once per clone:
-#   git config core.hooksPath .githooks
+# Pre-commit → full hard gates (migrations, systemConfig, catalog, GUI, …).
+# Auto-wired by scripts/install-git-hooks.sh (Cursor sessionStart + run-gates).
+# Do not require a manual `git config core.hooksPath` — the installer does that.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 exec bash "$ROOT/tests/run-gates.sh"

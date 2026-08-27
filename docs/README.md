@@ -1,89 +1,75 @@
-# NixOSControlCenter Documentation
+# NCC documentation
 
-Welcome to the complete documentation for NixOSControlCenter. This documentation follows the PIDEA standard structure for consistency and ease of navigation.
+Cross-cutting human docs. Product pitch: [root README](../README.md).
 
-## 📚 Documentation Structure
+**Per-module depth** stays in `nixos/<module>/README.md` + `doc/` — do not copy it here.
 
-### 🚀 [01. Getting Started](./01_getting-started/)
-- [Installation Guide](./01_getting-started/installation.md)
-- [Quick Start](./01_getting-started/quick-start.md)
-- [Screenshots](./01_getting-started/screenshots/)
+## Naming & layout (law)
 
-### 🏗️ [02. Architecture](./02_architecture/)
-- [System Overview](./02_architecture/overview.md)
-- [Component Architecture](./02_architecture/components.md)
-- [Module Architecture](./02_architecture/Architecture.md) - Core vs Features, Domain-Grouping, Module Tree
-- [Diagrams](./02_architecture/diagrams/)
+| Rule | |
+|------|--|
+| Filenames | **kebab-case**, lowercase (`features.md`, not `FEATURES.md`) |
+| Exception | only `README.md` (GitHub/index convention) |
+| Folders | group by topic: `cli/`, `gui/`, `tui/`, `developing/` |
+| What belongs in `docs/` | install, feature overview, domains, surfaces, limits, contributor guides |
+| What does **not** | module USAGE/ARCHITECTURE (→ module `doc/`), agent rules (→ `.cursor/rules/`), test suites (→ `tests/`) |
 
-### ⚡ [03. Features](./03_features/)
-- [Feature Overview](./03_features/overview.md)
-- [Screenshots](./03_features/screenshots/)
+## Target tree
 
-### 🔌 [04. API Reference](./04_api-reference/)
-- [API Endpoints](./04_api-reference/endpoints.md)
-- [Authentication](./04_api-reference/authentication.md)
-- [Examples](./04_api-reference/examples.md)
+```
+docs/
+  README.md                 ← this index
+  install.md
+  features.md
+  domains.md
+  limitations.md
+  cli/
+    pattern.md              ← ncc <domain> <action>
+    migration.md            ← historical flat→domain
+  gui/
+    overview.md
+    ui-matrix.md            ← CLI/TUI/GUI checklist
+  tui/                      ← Bubble Tea drafts
+    README.md
+    …
+  developing/
+    new-module.md
+    testing.md
+```
 
-### 💻 [05. Development](./05_development/)
-- [Environment Setup](./05_development/environment.md)
-- [Development Setup](./05_development/setup.md)
-- [Git Workflow](./05_development/git-workflow.md)
+## Index
 
-### 🚀 [06. Deployment](./06_deployment/)
-- [Docker Deployment](./06_deployment/docker.md)
-- [Production Setup](./06_deployment/production.md)
-- [Monitoring](./06_deployment/monitoring.md)
+### Product
 
-### 🧪 [07. Testing](./07_testing/)
-- [Unit Tests](./07_testing/unit-tests.md)
-- [Integration Tests](./07_testing/integration-tests.md)
-- [End-to-End Tests](./07_testing/e2e-tests.md)
+| Doc | Purpose |
+|-----|---------|
+| [install.md](./install.md) | Bootstrap + `system-update` |
+| [features.md](./features.md) | Present / partial / planned |
+| [domains.md](./domains.md) | Domains ↔ modules |
+| [limitations.md](./limitations.md) | Anti-cheat, fleet, … |
 
-### 📖 [08. Reference](./08_reference/)
-- [Configuration](./08_reference/config.md)
-- [CLI Reference](./08_reference/cli.md)
-- [Troubleshooting](./08_reference/troubleshooting.md)
+### Surfaces
 
-### 🗺️ [09. Roadmap](./09_roadmap/)
-- [Roadmap Overview](./09_roadmap/overview.md)
-- [Future Features](./09_roadmap/features/)
+| Doc | Purpose |
+|-----|---------|
+| [cli/pattern.md](./cli/pattern.md) | CLI contract |
+| [cli/migration.md](./cli/migration.md) | Historical CLI migration |
+| [gui/overview.md](./gui/overview.md) | Domain GUIs |
+| [gui/ui-matrix.md](./gui/ui-matrix.md) | CLI / TUI / GUI matrix |
+| [tui/](./tui/) | TUI integration drafts |
 
-### 🔧 [10. Maintenance](./10_maintenance/)
-- [Updates](./10_maintenance/updates.md)
-- [Support](./10_maintenance/support.md)
+### Developing
 
----
+| Doc | Purpose |
+|-----|---------|
+| [developing/new-module.md](./developing/new-module.md) | Add a module |
+| [developing/testing.md](./developing/testing.md) | Gates → `tests/TESTING.md` |
 
-## 🎯 Quick Navigation
+### Also trust (outside `docs/`)
 
-- **New to NixOSControlCenter?** → Start with [Getting Started](./01_getting-started/)
-- **Need CLI docs?** → Check [CLI Reference](./08_reference/cli.md)
-- **Want to contribute?** → See [Development](./05_development/)
-- **Deployment help?** → Visit [Deployment](./06_deployment/)
-- **Having issues?** → Check [Troubleshooting](./08_reference/troubleshooting.md)
-
----
-
-## 🎯 Project Overview
-
-NixOSControlCenter is a comprehensive tool for managing packages, configurations, and devices on NixOS systems with a focus on reproducibility and declarative configurations. It provides quick installation for desktop, server, or whole homelab setup in less than 5 minutes.
-
-### Key Features
-- **System Configuration Management**: Declarative system configuration through Nix expressions
-- **Package Management**: Unified package management interface
-- **Device Management**: Hardware configuration and monitoring
-- **AI Workspace**: Integrated AI development tools and containers
-- **Homelab Management**: Complete homelab automation and configuration
-- **SSH Management**: Advanced SSH client and server management
-- **VM Management**: Virtual machine creation and management
-- **Modular Architecture**: Extensible through Nix modules
-
-### Hardware Compatibility
-- ✅ AMD GPU
-- ✅ Intel GPU  
-- ✅ NVIDIA-Intel GPU
-- ✅ systemd-boot
-
----
-
-*This documentation follows the PIDEA standard structure for consistent, high-quality project documentation.*
+| Location | Purpose |
+|----------|---------|
+| `nixos/**/README.md` + `doc/` | Domain SSOT |
+| `gui-engine/doc/` | Page template, design, perf |
+| `.cursor/rules/ncc-*.mdc` | Discovery, migrations, gates |
+| `tests/TESTING.md` | Repo tests vs host preflight |

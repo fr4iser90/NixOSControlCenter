@@ -9,6 +9,12 @@
 # Strategy: tests/TESTING.md
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Self-heal: wire Git pre-commit like deepseek-harness postinstall (idempotent).
+if [[ -f "$ROOT/scripts/install-git-hooks.sh" ]]; then
+  bash "$ROOT/scripts/install-git-hooks.sh" >/dev/null 2>&1 || true
+fi
+
 FAIL=0
 
 run() {

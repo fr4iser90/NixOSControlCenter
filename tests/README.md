@@ -22,10 +22,10 @@ Minimum Nix + catalog gate alone:
 bash tests/validate-ncc-nix.sh
 ```
 
-Enable optional pre-commit hook (once per clone):
+Git pre-commit is auto-wired (`scripts/install-git-hooks.sh` via Cursor sessionStart / `run-gates.sh`). Manual:
 
 ```bash
-git config core.hooksPath .githooks
+bash scripts/install-git-hooks.sh
 ```
 
 ## Layout

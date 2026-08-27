@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": ".cursor/hooks/install-git-hooks.sh",
+        "timeout": 15
+      }
+    ]
+  }
+}

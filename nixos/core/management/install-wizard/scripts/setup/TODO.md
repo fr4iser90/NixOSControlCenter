@@ -39,7 +39,7 @@ Siehe Analyse: Preset-`features`/`overrides` oft ungenutzt, Memory/Storage-Check
 - **Done when:** `install*` Aliases zeigen nur auf existierende Pfade
 
 ### [INST-04] Docs an aktuellen Flow anpassen
-- [ ] `docs/INSTALL.md` auf Preset-first + Dual-UI + dry-run + Dual-Layout aktualisieren
+- [ ] `docs/install.md` auf Preset-first + Dual-UI + dry-run + Dual-Layout aktualisieren
 - [ ] Hardware-Compatibility-Claims mit echtem Detect/Gate abgleichen
 - [ ] Kurz `shell/scripts/README.md` (falls veraltet) syncen
 - **Done when:** Doc beschreibt denselben Flow wie `init.sh`
@@ -68,7 +68,7 @@ Siehe Analyse: Preset-`features`/`overrides` oft ungenutzt, Memory/Storage-Check
   - Bootloader × UEFI/BIOS
   - Unsupported Combos → warn oder abort (Flag: soft/hard)
 - [ ] Report im Wizard anzeigen (TUI + GUI)
-- [ ] Align mit `docs/INSTALL.md` Supported-Liste
+- [ ] Align mit `docs/install.md` Supported-Liste
 - **Files:** neuer Check z.B. `checks/hardware/compatibility.sh`, `init.sh`, UI prompts
 - **Done when:** Unbekannte/kaputte Combos werden vor Deploy gemeldet
 
