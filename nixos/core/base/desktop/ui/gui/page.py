@@ -11,6 +11,9 @@ from ncc_gui.scaffold import DomainPage
 
 _DESKTOP_OP = "desktop-set"
 
+# Environments with an active color-schemes/*.nix implementation (theme.dark).
+_DESKTOP_THEME_ENVS = frozenset({"gnome"})
+
 
 def _parse_kv(text: str) -> dict[str, str]:
     out: dict[str, str] = {}
@@ -24,7 +27,12 @@ def _parse_kv(text: str) -> dict[str, str]:
 
 
 def _snapshot_equal(a: dict[str, str], b: dict[str, str]) -> bool:
-    keys = ("enable", "environment", "manager", "server", "dark")
+    keys = ("enable", "environment", "manager", "server")
+    if (
+        a.get("environment") in _DESKTOP_THEME_ENVS
+        and b.get("environment") in _DESKTOP_THEME_ENVS
+    ):
+        keys = keys + ("dark",)
     return all(a.get(k) == b.get(k) for k in keys)
 
 
@@ -53,6 +61,7 @@ class DesktopPage(DomainPage):
             ("plasma", "Plasma (KDE)"),
             ("gnome", "GNOME"),
             ("xfce", "XFCE"),
+            ("hyprland", "Hyprland"),
         ):
             self.env.addItem(lab, v)
         form.addRow("Desktop environment", self.env)
@@ -75,10 +84,20 @@ class DesktopPage(DomainPage):
             self.server.addItem(lab, v)
         form.addRow("Display server", self.server)
 
+        self.dark_lbl = QLabel("Theme")
         self.dark = QComboBox()
         self.dark.addItem("Dark", "true")
         self.dark.addItem("Light", "false")
-        form.addRow("Theme", self.dark)
+        form.addRow(self.dark_lbl, self.dark)
+
+        self.theme_hint = QLabel(
+            "Hyprland look-and-feel: Features → Hyprland (rice store). "
+            "Desktop theme.dark does not apply here."
+        )
+        self.theme_hint.setObjectName("nccPageSubtitle")
+        self.theme_hint.setWordWrap(True)
+        self.theme_hint.hide()
+        form.addRow("", self.theme_hint)
 
         self.enable = QCheckBox("Desktop module enabled")
         self.enable.setChecked(False)
@@ -144,8 +163,15 @@ class DesktopPage(DomainPage):
         env = self.env.currentData()
         if env == "gnome":
             self._set_combo(self.manager, "gdm")
-        elif env == "plasma":
+        elif env in ("plasma", "hyprland"):
             self._set_combo(self.manager, "sddm")
+
+    def _sync_theme_visibility(self) -> None:
+        env = str(self.env.currentData())
+        show_theme = env in _DESKTOP_THEME_ENVS
+        self.dark_lbl.setVisible(show_theme)
+        self.dark.setVisible(show_theme)
+        self.theme_hint.setVisible(env == "hyprland")
 
     def _on_env_changed(self, _idx: int = 0) -> None:
         if self._loading:
@@ -153,6 +179,7 @@ class DesktopPage(DomainPage):
         self._loading = True
         try:
             self._sync_manager_hint()
+            self._sync_theme_visibility()
         finally:
             self._loading = False
         self._stage_from_widgets()
@@ -175,12 +202,14 @@ class DesktopPage(DomainPage):
         env = snap["environment"]
         mgr = snap["manager"]
         server = snap["server"]
-        dark = snap["dark"]
+        dark = self._live.get("dark", "true") if env not in _DESKTOP_THEME_ENVS else snap["dark"]
         enable = snap["enable"]
-        summary = (
-            f"desktop set env={env} login={mgr} server={server} "
-            f"theme={'dark' if dark == 'true' else 'light'}"
+        theme_bit = (
+            f" theme={'dark' if dark == 'true' else 'light'}"
+            if env in _DESKTOP_THEME_ENVS
+            else ""
         )
+        summary = f"desktop set env={env} login={mgr} server={server}{theme_bit}"
         argv = [
             "desktop",
             "set",
@@ -189,8 +218,9 @@ class DesktopPage(DomainPage):
             f"manager={mgr}",
             f"server={server}",
             f"session={env}",
-            f"dark={dark}",
         ]
+        if env in _DESKTOP_THEME_ENVS:
+            argv.append(f"dark={dark}")
         self.commit.stage_replace(
             PendingChange(
                 summary=summary,
@@ -267,6 +297,7 @@ class DesktopPage(DomainPage):
             self._apply_snapshot(snap)
         else:
             self._apply_snapshot(self._live)
+        self._sync_theme_visibility()
         self._update_draft_label()
 
     def _flush_pending(self, changes: list[PendingChange]) -> None:

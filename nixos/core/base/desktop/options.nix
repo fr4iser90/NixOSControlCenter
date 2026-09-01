@@ -20,7 +20,7 @@ in {
     };
 
     environment = lib.mkOption {
-      type = lib.types.enum [ "plasma" "gnome" "xfce" ];
+      type = lib.types.enum [ "plasma" "gnome" "xfce" "hyprland" ];
       default = "plasma";
       description = "Desktop environment to use";
     };

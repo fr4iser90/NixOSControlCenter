@@ -1,11 +1,12 @@
 # Shared domain GUI binary: `ncc-domain-gui <page>` (+ AI embed sources)
 # Peer roots come from getModuleMetadata (via gui-engine api) — no relative cross-module imports.
 # Domain pages come from cli-registry guiPages (each module’s ui/gui/).
-{ pkgs, lib, getModuleMetadata, getModuleApi, packagesRoot, assistantRoot, guiPages ? {} }:
+{ pkgs, lib, getModuleMetadata, getModuleApi, packagesRoot, hyprlandRoot, assistantRoot, guiPages ? {} }:
 
 let
   eng = import ./package.nix { inherit pkgs; };
   catalogFile = import "${packagesRoot}/lib/mk-catalog-json.nix" { inherit pkgs; };
+  hyprlandCatalogFile = import "${hyprlandRoot}/lib/mk-catalog-json.nix" { inherit pkgs; };
   packagesCli = import "${packagesRoot}/scripts/ncc-packages.nix" {
     inherit pkgs getModuleMetadata getModuleApi;
   };
@@ -31,6 +32,7 @@ let
     export PYTHONPATH="${src}''${PYTHONPATH:+:$PYTHONPATH}"
     export NCC_PACKAGES_BIN="${packagesCli}/bin/ncc-packages"
     export NCC_PACKAGES_CATALOG="${catalogFile}"
+    export NCC_HYPRLAND_CATALOG="${hyprlandCatalogFile}"
     export NCC_GUI_ICON="''${NCC_GUI_ICON:-${eng.iconPng}}"
     export QT_QPA_PLATFORM="''${QT_QPA_PLATFORM:-xcb}"
     export PATH="${packagesCli}/bin:${pkgs.nix}/bin:$PATH"

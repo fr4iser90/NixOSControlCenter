@@ -5,6 +5,7 @@
 
 let
   packagesRoot = (getModuleMetadata "packages").path;
+  hyprlandRoot = (getModuleMetadata "hyprland").path;
   assistantRoot = (getModuleMetadata "ncc-assistant").path;
   cliMeta = getModuleMetadata "cli-registry";
   cliApi = import "${cliMeta.path}/api.nix" {
@@ -32,19 +33,19 @@ in
   # domainGui pkgs config — includes every registerGuiPage from modules
   domainGui = pkgs: config:
     (import ./domain-gui.nix {
-      inherit pkgs lib getModuleMetadata getModuleApi packagesRoot assistantRoot;
+      inherit pkgs lib getModuleMetadata getModuleApi packagesRoot hyprlandRoot assistantRoot;
       guiPages = cliApi.guiPages config;
     }).nccDomainGui;
 
   rootGui = pkgs: config:
     (import ./root-gui.nix {
-      inherit pkgs lib getModuleMetadata getModuleApi packagesRoot;
+      inherit pkgs lib getModuleMetadata getModuleApi packagesRoot hyprlandRoot;
       guiPages = cliApi.guiPages config;
     }).nccGui;
 
   domainGuiBundle = pkgs: config:
     import ./domain-gui.nix {
-      inherit pkgs lib getModuleMetadata getModuleApi packagesRoot assistantRoot;
+      inherit pkgs lib getModuleMetadata getModuleApi packagesRoot hyprlandRoot assistantRoot;
       guiPages = cliApi.guiPages config;
     };
 }

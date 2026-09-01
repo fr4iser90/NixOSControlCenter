@@ -3,13 +3,10 @@
 let
   cfg = getModuleConfig "desktop";
   themeModule = ./schemes + "/${cfg.environment or "plasma"}.nix";
+  hasColorScheme = builtins.pathExists themeModule;
 in {
-  imports = lib.optionals (cfg.enable or true) [
+  # Only import when a per-environment scheme exists (gnome today; hyprland uses rice store).
+  imports = lib.optionals ((cfg.enable or true) && hasColorScheme) [
     themeModule
   ];
-
-  assertions = lib.optionals (cfg.enable or true) [{
-    assertion = builtins.pathExists themeModule;
-    message = "Color scheme for desktop environment ${cfg.environment} not found";
-  }];
 }

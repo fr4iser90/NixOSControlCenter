@@ -7,7 +7,7 @@ let
     inherit pkgs;
   };
 
-  aiKnowledgeSrc = ./AI_KNOWLEDGE.md;
+  aiKnowledgeSrc = ./doc/ai-knowledge.md;
 
   guiEngine = (getModuleApi "gui-engine").package pkgs;
 
