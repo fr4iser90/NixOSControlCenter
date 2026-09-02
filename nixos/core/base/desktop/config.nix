@@ -34,8 +34,7 @@ lib.mkIf (cfg.enable or true) {
         {
           assertion = cfg.environment or "plasma" == "plasma" ||
                       cfg.environment == "gnome" ||
-                      cfg.environment == "xfce" ||
-                      cfg.environment == "hyprland";
+                      cfg.environment == "xfce";
           message = "Invalid desktop environment: ${cfg.environment or "none"}";
         }
         {

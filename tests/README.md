@@ -71,5 +71,5 @@ Shell gates must source install-wizard bash and call `nix-instantiate`. Python t
 | Script | What |
 |--------|------|
 | `validate-nix-import-paths.sh` | Static `import ./…` resolve + parse all `.nix` |
-| `validate-nix-module-eval.sh` | Eval prebuild-check modules (imports in `let`) |
+| `validate-nix-module-eval.sh` | Eval prebuild-checks + `import ./config.nix` module shapes |
 | `validate-gui-catalog.sh` | Catalog invariants + no tests under `nixos/` |

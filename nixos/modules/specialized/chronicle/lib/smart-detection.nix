@@ -102,7 +102,7 @@ in {
           echo "{\"title\":\"Unknown\",\"class\":\"Unknown\",\"pid\":\"0\"}"
         fi
       elif [[ "$display_protocol" == "wayland" ]]; then
-        # Wayland: Use sway/hyprland specific commands
+        # Wayland: compositor-specific (Sway)
         if command -v swaymsg &>/dev/null; then
           local info=$(${pkgs.sway}/bin/swaymsg -t get_tree | ${pkgs.jq}/bin/jq -r '.. | select(.focused? == true) | {title: .name, class: .app_id, pid: .pid}')
           echo "$info"
@@ -140,20 +140,7 @@ in {
         return
       fi
       
-      # Method 2: Hyprland via hyprctl
-      if command -v hyprctl &>/dev/null; then
-        # Hyprland can provide some activity info
-        local last_activity=$(hyprctl activewindow -j 2>/dev/null | ${pkgs.jq}/bin/jq -r '.pid // 0')
-        if [[ "$last_activity" != "0" ]]; then
-          idle_time=$(get_wayland_idle_from_state)
-        else
-          idle_time=999999  # Very large number if no active window
-        fi
-        echo "$idle_time"
-        return
-      fi
-      
-      # Method 3: wlr-randr (for wlroots-based compositors)
+      # Method 2: wlr-randr (for wlroots-based compositors)
       if command -v wlr-randr &>/dev/null; then
         # Use state-based tracking
         idle_time=$(get_wayland_idle_from_state)

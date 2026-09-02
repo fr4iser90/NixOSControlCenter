@@ -47,7 +47,7 @@ Usage:
 
 Keys:
   enable=true|false
-  environment=plasma|gnome|xfce|hyprland
+  environment=plasma|gnome|xfce
   display.manager=sddm|gdm|lightdm   (also: manager=…)
   display.server=wayland|x11|hybrid  (also: server=…)
   display.session=<name>             (also: session=…; default follows environment)
@@ -128,10 +128,10 @@ EOF
     fi
   fi
 
-  case "$ENVIRONMENT" in plasma|gnome|xfce|hyprland) ;; *)
-    ${ui.messages.error "Invalid environment: $ENVIRONMENT (plasma|gnome|xfce|hyprland)"}
+  case "$ENVIRONMENT" in plasma|gnome|xfce) ;; *)
+    ${ui.messages.error "Invalid environment: $ENVIRONMENT (plasma|gnome|xfce)"}
     if [[ -z "''${NCC_CLI_NESTED:-}" ]]; then
-      ${ui.messages.info "Next: sudo ncc desktop set environment=plasma|gnome|xfce|hyprland"}
+      ${ui.messages.info "Next: sudo ncc desktop set environment=plasma|gnome|xfce"}
     fi
     exit 2
   esac

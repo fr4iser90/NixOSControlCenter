@@ -132,13 +132,13 @@ else
   fail "broken relative import paths under nixos/"
 fi
 
-# ── 8) Module fragment eval (prebuild checks) ────────────────────────────────
+# ── 8) Module fragment eval (prebuild + imported config.nix) ─────────────────
 echo ""
-echo "== 8/10  nix module eval (prebuild fragments) =="
+echo "== 8/10  nix module eval (prebuild + config.nix imports) =="
 if bash "$ROOT/tests/validate-nix-module-eval.sh"; then
   pass "validate-nix-module-eval.sh"
 else
-  fail "prebuild module eval failed (missing import at apply-time)"
+  fail "prebuild / imported config.nix module eval failed"
 fi
 
 # ── 9) GUI catalog invariants ────────────────────────────────────────────────

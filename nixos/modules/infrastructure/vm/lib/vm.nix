@@ -358,10 +358,19 @@ PY
       echo "  Boot: $boot_mode"
       echo "  Memory: ${toString memory}MB"
       echo "  Cores: ${toString cores}"
+      # SSH hostfwd for Linux E2E (127.0.0.1 only). Port tracks SPICE slot.
+      local ssh_port=$((2200 + spice_port - 5900))
       echo "  SPICE Display: spice://localhost:$spice_port"
+      ${if isWindows then "" else ''
+      echo "  SSH forward:  ssh -p $ssh_port USER@127.0.0.1"
+      ''}
       echo ""
       echo "To connect: remote-viewer spice://localhost:$spice_port"
       echo "              (or: spicy -h localhost -p $spice_port)"
+      ${if isWindows then "" else ''
+      echo "E2E SSH:       ssh -p $ssh_port USER@127.0.0.1"
+      echo "               (guest must have openssh; QMP: $qmp_sock)"
+      ''}
       if [ "$boot_mode" = "iso" ]; then
         echo "After install: reboot in the guest → boots installed OS (same session)"
         echo "Force installer anytime: ncc vm test-${distro}-run --iso"
@@ -393,8 +402,10 @@ PY
 
       # Drive args: ISO boot prefers CD (bootindex=1); disk boot boots installed system only.
       # cdrom0 id is required so QMP can detach the ISO after post-install RESET.
+      # QMP always on — ISO eject helper + host E2E screendump.
       local drive_args
-      local qmp_args=()
+      rm -f "$qmp_sock"
+      local qmp_args=( -qmp "unix:$qmp_sock,server,nowait" )
       if [ "$boot_mode" = "disk" ]; then
         ${if isWindows then ''
         drive_args=(
@@ -426,8 +437,6 @@ PY
           -device ide-cd,id=cdrom0,bus=ahci0.0,drive=cd0,bootindex=1
         )
         ''}
-        rm -f "$qmp_sock"
-        qmp_args=( -qmp "unix:$qmp_sock,server,nowait" )
         start_iso_eject_on_reset "$qmp_sock" "${image.path}" &
         eject_helper_pid=$!
       fi
@@ -464,10 +473,11 @@ PY
         ${if isWindows then ''
         # e1000: in-box Windows driver (virtio-net needs virtio-win ISO)
         -device e1000,netdev=net0 \
+        -netdev user,id=net0 \
         '' else ''
         -device virtio-net-pci,netdev=net0 \
+        -netdev user,id=net0,hostfwd=tcp:127.0.0.1:$ssh_port-:22 \
         ''} \
-        -netdev user,id=net0 \
         -boot menu=on 2>"$qemu_err"
       qemu_rc=$?
       set -e

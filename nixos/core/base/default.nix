@@ -9,7 +9,6 @@
     ./localization
     ./user
     ./desktop
-    ./hyprland
     ./audio
     ./packages
   ];

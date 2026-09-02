@@ -1,20 +1,18 @@
 # Root NCC GUI launcher (includes AI assistant sources for embed)
-{ pkgs, lib, getModuleMetadata, getModuleApi, packagesRoot, hyprlandRoot, guiPages ? {} }:
+{ pkgs, lib, getModuleMetadata, getModuleApi, packagesRoot, guiPages ? {} }:
 
 let
   shared = import ./domain-gui.nix {
-    inherit pkgs lib getModuleMetadata getModuleApi packagesRoot hyprlandRoot guiPages;
+    inherit pkgs lib getModuleMetadata getModuleApi packagesRoot guiPages;
     assistantRoot = (getModuleMetadata "ncc-assistant").path;
   };
   catalogFile = import "${packagesRoot}/lib/mk-catalog-json.nix" { inherit pkgs; };
-  hyprlandCatalogFile = import "${hyprlandRoot}/lib/mk-catalog-json.nix" { inherit pkgs; };
   eng = import ./package.nix { inherit pkgs; };
   nccGui = pkgs.writeShellScriptBin "ncc-gui" ''
     set -euo pipefail
     export PYTHONPATH="${shared.src}''${PYTHONPATH:+:$PYTHONPATH}"
     export NCC_PACKAGES_BIN="''${NCC_PACKAGES_BIN:-ncc-packages}"
     export NCC_PACKAGES_CATALOG="''${NCC_PACKAGES_CATALOG:-${catalogFile}}"
-    export NCC_HYPRLAND_CATALOG="''${NCC_HYPRLAND_CATALOG:-${hyprlandCatalogFile}}"
     export NCC_GUI_ICON="''${NCC_GUI_ICON:-${eng.iconPng}}"
     export QT_QPA_PLATFORM="''${QT_QPA_PLATFORM:-xcb}"
     export PATH="${pkgs.nix}/bin:$PATH"

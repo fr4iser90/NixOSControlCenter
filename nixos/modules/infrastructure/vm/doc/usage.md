@@ -72,6 +72,8 @@ Notes:
 - **win11**: UEFI Secure Boot (OVMFFull MS keys) + software TPM
 - ISO boots via `bootindex` (not classic `-cdrom` / `-boot order`) so OVMF does not fall through to PXE
 - **Network**: QEMU user/NAT (`-netdev user`). Windows uses `e1000` (in-box driver); Linux guests use `virtio-net`
+- **Linux SSH**: `hostfwd` `127.0.0.1:2200+ → guest:22` (port printed at start).
+- **QMP**: always enabled under `$XDG_RUNTIME_DIR/ncc-vm/<name>/qmp.sock` (ISO eject + screendump)
 
 ### Starting an existing libvirt domain
 

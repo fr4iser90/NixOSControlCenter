@@ -19,12 +19,12 @@ Usage: ocr-screenshot [options] [image.png]
   Region capture then OCR, or OCR an existing image.
 
   Session/desktop are detected (XDG_SESSION_TYPE, WAYLAND_DISPLAY, XDG_CURRENT_DESKTOP,
-  SWAYSOCK, HYPRLAND_INSTANCE_SIGNATURE). Capture backend:
+  SWAYSOCK). Capture backend:
 
   • X11 session          → maim (region)
   • Wayland + KDE/KWin   → spectacle -r -b
   • Wayland + GNOME/Mutter → gnome-screenshot -a
-  • Wayland + wlroots (Sway, Hyprland, …) → grim + slurp
+  • Wayland + wlroots (Sway, …) → grim + slurp
   • Wayland + unknown    → grim+slurp, then spectacle, then gnome-screenshot
 
 Options:
@@ -112,10 +112,6 @@ EOF
 
     # Returns: kde | gnome | wlroots | other
     detect_desktop_kind() {
-      if [[ -n "''${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
-        echo wlroots
-        return
-      fi
       if [[ -n "''${SWAYSOCK:-}" ]]; then
         echo wlroots
         return
@@ -135,7 +131,7 @@ EOF
         echo gnome
         return
       fi
-      if [[ "$d" == *sway* ]] || [[ "$d" == *hyprland* ]] || [[ "$d" == *dwl* ]] || [[ "$d" == *wayfire* ]] || [[ "$d" == *river* ]] || [[ "$d" == *labwc* ]] || [[ "$d" == *niri* ]]; then
+      if [[ "$d" == *sway* ]] || [[ "$d" == *dwl* ]] || [[ "$d" == *wayfire* ]] || [[ "$d" == *river* ]] || [[ "$d" == *labwc* ]] || [[ "$d" == *niri* ]]; then
         echo wlroots
         return
       fi
