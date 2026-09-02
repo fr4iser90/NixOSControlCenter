@@ -3,7 +3,7 @@
 
 let
   lib = pkgs.lib;
-  catalog = import ./rice-catalog.nix;
+  catalog = import ./rice-catalog.nix { inherit pkgs; };
 
   isApplyable = rice:
     let
@@ -47,10 +47,12 @@ let
   entries = lib.mapAttrsToList (_: v: v) catalog;
   enriched = map enrich entries;
   applyableRices = lib.filter (r: r.applyable) enriched;
-  contests = lib.unique (map (r: r.contest) applyableRices);
+  # Gallery categories from all catalog entries (apply store may be empty).
+  gallery = if applyableRices == [] then enriched else applyableRices;
+  contests = lib.unique (map (r: r.contest) gallery);
   categories = map (n:
     let
-      sample = lib.head (lib.filter (r: r.contest == n) applyableRices);
+      sample = lib.head (lib.filter (r: r.contest == n) gallery);
     in {
       id = "contest-${toString n}";
       title = "Contest #${toString n}: ${sample.theme}";
@@ -61,6 +63,7 @@ let
     inherit categories;
     rices = enriched;
     storeRices = applyableRices;
+    galleryRices = enriched; # preview gallery (includes reference-only)
     riceIds = builtins.attrNames catalog;
     applyableIds = map (r: r.id) applyableRices;
     riceNames = map (r: r.name) enriched;

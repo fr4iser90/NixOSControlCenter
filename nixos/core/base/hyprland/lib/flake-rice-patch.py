@@ -21,7 +21,7 @@ def replace_block(text: str, begin: str, end: str, body: str) -> str:
     block = begin + "\n" + body.rstrip() + "\n    " + end
     if pattern.search(text):
         return pattern.sub(block, text, count=1)
-    raise SystemExit(f"missing marker block: {begin} .. {end}")
+    return text
 
 
 def add_outputs_arg(text: str, name: str) -> str:
@@ -66,8 +66,14 @@ def patch_flake(
             "        ]"
         )
 
-    text = replace_block(text, INPUTS_BEGIN, INPUTS_END, inputs_body)
-    text = replace_block(text, MODULES_BEGIN, MODULES_END, modules_body)
+    if INPUTS_BEGIN in text and INPUTS_END in text:
+        text = replace_block(text, INPUTS_BEGIN, INPUTS_END, inputs_body)
+    elif rice_id:
+        raise SystemExit(f"missing marker block: {INPUTS_BEGIN} .. {INPUTS_END}")
+    if MODULES_BEGIN in text and MODULES_END in text:
+        text = replace_block(text, MODULES_BEGIN, MODULES_END, modules_body)
+    elif rice_id:
+        raise SystemExit(f"missing marker block: {MODULES_BEGIN} .. {MODULES_END}")
     if input_name and rice_id:
         text = add_outputs_arg(text, input_name)
     flake_path.write_text(text, encoding="utf-8")

@@ -8,8 +8,14 @@ let
   catalogFile = import ../lib/mk-catalog-json.nix { inherit pkgs; };
   paths = import ../lib/paths.nix;
   flakePatch = ../lib/flake-rice-patch.py;
-
-  hyprCandidatesJson = builtins.toJSON paths.hyprConfigCandidates;
+  flakePatchBin = pkgs.writeShellScriptBin "ncc-flake-rice-patch" ''
+    exec ${pkgs.python3}/bin/python3 ${flakePatch} "$@"
+  '';
+  riceSanitize = ../lib/rice-sanitize.py;
+  riceSanitizeBin = pkgs.writeShellScriptBin "ncc-rice-sanitize" ''
+    exec ${pkgs.python3}/bin/python3 ${riceSanitize} "$@"
+  '';
+  hyprlandBin = "${pkgs.hyprland}/bin/hyprland";
 in
 pkgs.writeShellScriptBin "ncc-hyprland-rice-install" ''
   #!${pkgs.bash}/bin/bash
@@ -19,17 +25,15 @@ pkgs.writeShellScriptBin "ncc-hyprland-rice-install" ''
   JQ=${pkgs.jq}/bin/jq
   GIT=${pkgs.git}/bin/git
   RSYNC=${pkgs.rsync}/bin/rsync
+  SANITIZE=${riceSanitizeBin}/bin/ncc-rice-sanitize
+  HYPRLAND_BIN=${hyprlandBin}
   NIXOS_DIR="''${NIXOS_DIR:-/etc/nixos}"
   ${facade.sourcePreamble { nixosRoot = "/etc/nixos"; }}
   export NIXOS_ROOT="$NIXOS_DIR"
   STATE_ROOT="${paths.stateRoot}"
   COLLECTIONS_ROOT="${paths.collectionsRoot}"
   ACTIVE_MANIFEST="${paths.activeManifest}"
-  HYPR_CANDIDATES='${hyprCandidatesJson}'
-  FLAKE_PATCH=${pkgs.writeScript "ncc-flake-rice-patch" [
-    "python3"
-    "${flakePatch}"
-  ]}
+  FLAKE_PATCH=${flakePatchBin}/bin/ncc-flake-rice-patch
 
   usage() {
     cat <<EOF
@@ -50,7 +54,8 @@ EOF
 
   discover_hypr_config() {
     local root="$1"
-    local c path
+    local json="$2"
+    local c path found
     while IFS= read -r c; do
       [[ -z "$c" ]] && continue
       path="$root/upstream/$c"
@@ -58,7 +63,16 @@ EOF
         echo "$c"
         return 0
       fi
-    done < <("$JQ" -r '.[]' <<< "$HYPR_CANDIDATES")
+    done < <("$JQ" -r '.dotfiles.hyprCandidates[]? // empty' <<< "$json")
+    found=$(
+      find "$root/upstream" -type f \( -name 'hyprland.conf' -o -name 'hyprland.lua' \) 2>/dev/null \
+        | LC_ALL=C sort \
+        | head -n 1
+    ) || true
+    if [[ -n "''${found:-}" ]]; then
+      echo "''${found#$root/upstream/}"
+      return 0
+    fi
   }
 
   fetch_dotfiles() {
@@ -85,11 +99,18 @@ EOF
     mkdir -p "$dest/upstream"
     "$RSYNC" -a --delete "$tmp/upstream/" "$dest/upstream/"
     rm -rf "$tmp"
+    ${ui.messages.loading "Sanitizing upstream paths for NCC…"}
+    "$SANITIZE" "$dest/upstream" || true
     local hypr_rel
-    hypr_rel=$(discover_hypr_config "$dest") || true
+    hypr_rel=$(discover_hypr_config "$dest" "$json") || true
     if [[ -z "''${hypr_rel:-}" ]]; then
-      ${ui.messages.error "No hyprland.conf found in upstream repo for $id"}
-      ${ui.messages.info "Tried paths from catalog hyprCandidates"}
+      ${ui.messages.error "No hyprland.conf / hyprland.lua found in upstream repo for $id"}
+      ${ui.messages.info "Tried catalog hyprCandidates and a repo-wide search"}
+      return 1
+    fi
+    ${ui.messages.loading "Repairing config for current Hyprland (verify-config)…"}
+    if ! "$SANITIZE" "$dest/upstream" --hyprland "$HYPRLAND_BIN" --entry "$dest/upstream/$hypr_rel"; then
+      ${ui.messages.error "hyprland --verify-config still failing after sanitize — rice not installable"}
       return 1
     fi
     "$JQ" -n \

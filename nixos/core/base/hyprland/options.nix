@@ -3,7 +3,7 @@
 let
   metadata = getCurrentModuleMetadata ./.;
   configPath = metadata.configPath;
-  catalog = import ./lib/rice-catalog.nix;
+  catalog = import ./lib/rice-catalog.nix { };
   riceIds = builtins.attrNames catalog;
 in {
   options.${configPath} = {

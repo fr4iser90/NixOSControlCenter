@@ -6,7 +6,7 @@ let
     inherit pkgs;
   };
   cfg = getModuleConfig moduleName;
-  catalog = import ../lib/rice-catalog.nix;
+  catalog = import ../lib/rice-catalog.nix { inherit pkgs; };
   riceIds = builtins.attrNames catalog;
   riceIdsList = builtins.concatStringsSep " " riceIds;
   isApplyable = rice:
@@ -19,6 +19,9 @@ let
 
   riceInstall = import ./hyprland-rice-install.nix {
     inherit pkgs getModuleApi getModuleMetadata getModuleConfig moduleName;
+  };
+  riceValidate = import ./hyprland-rice-validate.nix {
+    inherit pkgs getModuleApi;
   };
 
   nixNullStr = v: if v == null then "null" else v;
@@ -107,12 +110,10 @@ EOF
     local val="$1" label="$2"
     local require_applyable="''${3:-false}"
     [[ "$val" == "null" || -z "$val" ]] && return 0
-    case " $val " in
-      *" "*)
-        ${ui.messages.error "Invalid $label: $val"}
-        exit 2
-        ;;
-    esac
+    if [[ "$val" == *' '* ]]; then
+      ${ui.messages.error "Invalid $label: $val"}
+      exit 2
+    fi
     local ok=false
     for id in ${riceIdsList}; do
       [[ "$id" == "$val" ]] && ok=true
@@ -137,6 +138,16 @@ EOF
 
   validate_rice "$RICE" "rice" "true"
   validate_rice "$WALL_RICE" "wallpaper.rice" "true"
+
+  # HARD GATE: rice apply only when validated100
+  if [[ "$RICE" != "null" && -n "$RICE" ]]; then
+    ${ui.messages.loading "100% validating rice $RICE…"}
+    if ! ${riceValidate}/bin/ncc-hyprland-rice-validate "$RICE"; then
+      ${ui.messages.error "Apply blocked — rice $RICE is not validated 100%"}
+      ${ui.messages.info "Next: ncc hyprland rice validate $RICE"}
+      exit 1
+    fi
+  fi
 
   if [ "''${EUID:-$(id -u)}" -ne 0 ] && [ "$DRY_RUN" != true ]; then
     ${ui.messages.error "Run as root: sudo ncc hyprland set …"}

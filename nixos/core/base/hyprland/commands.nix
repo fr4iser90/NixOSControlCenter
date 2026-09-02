@@ -19,6 +19,12 @@ let
   hyprlandStatus = import ./scripts/hyprland-status.nix {
     inherit pkgs getModuleApi getModuleMetadata getModuleConfig moduleName;
   };
+  hyprlandRiceValidate = import ./scripts/hyprland-rice-validate.nix {
+    inherit pkgs getModuleApi;
+  };
+  hyprlandRiceVerify = import ./scripts/hyprland-rice-verify.nix {
+    inherit pkgs getModuleApi;
+  };
   hyprlandGui = import ./gui/default.nix {
     inherit pkgs hyprlandCli getModuleApi config;
   };
@@ -58,6 +64,14 @@ let
       install)
         shift
         exec ${hyprlandRiceInstall}/bin/ncc-hyprland-rice-install "$@"
+        ;;
+      validate)
+        shift
+        exec ${hyprlandRiceValidate}/bin/ncc-hyprland-rice-validate "$@"
+        ;;
+      verify)
+        shift
+        exec ${hyprlandRiceVerify}/bin/ncc-hyprland-rice-verify "$@"
         ;;
       status)
         exec ${hyprlandStatus}/bin/ncc-hyprland-status
@@ -123,6 +137,26 @@ let
       '';
     }
     {
+      name = "validate";
+      parent = "rice";
+      domain = "hyprland";
+      description = "HARD 100% gate — exit 0 only when every validation check passes";
+      category = "base";
+      script = "${hyprlandRiceValidate}/bin/ncc-hyprland-rice-validate";
+      shortHelp = "validate - 100% gate before apply";
+      longHelp = "ncc hyprland rice validate space-rice";
+    }
+    {
+      name = "verify";
+      parent = "rice";
+      domain = "hyprland";
+      description = "Hard gate: hyprland --verify-config on live /etc/xdg/hypr before login";
+      category = "base";
+      script = "${hyprlandRiceVerify}/bin/ncc-hyprland-rice-verify";
+      shortHelp = "verify - prove live config before Hyprland login";
+      longHelp = "ncc hyprland rice verify";
+    }
+    {
       name = "status";
       parent = "hyprland";
       domain = "hyprland";
@@ -162,6 +196,7 @@ in {
         hyprlandCli
         hyprlandSet
         hyprlandRiceInstall
+        hyprlandRiceValidate
         hyprlandStatus
         hyprlandGui.nccHyprlandGui
         entry

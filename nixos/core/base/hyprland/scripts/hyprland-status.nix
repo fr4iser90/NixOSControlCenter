@@ -2,7 +2,7 @@
 
 let
   paths = import ../lib/paths.nix;
-  catalog = import ../lib/rice-catalog.nix;
+  catalog = import ../lib/rice-catalog.nix { };
   catalogCount = builtins.length (builtins.attrNames catalog);
 in
 pkgs.writeShellScriptBin "ncc-hyprland-status" ''

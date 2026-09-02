@@ -3,6 +3,8 @@
 let
   catalogFile = import ../lib/mk-catalog-json.nix { inherit pkgs; };
   ui = getModuleApi "cli-formatter";
+  riceValidate = import ./hyprland-rice-validate.nix { inherit pkgs getModuleApi; };
+  riceVerify = import ./hyprland-rice-verify.nix { inherit pkgs getModuleApi; };
 in
 pkgs.writeShellScriptBin "ncc-hyprland" ''
   set -euo pipefail
@@ -17,14 +19,20 @@ ncc hyprland — Hyprland rice catalog and wallpaper helpers
 Usage:
   ncc hyprland status
   ncc hyprland rice list [--all]
+  ncc hyprland rice validate <id>
+  ncc hyprland rice verify
   ncc hyprland rice info <id>
   ncc hyprland wallpaper list
 
-Store lists one-click applyable rices only (wallpaper or flake preset).
+Store lists applyable rices only (validated100). Currently none — use rice list --all for previews.
 Use rice list --all to include reference-only catalog entries.
 
 Catalog source: Hyprland Hall of Fame (https://hypr.land/hall_of_fame/)
 Apply via: ncc hyprland --gui  or  sudo ncc hyprland set rice=<id>
+
+Safety:
+  ncc hyprland rice validate <id>   # HARD 100% gate (set/GUI block without YES)
+  ncc hyprland rice verify          # after rebuild, before Hyprland login
 
 Examples:
   ncc hyprland rice list
@@ -105,6 +113,8 @@ EOF
       case "''${1:-}" in
         list) shift; rice_list "$@" ;;
         info) shift; rice_info "''${1:-}" ;;
+        validate) shift; exec ${riceValidate}/bin/ncc-hyprland-rice-validate "$@" ;;
+        verify) shift; exec ${riceVerify}/bin/ncc-hyprland-rice-verify "$@" ;;
         *)
           ${ui.messages.error ''Unknown: ncc hyprland rice ''${1:-}''}
           ${ui.messages.info "Next: ncc hyprland rice list"}

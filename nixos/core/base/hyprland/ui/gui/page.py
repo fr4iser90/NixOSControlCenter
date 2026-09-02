@@ -11,7 +11,6 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -178,16 +177,51 @@ def _format_rice_details(rice: dict, *, active_id: str | None) -> str:
     return "\n".join(lines)
 
 
+def _format_validate_block(report: dict) -> str:
+    v100 = bool(report.get("validated100"))
+    lines = [
+        "",
+        f"── 100% validate: {'YES' if v100 else 'NO / REJECTED'} ──",
+    ]
+    for line in report.get("checks") or []:
+        lines.append(f"✓ {line}")
+    for line in report.get("warnings") or []:
+        lines.append(f"⚠ {line}")
+    for line in report.get("errors") or []:
+        lines.append(f"✗ {line}")
+    if not v100:
+        lines.append("Apply blocked until validated100=YES.")
+    return "\n".join(lines)
+
+
+def _validate_report_text(report: dict) -> str:
+    v100 = bool(report.get("validated100"))
+    parts = [f"validated100: {'YES' if v100 else 'NO'}"]
+    if report.get("hyprConfig"):
+        parts.append(f"Config: {report['hyprConfig']}")
+    for line in report.get("errors") or []:
+        parts.append(f"✗ {line}")
+    for line in report.get("warnings") or []:
+        parts.append(f"⚠ {line}")
+    parts.append("")
+    if v100:
+        parts.append("VALIDATED 100% — apply allowed.")
+    else:
+        parts.append("REJECTED — not 100%. Apply blocked.")
+    return "\n".join(parts)
+
+
 class HyprlandPage(DomainPage):
     def __init__(self, parent=None) -> None:
         super().__init__(
             "Hyprland",
-            "One-click applyable Hall of Fame rices with live previews. "
-            "Apply stages systemConfig; rebuild activates wallpaper and Hypr presets.",
+            "Hall of Fame gallery (preview) + NCC collection apply store. "
+            "Apply only for collection rices that pass validated100.",
             parent=parent,
         )
-        self._catalog: dict = {"storeRices": [], "categories": []}
+        self._catalog: dict = {"storeRices": [], "galleryRices": [], "categories": []}
         self._store_rices: list[dict] = []
+        self._gallery_rices: list[dict] = []
         self._live = {
             "enable": "false",
             "rice": "null",
@@ -206,8 +240,8 @@ class HyprlandPage(DomainPage):
         self.add_content_widget(wrap)
 
         tip = QLabel(
-            "Store: dotfiles → /var/lib/ncc/hyprland/collections/ (fetched on Apply). "
-            "Flake rices also patch flake.nix. Reference catalog: ncc hyprland rice list --all"
+            "Gallery = HoF previews. Apply store = NCC-Hyperland-Collection only. "
+            "Save → Apply when a rice is validated100."
         )
         tip.setObjectName("nccPageSubtitle")
         tip.setWordWrap(True)
@@ -222,7 +256,7 @@ class HyprlandPage(DomainPage):
         ll.addWidget(self.categories)
         split.addWidget(left)
 
-        mid = QGroupBox("Store")
+        mid = QGroupBox("Gallery (preview)")
         ml = QVBoxLayout(mid)
         self.rices = QListWidget()
         self.rices.setViewMode(QListWidget.ViewMode.IconMode)
@@ -231,7 +265,7 @@ class HyprlandPage(DomainPage):
         self.rices.setResizeMode(QListWidget.ResizeMode.Adjust)
         self.rices.setMovement(QListWidget.Movement.Static)
         self.rices.setSpacing(8)
-        self.rices.currentItemChanged.connect(self._show_details)
+        self.rices.currentItemChanged.connect(self._on_rice_selected)
         ml.addWidget(self.rices)
         split.addWidget(mid)
 
@@ -253,15 +287,6 @@ class HyprlandPage(DomainPage):
         self.details.setReadOnly(True)
         self.details.setMinimumHeight(160)
         rl.addWidget(self.details)
-
-        self.wallpaper_only = QCheckBox("Wallpaper only (do not set active rice)")
-        self.wallpaper_only.stateChanged.connect(self._on_wallpaper_only)
-        rl.addWidget(self.wallpaper_only)
-
-        self.wall_combo = QComboBox()
-        self.wall_combo.addItem("(follow active rice)", "null")
-        rl.addWidget(QLabel("Wallpaper override"))
-        rl.addWidget(self.wall_combo)
         split.addWidget(right)
         split.setSizes([160, 420, 320])
         self.add_content_widget(split, stretch=1)
@@ -275,14 +300,13 @@ class HyprlandPage(DomainPage):
         self.commit.set_flush_handler(self._flush_pending)
         self.commit.set_pending_changed(self._on_pending_changed)
 
-        self.add_action("Apply selected", self._apply_selected, ncc=("hyprland", "set"))
         self.add_action("Reload", self.reload, local=True)
         self.add_action("Rebuild…", self._rebuild, ncc=("system", "build"))
 
         self.reload()
 
     def _store_rices_for_category(self, cat_kind: str, cat: dict) -> list[dict]:
-        rices = list(self._store_rices)
+        rices = list(self._gallery_rices)
         if cat_kind == "all":
             return sorted(rices, key=lambda r: (-(r.get("contest") or 0), r.get("rank") or 0))
         cid = str(cat.get("contest") or "")
@@ -310,12 +334,7 @@ class HyprlandPage(DomainPage):
     def _on_enable_changed(self, _state: int = 0) -> None:
         if self._loading:
             return
-        self._stage_from_state(trigger="enable")
-
-    def _on_wallpaper_only(self, _state: int = 0) -> None:
-        if self._loading:
-            return
-        self._stage_from_state(trigger="wallpaper")
+        self._stage_from_state()
 
     def _fill_categories(self) -> None:
         self.categories.clear()
@@ -328,26 +347,6 @@ class HyprlandPage(DomainPage):
         if self.categories.count() > 0:
             self.categories.setCurrentRow(0)
 
-    def _fill_wall_combo(self) -> None:
-        self.wall_combo.blockSignals(True)
-        cur = self.wall_combo.currentData()
-        self.wall_combo.clear()
-        self.wall_combo.addItem("(follow active rice)", "null")
-        for rice in sorted(
-            self._store_rices,
-            key=lambda r: (r.get("contest") or 0, r.get("rank") or 0),
-        ):
-            rid = rice.get("id")
-            self.wall_combo.addItem(
-                f"{rice.get('name')} (#{rice.get('contest')})",
-                rid,
-            )
-        for i in range(self.wall_combo.count()):
-            if self.wall_combo.itemData(i) == cur:
-                self.wall_combo.setCurrentIndex(i)
-                break
-        self.wall_combo.blockSignals(False)
-
     def _on_category(self, cur: QListWidgetItem | None, _prev=None) -> None:
         if cur is None:
             return
@@ -355,20 +354,49 @@ class HyprlandPage(DomainPage):
         if not raw:
             return
         kind, cat = raw
-        self.rices.clear()
-        active = self._active_rice_id()
-        for rice in self._store_rices_for_category(kind, cat):
-            rid = rice.get("id") or ""
-            mark = " ✓" if rid == active else ""
-            method = rice.get("applyMethod") or "wallpaper"
-            badge = "⬡" if method == "flake" else "◻"
-            label = f"{badge} #{rice.get('rank')} {rice.get('name')}{mark}"
-            item = _make_item(label, rice)
-            item.setIcon(_icon_from_store(rice.get("previewStorePath")))
-            item.setSizeHint(QSize(_THUMB_W + 16, _THUMB_H + 36))
-            self.rices.addItem(item)
-        if self.rices.count() > 0:
-            self.rices.setCurrentRow(0)
+        self._loading = True
+        try:
+            self.rices.clear()
+            active = self._display_rice_id()
+            select_row = 0
+            for row, rice in enumerate(self._store_rices_for_category(kind, cat)):
+                rid = rice.get("id") or ""
+                mark = " ✓" if rid == active else ""
+                label = f"#{rice.get('rank')} {rice.get('name')}{mark}"
+                item = _make_item(label, rice)
+                item.setIcon(_icon_from_store(rice.get("previewStorePath")))
+                item.setSizeHint(QSize(_THUMB_W + 16, _THUMB_H + 36))
+                self.rices.addItem(item)
+                if rid == active:
+                    select_row = row
+            if self.rices.count() > 0:
+                self.rices.setCurrentRow(select_row)
+        finally:
+            self._loading = False
+
+    def _on_rice_selected(self, cur: QListWidgetItem | None, _prev=None) -> None:
+        self._show_details(cur, _prev)
+        if self._loading or cur is None:
+            return
+        rice = cur.data(Qt.ItemDataRole.UserRole)
+        if not isinstance(rice, dict):
+            return
+        if not rice.get("applyable"):
+            return
+        rid = str(rice.get("id") or "")
+        report = self._validate_rice(rid) if rid else None
+        if report is not None:
+            self.details.setPlainText(
+                self.details.toPlainText() + _format_validate_block(report)
+            )
+        self._maybe_warn_validate(report)
+        if report is not None and not report.get("validated100"):
+            self.log_append(f"• REJECTED {rid} — not validated 100%; not staged\n")
+            return
+        if report is None:
+            self.log_append(f"• validate unavailable for {rid} — not staged\n")
+            return
+        self._stage_from_state(rice=rice)
 
     def _show_details(self, cur: QListWidgetItem | None, _prev=None) -> None:
         if cur is None:
@@ -389,8 +417,44 @@ class HyprlandPage(DomainPage):
             self.preview_img.setText("No preview")
         self.apply_badge.setText(rice.get("applyLabel") or rice.get("applyMethod") or "")
         self.details.setPlainText(
-            _format_rice_details(rice, active_id=self._active_rice_id())
+            _format_rice_details(rice, active_id=self._display_rice_id())
         )
+
+    def _validate_rice(self, rice_id: str) -> dict | None:
+        proc = run_ncc(
+            "hyprland",
+            "rice",
+            "validate",
+            rice_id,
+            "--json",
+            timeout=300,
+        )
+        if proc.returncode not in (0, 1) or not (proc.stdout or "").strip():
+            self.log_append(f"• validate unavailable for {rice_id}\n")
+            return None
+        try:
+            report = json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            self.log_append(f"• validate parse error for {rice_id}\n")
+            return None
+        return report if isinstance(report, dict) else None
+
+    def _maybe_warn_validate(self, report: dict | None) -> None:
+        if not report:
+            return
+        if report.get("validated100"):
+            return
+        info(self, "Rice REJECTED — not 100% validated", _validate_report_text(report))
+
+    def _display_rice_id(self) -> str | None:
+        ch = self._pending_hyprland()
+        if ch is not None:
+            snap = ch.meta.get("snapshot")
+            if isinstance(snap, dict):
+                rid = str(snap.get("rice", "null"))
+                if rid not in ("null", "", "None"):
+                    return rid
+        return self._active_rice_id()
 
     def _selected_rice(self) -> dict | None:
         item = self.rices.currentItem()
@@ -399,24 +463,16 @@ class HyprlandPage(DomainPage):
         rice = item.data(Qt.ItemDataRole.UserRole)
         return rice if isinstance(rice, dict) else None
 
-    def _stage_from_state(self, *, trigger: str = "rice", rice: dict | None = None) -> None:
+    def _stage_from_state(self, *, rice: dict | None = None) -> None:
         assert self.commit is not None
         enable = "true" if self.enable.isChecked() else "false"
         selected = rice or self._selected_rice()
-        rice_id = "null"
-        wall_rice = str(self.wall_combo.currentData() or "null")
-        if selected and not self.wallpaper_only.isChecked():
-            rice_id = str(selected.get("id") or "null")
-        if trigger == "rice" and selected:
-            if self.wallpaper_only.isChecked():
-                wall_rice = str(selected.get("id") or "null")
-            elif wall_rice == "null":
-                wall_rice = rice_id
+        rice_id = str(selected.get("id") or "null") if selected else "null"
 
         snap = {
             "enable": enable,
             "rice": rice_id,
-            "wallpaper.rice": wall_rice,
+            "wallpaper.rice": "null",
             "wallpaper.path": "null",
         }
         if snap == self._live:
@@ -427,13 +483,13 @@ class HyprlandPage(DomainPage):
             self._update_draft_label()
             return
 
-        summary = f"hyprland set enable={enable} rice={rice_id} wallpaper.rice={wall_rice}"
+        summary = f"hyprland set enable={enable} rice={rice_id} wallpaper.rice=null"
         argv = [
             "hyprland",
             "set",
             f"enable={enable}",
             f"rice={rice_id}",
-            f"wallpaper.rice={wall_rice}",
+            "wallpaper.rice=null",
             "wallpaper.path=null",
         ]
         self.commit.stage_replace(
@@ -447,19 +503,21 @@ class HyprlandPage(DomainPage):
         )
         self._update_draft_label()
 
-    def _apply_selected(self) -> None:
-        rice = self._selected_rice()
-        if not rice:
-            info(self, "Apply", "Select a rice from the store first.")
+    def _select_rice_by_id(self, rice_id: str | None) -> None:
+        if not rice_id or rice_id in ("null", "", "None"):
             return
-        if not rice.get("applyable"):
-            info(
-                self,
-                "Not applyable",
-                "This entry is reference-only.\nUse: ncc hyprland rice list --all",
-            )
-            return
-        self._stage_from_state(trigger="rice", rice=rice)
+        self._loading = True
+        try:
+            for row in range(self.rices.count()):
+                item = self.rices.item(row)
+                if item is None:
+                    continue
+                rice = item.data(Qt.ItemDataRole.UserRole)
+                if isinstance(rice, dict) and rice.get("id") == rice_id:
+                    self.rices.setCurrentRow(row)
+                    return
+        finally:
+            self._loading = False
 
     def _on_pending_changed(self) -> None:
         ch = self._pending_hyprland()
@@ -475,15 +533,7 @@ class HyprlandPage(DomainPage):
         self._loading = True
         try:
             self.enable.setChecked(snap.get("enable", "false") == "true")
-            rid = snap.get("rice", "null")
-            wall = snap.get("wallpaper.rice", "null")
-            self.wallpaper_only.setChecked(
-                rid in ("null", "", "None") and wall not in ("null", "", "None")
-            )
-            for i in range(self.wall_combo.count()):
-                if str(self.wall_combo.itemData(i)) == wall:
-                    self.wall_combo.setCurrentIndex(i)
-                    break
+            self._select_rice_by_id(snap.get("rice"))
         finally:
             self._loading = False
 
@@ -493,13 +543,16 @@ class HyprlandPage(DomainPage):
     def _update_draft_label(self) -> None:
         ch = self._pending_hyprland()
         store_n = len(self._store_rices)
+        gallery_n = len(self._gallery_rices)
         if ch is None:
             active = self._active_rice_id()
             extra = f" Active rice: {active}." if active else ""
-            self.draft_lbl.setText(f"Store: {store_n} applyable rices.{extra}")
+            self.draft_lbl.setText(
+                f"Applyable: {store_n} · Gallery: {gallery_n} preview-only.{extra}"
+            )
         else:
             self.draft_lbl.setText(
-                "Draft staged — Save / Undo, then Apply to write systemConfig."
+                "Draft ready — Save, then Apply to write systemConfig."
             )
 
     def reload(self) -> None:
@@ -507,16 +560,25 @@ class HyprlandPage(DomainPage):
             self._catalog = load_catalog()
         except Exception as exc:  # noqa: BLE001
             error(self, "Catalog", str(exc))
-            self._catalog = {"storeRices": [], "categories": []}
+            self._catalog = {"storeRices": [], "galleryRices": [], "categories": []}
         self._store_rices = [
             r
-            for r in (self._catalog.get("storeRices") or self._catalog.get("rices") or [])
+            for r in (self._catalog.get("storeRices") or [])
             if isinstance(r, dict) and r.get("applyable")
+        ]
+        self._gallery_rices = [
+            r
+            for r in (
+                self._catalog.get("galleryRices")
+                or self._catalog.get("rices")
+                or self._store_rices
+            )
+            if isinstance(r, dict)
         ]
 
         proc = run_ncc("hyprland", "status")
         kv = _parse_status(proc.stdout or "")
-        if proc.returncode == 0 and kv.get("enable"):
+        if proc.returncode == 0:
             self._live = {
                 "enable": kv.get("enable", "false"),
                 "rice": kv.get("rice", "null"),
@@ -529,11 +591,10 @@ class HyprlandPage(DomainPage):
                 self.log_append(
                     f"• collection installed ({method}) hypr={kv.get('collection.hyprConfig', '')}\n"
                 )
-        elif proc.returncode != 0:
+        else:
             self.log_append("• hyprland status unavailable — showing defaults\n")
 
         self._fill_categories()
-        self._fill_wall_combo()
         ch = self._pending_hyprland()
         if ch is not None and isinstance(ch.meta.get("snapshot"), dict):
             snap = {str(k): str(v) for k, v in ch.meta["snapshot"].items()}
