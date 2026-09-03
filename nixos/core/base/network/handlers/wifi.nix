@@ -8,6 +8,7 @@ let
   preserveProfiles = wifiCfg.preserveSystemConnections or true;
   configNetworks = wifiCfg.networks or { };
 
+
   secretsWifiDir = "/etc/nixos/secrets/wifi";
 
   hasPsk = net:
@@ -67,4 +68,12 @@ in
       StandardError = "journal";
     };
   };
+
+  # Workarounds for known WiFi driver issues (harmless if module doesn't exist)
+  boot.extraModprobeConfig = lib.mkIf wifiEnabled ''
+    # MT7925/MT7921: disable ASPM to prevent probe failures on some systems
+    # These options are only applied IF the module is loaded — no error if absent
+    options mt7925e disable_aspm=1
+    options mt7921e disable_aspm=1
+  '';
 }

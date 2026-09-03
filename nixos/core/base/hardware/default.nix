@@ -22,4 +22,9 @@ in {
     ./components/cpu
     ./components/memory
   ];
+
+  # Global firmware for all hardware: WiFi (MediaTek, Intel, Broadcom, etc.),
+  # Bluetooth, sound cards, and other devices that need proprietary firmware.
+  # Previously only set for AMD GPU — now applies to all hosts.
+  hardware.enableRedistributableFirmware = true;
 }

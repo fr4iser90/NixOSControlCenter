@@ -28,6 +28,11 @@ let
   applyMigrations = import ../../module-manager/components/module-migration/apply-migrations.nix {
     inherit pkgs;
   };
+  # Cross-module migrations (plans.nix: renames, merges like ssh-merge)
+  # Must run BEFORE build so seeding doesn't create conflicting defaults
+  moduleMigrate = (import ../../module-manager/components/module-migration/runner.nix {
+    inherit pkgs lib getModuleApi getModuleMetadata;
+  }).moduleMigrate;
 
   # Extract configuration values
   userCfg = getModuleConfig "user";
@@ -1572,13 +1577,24 @@ EOF
       ${ui.messages.info "Note: running system is not switched until build succeeds."}
     fi
 
-    # Post-sync: discover <module>/migrations/v*-to-v*.nix and apply (before rebuild).
-    # No module names here — discovery only.
+    # Post-sync: run ALL migrations BEFORE build (so seeding doesn't create conflicting defaults)
+    # 1. Single-module migrations: <module>/migrations/v*-to-v*.nix (file cleanup)
+    # 2. Cross-module migrations: plans.nix (renames, merges like ssh-server-manager → ssh-manager)
     if [ "$DRY_RUN" != "true" ]; then
       if [ "$VERBOSE" = "true" ]; then
         ${ui.messages.loading "Applying module migrations…"}
       fi
-      if ${applyMigrations}/bin/ncc-apply-migrations "$NIXOS_DIR" 0; then
+      # Single-module migrations (file cleanup within modules)
+      SINGLE_OK=true
+      if ! ${applyMigrations}/bin/ncc-apply-migrations "$NIXOS_DIR" 0; then
+        SINGLE_OK=false
+      fi
+      # Cross-module migrations (config merges like ssh-merge) — MUST run before build/seeding
+      CROSS_OK=true
+      if ! NCC_CLI_NESTED=1 ${moduleMigrate}/bin/ncc-module-migrate; then
+        CROSS_OK=false
+      fi
+      if [ "$SINGLE_OK" = "true" ] && [ "$CROSS_OK" = "true" ]; then
         ${ui.badges.success "Migrations"}
       else
         ${ui.badges.warning "Migrations"}
@@ -1721,7 +1737,9 @@ EOF
         else
           ${ui.messages.warning "migrate-config not on PATH — run: sudo ncc system migrate-config"}
         fi
-        ${ui.messages.loading "Migrating module configs if needed..."}
+        # Post-switch module migrate (safety net — main work done pre-build at sync time)
+        # Uses NEW system's tools; catches any migrations the old tools missed
+        ${ui.messages.loading "Verifying module configs..."}
         if command -v ncc-module-migrate >/dev/null 2>&1; then
           if NCC_CLI_NESTED=1 ncc-module-migrate; then
             ${ui.messages.success "Module configs are current"}
