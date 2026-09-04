@@ -196,3 +196,28 @@ print(f"OK: checked inline '' bash blocks ({len(issues)} issues)")
 PY
 
 if [[ "$FAIL" -ne 0 ]]; then exit 1; fi
+
+# Parse high-traffic bash-in-nix handlers (nested " etc. that the scan can miss)
+if command -v nix-instantiate >/dev/null 2>&1; then
+  PARSE_FILES=(
+    "$NIXOS/core/management/system-manager/handlers/system-update.nix"
+    "$NIXOS/core/management/system-manager/components/config-migration/check.nix"
+  )
+  for f in "${PARSE_FILES[@]}"; do
+    if [[ ! -f "$f" ]]; then
+      echo "FAIL: missing $f"
+      FAIL=1
+      continue
+    fi
+    if ! nix-instantiate --parse "$f" >/dev/null 2>&1; then
+      echo "FAIL: nix-instantiate --parse $f"
+      nix-instantiate --parse "$f" 2>&1 | head -20 | sed 's/^/  /' || true
+      FAIL=1
+    fi
+  done
+  if [[ "$FAIL" -eq 0 ]]; then
+    echo "OK: nix-instantiate --parse (system-update + config-check)"
+  fi
+fi
+
+if [[ "$FAIL" -ne 0 ]]; then exit 1; fi

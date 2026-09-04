@@ -53,6 +53,7 @@ CORE = {
     "network",
     "user",
     "packages",
+    "hyprland",
     "system",
     "modules",
     "install",

@@ -67,15 +67,15 @@ in
           else
             cat "$migrate_log"
             rm -f "$migrate_log"
-            ${formatter.badges.warning "Merge module configs"}
+            ${formatter.badges.warning "Migrations"}
             return 1
           fi
         fi
-        ${formatter.messages.loading "Merging module configs…"}
+        ${formatter.messages.loading "Running module migrations…"}
         if NCC_CLI_NESTED=1 ncc-module-migrate $MIGRATE_EXTRA $VERBOSE_FLAG; then
-          ${formatter.badges.success "Merge module configs"}
+          ${formatter.badges.success "Migrations — up to date"}
         else
-          ${formatter.messages.warning "Module merge had issues — run: sudo ncc modules migrate --verbose"}
+          ${formatter.messages.warning "Module migrations had issues — run: sudo ncc modules migrate --verbose"}
           return 1
         fi
       elif command -v ncc >/dev/null 2>&1; then
@@ -86,15 +86,15 @@ in
           else
             cat "$migrate_log"
             rm -f "$migrate_log"
-            ${formatter.badges.warning "Merge module configs"}
+            ${formatter.badges.warning "Migrations"}
             return 1
           fi
         fi
-        ${formatter.messages.loading "Merging module configs…"}
+        ${formatter.messages.loading "Running module migrations…"}
         if NCC_CLI_NESTED=1 ncc modules migrate $MIGRATE_EXTRA $VERBOSE_FLAG; then
-          ${formatter.badges.success "Merge module configs"}
+          ${formatter.badges.success "Migrations — up to date"}
         else
-          ${formatter.messages.warning "Module merge had issues — run: sudo ncc modules migrate"}
+          ${formatter.messages.warning "Module migrations had issues — run: sudo ncc modules migrate"}
           return 1
         fi
       else
@@ -102,7 +102,7 @@ in
           ${formatter.messages.info "ncc-module-migrate not on PATH (skip)"}
         fi
         if [ "$show_ok" = "true" ]; then
-          ${formatter.badges.success "Merge module configs"}
+          ${formatter.badges.success "Migrations — up to date"}
         fi
       fi
       return 0

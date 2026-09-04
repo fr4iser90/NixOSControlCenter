@@ -91,8 +91,8 @@ class DesktopPage(DomainPage):
         form.addRow(self.dark_lbl, self.dark)
 
         self.theme_hint = QLabel(
-            "Hyprland look-and-feel: Features → Hyprland (rice store). "
-            "Desktop theme.dark does not apply here."
+            "After Apply + rebuild with Hyprland as DE, Core → Hyprland appears "
+            "for the rice store. Desktop theme.dark does not apply here."
         )
         self.theme_hint.setObjectName("nccPageSubtitle")
         self.theme_hint.setWordWrap(True)
@@ -113,6 +113,12 @@ class DesktopPage(DomainPage):
             "rebuild makes it active on the system."
         )
         self.add_action("Reload", self.reload, local=True)
+        self._btn_hyprland = self.add_action(
+            "Hyprland rices…",
+            self._open_hyprland,
+            local=True,
+        )
+        self._btn_hyprland.hide()
 
         assert self.commit is not None
         self.commit.set_flush_handler(self._flush_pending)
@@ -169,9 +175,16 @@ class DesktopPage(DomainPage):
     def _sync_theme_visibility(self) -> None:
         env = str(self.env.currentData())
         show_theme = env in _DESKTOP_THEME_ENVS
+        show_hypr = env == "hyprland"
         self.dark_lbl.setVisible(show_theme)
         self.dark.setVisible(show_theme)
-        self.theme_hint.setVisible(env == "hyprland")
+        self.theme_hint.setVisible(show_hypr)
+        self._btn_hyprland.setVisible(show_hypr)
+
+    def _open_hyprland(self) -> None:
+        from ncc_gui.target_bus import bus as target_bus
+
+        target_bus().navigate.emit("hyprland")
 
     def _on_env_changed(self, _idx: int = 0) -> None:
         if self._loading:

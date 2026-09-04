@@ -718,23 +718,39 @@ let
     
     # Mirror module code from source. --delete drops files removed in source;
     # without it, stale paths under /etc/nixos break Nix eval after renames/removals.
+    # Increments globals SYNC_CHANGED / SYNC_REMOVED (itemize: >f* / *deleting).
     update_module_code() {
       local source_module="$1"
       local target_module="$2"
+      local rsync_out rsync_rc=0
+      local n_up=0 n_del=0
 
       # Create target_module if it doesn't exist
       mkdir -p "$target_module"
 
-      if [ "$VERBOSE" = "true" ]; then
-        rsync -av --delete "$source_module/" "$target_module/" || {
-          # Fallback: recursively copy (no orphan cleanup on failure)
-          cp -r "$source_module"/* "$target_module/" 2>/dev/null || true
-        }
-      else
-        rsync -aq --delete "$source_module/" "$target_module/" >/dev/null 2>&1 || {
-          cp -r "$source_module"/* "$target_module/" 2>/dev/null || true
-        }
+      set +e
+      rsync_out=$(rsync -ai --delete "$source_module/" "$target_module/" 2>&1)
+      rsync_rc=$?
+      set -e
+
+      if [ "$rsync_rc" -ne 0 ]; then
+        # Fallback: recursively copy (no orphan cleanup on failure)
+        cp -r "$source_module"/* "$target_module/" 2>/dev/null || true
+        if [ "$VERBOSE" = "true" ]; then
+          _rsync_fail_mod=$(basename "$source_module")
+          ${ui.messages.warning "rsync failed for $_rsync_fail_mod — used cp fallback"}
+        fi
+        return 0
       fi
+
+      if [ "$VERBOSE" = "true" ] && [ -n "$rsync_out" ]; then
+        echo "$rsync_out"
+      fi
+
+      n_up=$(printf '%s\n' "$rsync_out" | grep -cE '^>f' || true)
+      n_del=$(printf '%s\n' "$rsync_out" | grep -cE '^\*deleting' || true)
+      SYNC_CHANGED=$((SYNC_CHANGED + n_up))
+      SYNC_REMOVED=$((SYNC_REMOVED + n_del))
     }
     
     # Handle versioned module (Stage 1+)
@@ -960,6 +976,8 @@ EOF
           ${ui.messages.info "Module $module_name: New module, copying completely"}
         fi
         cp -r "$source_module" "$target_module" 2>/dev/null || true
+        _new_n=$(find "$target_module" -type f 2>/dev/null | wc -l | tr -d ' ')
+        SYNC_CHANGED=$((SYNC_CHANGED + ''${_new_n:-0}))
       fi
     }
     
@@ -994,6 +1012,7 @@ EOF
       done < <(find "$base" -type f -name options.nix -print0 2>/dev/null)
 
       if [ "$removed_count" -gt 0 ]; then
+        SYNC_REMOVED=$((SYNC_REMOVED + removed_count))
         ${ui.messages.success "Removed $removed_count stale module(s) from $item_type/"}
       elif [ "$VERBOSE" = "true" ]; then
         ${ui.messages.info "No stale leaf modules in $item_type/"}
@@ -1199,6 +1218,8 @@ EOF
     fi
     
     # Update files
+    SYNC_CHANGED=0
+    SYNC_REMOVED=0
     if [ "$VERBOSE" = "true" ]; then
       ${ui.messages.loading "Updating system files…"}
     fi
@@ -1221,6 +1242,8 @@ EOF
                 ${ui.messages.loading "Copying $item... ($item/ does not exist)"}
               fi
               sudo cp -r "$SOURCE_DIR/$item" "$NIXOS_DIR/"
+              _new_n=$(find "$NIXOS_DIR/$item" -type f 2>/dev/null | wc -l | tr -d ' ')
+              SYNC_CHANGED=$((SYNC_CHANGED + ''${_new_n:-0}))
             else
               if [ "$VERBOSE" = "true" ]; then
                 ${ui.messages.info "$item exists, skipping (preserving existing $item)..."}
@@ -1295,9 +1318,15 @@ EOF
         else
           # Files: copy if missing or always update flake.nix
           if [ "$item" = "flake.nix" ]; then
-            sudo cp "$FLAKE_COPY_SRC" "$NIXOS_DIR/flake.nix"
+            if [ -f "$NIXOS_DIR/flake.nix" ] && cmp -s "$FLAKE_COPY_SRC" "$NIXOS_DIR/flake.nix"; then
+              :
+            else
+              sudo cp "$FLAKE_COPY_SRC" "$NIXOS_DIR/flake.nix"
+              SYNC_CHANGED=$((SYNC_CHANGED + 1))
+            fi
           elif [ ! -e "$NIXOS_DIR/$item" ]; then
             sudo cp "$SOURCE_DIR/$item" "$NIXOS_DIR/$item"
+            SYNC_CHANGED=$((SYNC_CHANGED + 1))
           fi
         fi
       fi
@@ -1574,54 +1603,75 @@ EOF
       fi
     done
     
-    ${ui.badges.success "Files synced"}
+    if [ "''${SYNC_CHANGED:-0}" -eq 0 ] && [ "''${SYNC_REMOVED:-0}" -eq 0 ]; then
+      ${ui.badges.success "Files synced — up to date"}
+    else
+      sync_parts=()
+      if [ "''${SYNC_CHANGED:-0}" -gt 0 ]; then
+        sync_parts+=("$SYNC_CHANGED file(s)")
+      fi
+      if [ "''${SYNC_REMOVED:-0}" -gt 0 ]; then
+        sync_parts+=("$SYNC_REMOVED removed")
+      fi
+      _sync_detail=$(printf '%s, ' "''${sync_parts[@]}")
+      _sync_detail="''${_sync_detail%, }"
+      ${ui.badges.success "Files synced — $_sync_detail"}
+    fi
     if [ "$VERBOSE" = "true" ]; then
       ${ui.tables.keyValue "Backup" "$BACKUP_DIR"}
       ${ui.messages.info "Note: running system is not switched until build succeeds."}
     fi
 
     # Post-sync: code cleanup + module migrate BEFORE build
-    # Same QUIET pattern as ncc-config-check: nested child → log; parent prints badges.
+    # QUIET: child → log; parent prints ONE "Migrations" badge (hybrid D).
     if [ "$DRY_RUN" != "true" ]; then
       SINGLE_OK=true
       CROSS_OK=true
+      _mig_log=$(mktemp /tmp/ncc-migrate.XXXXXX.log)
       if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.loading "Removing old module files…"}
-        if ! ${applyMigrations}/bin/ncc-apply-migrations "$NIXOS_DIR" 0; then
-          SINGLE_OK=false
-        fi
-        ${ui.messages.loading "Merging module configs…"}
-        if ! NCC_CLI_NESTED=1 ${moduleMigrate}/bin/ncc-module-migrate; then
-          CROSS_OK=false
+        ${ui.messages.loading "Running module migrations…"}
+      fi
+      if ! ${applyMigrations}/bin/ncc-apply-migrations "$NIXOS_DIR" 0 >"$_mig_log" 2>&1; then
+        SINGLE_OK=false
+      fi
+      if ! NCC_CLI_NESTED=1 ${moduleMigrate}/bin/ncc-module-migrate >>"$_mig_log" 2>&1; then
+        CROSS_OK=false
+      fi
+      if [ "$VERBOSE" = "true" ] || [ "$SINGLE_OK" != "true" ] || [ "$CROSS_OK" != "true" ]; then
+        cat "$_mig_log"
+      fi
+      # Action detection from child logs (idle → "up to date")
+      mig_parts=()
+      _rm_count=$(grep -c 'removing:' "$_mig_log" 2>/dev/null || true)
+      if [ "''${_rm_count:-0}" -gt 0 ]; then
+        mig_parts+=("cleaned $_rm_count file(s)")
+      elif grep -qE 'Applying migration |Re-applying migration ' "$_mig_log" 2>/dev/null; then
+        mig_parts+=("cleaned module files")
+      fi
+      if grep -qE 'Renamed →|Migrated →|Legacy SSH module|Removed [1-9][0-9]* orphan module config' "$_mig_log" 2>/dev/null; then
+        mig_parts+=("applied plan(s)")
+      fi
+      if [ "$SINGLE_OK" = "true" ] && [ "$CROSS_OK" = "true" ]; then
+        if [ "''${#mig_parts[@]}" -eq 0 ]; then
+          ${ui.badges.success "Migrations — up to date"}
+        else
+          _mig_detail=$(printf '%s, ' "''${mig_parts[@]}")
+          _mig_detail="''${_mig_detail%, }"
+          ${ui.badges.success "Migrations — $_mig_detail"}
         fi
       else
-        _mig_log=$(mktemp /tmp/ncc-migrate.XXXXXX.log)
-        if ! ${applyMigrations}/bin/ncc-apply-migrations "$NIXOS_DIR" 0 >"$_mig_log" 2>&1; then
-          SINGLE_OK=false
+        ${ui.badges.warning "Migrations"}
+        if [ "$SINGLE_OK" != "true" ]; then
+          ${ui.messages.info "Retry: sudo ncc-apply-migrations /etc/nixos"}
         fi
-        if ! NCC_CLI_NESTED=1 ${moduleMigrate}/bin/ncc-module-migrate >>"$_mig_log" 2>&1; then
-          CROSS_OK=false
+        if [ "$CROSS_OK" != "true" ]; then
+          ${ui.messages.info "Retry: sudo ncc modules migrate"}
         fi
-        if [ "$SINGLE_OK" != "true" ] || [ "$CROSS_OK" != "true" ]; then
-          cat "$_mig_log"
-        fi
-        rm -f "$_mig_log"
       fi
-      if [ "$SINGLE_OK" = "true" ]; then
-        ${ui.badges.success "Remove old module files"}
-      else
-        ${ui.badges.warning "Remove old module files"}
-        ${ui.messages.info "Retry: sudo ncc-apply-migrations /etc/nixos"}
-      fi
-      if [ "$CROSS_OK" = "true" ]; then
-        ${ui.badges.success "Merge module configs"}
-      else
-        ${ui.badges.warning "Merge module configs"}
-        ${ui.messages.info "Retry: sudo ncc modules migrate"}
-      fi
+      rm -f "$_mig_log"
     fi
     
-    # PASSWORT-INTEGRITAET
+    # Password hash files under secrets/passwords (integrity only)
     if [ "$VERBOSE" = "true" ]; then
       ${ui.messages.loading "Checking password file integrity..."}
     fi
@@ -1641,9 +1691,9 @@ EOF
       done
     fi
     if [ "$pw_issues" -gt 0 ]; then
-      ${ui.badges.warning "Passwords — $pw_issues issue(s)"}
+      ${ui.badges.warning "Password files — $pw_issues issue(s)"}
     else
-      ${ui.badges.success "Passwords"}
+      ${ui.badges.success "Password files"}
     fi
 
     # After copying a flake that requires system.platform, heal before rebuild
@@ -1745,63 +1795,81 @@ EOF
       if [ "$EXIT_CODE" -eq 0 ]; then
         rm -f "$BUILD_LOG"
         # Tree sync preserves systemConfig — schema bump is migrate-config (1.0→2.1…)
-        # QUIET pattern (ncc-config-check): child → log; parent one badge
+        # Hybrid D: badge only on change / error; idle silent (show with -v).
         _sch_log=$(mktemp /tmp/ncc-schema.XXXXXX.log)
+        _schema_ok=true
+        _schema_changed=false
+        _schema_detail="updated"
         if command -v ncc-migrate-config >/dev/null 2>&1; then
-          if ncc-migrate-config >"$_sch_log" 2>&1; then
-            ${ui.badges.success "Config schema"}
-            rm -f "$_sch_log"
-          else
-            cat "$_sch_log"
-            rm -f "$_sch_log"
-            ${ui.badges.warning "Config schema"}
-            ${ui.messages.info "Next: sudo ncc system migrate-config"}
+          if ! ncc-migrate-config >"$_sch_log" 2>&1; then
+            _schema_ok=false
           fi
         elif command -v ncc >/dev/null 2>&1; then
-          if ncc system migrate-config >"$_sch_log" 2>&1; then
-            ${ui.badges.success "Config schema"}
-            rm -f "$_sch_log"
-          else
-            cat "$_sch_log"
-            rm -f "$_sch_log"
-            ${ui.badges.warning "Config schema"}
-            ${ui.messages.info "Next: sudo ncc system migrate-config"}
+          if ! ncc system migrate-config >"$_sch_log" 2>&1; then
+            _schema_ok=false
           fi
         else
+          _schema_ok=false
+          : >"$_sch_log"
+        fi
+        if [ "$_schema_ok" = "true" ]; then
+          if grep -qE 'Migrating v|Leaf schema migrate|Config version |Removing stale system-config|system\.platform = .*from live arch|Removed stale aggregator' "$_sch_log" 2>/dev/null; then
+            _schema_changed=true
+            _ver=$(grep -oE 'Config version [^[:space:]]+' "$_sch_log" 2>/dev/null | tail -1 | sed 's/^Config version //' || true)
+            if [ -z "$_ver" ]; then
+              _ver=$(grep -oE '→ v[^[:space:]]+' "$_sch_log" 2>/dev/null | tail -1 | sed 's/^→ v//' || true)
+            fi
+            if [ -n "$_ver" ]; then
+              _schema_detail="bumped to $_ver"
+            fi
+          fi
+          if [ "$VERBOSE" = "true" ]; then
+            cat "$_sch_log"
+          fi
+          rm -f "$_sch_log"
+          if [ "$_schema_changed" = "true" ]; then
+            ${ui.badges.success "Config schema — $_schema_detail"}
+          elif [ "$VERBOSE" = "true" ]; then
+            ${ui.badges.success "Config schema — already current"}
+          fi
+        else
+          cat "$_sch_log"
           rm -f "$_sch_log"
           ${ui.badges.warning "Config schema"}
           ${ui.messages.info "Next: sudo ncc system migrate-config"}
         fi
         _mod_log=$(mktemp /tmp/ncc-modmig.XXXXXX.log)
-        # Post-rebuild merge: silent on success (badge already shown post-sync); warn only on fail.
+        # Post-rebuild merge: silent on success (badge already post-sync); warn only on fail.
         if command -v ncc-module-migrate >/dev/null 2>&1; then
           if NCC_CLI_NESTED=1 ncc-module-migrate >"$_mod_log" 2>&1; then
-            rm -f "$_mod_log"
             if [ "$VERBOSE" = "true" ]; then
-              ${ui.badges.success "Merge module configs (post-rebuild)"}
+              cat "$_mod_log"
+              ${ui.badges.success "Migrations — up to date (post-rebuild)"}
             fi
+            rm -f "$_mod_log"
           else
             cat "$_mod_log"
             rm -f "$_mod_log"
-            ${ui.badges.warning "Merge module configs"}
+            ${ui.badges.warning "Migrations"}
             ${ui.messages.info "Next: sudo ncc modules migrate"}
           fi
         elif command -v ncc >/dev/null 2>&1; then
           if NCC_CLI_NESTED=1 ncc modules migrate >"$_mod_log" 2>&1; then
-            rm -f "$_mod_log"
             if [ "$VERBOSE" = "true" ]; then
-              ${ui.badges.success "Merge module configs (post-rebuild)"}
+              cat "$_mod_log"
+              ${ui.badges.success "Migrations — up to date (post-rebuild)"}
             fi
+            rm -f "$_mod_log"
           else
             cat "$_mod_log"
             rm -f "$_mod_log"
-            ${ui.badges.warning "Merge module configs"}
+            ${ui.badges.warning "Migrations"}
             ${ui.messages.info "Next: sudo ncc modules migrate"}
           fi
         else
           rm -f "$_mod_log"
           if [ "$VERBOSE" = "true" ]; then
-            ${ui.badges.warning "Merge module configs"}
+            ${ui.badges.warning "Migrations"}
             ${ui.messages.info "Next: sudo ncc modules migrate"}
           fi
         fi

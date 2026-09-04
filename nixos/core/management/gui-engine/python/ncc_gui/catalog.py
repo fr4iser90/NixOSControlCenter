@@ -20,6 +20,8 @@ class DomainInfo:
     description: str
     enabled: bool
     group: str = "features"  # "core" | "features"
+    # From catalog: stay in nav when enabled=false (Off). False → hide unless enabled.
+    always_visible: bool = False
     actions: list[DomainAction] = field(default_factory=list)
 
 
@@ -38,6 +40,7 @@ def load_domains() -> list[DomainInfo]:
           "description": "...",
           "enabled": true,
           "group": "core",
+          "alwaysVisible": true,
           "actions": [{"label": "List", "args": ["list"]}]
         }
       ]
@@ -74,6 +77,11 @@ def load_domains() -> list[DomainInfo]:
         group = str(item.get("group") or "features")
         if group not in ("core", "features"):
             group = "features"
+        # Default: core stubs without the field behave as managers (always listed).
+        if "alwaysVisible" in item:
+            always_visible = bool(item.get("alwaysVisible"))
+        else:
+            always_visible = group == "core"
         out.append(
             DomainInfo(
                 id=str(item["id"]),
@@ -81,6 +89,7 @@ def load_domains() -> list[DomainInfo]:
                 description=str(item.get("description") or ""),
                 enabled=bool(item.get("enabled", True)),
                 group=group,
+                always_visible=always_visible,
                 actions=actions,
             )
         )

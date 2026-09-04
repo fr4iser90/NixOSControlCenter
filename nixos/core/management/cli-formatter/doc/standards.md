@@ -103,54 +103,62 @@ Do you want to continue? (yes/no): y
 [ OK ] Source: local — /home/…/NixOSControlCenter/nixos
 [ OK ] Flake extras
 [ OK ] Backup
-[ OK ] Files synced
-[ OK ] Remove old module files
-[ OK ] Merge module configs
-[ OK ] Passwords
+[ OK ] Files synced — up to date
+[ OK ] Migrations — up to date
+[ OK ] Password files
 [ OK ] Platform: x86_64-linux
-[ OK ] Channel: nixos-25.05
+[ OK ] Channel: nixos-26.05
 Do you want to build and switch…? (y/n): y
 [ OK ] Hardware & users
 Building…
 [ OK ] Switch
-[ OK ] Config schema
+[ OK ] Update complete
+```
+
+When migrations or schema actually changed:
+
+```text
+[ OK ] Files synced — 42 file(s)
+[ OK ] Migrations — cleaned 2 file(s), applied plan(s)
+…
+[ OK ] Switch
+[ OK ] Config schema — bumped to 2.1
 [ OK ] Update complete
 ```
 
 Phase badges ≤ ~40 chars (path lines may be longer). Values OK when short (`Platform: …`, `Channel: …`).  
 Outcome wording for end users — not internal tool names.
 
-| Line | What it means |
-|------|----------------|
-| `Config check` | Is `systemConfig` valid / healed? |
-| `Source: …` | Where the new code comes from. |
-| `Flake extras` | Host-only flake bits kept or merged. |
-| `Backup` | Safety copy before overwrite. |
-| `Files synced` | Module/code tree copied; user `systemConfig/` kept. |
-| `Remove old module files` | Delete orphans from `<module>/migrations/` (renames/removals). |
-| `Merge module configs` | Apply cross-module plans / leaf merges (e.g. SSH rename). **One** user-facing line (post-sync). Early/post-rebuild runs are silent unless they fail (or `-v`). |
-| `Passwords` | Password files look intact. |
-| `Platform: …` | Arch for flake eval (`x86_64-linux` / `aarch64-linux`). |
-| `Channel: …` | nixpkgs release pin (current or after bump). |
-| `Hardware & users` | Before rebuild: CPU, GPU, memory, users vs config (was “Preflight”). Details with `-v`. |
-| `Building…` | Wait; full nix log only with `-v`. |
-| `Switch` | New generation active. |
-| `Config schema` | Bump `configVersion` + required fields (`ncc-migrate-config`). |
-| `Update complete` | **Last** — everything done. |
+| Line | When shown | What it means |
+|------|------------|----------------|
+| `Config check` | always | Is `systemConfig` valid / healed? |
+| `Source: …` | always | Where the new code comes from. |
+| `Flake extras` | always | Host-only flake bits kept or merged. |
+| `Backup` | always | Safety copy before overwrite. |
+| `Files synced — …` | **always** | Module/code tree vs `/etc/nixos` (rsync). Idle → `up to date`; work → `N file(s)` and/or `N removed`. `systemConfig/` kept. |
+| `Migrations — …` | **always** (one line) | Cleanup + cross-module plans. Idle → `up to date`; work → short detail (`cleaned N file(s)`, `applied plan(s)`). Post-rebuild re-run: silent on success; `[WARN]` only on fail (`-v` may show post-rebuild OK). |
+| `Password files` | always | Login hash files under `secrets/passwords/` look intact. |
+| `Platform: …` | always | Arch for flake eval (`x86_64-linux` / `aarch64-linux`). |
+| `Channel: …` | always | nixpkgs release pin (current or after bump). |
+| `Hardware & users` | always | Before rebuild: CPU, GPU, memory, users vs config. Details with `-v`. |
+| `Building…` | always | Wait; full nix log only with `-v`. |
+| `Switch` | always | New generation active. |
+| `Config schema — …` | **only on change / error** (or always with `-v`) | Bump `configVersion` + required fields. Idle default: **omit**; `-v` → `already current`. |
+| `Update complete` | always last | Everything done. |
 
 Skip-build → one `Next: sudo ncc system build switch …`. Failure → `[ERROR]` + copyable log (always).
 
 **Two version tracks (do not mix):**
 
 - **Config schema** (`configVersion`) → `Config schema` / `ncc-migrate-config`
-- **Module code** → `Remove old module files` + `Merge module configs`
+- **Module code** → single `Migrations` line (`ncc-apply-migrations` + `ncc-module-migrate`)
 
 ### With `-v` / `--verbose` (extra)
 
 Everything above, plus:
 
 - backup path, layout, per-module skip/copy, preserve notes, permissions
-- migration “Scanning…” / “No pending…” detail
+- full migration child logs; `Config schema — already current` when idle
 - each preflight check line (`[ OK ] CPU: …`)
 - **full** `nixos-rebuild` + activation stdout
 - optional `Next: ncc system report`

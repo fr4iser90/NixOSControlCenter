@@ -403,8 +403,11 @@ Desktop entry: `ncc.desktop`, exec `ncc`, icon name `ncc` (hicolor from gui-engi
    - **failed (unreachable):** danger strip + Retry Connect / Use this machine
    - **needs_install / needs_update:** warn + Open Install / Update
 3. Brand (icon + “NCC” / “Control Center”)
-4. Sidebar sections **Core** / **Features** (`registerGuiDomain.group`)
-5. Disabled domains: **hidden** (not grey stubs)
+4. Sidebar sections **Core** / **Features** (`registerGuiDomain.group`).
+   Nav presence: `alwaysVisible` (default true for core) keeps Off managers listed;
+   set `alwaysVisible = false` + bake `enabled` for conditional domains (discovery only —
+   shell must not hardcode domain ids).
+5. Disabled domains: **hidden** when not `alwaysVisible` (not grey stubs)
 6. Content = resolved page for selection; every `DomainPage` shows **Operating on: …**
 7. **Write gate:** Apply / `run_ncc_root` confirm when a remote host is selected/failed but session is still LOCAL
 

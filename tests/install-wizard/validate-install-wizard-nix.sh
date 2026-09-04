@@ -85,7 +85,7 @@ else
   else
     fail "system-update must import apply-migrations.nix and run ncc-apply-migrations after sync"
   fi
-  if rg -q 'rsync -a[qvx]* .*--delete.*"\$source_module/"' "$SYSTEM_UPDATE" 2>/dev/null; then
+  if rg -q 'rsync -a[iqvx]* .*--delete.*"\$source_module/"' "$SYSTEM_UPDATE" 2>/dev/null; then
     pass "update_module_code rsync uses --delete"
   else
     fail "update_module_code must rsync with --delete"

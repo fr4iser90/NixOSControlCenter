@@ -100,6 +100,7 @@ let
     description = g.description or "";
     enabled = g.enabled or false;
     group = g.group or "features";
+    alwaysVisible = g.alwaysVisible or ((g.group or "features") == "core");
     actions = [];
   }) guiDomainAttrs;
 
@@ -118,6 +119,9 @@ let
         if (prev.label or "") != ""
         then prev.label
         else (item.label or item.id);
+      alwaysVisible =
+        if item ? alwaysVisible then item.alwaysVisible
+        else (prev.alwaysVisible or false);
     in
       acc // {
         ${item.id} = {
@@ -125,7 +129,7 @@ let
           inherit label;
           description = item.description or prev.description or "";
           enabled = if item ? enabled then item.enabled else (prev.enabled or false);
-          inherit group actions;
+          inherit group actions alwaysVisible;
         };
       }
   ) {} (fromGuiStubs ++ fromCommands);

@@ -29,6 +29,10 @@ let
     inherit pkgs hyprlandCli getModuleApi config;
   };
 
+  # Nav: only list under Core when Desktop DE is Hyprland (bake-time catalog).
+  desktopCfg = getModuleConfig "desktop";
+  hyprlandDesktopActive = (desktopCfg.environment or "") == "hyprland";
+
   entry = pkgs.writeShellScriptBin "ncc-hyprland-entry" ''
     set -euo pipefail
     _ui=""
@@ -186,8 +190,10 @@ in {
     (cliRegistry.registerGuiDomain "hyprland" {
       label = "Hyprland";
       description = "Hall of Fame rices and wallpapers";
-      enabled = true;
-      group = "features";
+      # Present only when Desktop DE is Hyprland (catalog enabled + not alwaysVisible)
+      enabled = hyprlandDesktopActive;
+      group = "core";
+      alwaysVisible = false;
     })
     (cliRegistry.registerGuiPage "hyprland" ./ui/gui)
     (cliRegistry.registerCommandsFor moduleName allCommands)

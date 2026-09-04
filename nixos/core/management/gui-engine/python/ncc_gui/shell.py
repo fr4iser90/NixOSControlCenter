@@ -575,9 +575,10 @@ class NccShell(QMainWindow):
     def _apply_nav_for_session(self, session: TargetSession) -> None:
         """Project sidebar visibility.
 
-        Rules (config manager):
-        * Core domains: always visible (gate permitting) — enable is a page field.
-        * Feature domains: visible unless Settings → Hide inactive features.
+        Rules (config manager) — all from catalog, no domain-id hardcodes:
+        * alwaysVisible: stay listed when Off (enable is a page field).
+        * else Core: listed only when catalog enabled (conditional domains).
+        * Features: visible unless Settings → Hide inactive features.
         * Active/Off badge from Target systemConfig when connected; else catalog.
         """
         remote = session.connected
@@ -612,8 +613,10 @@ class NccShell(QMainWindow):
                 visible = True
             elif allow is not None:
                 visible = info.id in allow
-            elif info.group == "core":
+            elif info.always_visible:
                 visible = True
+            elif info.group == "core":
+                visible = catalog_on
             elif hide_inactive:
                 visible = active
             else:

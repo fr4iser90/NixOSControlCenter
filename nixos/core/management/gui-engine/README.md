@@ -49,8 +49,11 @@ domainGui = gui.domainGui pkgs config;
   description = "…";
   enabled = cfg.enable or false;
   group = "features";
+  # Optional: alwaysVisible = false;  # hide when enabled=false (default for features)
+  # Core managers default alwaysVisible=true; conditional core sets false + enabled=….
 })
 ```
+
 
 **Do not** put domain pages under `gui-engine/python/ncc_gui/pages/`.  
 **Do not** hand-roll Header/Actions/Activity — `DomainPage` owns that order.

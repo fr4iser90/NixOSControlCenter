@@ -36,7 +36,9 @@ let
     '' else "";
 
   riceMethod = selectedRice.applyMethod or "reference";
-  usesCollection = riceMethod == "dotfiles" || riceMethod == "flake";
+  # Reference / HoF gallery entries are preview-only — never fail the rebuild.
+  riceApplyable = selectedRice != null && isApplyable selectedRice;
+  usesCollection = riceApplyable && (riceMethod == "dotfiles" || riceMethod == "flake");
 
   hyprHeader =
     let
@@ -190,13 +192,6 @@ NCC_FALLBACK
     }
     {
       assertion =
-        cfg.rice == null
-        || selectedRice == null
-        || isApplyable selectedRice;
-      message = "hyprland.rice '${cfg.rice}' is not installable. Use: ncc hyprland rice list";
-    }
-    {
-      assertion =
         cfg.wallpaper.rice == null
         || catalog ? ${cfg.wallpaper.rice};
       message = "hyprland.wallpaper.rice '${cfg.wallpaper.rice}' is not in the rice catalog.";
@@ -213,4 +208,12 @@ NCC_FALLBACK
       '';
     }
   ];
+
+  warnings =
+    lib.optional
+      (cfg.rice != null && selectedRice != null && !(isApplyable selectedRice))
+      ''
+        hyprland.rice "${cfg.rice}" is reference-only (Hall of Fame preview) — not applied.
+        Clear it or pick an applyable rice: ncc hyprland rice list
+      '';
 }

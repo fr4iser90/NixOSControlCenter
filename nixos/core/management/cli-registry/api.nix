@@ -14,12 +14,18 @@ rec {
     lib.setAttrByPath [ selfPath "commandSets" moduleName ] commands;
 
   registerGuiDomain = id: attrs:
+    let
+      group = attrs.group or "features";
+    in
     lib.setAttrByPath [ selfPath "guiDomains" id ] {
       label = attrs.label or id;
       description = attrs.description or "";
       enabled = attrs.enabled or false;
       # Sidebar section: "core" | "features" (default features)
-      group = attrs.group or "features";
+      inherit group;
+      # true: stay in nav when enabled=false (Off badge). Default: core managers.
+      # false: omit from nav unless enabled (conditional domains via discovery).
+      alwaysVisible = attrs.alwaysVisible or (group == "core");
     };
 
   # Rich Qt page lives in the module (`ui/gui/page.py`). Engine only aggregates.

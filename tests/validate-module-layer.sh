@@ -53,13 +53,16 @@ else
   fail "runner.nix must discover */migrations/plan-*.nix"
 fi
 
-# gui-engine must not hardwire hyprland catalog (owned by hyprland module)
-echo "== 1b) gui-engine no hyprland catalog hardwire =="
+# gui-engine must not hardwire hyprland (catalog owned by hyprland module)
+echo "== 1b) gui-engine no hyprland hardwire =="
 GUI_ENG="$NIXOS/core/management/gui-engine"
 if rg -q 'hyprlandRoot|NCC_HYPRLAND_CATALOG|hyprland/lib/mk-catalog' "$GUI_ENG" --glob '*.nix'; then
   fail "gui-engine hardwires hyprland catalog — keep NCC_HYPRLAND_CATALOG in hyprland/gui/"
+elif rg -q '_CORE_CONDITIONAL|frozenset\(\{\"hyprland\"\}\)|\"hyprland\"' \
+  "$GUI_ENG/python/ncc_gui/shell.py" 2>/dev/null; then
+  fail "shell.py hardcodes hyprland — use catalog alwaysVisible from registerGuiDomain"
 else
-  pass "gui-engine has no hyprland catalog hardwire"
+  pass "gui-engine has no hyprland hardwire"
 fi
 
 # ── 2) module-manager must not hardwire install-wizard script paths ─────────

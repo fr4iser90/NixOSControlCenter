@@ -59,12 +59,21 @@ in {
           enabled = lib.mkOption {
             type = lib.types.bool;
             default = false;
-            description = "Whether the domain is usable (false → hidden when inactive)";
+            description = "Module active on this host (bake). Off badge when false and alwaysVisible.";
           };
           group = lib.mkOption {
             type = lib.types.enum [ "core" "features" ];
             default = "features";
-            description = "Sidebar section: Core (always-on engines/base) vs Features (optional modules)";
+            description = "Sidebar section: Core vs Features";
+          };
+          alwaysVisible = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = ''
+              Stay listed in the sidebar when enabled=false (config managers → Off).
+              registerGuiDomain defaults this to true for group=core; set false for
+              conditional core domains that only appear when enabled.
+            '';
           };
         };
       });
