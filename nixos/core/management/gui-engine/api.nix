@@ -1,6 +1,9 @@
 # GUI Engine API — getModuleApi "gui-engine"
 # Peer module paths via getModuleMetadata — never relative ../../other-module
 # Domain pages: always pass `config` so guiPages from cli-registry are aggregated.
+#
+# Module-specific catalogs (packages, hyprland rices, …) stay in that module’s
+# gui/default.nix / CLI — do NOT hardwire peer catalog roots here.
 { lib, metadata, getModuleMetadata, getModuleApi, ... }:
 
 let

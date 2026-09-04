@@ -1,4 +1,7 @@
 # Root NCC GUI launcher (includes AI assistant sources for embed)
+#
+# Does not know peer module catalogs (hyprland, …). Those are set by the owning
+# module’s gui wrapper / page fallback (NCC_*_CATALOG or NIXOS_DIR eval).
 { pkgs, lib, getModuleMetadata, getModuleApi, packagesRoot, guiPages ? {} }:
 
 let

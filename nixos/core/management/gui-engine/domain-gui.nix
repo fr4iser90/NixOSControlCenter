@@ -1,6 +1,9 @@
 # Shared domain GUI binary: `ncc-domain-gui <page>` (+ AI embed sources)
 # Peer roots come from getModuleMetadata (via gui-engine api) — no relative cross-module imports.
 # Domain pages come from cli-registry guiPages (each module’s ui/gui/).
+#
+# Catalogs for optional domains (hyprland rice store, …) are owned by those modules
+# (see <module>/gui/default.nix). Do not import peer mk-catalog-json here.
 { pkgs, lib, getModuleMetadata, getModuleApi, packagesRoot, assistantRoot, guiPages ? {} }:
 
 let

@@ -17,6 +17,10 @@
 
     configs.url = "path:./systemConfig";
     configs.flake = false;
+
+    # ncc-hyprland-rice-inputs-begin
+    # (no active hyprland rice flake)
+    # ncc-hyprland-rice-inputs-end
   };
 
   outputs = { self
@@ -120,7 +124,10 @@
           };
           modules = [
             ./core/management/module-manager
-          ] ++ systemModules ++ [
+          # ncc-hyprland-rice-modules-begin
+          ] ++ systemModules ++ lib.optionals false [ null ]
+          # ncc-hyprland-rice-modules-end
+          ++ [
             {
               system.stateVersion = stateVersion;
               nix.settings.experimental-features = [ "nix-command" "flakes" ];

@@ -5,7 +5,7 @@ let
   themeModule = ./schemes + "/${cfg.environment or "plasma"}.nix";
   hasColorScheme = builtins.pathExists themeModule;
 in {
-  # Only import when a per-environment scheme exists (gnome today).
+  # Only import when a per-environment scheme exists (gnome today; hyprland uses rice store).
   imports = lib.optionals ((cfg.enable or true) && hasColorScheme) [
     themeModule
   ];

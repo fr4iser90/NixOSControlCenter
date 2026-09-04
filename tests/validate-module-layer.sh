@@ -53,6 +53,15 @@ else
   fail "runner.nix must discover */migrations/plan-*.nix"
 fi
 
+# gui-engine must not hardwire hyprland catalog (owned by hyprland module)
+echo "== 1b) gui-engine no hyprland catalog hardwire =="
+GUI_ENG="$NIXOS/core/management/gui-engine"
+if rg -q 'hyprlandRoot|NCC_HYPRLAND_CATALOG|hyprland/lib/mk-catalog' "$GUI_ENG" --glob '*.nix'; then
+  fail "gui-engine hardwires hyprland catalog — keep NCC_HYPRLAND_CATALOG in hyprland/gui/"
+else
+  pass "gui-engine has no hyprland catalog hardwire"
+fi
+
 # ── 2) module-manager must not hardwire install-wizard script paths ─────────
 echo "== 2) module-manager no install-wizard script paths =="
 HITS=$(rg -n 'install-wizard/scripts' "$MM_MIG" --glob '*.nix' 2>/dev/null || true)

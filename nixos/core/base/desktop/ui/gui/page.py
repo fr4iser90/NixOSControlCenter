@@ -61,6 +61,7 @@ class DesktopPage(DomainPage):
             ("plasma", "Plasma (KDE)"),
             ("gnome", "GNOME"),
             ("xfce", "XFCE"),
+            ("hyprland", "Hyprland"),
         ):
             self.env.addItem(lab, v)
         form.addRow("Desktop environment", self.env)
@@ -88,6 +89,15 @@ class DesktopPage(DomainPage):
         self.dark.addItem("Dark", "true")
         self.dark.addItem("Light", "false")
         form.addRow(self.dark_lbl, self.dark)
+
+        self.theme_hint = QLabel(
+            "Hyprland look-and-feel: Features → Hyprland (rice store). "
+            "Desktop theme.dark does not apply here."
+        )
+        self.theme_hint.setObjectName("nccPageSubtitle")
+        self.theme_hint.setWordWrap(True)
+        self.theme_hint.hide()
+        form.addRow("", self.theme_hint)
 
         self.enable = QCheckBox("Desktop module enabled")
         self.enable.setChecked(False)
@@ -153,7 +163,7 @@ class DesktopPage(DomainPage):
         env = self.env.currentData()
         if env == "gnome":
             self._set_combo(self.manager, "gdm")
-        elif env == "plasma":
+        elif env in ("plasma", "hyprland"):
             self._set_combo(self.manager, "sddm")
 
     def _sync_theme_visibility(self) -> None:
@@ -161,6 +171,7 @@ class DesktopPage(DomainPage):
         show_theme = env in _DESKTOP_THEME_ENVS
         self.dark_lbl.setVisible(show_theme)
         self.dark.setVisible(show_theme)
+        self.theme_hint.setVisible(env == "hyprland")
 
     def _on_env_changed(self, _idx: int = 0) -> None:
         if self._loading:
