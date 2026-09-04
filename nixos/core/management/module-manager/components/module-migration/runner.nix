@@ -2,8 +2,6 @@
 
 let
   ui = getModuleApi "cli-formatter";
-  plans = (import ./plans.nix { inherit lib; }).plans;
-  plansJson = builtins.toJSON plans;
   smRoot = (getModuleMetadata "system-manager").path;
   facade = import "${smRoot}/lib/config-facade.nix" { inherit pkgs; };
   backupHelpers = import "${smRoot}/lib/backup-helpers.nix" { inherit pkgs lib; };
@@ -17,7 +15,6 @@ let
     set -euo pipefail
 
     APPLY_MIGRATIONS="${applyMigrations}/bin/ncc-apply-migrations"
-    PLANS_NIX="${./plans.nix}"
 
     DRY=0
     VERBOSE=0
@@ -31,7 +28,8 @@ let
           cat <<EOF
 ncc-module-migrate — migrate / clean legacy module configs
 
-Runs module migration plans (renames, merges) then orphan cleanup
+Discovers <module>/migrations/plan-*.nix (rename/merge) then
+<module>/migrations/v*-to-v*.nix (code cleanup), then orphan cleanup
 under systemConfig/{core,modules} (split layout). Never touches:
   - \$NIXOS_ROOT/custom/     (userspace NixOS modules)
   - systemConfig/custom/     (if present)
@@ -55,7 +53,6 @@ EOF
 
     ${backupHelpers.backupConfigFileFn}
 
-    PLANS_JSON='${plansJson}'
     NCC_STATE_DIR="''${NCC_STATE_DIR:-/var/lib/ncc}"
     STATE_FILE="$NCC_STATE_DIR/module-migrations.json"
     LEGACY_STATE="''${CONFIGS_BASE}/.ncc-module-migrations.json"
@@ -181,8 +178,11 @@ EOF
     }
 
     strip_known_leaves_internal_meta() {
-      strip_leaf_internal_meta "modules/infrastructure/stack-manager"
-      strip_leaf_internal_meta "modules/security/ssh-manager"
+      # Destination leaves from discovered plan-*.nix (no hardcoded module paths)
+      while IFS= read -r tp; do
+        [[ -z "$tp" || "$tp" == "null" ]] && continue
+        strip_leaf_internal_meta "$tp"
+      done < <(echo "$PLANS_JSON" | ${pkgs.jq}/bin/jq -r '.[].toPath // empty')
     }
 
     mark_applied() {
@@ -215,27 +215,36 @@ EOF
     }
 
     apply_ssh_merge() {
-      local id="$1" to_path="$2"
-      local server_p="modules/security/ssh-server-manager"
-      local client_p="modules/security/ssh-client-manager"
-      local client_spec_p="modules/specialized/ssh-client-manager"
+      # fromPaths from destination module's plan-*.nix: [server, client, specialized?]
+      local id="$1" plan="$2"
+      local to_path server_p client_p client_spec_p
       local has_s=0 has_c=0 has_cs=0 has_t=0
       local has_code=0
+      to_path=$(echo "$plan" | ${pkgs.jq}/bin/jq -r '.toPath // empty')
+      server_p=$(echo "$plan" | ${pkgs.jq}/bin/jq -r '.fromPaths[0] // empty')
+      client_p=$(echo "$plan" | ${pkgs.jq}/bin/jq -r '.fromPaths[1] // empty')
+      client_spec_p=$(echo "$plan" | ${pkgs.jq}/bin/jq -r '.fromPaths[2] // empty')
+      if [[ -z "$to_path" || -z "$server_p" ]]; then
+        ${ui.messages.error "ssh-merge plan $id missing toPath/fromPaths"}
+        return 1
+      fi
 
       path_exists "$server_p" && has_s=1
-      path_exists "$client_p" && has_c=1
-      path_exists "$client_spec_p" && has_cs=1
+      [[ -n "$client_p" ]] && path_exists "$client_p" && has_c=1
+      [[ -n "$client_spec_p" ]] && path_exists "$client_spec_p" && has_cs=1
       path_exists "$to_path" && has_t=1
-      [[ -d "$NIXOS_ROOT/$server_p" || -d "$NIXOS_ROOT/$client_p" ]] && has_code=1
+      [[ -n "$server_p" && -d "$NIXOS_ROOT/$server_p" ]] && has_code=1
+      [[ -n "$client_p" && -d "$NIXOS_ROOT/$client_p" ]] && has_code=1
 
       remove_legacy_ssh_code() {
         if [[ "$DRY" -eq 1 ]]; then
           for p in "$server_p" "$client_p"; do
-            [[ -d "$NIXOS_ROOT/$p" ]] && echo "  dry-run: would remove $NIXOS_ROOT/$p"
+            [[ -n "$p" && -d "$NIXOS_ROOT/$p" ]] && echo "  dry-run: would remove $NIXOS_ROOT/$p"
           done
           return 0
         fi
         for p in "$server_p" "$client_p"; do
+          [[ -n "$p" ]] || continue
           local legacy_code="$NIXOS_ROOT/$p"
           if [[ -d "$legacy_code" ]]; then
             ${ui.messages.warning "Removing leftover module tree: $legacy_code"}
@@ -245,6 +254,7 @@ EOF
       }
 
       drop_specialized_ssh_client_leaf() {
+        [[ -n "$client_spec_p" ]] || return 0
         path_exists "$client_spec_p" || return 0
         if [[ "$DRY" -eq 1 ]]; then
           ${ui.messages.info "Would remove orphan leaf $client_spec_p"}
@@ -393,7 +403,7 @@ EOF
         return 1
       }
       delete_leaf "$server_p"
-      delete_leaf "$client_p"
+      [[ -n "$client_p" ]] && delete_leaf "$client_p"
       drop_specialized_ssh_client_leaf
       remove_legacy_ssh_code
       mark_applied "$id"
@@ -552,7 +562,48 @@ EOF
     PENDING=0
     FAILED=0
 
+    # Cross-module rename/merge: discover <module>/migrations/plan-*.nix
+    # toPath defaults to the destination module path under NIXOS_ROOT.
+    load_plans_json() {
+      local acc='[]'
+      local plan_file mig_dir module_root to_path plan_json id
+      while IFS= read -r -d ''' plan_file; do
+        [[ -n "$plan_file" ]] || continue
+        case "$plan_file" in
+          */config-migration/*|*/config-schema/*) continue ;;
+        esac
+        mig_dir=$(dirname "$plan_file")
+        module_root=$(dirname "$mig_dir")
+        to_path="''${module_root#"$NIXOS_ROOT"/}"
+        plan_json=$("$NIX_INSTANTIATE_BIN" --eval --strict --json -E "
+          let
+            lib = (import <nixpkgs> {}).lib;
+            m = import $plan_file { inherit lib; };
+            derivedTo = \"$to_path\";
+          in {
+            id = m.id or \"\";
+            kind = m.kind or \"rename\";
+            description = m.description or \"\";
+            fromPaths = m.fromPaths or [];
+            toPath = m.toPath or derivedTo;
+            removeObsoleteLeaves = m.removeObsoleteLeaves or [];
+            paths = m.paths or [];
+          }
+        " 2>/dev/null) || continue
+        id=$(echo "$plan_json" | ${pkgs.jq}/bin/jq -r '.id // empty')
+        [[ -n "$id" ]] || continue
+        acc=$(echo "$acc" | ${pkgs.jq}/bin/jq -c --argjson p "$plan_json" '. + [$p]')
+      done < <(
+        find "$NIXOS_ROOT/core" "$NIXOS_ROOT/modules" \
+          -type f -path '*/migrations/plan-*.nix' -print0 2>/dev/null || true
+      )
+      echo "$acc"
+    }
+    PLANS_JSON=$(load_plans_json)
+    log "discovered $(echo "$PLANS_JSON" | ${pkgs.jq}/bin/jq 'length') cross-module plan(s)"
+
     while IFS= read -r plan; do
+      [[ -z "$plan" || "$plan" == "null" ]] && continue
       id=$(echo "$plan" | ${pkgs.jq}/bin/jq -r '.id')
       kind=$(echo "$plan" | ${pkgs.jq}/bin/jq -r '.kind // "generic"')
       desc=$(echo "$plan" | ${pkgs.jq}/bin/jq -r '.description')
@@ -580,7 +631,7 @@ EOF
       case "$kind" in
         ssh-merge)
           PENDING=$((PENDING + 1))
-          if ! apply_ssh_merge "$id" "$to_path"; then
+          if ! apply_ssh_merge "$id" "$plan"; then
             FAILED=$((FAILED + 1))
           fi
           ;;
@@ -591,7 +642,7 @@ EOF
           fi
           ;;
         code-cleanup)
-          ${ui.messages.warning "kind=code-cleanup in central plans.nix is forbidden — put removeRelativePaths in <module>/migrations/"}
+          ${ui.messages.warning "kind=code-cleanup in plan-*.nix is forbidden — use v*-to-v*.nix + removeRelativePaths"}
           ;;
         *)
           ${ui.messages.warning "Unknown migration plan — skipped"}
@@ -637,5 +688,6 @@ EOF
   '';
 in {
   inherit moduleMigrate;
-  plans = plans;
+  # Deprecated: always empty. Cross-module plans live in <module>/migrations/plan-*.nix
+  plans = [];
 }

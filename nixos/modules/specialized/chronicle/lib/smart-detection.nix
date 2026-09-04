@@ -306,7 +306,7 @@ in {
       else
         # Start new cluster
         if [[ $count -ge 3 ]]; then
-          log "Click cluster detected: $count clicks at (${center_x},${center_y})"
+          log "Click cluster detected: $count clicks at ($center_x,$center_y)"
           
           # Reset cluster and trigger step
           ${pkgs.jq}/bin/jq --arg x "$x" \

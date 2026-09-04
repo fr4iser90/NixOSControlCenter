@@ -2,7 +2,8 @@
 # HARD GATE — module layer / modularity.
 #
 # Law:
-#   - Central module-manager plans.nix = cross-module rename/merge ONLY
+#   - Cross-module rename/merge = <destination>/migrations/plan-*.nix (discovered)
+#   - Central module-manager plans.nix = empty registry only (plans = [])
 #   - Single-module cleanup = <that-module>/migrations/v*-to-v*.nix
 #   - nixos/modules/* must not import other modules' trees
 #   - Core orchestration may discover; must not list peer module script paths
@@ -20,21 +21,36 @@ fail() { echo "  FAIL: $*"; FAIL=1; }
 
 echo "=== validate-module-layer (HARD GATE) ==="
 
-# ── 1) Central plans: no code-cleanup / no install-wizard paths ─────────────
-echo "== 1) plans.nix cross-module only =="
+# ── 1) Central plans.nix must stay empty (no peer hardwires) ────────────────
+echo "== 1) plans.nix empty registry =="
 if [[ ! -f "$PLANS" ]]; then
   fail "missing $PLANS"
 else
+  if rg -q 'fromPaths\s*=|toPath\s*=|kind\s*=' "$PLANS"; then
+    fail "plans.nix hardwires migrations — put plan-*.nix under destination module migrations/"
+  else
+    pass "plans.nix has no fromPaths/toPath/kind hardwires"
+  fi
   if rg -q 'kind\s*=\s*"code-cleanup"' "$PLANS"; then
     fail "plans.nix has kind=code-cleanup — put removeRelativePaths in <module>/migrations/"
-  else
-    pass "plans.nix has no code-cleanup (module migrations/ own that)"
   fi
   if rg -q 'install-wizard' "$PLANS"; then
     fail "plans.nix hardwires install-wizard — layer violation (migration belongs in install-wizard/migrations/)"
   else
     pass "plans.nix does not mention install-wizard"
   fi
+  if ! rg -q 'plans\s*=\s*\[\s*\]' "$PLANS"; then
+    fail "plans.nix must be plans = [] (discovery owns rename/merge)"
+  else
+    pass "plans.nix is empty plans = []"
+  fi
+fi
+
+# Runner must discover plan-*.nix
+if rg -q 'migrations/plan-\*\.nix' "$MM_MIG/runner.nix"; then
+  pass "runner discovers migrations/plan-*.nix"
+else
+  fail "runner.nix must discover */migrations/plan-*.nix"
 fi
 
 # ── 2) module-manager must not hardwire install-wizard script paths ─────────
@@ -151,5 +167,5 @@ if [[ "$FAIL" -ne 0 ]]; then
   echo "FAILED — fix layer violations before claiming modularity."
   exit 1
 fi
-echo "OK — central plans cross-module only; module migrations discovered; modules modular."
+echo "OK — plans.nix empty; plan-*.nix + v*-to-v*.nix discovered; modules modular."
 exit 0

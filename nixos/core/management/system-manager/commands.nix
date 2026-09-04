@@ -40,7 +40,9 @@ let
     if tuiOn
     then (import ./ui/tui/domain.nix { inherit config lib pkgs getModuleApi; }).tuiScript
     else null;
-  systemGui = (import ./gui/default.nix { inherit pkgs getModuleApi config; }).nccSystemGui;
+  systemGui = (import ./gui/default.nix {
+    inherit pkgs lib getModuleApi getModuleMetadata config;
+  }).nccSystemGui;
   guiOn = (getModuleApi "gui-engine").isEnabled getModuleConfig;
   guiOff = (getModuleApi "gui-engine").disabledHint;
 

@@ -78,7 +78,7 @@ in
     rm -f "$preflight_log"
 
     if [ "$checks_failed" -eq 1 ]; then
-      ${ui.badges.error "Preflight"}
+      ${ui.badges.error "Hardware & users"}
       printf "Continue with build anyway? [y/N] "
       read -r response || response=""
       if [[ ! "$response" =~ ^[Yy]$ ]]; then
@@ -86,9 +86,9 @@ in
         ${ui.messages.info "Next: fix the failing checks, or re-run with --force"}
         exit 1
       fi
-      ${ui.badges.warning "Continuing despite preflight failures"}
+      ${ui.badges.warning "Continuing despite hardware/user check failures"}
     else
-      ${ui.badges.success "Preflight"}
+      ${ui.badges.success "Hardware & users"}
     fi
 
     ${ui.messages.loading "Building…"}

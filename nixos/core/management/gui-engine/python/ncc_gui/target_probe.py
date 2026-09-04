@@ -13,8 +13,11 @@ from dataclasses import dataclass, field
 from typing import Mapping
 from pathlib import Path
 
-# Keep in sync with system-manager config-migration schema.currentVersion
-EXPECTED_CONFIG_VERSION = "2.1"
+# SSOT is schema.nix currentVersion — GUI launchers export NCC_EXPECTED_CONFIG_VERSION.
+# Fallback only for unpackaged tests / bare imports.
+EXPECTED_CONFIG_VERSION = (
+    (os.environ.get("NCC_EXPECTED_CONFIG_VERSION") or "").strip() or "2.1"
+)
 
 SUPPORTED_ARCH = frozenset({"x86_64", "amd64", "aarch64", "arm64"})
 

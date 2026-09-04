@@ -28,7 +28,7 @@ let
   applyMigrations = import ../../module-manager/components/module-migration/apply-migrations.nix {
     inherit pkgs;
   };
-  # Cross-module migrations (plans.nix: renames, merges like ssh-merge)
+  # Cross-module migrations: discover <module>/migrations/plan-*.nix (rename/merge)
   # Must run BEFORE build so seeding doesn't create conflicting defaults
   moduleMigrate = (import ../../module-manager/components/module-migration/runner.nix {
     inherit pkgs lib getModuleApi getModuleMetadata;
@@ -216,8 +216,10 @@ let
     ${configFacade.sourcePreamble { nixosRoot = "/etc/nixos"; }}
 
     # flake.nix requires system-manager.system.platform — heal before rebuild (no silent x86).
+    # Sets HEALED_PLATFORM for the checklist badge (e.g. Platform: x86_64-linux).
     ensure_system_platform() {
       local platform current have
+      HEALED_PLATFORM=""
       case "$(uname -m 2>/dev/null || true)" in
         aarch64|arm64) platform="aarch64-linux" ;;
         x86_64|amd64) platform="x86_64-linux" ;;
@@ -226,6 +228,7 @@ let
           return 1
           ;;
       esac
+      HEALED_PLATFORM="$platform"
       current=$(ncc_read_module_config "core/management/system-manager" 2>/dev/null || echo "{}")
       have=""
       if echo "$current" | grep -qE 'system\.platform[[:space:]]*='; then
@@ -539,7 +542,7 @@ let
           fi
           
           SOURCE_DIR="$TEMP_DIR/nixos"
-          ${ui.messages.info "Source: remote — $SELECTED_BRANCH ($SOURCE_DIR)"}
+          ${ui.badges.success "Source: remote — $SELECTED_BRANCH ($SOURCE_DIR)"}
           break
           ;;
         2)
@@ -653,12 +656,12 @@ let
             done
           fi
           
-          ${ui.messages.info "Source: local — $SOURCE_DIR"}
+          ${ui.badges.success "Source: local — $SOURCE_DIR"}
           break
           ;;
         3)
           # Execute the separate channel update script
-          ${ui.messages.info "Source: channels"}
+          ${ui.badges.success "Source: channels"}
           ${ui.messages.info "Executing ncc-update-channels..."}
           # The ncc-update-channels script should handle its own sudo checks and messages
           if sudo ncc-update-channels; then
@@ -1577,27 +1580,43 @@ EOF
       ${ui.messages.info "Note: running system is not switched until build succeeds."}
     fi
 
-    # Post-sync: run ALL migrations BEFORE build (so seeding doesn't create conflicting defaults)
-    # 1. Single-module migrations: <module>/migrations/v*-to-v*.nix (file cleanup)
-    # 2. Cross-module migrations: plans.nix (renames, merges like ssh-server-manager → ssh-manager)
+    # Post-sync: code cleanup + module migrate BEFORE build
+    # Same QUIET pattern as ncc-config-check: nested child → log; parent prints badges.
     if [ "$DRY_RUN" != "true" ]; then
-      if [ "$VERBOSE" = "true" ]; then
-        ${ui.messages.loading "Applying module migrations…"}
-      fi
-      # Single-module migrations (file cleanup within modules)
       SINGLE_OK=true
-      if ! ${applyMigrations}/bin/ncc-apply-migrations "$NIXOS_DIR" 0; then
-        SINGLE_OK=false
-      fi
-      # Cross-module migrations (config merges like ssh-merge) — MUST run before build/seeding
       CROSS_OK=true
-      if ! NCC_CLI_NESTED=1 ${moduleMigrate}/bin/ncc-module-migrate; then
-        CROSS_OK=false
-      fi
-      if [ "$SINGLE_OK" = "true" ] && [ "$CROSS_OK" = "true" ]; then
-        ${ui.badges.success "Migrations"}
+      if [ "$VERBOSE" = "true" ]; then
+        ${ui.messages.loading "Removing old module files…"}
+        if ! ${applyMigrations}/bin/ncc-apply-migrations "$NIXOS_DIR" 0; then
+          SINGLE_OK=false
+        fi
+        ${ui.messages.loading "Merging module configs…"}
+        if ! NCC_CLI_NESTED=1 ${moduleMigrate}/bin/ncc-module-migrate; then
+          CROSS_OK=false
+        fi
       else
-        ${ui.badges.warning "Migrations"}
+        _mig_log=$(mktemp /tmp/ncc-migrate.XXXXXX.log)
+        if ! ${applyMigrations}/bin/ncc-apply-migrations "$NIXOS_DIR" 0 >"$_mig_log" 2>&1; then
+          SINGLE_OK=false
+        fi
+        if ! NCC_CLI_NESTED=1 ${moduleMigrate}/bin/ncc-module-migrate >>"$_mig_log" 2>&1; then
+          CROSS_OK=false
+        fi
+        if [ "$SINGLE_OK" != "true" ] || [ "$CROSS_OK" != "true" ]; then
+          cat "$_mig_log"
+        fi
+        rm -f "$_mig_log"
+      fi
+      if [ "$SINGLE_OK" = "true" ]; then
+        ${ui.badges.success "Remove old module files"}
+      else
+        ${ui.badges.warning "Remove old module files"}
+        ${ui.messages.info "Retry: sudo ncc-apply-migrations /etc/nixos"}
+      fi
+      if [ "$CROSS_OK" = "true" ]; then
+        ${ui.badges.success "Merge module configs"}
+      else
+        ${ui.badges.warning "Merge module configs"}
         ${ui.messages.info "Retry: sudo ncc modules migrate"}
       fi
     fi
@@ -1636,7 +1655,8 @@ EOF
       ${ui.messages.info "Retry heal: sudo ncc-migrate-config --verbose"}
       exit 1
     fi
-    ${ui.badges.success "Platform"}
+    # $VAR (not ''${}) — badge text is Nix-baked; bash expands $HEALED_PLATFORM at runtime
+    ${ui.badges.success "Platform: $HEALED_PLATFORM"}
 
     # After config update (opt 1/2): offer channel bump when a newer stable pin exists
     CHANNELS_UPDATED=false
@@ -1680,7 +1700,7 @@ EOF
             fi
             if ncc-update-channels "''${BUMP_ARGS[@]}"; then
               CHANNELS_UPDATED=true
-              ${ui.badges.success "Channel"}
+              ${ui.badges.success "Channel: nixos-$LATEST_PIN"}
             else
               ${ui.badges.error "Channel"}
               ${ui.messages.error "Channel update failed — continuing with config-only rebuild"}
@@ -1690,7 +1710,12 @@ EOF
           fi
         fi
       elif [ "$CHECK_RC" -eq 0 ]; then
-        ${ui.badges.success "Channel"}
+        CURRENT_PIN=$(echo "$CHECK_JSON" | ${pkgs.jq}/bin/jq -r '.current // empty' 2>/dev/null || true)
+        if [ -n "$CURRENT_PIN" ]; then
+          ${ui.badges.success "Channel: nixos-$CURRENT_PIN"}
+        else
+          ${ui.badges.success "Channel: current"}
+        fi
       else
         ${ui.badges.warning "Channel"}
         if [ "$VERBOSE" = "true" ]; then
@@ -1718,43 +1743,69 @@ EOF
       set -e
 
       if [ "$EXIT_CODE" -eq 0 ]; then
-        ${ui.badges.success "Update complete"}
         rm -f "$BUILD_LOG"
         # Tree sync preserves systemConfig — schema bump is migrate-config (1.0→2.1…)
-        ${ui.messages.loading "Migrating config schema if needed..."}
+        # QUIET pattern (ncc-config-check): child → log; parent one badge
+        _sch_log=$(mktemp /tmp/ncc-schema.XXXXXX.log)
         if command -v ncc-migrate-config >/dev/null 2>&1; then
-          if ncc-migrate-config; then
-            ${ui.messages.success "Config schema is current"}
+          if ncc-migrate-config >"$_sch_log" 2>&1; then
+            ${ui.badges.success "Config schema"}
+            rm -f "$_sch_log"
           else
-            ${ui.messages.warning "ncc-migrate-config failed — run: sudo ncc system migrate-config"}
+            cat "$_sch_log"
+            rm -f "$_sch_log"
+            ${ui.badges.warning "Config schema"}
+            ${ui.messages.info "Next: sudo ncc system migrate-config"}
           fi
         elif command -v ncc >/dev/null 2>&1; then
-          if ncc system migrate-config; then
-            ${ui.messages.success "Config schema is current"}
+          if ncc system migrate-config >"$_sch_log" 2>&1; then
+            ${ui.badges.success "Config schema"}
+            rm -f "$_sch_log"
           else
-            ${ui.messages.warning "migrate-config failed — run: sudo ncc system migrate-config"}
+            cat "$_sch_log"
+            rm -f "$_sch_log"
+            ${ui.badges.warning "Config schema"}
+            ${ui.messages.info "Next: sudo ncc system migrate-config"}
           fi
         else
-          ${ui.messages.warning "migrate-config not on PATH — run: sudo ncc system migrate-config"}
+          rm -f "$_sch_log"
+          ${ui.badges.warning "Config schema"}
+          ${ui.messages.info "Next: sudo ncc system migrate-config"}
         fi
-        # Post-switch module migrate (safety net — main work done pre-build at sync time)
-        # Uses NEW system's tools; catches any migrations the old tools missed
-        ${ui.messages.loading "Verifying module configs..."}
+        _mod_log=$(mktemp /tmp/ncc-modmig.XXXXXX.log)
+        # Post-rebuild merge: silent on success (badge already shown post-sync); warn only on fail.
         if command -v ncc-module-migrate >/dev/null 2>&1; then
-          if NCC_CLI_NESTED=1 ncc-module-migrate; then
-            ${ui.messages.success "Module configs are current"}
+          if NCC_CLI_NESTED=1 ncc-module-migrate >"$_mod_log" 2>&1; then
+            rm -f "$_mod_log"
+            if [ "$VERBOSE" = "true" ]; then
+              ${ui.badges.success "Merge module configs (post-rebuild)"}
+            fi
           else
-            ${ui.messages.warning "ncc-module-migrate failed — run: sudo ncc modules migrate"}
+            cat "$_mod_log"
+            rm -f "$_mod_log"
+            ${ui.badges.warning "Merge module configs"}
+            ${ui.messages.info "Next: sudo ncc modules migrate"}
           fi
         elif command -v ncc >/dev/null 2>&1; then
-          if NCC_CLI_NESTED=1 ncc modules migrate; then
-            ${ui.messages.success "Module configs are current"}
+          if NCC_CLI_NESTED=1 ncc modules migrate >"$_mod_log" 2>&1; then
+            rm -f "$_mod_log"
+            if [ "$VERBOSE" = "true" ]; then
+              ${ui.badges.success "Merge module configs (post-rebuild)"}
+            fi
           else
-            ${ui.messages.warning "modules migrate failed — run: sudo ncc modules migrate"}
+            cat "$_mod_log"
+            rm -f "$_mod_log"
+            ${ui.badges.warning "Merge module configs"}
+            ${ui.messages.info "Next: sudo ncc modules migrate"}
           fi
         else
-          ${ui.messages.warning "module-migrate not on PATH — run: sudo ncc modules migrate"}
+          rm -f "$_mod_log"
+          if [ "$VERBOSE" = "true" ]; then
+            ${ui.badges.warning "Merge module configs"}
+            ${ui.messages.info "Next: sudo ncc modules migrate"}
+          fi
         fi
+        ${ui.badges.success "Update complete"}
       else
         ${ui.messages.error "Auto-build FAILED (exit $EXIT_CODE) — files are updated, but the system was NOT switched."}
         print_copyable_build_error "$BUILD_LOG" "$EXIT_CODE"

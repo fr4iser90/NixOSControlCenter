@@ -166,7 +166,7 @@ in {
     # Initialize builtin themes
     init_builtin_themes() {
       ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: theme: ''
-        cat > "$THEMES_DIR/${name}.json" <<'THEME_EOF'
+        cat > "$THEMES_DIR/''${name}.json" <<'THEME_EOF'
         ${builtins.toJSON theme}
         THEME_EOF
       '') builtinThemes)}

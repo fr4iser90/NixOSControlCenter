@@ -16,8 +16,6 @@ in {
 
   imports = [
     ./options.nix
-    # Always: wipe legacy systemConfig/.../client-connections.nix (recreated nothing)
-    ./client/config.nix
   ] ++ optionals on [
     ./commands.nix
     ./auth.nix

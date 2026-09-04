@@ -185,7 +185,7 @@ class SystemPage(DomainPage):
         self.lbl_config_ver = self.add_form_value(status, "Config version")
         self.lbl_system_type = self.add_form_value(status, "System type")
         self.lbl_layout = self.add_form_value(status, "Config layout")
-        self.lbl_checks = self.add_form_value(status, "Preflight checks")
+        self.lbl_checks = self.add_form_value(status, "Hardware & users")
 
         store = self.add_form_block("Nix store")
         self.lbl_store_size = self.add_form_value(store, "Store size")
@@ -371,14 +371,15 @@ class SystemPage(DomainPage):
         where = t or "this machine"
 
         if t:
-            # Host→Target never uses Target's old ``ncc --source-dir`` (often ignored).
-            # Always rebuild after apply so PATH gets the new migrate-config.
+            # Host→Target: migrate module configs WHILE SSH still works, then rebuild.
+            # (Rebuild with ssh-manager.enable=false kills sshd — migrate must be first.)
             summary = (
                 f"On {t}:\n"
                 f"1) Copy this PC's tree → {remote_staging_dir()}\n"
                 f"2) Apply into /etc/nixos (keep your systemConfig)\n"
-                f"3) Rebuild & switch\n"
-                f"4) Migrate config → {EXPECTED_CONFIG_VERSION}"
+                f"3) Module migrate (SSH merge / renames — before rebuild)\n"
+                f"4) Rebuild & switch\n"
+                f"5) Migrate config schema → {EXPECTED_CONFIG_VERSION}"
             )
         else:
             steps = (
@@ -401,7 +402,7 @@ class SystemPage(DomainPage):
             return
 
         if t:
-            self._host_push_apply_rebuild_migrate(path)
+            self._host_push_apply_rebuild_migrate(path, auto_build=auto_build)
             return
 
         # Local (no Target): update --local, then migrate
@@ -429,8 +430,10 @@ class SystemPage(DomainPage):
             follow_target=False,
         )
 
-    def _host_push_apply_rebuild_migrate(self, path: str) -> None:
-        """rsync → apply → rebuild → migrate (Target). Blocking push/apply, then async."""
+    def _host_push_apply_rebuild_migrate(
+        self, path: str, *, auto_build: bool = True
+    ) -> None:
+        """rsync This-PC tree → Target apply → module migrate → rebuild → schema."""
         from PySide6.QtWidgets import QApplication
 
         t = target_from_env()
@@ -462,17 +465,49 @@ class SystemPage(DomainPage):
             )
             return
 
-        self._chain_rebuild_then_migrate(auto_build=True)
+        self._chain_module_migrate_rebuild_schema(auto_build=auto_build)
+
+    def _chain_module_migrate_rebuild_schema(self, *, auto_build: bool) -> None:
+        """After Host→Target apply: module migrate → rebuild → schema migrate-config.
+
+        Module migrate MUST run before rebuild: cross-module merges (e.g. ssh-server-manager
+        → ssh-manager with enable=true) need to land in systemConfig before Nix eval, or
+        openssh stays off and post-rebuild SSH (migrate-config) fails with connection refused.
+        """
+
+        def _after_module_migrate(code: int) -> None:
+            if code != 0:
+                error(
+                    self,
+                    f"Update to {EXPECTED_CONFIG_VERSION}",
+                    "Module migrate failed — rebuild skipped (SSH/config merges "
+                    "must succeed first).\n\n"
+                    "On Target (console if SSH is down):\n"
+                    "  sudo ncc modules migrate --verbose\n"
+                    "Then fix enable in systemConfig if needed and rebuild.",
+                )
+                return
+            self._chain_rebuild_then_migrate(auto_build=auto_build)
+
+        if self.set_busy():
+            return
+        self.log_append("• module migrate (before rebuild — keep SSH merges)\n")
+        self.run_ncc_root(
+            ["modules", "migrate"],
+            label="module migrate (pre-rebuild)",
+            on_done=_after_module_migrate,
+            follow_target=True,
+        )
 
     def _chain_rebuild_then_migrate(self, *, auto_build: bool) -> None:
-        """After Host→Target apply: rebuild (new ncc), then migrate-config."""
+        """Rebuild (new ncc on PATH), then schema migrate-config."""
 
         def _after_rebuild(code: int) -> None:
             if code != 0:
                 error(
                     self,
                     f"Update to {EXPECTED_CONFIG_VERSION}",
-                    "Rebuild failed — migrate skipped. Fix build, then "
+                    "Rebuild failed — schema migrate skipped. Fix build, then "
                     "run Migrate config (or Update to "
                     f"{EXPECTED_CONFIG_VERSION} again).",
                 )
@@ -791,22 +826,51 @@ class SystemPage(DomainPage):
             return
         t = target_from_env()
         where = t or "this machine"
+
+        # Host→Target + "From local repo": push THIS PC's tree to Target (never
+        # run ``ncc system update --local --source-dir=<host-path>`` on Target —
+        # that path only exists on this PC).
+        if mode == "local" and t:
+            path = self._local_path
+            ok, err = local_path_ok(path)
+            if not ok:
+                error(self, "From local repo", err)
+                return
+            summary = (
+                f"This PC → {t}:\n"
+                f"1) Copy {path} → {remote_staging_dir()}\n"
+                f"2) Apply into /etc/nixos (keep systemConfig)\n"
+                f"3) Module migrate (before rebuild)\n"
+                f"4) Rebuild & switch\n"
+                f"5) Migrate config schema → {EXPECTED_CONFIG_VERSION}"
+            )
+            build = self._auto_build
+            if not build:
+                summary = (
+                    f"This PC → {t}:\n"
+                    f"1) Copy {path} → Target /etc/nixos (keep systemConfig)\n"
+                    f"2) Module migrate\n"
+                    f"(auto-build off — no rebuild / schema migrate)"
+                )
+            if not confirm(
+                self,
+                "From local repo",
+                f"{summary}\n\nContinue on {where}?",
+            ):
+                return
+            self._host_push_apply_rebuild_migrate(path, auto_build=build)
+            return
+
         if mode == "local":
             path = self._local_path
-            if not t and (not path or not Path(path).is_dir()):
+            if not path or not Path(path).is_dir():
                 error(
                     self,
                     "Local update",
                     f"Directory not found:\n{path}\n\nSet the path in Settings.",
                 )
                 return
-            if t:
-                summary = (
-                    f"On {where}: sync from a path available there "
-                    f"(configured local path is for this PC):\n{path}"
-                )
-            else:
-                summary = f"Copy from local tree:\n{path}"
+            summary = f"Copy from local tree:\n{path}"
         elif mode == "remote":
             summary = f"On {where}: clone GitHub NixOSControlCenter @ {self._branch}"
         else:

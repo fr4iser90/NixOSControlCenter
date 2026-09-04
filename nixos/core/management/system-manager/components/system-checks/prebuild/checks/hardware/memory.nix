@@ -70,7 +70,7 @@ let
     fi
 
     if [ "$DETECTED_GB" != "$CONFIGURED_GB" ]; then
-      ${ui.badges.warning "Memory: was \${CONFIGURED_GB:-?} GB → set to $DETECTED_GB GB"}
+      ${ui.badges.warning "Memory: was $CONFIGURED_GB GB → set to $DETECTED_GB GB"}
       _update_memory "$DETECTED_GB"
       ${ui.badges.success "Memory: $DETECTED_GB GB"}
     else

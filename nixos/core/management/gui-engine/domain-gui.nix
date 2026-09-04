@@ -11,6 +11,11 @@ let
   };
   assistantSrc = "${assistantRoot}/python/ncc_assistant";
   pagesPkg = import ./lib/mk-domain-pages.nix { inherit lib pkgs guiPages; };
+  # Schema SSOT — same as ncc-migrate-config (no Python hardcode)
+  expectedConfigVersion =
+    (import "${(getModuleMetadata "system-manager").path}/components/config-migration/schema.nix" {
+      inherit lib;
+    }).currentVersion;
 
   pythonEnv = pkgs.python3.withPackages (ps: with ps; [
     pyside6
@@ -32,6 +37,7 @@ let
     export NCC_PACKAGES_BIN="${packagesCli}/bin/ncc-packages"
     export NCC_PACKAGES_CATALOG="${catalogFile}"
     export NCC_GUI_ICON="''${NCC_GUI_ICON:-${eng.iconPng}}"
+    export NCC_EXPECTED_CONFIG_VERSION="${expectedConfigVersion}"
     export QT_QPA_PLATFORM="''${QT_QPA_PLATFORM:-xcb}"
     export PATH="${packagesCli}/bin:${pkgs.nix}/bin:$PATH"
     exec ${pythonEnv}/bin/python -m ncc_gui.domain_gui "$@"

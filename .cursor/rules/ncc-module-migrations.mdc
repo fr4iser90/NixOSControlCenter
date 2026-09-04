@@ -28,13 +28,26 @@ Default: **no version bump**. If unsure: no bump unless a host rebuild fails wit
 | Kind | Location |
 |------|----------|
 | Single-module code/config cleanup | `<that-module>/migrations/vFROM-to-vTO.nix` |
-| Cross-module rename/merge only | `module-manager/.../plans.nix` |
+| Cross-module rename/merge | **destination** `<module>/migrations/plan-*.nix` (discovered by `ncc-module-migrate`) |
 
-**Forbidden:** hardcoding peer module paths in `system-update.nix` or central `plans.nix` for single-module cleanup.
+**Forbidden:** hardcoding peer module paths in `system-update.nix` or central `plans.nix` (must stay `plans = []`).
 
 Naming: helper is **`apply-migrations.nix`** / **`ncc-apply-migrations`**. Never “local migrations”, “code-cleanup plans”, or invent new names.
 
-## Migration file shape
+## Cross-module plan shape
+
+```nix
+# <destination-module>/migrations/plan-my-rename-v1.nix
+{ lib }: {
+  id = "my-rename-v1";           # stable id for /var/lib/ncc/module-migrations.json
+  kind = "rename";               # or "ssh-merge"
+  description = "Why this exists";
+  fromPaths = [ "modules/…/old-name" ];
+  # toPath optional — runner derives from this module's path under /etc/nixos
+}
+```
+
+## Migration file shape (code cleanup)
 
 ```nix
 # <module>/migrations/v1.0.0-to-v1.1.0.nix
@@ -71,3 +84,4 @@ Normal module code deletions (covered by `rsync --delete`) do **not** require a 
 
 - `nixos/modules/*`: no cross-module `import` of peer trees — `getModuleApi` / `getModuleConfig`
 - Core may discover `*/migrations/`; must not list install-wizard (or other) script paths by name
+- Central `module-manager/.../plans.nix` stays empty (`plans = []`); rename/merge = destination `plan-*.nix`

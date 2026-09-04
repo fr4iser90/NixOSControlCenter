@@ -301,7 +301,7 @@ in {
         return 1
       fi
       
-      echo "Batch delete ${#step_ids[@]} steps"
+      echo "Batch delete ''${#step_ids[@]} steps"
       read -p "Continue? (y/N): " confirm
       
       if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
@@ -324,7 +324,7 @@ in {
         "$session_file" > "$session_file.tmp"
       mv "$session_file.tmp" "$session_file"
       
-      log "Batch deleted ${#step_ids[@]} steps from $session_file"
+      log "Batch deleted ''${#step_ids[@]} steps from $session_file"
       echo "Batch delete completed"
     }
     

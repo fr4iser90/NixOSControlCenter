@@ -20,18 +20,16 @@ let
   
   # Convert migration plans to JSON for bash script
   migrationPlansJson = builtins.toJSON migrationPlans;
-  
-  # Helper .nix file that computes the migration chain (avoids nested ''...'' strings)
-  findChainFile = pkgs.writeText "find-chain.nix" ''
-    { migrationsPath, utilsPath, configVersion, currentVersion }:
-    let
-      lib = import <nixpkgs/lib>;
-      utils = import utilsPath { inherit lib; };
-      plans = utils.discoverMigrations migrationsPath;
-      chain = utils.findMigrationChain plans configVersion currentVersion;
-    in
-      if chain != null then chain else []
-  '';
+
+  # Precompute chains from every known plan "from" → currentVersion (no runtime nix/<nixpkgs>)
+  chainsToCurrentJson = builtins.toJSON (
+    lib.listToAttrs (
+      map (from:
+        let chain = utils.findMigrationChain migrationPlans from currentVersion;
+        in lib.nameValuePair from (if chain != null then chain else [])
+      ) (lib.attrNames migrationPlans)
+    )
+  );
   
   # Migration script that migrates old system-config.nix to new modular structure
   # NOTE: The old processStructure function was removed - migration now uses jq directly in bash
@@ -52,16 +50,33 @@ let
     # Generic config directory - can be overridden via environment variable
     NIXOS_CONFIG_DIR="''${NIXOS_CONFIG_DIR:-/etc/nixos}"
     
-    # All paths relative to NIXOS_CONFIG_DIR (no hardcoded paths)
+    # All paths relative to NIXOS_CONFIG_DIR (no hardcoded host layout paths)
     SYSTEM_CONFIG="$NIXOS_CONFIG_DIR/system-config.nix"
     CONFIGS_DIR="$NIXOS_CONFIG_DIR/systemConfig"
-    UTILS_PATH="$NIXOS_CONFIG_DIR/core/management/system-manager/lib/utils-config-migration.nix"
-    MIGRATIONS_PATH="$NIXOS_CONFIG_DIR/core/management/system-manager/components/config-migration/schema/migrations"
+    MIGRATION_PLANS_JSON='${migrationPlansJson}'
+    CHAINS_TO_CURRENT_JSON='${chainsToCurrentJson}'
     
     # Set Nix and jq paths as bash variables (like in homelab-create.nix)
     NIX_BIN="${pkgs.nix}/bin/nix-instantiate"
     JQ_BIN="${pkgs.jq}/bin/jq"
-    FIND_CHAIN_FILE="${findChainFile}"
+
+    # Resolve schema chain from baked map (build-time discovery — works without NIX_PATH)
+    ncc_migrate_chain_json() {
+      local from="$1"
+      local to="''${2:-}"
+      local chain
+      chain=$(echo "$CHAINS_TO_CURRENT_JSON" | "$JQ_BIN" -c --arg f "$from" '.[$f] // empty')
+      if [ -z "$chain" ] || [ "$chain" = "null" ] || [ "$chain" = "[]" ]; then
+        # Fallback: direct edge in embedded plans (same package)
+        if [ -n "$to" ] && echo "$MIGRATION_PLANS_JSON" | "$JQ_BIN" -e --arg a "$from" --arg b "$to" '.[$a][$b] != null' >/dev/null 2>&1; then
+          printf '[%s,%s]\n' "\"$from\"" "\"$to\""
+          return 0
+        fi
+        printf '%s\n' "[]"
+        return 1
+      fi
+      printf '%s\n' "$chain"
+    }
 
     ${facade.sourcePreamble { nixosRoot = "/etc/nixos"; }}
     export NIXOS_ROOT="$NIXOS_CONFIG_DIR"
@@ -97,7 +112,6 @@ let
         current=$(echo "$current" | sed -E "s/(systemType[[:space:]]*=[[:space:]]*\"[^\"]*\"[[:space:]]*;)/\1\n  system.platform = \"$platform\";/")
       elif [ "$current" = "{}" ] || [ -z "$(echo "$current" | tr -d '[:space:]{}')" ]; then
         current="{
-  configVersion = \"2.1\";
   layout = \"monolith\";
   systemType = \"desktop\";
   system.platform = \"$platform\";
@@ -106,12 +120,7 @@ let
         current=$(printf '%s\n' "$current" | ${pkgs.gnused}/bin/sed "\$ i\  system.platform = \"$platform\";")
       fi
 
-      # Bump leaf configVersion to 2.1 when present
-      if echo "$current" | grep -qE 'configVersion[[:space:]]*='; then
-        current=$(echo "$current" | sed -E 's/configVersion[[:space:]]*=[[:space:]]*"[^"]*"/configVersion = "2.1"/')
-      else
-        current=$(echo "$current" | sed -E '0,/{/s/{/{\n  configVersion = "2.1";/')
-      fi
+      # Do not bump configVersion here — leaf steps / ncc_migrate_bump_config_version own that
 
       if ! ncc_write_module_config "core/management/system-manager" "$current"; then
         ${formatter.messages.error "Failed to write system-manager config (platform)"}
@@ -153,6 +162,37 @@ let
       fi
       ${formatter.messages.success "system.platform = $platform (from live arch)"}
     }
+
+    # Bump configVersion in system-manager leaf (split) or monolith — always for schema steps.
+    ncc_migrate_bump_config_version() {
+      local want="''${1:-2.1}"
+      local current
+      if [ -f "$SM_CONFIG" ] || ncc_module_config_exists "core/management/system-manager" 2>/dev/null; then
+        current=$(ncc_read_module_config "core/management/system-manager" 2>/dev/null || echo "{}")
+        if echo "$current" | grep -qE 'configVersion[[:space:]]*='; then
+          current=$(echo "$current" | sed -E "s/configVersion[[:space:]]*=[[:space:]]*\"[^\"]*\"/configVersion = \"$want\"/")
+        else
+          current=$(echo "$current" | sed -E "0,/{/s/{/{\n  configVersion = \"$want\";/")
+        fi
+        if ! ncc_write_module_config "core/management/system-manager" "$current"; then
+          ${formatter.messages.error "Failed to write configVersion = $want"}
+          return 1
+        fi
+        ${formatter.badges.success "Config version $want"}
+        return 0
+      fi
+      if [ -f "$MONOLITH_FILE" ]; then
+        if grep -qE 'configVersion[[:space:]]*=' "$MONOLITH_FILE"; then
+          sed -i "s/configVersion = \"[^\"]*\"/configVersion = \"$want\"/" "$MONOLITH_FILE"
+        else
+          sed -i "0,/{/s/{/{\n  configVersion = \"$want\";/" "$MONOLITH_FILE"
+        fi
+        ${formatter.badges.success "Config version $want"}
+        return 0
+      fi
+      ${formatter.messages.error "No system-manager config to bump (configVersion $want)"}
+      return 1
+    }
     
     # PRE-CHECK: If already at current schema version, only clean stale artifacts
     # Just clean up stale files from incomplete previous migrations
@@ -165,7 +205,7 @@ let
     fi
     if [ "$DETECTED_PRE" = "$CURRENT_VERSION_PRE" ]; then
       if [ -f "$SYSTEM_CONFIG" ]; then
-        ${formatter.messages.info "Removing stale system-config.nix (v2.1 already active)"}
+        ${formatter.messages.info "Removing stale system-config.nix (schema $CURRENT_VERSION_PRE already active)"}
         rm -f "$SYSTEM_CONFIG"
       fi
       for agg in \
@@ -191,29 +231,81 @@ let
       exit 0
     fi
 
-    # v2.0 → v2.1: write system.platform from live uname (no x86 fallback in flake)
-    if [ "$DETECTED_PRE" = "2.0" ] && { [ -f "$MONOLITH_FILE" ] || [ -f "$SM_CONFIG" ]; }; then
-      ${formatter.messages.info "Migrating v2.0 → v2.1 (system.platform from live arch)"}
-      ncc_migrate_ensure_platform
-      exit 0
-    fi
+    # Apply one leaf schema step: liveInject + inject attrs + bump configVersion to $1
+    ncc_migrate_apply_leaf_step() {
+      local from="$1" to="$2"
+      local plan inject_json key method
+      plan=$(echo "$MIGRATION_PLANS_JSON" | "$JQ_BIN" -c ".\"$from\".\"$to\" // empty")
+      if [ -z "$plan" ] || [ "$plan" = "null" ]; then
+        ${formatter.messages.error "No migration plan for $from → $to"}
+        return 1
+      fi
+      ${formatter.messages.info "Migrating v$from → v$to"}
 
-    # v1→v2 in-place bump when already on split layout without legacy system-config.nix
-    if [ "$DETECTED_PRE" = "1.0" ] && [ ! -f "$SYSTEM_CONFIG" ] && [ -f "$SM_CONFIG" ]; then
-      ${formatter.messages.info "Bumping split config from v1.0 → v2.0 (layout=split)"}
-      if grep -q "configVersion" "$SM_CONFIG"; then
-        sed -i 's/configVersion = "[^"]*"/configVersion = "2.0"/' "$SM_CONFIG"
-      else
-        sed -i '0,/{/s/{/{\n  configVersion = "2.0";/' "$SM_CONFIG"
+      # liveInject (e.g. system.platform = uname-m)
+      while IFS= read -r key; do
+        [ -z "$key" ] && continue
+        method=$(echo "$plan" | "$JQ_BIN" -r ".liveInject.\"$key\" // empty")
+        case "$key:$method" in
+          system.platform:uname-m)
+            ncc_migrate_ensure_platform || return 1
+            ;;
+          *)
+            if [ -n "$method" ] && [ "$VERBOSE" = "true" ]; then
+              ${formatter.messages.warning "Unknown liveInject $key=$method (skipped)"}
+            fi
+            ;;
+        esac
+      done < <(echo "$plan" | "$JQ_BIN" -r '.liveInject // {} | keys[]')
+
+      # inject from fieldsToMigrate.*.inject (layout, configVersion, …)
+      inject_json=$(echo "$plan" | "$JQ_BIN" -c '
+        [.fieldsToMigrate // {} | to_entries[] | .value.inject // {}]
+        | add // {}
+      ')
+      if [ -n "$inject_json" ] && [ "$inject_json" != "null" ] && [ "$inject_json" != "{}" ]; then
+        if [ -f "$SM_CONFIG" ] || ncc_module_config_exists "core/management/system-manager" 2>/dev/null; then
+          local current ik iv
+          current=$(ncc_read_module_config "core/management/system-manager" 2>/dev/null || echo "{}")
+          while IFS=$'\t' read -r ik iv; do
+            [ -z "$ik" ] && continue
+            # Only simple string injects into the leaf (layout, configVersion, …)
+            # ''${…} = bash; bare ''${ would be Nix interp (undefined variable)
+            if echo "$current" | grep -qE "(^|[[:space:]])''${ik}[[:space:]]*="; then
+              current=$(echo "$current" | sed -E "s/(^|[[:space:]])''${ik}[[:space:]]*=[[:space:]]*\"[^\"]*\"/\1''${ik} = \"$iv\"/")
+            else
+              current=$(echo "$current" | sed -E "0,/{/s/{/{\n  ''${ik} = \"$iv\";/")
+            fi
+          done < <(echo "$inject_json" | "$JQ_BIN" -r 'to_entries[] | select(.value|type=="string") | "\(.key)\t\(.value)"')
+          if ! ncc_write_module_config "core/management/system-manager" "$current"; then
+            ${formatter.messages.error "Failed to apply inject for $from → $to"}
+            return 1
+          fi
+        fi
       fi
-      if grep -qE 'layout\s*=' "$SM_CONFIG"; then
-        sed -i 's/layout = "[^"]*"/layout = "split"/' "$SM_CONFIG"
-      else
-        sed -i '0,/{/s/{/{\n  layout = "split";/' "$SM_CONFIG"
+
+      ncc_migrate_bump_config_version "$to" || return 1
+    }
+
+    # Split/monolith leaf behind current (no legacy system-config.nix): walk schema chain
+    if [ -n "$DETECTED_PRE" ] && [ "$DETECTED_PRE" != "$CURRENT_VERSION_PRE" ] \
+       && { [ -f "$MONOLITH_FILE" ] || [ -f "$SM_CONFIG" ]; } \
+       && [ ! -f "$SYSTEM_CONFIG" ]; then
+      ${formatter.messages.info "Leaf schema migrate v$DETECTED_PRE → v$CURRENT_VERSION_PRE"}
+      CHAIN_JSON=$(ncc_migrate_chain_json "$DETECTED_PRE" "$CURRENT_VERSION_PRE" || true)
+      if [ "$CHAIN_JSON" = "[]" ] || [ -z "$CHAIN_JSON" ]; then
+        ${formatter.messages.error "No migration chain from $DETECTED_PRE to $CURRENT_VERSION_PRE"}
+        exit 1
       fi
-      ${formatter.messages.info "Continuing → v2.1 (system.platform)"}
-      DETECTED_PRE="2.0"
-      ncc_migrate_ensure_platform
+      CHAIN_STEPS=''$(echo "$CHAIN_JSON" | "$JQ_BIN" -r ".[]")
+      CHAIN_ARRAY=($CHAIN_STEPS)
+      if [ ''${#CHAIN_ARRAY[@]} -lt 2 ]; then
+        ${formatter.messages.error "Invalid migration chain"}
+        exit 1
+      fi
+      for i in ''$(seq 1 ''$((''${#CHAIN_ARRAY[@]} - 1))); do
+        ncc_migrate_apply_leaf_step "''${CHAIN_ARRAY[$((i - 1))]}" "''${CHAIN_ARRAY[$i]}" || exit 1
+      done
       exit 0
     fi
     
@@ -311,14 +403,7 @@ let
     
     # If no direct migration, try to find chain migration
     if [ -z "$MIGRATION_TARGET" ] || [ "$MIGRATION_TARGET" = "null" ]; then
-      # Use findMigrationChain to get full chain (v1→v2→v3→v4)
-      # Call nix-instantiate on the prewritten helper .nix file instead of inline -E expression
-      CHAIN_JSON=''$("$NIX_BIN" --eval --strict --json "$FIND_CHAIN_FILE" \
-        --argstr migrationsPath "$MIGRATIONS_PATH" \
-        --argstr utilsPath "$UTILS_PATH" \
-        --argstr configVersion "$CONFIG_VERSION" \
-        --argstr currentVersion "$CURRENT_VERSION" \
-        2>/dev/null || echo "[]")
+      CHAIN_JSON=$(ncc_migrate_chain_json "$CONFIG_VERSION" "$CURRENT_VERSION" || true)
       
       if [ "$CHAIN_JSON" = "[]" ] || [ -z "$CHAIN_JSON" ]; then
         ${formatter.messages.error "No migration path from version $CONFIG_VERSION to $CURRENT_VERSION"}

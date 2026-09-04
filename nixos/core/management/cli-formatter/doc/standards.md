@@ -99,37 +99,51 @@ WARNING: …                         # registry; skipped with --yes / -y / dange
 Do you want to continue? (yes/no): y
 
 === NixOS System Update ===
-[ OK ] Config
-[ OK ] Migrations
-Source: local — /home/…/NixOSControlCenter/nixos
+[ OK ] Config check
+[ OK ] Source: local — /home/…/NixOSControlCenter/nixos
 [ OK ] Flake extras
 [ OK ] Backup
 [ OK ] Files synced
+[ OK ] Remove old module files
+[ OK ] Merge module configs
 [ OK ] Passwords
-[ OK ] Platform
-[ OK ] Channel
+[ OK ] Platform: x86_64-linux
+[ OK ] Channel: nixos-25.05
 Do you want to build and switch…? (y/n): y
-[ OK ] Preflight
+[ OK ] Hardware & users
 Building…
 [ OK ] Switch
+[ OK ] Config schema
 [ OK ] Update complete
 ```
 
-| Line | Meaning |
-|------|---------|
-| `[ OK ] Config` | schema / heal OK |
-| `[ OK ] Migrations` | module renames/orphans OK (no work or done) |
-| `Source: …` | fact (not a check) — one line only |
-| `[ OK ] Flake extras` | kept none, or merge ready |
-| `[ OK ] Backup` | safety copy done (path only with `-v`) |
-| `[ OK ] Files synced` | tree copy done (per-dir chatter only with `-v`) |
-| `[ OK ] Passwords` / Platform / Channel | post-sync checks |
-| `[ OK ] Preflight` | hardware/users (individual check lines only with `-v`) |
-| `Building…` | wait; **no** rebuild dump |
-| `[ OK ] Switch` | rebuild+activate succeeded |
-| `[ OK ] Update complete` | parent final line |
+Phase badges ≤ ~40 chars (path lines may be longer). Values OK when short (`Platform: …`, `Channel: …`).  
+Outcome wording for end users — not internal tool names.
+
+| Line | What it means |
+|------|----------------|
+| `Config check` | Is `systemConfig` valid / healed? |
+| `Source: …` | Where the new code comes from. |
+| `Flake extras` | Host-only flake bits kept or merged. |
+| `Backup` | Safety copy before overwrite. |
+| `Files synced` | Module/code tree copied; user `systemConfig/` kept. |
+| `Remove old module files` | Delete orphans from `<module>/migrations/` (renames/removals). |
+| `Merge module configs` | Apply cross-module plans / leaf merges (e.g. SSH rename). **One** user-facing line (post-sync). Early/post-rebuild runs are silent unless they fail (or `-v`). |
+| `Passwords` | Password files look intact. |
+| `Platform: …` | Arch for flake eval (`x86_64-linux` / `aarch64-linux`). |
+| `Channel: …` | nixpkgs release pin (current or after bump). |
+| `Hardware & users` | Before rebuild: CPU, GPU, memory, users vs config (was “Preflight”). Details with `-v`. |
+| `Building…` | Wait; full nix log only with `-v`. |
+| `Switch` | New generation active. |
+| `Config schema` | Bump `configVersion` + required fields (`ncc-migrate-config`). |
+| `Update complete` | **Last** — everything done. |
 
 Skip-build → one `Next: sudo ncc system build switch …`. Failure → `[ERROR]` + copyable log (always).
+
+**Two version tracks (do not mix):**
+
+- **Config schema** (`configVersion`) → `Config schema` / `ncc-migrate-config`
+- **Module code** → `Remove old module files` + `Merge module configs`
 
 ### With `-v` / `--verbose` (extra)
 

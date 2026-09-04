@@ -54,51 +54,56 @@ in
     run_module_migrate() {
       local migrate_log
       migrate_log=$(mktemp /tmp/ncc-migrate.XXXXXX.log)
+      # Nested under system-update (quiet): run silently — post-sync owns the user-facing badge.
+      local show_ok=true
+      if [ "$QUIET" = "true" ]; then
+        show_ok=false
+      fi
       if command -v ncc-module-migrate >/dev/null 2>&1; then
         if [ "$QUIET" = "true" ]; then
           if NCC_CLI_NESTED=1 ncc-module-migrate $MIGRATE_EXTRA $VERBOSE_FLAG >"$migrate_log" 2>&1; then
-            ${formatter.badges.success "Migrations"}
             rm -f "$migrate_log"
             return 0
           else
             cat "$migrate_log"
             rm -f "$migrate_log"
-            ${formatter.badges.warning "Migrations"}
+            ${formatter.badges.warning "Merge module configs"}
             return 1
           fi
         fi
-        ${formatter.messages.loading "Checking module config migrations…"}
+        ${formatter.messages.loading "Merging module configs…"}
         if NCC_CLI_NESTED=1 ncc-module-migrate $MIGRATE_EXTRA $VERBOSE_FLAG; then
-          ${formatter.badges.success "Migrations"}
+          ${formatter.badges.success "Merge module configs"}
         else
-          ${formatter.messages.warning "Module migrate had issues — run: sudo ncc modules migrate --verbose"}
+          ${formatter.messages.warning "Module merge had issues — run: sudo ncc modules migrate --verbose"}
           return 1
         fi
       elif command -v ncc >/dev/null 2>&1; then
         if [ "$QUIET" = "true" ]; then
           if NCC_CLI_NESTED=1 ncc modules migrate $MIGRATE_EXTRA $VERBOSE_FLAG >"$migrate_log" 2>&1; then
-            ${formatter.badges.success "Migrations"}
             rm -f "$migrate_log"
             return 0
           else
             cat "$migrate_log"
             rm -f "$migrate_log"
-            ${formatter.badges.warning "Migrations"}
+            ${formatter.badges.warning "Merge module configs"}
             return 1
           fi
         fi
-        ${formatter.messages.loading "Checking module config migrations…"}
+        ${formatter.messages.loading "Merging module configs…"}
         if NCC_CLI_NESTED=1 ncc modules migrate $MIGRATE_EXTRA $VERBOSE_FLAG; then
-          ${formatter.badges.success "Migrations"}
+          ${formatter.badges.success "Merge module configs"}
         else
-          ${formatter.messages.warning "Module migrate had issues — run: sudo ncc modules migrate"}
+          ${formatter.messages.warning "Module merge had issues — run: sudo ncc modules migrate"}
           return 1
         fi
       else
         if [ "$VERBOSE" = "true" ]; then
           ${formatter.messages.info "ncc-module-migrate not on PATH (skip)"}
         fi
-        ${formatter.badges.success "Migrations"}
+        if [ "$show_ok" = "true" ]; then
+          ${formatter.badges.success "Merge module configs"}
+        fi
       fi
       return 0
     }
@@ -111,18 +116,18 @@ in
       if [ "$QUIET" = "true" ]; then
         _vlog=$(mktemp /tmp/ncc-validate.XXXXXX.log)
         if ${validator.validateSystemConfig}/bin/ncc-validate-config $VERBOSE_FLAG >"$_vlog" 2>&1; then
-          ${formatter.badges.success "Config"}
+          ${formatter.badges.success "Config check"}
         else
           cat "$_vlog"
-          ${formatter.badges.warning "Config"}
+          ${formatter.badges.warning "Config check"}
         fi
         rm -f "$_vlog"
       else
         ${formatter.messages.loading "Checking system configuration…"}
         if ${validator.validateSystemConfig}/bin/ncc-validate-config $VERBOSE_FLAG 2>&1; then
-          ${formatter.badges.success "Config"}
+          ${formatter.badges.success "Config check"}
         else
-          ${formatter.badges.warning "Config"}
+          ${formatter.badges.warning "Config check"}
           if [ "$VERBOSE" = "false" ]; then
             ${formatter.messages.info "Add --verbose for details, or run without --dry-run to migrate"}
           fi
@@ -141,7 +146,7 @@ in
     fi
 
     if ! ${legacyCleanup.cleanupLegacyConfigs}/bin/ncc-cleanup-legacy-configs $VERBOSE_FLAG 2>&1; then
-      ${formatter.badges.error "Config"}
+      ${formatter.badges.error "Config check"}
       ${formatter.messages.info "Next: sudo ncc system migrate-config --verbose"}
       exit 1
     fi
@@ -149,7 +154,7 @@ in
     if [ "$QUIET" = "true" ]; then
       _vlog=$(mktemp /tmp/ncc-validate.XXXXXX.log)
       if ${validator.validateSystemConfig}/bin/ncc-validate-config $VERBOSE_FLAG >"$_vlog" 2>&1; then
-        ${formatter.badges.success "Config"}
+        ${formatter.badges.success "Config check"}
         rm -f "$_vlog"
         run_module_migrate || true
         exit 0
@@ -161,7 +166,7 @@ in
     else
       ${formatter.messages.loading "Checking system configuration…"}
       if ${validator.validateSystemConfig}/bin/ncc-validate-config $VERBOSE_FLAG 2>&1; then
-        ${formatter.badges.success "Config"}
+        ${formatter.badges.success "Config check"}
         run_module_migrate || true
         if [ -z "''${NCC_CLI_NESTED:-}" ]; then
           ${formatter.messages.info "Next: ncc system update --dry-run --local --source-dir /path/to/NixOSControlCenter/nixos"}
@@ -173,7 +178,7 @@ in
     fi
 
     if [ "''${VALIDATION_EXIT:-1}" -eq 1 ]; then
-      ${formatter.badges.warning "Config"}
+      ${formatter.badges.warning "Config check"}
       ${formatter.messages.info "Attempting automatic migration…"}
 
       if ${migration.migrateSystemConfig}/bin/ncc-migrate-config $VERBOSE_FLAG 2>&1; then
@@ -181,24 +186,24 @@ in
         ${legacyCleanup.cleanupLegacyConfigs}/bin/ncc-cleanup-legacy-configs $VERBOSE_FLAG 2>&1 || true
 
         if ${validator.validateSystemConfig}/bin/ncc-validate-config $VERBOSE_FLAG 2>&1; then
-          ${formatter.badges.success "Config"}
+          ${formatter.badges.success "Config check"}
           run_module_migrate || true
           if [ -z "''${NCC_CLI_NESTED:-}" ]; then
             ${formatter.messages.info "Next: sudo ncc system build switch"}
           fi
           exit 0
         else
-          ${formatter.badges.error "Config"}
+          ${formatter.badges.error "Config check"}
           ${formatter.messages.info "Next: ncc-config-check --verbose"}
           exit 1
         fi
       else
-        ${formatter.badges.error "Config"}
+        ${formatter.badges.error "Config check"}
         ${formatter.messages.info "Next: ncc-config-check --verbose"}
         exit 1
       fi
     else
-      ${formatter.badges.error "Config"}
+      ${formatter.badges.error "Config check"}
       ${formatter.messages.info "Next: ncc-config-check --verbose"}
       exit 1
     fi
