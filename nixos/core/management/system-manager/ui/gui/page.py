@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QProcess, QSettings, QTimer
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -185,15 +186,17 @@ class SystemPage(DomainPage):
         self.lbl_config_ver = self.add_form_value(status, "Config version")
         self.lbl_system_type = self.add_form_value(status, "System type")
         self.lbl_layout = self.add_form_value(status, "Config layout")
-        self.lbl_checks = self.add_form_value(status, "Hardware & users")
+        # system-manager.enableChecks — preflight before rebuild (not an inventory)
+        self.lbl_checks = self.add_form_value(status, "Preflight checks")
 
         store = self.add_form_block("Nix store")
-        self.lbl_store_size = self.add_form_value(store, "Store size")
+        self.lbl_store_size = self.add_form_value(store, "Disk (/nix)")
         self.lbl_generations = self.add_form_value(store, "Generations")
         self.lbl_gc_preview = self.add_form_value(store, "GC preview")
 
         self._elevated_btns: list = []
         self.add_action("Refresh status", self.reload, local=True)
+        self.add_action("Copy status", self._copy_status, local=True)
         self._elevated_btns.append(
             self.add_action(
                 "From local repo",
@@ -277,6 +280,7 @@ class SystemPage(DomainPage):
 
         self._status_proc: QProcess | None = None
         self._store_proc: QProcess | None = None
+        self._gc_probe_proc: QProcess | None = None
         self._reload_timer = QTimer(self)
         self._reload_timer.setSingleShot(True)
         self._reload_timer.setInterval(150)
@@ -629,6 +633,8 @@ class SystemPage(DomainPage):
             data = json.loads(text)
         except json.JSONDecodeError:
             self.lbl_store_size.setText("error: invalid JSON")
+            self.lbl_generations.setText("—")
+            self.lbl_gc_preview.setText("—")
             return
         size = data.get("storeSize")
         self.lbl_store_size.setText(_dash(size))
@@ -643,13 +649,21 @@ class SystemPage(DomainPage):
             self.lbl_generations.setText("—")
         dead = data.get("gcDeadPaths")
         freed = data.get("gcFreedEstimate")
-        if dead is not None:
-            preview = str(dead)
-            if freed:
-                preview = f"{dead} paths (~{freed})"
-            self.lbl_gc_preview.setText(preview)
+        note = (data.get("gcNote") or "").strip()
+        if dead is None:
+            if note.startswith("skipped"):
+                self.lbl_gc_preview.setText("skipped — use GC dry-run (slow)")
+            elif note:
+                self.lbl_gc_preview.setText(f"n/a ({note})")
+            else:
+                self.lbl_gc_preview.setText("n/a")
+        elif dead == 0:
+            self.lbl_gc_preview.setText("0 paths (nothing to free)")
         else:
-            self.lbl_gc_preview.setText("—")
+            preview = f"{dead} paths"
+            if freed:
+                preview = f"{dead} paths ({freed})"
+            self.lbl_gc_preview.setText(preview)
 
     def _run_gc_run(self) -> None:
         if self.set_busy():
@@ -713,11 +727,12 @@ class SystemPage(DomainPage):
         self.lbl_system_type.setText(_dash(fs.system_type))
         self.lbl_layout.setText(_dash(fs.layout))
         if fs.enable_checks is True:
-            self.lbl_checks.setText("on")
+            self.lbl_checks.setText("enabled")
         elif fs.enable_checks is False:
-            self.lbl_checks.setText("off")
+            self.lbl_checks.setText("disabled")
         else:
-            self.lbl_checks.setText("—")
+            # Option default is true when unset in systemConfig text
+            self.lbl_checks.setText("enabled (unset in config)")
         self.lbl_channel.setText(_dash(fs.channel))
 
         latest = ""
@@ -755,6 +770,7 @@ class SystemPage(DomainPage):
 
         from ncc_gui.remote import build_ncc_argv
 
+        # Fast path: disk + generations only (GC scan can take minutes on big stores)
         argv = build_ncc_argv(
             ["system", "store-status", "--json"],
             target=target_from_env(),
@@ -767,7 +783,33 @@ class SystemPage(DomainPage):
         proc.start(prog, args)
         if not proc.waitForStarted(3000):
             self.lbl_store_size.setText("error: probe failed to start")
+            self.lbl_generations.setText("—")
+            self.lbl_gc_preview.setText("—")
             self._store_proc = None
+
+    def _start_gc_preview_probe(self) -> None:
+        """Background --with-gc scan; may take minutes on multi-TB stores."""
+        if self._gc_probe_proc is not None:
+            if self._gc_probe_proc.state() != QProcess.ProcessState.NotRunning:
+                self._gc_probe_proc.kill()
+            self._gc_probe_proc = None
+
+        from ncc_gui.remote import build_ncc_argv
+
+        self.lbl_gc_preview.setText("scanning… (can take minutes)")
+        argv = build_ncc_argv(
+            ["system", "store-status", "--json", "--with-gc"],
+            target=target_from_env(),
+        )
+        proc = QProcess(self)
+        self._gc_probe_proc = proc
+        proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        proc.finished.connect(self._on_gc_preview_finished)
+        prog, *args = argv
+        proc.start(prog, args)
+        if not proc.waitForStarted(3000):
+            self.lbl_gc_preview.setText("n/a (GC probe failed to start)")
+            self._gc_probe_proc = None
 
     def _on_store_status_finished(self, code: int, _status) -> None:
         proc = self._store_proc
@@ -778,9 +820,75 @@ class SystemPage(DomainPage):
             bytes(proc.readAllStandardOutput()).decode("utf-8", errors="replace")
         )
         if code != 0 and not raw.strip():
-            self.lbl_store_size.setText(f"error (exit {code})")
+            err = f"error (exit {code})"
+            self.lbl_store_size.setText(err)
+            self.lbl_generations.setText("—")
+            self.lbl_gc_preview.setText("—")
             return
         self._apply_store_json(raw)
+        # Kick off slow GC scan after fast fields are filled
+        self._start_gc_preview_probe()
+
+    def _on_gc_preview_finished(self, code: int, _status) -> None:
+        proc = self._gc_probe_proc
+        self._gc_probe_proc = None
+        if proc is None:
+            return
+        raw = strip_ansi(
+            bytes(proc.readAllStandardOutput()).decode("utf-8", errors="replace")
+        )
+        if code != 0 and not raw.strip():
+            self.lbl_gc_preview.setText(
+                f"n/a (scan exit {code} — try GC dry-run)"
+            )
+            return
+        # Only refresh GC fields; keep disk/gens from fast probe
+        import json
+
+        try:
+            data = json.loads((raw or "").strip() or "{}")
+        except json.JSONDecodeError:
+            self.lbl_gc_preview.setText("n/a (invalid GC JSON)")
+            return
+        dead = data.get("gcDeadPaths")
+        freed = data.get("gcFreedEstimate")
+        note = (data.get("gcNote") or "").strip()
+        if dead is None:
+            self.lbl_gc_preview.setText(
+                f"n/a ({note})" if note else "n/a (scan failed)"
+            )
+        elif dead == 0:
+            self.lbl_gc_preview.setText("0 paths (nothing to free)")
+        else:
+            preview = f"{dead} paths"
+            if freed:
+                preview = f"{dead} paths ({freed})"
+            self.lbl_gc_preview.setText(preview)
+
+    def _copy_status(self) -> None:
+        """Copy Status + Nix store rows to clipboard (values are also mouse-selectable)."""
+        rows = [
+            ("Hostname", self.lbl_host),
+            ("NixOS pin", self.lbl_nixos),
+            ("Latest stable", self.lbl_latest),
+            ("Channel", self.lbl_channel),
+            ("Release status", self.lbl_release),
+            ("Running", self.lbl_running),
+            ("Config version", self.lbl_config_ver),
+            ("System type", self.lbl_system_type),
+            ("Config layout", self.lbl_layout),
+            ("Preflight checks", self.lbl_checks),
+            ("Disk (/nix)", self.lbl_store_size),
+            ("Generations", self.lbl_generations),
+            ("GC preview", self.lbl_gc_preview),
+        ]
+        text = "\n".join(f"{name}: {lbl.text()}" for name, lbl in rows)
+        clip = QGuiApplication.clipboard()
+        if clip is None:
+            error(self, "Copy status", "Clipboard unavailable.")
+            return
+        clip.setText(text)
+        info(self, "Copy status", "Status copied to clipboard.")
 
     def _start_fs_status_probe(self) -> None:
         if self._status_proc is not None:
@@ -945,7 +1053,7 @@ class SystemPage(DomainPage):
             )
             return
 
-        timeout = 3600 if args[:1] == ("build",) else 180
+        timeout = 3600 if args[:1] == ("build",) or args[:1] == ("gc",) else 180
         proc = self.run_ncc(
             "system",
             *args,
@@ -955,8 +1063,25 @@ class SystemPage(DomainPage):
         )
         if args == ("store-status",) and proc.returncode == 0:
             self._apply_store_json(proc.stdout or "")
+        if args[:1] == ("store-status",) and "--json" in args and proc.returncode == 0:
+            self._apply_store_json(proc.stdout or "")
         if args[:2] == ("gc", "--dry-run") and proc.returncode == 0:
-            self._start_store_status_probe()
+            # Prefer parsing "Dead store paths: N" from dry-run output
+            dead = None
+            for line in (proc.stdout or "").splitlines():
+                if "Dead store paths:" in line:
+                    try:
+                        dead = int(line.rsplit(":", 1)[-1].strip().split()[0])
+                    except ValueError:
+                        dead = None
+                    break
+            if dead is not None:
+                if dead == 0:
+                    self.lbl_gc_preview.setText("0 paths (nothing to free)")
+                else:
+                    self.lbl_gc_preview.setText(f"{dead} paths")
+            else:
+                self._start_gc_preview_probe()
         if args == ("config-layout", "detect") and proc.returncode == 0:
             for line in reversed((proc.stdout or "").strip().splitlines()):
                 tline = line.strip().strip('"')

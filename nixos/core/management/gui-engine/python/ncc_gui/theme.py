@@ -72,6 +72,8 @@ QLabel#nccFormValue {
   color: palette(window-text);
   padding: 0;
   margin: 0;
+  selection-background-color: palette(highlight);
+  selection-color: palette(highlighted-text);
 }
 QGroupBox {
   font-weight: 600;

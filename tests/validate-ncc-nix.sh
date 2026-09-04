@@ -15,6 +15,7 @@
 #   8) prebuild module fragments eval (import paths at apply-time)
 #   9) GUI catalog invariants (enable or true, core domain+page, no tests in nixos/)
 #  10) docs layout + kebab-case (module doc/, no loose root markdown)
+#  11) store-status probes (df + profile gens — not flake path-info / list-generations)
 #
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,7 +31,7 @@ echo "╚═══════════════════════�
 
 # ── 1) Bash embedding: entire nixos/ ────────────────────────────────────────
 echo ""
-echo "== 1/10  bash-in-nix (all of nixos/) =="
+echo "== 1/11  bash-in-nix (all of nixos/) =="
 if bash "$ROOT/tests/install-wizard/validate-bash-embedding.sh"; then
   pass "validate-bash-embedding.sh (nixos/)"
 else
@@ -39,7 +40,7 @@ fi
 
 # ── 2) Layer: no cross-module relative imports into foreign lib/ ─────────────
 echo ""
-echo "== 2/10  layer: no relative imports into other modules' lib/ =="
+echo "== 2/11  layer: no relative imports into other modules' lib/ =="
 LAYER_OUT=$(mktemp)
 set +e
 python3 - "$NIXOS" "$LAYER_OUT" <<'PY'
@@ -89,7 +90,7 @@ rm -f "$LAYER_OUT"
 
 # ── 3) Module modularity ────────────────────────────────────────────────────
 echo ""
-echo "== 3/10  module layer / modularity =="
+echo "== 3/11  module layer / modularity =="
 if bash "$ROOT/tests/validate-module-layer.sh"; then
   pass "validate-module-layer.sh"
 else
@@ -98,7 +99,7 @@ fi
 
 # ── 4) Auto-detect migrations / version bumps ───────────────────────────────
 echo ""
-echo "== 4/10  module migrations auto-detect =="
+echo "== 4/11  module migrations auto-detect =="
 if bash "$ROOT/tests/validate-module-migrations.sh"; then
   pass "validate-module-migrations.sh"
 else
@@ -107,7 +108,7 @@ fi
 
 # ── 5) Install-wizard packaging ─────────────────────────────────────────────
 echo ""
-echo "== 5/10  install-wizard packaging gate =="
+echo "== 5/11  install-wizard packaging gate =="
 if bash "$ROOT/tests/install-wizard/validate-install-wizard-nix.sh"; then
   pass "validate-install-wizard-nix.sh"
 else
@@ -116,7 +117,7 @@ fi
 
 # ── 6) Wizard writes vs module options.nix ───────────────────────────────────
 echo ""
-echo "== 6/10  systemConfig writes vs options.nix (SSOT) =="
+echo "== 6/11  systemConfig writes vs options.nix (SSOT) =="
 if bash "$ROOT/tests/validate-systemconfig-writes.sh"; then
   pass "validate-systemconfig-writes.sh"
 else
@@ -125,7 +126,7 @@ fi
 
 # ── 7) Static relative import paths ──────────────────────────────────────────
 echo ""
-echo "== 7/10  nix import paths + parse (generic) =="
+echo "== 7/11  nix import paths + parse (generic) =="
 if bash "$ROOT/tests/validate-nix-import-paths.sh"; then
   pass "validate-nix-import-paths.sh"
 else
@@ -134,7 +135,7 @@ fi
 
 # ── 8) Module fragment eval (prebuild + imported config.nix) ─────────────────
 echo ""
-echo "== 8/10  nix module eval (prebuild + config.nix imports) =="
+echo "== 8/11  nix module eval (prebuild + config.nix imports) =="
 if bash "$ROOT/tests/validate-nix-module-eval.sh"; then
   pass "validate-nix-module-eval.sh"
 else
@@ -143,7 +144,7 @@ fi
 
 # ── 9) GUI catalog invariants ────────────────────────────────────────────────
 echo ""
-echo "== 9/10  GUI catalog invariants =="
+echo "== 9/11  GUI catalog invariants =="
 if bash "$ROOT/tests/validate-gui-catalog.sh"; then
   pass "validate-gui-catalog.sh"
 else
@@ -152,11 +153,20 @@ fi
 
 # ── 10) Docs layout + kebab naming ───────────────────────────────────────────
 echo ""
-echo "== 10/10  docs layout + kebab-case =="
+echo "== 10/11  docs layout + kebab-case =="
 if bash "$ROOT/tests/validate-docs-layout.sh"; then
   pass "validate-docs-layout.sh"
 else
   fail "markdown outside doc/ or non-kebab names"
+fi
+
+# ── 11) Store-status probes ──────────────────────────────────────────────────
+echo ""
+echo "== 11/11  store-status probes =="
+if bash "$ROOT/tests/validate-store-status-probes.sh"; then
+  pass "validate-store-status-probes.sh"
+else
+  fail "store-status probe contract broken"
 fi
 
 echo ""
@@ -166,5 +176,5 @@ if [[ "$FAIL" -ne 0 ]]; then
   echo "Fix issues above, then re-run: bash tests/validate-ncc-nix.sh"
   exit 1
 fi
-echo "OK — bash + layer + modularity + migrations + wizard + options + import paths + module eval + catalog + docs-layout green."
+echo "OK — bash + layer + modularity + migrations + wizard + options + import paths + module eval + catalog + docs-layout + store-status green."
 exit 0

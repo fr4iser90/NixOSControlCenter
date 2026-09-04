@@ -195,18 +195,20 @@ in {
         name = "store-status";
         domain = "system";
         parent = "system";
-        description = "Nix store size, generations, and GC preview";
+        description = "Nix store size, generations, and optional GC preview";
         category = "system";
         script = "${storeGcScripts.storeStatusScript}/bin/ncc-store-status";
         arguments = [ "--json" ];
         shortHelp = "store-status - Nix store health";
         longHelp = ''
-          Show /nix/store size, system generations, and a dry-run preview of
-          paths removable by nix-collect-garbage (no deletes).
+          Show /nix disk usage and system generations. GC dead-path scan is
+          opt-in (--with-gc) because it can take many minutes on large stores
+          (nix-store --gc --print-dead).
 
           Examples:
             ncc system store-status
             ncc system store-status --json
+            ncc system store-status --json --with-gc
         '';
       }
       {

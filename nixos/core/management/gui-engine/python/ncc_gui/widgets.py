@@ -26,7 +26,9 @@ class FormValueLabel(QLabel):
         )
         self.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
+            | Qt.TextInteractionFlag.TextSelectableByKeyboard
         )
+        self.setCursor(Qt.CursorShape.IBeamCursor)
         self.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Minimum,
