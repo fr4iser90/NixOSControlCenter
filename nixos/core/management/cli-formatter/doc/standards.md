@@ -105,11 +105,10 @@ Do you want to continue? (yes/no): y
 [ OK ] Backup
 [ OK ] Files synced — up to date
 [ OK ] Migrations — up to date
-[ OK ] Password files
 [ OK ] Platform: x86_64-linux
 [ OK ] Channel: nixos-26.05
 Do you want to build and switch…? (y/n): y
-[ OK ] Hardware & users
+[ OK ] System checks — users & hardware
 Building…
 [ OK ] Switch
 [ OK ] Update complete
@@ -135,12 +134,11 @@ Outcome wording for end users — not internal tool names.
 | `Source: …` | always | Where the new code comes from. |
 | `Flake extras` | always | Host-only flake bits kept or merged. |
 | `Backup` | always | Safety copy before overwrite. |
-| `Files synced — …` | **always** | Module/code tree vs `/etc/nixos` (rsync). Idle → `up to date`; work → `N file(s)` and/or `N removed`. `systemConfig/` kept. |
+| `Files synced — …` | **always** | Module/code **content** vs `/etc/nixos` (rsync). Idle → `up to date`; work → `N file(s)` (new/size/checksum only — not owner/perm/time-only) and/or `N removed`. `systemConfig/` kept. |
 | `Migrations — …` | **always** (one line) | Cleanup + cross-module plans. Idle → `up to date`; work → short detail (`cleaned N file(s)`, `applied plan(s)`). Post-rebuild re-run: silent on success; `[WARN]` only on fail (`-v` may show post-rebuild OK). |
-| `Password files` | always | Login hash files under `secrets/passwords/` look intact. |
 | `Platform: …` | always | Arch for flake eval (`x86_64-linux` / `aarch64-linux`). |
 | `Channel: …` | always | nixpkgs release pin (current or after bump). |
-| `Hardware & users` | always | Before rebuild: CPU, GPU, memory, users vs config. Details with `-v`. |
+| `System checks — users & hardware` | **always** before build | Users (must: config + password hashes) + hardware (soft: CPU/GPU/memory). Password file issues may WARN earlier; no separate Password-OK line. Details with `-v`. |
 | `Building…` | always | Wait; full nix log only with `-v`. |
 | `Switch` | always | New generation active. |
 | `Config schema — …` | **only on change / error** (or always with `-v`) | Bump `configVersion` + required fields. Idle default: **omit**; `-v` → `already current`. |

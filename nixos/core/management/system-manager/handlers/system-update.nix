@@ -718,12 +718,13 @@ let
     
     # Mirror module code from source. --delete drops files removed in source;
     # without it, stale paths under /etc/nixos break Nix eval after renames/removals.
-    # Increments globals SYNC_CHANGED / SYNC_REMOVED (itemize: >f* / *deleting).
+    # SYNC_CHANGED counts content only (new file / size / checksum) — not owner/perm/time-only.
     update_module_code() {
       local source_module="$1"
       local target_module="$2"
       local rsync_out rsync_rc=0
       local n_up=0 n_del=0
+      local _counts
 
       # Create target_module if it doesn't exist
       mkdir -p "$target_module"
@@ -747,8 +748,19 @@ let
         echo "$rsync_out"
       fi
 
-      n_up=$(printf '%s\n' "$rsync_out" | grep -cE '^>f' || true)
-      n_del=$(printf '%s\n' "$rsync_out" | grep -cE '^\*deleting' || true)
+      # Itemize: >f + 9 attrs (cstpoguax). Content = new (+++) or checksum/size (c/s).
+      # Ignore permission/owner/time-only noise (common git → /etc/nixos as root).
+      _counts=$(printf '%s\n' "$rsync_out" | ${pkgs.gawk}/bin/awk '
+        /^\*deleting/ { d++; next }
+        /^>f/ {
+          a = substr($0, 3, 9)
+          if (a ~ /^\+{9}$/ || a ~ /[cs]/) u++
+        }
+        END { printf "%d %d", u+0, d+0 }
+      ')
+      # $VAR — bash expands at runtime (Nix must not eat this)
+      n_up=''${_counts%% *}
+      n_del=''${_counts##* }
       SYNC_CHANGED=$((SYNC_CHANGED + n_up))
       SYNC_REMOVED=$((SYNC_REMOVED + n_del))
     }
@@ -1671,7 +1683,8 @@ EOF
       rm -f "$_mig_log"
     fi
     
-    # Password hash files under secrets/passwords (integrity only)
+    # Password hash integrity (silent OK — users preflight owns the real check;
+    # warn only if secrets/passwords looks broken before build).
     if [ "$VERBOSE" = "true" ]; then
       ${ui.messages.loading "Checking password file integrity..."}
     fi
@@ -1691,9 +1704,9 @@ EOF
       done
     fi
     if [ "$pw_issues" -gt 0 ]; then
-      ${ui.badges.warning "Password files — $pw_issues issue(s)"}
-    else
-      ${ui.badges.success "Password files"}
+      ${ui.badges.warning "System checks — users (password files: $pw_issues issue(s))"}
+    elif [ "$VERBOSE" = "true" ]; then
+      ${ui.messages.info "Password files look intact (users check will re-check)"}
     fi
 
     # After copying a flake that requires system.platform, heal before rebuild
