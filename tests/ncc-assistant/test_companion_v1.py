@@ -50,16 +50,30 @@ class CompanionWiringTests(unittest.TestCase):
         ):
             self.assertIn(name, text)
 
+    def test_slots_initialized_before_empty_check(self) -> None:
+        """Empty companion-chats.json must not AttributeError on _slots."""
+        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        init_at = text.index("class CompanionWindow")
+        chunk = text[init_at : init_at + 2500]
+        self.assertLess(
+            chunk.index("self._slots: list[ChatSlot] = []"),
+            chunk.index("if not self._slots:"),
+        )
+
     def test_v11_ux_hooks(self) -> None:
         text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
         self.assertIn("startSystemMove", text)
         self.assertIn("WA_TranslucentBackground", text)
         self.assertIn("PANEL_HISTORY", text)
-        self.assertIn("PANEL_SKILLS", text)
+        self.assertIn("PANEL_TEMPLATES", text)
+        self.assertIn("PANEL_TOOLS", text)
+        self.assertIn("PANEL_MCP", text)
+        self.assertIn("PANEL_WORKSPACES", text)
         self.assertIn("PANEL_CRON", text)
         self.assertIn("PANEL_JOBS", text)
         self.assertIn("_new_chat", text)
         self.assertIn("_switch_chat", text)
+        self.assertIn("session_btn", text)
         self.assertIn("WindowType.Window", text)
         self.assertNotIn("WindowType.Tool", text)
         self.assertNotIn("setFallbackSessionManagementEnabled", text)

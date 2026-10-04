@@ -61,6 +61,7 @@ class DshHarness:
         cwd: str | None = None,
         cancel_event: threading.Event | None = None,
         session: Any | None = None,
+        history: list[dict[str, Any]] | None = None,
     ) -> Iterator[Event]:
         del session
         info = self.probe()
@@ -69,11 +70,31 @@ class DshHarness:
             yield {"kind": "done"}
             return
 
+        from .mcp_inject import ensure_dsh_ncc_mcp
+
+        inject = ensure_dsh_ncc_mcp()
+        if inject.get("status") in ("created", "updated"):
+            yield {
+                "kind": "status",
+                "text": f"MCP: {inject.get('detail')}",
+                "phase": "setup",
+            }
+
         ncc_hint = (
-            "Prefer MCP `ncc-assistant` for NixOS Control Center tools when available. "
-            "Task:\n\n"
+            "Prefer MCP `ncc-assistant` for NixOS Control Center tools when available.\n\n"
         )
-        task = ncc_hint + text
+        hist_bits: list[str] = []
+        for turn in (history or [])[-12:]:
+            if not isinstance(turn, dict):
+                continue
+            role = str(turn.get("role") or "")
+            content = str(turn.get("content") or "").strip()
+            if content:
+                hist_bits.append(f"{role.capitalize()}: {content[:1500]}")
+        hist_block = (
+            ("Prior conversation:\n" + "\n".join(hist_bits) + "\n\n") if hist_bits else ""
+        )
+        task = ncc_hint + hist_block + "Current task:\n" + text
         bin_path = _dsh_bin()
         if bin_path:
             cmd = [bin_path, "--profile", "headless", task]

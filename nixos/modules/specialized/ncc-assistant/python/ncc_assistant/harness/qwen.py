@@ -79,13 +79,28 @@ def map_qwen_line(obj: dict[str, Any]) -> list[Event]:
         elif et == "content_block_start":
             block = ev.get("content_block") or {}
             if block.get("type") in ("tool_use", "tool_call"):
-                out.append(
-                    {
-                        "kind": "tool",
-                        "name": str(block.get("name") or "tool"),
-                        "args": block.get("input") or {},
-                    }
-                )
+                name = str(block.get("name") or "tool")
+                args = block.get("input") or {}
+                out.append({"kind": "tool", "name": name, "args": args})
+                low = name.lower()
+                if any(x in low for x in ("task", "subagent", "delegate", "spawn")):
+                    out.append(
+                        {
+                            "kind": "run_spawn",
+                            "name": name,
+                            "title": str(
+                                (args.get("description") if isinstance(args, dict) else None)
+                                or (args.get("prompt") if isinstance(args, dict) else None)
+                                or name
+                            )[:40],
+                            "goal": str(
+                                (args.get("prompt") if isinstance(args, dict) else None)
+                                or (args.get("goal") if isinstance(args, dict) else None)
+                                or ""
+                            ),
+                            "focus": False,
+                        }
+                    )
         return out
 
     if typ == "assistant":
@@ -183,6 +198,7 @@ class QwenHarness:
         cwd: str | None = None,
         cancel_event: threading.Event | None = None,
         session: Any | None = None,
+        history: list[dict[str, Any]] | None = None,
     ) -> Iterator[Event]:
         del session
         info = self.probe()
@@ -191,14 +207,35 @@ class QwenHarness:
             yield {"kind": "done"}
             return
 
+        from .mcp_inject import ensure_qwen_ncc_mcp
+
+        inject = ensure_qwen_ncc_mcp()
+        if inject.get("status") in ("created", "updated"):
+            yield {
+                "kind": "status",
+                "text": f"MCP: {inject.get('detail')}",
+                "phase": "setup",
+            }
+
         bin_path = _qwen_bin()
         assert bin_path
-        # Hint NCC MCP: user should register ncc-assistant as MCP in qwen settings.
         ncc_hint = (
             "When NixOS/NCC config tools are needed, prefer MCP server `ncc-assistant` "
-            "if configured. Task:\n\n"
+            "if configured.\n\n"
         )
-        prompt = ncc_hint + text
+        hist_bits: list[str] = []
+        for turn in (history or [])[-12:]:
+            if not isinstance(turn, dict):
+                continue
+            role = str(turn.get("role") or "")
+            content = str(turn.get("content") or "").strip()
+            if not content:
+                continue
+            hist_bits.append(f"{role.capitalize()}: {content[:1500]}")
+        hist_block = ""
+        if hist_bits:
+            hist_block = "Prior conversation:\n" + "\n".join(hist_bits) + "\n\n"
+        prompt = ncc_hint + hist_block + "Current task:\n" + text
         cmd = [
             bin_path,
             "-p",

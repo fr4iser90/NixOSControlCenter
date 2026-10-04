@@ -216,6 +216,8 @@ class ToolRegistry:
         for server_name, server_def in servers.items():
             if not isinstance(server_def, dict):
                 continue
+            if server_def.get("enabled", True) is False:
+                continue
             tools = server_def.get("tools") or []
             for tool in tools:
                 if not isinstance(tool, dict):

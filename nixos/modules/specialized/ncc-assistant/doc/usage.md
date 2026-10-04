@@ -75,9 +75,10 @@ ncc ai gui
 ncc ai chat     # terminal fallback
 ncc ai companion   # desktop avatar + multi-chat (always-on-top)
 # or: ncc-assistant-companion
-# Drag avatar to move · + / Ctrl+N new chat · Ctrl+Tab switch · Hist/Skill/Cron/Jobs panels
-# Thinking / tools: collapsed by default (expand in Companion or Chat).
-# Harness chip per chat: auto | native | qwen | dsh (auto → resolved label).
+# Sessions ▾ (F2 rename, Move to workspace) persisted in ~/.config/ncc-assistant/companion-chats.json
+# Resize · workspace/harness chips · MCP marketplace · templates with param dialog
+# More → Theme (Dark/Midnight/Light) · avatar skin · inject NCC MCP into qwen/dsh
+# Thinking/tools collapsed; multi-turn history folded into harness prompts.
 
 ncc ai harness status              # native / qwen / dsh availability
 ncc ai agent run --harness qwen --goal "…"
@@ -87,9 +88,10 @@ ncc ai agent run --verbose --goal "…"   # full thinking/tool dumps
 
 Tabs: **Chat**, **Agent**, **Templates**, **Tools**, **Jobs**, **Schedules**, **Settings**.
 
-**Companion:** small frameless window — drag the avatar to move, type below,
-Pause/Resume presence, Open full UI. Avatar animates idle / thinking / speaking /
-paused / error.
+**Companion:** frameless overlay — drag avatar to move, resize via corner grip,
+session picker (grouped by workspace), template/tool/MCP/workspace icons.
+Default chrome theme is **Dark** (More → Theme; also Midnight / Light).
+Avatar animates idle / thinking / speaking / paused / error.
 
 ## Agent
 

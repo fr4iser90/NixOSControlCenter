@@ -22,6 +22,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import (
     QColor,
     QFont,
+    QIcon,
     QKeySequence,
     QMouseEvent,
     QPainter,
@@ -32,14 +33,22 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QFormLayout,
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMenu,
+    QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizeGrip,
     QSizePolicy,
     QStackedWidget,
     QTextEdit,
@@ -57,9 +66,32 @@ STATE_ERROR = "error"
 
 PANEL_NONE = "none"
 PANEL_HISTORY = "history"
-PANEL_SKILLS = "skills"
+PANEL_TEMPLATES = "templates"
+PANEL_TOOLS = "tools"
+PANEL_MCP = "mcp"
+PANEL_WORKSPACES = "workspaces"
 PANEL_CRON = "cron"
 PANEL_JOBS = "jobs"
+
+
+def _icon_button(
+    *,
+    tip: str,
+    theme: str,
+    fallback: str,
+    checkable: bool = False,
+) -> QToolButton:
+    btn = QToolButton()
+    btn.setAutoRaise(True)
+    btn.setToolTip(tip)
+    btn.setCheckable(checkable)
+    icon = QIcon.fromTheme(theme)
+    if not icon.isNull():
+        btn.setIcon(icon)
+        btn.setText("")
+    else:
+        btn.setText(fallback)
+    return btn
 
 
 def _start_system_move(widget: QWidget) -> bool:
@@ -86,6 +118,7 @@ class _CompanionChatWorker(QThread):
         harness_name: str,
         session: Any | None = None,
         cwd: str | None = None,
+        history: list | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -94,6 +127,7 @@ class _CompanionChatWorker(QThread):
         self._text = text
         self._harness_name = harness_name
         self._cwd = cwd
+        self._history = list(history or [])
 
     def run(self) -> None:
         try:
@@ -104,8 +138,79 @@ class _CompanionChatWorker(QThread):
                 self._text,
                 cwd=self._cwd,
                 session=self._session if self._harness_name == "native" else None,
+                history=self._history,
             ):
                 self.event.emit(self.slot_id, ev)
+        except Exception as exc:  # noqa: BLE001
+            self.failed.emit(self.slot_id, f"{exc}\n{traceback.format_exc()}")
+
+
+class _CompanionTemplateWorker(QThread):
+    """Run an agent template goal into a companion slot (same event contract)."""
+
+    event = Signal(str, object)
+    failed = Signal(str, str)
+
+    def __init__(
+        self,
+        slot_id: str,
+        template_id: str,
+        params: dict[str, Any],
+        *,
+        harness_force: str | None = None,
+        parent=None,
+    ) -> None:
+        super().__init__(parent)
+        self.slot_id = slot_id
+        self._template_id = template_id
+        self._params = params
+        self._harness_force = harness_force
+
+    def run(self) -> None:
+        try:
+            from .agent import run_agent
+            from .agent_templates import get_agent_template, render_goal
+            from .auth import with_cached_credentials
+            from .config import Settings
+            from .harness import get_harness, resolve_harness_name
+            from .workspaces import get_workspace
+
+            tmpl = get_agent_template(self._template_id)
+            if tmpl is None:
+                raise ValueError(f"Unknown template: {self._template_id}")
+            goal = render_goal(tmpl, self._params)
+            settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
+            hname = resolve_harness_name(
+                template_harness=tmpl.harness,
+                tags=tmpl.tags,
+                force=self._harness_force,
+            )
+            self.event.emit(
+                self.slot_id,
+                {"kind": "status", "text": f"Template {tmpl.title} · {hname}"},
+            )
+            cwd = None
+            repos = self._params.get("repositories") or self._params.get("workspace")
+            if isinstance(repos, list) and repos:
+                ws = get_workspace(str(repos[0]))
+                if ws:
+                    cwd = str(ws.path)
+            elif isinstance(repos, str) and repos:
+                ws = get_workspace(repos)
+                if ws:
+                    cwd = str(ws.path)
+            if hname != "native":
+                for ev in get_harness(hname).send(goal, cwd=cwd):
+                    self.event.emit(self.slot_id, ev)
+            else:
+                for ev in run_agent(
+                    goal,
+                    settings,
+                    max_steps=tmpl.max_steps or 24,
+                    dry_run=tmpl.dry_run,
+                    profile=tmpl.profile,
+                ):
+                    self.event.emit(self.slot_id, ev)
         except Exception as exc:  # noqa: BLE001
             self.failed.emit(self.slot_id, f"{exc}\n{traceback.format_exc()}")
 
@@ -117,7 +222,7 @@ class ChatSlot:
     id: str
     title: str = "Chat"
     session: Any | None = None
-    worker: _CompanionChatWorker | None = None
+    worker: Any | None = None
     reply_buf: str = ""
     thinking_buf: str = ""
     user_prompt: str = ""
@@ -129,14 +234,47 @@ class ChatSlot:
     harness: str = "native"  # last resolved
     activity: str = ""
     parent_id: str | None = None
+    workspace_id: str | None = None
+    title_locked: bool = False  # True after user rename
+    history: list | None = None  # [{role, content}] multi-turn for harnesses
 
     def __post_init__(self) -> None:
         if self.tool_traces is None:
             self.tool_traces = []
+        if self.history is None:
+            self.history = []
 
     @staticmethod
-    def new(title: str = "Chat", *, parent_id: str | None = None) -> "ChatSlot":
-        return ChatSlot(id=uuid.uuid4().hex[:8], title=title, parent_id=parent_id)
+    def new(
+        title: str = "Chat",
+        *,
+        parent_id: str | None = None,
+        workspace_id: str | None = None,
+    ) -> "ChatSlot":
+        return ChatSlot(
+            id=uuid.uuid4().hex[:8],
+            title=title,
+            parent_id=parent_id,
+            workspace_id=workspace_id,
+        )
+
+    @staticmethod
+    def from_record(rec: dict[str, Any]) -> "ChatSlot":
+        slot = ChatSlot(
+            id=str(rec.get("id") or uuid.uuid4().hex[:8]),
+            title=str(rec.get("title") or "Chat")[:48],
+            title_locked=bool(rec.get("title_locked")),
+            workspace_id=rec.get("workspace_id") or None,
+            harness_mode=str(rec.get("harness_mode") or "auto"),
+            harness=str(rec.get("harness") or "native"),
+            parent_id=rec.get("parent_id") or None,
+            user_prompt=str(rec.get("user_prompt") or ""),
+            reply_buf=str(rec.get("reply_buf") or ""),
+            thinking_buf=str(rec.get("thinking_buf") or ""),
+            history=list(rec.get("history") or []),
+            tool_traces=list(rec.get("tool_traces") or []),
+        )
+        return slot
 
 
 def _looks_like_subagent_spawn(event: dict[str, Any]) -> bool:
@@ -154,7 +292,7 @@ def _looks_like_subagent_spawn(event: dict[str, Any]) -> bool:
 
 
 class AvatarCanvas(QWidget):
-    """Painted character with simple idle / blink / talk animation."""
+    """Painted character with simple idle / blink / talk animation — or skin frames."""
 
     clicked = Signal()
 
@@ -168,15 +306,45 @@ class AvatarCanvas(QWidget):
         self._blink = 0.0
         self._drag_origin: QPoint | None = None
         self._win_origin: QPoint | None = None
+        self._skin: dict[str, Any] | None = None
+        self._frame_idx = 0
+        self._pixmaps: dict[str, list] = {}
 
         self._timer = QTimer(self)
         self._timer.setInterval(40)
         self._timer.timeout.connect(self._tick)
         self._timer.start()
 
+    def apply_skin(self, skin: dict[str, Any] | None) -> None:
+        self._skin = skin
+        self._pixmaps.clear()
+        self._frame_idx = 0
+        if not skin or skin.get("kind") == "painted":
+            self.update()
+            return
+        try:
+            from .avatar_skins import frame_paths
+            from PySide6.QtGui import QPixmap
+
+            for st in (
+                STATE_IDLE,
+                STATE_THINKING,
+                STATE_SPEAKING,
+                STATE_PAUSED,
+                STATE_ERROR,
+            ):
+                paths = frame_paths(skin, st)
+                if not paths and st != STATE_IDLE:
+                    paths = frame_paths(skin, STATE_IDLE)
+                self._pixmaps[st] = [QPixmap(str(p)) for p in paths if p.is_file()]
+        except Exception:
+            self._pixmaps.clear()
+        self.update()
+
     def set_state(self, state: str) -> None:
         if state != self._state:
             self._state = state
+            self._frame_idx = 0
             self.update()
 
     def state(self) -> str:
@@ -184,6 +352,13 @@ class AvatarCanvas(QWidget):
 
     def _tick(self) -> None:
         self._phase += 0.08
+        frames = self._pixmaps.get(self._state) or []
+        if frames:
+            # Animate frame sequence (~8 fps)
+            if int(self._phase * 10) % 5 == 0:
+                self._frame_idx = (self._frame_idx + 1) % len(frames)
+            self.update()
+            return
         if self._state in (STATE_IDLE, STATE_PAUSED):
             self._blink = max(0.0, self._blink - 0.15)
             if int(self._phase * 10) % 100 == 0:
@@ -197,6 +372,20 @@ class AvatarCanvas(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
+        frames = self._pixmaps.get(self._state) or []
+        if frames:
+            pm = frames[self._frame_idx % len(frames)]
+            if not pm.isNull():
+                scaled = pm.scaled(
+                    w,
+                    h,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+                x = (w - scaled.width()) // 2
+                y = (h - scaled.height()) // 2
+                p.drawPixmap(x, y, scaled)
+                return
         cx, cy = w / 2, h / 2 + 8
 
         p.setBrush(QColor(0, 0, 0, 40))
@@ -344,23 +533,50 @@ class CompanionWindow(QWidget):
             | Qt.WindowType.WindowStaysOnTopHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setMinimumWidth(300)
-        self.resize(320, 520)
+        self.setMinimumSize(280, 420)
+        self.resize(340, 560)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-        self._slots: list[ChatSlot] = [ChatSlot.new("Chat 1")]
+        from .companion_store import load_companion_chats
+        from .preferences import get_active_workspace_id, get_default_harness_mode
+
+        self._active_workspace_id: str | None = get_active_workspace_id()
+        self._slots: list[ChatSlot] = []
+        loaded = load_companion_chats()
+        if loaded:
+            self._slots = [ChatSlot.from_record(r) for r in loaded]
+            # Drop orphan nested without parent
+            ids = {s.id for s in self._slots}
+            self._slots = [
+                s for s in self._slots if not s.parent_id or s.parent_id in ids
+            ]
+        if not self._slots:
+            first = ChatSlot.new("Chat 1", workspace_id=self._active_workspace_id)
+            first.harness_mode = get_default_harness_mode()
+            self._slots = [first]
         self._active_id: str = self._slots[0].id
         self._panel = PANEL_NONE
         self._settings: Any | None = None
         self._drag_origin: QPoint | None = None
         self._win_origin: QPoint | None = None
+        self._tool_btns: dict[str, QToolButton] = {}
+        self._persist_timer = QTimer(self)
+        self._persist_timer.setInterval(2000)
+        self._persist_timer.setSingleShot(True)
+        self._persist_timer.timeout.connect(self._persist_chats)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(8, 8, 8, 8)
         root.setSpacing(6)
 
-        # Transparent drag zone + avatar
+        # Transparent drag zone + avatar (painted or skin frames)
         self.avatar = AvatarCanvas()
+        try:
+            from .avatar_skins import get_active_skin_id, resolve_skin
+
+            self.avatar.apply_skin(resolve_skin(get_active_skin_id()))
+        except Exception:
+            pass
         root.addWidget(self.avatar, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         # Solid glass panel for interactive chrome
@@ -377,10 +593,15 @@ class CompanionWindow(QWidget):
         f.setPointSize(11)
         title.setFont(f)
         header.addWidget(title)
-        header.addStretch()
         self.presence_lbl = QLabel("")
-        self.presence_lbl.setStyleSheet("color: #667;")
+        self.presence_lbl.setObjectName("nccMuted")
         header.addWidget(self.presence_lbl)
+        header.addStretch()
+        self.workspace_combo = QComboBox()
+        self.workspace_combo.setToolTip("Active workspace (scopes new chats + templates)")
+        self.workspace_combo.setMaximumWidth(120)
+        self.workspace_combo.currentIndexChanged.connect(self._on_workspace_chip_changed)
+        header.addWidget(self.workspace_combo)
         self.harness_combo = QComboBox()
         self.harness_combo.setToolTip(
             "Harness for this chat (auto resolves coding goals → qwen/dsh)"
@@ -392,11 +613,11 @@ class CompanionWindow(QWidget):
             ("dsh", "dsh"),
         ):
             self.harness_combo.addItem(label, key)
-        self.harness_combo.setMaximumWidth(110)
+        self.harness_combo.setMaximumWidth(90)
         self.harness_combo.currentIndexChanged.connect(self._on_harness_chip_changed)
         header.addWidget(self.harness_combo)
         self.harness_resolved_lbl = QLabel("")
-        self.harness_resolved_lbl.setStyleSheet("color: #556; font-size: 10px;")
+        self.harness_resolved_lbl.setObjectName("nccMuted")
         self.harness_resolved_lbl.setToolTip("Resolved harness for last / next send")
         header.addWidget(self.harness_resolved_lbl)
         glass.addLayout(header)
@@ -410,57 +631,74 @@ class CompanionWindow(QWidget):
         self.parent_btn.hide()
         crumb.addWidget(self.parent_btn)
         self.breadcrumb_lbl = QLabel("")
-        self.breadcrumb_lbl.setStyleSheet("color: #667; font-size: 10px;")
+        self.breadcrumb_lbl.setObjectName("nccMuted")
         crumb.addWidget(self.breadcrumb_lbl, stretch=1)
         glass.addLayout(crumb)
 
-        # Chat tabs
-        self.tabs_row = QHBoxLayout()
-        self.tabs_row.setSpacing(4)
-        glass.addLayout(self.tabs_row)
-        self._tab_buttons: dict[str, QToolButton] = {}
+        # Active session chip (replaces tab strip)
+        sess_row = QHBoxLayout()
+        self.session_btn = QToolButton()
+        self.session_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.session_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.session_btn.setToolTip("Sessions — switch, new, rename")
+        sess_icon = QIcon.fromTheme("document-open-recent")
+        if not sess_icon.isNull():
+            self.session_btn.setIcon(sess_icon)
+        self.session_btn.setText("Chat 1 ▾")
+        self._session_menu = QMenu(self)
+        self.session_btn.setMenu(self._session_menu)
+        self._session_menu.aboutToShow.connect(self._rebuild_session_menu)
+        sess_row.addWidget(self.session_btn, stretch=1)
+        rename_btn = _icon_button(
+            tip="Rename session", theme="document-edit", fallback="✎"
+        )
+        rename_btn.clicked.connect(self._rename_session)
+        sess_row.addWidget(rename_btn)
+        glass.addLayout(sess_row)
 
-        # Icon toolbar
+        # Icon toolbar — primary surfaces + overflow
         tools = QHBoxLayout()
-        tools.setSpacing(4)
-        self._tool_btns: dict[str, QToolButton] = {}
-        for key, label, tip in (
-            (PANEL_HISTORY, "Hist", "Session history"),
-            (PANEL_SKILLS, "Skill", "Skills / templates"),
-            (PANEL_CRON, "Cron", "Schedules / cron"),
-            (PANEL_JOBS, "Jobs", "Agent jobs"),
-        ):
-            btn = QToolButton()
-            btn.setText(label)
-            btn.setToolTip(tip)
-            btn.setCheckable(True)
+        tools.setSpacing(2)
+        primary = (
+            (PANEL_TEMPLATES, "folder-templates", "▶", "Workflow templates"),
+            (PANEL_TOOLS, "applications-system", "🔧", "Tools registry"),
+            (PANEL_MCP, "network-server", "🔌", "MCP servers"),
+            (PANEL_WORKSPACES, "folder", "📁", "Workspaces"),
+            (PANEL_HISTORY, "document-open-recent", "⏱", "Saved session history"),
+        )
+        for key, theme, fallback, tip in primary:
+            btn = _icon_button(tip=tip, theme=theme, fallback=fallback, checkable=True)
             btn.clicked.connect(lambda checked=False, k=key: self._toggle_panel(k))
             tools.addWidget(btn)
             self._tool_btns[key] = btn
+
+        more_btn = _icon_button(tip="More…", theme="application-menu", fallback="⋯")
+        more_menu = QMenu(self)
+        more_menu.addAction("Schedules / cron", lambda: self._toggle_panel(PANEL_CRON))
+        more_menu.addAction("Agent jobs", lambda: self._toggle_panel(PANEL_JOBS))
+        more_menu.addSeparator()
+        more_menu.addAction("Pause presence", self._pause)
+        more_menu.addAction("Resume presence", self._resume)
+        more_menu.addSeparator()
+        theme_menu = more_menu.addMenu("Theme")
+        from .companion_themes import list_themes
+
+        for tid, label in list_themes():
+            theme_menu.addAction(label, lambda t=tid: self._set_theme(t))
+        more_menu.addAction("Avatar skin…", self._pick_avatar_skin)
+        more_menu.addAction("Inject NCC MCP into qwen/dsh", self._inject_mcp_now)
+        more_btn.setMenu(more_menu)
+        more_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        tools.addWidget(more_btn)
+
         tools.addStretch()
-        new_btn = QToolButton()
-        new_btn.setText("+")
-        new_btn.setToolTip("New chat")
+        new_btn = _icon_button(tip="New chat", theme="list-add", fallback="+")
         new_btn.clicked.connect(self._new_chat)
         tools.addWidget(new_btn)
-        open_btn = QToolButton()
-        open_btn.setText("UI")
-        open_btn.setToolTip("Open full AI UI")
+        open_btn = _icon_button(tip="Open full AI UI", theme="window-new", fallback="UI")
         open_btn.clicked.connect(self._open_full)
         tools.addWidget(open_btn)
-        pause_btn = QToolButton()
-        pause_btn.setText("❚❚")
-        pause_btn.setToolTip("Pause presence")
-        pause_btn.clicked.connect(self._pause)
-        tools.addWidget(pause_btn)
-        resume_btn = QToolButton()
-        resume_btn.setText("▶")
-        resume_btn.setToolTip("Resume presence")
-        resume_btn.clicked.connect(self._resume)
-        tools.addWidget(resume_btn)
-        quit_btn = QToolButton()
-        quit_btn.setText("×")
-        quit_btn.setToolTip("Quit companion")
+        quit_btn = _icon_button(tip="Quit companion", theme="window-close", fallback="×")
         quit_btn.clicked.connect(QApplication.instance().quit)
         tools.addWidget(quit_btn)
         glass.addLayout(tools)
@@ -472,7 +710,7 @@ class CompanionWindow(QWidget):
         chat_l.setSpacing(4)
 
         self.activity_lbl = QLabel("")
-        self.activity_lbl.setStyleSheet("color: #667; font-size: 10px;")
+        self.activity_lbl.setObjectName("nccMuted")
         self.activity_lbl.setMinimumHeight(14)
         chat_l.addWidget(self.activity_lbl)
 
@@ -540,71 +778,32 @@ class CompanionWindow(QWidget):
         self.stack.addWidget(self.list_page)
         glass.addWidget(self.stack)
 
-        tip = QLabel("Drag avatar to move · Esc quits")
-        tip.setStyleSheet("color: #889; font-size: 10px;")
-        tip.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        glass.addWidget(tip)
+        tip_row = QHBoxLayout()
+        tip = QLabel("Drag avatar · resize corner · Esc")
+        tip.setObjectName("nccMuted")
+        tip_row.addWidget(tip, stretch=1)
+        grip = QSizeGrip(self.panel)
+        tip_row.addWidget(grip, alignment=Qt.AlignmentFlag.AlignRight)
+        glass.addLayout(tip_row)
 
-        root.addWidget(self.panel)
+        root.addWidget(self.panel, stretch=1)
 
-        self.setStyleSheet(
-            """
-            QFrame#glass {
-              background: rgba(244, 246, 248, 230);
-              border: 1px solid rgba(80, 90, 100, 90);
-              border-radius: 14px;
-            }
-            QTextEdit, QLineEdit, QListWidget {
-              background: rgba(255, 255, 255, 235);
-              border: 1px solid #c5ccd4;
-              border-radius: 8px;
-              padding: 6px;
-              color: #1a1a1a;
-            }
-            QPushButton, QToolButton {
-              border-radius: 6px;
-              padding: 4px 8px;
-              background: rgba(255,255,255,200);
-              border: 1px solid #c5ccd4;
-              color: #1a1a1a;
-            }
-            QToolButton:checked {
-              background: #3d5a80;
-              color: white;
-              border-color: #2d4460;
-            }
-            QToolButton[activeChat="true"] {
-              background: #5a9e7a;
-              color: white;
-              border-color: #2d6a4f;
-            }
-            QLabel { color: #1a1a1a; }
-            """
-        )
+        self._theme_id = self._load_theme_id()
+        self._apply_theme(self._theme_id)
 
         QShortcut(QKeySequence("Escape"), self, activated=self._on_escape)
         QShortcut(QKeySequence("Ctrl+N"), self, activated=self._new_chat)
         QShortcut(QKeySequence("Ctrl+Tab"), self, activated=self._next_chat)
+        QShortcut(QKeySequence("F2"), self, activated=self._rename_session)
 
         self._presence_timer = QTimer(self)
         self._presence_timer.setInterval(2000)
         self._presence_timer.timeout.connect(self._sync_presence)
         self._presence_timer.start()
+        self._reload_workspace_chip()
         self._sync_presence()
-        self._rebuild_tabs()
         self._apply_slot_ui()
-
-        from PySide6.QtCore import QSettings
-
-        s = QSettings("NixOSControlCenter", "ncc-assistant-companion")
-        pos = s.value("pos")
-        if pos is not None:
-            self.move(pos)
-        from .preferences import get_default_harness_mode
-
-        mode = get_default_harness_mode()
-        self._slots[0].harness_mode = mode
-        self._sync_harness_chip(self._slots[0])
+        self._restore_geometry()
 
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
@@ -617,12 +816,77 @@ class CompanionWindow(QWidget):
             self.input.setFocus(Qt.FocusReason.ActiveWindowFocusReason)
 
     def closeEvent(self, event) -> None:  # noqa: N802
+        self._persist_chats()
+        self._save_geometry()
+        super().closeEvent(event)
+
+    def _schedule_persist(self) -> None:
+        if hasattr(self, "_persist_timer"):
+            self._persist_timer.start()
+
+    def _persist_chats(self) -> None:
+        from .companion_store import save_companion_chats, slot_to_record
+
+        try:
+            save_companion_chats([slot_to_record(s) for s in self._slots])
+        except Exception:
+            pass
+
+    def _settings_store(self):
         from PySide6.QtCore import QSettings
 
-        QSettings("NixOSControlCenter", "ncc-assistant-companion").setValue(
-            "pos", self.pos()
+        return QSettings("NixOSControlCenter", "ncc-assistant-companion")
+
+    def _load_theme_id(self) -> str:
+        from .companion_themes import DEFAULT_THEME, normalize_theme_id
+
+        raw = self._settings_store().value("theme", DEFAULT_THEME)
+        return normalize_theme_id(str(raw) if raw is not None else DEFAULT_THEME)
+
+    def _set_theme(self, theme_id: str) -> None:
+        self._apply_theme(theme_id)
+        self._settings_store().setValue("theme", self._theme_id)
+
+    def _apply_theme(self, theme_id: str) -> None:
+        from .companion_themes import (
+            apply_palette,
+            get_theme,
+            normalize_theme_id,
+            stylesheet_for,
         )
-        super().closeEvent(event)
+
+        self._theme_id = normalize_theme_id(theme_id)
+        theme = get_theme(self._theme_id)
+        apply_palette(self, theme)
+        app = QApplication.instance()
+        if app is not None:
+            apply_palette(app, theme)
+        self.setStyleSheet(stylesheet_for(theme))
+
+    def _restore_geometry(self) -> None:
+        s = self._settings_store()
+        geo = s.value("geometry")
+        if geo is not None:
+            try:
+                self.restoreGeometry(geo)
+                return
+            except Exception:
+                pass
+        pos = s.value("pos")
+        size = s.value("size")
+        if pos is not None:
+            self.move(pos)
+        if size is not None:
+            try:
+                self.resize(size)
+            except Exception:
+                pass
+
+    def _save_geometry(self) -> None:
+        s = self._settings_store()
+        s.setValue("geometry", self.saveGeometry())
+        s.setValue("pos", self.pos())
+        s.setValue("size", self.size())
 
     def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
         # Drag from empty glass margins / header area (not line edit / buttons).
@@ -679,48 +943,119 @@ class CompanionWindow(QWidget):
                 return s
         return self._slots[0]
 
-    def _rebuild_tabs(self) -> None:
-        while self.tabs_row.count():
-            item = self.tabs_row.takeAt(0)
-            w = item.widget()
-            if w is not None:
-                w.deleteLater()
-        self._tab_buttons.clear()
-        active = self._slot()
-        # Show root + siblings; if nested, show parent lineage + children of active parent
-        visible = self._visible_slots()
-        for slot in visible:
-            btn = QToolButton()
-            nest = "▸" if slot.parent_id else ""
-            mark = "✦" if slot.busy else ""
-            btn.setText(f"{nest}{slot.title}{mark}"[:18])
-            tip = f"{slot.title} ({slot.id}) [{slot.harness}]"
-            if slot.parent_id:
-                tip += f" · child of {slot.parent_id}"
-            btn.setToolTip(tip)
-            btn.setCheckable(True)
-            btn.setChecked(slot.id == self._active_id)
-            btn.setProperty("activeChat", "true" if slot.id == self._active_id else "false")
-            btn.clicked.connect(lambda checked=False, sid=slot.id: self._switch_chat(sid))
-            self.tabs_row.addWidget(btn)
-            self._tab_buttons[slot.id] = btn
-        self.tabs_row.addStretch()
-        del active
+    def _sync_session_chip(self) -> None:
+        slot = self._slot()
+        mark = " ✦" if slot.busy else ""
+        nest = "▸ " if slot.parent_id else ""
+        self.session_btn.setText(f"{nest}{slot.title}{mark} ▾"[:28])
 
-    def _visible_slots(self) -> list[ChatSlot]:
-        """Parent + nested children when in a subagent; else roots + children of active."""
-        active = self._slot()
-        if active.parent_id:
-            parent = next((s for s in self._slots if s.id == active.parent_id), None)
-            siblings = [s for s in self._slots if s.parent_id == active.parent_id]
-            out: list[ChatSlot] = []
-            if parent is not None:
-                out.append(parent)
-            out.extend(siblings)
-            return out
-        roots = [s for s in self._slots if not s.parent_id]
-        children = [s for s in self._slots if s.parent_id == active.id]
-        return roots + children
+    def _rebuild_session_menu(self) -> None:
+        self._session_menu.clear()
+        self._session_menu.addAction("New chat", self._new_chat)
+        self._session_menu.addAction("Rename…", self._rename_session)
+        self._session_menu.addSeparator()
+
+        # Group by workspace
+        groups: dict[str, list[ChatSlot]] = {}
+        for slot in self._slots:
+            if slot.parent_id:
+                continue  # children listed under parent when active lineage
+            key = slot.workspace_id or ""
+            groups.setdefault(key, []).append(slot)
+
+        def _ws_label(wid: str) -> str:
+            if not wid:
+                return "No workspace"
+            try:
+                from .workspaces import get_workspace
+
+                ws = get_workspace(wid)
+                return ws.label if ws else wid
+            except Exception:
+                return wid
+
+        for wid in sorted(groups.keys(), key=lambda k: (k == "", k)):
+            self._session_menu.addSection(_ws_label(wid))
+            for slot in groups[wid]:
+                mark = " ✦" if slot.busy else ""
+                act = self._session_menu.addAction(f"{slot.title}{mark}")
+                act.setCheckable(True)
+                act.setChecked(slot.id == self._active_id)
+                act.triggered.connect(
+                    lambda checked=False, sid=slot.id: self._switch_chat(sid)
+                )
+                # Nested children of this slot
+                kids = [s for s in self._slots if s.parent_id == slot.id]
+                for child in kids:
+                    cmark = " ✦" if child.busy else ""
+                    cact = self._session_menu.addAction(f"  ▸ {child.title}{cmark}")
+                    cact.setCheckable(True)
+                    cact.setChecked(child.id == self._active_id)
+                    cact.triggered.connect(
+                        lambda checked=False, sid=child.id: self._switch_chat(sid)
+                    )
+
+        self._session_menu.addSeparator()
+        # Move current session to a workspace
+        move_menu = self._session_menu.addMenu("Move to workspace")
+        move_menu.addAction(
+            "(no workspace)",
+            lambda: self._assign_workspace(None),
+        )
+        try:
+            from .workspaces import list_workspaces
+
+            for ws in list_workspaces():
+                move_menu.addAction(
+                    ws.label,
+                    lambda checked=False, wid=ws.id: self._assign_workspace(wid),
+                )
+        except Exception:
+            pass
+        self._session_menu.addSeparator()
+        del_act = self._session_menu.addAction("Close session")
+        del_act.triggered.connect(self._close_session)
+
+    def _assign_workspace(self, workspace_id: str | None) -> None:
+        slot = self._slot()
+        slot.workspace_id = workspace_id
+        from .preferences import set_active_workspace_id
+
+        self._active_workspace_id = workspace_id
+        set_active_workspace_id(workspace_id)
+        self._reload_workspace_chip()
+        self._sync_session_chip()
+        self._schedule_persist()
+
+    def _rename_session(self) -> None:
+        slot = self._slot()
+        text, ok = QInputDialog.getText(
+            self, "Rename session", "Title:", text=slot.title
+        )
+        if not ok:
+            return
+        title = text.strip()
+        if not title:
+            return
+        slot.title = title[:48]
+        slot.title_locked = True
+        self._sync_session_chip()
+        self._update_breadcrumb(slot)
+        self._schedule_persist()
+
+    def _close_session(self) -> None:
+        if len(self._slots) <= 1:
+            return
+        slot = self._slot()
+        if slot.busy:
+            QMessageBox.information(self, "Sessions", "Stop the busy chat first.")
+            return
+        # Drop children too
+        drop = {slot.id} | {s.id for s in self._slots if s.parent_id == slot.id}
+        self._slots = [s for s in self._slots if s.id not in drop]
+        self._active_id = self._slots[0].id
+        self._apply_slot_ui()
+        self._schedule_persist()
 
     def _clear_tool_widgets(self) -> None:
         for w in self._tool_widgets:
@@ -783,6 +1118,31 @@ class CompanionWindow(QWidget):
             slot.harness = mode
         self._sync_harness_chip(slot)
 
+    def _reload_workspace_chip(self) -> None:
+        self.workspace_combo.blockSignals(True)
+        self.workspace_combo.clear()
+        self.workspace_combo.addItem("(no ws)", "")
+        try:
+            from .workspaces import list_workspaces
+
+            for ws in list_workspaces():
+                self.workspace_combo.addItem(ws.label, ws.id)
+        except Exception:
+            pass
+        idx = self.workspace_combo.findData(self._active_workspace_id or "")
+        self.workspace_combo.setCurrentIndex(max(0, idx))
+        self.workspace_combo.blockSignals(False)
+
+    def _on_workspace_chip_changed(self, _index: int = 0) -> None:
+        from .preferences import set_active_workspace_id
+
+        wid = str(self.workspace_combo.currentData() or "").strip() or None
+        self._active_workspace_id = wid
+        set_active_workspace_id(wid)
+        slot = self._slot()
+        if not slot.busy:
+            slot.workspace_id = wid
+
     def _go_parent(self) -> None:
         slot = self._slot()
         if slot.parent_id:
@@ -822,7 +1182,13 @@ class CompanionWindow(QWidget):
         self.input.setEnabled(True)  # always allow typing / queue feel
         self._sync_harness_chip(slot)
         self._update_breadcrumb(slot)
-        self._rebuild_tabs()
+        self._sync_session_chip()
+        # Sync workspace combo to slot without clobbering global active on view-only
+        self.workspace_combo.blockSignals(True)
+        widx = self.workspace_combo.findData(slot.workspace_id or "")
+        if widx >= 0:
+            self.workspace_combo.setCurrentIndex(widx)
+        self.workspace_combo.blockSignals(False)
 
     def _switch_chat(self, slot_id: str) -> None:
         if slot_id == self._active_id:
@@ -841,12 +1207,15 @@ class CompanionWindow(QWidget):
 
     def _new_chat(self) -> None:
         n = len([s for s in self._slots if not s.parent_id]) + 1
-        slot = ChatSlot.new(f"Chat {n}")
+        slot = ChatSlot.new(
+            f"Chat {n}", workspace_id=self._active_workspace_id
+        )
         slot.harness_mode = self._slot().harness_mode
         self._slots.append(slot)
         self._active_id = slot.id
         self._toggle_panel(PANEL_NONE)
         self._apply_slot_ui()
+        self._schedule_persist()
         self._focus_input()
 
     def _shared_settings(self) -> Any:
@@ -893,6 +1262,8 @@ class CompanionWindow(QWidget):
                 last = str(m.get("content") or "")[:2000]
                 break
         slot.reply_buf = last or f"(loaded {title})"
+        slot.workspace_id = self._active_workspace_id
+        slot.title_locked = True
         self._slots.append(slot)
         self._active_id = slot.id
         self._toggle_panel(PANEL_NONE)
@@ -936,7 +1307,9 @@ class CompanionWindow(QWidget):
 
     def _spawn_child_slot(self, parent: ChatSlot, event: dict[str, Any]) -> ChatSlot:
         title = str(event.get("title") or event.get("name") or "Subagent")[:20]
-        child = ChatSlot.new(title, parent_id=parent.id)
+        child = ChatSlot.new(
+            title, parent_id=parent.id, workspace_id=parent.workspace_id
+        )
         child.harness_mode = parent.harness_mode
         child.harness = parent.harness
         child.user_prompt = str(event.get("goal") or event.get("text") or title)
@@ -966,14 +1339,31 @@ class CompanionWindow(QWidget):
         slot.busy = True
         slot.avatar_state = STATE_THINKING
         slot.activity = f"Streaming ({hname})"
-        if (slot.title.startswith("Chat ") or slot.title.startswith("Sub")) and len(text) > 2:
+        if (
+            not slot.title_locked
+            and (slot.title.startswith("Chat ") or slot.title.startswith("Sub"))
+            and len(text) > 2
+        ):
             slot.title = text[:16] + ("…" if len(text) > 16 else "")
+        cwd = None
+        if slot.workspace_id:
+            try:
+                from .workspaces import get_workspace
+
+                ws = get_workspace(slot.workspace_id)
+                if ws:
+                    cwd = str(ws.path)
+            except Exception:
+                pass
         self._apply_slot_ui()
+        hist = list(slot.history or [])
         worker = _CompanionChatWorker(
             slot.id,
             text,
             harness_name=hname,
             session=slot.session,
+            cwd=cwd,
+            history=hist,
             parent=self,
         )
         slot.worker = worker
@@ -981,20 +1371,35 @@ class CompanionWindow(QWidget):
         worker.failed.connect(self._on_fail)
         worker.finished.connect(lambda sid=slot.id: self._on_worker_done(sid))
         worker.start()
+        self._schedule_persist()
 
     def _on_worker_done(self, slot_id: str) -> None:
         slot = self._slot(slot_id)
         slot.busy = False
         slot.worker = None
         slot.activity = ""
+        # Multi-turn history for next harness prompt
+        if slot.user_prompt and not slot.user_prompt.startswith("[template]"):
+            slot.history = list(slot.history or [])
+            slot.history.append({"role": "user", "content": slot.user_prompt})
+        elif slot.user_prompt:
+            slot.history = list(slot.history or [])
+            slot.history.append({"role": "user", "content": slot.user_prompt})
+        if slot.reply_buf.strip():
+            slot.history = list(slot.history or [])
+            slot.history.append(
+                {"role": "assistant", "content": slot.reply_buf.strip()[-4000:]}
+            )
+        slot.history = (slot.history or [])[-40:]
         if slot.thinking_buf.strip() and slot_id == self._active_id:
             self.think_block.finish()
             self.think_block.collapse()
+        self._schedule_persist()
         if slot_id == self._active_id:
             self._apply_slot_ui()
             self._sync_presence()
         else:
-            self._rebuild_tabs()
+            self._sync_session_chip()
 
     def _on_event(self, slot_id: str, event: object) -> None:
         if not isinstance(event, dict):
@@ -1004,7 +1409,7 @@ class CompanionWindow(QWidget):
 
         if _looks_like_subagent_spawn(event) and kind == "run_spawn":
             child = self._spawn_child_slot(slot, event)
-            self._rebuild_tabs()
+            self._sync_session_chip()
             # Stay on parent unless event asks to focus child
             if event.get("focus"):
                 self._switch_chat(child.id)
@@ -1012,7 +1417,7 @@ class CompanionWindow(QWidget):
         if kind == "tool" and _looks_like_subagent_spawn(event):
             # Interim: open nested tab (do not steal focus)
             child = self._spawn_child_slot(slot, event)
-            self._rebuild_tabs()
+            self._sync_session_chip()
 
         if kind == "thinking_delta":
             slot.avatar_state = STATE_THINKING
@@ -1093,7 +1498,7 @@ class CompanionWindow(QWidget):
             self.avatar.set_state(slot.avatar_state)
             self._sync_harness_chip(slot)
             if kind in ("assistant_delta", "delta", "thinking_delta", "tool", "done", "run_spawn"):
-                self._rebuild_tabs()
+                self._sync_session_chip()
 
     def _on_fail(self, slot_id: str, message: str) -> None:
         slot = self._slot(slot_id)
@@ -1141,14 +1546,106 @@ class CompanionWindow(QWidget):
                 row = QListWidgetItem(f"{title}  ·  {n} msgs")
                 row.setData(Qt.ItemDataRole.UserRole, ("history", sid))
                 self.panel_list.addItem(row)
-        elif key == PANEL_SKILLS:
-            self.panel_title.setText("Skills & templates")
-            for label, kind, ref in self._skill_rows():
-                row = QListWidgetItem(label)
-                row.setData(Qt.ItemDataRole.UserRole, (kind, ref))
+        elif key == PANEL_TEMPLATES:
+            self.panel_title.setText("Workflow templates — tap to run")
+            try:
+                from .agent_templates import list_agent_templates
+
+                tmpls = list_agent_templates()
+            except Exception as exc:  # noqa: BLE001
+                self.panel_list.addItem(f"(error: {exc})")
+                return
+            if not tmpls:
+                self.panel_list.addItem("(no templates)")
+                return
+            for t in tmpls[:50]:
+                row = QListWidgetItem(f"{t.title}  ·  {t.category}")
+                row.setToolTip(t.description or t.id)
+                row.setData(Qt.ItemDataRole.UserRole, ("template", t.id))
                 self.panel_list.addItem(row)
-            if self.panel_list.count() == 0:
-                self.panel_list.addItem("(none found)")
+        elif key == PANEL_TOOLS:
+            self.panel_title.setText("Tools — tap to toggle enable")
+            try:
+                from .registry import get_registry
+
+                tools = sorted(get_registry().list_all(), key=lambda t: t.name)
+            except Exception as exc:  # noqa: BLE001
+                self.panel_list.addItem(f"(error: {exc})")
+                return
+            if not tools:
+                self.panel_list.addItem("(no tools)")
+                return
+            for t in tools[:80]:
+                mark = "✓" if t.enabled else "·"
+                row = QListWidgetItem(f"{mark} {t.name}  [{t.kind}]")
+                row.setToolTip(t.description or "")
+                row.setData(Qt.ItemDataRole.UserRole, ("tool_toggle", t.name))
+                self.panel_list.addItem(row)
+        elif key == PANEL_MCP:
+            self.panel_title.setText("MCP marketplace — install / toggle / remove")
+            try:
+                from .marketplace import (
+                    installed_mcp_names,
+                    list_installed_mcp,
+                    list_templates,
+                )
+
+                installed = list_installed_mcp()
+                have = installed_mcp_names()
+                catalog = list_templates()
+            except Exception as exc:  # noqa: BLE001
+                self.panel_list.addItem(f"(error: {exc})")
+                return
+            inj = QListWidgetItem("⚡ Inject NCC → qwen/dsh settings")
+            inj.setData(Qt.ItemDataRole.UserRole, ("mcp_inject", ""))
+            self.panel_list.addItem(inj)
+            self.panel_list.addItem(QListWidgetItem("— Installed —"))
+            if not installed:
+                self.panel_list.addItem("(none installed)")
+            for entry in installed:
+                en = "✓" if entry.get("enabled", True) else "○"
+                row = QListWidgetItem(f"{en} {entry['name']}  [toggle]")
+                row.setToolTip(entry.get("command") or "")
+                row.setData(
+                    Qt.ItemDataRole.UserRole, ("mcp_toggle", entry["name"])
+                )
+                self.panel_list.addItem(row)
+                rm = QListWidgetItem(f"    🗑 remove {entry['name']}")
+                rm.setData(
+                    Qt.ItemDataRole.UserRole, ("mcp_remove", entry["name"])
+                )
+                self.panel_list.addItem(rm)
+            self.panel_list.addItem(QListWidgetItem("— Catalog —"))
+            for tmpl in catalog:
+                mark = "✓" if tmpl.name in have else "+"
+                row = QListWidgetItem(f"{mark} {tmpl.name}  ·  {tmpl.risk or 'read'}")
+                row.setToolTip(getattr(tmpl, "description", "") or tmpl.name)
+                if tmpl.name in have:
+                    row.setData(Qt.ItemDataRole.UserRole, ("mcp_toggle", tmpl.name))
+                else:
+                    row.setData(Qt.ItemDataRole.UserRole, ("mcp_install", tmpl.name))
+                self.panel_list.addItem(row)
+        elif key == PANEL_WORKSPACES:
+            self.panel_title.setText("Workspaces — tap set active · + add")
+            add = QListWidgetItem("+ Add workspace folder…")
+            add.setData(Qt.ItemDataRole.UserRole, ("ws_add", ""))
+            self.panel_list.addItem(add)
+            try:
+                from .workspaces import list_workspaces
+
+                items = list_workspaces()
+            except Exception as exc:  # noqa: BLE001
+                self.panel_list.addItem(f"(error: {exc})")
+                return
+            if not items:
+                self.panel_list.addItem("(none yet)")
+                return
+            for ws in items:
+                mark = "★" if ws.id == self._active_workspace_id else "·"
+                row = QListWidgetItem(f"{mark} {ws.label}")
+                row.setToolTip(ws.path)
+                row.setData(Qt.ItemDataRole.UserRole, ("ws_select", ws.id))
+                self.panel_list.addItem(row)
         elif key == PANEL_CRON:
             self.panel_title.setText("Schedules")
             try:
@@ -1189,33 +1686,6 @@ class CompanionWindow(QWidget):
                 row.setData(Qt.ItemDataRole.UserRole, ("job", jid))
                 self.panel_list.addItem(row)
 
-    def _skill_rows(self) -> list[tuple[str, str, str]]:
-        out: list[tuple[str, str, str]] = []
-        roots: list[Path] = []
-        env = os.environ.get("NCC_ASSISTANT_PROMPTS") or os.environ.get("NCC_AI_PROMPTS")
-        if env:
-            roots.append(Path(env) / "skills")
-        roots.append(Path(__file__).resolve().parents[2] / "prompts" / "skills")
-        seen: set[str] = set()
-        for root in roots:
-            if not root.is_dir():
-                continue
-            for path in sorted(root.glob("*.md")):
-                if path.stem in seen:
-                    continue
-                seen.add(path.stem)
-                out.append((f"skill · {path.stem}", "skill", path.stem))
-        try:
-            from .agent_templates import list_agent_templates
-
-            for t in list_agent_templates():
-                tid = getattr(t, "id", None) or getattr(t, "name", "")
-                title = getattr(t, "title", None) or tid
-                out.append((f"tmpl · {title}", "template", str(tid)))
-        except Exception:
-            pass
-        return out[:40]
-
     def _on_panel_item(self, item: QListWidgetItem) -> None:
         data = item.data(Qt.ItemDataRole.UserRole)
         if not data or not isinstance(data, tuple) or len(data) != 2:
@@ -1224,20 +1694,310 @@ class CompanionWindow(QWidget):
         if kind == "history" and ref:
             self._load_session_into_slot(str(ref))
             return
-        if kind == "skill" and ref:
-            # Seed active chat with a short ask to use the skill
-            self._toggle_panel(PANEL_NONE)
-            self.input.setText(f"Use skill `{ref}` for the current task.")
-            self._focus_input()
-            return
         if kind == "template" and ref:
+            self._run_template(str(ref))
+            return
+        if kind == "tool_toggle" and ref:
+            try:
+                from .registry import get_registry
+
+                reg = get_registry()
+                entry = reg.get(str(ref))
+                if entry:
+                    reg.set_enabled(str(ref), not entry.enabled)
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(self, "Tools", str(exc))
+            self._fill_panel(PANEL_TOOLS)
+            return
+        if kind == "mcp_toggle" and ref:
+            try:
+                from .marketplace import list_installed_mcp, set_mcp_enabled
+                from .registry import reload_registry
+
+                cur = next(
+                    (x for x in list_installed_mcp() if x["name"] == ref), None
+                )
+                if cur:
+                    set_mcp_enabled(str(ref), not cur.get("enabled", True))
+                    reload_registry()
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(self, "MCP", str(exc))
+            self._fill_panel(PANEL_MCP)
+            return
+        if kind == "mcp_remove" and ref:
+            try:
+                from .marketplace import remove_mcp_server
+                from .registry import reload_registry
+
+                if remove_mcp_server(str(ref)):
+                    reload_registry()
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(self, "MCP", str(exc))
+            self._fill_panel(PANEL_MCP)
+            return
+        if kind == "mcp_install" and ref:
+            self._mcp_install_named(str(ref))
+            return
+        if kind == "mcp_inject":
+            self._inject_mcp_now()
+            return
+        if kind == "mcp_catalog":
+            self._mcp_install_picker()
+            return
+        if kind == "ws_add":
+            self._add_workspace_dialog()
+            return
+        if kind == "ws_select" and ref:
+            from .preferences import set_active_workspace_id
+
+            self._active_workspace_id = str(ref)
+            set_active_workspace_id(str(ref))
+            self._reload_workspace_chip()
+            slot = self._slot()
+            if not slot.busy:
+                slot.workspace_id = str(ref)
             self._toggle_panel(PANEL_NONE)
-            self.input.setText(f"Run agent template `{ref}`.")
-            self._focus_input()
             return
         if kind in ("cron", "job"):
-            # Informational for v1 — open full UI for management
             self._open_full()
+
+    def _template_params(self, template_id: str) -> dict[str, Any] | None:
+        from .agent_templates import get_agent_template
+
+        tmpl = get_agent_template(template_id)
+        if tmpl is None:
+            QMessageBox.warning(self, "Templates", f"Unknown: {template_id}")
+            return None
+        params: dict[str, Any] = {
+            p.id: p.default for p in tmpl.params if p.default is not None
+        }
+        ws = self._active_workspace_id or self._slot().workspace_id
+        for p in tmpl.params:
+            if p.type in ("workspaceList", "workspace") and ws:
+                if p.type == "workspaceList":
+                    params[p.id] = [ws]
+                else:
+                    params[p.id] = ws
+
+        if tmpl.params:
+            filled = self._template_param_dialog(tmpl, params)
+            if filled is None:
+                return None
+            return filled
+        if any(
+            p.type in ("workspaceList", "workspace") and p.required for p in tmpl.params
+        ) and not ws:
+            QMessageBox.information(
+                self,
+                "Templates",
+                "Select or add a workspace first (📁), then retry.",
+            )
+            return None
+        return params
+
+    def _template_param_dialog(
+        self, tmpl: Any, seed: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Template · {tmpl.title}")
+        form = QFormLayout(dlg)
+        widgets: dict[str, QWidget] = {}
+        ws_ids: list[str] = []
+        try:
+            from .workspaces import list_workspaces
+
+            ws_ids = [w.id for w in list_workspaces()]
+        except Exception:
+            pass
+        for p in tmpl.params:
+            if p.type in ("workspaceList", "workspace"):
+                combo = QComboBox()
+                combo.addItem("(none)", "")
+                for wid in ws_ids:
+                    combo.addItem(wid, wid)
+                cur = seed.get(p.id)
+                if isinstance(cur, list) and cur:
+                    cur = cur[0]
+                idx = combo.findData(str(cur or self._active_workspace_id or ""))
+                if idx >= 0:
+                    combo.setCurrentIndex(idx)
+                form.addRow(p.label + (" *" if p.required else ""), combo)
+                widgets[p.id] = combo
+            elif p.type == "enum" and p.options:
+                combo = QComboBox()
+                for opt in p.options:
+                    combo.addItem(str(opt), str(opt))
+                if seed.get(p.id) is not None:
+                    i = combo.findData(str(seed[p.id]))
+                    if i >= 0:
+                        combo.setCurrentIndex(i)
+                form.addRow(p.label + (" *" if p.required else ""), combo)
+                widgets[p.id] = combo
+            else:
+                edit = QLineEdit(str(seed.get(p.id) or p.default or ""))
+                form.addRow(p.label + (" *" if p.required else ""), edit)
+                widgets[p.id] = edit
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        form.addRow(buttons)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return None
+        out: dict[str, Any] = dict(seed)
+        for p in tmpl.params:
+            w = widgets.get(p.id)
+            if isinstance(w, QComboBox):
+                val = w.currentData()
+                if p.type == "workspaceList":
+                    out[p.id] = [val] if val else []
+                else:
+                    out[p.id] = val
+            elif isinstance(w, QLineEdit):
+                out[p.id] = w.text().strip()
+            if p.required and out.get(p.id) in (None, "", []):
+                QMessageBox.warning(self, "Templates", f"Required: {p.label}")
+                return None
+        return out
+
+    def _run_template(self, template_id: str) -> None:
+        slot = self._slot()
+        if slot.busy:
+            QMessageBox.information(self, "Templates", "Current chat is busy.")
+            return
+        params = self._template_params(template_id)
+        if params is None:
+            return
+        from .agent_templates import get_agent_template
+
+        tmpl = get_agent_template(template_id)
+        title = (tmpl.title if tmpl else template_id)[:24]
+        force = None
+        mode = (slot.harness_mode or "auto").strip().lower()
+        if mode in ("native", "qwen", "dsh"):
+            force = mode
+        self._toggle_panel(PANEL_NONE)
+        slot.reply_buf = ""
+        slot.thinking_buf = ""
+        slot.tool_traces = []
+        slot.last_error = ""
+        slot.user_prompt = f"[template] {title}"
+        slot.busy = True
+        slot.avatar_state = STATE_THINKING
+        slot.activity = f"Template ({title})"
+        if not slot.title_locked:
+            slot.title = title
+            slot.title_locked = True
+        self._apply_slot_ui()
+        worker = _CompanionTemplateWorker(
+            slot.id,
+            template_id,
+            params,
+            harness_force=force,
+            parent=self,
+        )
+        slot.worker = worker
+        worker.event.connect(self._on_event)
+        worker.failed.connect(self._on_fail)
+        worker.finished.connect(lambda sid=slot.id: self._on_worker_done(sid))
+        worker.start()
+
+    def _add_workspace_dialog(self) -> None:
+        path = QFileDialog.getExistingDirectory(self, "Add workspace (git repo)")
+        if not path:
+            return
+        try:
+            from .workspaces import detect_github_slug, slug_from_path, upsert_workspace
+
+            p = Path(path)
+            wid = slug_from_path(p)
+            gh = detect_github_slug(p)
+            upsert_workspace(wid, str(p), label=p.name, github=gh)
+            from .preferences import set_active_workspace_id
+
+            self._active_workspace_id = wid
+            set_active_workspace_id(wid)
+            self._reload_workspace_chip()
+            self._fill_panel(PANEL_WORKSPACES)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Workspaces", str(exc))
+
+    def _mcp_install_picker(self) -> None:
+        try:
+            from .marketplace import installed_mcp_names, list_templates
+
+            installed = installed_mcp_names()
+            choices = [t.name for t in list_templates() if t.name not in installed]
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "MCP", str(exc))
+            return
+        if not choices:
+            QMessageBox.information(self, "MCP", "All catalog templates already installed.")
+            return
+        name, ok = QInputDialog.getItem(
+            self, "Install MCP", "Template:", choices, 0, False
+        )
+        if not ok or not name:
+            return
+        self._mcp_install_named(name)
+
+    def _mcp_install_named(self, name: str) -> None:
+        try:
+            from .marketplace import install_template
+            from .registry import reload_registry
+
+            result = install_template(
+                name, workspace_id=self._active_workspace_id
+            )
+            if not result.get("ok"):
+                QMessageBox.warning(self, "MCP", str(result.get("error") or "failed"))
+                return
+            reload_registry()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "MCP", str(exc))
+            return
+        self._fill_panel(PANEL_MCP)
+
+    def _inject_mcp_now(self) -> None:
+        try:
+            from .harness.mcp_inject import ensure_dsh_ncc_mcp, ensure_qwen_ncc_mcp
+
+            q = ensure_qwen_ncc_mcp(force=True)
+            d = ensure_dsh_ncc_mcp(force=True)
+            QMessageBox.information(
+                self,
+                "MCP inject",
+                f"Qwen: {q.get('detail')}\nDSH: {d.get('detail')}",
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "MCP inject", str(exc))
+
+    def _pick_avatar_skin(self) -> None:
+        try:
+            from .avatar_skins import list_skins, resolve_skin, set_active_skin_id
+
+            skins = list_skins()
+            labels = [f"{s['label']} ({s['kind']})" for s in skins]
+            choice, ok = QInputDialog.getItem(
+                self, "Avatar skin", "Skin:", labels, 0, False
+            )
+            if not ok:
+                return
+            idx = labels.index(choice)
+            sid = skins[idx]["id"]
+            set_active_skin_id(sid)
+            self.avatar.apply_skin(resolve_skin(sid))
+            tip = (
+                "Painted default."
+                if sid == "painted"
+                else f"Using {sid}. Put PNG frames in ~/.config/ncc-assistant/avatar-skins/{sid}/ "
+                "(idle.png / thinking.png / speaking.png or a frames/ folder). "
+                "Live2D: export PNG sequence into that folder (Cubism runtime not bundled)."
+            )
+            QMessageBox.information(self, "Avatar skin", tip)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Avatar skin", str(exc))
 
     def _open_full(self) -> None:
         import shutil

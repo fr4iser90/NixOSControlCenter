@@ -258,3 +258,63 @@ def install_template(
     if warning:
         result["warning"] = warning
     return result
+
+
+def list_installed_mcp() -> list[dict[str, Any]]:
+    """Installed MCP server entries from user mcp-servers.json."""
+    path = mcp_servers_file()
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    out: list[dict[str, Any]] = []
+    for name, entry in data.items():
+        if not isinstance(entry, dict):
+            continue
+        out.append(
+            {
+                "name": str(name),
+                "command": str(entry.get("command") or ""),
+                "enabled": bool(entry.get("enabled", True)),
+                "workspaceId": entry.get("workspaceId"),
+            }
+        )
+    return sorted(out, key=lambda x: x["name"])
+
+
+def set_mcp_enabled(name: str, enabled: bool) -> bool:
+    path = mcp_servers_file()
+    if not path.is_file():
+        return False
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(data, dict) or name not in data:
+        return False
+    entry = data[name]
+    if not isinstance(entry, dict):
+        return False
+    entry["enabled"] = bool(enabled)
+    data[name] = entry
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return True
+
+
+def remove_mcp_server(name: str) -> bool:
+    path = mcp_servers_file()
+    if not path.is_file():
+        return False
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(data, dict) or name not in data:
+        return False
+    del data[name]
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return True

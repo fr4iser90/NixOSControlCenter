@@ -103,6 +103,20 @@ def set_default_harness_mode(mode: str) -> None:
         save_preferences({"harness_mode": m})
 
 
+def get_active_workspace_id() -> str | None:
+    raw = load_preferences().get("active_workspace_id")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return None
+
+
+def set_active_workspace_id(workspace_id: str | None) -> None:
+    if workspace_id and str(workspace_id).strip():
+        save_preferences({"active_workspace_id": str(workspace_id).strip()})
+    else:
+        save_preferences({"active_workspace_id": ""})
+
+
 def apply_startup_preferences(settings: Any) -> Any:
     """Apply last provider / model from preferences (Nix model env wins if set)."""
     from dataclasses import replace

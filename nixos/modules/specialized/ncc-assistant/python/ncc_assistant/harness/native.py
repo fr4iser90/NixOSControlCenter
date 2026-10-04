@@ -26,8 +26,10 @@ class NativeHarness:
         cwd: str | None = None,
         cancel_event: threading.Event | None = None,
         session: Any | None = None,
+        history: list[dict[str, Any]] | None = None,
     ) -> Iterator[Event]:
         del cwd  # native uses Settings / workspaces, not process cwd
+        del history  # native ChatSession already holds messages
         if session is None:
             from ..config import Settings
             from ..preferences import apply_startup_preferences

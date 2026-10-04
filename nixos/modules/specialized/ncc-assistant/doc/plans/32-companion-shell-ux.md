@@ -1,6 +1,6 @@
 # Phase 32 — Companion shell UX (sessions · workspaces · tools · MCP · templates)
 
-Status: **guidelines (SSOT) — next after 31**  
+Status: **implemented (v1)**  
 **Parent:** [roadmap.md](../roadmap.md)  
 **Depends on:** [31-agent-trace-ux](./31-agent-trace-ux.md), [29-desktop-companion-avatar](./29-desktop-companion-avatar.md), [28-agent-templates-mcp-secrets](./28-agent-templates-mcp-secrets.md)
 
@@ -74,13 +74,13 @@ Icons (theme with text fallback): sessions, tools, MCP, workspace, templates, mo
 
 ## Acceptance
 
-- [ ] No horizontal multi-tab row; session switch via icon list  
-- [ ] Rename session persists for companion lifetime (+ optional disk later)  
-- [ ] Resize companion; reopen restores size/position  
-- [ ] Session list grouped by workspace; active ws on new chat  
-- [ ] Template run shows thinking/tools/answer in Companion  
-- [ ] Tools / MCP / Workspace reachable without opening full GUI first  
-- [ ] Gates green
+- [x] No horizontal multi-tab row; session switch via icon list  
+- [x] Rename session persists for companion lifetime (+ optional disk later)  
+- [x] Resize companion; reopen restores size/position  
+- [x] Session list grouped by workspace; active ws on new chat  
+- [x] Template run shows thinking/tools/answer in Companion  
+- [x] Tools / MCP / Workspace reachable without opening full GUI first  
+- [x] Gates green
 
 ## Non-goals
 

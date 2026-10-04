@@ -34,5 +34,10 @@ class HarnessBackend(Protocol):
         cwd: str | None = None,
         cancel_event: threading.Event | None = None,
         session: Any | None = None,
+        history: list[dict[str, Any]] | None = None,
     ) -> Iterator[Event]:
-        """Run one user turn; yield unified events until done."""
+        """Run one user turn; yield unified events until done.
+
+        ``history`` is prior turns ``[{role, content}, …]`` for multi-turn
+        prompt folding (external harnesses) or native session continuity.
+        """

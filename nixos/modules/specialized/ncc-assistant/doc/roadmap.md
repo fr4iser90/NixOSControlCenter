@@ -85,7 +85,8 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 | 29 | [Desktop companion avatar](./plans/29-desktop-companion-avatar.md) | **done** (v1.1 multi-chat + panels; plasmoid later) |
 | 30 | [Swappable coding harness](./plans/30-swappable-coding-harness.md) | **done** (native/qwen/dsh adapters + thinking stream) |
 | 31 | [Agent trace UX (GUI + Companion)](./plans/31-agent-trace-ux.md) | **done** (ThinkingBlock, tool rows, harness chip, activity, nested subagent tabs) |
-| 32 | [Companion shell UX](./plans/32-companion-shell-ux.md) | **guidelines** (session picker, resize, workspace groups, tools/MCP/templates icons) |
+| 32 | [Companion shell UX](./plans/32-companion-shell-ux.md) | **done** (session picker, resize, workspace groups, tools/MCP/templates icons) |
+| 33 | [Companion persist / harness depth](./plans/33-companion-persist-harness-depth.md) | **done** (disk sessions, ws switch, MCP marketplace, auto-inject, multi-turn, skins) |
 
 ## Feature map (checklist)
 

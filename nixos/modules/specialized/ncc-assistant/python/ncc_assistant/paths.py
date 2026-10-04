@@ -104,6 +104,18 @@ def preferences_file() -> Path:
     return config_home() / "preferences.json"
 
 
+def companion_store_file() -> Path:
+    """Persisted companion chat slots (titles, workspaces, transcripts)."""
+    return config_home() / "companion-chats.json"
+
+
+def avatar_skins_dir() -> Path:
+    """User avatar skin assets (PNG/WebP frames)."""
+    path = config_home() / "avatar-skins"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def providers_file() -> Path:
     """Path to providers.json (user LLM endpoints)."""
     return config_home() / "providers.json"
