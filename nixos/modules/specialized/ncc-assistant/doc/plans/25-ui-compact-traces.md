@@ -1,11 +1,10 @@
 # Phase 25 — Compact UI for tool traces
 
-Status: **done** (see roadmap.md)
+Status: **done** (GUI `ToolTraceWidget`; Companion still flat text — see [31](./31-agent-trace-ux.md))
 
-**Status:** planned (backlog)  
-**Parent:** [roadmap.md](../doc/roadmap.md)  
+**Parent:** [roadmap.md](../roadmap.md)  
 **Depends on:** phase 5 UI shell  
-**Related:** [05-ui-integration.md](./05-ui-integration.md), [16-budgets-visible.md](./16-budgets-visible.md)
+**Related:** [05-ui-integration.md](./05-ui-integration.md), [16-budgets-visible.md](./16-budgets-visible.md), [31-agent-trace-ux.md](./31-agent-trace-ux.md)
 
 ## Problem
 

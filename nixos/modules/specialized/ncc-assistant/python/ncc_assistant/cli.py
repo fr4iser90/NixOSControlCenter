@@ -84,6 +84,7 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
     tags = ["coding"] if looks_like_coding_goal(goal) else []
     hname = resolve_harness_name(tags=tags, force=force)
 
+    verbose = bool(getattr(args, "verbose", False))
     print_info(f"Starting agent with goal: {goal}")
     print_info(
         f"Harness: {hname}, Max steps: {max_steps}, "
@@ -103,6 +104,7 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
             playbook=args.playbook,
         )
 
+    thinking_open = False
     for event in events:
         kind = event.get("kind")
         if kind == "job_started":
@@ -110,16 +112,36 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
         elif kind == "step":
             print_info(f"Step {event.get('step')}/{event.get('max_steps')}")
         elif kind == "thinking_delta":
-            print_info(f"thinking: {event.get('text', '')[:200]}")
+            if verbose:
+                print_info(f"thinking: {event.get('text', '')[:200]}")
+            elif not thinking_open:
+                print_info("Thinking…")
+                thinking_open = True
         elif kind == "assistant":
+            thinking_open = False
             print_info(f"Assistant: {event.get('text', '')[:500]}")
         elif kind == "assistant_delta":
-            pass
+            thinking_open = False
         elif kind == "tool":
-            print_info(f"Tool: {event.get('name')}({json.dumps(event.get('args', {}))})")
+            thinking_open = False
+            name = event.get("name")
+            if verbose:
+                print_info(f"Tool: {name}({json.dumps(event.get('args', {}))})")
+            else:
+                print_info(f"▸ {name}")
         elif kind == "tool_result":
             text = event.get("text", "")
-            print_info(f"Result: {text[:300]}{'...' if len(text) > 300 else ''}")
+            if verbose:
+                print_info(f"Result: {text[:300]}{'...' if len(text) > 300 else ''}")
+            else:
+                print_info(f"  ↳ {text[:120]}{'…' if len(text) > 120 else ''}")
+        elif kind == "status":
+            if verbose:
+                print_info(f"status: {event.get('text') or event.get('phase') or ''}")
+        elif kind == "run_spawn":
+            print_info(
+                f"▸ Subagent: {event.get('title') or event.get('name') or 'child'}"
+            )
         elif kind == "agent_finish":
             print_ok(f"Agent finished: {event.get('summary')}")
             print_info(f"Success: {event.get('success')}")
@@ -666,6 +688,12 @@ def main(argv: list[str] | None = None) -> int:
         "--harness",
         choices=["native", "qwen", "dsh"],
         help="Force agent harness (default: settings / coding auto)",
+    )
+    agent_run.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Full thinking/tool dumps (default: compact one-liners)",
     )
 
     harness_p = sub.add_parser("harness", help="Coding harness backends (native/qwen/dsh)")

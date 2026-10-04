@@ -31,6 +31,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -38,6 +39,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QStackedWidget,
     QTextEdit,
@@ -118,15 +120,37 @@ class ChatSlot:
     worker: _CompanionChatWorker | None = None
     reply_buf: str = ""
     thinking_buf: str = ""
-    transcript: str = ""
+    user_prompt: str = ""
+    tool_traces: list | None = None  # [{name, args, result}]
     busy: bool = False
     avatar_state: str = STATE_IDLE
     last_error: str = ""
-    harness: str = "native"
+    harness_mode: str = "auto"  # user chip: auto|native|qwen|dsh
+    harness: str = "native"  # last resolved
+    activity: str = ""
+    parent_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.tool_traces is None:
+            self.tool_traces = []
 
     @staticmethod
-    def new(title: str = "Chat") -> "ChatSlot":
-        return ChatSlot(id=uuid.uuid4().hex[:8], title=title)
+    def new(title: str = "Chat", *, parent_id: str | None = None) -> "ChatSlot":
+        return ChatSlot(id=uuid.uuid4().hex[:8], title=title, parent_id=parent_id)
+
+
+def _looks_like_subagent_spawn(event: dict[str, Any]) -> bool:
+    """Interim heuristic until adapters emit run_spawn reliably."""
+    kind = event.get("kind")
+    if kind == "run_spawn":
+        return True
+    if kind == "tool":
+        name = str(event.get("name") or "").lower()
+        return any(x in name for x in ("subagent", "task", "delegate", "spawn"))
+    if kind == "status":
+        text = str(event.get("text") or event.get("phase") or "").lower()
+        return "subagent" in text or "spawn" in text
+    return False
 
 
 class AvatarCanvas(QWidget):
@@ -357,11 +381,38 @@ class CompanionWindow(QWidget):
         self.presence_lbl = QLabel("")
         self.presence_lbl.setStyleSheet("color: #667;")
         header.addWidget(self.presence_lbl)
-        self.harness_lbl = QLabel("native")
-        self.harness_lbl.setStyleSheet("color: #556; font-size: 10px;")
-        self.harness_lbl.setToolTip("Active harness (native / qwen / dsh)")
-        header.addWidget(self.harness_lbl)
+        self.harness_combo = QComboBox()
+        self.harness_combo.setToolTip(
+            "Harness for this chat (auto resolves coding goals → qwen/dsh)"
+        )
+        for key, label in (
+            ("auto", "auto"),
+            ("native", "native"),
+            ("qwen", "qwen"),
+            ("dsh", "dsh"),
+        ):
+            self.harness_combo.addItem(label, key)
+        self.harness_combo.setMaximumWidth(110)
+        self.harness_combo.currentIndexChanged.connect(self._on_harness_chip_changed)
+        header.addWidget(self.harness_combo)
+        self.harness_resolved_lbl = QLabel("")
+        self.harness_resolved_lbl.setStyleSheet("color: #556; font-size: 10px;")
+        self.harness_resolved_lbl.setToolTip("Resolved harness for last / next send")
+        header.addWidget(self.harness_resolved_lbl)
         glass.addLayout(header)
+
+        # Breadcrumb for nested subagent chats
+        crumb = QHBoxLayout()
+        self.parent_btn = QToolButton()
+        self.parent_btn.setText("↑ parent")
+        self.parent_btn.setToolTip("Back to parent chat")
+        self.parent_btn.clicked.connect(self._go_parent)
+        self.parent_btn.hide()
+        crumb.addWidget(self.parent_btn)
+        self.breadcrumb_lbl = QLabel("")
+        self.breadcrumb_lbl.setStyleSheet("color: #667; font-size: 10px;")
+        crumb.addWidget(self.breadcrumb_lbl, stretch=1)
+        glass.addLayout(crumb)
 
         # Chat tabs
         self.tabs_row = QHBoxLayout()
@@ -418,12 +469,43 @@ class CompanionWindow(QWidget):
         self.chat_page = QWidget()
         chat_l = QVBoxLayout(self.chat_page)
         chat_l.setContentsMargins(0, 0, 0, 0)
-        chat_l.setSpacing(6)
+        chat_l.setSpacing(4)
+
+        self.activity_lbl = QLabel("")
+        self.activity_lbl.setStyleSheet("color: #667; font-size: 10px;")
+        self.activity_lbl.setMinimumHeight(14)
+        chat_l.addWidget(self.activity_lbl)
+
+        from .gui_pages import ThinkingBlock
+        from .preferences import get_expand_thinking_while_streaming
+
+        self.think_block = ThinkingBlock(
+            compact=True,
+            expand_while_streaming=get_expand_thinking_while_streaming(),
+        )
+        chat_l.addWidget(self.think_block)
+
+        self.tools_scroll = QScrollArea()
+        self.tools_scroll.setWidgetResizable(True)
+        self.tools_scroll.setMaximumHeight(100)
+        self.tools_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.tools_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.tools_host = QWidget()
+        self.tools_layout = QVBoxLayout(self.tools_host)
+        self.tools_layout.setContentsMargins(0, 0, 0, 0)
+        self.tools_layout.setSpacing(3)
+        self.tools_layout.addStretch()
+        self.tools_scroll.setWidget(self.tools_host)
+        self.tools_scroll.hide()
+        chat_l.addWidget(self.tools_scroll)
+        self._tool_widgets: list[Any] = []
 
         self.bubble = QTextEdit()
         self.bubble.setReadOnly(True)
         self.bubble.setPlaceholderText("Ask me something…")
-        self.bubble.setMaximumHeight(140)
+        self.bubble.setMaximumHeight(120)
         self.bubble.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.bubble.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         chat_l.addWidget(self.bubble)
@@ -518,6 +600,11 @@ class CompanionWindow(QWidget):
         pos = s.value("pos")
         if pos is not None:
             self.move(pos)
+        from .preferences import get_default_harness_mode
+
+        mode = get_default_harness_mode()
+        self._slots[0].harness_mode = mode
+        self._sync_harness_chip(self._slots[0])
 
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
@@ -542,7 +629,16 @@ class CompanionWindow(QWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             child = self.childAt(event.position().toPoint())
             interactive = isinstance(
-                child, (QLineEdit, QTextEdit, QPushButton, QToolButton, QListWidget)
+                child,
+                (
+                    QLineEdit,
+                    QTextEdit,
+                    QPushButton,
+                    QToolButton,
+                    QListWidget,
+                    QComboBox,
+                    QScrollArea,
+                ),
             )
             if not interactive:
                 if not _start_system_move(self):
@@ -590,11 +686,18 @@ class CompanionWindow(QWidget):
             if w is not None:
                 w.deleteLater()
         self._tab_buttons.clear()
-        for slot in self._slots:
+        active = self._slot()
+        # Show root + siblings; if nested, show parent lineage + children of active parent
+        visible = self._visible_slots()
+        for slot in visible:
             btn = QToolButton()
-            mark = "…" if slot.busy else ""
-            btn.setText(f"{slot.title}{mark}"[:18])
-            btn.setToolTip(f"{slot.title} ({slot.id})")
+            nest = "▸" if slot.parent_id else ""
+            mark = "✦" if slot.busy else ""
+            btn.setText(f"{nest}{slot.title}{mark}"[:18])
+            tip = f"{slot.title} ({slot.id}) [{slot.harness}]"
+            if slot.parent_id:
+                tip += f" · child of {slot.parent_id}"
+            btn.setToolTip(tip)
             btn.setCheckable(True)
             btn.setChecked(slot.id == self._active_id)
             btn.setProperty("activeChat", "true" if slot.id == self._active_id else "false")
@@ -602,15 +705,123 @@ class CompanionWindow(QWidget):
             self.tabs_row.addWidget(btn)
             self._tab_buttons[slot.id] = btn
         self.tabs_row.addStretch()
+        del active
+
+    def _visible_slots(self) -> list[ChatSlot]:
+        """Parent + nested children when in a subagent; else roots + children of active."""
+        active = self._slot()
+        if active.parent_id:
+            parent = next((s for s in self._slots if s.id == active.parent_id), None)
+            siblings = [s for s in self._slots if s.parent_id == active.parent_id]
+            out: list[ChatSlot] = []
+            if parent is not None:
+                out.append(parent)
+            out.extend(siblings)
+            return out
+        roots = [s for s in self._slots if not s.parent_id]
+        children = [s for s in self._slots if s.parent_id == active.id]
+        return roots + children
+
+    def _clear_tool_widgets(self) -> None:
+        for w in self._tool_widgets:
+            self.tools_layout.removeWidget(w)
+            w.deleteLater()
+        self._tool_widgets.clear()
+        self.tools_scroll.hide()
+
+    def _rebuild_tool_widgets(self, slot: ChatSlot) -> None:
+        from .gui_pages import ToolTraceWidget
+
+        self._clear_tool_widgets()
+        traces = slot.tool_traces or []
+        if not traces:
+            return
+        self.tools_scroll.show()
+        stretch = self.tools_layout.takeAt(self.tools_layout.count() - 1)
+        for tr in traces:
+            w = ToolTraceWidget(
+                str(tr.get("name") or "tool"),
+                tr.get("args") or {},
+                compact=True,
+            )
+            result = tr.get("result")
+            if result:
+                w.set_result(str(result))
+            self.tools_layout.addWidget(w)
+            self._tool_widgets.append(w)
+        if stretch is not None:
+            self.tools_layout.addStretch()
+        else:
+            self.tools_layout.addStretch()
+
+    def _set_activity(self, slot: ChatSlot, text: str) -> None:
+        slot.activity = text
+        if slot.id == self._active_id:
+            self.activity_lbl.setText(text)
+
+    def _sync_harness_chip(self, slot: ChatSlot) -> None:
+        mode = slot.harness_mode or "auto"
+        idx = self.harness_combo.findData(mode)
+        self.harness_combo.blockSignals(True)
+        if idx >= 0:
+            self.harness_combo.setCurrentIndex(idx)
+        self.harness_combo.blockSignals(False)
+        if mode == "auto":
+            self.harness_resolved_lbl.setText(f"→ {slot.harness}" if slot.harness else "")
+        else:
+            self.harness_resolved_lbl.setText("")
+
+    def _on_harness_chip_changed(self, _index: int = 0) -> None:
+        slot = self._slot()
+        mode = str(self.harness_combo.currentData() or "auto")
+        slot.harness_mode = mode
+        from .preferences import set_default_harness_mode
+
+        set_default_harness_mode(mode)
+        # Preview resolve for display (next send uses same logic)
+        if mode != "auto":
+            slot.harness = mode
+        self._sync_harness_chip(slot)
+
+    def _go_parent(self) -> None:
+        slot = self._slot()
+        if slot.parent_id:
+            self._switch_chat(slot.parent_id)
+
+    def _update_breadcrumb(self, slot: ChatSlot) -> None:
+        if not slot.parent_id:
+            self.parent_btn.hide()
+            self.breadcrumb_lbl.setText("")
+            return
+        parent = next((s for s in self._slots if s.id == slot.parent_id), None)
+        self.parent_btn.show()
+        pname = parent.title if parent else slot.parent_id
+        self.breadcrumb_lbl.setText(f"{pname} › {slot.title}")
 
     def _apply_slot_ui(self) -> None:
         slot = self._slot()
-        self.bubble.setPlainText(slot.transcript or slot.reply_buf)
+        parts: list[str] = []
+        if slot.user_prompt:
+            parts.append(f"You: {slot.user_prompt}")
+        if slot.reply_buf.strip():
+            parts.append(slot.reply_buf.strip()[-2000:])
+        elif slot.last_error:
+            parts.append(f"Error: {slot.last_error}")
+        self.bubble.setPlainText("\n\n".join(parts))
         sb = self.bubble.verticalScrollBar()
         sb.setValue(sb.maximum())
+        self.think_block.clear()
+        if slot.thinking_buf.strip():
+            self.think_block.append_text(slot.thinking_buf)
+            self.think_block.finish()
+            self.think_block.collapse()
+        self._rebuild_tool_widgets(slot)
+        self.activity_lbl.setText(slot.activity)
         self.avatar.set_state(slot.avatar_state)
         self.send_btn.setEnabled(not slot.busy)
         self.input.setEnabled(True)  # always allow typing / queue feel
+        self._sync_harness_chip(slot)
+        self._update_breadcrumb(slot)
         self._rebuild_tabs()
 
     def _switch_chat(self, slot_id: str) -> None:
@@ -629,8 +840,9 @@ class CompanionWindow(QWidget):
         self._switch_chat(ids[(i + 1) % len(ids)])
 
     def _new_chat(self) -> None:
-        n = len(self._slots) + 1
+        n = len([s for s in self._slots if not s.parent_id]) + 1
         slot = ChatSlot.new(f"Chat {n}")
+        slot.harness_mode = self._slot().harness_mode
         self._slots.append(slot)
         self._active_id = slot.id
         self._toggle_panel(PANEL_NONE)
@@ -680,8 +892,7 @@ class CompanionWindow(QWidget):
             if isinstance(m, dict) and m.get("role") == "assistant":
                 last = str(m.get("content") or "")[:2000]
                 break
-        slot.transcript = last or f"(loaded {title})"
-        slot.reply_buf = slot.transcript
+        slot.reply_buf = last or f"(loaded {title})"
         self._slots.append(slot)
         self._active_id = slot.id
         self._toggle_panel(PANEL_NONE)
@@ -707,14 +918,33 @@ class CompanionWindow(QWidget):
             slot.avatar_state = STATE_IDLE
             self.avatar.set_state(STATE_IDLE)
 
-    def _pick_harness(self, text: str) -> str:
+    def _pick_harness(self, slot: ChatSlot, text: str) -> str:
         import os
 
         from .harness import looks_like_coding_goal, resolve_harness_name
 
-        force = (os.environ.get("NCC_ASSISTANT_COMPANION_HARNESS") or "").strip() or None
+        env_force = (os.environ.get("NCC_ASSISTANT_COMPANION_HARNESS") or "").strip()
+        mode = (slot.harness_mode or "auto").strip().lower()
+        if env_force:
+            force = env_force
+        elif mode in ("native", "qwen", "dsh"):
+            force = mode
+        else:
+            force = None
         tags = ["coding"] if looks_like_coding_goal(text) else []
         return resolve_harness_name(tags=tags, force=force)
+
+    def _spawn_child_slot(self, parent: ChatSlot, event: dict[str, Any]) -> ChatSlot:
+        title = str(event.get("title") or event.get("name") or "Subagent")[:20]
+        child = ChatSlot.new(title, parent_id=parent.id)
+        child.harness_mode = parent.harness_mode
+        child.harness = parent.harness
+        child.user_prompt = str(event.get("goal") or event.get("text") or title)
+        child.busy = True
+        child.avatar_state = STATE_THINKING
+        child.activity = "Subagent…"
+        self._slots.append(child)
+        return child
 
     def _send(self) -> None:
         text = self.input.text().strip()
@@ -723,21 +953,22 @@ class CompanionWindow(QWidget):
         slot = self._slot()
         if slot.busy:
             return
-        hname = self._pick_harness(text)
+        hname = self._pick_harness(slot, text)
         slot.harness = hname
         if hname == "native":
             self._ensure_session(slot)
         self.input.clear()
         slot.reply_buf = ""
         slot.thinking_buf = ""
+        slot.tool_traces = []
         slot.last_error = ""
-        slot.transcript = f"You: {text}\n\n[{hname}] …"
+        slot.user_prompt = text
         slot.busy = True
         slot.avatar_state = STATE_THINKING
-        if slot.title.startswith("Chat ") and len(text) > 2:
+        slot.activity = f"Streaming ({hname})"
+        if (slot.title.startswith("Chat ") or slot.title.startswith("Sub")) and len(text) > 2:
             slot.title = text[:16] + ("…" if len(text) > 16 else "")
         self._apply_slot_ui()
-        self.harness_lbl.setText(hname)
         worker = _CompanionChatWorker(
             slot.id,
             text,
@@ -755,77 +986,123 @@ class CompanionWindow(QWidget):
         slot = self._slot(slot_id)
         slot.busy = False
         slot.worker = None
+        slot.activity = ""
+        if slot.thinking_buf.strip() and slot_id == self._active_id:
+            self.think_block.finish()
+            self.think_block.collapse()
         if slot_id == self._active_id:
             self._apply_slot_ui()
             self._sync_presence()
         else:
             self._rebuild_tabs()
 
-    def _compose_transcript(self, slot: ChatSlot) -> str:
-        parts: list[str] = []
-        if slot.thinking_buf.strip():
-            parts.append("── thinking ──\n" + slot.thinking_buf.strip()[-1200:])
-        if slot.reply_buf.strip():
-            if parts:
-                parts.append("\n── reply ──\n")
-            parts.append(slot.reply_buf.strip()[-2000:])
-        return "\n".join(parts) if parts else slot.transcript
-
     def _on_event(self, slot_id: str, event: object) -> None:
         if not isinstance(event, dict):
             return
         slot = self._slot(slot_id)
         kind = event.get("kind")
+
+        if _looks_like_subagent_spawn(event) and kind == "run_spawn":
+            child = self._spawn_child_slot(slot, event)
+            self._rebuild_tabs()
+            # Stay on parent unless event asks to focus child
+            if event.get("focus"):
+                self._switch_chat(child.id)
+            return
+        if kind == "tool" and _looks_like_subagent_spawn(event):
+            # Interim: open nested tab (do not steal focus)
+            child = self._spawn_child_slot(slot, event)
+            self._rebuild_tabs()
+
         if kind == "thinking_delta":
             slot.avatar_state = STATE_THINKING
-            slot.thinking_buf += str(event.get("text") or "")
-            slot.transcript = self._compose_transcript(slot)
+            piece = str(event.get("text") or "")
+            slot.thinking_buf += piece
+            self._set_activity(slot, "Thinking…")
+            if slot_id == self._active_id and piece:
+                self.think_block.append_text(piece)
         elif kind in ("assistant_delta", "delta"):
             slot.avatar_state = STATE_SPEAKING
             slot.reply_buf += str(event.get("text") or "")
-            slot.transcript = self._compose_transcript(slot)
+            self._set_activity(slot, f"Streaming ({slot.harness})")
+            if slot_id == self._active_id:
+                self.think_block.collapse()
         elif kind == "assistant":
             slot.reply_buf = str(event.get("text") or slot.reply_buf)
-            slot.transcript = self._compose_transcript(slot)
+            if slot_id == self._active_id:
+                self.think_block.finish()
+                self.think_block.collapse()
         elif kind == "tool":
-            name = event.get("name") or "tool"
+            name = str(event.get("name") or "tool")
             args = event.get("args") or {}
-            arg_s = str(args)
-            if len(arg_s) > 120:
-                arg_s = arg_s[:120] + "…"
-            slot.reply_buf += f"\n[tool] {name}({arg_s})\n"
-            slot.transcript = self._compose_transcript(slot)
+            slot.tool_traces = list(slot.tool_traces or [])
+            slot.tool_traces.append({"name": name, "args": args, "result": ""})
             slot.avatar_state = STATE_THINKING
+            self._set_activity(slot, f"Running {name}")
+            if slot_id == self._active_id:
+                from .gui_pages import ToolTraceWidget
+
+                if not self.tools_scroll.isVisible():
+                    self.tools_scroll.show()
+                stretch = self.tools_layout.takeAt(self.tools_layout.count() - 1)
+                w = ToolTraceWidget(name, args, compact=True)
+                self.tools_layout.addWidget(w)
+                self._tool_widgets.append(w)
+                if stretch is not None:
+                    self.tools_layout.addItem(stretch)
+                else:
+                    self.tools_layout.addStretch()
         elif kind == "tool_result":
-            name = event.get("name") or "tool"
-            body = str(event.get("text") or "")[:400]
-            slot.reply_buf += f"[result] {name}: {body}\n"
-            slot.transcript = self._compose_transcript(slot)
+            body = str(event.get("text") or "")
+            traces = slot.tool_traces or []
+            if traces:
+                traces[-1]["result"] = body[:4000]
+            if slot_id == self._active_id and self._tool_widgets:
+                self._tool_widgets[-1].set_result(body)
         elif kind == "status":
-            phase = event.get("phase") or ""
-            if phase == "tool":
+            phase = str(event.get("phase") or "")
+            text = str(event.get("text") or "")
+            if phase == "tool" or text:
                 slot.avatar_state = STATE_THINKING
+                self._set_activity(slot, text or "Working…")
+            # never append status into answer bubble
         elif kind == "error":
             slot.avatar_state = STATE_ERROR
-            slot.transcript = str(event.get("text") or "error")
+            slot.last_error = str(event.get("text") or "error")
+            slot.reply_buf = ""
+            self._set_activity(slot, "")
         elif kind == "done":
+            self._set_activity(slot, "")
             if slot.avatar_state != STATE_PAUSED:
                 slot.avatar_state = STATE_IDLE
+            if slot_id == self._active_id:
+                self.think_block.finish()
+                self.think_block.collapse()
+
         if slot_id == self._active_id:
-            self.bubble.setPlainText(slot.transcript)
+            parts: list[str] = []
+            if slot.user_prompt:
+                parts.append(f"You: {slot.user_prompt}")
+            if slot.last_error:
+                parts.append(f"Error: {slot.last_error}")
+            elif slot.reply_buf.strip():
+                parts.append(slot.reply_buf.strip()[-2000:])
+            self.bubble.setPlainText("\n\n".join(parts))
             sb = self.bubble.verticalScrollBar()
             sb.setValue(sb.maximum())
             self.avatar.set_state(slot.avatar_state)
-            self.harness_lbl.setText(slot.harness)
-            if kind in ("assistant_delta", "delta", "thinking_delta", "tool", "done"):
+            self._sync_harness_chip(slot)
+            if kind in ("assistant_delta", "delta", "thinking_delta", "tool", "done", "run_spawn"):
                 self._rebuild_tabs()
 
     def _on_fail(self, slot_id: str, message: str) -> None:
         slot = self._slot(slot_id)
         slot.avatar_state = STATE_ERROR
         short = message.splitlines()[0][:400]
-        slot.transcript = f"Error: {short}"
+        slot.last_error = short
+        slot.reply_buf = ""
         slot.busy = False
+        slot.activity = ""
         if slot_id == self._active_id:
             self._apply_slot_ui()
 

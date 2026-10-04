@@ -80,4 +80,5 @@ NCC confirm/presence.
 
 - Bidirectional ACP/SDK sessions (multi-turn) instead of one-shot headless
 - Auto-inject NCC MCP into qwen/dsh on first run
-- Per-chat harness picker in companion UI
+- UI chrome for harness / thinking / tools / subagents → [31-agent-trace-ux](./31-agent-trace-ux.md)
+- Emit `run_spawn` when harness starts a nested/subagent run (feeds phase 31 session switch)

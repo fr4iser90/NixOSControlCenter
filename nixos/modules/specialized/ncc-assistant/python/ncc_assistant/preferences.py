@@ -64,6 +64,45 @@ def set_last_provider(provider_id: str | None, endpoint: str | None = None) -> N
         save_preferences(payload)
 
 
+def get_trace_density() -> str:
+    raw = load_preferences().get("trace_density")
+    if isinstance(raw, str) and raw.strip().lower() in ("compact", "comfortable"):
+        return raw.strip().lower()
+    return "comfortable"
+
+
+def set_trace_density(density: str) -> None:
+    d = (density or "").strip().lower()
+    if d in ("compact", "comfortable"):
+        save_preferences({"trace_density": d})
+
+
+def get_expand_thinking_while_streaming() -> bool:
+    return bool(load_preferences().get("expand_thinking_while_streaming"))
+
+
+def set_expand_thinking_while_streaming(enabled: bool) -> None:
+    save_preferences({"expand_thinking_while_streaming": bool(enabled)})
+
+
+def get_default_harness_mode() -> str:
+    raw = load_preferences().get("harness_mode")
+    if isinstance(raw, str) and raw.strip().lower() in (
+        "auto",
+        "native",
+        "qwen",
+        "dsh",
+    ):
+        return raw.strip().lower()
+    return "auto"
+
+
+def set_default_harness_mode(mode: str) -> None:
+    m = (mode or "").strip().lower()
+    if m in ("auto", "native", "qwen", "dsh"):
+        save_preferences({"harness_mode": m})
+
+
 def apply_startup_preferences(settings: Any) -> Any:
     """Apply last provider / model from preferences (Nix model env wins if set)."""
     from dataclasses import replace

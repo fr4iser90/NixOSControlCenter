@@ -66,3 +66,4 @@ ncc ai companion
 - Sprite / Lottie skins
 - Optional xdg autostart when `agent.companion.enable = true`
 - In-panel cron/job actions (not only “open full UI”)
+- Shell IA (sessions dropdown, resize, workspace/MCP/tools icons) → [32-companion-shell-ux](./32-companion-shell-ux.md)

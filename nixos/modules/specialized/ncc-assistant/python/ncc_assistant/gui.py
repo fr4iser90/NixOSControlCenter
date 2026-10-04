@@ -495,6 +495,7 @@ from .gui_pages import (
     JobsPage,
     SchedulesPage,
     SettingsPage,
+    ThinkingBlock,
     ToolTraceWidget,
     ToolsPage,
 )
@@ -899,6 +900,32 @@ class ChatPage(QWidget):
         self.model_combo.currentIndexChanged.connect(self.on_model_changed)
         bar.addWidget(self.model_combo)
 
+        bar.addWidget(QLabel("Harness"))
+        self.harness_combo = QComboBox()
+        self.harness_combo.setMinimumWidth(100)
+        self.harness_combo.setToolTip(
+            "Default harness for agent / coding turns (auto → qwen/dsh when installed)"
+        )
+        for key, label in (
+            ("auto", "auto"),
+            ("native", "native"),
+            ("qwen", "qwen"),
+            ("dsh", "dsh"),
+        ):
+            self.harness_combo.addItem(label, key)
+        from .preferences import get_default_harness_mode
+
+        mode = get_default_harness_mode()
+        hi = self.harness_combo.findData(mode)
+        if hi >= 0:
+            self.harness_combo.setCurrentIndex(hi)
+        self.harness_combo.currentIndexChanged.connect(self._on_harness_changed)
+        bar.addWidget(self.harness_combo)
+        self.harness_resolved_lbl = QLabel("")
+        self.harness_resolved_lbl.setStyleSheet("color: palette(mid); font-size: 11px;")
+        bar.addWidget(self.harness_resolved_lbl)
+        self._refresh_harness_resolved()
+
         new_btn = QPushButton("New")
         new_btn.setToolTip("Start a new chat session")
         new_btn.clicked.connect(self.on_new_session)
@@ -1009,6 +1036,8 @@ class ChatPage(QWidget):
         self._models_worker: ModelsFetchWorker | None = None
         self._models_fetch_gen = 0
         self._auth_prompt_open = False
+        self._think_block: ThinkingBlock | None = None
+        self._think_started_at: float | None = None
 
         self._populate_providers()
         # Seed combo from settings only — GET /models runs in background.
@@ -1393,6 +1422,43 @@ class ChatPage(QWidget):
             if isinstance(w, Bubble) and (w._role or "").lower() == "you":
                 self._tag_last_role_bubble(w, "user")
                 return
+
+    def _on_harness_changed(self, _index: int = 0) -> None:
+        from .preferences import set_default_harness_mode
+
+        mode = str(self.harness_combo.currentData() or "auto")
+        set_default_harness_mode(mode)
+        self._refresh_harness_resolved()
+
+    def harness_mode(self) -> str:
+        return str(self.harness_combo.currentData() or "auto")
+
+    def _refresh_harness_resolved(self) -> None:
+        from .harness import coding_harness_name, default_harness_name
+
+        mode = self.harness_mode()
+        if mode == "auto":
+            # Preview coding resolution (what auto uses for coding-like goals)
+            resolved = coding_harness_name()
+            if resolved == default_harness_name() and resolved == "native":
+                self.harness_resolved_lbl.setText("→ native")
+            else:
+                self.harness_resolved_lbl.setText(f"→ {resolved}")
+        else:
+            self.harness_resolved_lbl.setText("")
+
+    def _finish_think_block(self) -> None:
+        import time
+
+        block = self._think_block
+        if block is None:
+            return
+        secs = None
+        if self._think_started_at is not None:
+            secs = max(0.0, time.monotonic() - self._think_started_at)
+        block.finish(seconds=secs)
+        block.collapse()
+        self._think_started_at = None
 
     def _update_meta(self) -> None:
         """Kept as no-op for call sites; endpoint/key chrome lives in provider editor."""
@@ -1795,23 +1861,29 @@ class ChatPage(QWidget):
             piece = event.get("text") or ""
             if not piece:
                 return
+            import time
+
+            from .preferences import (
+                get_expand_thinking_while_streaming,
+                get_trace_density,
+            )
+
             self._set_activity("Thinking…")
-            if getattr(self, "_think_bubble", None) is None:
-                self._think_buf = piece
-                self._think_bubble = self._add_bubble(
-                    "Thinking", piece, markdown=False
+            if self._think_block is None:
+                self._think_started_at = time.monotonic()
+                self._think_block = ThinkingBlock(
+                    compact=get_trace_density() == "compact",
+                    expand_while_streaming=get_expand_thinking_while_streaming(),
                 )
-            else:
-                self._think_buf = (getattr(self, "_think_buf", "") or "") + piece
-                self._think_bubble.set_markdown(self._think_buf)
+                self.feed.addWidget(self._think_block)
+            self._think_block.append_text(piece)
             self._scroll_bottom()
         elif kind == "assistant_delta":
             piece = event.get("text") or ""
             if not piece:
                 return
-            # Close thinking bubble when answer tokens start
-            self._think_bubble = None
-            self._think_buf = ""
+            # Collapse thinking when answer tokens start
+            self._finish_think_block()
             if self._stream_bubble is None:
                 self._stream_bubble = self._add_bubble(
                     "Assistant", piece, markdown=True
@@ -1821,6 +1893,7 @@ class ChatPage(QWidget):
             self._scroll_bottom()
         elif kind == "assistant":
             self._set_activity(None)
+            self._finish_think_block()
             text = event.get("text") or ""
             if event.get("streamed") and self._stream_bubble is not None:
                 self._stream_bubble.set_markdown(text)
@@ -1836,9 +1909,14 @@ class ChatPage(QWidget):
             self._update_meta()
         elif kind == "tool":
             self._discard_empty_stream_bubble()
-            from .gui_pages import ToolTraceWidget
+            from .preferences import get_trace_density
 
-            trace = ToolTraceWidget(str(event.get("name")), event.get("args"))
+            self._set_activity(f"Running {event.get('name') or 'tool'}")
+            trace = ToolTraceWidget(
+                str(event.get("name")),
+                event.get("args"),
+                compact=get_trace_density() == "compact",
+            )
             self._last_trace = trace
             self.feed.addWidget(trace)
             self._scroll_bottom()
@@ -1851,9 +1929,13 @@ class ChatPage(QWidget):
                 self._wire_tool_menu(self._last_trace, tidx)
                 self._last_trace = None
             else:
-                from .gui_pages import ToolTraceWidget
+                from .preferences import get_trace_density
 
-                trace = ToolTraceWidget(str(event.get("name") or "tool"), {})
+                trace = ToolTraceWidget(
+                    str(event.get("name") or "tool"),
+                    {},
+                    compact=get_trace_density() == "compact",
+                )
                 trace.set_result(body)
                 tidx = self._last_index_for_role("tool")
                 self._wire_tool_menu(trace, tidx)
@@ -1884,8 +1966,14 @@ class ChatPage(QWidget):
             self._add_bubble("Error", event.get("text") or "")
             self._maybe_reauth(str(event.get("text") or ""))
             self._maybe_refresh_transcript()
+        elif kind == "run_spawn":
+            title = str(event.get("title") or event.get("name") or "Subagent")
+            self._set_activity(f"Subagent: {title}")
+            self._add_bubble("Status", f"Spawned nested run: {title}", markdown=False)
         elif kind == "done":
             self._set_activity(None)
+            self._finish_think_block()
+            self._think_block = None
             self._discard_empty_stream_bubble()
             self._update_meta()
             self.session.persist()

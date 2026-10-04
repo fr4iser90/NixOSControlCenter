@@ -29,6 +29,8 @@ class CompanionWiringTests(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         self.assertIn("get_harness", text)
         self.assertIn("thinking_delta", text)
+        self.assertIn("ThinkingBlock", text)
+        self.assertIn("harness_combo", text)
 
     def test_cli_has_companion_command(self) -> None:
         path = ROOT / "ncc_assistant" / "cli.py"

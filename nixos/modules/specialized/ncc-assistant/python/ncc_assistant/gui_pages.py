@@ -40,6 +40,182 @@ from PySide6.QtWidgets import (
 )
 
 
+from .trace_format import format_thinking_header, format_tool_header
+
+
+class ThinkingBlock(QFrame):
+    """Collapsible thinking / reasoning block — collapsed by default."""
+
+    _RADIUS = 8
+    _MARGINS = (10, 6, 10, 6)
+    _SPACING = 4
+    _BODY_MAX = 180
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        compact: bool = False,
+        expand_while_streaming: bool = False,
+    ) -> None:
+        super().__init__(parent)
+        self.setObjectName("nccThinking")
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        self._compact = compact
+        self._expand_while_streaming = expand_while_streaming
+        self._text = ""
+        self._streaming = False
+        self._elapsed_s: float | None = None
+        pad = 6 if compact else 8
+        self.setStyleSheet(
+            "QFrame#nccThinking {"
+            "  background: palette(alternate-base);"
+            "  border: 1px solid palette(mid);"
+            f"  border-radius: {self._RADIUS}px;"
+            "}"
+        )
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(pad, pad - 2, pad, pad - 2)
+        layout.setSpacing(self._SPACING)
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(4)
+
+        self._toggle = QToolButton()
+        self._toggle.setAutoRaise(True)
+        self._toggle.setFixedSize(22, 22)
+        self._toggle.setText("▸")
+        self._toggle.setCheckable(True)
+        self._toggle.setChecked(False)
+        self._toggle.setToolTip("Show / hide thinking")
+        self._toggle.setStyleSheet(
+            "QToolButton { border: none; padding: 0; margin: 0; }"
+        )
+        self._toggle.toggled.connect(self._on_toggle)
+        header.addWidget(self._toggle)
+
+        self._title = QLabel(format_thinking_header())
+        self._title.setObjectName("nccThinkingTitle")
+        self._title.setStyleSheet(
+            "QLabel#nccThinkingTitle {"
+            f"  font-weight: 600; font-size: {'11' if compact else '12'}px;"
+            "  color: palette(mid);"
+            "  padding: 0; margin: 0;"
+            "}"
+        )
+        header.addWidget(self._title, stretch=1)
+
+        copy_btn = QToolButton()
+        copy_btn.setAutoRaise(True)
+        copy_btn.setFixedSize(22, 22)
+        copy_btn.setToolTip("Copy thinking")
+        copy_btn.setStyleSheet(
+            "QToolButton { border: none; padding: 0; margin: 0; }"
+        )
+        icon = QIcon.fromTheme("edit-copy")
+        if not icon.isNull():
+            copy_btn.setIcon(icon)
+        else:
+            copy_btn.setText("⎘")
+        copy_btn.clicked.connect(self._copy)
+        header.addWidget(copy_btn)
+        layout.addLayout(header)
+
+        self._body = QTextBrowser()
+        self._body.setVisible(False)
+        self._body.setFixedHeight(0)
+        self._body.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        self._body.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._body.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._body.setStyleSheet(
+            "QTextBrowser {"
+            "  font-family: monospace; font-size: 11px;"
+            "  background: palette(base); color: palette(text);"
+            "  border: 1px solid palette(mid); border-radius: 4px;"
+            "  padding: 4px; margin: 0;"
+            "}"
+        )
+        layout.addWidget(self._body)
+        self.hide()
+
+    def clear(self) -> None:
+        self._text = ""
+        self._streaming = False
+        self._elapsed_s = None
+        self._toggle.setChecked(False)
+        self._body.clear()
+        self._body.setVisible(False)
+        self._body.setFixedHeight(0)
+        self._title.setText(format_thinking_header())
+        self.hide()
+
+    def append_text(self, piece: str) -> None:
+        if not piece:
+            return
+        self._text += piece
+        self._streaming = True
+        self.show()
+        self._title.setText(format_thinking_header(streaming=True))
+        if self._expand_while_streaming and not self._toggle.isChecked():
+            self._toggle.setChecked(True)
+        elif self._toggle.isChecked():
+            self._body.setPlainText(self._text)
+            self._fit_body_height()
+
+    def finish(self, *, seconds: float | None = None) -> None:
+        self._streaming = False
+        self._elapsed_s = seconds
+        if not self._text.strip():
+            self.clear()
+            return
+        self.show()
+        self._title.setText(
+            format_thinking_header(seconds=seconds, streaming=False)
+        )
+        # Collapse when turn finishes (unless user already expanded).
+        if self._toggle.isChecked() and not self._expand_while_streaming:
+            pass
+        else:
+            self._toggle.setChecked(False)
+        if self._toggle.isChecked():
+            self._body.setPlainText(self._text)
+            self._fit_body_height()
+
+    def collapse(self) -> None:
+        self._toggle.setChecked(False)
+
+    def text(self) -> str:
+        return self._text
+
+    def _on_toggle(self, checked: bool) -> None:
+        self._toggle.setText("▾" if checked else "▸")
+        if checked:
+            self._body.setVisible(True)
+            self._body.setPlainText(self._text)
+            self._fit_body_height()
+        else:
+            self._body.setVisible(False)
+            self._body.setFixedHeight(0)
+
+    def _fit_body_height(self) -> None:
+        doc = self._body.document()
+        width = self._body.viewport().width()
+        if width < 80:
+            width = max(self.width() - 24, 280)
+        doc.setTextWidth(float(width))
+        h = int(doc.size().height()) + 12
+        cap = 120 if self._compact else self._BODY_MAX
+        self._body.setFixedHeight(max(32, min(h, cap)))
+
+    def _copy(self) -> None:
+        from PySide6.QtGui import QGuiApplication
+
+        QGuiApplication.clipboard().setText(self._text)
+
+
 class ToolTraceWidget(QFrame):
     """Tool row — same chrome as chat Bubble (radius/margins/border/header)."""
 
@@ -48,10 +224,18 @@ class ToolTraceWidget(QFrame):
     _SPACING = 4
     _BODY_MAX = 160
 
-    def __init__(self, name: str, args: object, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        args: object,
+        parent: QWidget | None = None,
+        *,
+        compact: bool = False,
+    ) -> None:
         super().__init__(parent)
         self.setObjectName("nccToolTrace")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        self._compact = compact
         self.setStyleSheet(
             "QFrame#nccToolTrace {"
             "  background: palette(base);"
@@ -59,8 +243,9 @@ class ToolTraceWidget(QFrame):
             f"  border-radius: {self._RADIUS}px;"
             "}"
         )
+        margins = (8, 4, 8, 4) if compact else self._MARGINS
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(*self._MARGINS)
+        layout.setContentsMargins(*margins)
         layout.setSpacing(self._SPACING)
 
         header = QHBoxLayout()
@@ -83,11 +268,13 @@ class ToolTraceWidget(QFrame):
         self._name = name
         self._raw_args = args
         self._result = ""
-        self._title = QLabel(f"tool called: {name}")
+        self._ms: int | None = None
+        self._status = "…"
+        self._title = QLabel(format_tool_header(name, status=self._status))
         self._title.setObjectName("nccToolTraceTitle")
         self._title.setStyleSheet(
             "QLabel#nccToolTraceTitle {"
-            "  font-weight: 700; font-size: 12px;"
+            f"  font-weight: 700; font-size: {'11' if compact else '12'}px;"
             "  font-family: monospace;"
             "  color: palette(window-text); padding: 0; margin: 0;"
             "}"
@@ -132,6 +319,11 @@ class ToolTraceWidget(QFrame):
         )
         layout.addWidget(self._body)
 
+    def _sync_title(self) -> None:
+        self._title.setText(
+            format_tool_header(self._name, ms=self._ms, status=self._status)
+        )
+
     def _on_toggle(self, checked: bool) -> None:
         self._toggle.setText("▾" if checked else "▸")
         if checked:
@@ -152,7 +344,8 @@ class ToolTraceWidget(QFrame):
             width = max(self.width() - 24, 400)
         doc.setTextWidth(float(width))
         h = int(doc.size().height()) + 12
-        self._body.setFixedHeight(max(36, min(h, self._BODY_MAX)))
+        cap = 100 if self._compact else self._BODY_MAX
+        self._body.setFixedHeight(max(36, min(h, cap)))
 
     def _keep_in_view(self) -> None:
         """Keep this row visible when expanding — do not jump the feed to the bottom."""
@@ -165,10 +358,15 @@ class ToolTraceWidget(QFrame):
                 return
             w = w.parentWidget()
 
+    def set_duration_ms(self, ms: int) -> None:
+        self._ms = max(0, int(ms))
+        self._sync_title()
+
     def set_result(self, text: str) -> None:
         self._result = text
-        ok = "ok" if "error" not in text.lower()[:80] else "err"
-        self._title.setText(f"tool called: {self._name} → {ok}")
+        low = text.lower()[:80]
+        self._status = "✗" if ("error" in low or "failed" in low) else "✓"
+        self._sync_title()
         if self._toggle.isChecked():
             self._refresh()
 
@@ -285,6 +483,7 @@ class AgentWorker(QThread):
         dry_run: bool,
         profile: str,
         playbook: str | None = None,
+        harness: str | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -293,6 +492,7 @@ class AgentWorker(QThread):
         self._dry_run = dry_run
         self._profile = profile
         self._playbook = playbook
+        self._harness = harness
         self._cancelled = False
         self._runner = None
 
@@ -306,8 +506,24 @@ class AgentWorker(QThread):
             from .agent import AgentRunner, AgentSettings
             from .auth import with_cached_credentials
             from .config import Settings
+            from .harness import get_harness, looks_like_coding_goal, resolve_harness_name
 
             settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
+            mode = (self._harness or "auto").strip().lower()
+            force = mode if mode in ("native", "qwen", "dsh") else None
+            tags = ["coding"] if looks_like_coding_goal(self._goal) else []
+            hname = resolve_harness_name(tags=tags, force=force)
+            self.event.emit({"kind": "status", "text": f"Harness: {hname}"})
+
+            if hname != "native":
+                for ev in get_harness(hname).send(self._goal):
+                    if self._cancelled:
+                        self.event.emit({"kind": "cancelled"})
+                        break
+                    self.event.emit(ev)
+                self.finished_signal.emit()
+                return
+
             agent_settings = AgentSettings(
                 goal=self._goal,
                 max_steps=self._max_steps,
@@ -369,6 +585,24 @@ class AgentPage(QWidget):
         self.max_steps_spin.setValue(int(os.environ.get("AGENT_MAX_STEPS", "24")))
         form.addRow("Max steps", self.max_steps_spin)
 
+        self.harness_combo = QComboBox()
+        for key, label in (
+            ("auto", "auto"),
+            ("native", "native"),
+            ("qwen", "qwen"),
+            ("dsh", "dsh"),
+        ):
+            self.harness_combo.addItem(label, key)
+        try:
+            from .preferences import get_default_harness_mode
+
+            hi = self.harness_combo.findData(get_default_harness_mode())
+            if hi >= 0:
+                self.harness_combo.setCurrentIndex(hi)
+        except Exception:
+            pass
+        form.addRow("Harness", self.harness_combo)
+
         layout.addWidget(form_group)
 
         btn_row = QHBoxLayout()
@@ -420,16 +654,25 @@ class AgentPage(QWidget):
         self.run_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
         self.log.clear()
+        self._think_logged = False
         max_s = self.max_steps_spin.value()
         self.budget_label.setText(f"Steps: 0 / {max_s} · tokens: —")
         self.log.append(f"Starting agent: {goal}\n")
 
+        harness = str(self.harness_combo.currentData() or "auto")
+        try:
+            from .preferences import set_default_harness_mode
+
+            set_default_harness_mode(harness)
+        except Exception:
+            pass
         self._worker = AgentWorker(
             goal,
             max_steps=max_s,
             dry_run=self.dry_run_check.isChecked(),
             profile=self.profile_combo.currentText(),
             playbook=playbook,
+            harness=harness,
             parent=self,
         )
         self._worker.event.connect(self.on_event)
@@ -457,12 +700,31 @@ class AgentPage(QWidget):
         elif kind == "budget_exhausted":
             self.log.append(f"\n[Budget exhausted] {event.get('text', 'max steps')}")
             self.budget_label.setText(f"Steps: EXHAUSTED / {max_s}")
+        elif kind == "thinking_delta":
+            # Compact: one line, not full dump
+            if not getattr(self, "_think_logged", False):
+                self.log.append("▸ Thinking…")
+                self._think_logged = True
         elif kind == "tool":
-            self.log.append(f"▸ {event.get('name')} {event.get('args', '')}")
+            self._think_logged = False
+            name = event.get("name") or "tool"
+            self.log.append(f"▸ {name}")
         elif kind == "tool_result":
-            self.log.append(f"  ↳ {(event.get('text') or '')[:400]}")
+            body = (event.get("text") or "")[:120]
+            self.log.append(f"  ↳ {body}{'…' if len(event.get('text') or '') > 120 else ''}")
+        elif kind == "assistant_delta":
+            pass
         elif kind == "assistant":
+            self._think_logged = False
             self.log.append(f"Assistant: {(event.get('text') or '')[:500]}")
+        elif kind == "status":
+            text = event.get("text") or event.get("phase") or ""
+            if text:
+                self.log.append(f"· {text}")
+        elif kind == "run_spawn":
+            self.log.append(
+                f"▸ Subagent: {event.get('title') or event.get('name') or 'child'}"
+            )
         elif kind == "agent_finish":
             self.log.append(f"\n[Finish] success={event.get('success')} {event.get('summary')}")
         elif kind == "job_finished":
@@ -1447,6 +1709,46 @@ class SettingsPage(QWidget):
         self.presence_combo.currentTextChanged.connect(self._on_presence_changed)
         presence_layout.addRow("Status", self.presence_combo)
         layout.addWidget(presence_group)
+
+        # --- Trace UX ---
+        trace_group = QGroupBox("4b · Trace display")
+        trace_form = QFormLayout(trace_group)
+        self.density_combo = QComboBox()
+        self.density_combo.addItem("Comfortable", "comfortable")
+        self.density_combo.addItem("Compact", "compact")
+        try:
+            from .preferences import (
+                get_expand_thinking_while_streaming,
+                get_trace_density,
+                set_expand_thinking_while_streaming,
+                set_trace_density,
+            )
+
+            di = self.density_combo.findData(get_trace_density())
+            if di >= 0:
+                self.density_combo.setCurrentIndex(di)
+            self._expand_think_check = QCheckBox("Expand thinking while streaming")
+            self._expand_think_check.setChecked(get_expand_thinking_while_streaming())
+        except Exception:
+            set_trace_density = None  # type: ignore[assignment]
+            set_expand_thinking_while_streaming = None  # type: ignore[assignment]
+            self._expand_think_check = QCheckBox("Expand thinking while streaming")
+
+        def _on_density(_i: int = 0) -> None:
+            from .preferences import set_trace_density as _set
+
+            _set(str(self.density_combo.currentData() or "comfortable"))
+
+        def _on_expand(checked: bool) -> None:
+            from .preferences import set_expand_thinking_while_streaming as _set
+
+            _set(checked)
+
+        self.density_combo.currentIndexChanged.connect(_on_density)
+        self._expand_think_check.toggled.connect(_on_expand)
+        trace_form.addRow("Density", self.density_combo)
+        trace_form.addRow("", self._expand_think_check)
+        layout.addWidget(trace_group)
 
         host_group = QGroupBox("5 · Host profile")
         host_layout = QVBoxLayout(host_group)

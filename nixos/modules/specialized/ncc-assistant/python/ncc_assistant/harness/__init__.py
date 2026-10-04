@@ -5,6 +5,8 @@ from __future__ import annotations
 from .resolve import (
     CODING_TAGS,
     available_harnesses,
+    coding_harness_name,
+    default_harness_name,
     get_harness,
     looks_like_coding_goal,
     resolve_harness_name,
@@ -16,6 +18,8 @@ __all__ = [
     "HarnessBackend",
     "HarnessInfo",
     "available_harnesses",
+    "coding_harness_name",
+    "default_harness_name",
     "get_harness",
     "looks_like_coding_goal",
     "resolve_harness_name",
