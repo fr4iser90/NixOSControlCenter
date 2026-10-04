@@ -12,7 +12,7 @@ Cross-cutting human docs. Product pitch: [root README](../README.md).
 | Module docs | **only** `nixos/<module>/doc/` (+ root `README.md` stub) |
 | Forbidden | `ai/docs/`, root `cli.md` / loose manuals |
 | Gate | `tests/validate-docs-layout.sh` |
-| Rules | `.cursor/rules/ncc-docs-layout.mdc`, `docs/developing/docs-conventions.md` |
+| Rules | [AGENTS.md](../AGENTS.md), `docs/developing/docs-conventions.md` |
 
 ## Target tree
 
@@ -73,5 +73,5 @@ docs/
 |----------|---------|
 | `nixos/**/README.md` + `doc/` | Domain SSOT |
 | `gui-engine/doc/` | Page template, design, perf |
-| `.cursor/rules/ncc-*.mdc` | Discovery, migrations, gates |
+| `AGENTS.md` + `.agents/skills/` | Agent laws + workflows |
 | `tests/TESTING.md` | Repo tests vs host preflight |

@@ -1,7 +1,7 @@
 # Adding a new NCC module
 
 How to add a **feature** module under `nixos/modules/` (or a core domain under `nixos/core/`).  
-Laws live in `.cursor/rules/`; this page is the human checklist. Gates enforce the hard parts.
+Laws live in [AGENTS.md](../../AGENTS.md); this page is the human checklist. Gates enforce the hard parts.
 
 **Do not** maintain a separate `module-template/` tree — copy a small real module and follow this guide.
 
@@ -54,7 +54,7 @@ Modules under `nixos/modules/` are discovered by the tree; do **not** hardcode p
 
 **One docs home: `doc/`.** No `ai/docs/`, no root `cli.md`.  
 Assistant reads `doc/ai-*.md`. Tools stay in `ai/tools/`.  
-Law: `.cursor/rules/ncc-docs-layout.mdc` · Gate: `tests/validate-docs-layout.sh`.
+Law: [AGENTS.md](../../AGENTS.md) · Gate: `tests/validate-docs-layout.sh`.
 
 SSOT for AI packs: [`domain-ai-packs.md`](../../nixos/modules/specialized/ncc-assistant/doc/domain-ai-packs.md).
 
@@ -132,7 +132,7 @@ tui = (getModuleApi "tui-engine").fromConfig config;
 - `getModuleApi ? null` / `moduleName ? "desktop"` soft wiring
 - Relative `import` of another module’s tree under `nixos/modules/`
 
-Full law: [`.cursor/rules/ncc-module-discovery.mdc`](../../.cursor/rules/ncc-module-discovery.mdc).
+Full law: [AGENTS.md](../../AGENTS.md) · skill: [.agents/skills/ncc-module-work](../../.agents/skills/ncc-module-work/SKILL.md).
 
 Prefer `imports = [ ./commands.nix ];` so flake `specialArgs` inject helpers.  
 Never `(import ./commands.nix { inherit … })` — drops helpers.
@@ -228,7 +228,7 @@ Bump `_version` / metadata `version` **and** add `<module>/migrations/vFROM-to-v
 }
 ```
 
-Details: [`.cursor/rules/ncc-module-migrations.mdc`](../../.cursor/rules/ncc-module-migrations.mdc).  
+Details: [AGENTS.md](../../AGENTS.md) · [.agents/skills/ncc-module-work](../../.agents/skills/ncc-module-work/SKILL.md).  
 Gate: `tests/validate-module-migrations.sh` (via `validate-ncc-nix.sh`).
 
 ---
@@ -257,4 +257,4 @@ Do **not** tell anyone to `ncc system-update` until step 8 is green in this turn
 | Domain AI packs | `nixos/modules/specialized/ncc-assistant/doc/domain-ai-packs.md` |
 | Product overview | [`../../README.md`](../../README.md) |
 | Install bootstrap | [`../install.md`](../install.md) |
-| Agent rules | `.cursor/rules/ncc-*.mdc` |
+| Agent entry | [`AGENTS.md`](../../AGENTS.md) + `.agents/skills/` |

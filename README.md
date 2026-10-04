@@ -41,6 +41,8 @@ See [`docs/install.md`](docs/install.md).
 
 | Doc | |
 |-----|--|
+| [AGENTS.md](AGENTS.md) | Agent entry (any tool — laws, gates, skills) |
+| [.agents/skills/](.agents/skills/) | Portable agent workflow skills |
 | [docs/README.md](docs/README.md) | Index + layout rules |
 | [docs/features.md](docs/features.md) | Feature status |
 | [docs/domains.md](docs/domains.md) | Domains ↔ modules |

@@ -309,7 +309,7 @@ fi
 
 echo "=== module-migrations summary ==="
 if [[ "$FAIL" -ne 0 ]]; then
-  echo "FAILED — see .cursor/rules/ncc-module-migrations.mdc"
+  echo "FAILED — see AGENTS.md + .agents/skills/ncc-module-work/SKILL.md"
   exit 1
 fi
 echo "OK — migration auto-detect gate green."

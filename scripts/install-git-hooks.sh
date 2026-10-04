@@ -3,7 +3,6 @@
 # Idempotent. No Node/lefthook — plain Git.
 #
 # Called automatically from:
-#   - .cursor/hooks (sessionStart)
 #   - tests/run-gates.sh (self-heal)
 # Manual: bash scripts/install-git-hooks.sh
 set -euo pipefail
