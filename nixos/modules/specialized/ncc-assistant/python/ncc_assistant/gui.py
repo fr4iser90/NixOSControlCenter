@@ -841,6 +841,7 @@ class ChatPage(QWidget):
 
         self._worker: ChatWorker | None = None
         self._last_user = ""
+        self._can_retry = False
         self._busy = False
         self._pending_images: list[dict[str, str]] = []
         self._status_bubble: Bubble | None = None
@@ -1016,6 +1017,13 @@ class ChatPage(QWidget):
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self.on_stop)
         row.addWidget(self.stop_btn)
+
+        self.retry_btn = QPushButton("Retry")
+        self.retry_btn.setToolTip("Resend the last message after an error")
+        self.retry_btn.setFixedSize(90, 90)
+        self.retry_btn.clicked.connect(self.on_retry)
+        self.retry_btn.setEnabled(False)
+        row.addWidget(self.retry_btn)
 
         self.send_btn = QPushButton("Send")
         self.send_btn.setFixedSize(100, 90)
@@ -1572,9 +1580,14 @@ class ChatPage(QWidget):
         self.provider_add_btn.setEnabled(not busy)
         self.provider_edit_btn.setEnabled(not busy)
         self.stop_btn.setEnabled(busy)
-        if not busy:
+        if busy:
+            self.retry_btn.setEnabled(False)
+        elif not busy:
             self._set_activity(None)
             self._stream_bubble = None
+            # Keep retry enabled only after an error (set in on_fail / error event).
+            if not getattr(self, "_can_retry", False):
+                self.retry_btn.setEnabled(False)
 
     def _refresh_attach_label(self) -> None:
         n = len(self._pending_images)
@@ -1801,6 +1814,37 @@ class ChatPage(QWidget):
         self.session.request_cancel()
         self.status.setText("Cancelling...")
 
+    def _arm_retry(self, enabled: bool = True) -> None:
+        self._can_retry = bool(enabled) and bool(self._last_user)
+        self.retry_btn.setEnabled(self._can_retry and not self._busy)
+
+    @Slot()
+    def on_retry(self) -> None:
+        """Resend last prompt after error without duplicating a You bubble."""
+        if self._busy:
+            return
+        text = (self._last_user or "").strip()
+        if not text:
+            return
+        # Orphan user row left by a non-LLMError path — drop before resend.
+        msgs = self.session.messages
+        if msgs and msgs[-1].get("role") == "user":
+            content = msgs[-1].get("content")
+            if content == text or (
+                isinstance(content, str) and content.strip() == text
+            ):
+                msgs.pop()
+        self._can_retry = False
+        self.retry_btn.setEnabled(False)
+        self._stick_bottom = True
+        self._set_busy(True)
+        self._set_activity(f"Retrying with {self.session.model_label}")
+        self._worker = ChatWorker(self.session, text, [], self)
+        self._worker.event.connect(self.on_event)
+        self._worker.failed.connect(self.on_fail)
+        self._worker.finished.connect(self._on_worker_finished)
+        self._worker.start()
+
     @Slot()
     def on_send(self) -> None:
         if self._busy:
@@ -1817,6 +1861,7 @@ class ChatPage(QWidget):
             )
             return
         self._last_user = text
+        self._can_retry = False
         self.composer.clear()
         self._pending_images.clear()
         self._refresh_attach_label()
@@ -1964,6 +2009,7 @@ class ChatPage(QWidget):
             self._discard_empty_stream_bubble()
             self._stream_bubble = None
             self._add_bubble("Error", event.get("text") or "")
+            self._arm_retry(True)
             self._maybe_reauth(str(event.get("text") or ""))
             self._maybe_refresh_transcript()
         elif kind == "run_spawn":
@@ -2001,10 +2047,13 @@ class ChatPage(QWidget):
     def on_fail(self, message: str) -> None:
         self._set_activity(None)
         self._add_bubble("Error", message)
+        self._arm_retry(True)
 
     @Slot()
     def _on_worker_finished(self) -> None:
         self._set_busy(False)
+        if getattr(self, "_can_retry", False):
+            self.retry_btn.setEnabled(True)
         self.composer.setFocus()
 
 

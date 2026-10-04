@@ -21,12 +21,14 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import (
     QColor,
+    QCursor,
     QFont,
     QIcon,
     QKeySequence,
     QMouseEvent,
     QPainter,
     QPainterPath,
+    QPalette,
     QPen,
     QShortcut,
 )
@@ -104,6 +106,34 @@ def _start_system_move(widget: QWidget) -> bool:
         return bool(handle.startSystemMove())
     except Exception:
         return False
+
+
+class ResizeCorner(QSizeGrip):
+    """Visible bottom-right resize affordance (plain QSizeGrip is invisible on glass)."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("nccResizeGrip")
+        self.setFixedSize(22, 22)
+        self.setToolTip("Drag corner to resize")
+        self.setCursor(QCursor(Qt.CursorShape.SizeFDiagCursor))
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        del event
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        accent = self.palette().color(QPalette.ColorRole.Highlight)
+        muted = self.palette().color(QPalette.ColorRole.Mid)
+        bg = QColor(accent)
+        bg.setAlpha(40)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(bg)
+        p.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 5, 5)
+        p.setPen(QPen(accent if accent.isValid() else muted, 2.0))
+        w, h = self.width(), self.height()
+        for offset in (5, 10, 15):
+            p.drawLine(w - 4, h - offset, w - offset, h - 4)
+        p.end()
 
 
 class _CompanionChatWorker(QThread):
@@ -754,6 +784,11 @@ class CompanionWindow(QWidget):
         self.input.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.input.returnPressed.connect(self._send)
         row.addWidget(self.input, stretch=1)
+        self.retry_btn = QPushButton("Retry")
+        self.retry_btn.setToolTip("Resend the last message after an error")
+        self.retry_btn.clicked.connect(self._retry)
+        self.retry_btn.hide()
+        row.addWidget(self.retry_btn)
         self.send_btn = QPushButton("Send")
         self.send_btn.setDefault(True)
         self.send_btn.clicked.connect(self._send)
@@ -779,11 +814,11 @@ class CompanionWindow(QWidget):
         glass.addWidget(self.stack)
 
         tip_row = QHBoxLayout()
-        tip = QLabel("Drag avatar · resize corner · Esc")
+        tip = QLabel("Drag avatar · Esc · ↘ corner resize")
         tip.setObjectName("nccMuted")
         tip_row.addWidget(tip, stretch=1)
-        grip = QSizeGrip(self.panel)
-        tip_row.addWidget(grip, alignment=Qt.AlignmentFlag.AlignRight)
+        self.resize_grip = ResizeCorner(self.panel)
+        tip_row.addWidget(self.resize_grip, alignment=Qt.AlignmentFlag.AlignRight)
         glass.addLayout(tip_row)
 
         root.addWidget(self.panel, stretch=1)
@@ -1179,6 +1214,13 @@ class CompanionWindow(QWidget):
         self.activity_lbl.setText(slot.activity)
         self.avatar.set_state(slot.avatar_state)
         self.send_btn.setEnabled(not slot.busy)
+        can_retry = (
+            not slot.busy
+            and bool(slot.last_error)
+            and bool((slot.user_prompt or "").strip())
+        )
+        self.retry_btn.setVisible(can_retry)
+        self.retry_btn.setEnabled(can_retry)
         self.input.setEnabled(True)  # always allow typing / queue feel
         self._sync_harness_chip(slot)
         self._update_breadcrumb(slot)
@@ -1319,6 +1361,17 @@ class CompanionWindow(QWidget):
         self._slots.append(child)
         return child
 
+    def _retry(self) -> None:
+        """Resend last user prompt after an error (does not re-append failed turn)."""
+        slot = self._slot()
+        if slot.busy:
+            return
+        text = (slot.user_prompt or "").strip()
+        if not text or not slot.last_error:
+            return
+        self.input.setText(text)
+        self._send()
+
     def _send(self) -> None:
         text = self.input.text().strip()
         if not text:
@@ -1378,19 +1431,17 @@ class CompanionWindow(QWidget):
         slot.busy = False
         slot.worker = None
         slot.activity = ""
-        # Multi-turn history for next harness prompt
-        if slot.user_prompt and not slot.user_prompt.startswith("[template]"):
-            slot.history = list(slot.history or [])
-            slot.history.append({"role": "user", "content": slot.user_prompt})
-        elif slot.user_prompt:
-            slot.history = list(slot.history or [])
-            slot.history.append({"role": "user", "content": slot.user_prompt})
-        if slot.reply_buf.strip():
-            slot.history = list(slot.history or [])
-            slot.history.append(
-                {"role": "assistant", "content": slot.reply_buf.strip()[-4000:]}
-            )
-        slot.history = (slot.history or [])[-40:]
+        # Failed turns stay out of history so Retry can resend cleanly.
+        if not slot.last_error:
+            if slot.user_prompt:
+                slot.history = list(slot.history or [])
+                slot.history.append({"role": "user", "content": slot.user_prompt})
+            if slot.reply_buf.strip():
+                slot.history = list(slot.history or [])
+                slot.history.append(
+                    {"role": "assistant", "content": slot.reply_buf.strip()[-4000:]}
+                )
+            slot.history = (slot.history or [])[-40:]
         if slot.thinking_buf.strip() and slot_id == self._active_id:
             self.think_block.finish()
             self.think_block.collapse()
@@ -1582,7 +1633,9 @@ class CompanionWindow(QWidget):
                 row.setData(Qt.ItemDataRole.UserRole, ("tool_toggle", t.name))
                 self.panel_list.addItem(row)
         elif key == PANEL_MCP:
-            self.panel_title.setText("MCP marketplace — install / toggle / remove")
+            self.panel_title.setText(
+                "MCP — NCC inject · client servers · install catalog"
+            )
             try:
                 from .marketplace import (
                     installed_mcp_names,
@@ -1596,30 +1649,54 @@ class CompanionWindow(QWidget):
             except Exception as exc:  # noqa: BLE001
                 self.panel_list.addItem(f"(error: {exc})")
                 return
-            inj = QListWidgetItem("⚡ Inject NCC → qwen/dsh settings")
+            # Layer A: expose NCC tools INTO external harnesses
+            self.panel_list.addItem(QListWidgetItem("— Harness (qwen/dsh) —"))
+            inj = QListWidgetItem("⚡ Inject NCC MCP into qwen/dsh")
+            inj.setToolTip(
+                "Writes ncc-assistant-mcp into ~/.qwen/settings.json / dsh MCP "
+                "config so coding harnesses can call NCC tools. "
+                "This is NOT the marketplace catalog below."
+            )
             inj.setData(Qt.ItemDataRole.UserRole, ("mcp_inject", ""))
             self.panel_list.addItem(inj)
-            self.panel_list.addItem(QListWidgetItem("— Installed —"))
+            # Layer B: MCP servers NCC itself connects to as a client
+            self.panel_list.addItem(
+                QListWidgetItem("— Installed (NCC client) —")
+            )
             if not installed:
-                self.panel_list.addItem("(none installed)")
+                self.panel_list.addItem("(none — install from Catalog)")
             for entry in installed:
-                en = "✓" if entry.get("enabled", True) else "○"
-                row = QListWidgetItem(f"{en} {entry['name']}  [toggle]")
-                row.setToolTip(entry.get("command") or "")
+                on = bool(entry.get("enabled", True))
+                en = "ON" if on else "OFF"
+                row = QListWidgetItem(f"● {entry['name']}  ·  {en} · tap toggle")
+                row.setToolTip(
+                    f"{'Enabled' if on else 'Disabled'} in "
+                    f"~/.config/ncc-assistant/mcp-servers.json\n"
+                    f"{entry.get('command') or ''}\n"
+                    "Tap to enable/disable. Separate row removes the entry."
+                )
                 row.setData(
                     Qt.ItemDataRole.UserRole, ("mcp_toggle", entry["name"])
                 )
                 self.panel_list.addItem(row)
-                rm = QListWidgetItem(f"    🗑 remove {entry['name']}")
+                rm = QListWidgetItem(f"    🗑 Remove {entry['name']}")
+                rm.setToolTip("Delete this server from mcp-servers.json")
                 rm.setData(
                     Qt.ItemDataRole.UserRole, ("mcp_remove", entry["name"])
                 )
                 self.panel_list.addItem(rm)
-            self.panel_list.addItem(QListWidgetItem("— Catalog —"))
+            self.panel_list.addItem(
+                QListWidgetItem("— Catalog (templates/mcp) —")
+            )
             for tmpl in catalog:
-                mark = "✓" if tmpl.name in have else "+"
-                row = QListWidgetItem(f"{mark} {tmpl.name}  ·  {tmpl.risk or 'read'}")
-                row.setToolTip(getattr(tmpl, "description", "") or tmpl.name)
+                mark = "✓ installed" if tmpl.name in have else "+ install"
+                row = QListWidgetItem(
+                    f"{mark}  {tmpl.name}  ·  {tmpl.risk or 'read'}"
+                )
+                tip = getattr(tmpl, "description", "") or tmpl.name
+                if getattr(tmpl, "install_hint", None):
+                    tip = f"{tip}\n{tmpl.install_hint}"
+                row.setToolTip(tip)
                 if tmpl.name in have:
                     row.setData(Qt.ItemDataRole.UserRole, ("mcp_toggle", tmpl.name))
                 else:
@@ -1809,6 +1886,8 @@ class CompanionWindow(QWidget):
             ws_ids = [w.id for w in list_workspaces()]
         except Exception:
             pass
+        from .templates_ui import FrequencyPicker, TimezonePicker
+
         for p in tmpl.params:
             if p.type in ("workspaceList", "workspace"):
                 combo = QComboBox()
@@ -1833,6 +1912,18 @@ class CompanionWindow(QWidget):
                         combo.setCurrentIndex(i)
                 form.addRow(p.label + (" *" if p.required else ""), combo)
                 widgets[p.id] = combo
+            elif p.type == "cronOrInterval":
+                picker = FrequencyPicker(
+                    default=str(seed.get(p.id) or p.default or "daily")
+                )
+                form.addRow(p.label + (" *" if p.required else ""), picker)
+                widgets[p.id] = picker
+            elif p.type == "timezone":
+                tz = TimezonePicker(
+                    default=str(seed.get(p.id) or p.default or "Europe/Berlin")
+                )
+                form.addRow(p.label + (" *" if p.required else ""), tz)
+                widgets[p.id] = tz
             else:
                 edit = QLineEdit(str(seed.get(p.id) or p.default or ""))
                 form.addRow(p.label + (" *" if p.required else ""), edit)
@@ -1848,7 +1939,11 @@ class CompanionWindow(QWidget):
         out: dict[str, Any] = dict(seed)
         for p in tmpl.params:
             w = widgets.get(p.id)
-            if isinstance(w, QComboBox):
+            if isinstance(w, FrequencyPicker):
+                out[p.id] = w.on_calendar()
+            elif isinstance(w, TimezonePicker):
+                out[p.id] = w.currentText().strip()
+            elif isinstance(w, QComboBox):
                 val = w.currentData()
                 if p.type == "workspaceList":
                     out[p.id] = [val] if val else []

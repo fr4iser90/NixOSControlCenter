@@ -9,6 +9,23 @@ from typing import Any
 from .paths import companion_store_file
 
 
+def record_has_content(rec: dict[str, Any]) -> bool:
+    """True once the user actually started a turn (skip empty 'New chat' shells)."""
+    if not isinstance(rec, dict):
+        return False
+    hist = rec.get("history") or []
+    if isinstance(hist, list) and len(hist) > 0:
+        return True
+    if str(rec.get("user_prompt") or "").strip():
+        return True
+    if str(rec.get("reply_buf") or "").strip():
+        return True
+    if str(rec.get("thinking_buf") or "").strip():
+        return True
+    traces = rec.get("tool_traces") or []
+    return isinstance(traces, list) and len(traces) > 0
+
+
 def load_companion_chats() -> list[dict[str, Any]]:
     path = companion_store_file()
     if not path.is_file():
@@ -22,13 +39,18 @@ def load_companion_chats() -> list[dict[str, Any]]:
     chats = data.get("chats")
     if not isinstance(chats, list):
         return []
-    return [c for c in chats if isinstance(c, dict) and c.get("id")]
+    return [
+        c
+        for c in chats
+        if isinstance(c, dict) and c.get("id") and record_has_content(c)
+    ]
 
 
 def save_companion_chats(chats: list[dict[str, Any]]) -> None:
     path = companion_store_file()
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"version": 1, "chats": chats}
+    kept = [c for c in chats if record_has_content(c)]
+    payload = {"version": 1, "chats": kept}
     path.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",

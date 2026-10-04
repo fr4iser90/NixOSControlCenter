@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from typing import Any, Iterator
 
 import httpx
@@ -27,6 +28,40 @@ class LLMError(RuntimeError):
 
 class CancelledError(LLMError):
     pass
+
+
+def _request_timeout() -> httpx.Timeout:
+    """User-pref wall clock for chat/completions (connect capped at 30s)."""
+    try:
+        from .preferences import get_llm_timeout_sec
+
+        total = float(get_llm_timeout_sec())
+    except Exception:
+        total = 300.0
+    return httpx.Timeout(total, connect=min(30.0, total))
+
+
+def _max_attempts() -> int:
+    try:
+        from .preferences import get_llm_retries
+
+        return 1 + max(0, int(get_llm_retries()))
+    except Exception:
+        return 2
+
+
+def _is_transient_llm_error(exc: BaseException) -> bool:
+    if isinstance(exc, (httpx.TimeoutException, httpx.TransportError)):
+        return True
+    if isinstance(exc, LLMError):
+        if exc.status_code in (408, 429, 500, 502, 503, 504):
+            return True
+        low = str(exc).lower()
+        return any(
+            t in low
+            for t in ("timeout", "timed out", "temporarily", "rate limit", "503", "502")
+        )
+    return False
 
 
 def is_auth_failure_message(message: str) -> bool:
@@ -247,21 +282,49 @@ def iter_chat_completion(
         yield {"type": "done", "message": reply}
         return
 
-    try:
-        yield from _openai_stream(settings, messages, tools, cancel_event)
-        return
-    except CancelledError:
-        raise
-    except LLMError as exc:
-        if cancel_event and cancel_event.is_set():
-            raise CancelledError("cancelled") from exc
-        if not _stream_rejected(exc):
+    attempts = _max_attempts()
+    stream_rejected = False
+    for attempt in range(attempts):
+        emitted = False
+        try:
+            for ev in _openai_stream(settings, messages, tools, cancel_event):
+                emitted = True
+                yield ev
+            return
+        except CancelledError:
+            raise
+        except LLMError as exc:
+            if cancel_event and cancel_event.is_set():
+                raise CancelledError("cancelled") from exc
+            if emitted:
+                raise
+            if _stream_rejected(exc):
+                stream_rejected = True
+                break
+            if _is_transient_llm_error(exc) and attempt + 1 < attempts:
+                time.sleep(min(2.0, 0.4 * (attempt + 1)))
+                continue
             raise
 
-    reply = _openai_compatible(settings, messages, tools)
-    if reply.get("content"):
-        yield {"type": "delta", "text": reply["content"]}
-    yield {"type": "done", "message": reply}
+    # Non-streaming fallback (gateway rejected SSE) — also honor retries.
+    last_exc: BaseException | None = None
+    for attempt in range(attempts if stream_rejected else 1):
+        try:
+            reply = _openai_compatible(settings, messages, tools)
+            if reply.get("content"):
+                yield {"type": "delta", "text": reply["content"]}
+            yield {"type": "done", "message": reply}
+            return
+        except CancelledError:
+            raise
+        except LLMError as exc:
+            last_exc = exc
+            if _is_transient_llm_error(exc) and attempt + 1 < attempts:
+                time.sleep(min(2.0, 0.4 * (attempt + 1)))
+                continue
+            raise
+    if last_exc is not None:
+        raise last_exc
 
 
 def _stream_rejected(exc: LLMError) -> bool:
@@ -322,7 +385,7 @@ def _openai_compatible(
     url = f"{settings.endpoint}/chat/completions"
     headers = {"Content-Type": "application/json", **_auth_headers(settings)}
 
-    with httpx.Client(timeout=300.0) as client:
+    with httpx.Client(timeout=_request_timeout()) as client:
         model = resolve_model(settings, client)
         payload = _openai_payload(settings, model, messages, tools, stream=False)
         resp = client.post(url, headers=headers, json=payload)
@@ -381,7 +444,7 @@ def _openai_stream(
     tool_acc: dict[int, dict[str, Any]] = {}
     model_name = settings.model or ""
 
-    with httpx.Client(timeout=httpx.Timeout(300.0, connect=30.0)) as client:
+    with httpx.Client(timeout=_request_timeout()) as client:
         model_name = resolve_model(settings, client)
         payload = _openai_payload(settings, model_name, messages, tools, stream=True)
         with client.stream("POST", url, headers=headers, json=payload) as resp:

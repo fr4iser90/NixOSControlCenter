@@ -117,6 +117,46 @@ def set_active_workspace_id(workspace_id: str | None) -> None:
         save_preferences({"active_workspace_id": ""})
 
 
+DEFAULT_LLM_TIMEOUT_SEC = 300
+DEFAULT_LLM_RETRIES = 1
+
+
+def get_llm_timeout_sec() -> int:
+    """Wall-clock HTTP timeout for chat/completions (seconds)."""
+    raw = load_preferences().get("llm_timeout_sec", DEFAULT_LLM_TIMEOUT_SEC)
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_LLM_TIMEOUT_SEC
+    return max(30, min(n, 3600))
+
+
+def set_llm_timeout_sec(sec: int) -> None:
+    try:
+        n = int(sec)
+    except (TypeError, ValueError):
+        return
+    save_preferences({"llm_timeout_sec": max(30, min(n, 3600))})
+
+
+def get_llm_retries() -> int:
+    """Extra attempts after a transient failure (0 = try once)."""
+    raw = load_preferences().get("llm_retries", DEFAULT_LLM_RETRIES)
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_LLM_RETRIES
+    return max(0, min(n, 5))
+
+
+def set_llm_retries(retries: int) -> None:
+    try:
+        n = int(retries)
+    except (TypeError, ValueError):
+        return
+    save_preferences({"llm_retries": max(0, min(n, 5))})
+
+
 def apply_startup_preferences(settings: Any) -> Any:
     """Apply last provider / model from preferences (Nix model env wins if set)."""
     from dataclasses import replace

@@ -75,7 +75,7 @@ ncc ai gui
 ncc ai chat     # terminal fallback
 ncc ai companion   # desktop avatar + multi-chat (always-on-top)
 # or: ncc-assistant-companion
-# Sessions ▾ (F2 rename, Move to workspace) persisted in ~/.config/ncc-assistant/companion-chats.json
+# Sessions ▾ (F2 rename, Move to workspace) → companion-chats.json (empty 0-msg chats skipped)
 # Resize · workspace/harness chips · MCP marketplace · templates with param dialog
 # More → Theme (Dark/Midnight/Light) · avatar skin · inject NCC MCP into qwen/dsh
 # Thinking/tools collapsed; multi-turn history folded into harness prompts.
@@ -87,6 +87,11 @@ ncc ai agent run --verbose --goal "…"   # full thinking/tool dumps
 ```
 
 Tabs: **Chat**, **Agent**, **Templates**, **Tools**, **Jobs**, **Schedules**, **Settings**.
+
+**Retry / timeouts:** Chat and Companion show **Retry** after an error (resends the
+last user message). Settings → **4c · LLM request**: HTTP timeout (default 300s)
+and auto-retries on transient failures before the first streamed token
+(`preferences.json`: `llm_timeout_sec`, `llm_retries`).
 
 **Companion:** frameless overlay — drag avatar to move, resize via corner grip,
 session picker (grouped by workspace), template/tool/MCP/workspace icons.
@@ -106,9 +111,11 @@ Aliases: `cautious` → config-writer, `autonomous` → ops
 ## Templates / secrets / workspaces
 
 Workflow cards (AGENTS.md maintainer, skills maintainer, GitHub code review, …)
-live under the **Templates** tab. Configure → named instance + optional schedule.
-Secrets and workspaces are managed in **Settings** (or CLI). Never put tokens in
-`systemConfig`.
+live under the **Templates** tab. **Run once** = params + immediate run (no timer).
+**⚙ Configure** = save instance + optional recurring schedule. Frequency uses
+enums: Simple / Daily at time / Weekly / Cron field pickers (Advanced raw
+OnCalendar only when needed). Secrets and workspaces are in **Settings** (or CLI).
+Never put tokens in `systemConfig`.
 
 ```bash
 # Named secrets (0600 under ~/.config/ncc-assistant/secrets.json)
@@ -194,7 +201,18 @@ ncc-assistant red-team
 ncc-assistant serve-openapi --port 8765
 ```
 
-## MCP
+## MCP (three layers — easy to confuse)
+
+| Layer | Direction | Where | Companion UI |
+|-------|-----------|--------|--------------|
+| **NCC MCP server** | NCC → Cursor / Claude / qwen / dsh | `ncc-assistant-mcp` | **Inject NCC MCP into qwen/dsh** |
+| **Marketplace / client MCPs** | External servers → NCC (client) | `~/.config/ncc-assistant/mcp-servers.json` | **Installed** + **Catalog** |
+| **Harness-native MCPs** | Whatever qwen/dsh already have | `~/.qwen/settings.json` etc. | Not listed here (only NCC inject) |
+
+**Catalog** ships templates under `templates/mcp/` (`git`, `github`, `filesystem`, `fetch`).
+Install copies into `mcp-servers.json`. **Toggle** = enable/disable that entry;
+**Remove** = delete it. Names like `git-aboutME` are *your* installed server ids
+(not the catalog template name).
 
 ```bash
 ncc ai mcp

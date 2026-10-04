@@ -1008,8 +1008,12 @@ class ScheduleEditDialog(QDialog):
         self.desc_edit = QLineEdit(spec.description if spec else "")
         form.addRow("Description", self.desc_edit)
 
-        self.cal_edit = QLineEdit(spec.onCalendar if spec else "*-*-* 03:15:00")
-        form.addRow("OnCalendar", self.cal_edit)
+        from .templates_ui import FrequencyPicker
+
+        self.cal_picker = FrequencyPicker(
+            default=(spec.onCalendar if spec else "*-*-* 03:15:00")
+        )
+        form.addRow("Schedule", self.cal_picker)
 
         self.kind_combo = QComboBox()
         self.kind_combo.addItems(["agent", "probe"])
@@ -1094,7 +1098,7 @@ class ScheduleEditDialog(QDialog):
         return ScheduleSpec(
             name=self.name_edit.text().strip(),
             description=self.desc_edit.text().strip(),
-            onCalendar=self.cal_edit.text().strip() or "daily",
+            onCalendar=self.cal_picker.on_calendar() or "daily",
             playbook=pb if kind == "agent" else None,
             goal=goal if kind == "agent" else None,
             profile=self.profile_combo.currentText(),
@@ -1749,6 +1753,59 @@ class SettingsPage(QWidget):
         trace_form.addRow("Density", self.density_combo)
         trace_form.addRow("", self._expand_think_check)
         layout.addWidget(trace_group)
+
+        # --- LLM request reliability ---
+        llm_net = QGroupBox("4c · LLM request (timeout / retry)")
+        llm_form = QFormLayout(llm_net)
+        self.timeout_spin = QSpinBox()
+        self.timeout_spin.setRange(30, 3600)
+        self.timeout_spin.setSuffix(" s")
+        self.timeout_spin.setToolTip(
+            "Wall-clock timeout for chat/completions HTTP calls"
+        )
+        self.retries_spin = QSpinBox()
+        self.retries_spin.setRange(0, 5)
+        self.retries_spin.setToolTip(
+            "Extra attempts after transient errors (timeout / 429 / 5xx). "
+            "0 = try once only."
+        )
+        try:
+            from .preferences import (
+                get_llm_retries,
+                get_llm_timeout_sec,
+                set_llm_retries,
+                set_llm_timeout_sec,
+            )
+
+            self.timeout_spin.setValue(get_llm_timeout_sec())
+            self.retries_spin.setValue(get_llm_retries())
+        except Exception:
+            self.timeout_spin.setValue(300)
+            self.retries_spin.setValue(1)
+
+        def _on_timeout(v: int) -> None:
+            from .preferences import set_llm_timeout_sec as _set
+
+            _set(v)
+
+        def _on_retries(v: int) -> None:
+            from .preferences import set_llm_retries as _set
+
+            _set(v)
+
+        self.timeout_spin.valueChanged.connect(_on_timeout)
+        self.retries_spin.valueChanged.connect(_on_retries)
+        llm_form.addRow("HTTP timeout", self.timeout_spin)
+        llm_form.addRow("Auto-retries", self.retries_spin)
+        llm_hint = QLabel(
+            "Applies to native chat/agent LLM calls. Companion Retry button "
+            "resends the last user message after an error. Auto-retries only "
+            "run when no tokens were streamed yet."
+        )
+        llm_hint.setWordWrap(True)
+        llm_hint.setStyleSheet("color: palette(placeholder-text);")
+        llm_form.addRow(llm_hint)
+        layout.addWidget(llm_net)
 
         host_group = QGroupBox("5 · Host profile")
         host_layout = QVBoxLayout(host_group)

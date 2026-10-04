@@ -28,14 +28,30 @@ from PySide6.QtWidgets import (
 
 
 class FrequencyPicker(QWidget):
-    """Preset / daily-at / weekly-at / custom OnCalendar picker."""
+    """Schedule picker: mode enum → Simple / Daily / Weekly / Cron fields / Advanced."""
 
     def __init__(self, parent: QWidget | None = None, *, default: str = "daily") -> None:
         super().__init__(parent)
-        from .schedule_freq import FREQUENCY_PRESETS, WEEKDAYS
+        from .schedule_freq import (
+            CRON_DOM,
+            CRON_DOW,
+            CRON_HOURS,
+            CRON_MINUTES,
+            CRON_MONTH,
+            FREQUENCY_PRESETS,
+            SCHEDULE_MODES,
+            WEEKDAYS,
+            parse_stored_frequency,
+        )
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+
+        self.mode = QComboBox()
+        for key, label in SCHEDULE_MODES:
+            self.mode.addItem(label, key)
+        lay.addWidget(self.mode)
 
         self.preset = QComboBox()
         for key, label, _tmpl in FREQUENCY_PRESETS:
@@ -45,20 +61,75 @@ class FrequencyPicker(QWidget):
         self.time_row = QWidget()
         tr = QHBoxLayout(self.time_row)
         tr.setContentsMargins(0, 0, 0, 0)
+        tr.setSpacing(6)
         self.weekday = QComboBox()
         for key, label in WEEKDAYS:
             self.weekday.addItem(label, key)
-        tr.addWidget(self.weekday)
+        self.weekday.setToolTip("Weekday (local calendar)")
+        wd_box = QVBoxLayout()
+        wd_box.setContentsMargins(0, 0, 0, 0)
+        wd_box.setSpacing(0)
+        wd_tag = QLabel("Weekday")
+        wd_tag.setStyleSheet("color: palette(placeholder-text); font-size: 10px;")
+        wd_box.addWidget(wd_tag)
+        wd_box.addWidget(self.weekday)
+        wd_wrap = QWidget()
+        wd_wrap.setLayout(wd_box)
+        tr.addWidget(wd_wrap, stretch=1)
         self.time_edit = QTimeEdit()
         self.time_edit.setDisplayFormat("HH:mm")
-        self.time_edit.setTime(QTime(3, 15))
-        tr.addWidget(self.time_edit)
+        self.time_edit.setTime(QTime(8, 30))
+        self.time_edit.setToolTip("Clock time — uses this machine's local system time")
+        tm_box = QVBoxLayout()
+        tm_box.setContentsMargins(0, 0, 0, 0)
+        tm_box.setSpacing(0)
+        tm_tag = QLabel("Time (local)")
+        tm_tag.setStyleSheet("color: palette(placeholder-text); font-size: 10px;")
+        tm_box.addWidget(tm_tag)
+        tm_box.addWidget(self.time_edit)
+        tm_wrap = QWidget()
+        tm_wrap.setLayout(tm_box)
+        tr.addWidget(tm_wrap)
         lay.addWidget(self.time_row)
 
+        self.cron_row = QWidget()
+        cr = QHBoxLayout(self.cron_row)
+        cr.setContentsMargins(0, 0, 0, 0)
+        cr.setSpacing(4)
+
+        def _cron_combo(items: list[tuple[str, str]], tip: str) -> QComboBox:
+            c = QComboBox()
+            c.setToolTip(tip)
+            for val, label in items:
+                c.addItem(label, val)
+            return c
+
+        self.cron_min = _cron_combo(CRON_MINUTES, "Minute")
+        self.cron_hour = _cron_combo(CRON_HOURS, "Hour")
+        self.cron_dom = _cron_combo(CRON_DOM, "Day of month")
+        self.cron_month = _cron_combo(CRON_MONTH, "Month")
+        self.cron_dow = _cron_combo(CRON_DOW, "Day of week")
+        for w, lab in (
+            (self.cron_min, "min"),
+            (self.cron_hour, "h"),
+            (self.cron_dom, "dom"),
+            (self.cron_month, "mon"),
+            (self.cron_dow, "dow"),
+        ):
+            box = QVBoxLayout()
+            box.setContentsMargins(0, 0, 0, 0)
+            box.setSpacing(0)
+            tag = QLabel(lab)
+            tag.setStyleSheet("color: palette(placeholder-text); font-size: 10px;")
+            box.addWidget(tag)
+            box.addWidget(w)
+            wrap = QWidget()
+            wrap.setLayout(box)
+            cr.addWidget(wrap)
+        lay.addWidget(self.cron_row)
+
         self.custom_edit = QLineEdit()
-        self.custom_edit.setPlaceholderText(
-            "systemd OnCalendar, e.g. *-*-* 03:15:00  or cron: 15 3 * * *"
-        )
+        self.custom_edit.setPlaceholderText("Raw systemd OnCalendar, e.g. *-*-* 03:15:00")
         lay.addWidget(self.custom_edit)
 
         self.preview = QLabel("")
@@ -66,60 +137,155 @@ class FrequencyPicker(QWidget):
         self.preview.setWordWrap(True)
         lay.addWidget(self.preview)
 
-        self.preset.currentIndexChanged.connect(self._sync_visibility)
+        self._suppress_mode_defaults = True
+        self.mode.currentIndexChanged.connect(self._on_mode_changed)
+        self.preset.currentIndexChanged.connect(self._update_preview)
         self.weekday.currentIndexChanged.connect(self._update_preview)
         self.time_edit.timeChanged.connect(lambda _t: self._update_preview())
         self.custom_edit.textChanged.connect(lambda _t: self._update_preview())
-
-        # Apply default
-        from .schedule_freq import parse_stored_frequency
+        for c in (
+            self.cron_min,
+            self.cron_hour,
+            self.cron_dom,
+            self.cron_month,
+            self.cron_dow,
+        ):
+            c.currentIndexChanged.connect(self._update_preview)
 
         parsed = parse_stored_frequency(str(default or "daily"))
+        mode = str(parsed.get("mode") or "simple")
+        midx = self.mode.findData(mode)
+        if midx < 0:
+            midx = self.mode.findData("simple")
+        if midx >= 0:
+            self.mode.setCurrentIndex(midx)
         preset = parsed.get("preset") or "daily"
-        # Map aliases like "weekly" that normalize to themselves
-        idx = self.preset.findData(preset)
-        if idx < 0 and preset in ("hourly", "daily", "weekly"):
-            idx = self.preset.findData(preset)
-        if idx < 0:
-            idx = self.preset.findData("custom")
-        if idx >= 0:
-            self.preset.setCurrentIndex(idx)
+        pidx = self.preset.findData(preset)
+        if pidx >= 0:
+            self.preset.setCurrentIndex(pidx)
         if parsed.get("hour") is not None:
             self.time_edit.setTime(
                 QTime(int(parsed["hour"]), int(parsed.get("minute") or 0))
             )
+        elif mode in ("daily-at", "weekly-at"):
+            self.time_edit.setTime(QTime(8, 30))
         if parsed.get("weekday"):
             widx = self.weekday.findData(parsed["weekday"])
             if widx >= 0:
                 self.weekday.setCurrentIndex(widx)
+        elif mode == "weekly-at":
+            widx = self.weekday.findData("Mon")
+            if widx >= 0:
+                self.weekday.setCurrentIndex(widx)
+        for attr, key in (
+            ("cron_min", "cron_minute"),
+            ("cron_hour", "cron_hour"),
+            ("cron_dom", "cron_dom"),
+            ("cron_month", "cron_month"),
+            ("cron_dow", "cron_dow"),
+        ):
+            if parsed.get(key) is not None:
+                combo = getattr(self, attr)
+                cidx = combo.findData(str(parsed[key]))
+                if cidx >= 0:
+                    combo.setCurrentIndex(cidx)
         if parsed.get("custom"):
             self.custom_edit.setText(str(parsed["custom"]))
+        if self.cron_min.currentData() is None:
+            self.cron_min.setCurrentIndex(0)
+        # Default cron example: Monday 08:30 when no stored cron fields
+        if mode == "cron" and parsed.get("cron_hour") is None:
+            hidx = self.cron_hour.findData("8")
+            midx_c = self.cron_min.findData("30")
+            didx = self.cron_dow.findData("1")
+            if hidx >= 0:
+                self.cron_hour.setCurrentIndex(hidx)
+            if midx_c >= 0:
+                self.cron_min.setCurrentIndex(midx_c)
+            if didx >= 0:
+                self.cron_dow.setCurrentIndex(didx)
+        self._suppress_mode_defaults = False
+        self._sync_visibility()
+
+    def _on_mode_changed(self, _index: int = 0) -> None:
+        if not self._suppress_mode_defaults:
+            mode = str(self.mode.currentData() or "simple")
+            # Sensible defaults when switching into clock modes
+            if mode == "weekly-at":
+                if self.weekday.currentData() is None:
+                    widx = self.weekday.findData("Mon")
+                    if widx >= 0:
+                        self.weekday.setCurrentIndex(widx)
+                # Prefer a daytime example if still at midnight-ish from other modes
+                t = self.time_edit.time()
+                if t.hour() == 0 and t.minute() == 0:
+                    self.time_edit.setTime(QTime(8, 30))
+            elif mode == "daily-at":
+                t = self.time_edit.time()
+                if t.hour() == 0 and t.minute() == 0:
+                    self.time_edit.setTime(QTime(8, 30))
+            elif mode == "cron":
+                if str(self.cron_hour.currentData() or "*") == "*":
+                    hidx = self.cron_hour.findData("8")
+                    if hidx >= 0:
+                        self.cron_hour.setCurrentIndex(hidx)
+                if str(self.cron_min.currentData() or "0") == "0":
+                    midx = self.cron_min.findData("30")
+                    if midx >= 0:
+                        self.cron_min.setCurrentIndex(midx)
+                if str(self.cron_dow.currentData() or "*") == "*":
+                    didx = self.cron_dow.findData("1")
+                    if didx >= 0:
+                        self.cron_dow.setCurrentIndex(didx)
         self._sync_visibility()
 
     def _sync_visibility(self) -> None:
-        key = self.preset.currentData()
-        self.time_row.setVisible(key in ("daily-at", "weekly-at"))
-        self.weekday.setVisible(key == "weekly-at")
-        self.custom_edit.setVisible(key == "custom")
+        mode = str(self.mode.currentData() or "simple")
+        self.preset.setVisible(mode == "simple")
+        self.time_row.setVisible(mode in ("daily-at", "weekly-at"))
+        self.weekday.parentWidget().setVisible(mode == "weekly-at")
+        self.cron_row.setVisible(mode == "cron")
+        self.custom_edit.setVisible(mode == "advanced")
         self._update_preview()
 
     def _update_preview(self) -> None:
+        from .schedule_freq import describe_schedule_human, system_local_tz_label
+
         cal = self.on_calendar()
-        self.preview.setText(f"Schedule: {cal}")
+        human = describe_schedule_human(cal)
+        tz = system_local_tz_label()
+        self.preview.setText(
+            f"→ {human}\n"
+            f"OnCalendar: {cal}\n"
+            f"Uses local system time: {tz} (not UTC)"
+        )
 
     def on_calendar(self) -> str:
-        from .schedule_freq import normalize_on_calendar
+        from .schedule_freq import cron_fields_to_on_calendar, normalize_on_calendar
 
-        key = str(self.preset.currentData() or "daily")
-        if key == "custom":
-            return normalize_on_calendar(self.custom_edit.text().strip() or "daily")
-        t = self.time_edit.time()
-        return normalize_on_calendar(
-            key,
-            hour=t.hour(),
-            minute=t.minute(),
-            weekday=str(self.weekday.currentData() or "Sun"),
-        )
+        mode = str(self.mode.currentData() or "simple")
+        if mode == "simple":
+            return normalize_on_calendar(str(self.preset.currentData() or "daily"))
+        if mode == "daily-at":
+            t = self.time_edit.time()
+            return normalize_on_calendar("daily-at", hour=t.hour(), minute=t.minute())
+        if mode == "weekly-at":
+            t = self.time_edit.time()
+            return normalize_on_calendar(
+                "weekly-at",
+                hour=t.hour(),
+                minute=t.minute(),
+                weekday=str(self.weekday.currentData() or "Sun"),
+            )
+        if mode == "cron":
+            return cron_fields_to_on_calendar(
+                str(self.cron_min.currentData() or "0"),
+                str(self.cron_hour.currentData() or "*"),
+                str(self.cron_dom.currentData() or "*"),
+                str(self.cron_month.currentData() or "*"),
+                str(self.cron_dow.currentData() or "*"),
+            )
+        return normalize_on_calendar(self.custom_edit.text().strip() or "daily")
 
 
 class TimezonePicker(QComboBox):
@@ -127,7 +293,7 @@ class TimezonePicker(QComboBox):
         super().__init__(parent)
         from .schedule_freq import COMMON_TIMEZONES
 
-        self.setEditable(True)
+        self.setEditable(False)
         for tz in COMMON_TIMEZONES:
             self.addItem(tz)
         if default:
@@ -135,7 +301,8 @@ class TimezonePicker(QComboBox):
             if idx >= 0:
                 self.setCurrentIndex(idx)
             else:
-                self.setEditText(default)
+                self.addItem(default)
+                self.setCurrentIndex(self.count() - 1)
 
 
 class TemplateConfigureDialog(QDialog):
@@ -147,6 +314,7 @@ class TemplateConfigureDialog(QDialog):
         parent: QWidget | None = None,
         *,
         instance: Any | None = None,
+        run_once_mode: bool = False,
     ) -> None:
         super().__init__(parent)
         from .agent_templates import get_agent_template
@@ -156,7 +324,13 @@ class TemplateConfigureDialog(QDialog):
             raise ValueError(f"Unknown template: {template_id}")
         self._instance = instance
         self._editing = instance is not None
-        title_verb = "Edit" if self._editing else "Configure"
+        self._run_once_mode = bool(run_once_mode)
+        if self._run_once_mode:
+            title_verb = "Run once"
+        elif self._editing:
+            title_verb = "Edit"
+        else:
+            title_verb = "Configure"
         self.setWindowTitle(f"{title_verb} — {self._tmpl.title}")
         self.resize(540, 680)
         self._fields: dict[str, Any] = {}
@@ -166,6 +340,14 @@ class TemplateConfigureDialog(QDialog):
         desc = QLabel(self._tmpl.description)
         desc.setWordWrap(True)
         root.addWidget(desc)
+        if self._run_once_mode:
+            once_hint = QLabel(
+                "Run once: fills params, saves a temporary instance, runs immediately. "
+                "No recurring schedule is created."
+            )
+            once_hint.setWordWrap(True)
+            once_hint.setStyleSheet("color: palette(placeholder-text);")
+            root.addWidget(once_hint)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -287,24 +469,40 @@ class TemplateConfigureDialog(QDialog):
             self._fields[p.id] = (p, widget)
             form.addRow(label, widget)
 
-        self.schedule_cb = QCheckBox("Enable schedule from check frequency")
-        if instance is not None:
+        self.schedule_cb = QCheckBox("Enable recurring schedule (from frequency below)")
+        if self._run_once_mode:
+            self.schedule_cb.setChecked(False)
+            self.schedule_cb.setEnabled(False)
+            self.schedule_cb.setToolTip("Disabled for Run once — use Configure to schedule.")
+        elif instance is not None:
             self.schedule_cb.setChecked(bool(instance.enabled_schedule))
         else:
             self.schedule_cb.setChecked(bool(self._tmpl.schedule_kind))
         root.addWidget(self.schedule_cb)
 
         buttons = QDialogButtonBox()
-        save_label = "Save changes" if self._editing else "Save instance"
-        save_btn = buttons.addButton(save_label, QDialogButtonBox.ButtonRole.AcceptRole)
-        run_btn = buttons.addButton("Save & Run once", QDialogButtonBox.ButtonRole.ActionRole)
-        cancel = buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
-        root.addWidget(buttons)
-
         self._run_after = False
-        save_btn.clicked.connect(self._accept_save)
-        run_btn.clicked.connect(self._accept_run)
+        if self._run_once_mode:
+            run_btn = buttons.addButton(
+                "Run once", QDialogButtonBox.ButtonRole.AcceptRole
+            )
+            run_btn.clicked.connect(self._accept_run)
+        else:
+            save_label = "Save changes" if self._editing else "Save instance"
+            save_btn = buttons.addButton(
+                save_label, QDialogButtonBox.ButtonRole.AcceptRole
+            )
+            run_btn = buttons.addButton(
+                "Run once", QDialogButtonBox.ButtonRole.ActionRole
+            )
+            run_btn.setToolTip(
+                "Save without enabling a new schedule, then run immediately"
+            )
+            save_btn.clicked.connect(self._accept_save)
+            run_btn.clicked.connect(self._accept_run_once)
+        cancel = buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
         cancel.clicked.connect(self.reject)
+        root.addWidget(buttons)
 
     def _refresh_models(self) -> None:
         from .auth import with_cached_credentials
@@ -369,6 +567,16 @@ class TemplateConfigureDialog(QDialog):
 
     def _accept_run(self) -> None:
         self._run_after = True
+        self.schedule_cb.setChecked(False)
+        self.accept()
+
+    def _accept_run_once(self) -> None:
+        """From Configure: run immediately without turning schedule on."""
+        self._run_after = True
+        # Keep user's schedule checkbox if editing an already-scheduled instance,
+        # but never force-enable schedule just because they clicked Run once.
+        if not self._editing:
+            self.schedule_cb.setChecked(False)
         self.accept()
 
     def result_payload(self) -> dict[str, Any]:
@@ -376,9 +584,12 @@ class TemplateConfigureDialog(QDialog):
         model = mid if mid else self.model_combo.currentText().strip()
         if model in ("", "(auto / server default)"):
             model = ""
+        enable_sched = bool(self.schedule_cb.isChecked()) and not self._run_once_mode
+        if self._run_after and self._run_once_mode:
+            enable_sched = False
         return {
             "params": self._collect_params(),
-            "enable_schedule": self.schedule_cb.isChecked(),
+            "enable_schedule": enable_sched,
             "run_after": self._run_after,
             "provider_id": self.provider_combo.currentData() or "",
             "model": model,
@@ -389,6 +600,7 @@ class TemplateConfigureDialog(QDialog):
 
 class _TemplateCard(QFrame):
     configure = Signal(str)
+    run_once = Signal(str)
 
     def __init__(self, tmpl: Any, badges: list[dict[str, str]], parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -406,9 +618,13 @@ class _TemplateCard(QFrame):
         cat = QLabel(tmpl.category)
         cat.setStyleSheet("color: palette(placeholder-text);")
         head.addWidget(cat)
-        plus = QPushButton("+")
-        plus.setFixedWidth(32)
-        plus.setToolTip("Configure")
+        run = QPushButton("Run once")
+        run.setToolTip("Fill params and run immediately (no schedule)")
+        run.clicked.connect(lambda: self.run_once.emit(tmpl.id))
+        head.addWidget(run)
+        plus = QPushButton("⚙")
+        plus.setFixedWidth(36)
+        plus.setToolTip("Configure / schedule")
         plus.clicked.connect(lambda: self.configure.emit(tmpl.id))
         head.addWidget(plus)
         lay.addLayout(head)
@@ -470,8 +686,9 @@ class TemplatesPage(QWidget):
         layout.setContentsMargins(12, 12, 12, 12)
 
         intro = QLabel(
-            "Each template bundles an agent prompt, skill instructions, and the MCPs "
-            "needed to make it useful. Configure one to save an instance (optional schedule)."
+            "Workflow templates: <b>Run once</b> executes immediately (no timer). "
+            "<b>⚙ Configure</b> saves an instance and optionally enables a recurring "
+            "schedule (Simple / Daily / Weekly / Cron enums — not free-text)."
         )
         intro.setWordWrap(True)
         layout.addWidget(intro)
@@ -492,7 +709,8 @@ class TemplatesPage(QWidget):
         edit_btn = QPushButton("Edit…")
         edit_btn.clicked.connect(self._edit_selected)
         irow.addWidget(edit_btn)
-        run_btn = QPushButton("Run selected")
+        run_btn = QPushButton("Run once")
+        run_btn.setToolTip("Run the selected saved instance once (no schedule change)")
         run_btn.clicked.connect(self._run_selected)
         irow.addWidget(run_btn)
         del_btn = QPushButton("Delete")
@@ -529,6 +747,7 @@ class TemplatesPage(QWidget):
             for tmpl in items:
                 card = _TemplateCard(tmpl, template_badges(tmpl))
                 card.configure.connect(self._configure)
+                card.run_once.connect(self._run_once_configure)
                 self._host_layout.addWidget(card)
 
         section("Workflow templates", catalog)
@@ -585,6 +804,21 @@ class TemplatesPage(QWidget):
         payload = dlg.result_payload()
         iid = self._save_from_dialog(template_id, payload)
         if iid and payload.get("run_after"):
+            self._run_instance(iid)
+
+    def _run_once_configure(self, template_id: str) -> None:
+        try:
+            dlg = TemplateConfigureDialog(template_id, self, run_once_mode=True)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Templates", str(exc))
+            return
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        payload = dlg.result_payload()
+        payload["enable_schedule"] = False
+        payload["run_after"] = True
+        iid = self._save_from_dialog(template_id, payload)
+        if iid:
             self._run_instance(iid)
 
     def _edit_selected(self) -> None:

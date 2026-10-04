@@ -224,9 +224,12 @@ def stylesheet_for(theme: CompanionTheme) -> str:
       background: transparent;
       border: none;
     }}
-    QSizeGrip {{
-      width: 14px;
-      height: 14px;
+    QSizeGrip, QSizeGrip#nccResizeGrip {{
+      width: 22px;
+      height: 22px;
+      background: transparent;
+      border: 1px solid {t.accent};
+      border-radius: 5px;
     }}
     """
 

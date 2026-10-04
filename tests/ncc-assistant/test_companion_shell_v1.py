@@ -27,8 +27,16 @@ class CompanionShellAstTests(unittest.TestCase):
         text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
         self.assertIn("_restore_geometry", text)
         self.assertIn("_save_geometry", text)
-        self.assertIn("QSizeGrip", text)
+        self.assertIn("class ResizeCorner", text)
+        self.assertIn("ResizeCorner", text)
         self.assertIn("saveGeometry", text)
+
+    def test_mcp_panel_layers_copy(self) -> None:
+        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        self.assertIn("Installed (NCC client)", text)
+        self.assertIn("Catalog (templates/mcp)", text)
+        self.assertIn("Inject NCC MCP into qwen/dsh", text)
+        self.assertIn("tap toggle", text)
 
     def test_workspace_and_panels(self) -> None:
         text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
