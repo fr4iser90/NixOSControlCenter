@@ -243,9 +243,11 @@ Gate: `tests/gates/validate-module-migrations.sh` (via `gates/validate-ncc-nix.s
 5b. [ ] If assistant should call this domain: `ai/manifest.nix` (+ `tools/` as needed)  
 6. [ ] No `test_*.py` under `nixos/`  
 7. [ ] Migration only if breaking; version matches `to`  
-8. [ ] **`bash tests/run-gates.sh`** exits 0  
+8. [ ] Skeleton: `template-config.nix` + `ai/manifest.nix` + `doc/usage.md`  
+9. [ ] If `commands.nix`: `doc/cli.md` with Status; if GUI page: `registerGuiPage`  
+10. [ ] **`bash tests/run-gates.sh`** exits 0  
 
-Do **not** tell anyone to `ncc system-update` until step 8 is green in this turn.
+Do **not** tell anyone to `ncc system-update` until step 10 is green in this turn.
 
 ---
 

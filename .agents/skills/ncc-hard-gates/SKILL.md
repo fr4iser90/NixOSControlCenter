@@ -35,6 +35,9 @@ Require **exit 0 in this turn**. Prefer this over `gates/validate-ncc-nix.sh` al
 | options SSOT | wizard writes vs `options.nix` |
 | GUI catalog | no `test_*.py` under `nixos/`; domain registration |
 | docs layout | markdown under `doc/` + kebab-case |
+| module shape | every discovery module: `template-config` + `ai/manifest` + `doc/usage.md` |
+| AI packs | tool JSON fields + `risk`; manifest `domain`/`description` |
+| surfaces | `commands.nix` ⇒ `doc/cli.md`; `page.py` ↔ `registerGuiPage` |
 | gui-python | page smoke / argv / session |
 
 Details: [tests/TESTING.md](../../../tests/TESTING.md).

@@ -72,3 +72,6 @@ Shell gates must source install-wizard bash and call `nix-instantiate`. Python t
 | `gates/validate-nix-import-paths.sh` | Static `import ./…` resolve + parse all `.nix` |
 | `gates/validate-nix-module-eval.sh` | Eval prebuild-checks + `import ./config.nix` module shapes |
 | `gates/validate-gui-catalog.sh` | Catalog invariants + no tests under `nixos/` |
+| `gates/validate-module-shape.sh` | Uniform skeleton: template-config + AI manifest + usage.md |
+| `gates/validate-ai-packs.sh` | AI pack manifest + tools JSON contract |
+| `gates/validate-module-surfaces.sh` | `commands.nix` ↔ `doc/cli.md` ↔ GUI `page.py` |

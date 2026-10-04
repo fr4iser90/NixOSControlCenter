@@ -17,18 +17,18 @@ echo ""
 # --------------------------------------------------------------------------
 section() { echo ""; echo "== $* =="; }
 
-section "1) CLI.md for every commands.nix"
+section "1) doc/cli.md for every commands.nix"
 n_ok=0
 n_miss=0
 while IFS= read -r cmd; do
   dir=$(dirname "$cmd")
   rel=${dir#"$ROOT/"}
-  if [[ ! -f "$dir/CLI.md" ]]; then
-    echo "MISSING CLI.md: $rel"
+  if [[ ! -f "$dir/doc/cli.md" ]]; then
+    echo "MISSING doc/cli.md: $rel"
     fail=1
     n_miss=$((n_miss + 1))
-  elif ! grep -qE '\*\*Status:\*\* `(todo|partial|compliant)`' "$dir/CLI.md"; then
-    echo "BAD STATUS LINE: $rel/CLI.md"
+  elif ! grep -qE '\*\*Status:\*\* `(todo|partial|compliant)`' "$dir/doc/cli.md"; then
+    echo "BAD STATUS LINE: $rel/doc/cli.md"
     fail=1
     n_miss=$((n_miss + 1))
   else
@@ -39,8 +39,8 @@ echo "OK: $n_ok · missing/bad: $n_miss"
 
 section "2) SSOT docs present"
 for f in \
-  nixos/core/management/cli-formatter/doc/STANDARDS.md \
-  nixos/core/management/cli-formatter/doc/COPY.md \
+  nixos/core/management/cli-formatter/doc/standards.md \
+  nixos/core/management/cli-formatter/doc/copy.md \
   nixos/core/management/cli-formatter/doc/CLI.md.template \
   nixos/core/management/cli-formatter/api.nix
 do

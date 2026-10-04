@@ -25,10 +25,17 @@ api = getModuleApi "cli-registry";
 
 Laws: [AGENTS.md](../../../AGENTS.md) (discovery section)
 
-## Docs
+## Docs + surfaces (uniformity)
 
 One home: `<module>/doc/**/*.md`. README/CHANGELOG stubs at module root only.  
 No `ai/docs/`, no root `cli.md`. Gate: `tests/gates/validate-docs-layout.sh`.
+
+Hard gates also require per discovery module:
+
+- `template-config.nix` + `ai/manifest.nix` + `doc/usage.md` (`validate-module-shape`)
+- If `commands.nix`: sibling `doc/cli.md` with `**Status:** \`…\`` (`validate-module-surfaces`)
+- If `ui/gui/page.py`: `registerGuiPage` in `commands.nix` (same gate)
+- AI tools JSON contract when `ai/tools/*.json` exist (`validate-ai-packs`)
 
 ## Migrations (only when hosts break without cleanup)
 

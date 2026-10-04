@@ -52,11 +52,19 @@ Skip nix-build: `NCC_GUI_SKIP_NIX_PYTHON=1` (Qt tests skip; AST/smokes still run
 
 | Gate | Role |
 |------|------|
-| `gates/validate-ncc-nix.sh` | bash-in-nix, layer, migrations, wizard packaging, options SSOT, imports, prebuild + **imported config.nix** eval, **GUI catalog** |
+| `gates/validate-ncc-nix.sh` | bash-in-nix, layer, migrations, wizard packaging, options SSOT, imports, prebuild + **imported config.nix** eval, **GUI catalog**, **module shape**, **AI packs**, **CLI/GUI surfaces** |
+| `gui/validate-gui-python.sh` | page smoke, argv, fs_status, session_ux, hot-path; optional soak |
+| `cli-formatter/validate-cli.sh` | Soft / optional — formatter/ANSI extras (`doc/cli.md` already hard-gated) |
 
 Step 8 (`gates/validate-nix-module-eval.sh`) also force-evals `(import ./config.nix …)` values as NixOS modules (`lib.evalModules`). That catches top-level `lib.mkMerge` and mixed `config` + `warnings` — bugs that only showed up at `ncc system-update` before.
-| `gui/validate-gui-python.sh` | page smoke, argv, fs_status, session_ux, hot-path; optional soak |
-| `cli-formatter/validate-cli.sh` | Soft / optional — CLI docs/formatter (`tests/default.nix` or manual) |
+
+Uniformity steps inside `validate-ncc-nix` (12–14):
+
+| Script | Enforces |
+|--------|----------|
+| `gates/validate-module-shape.sh` | discovery module ⇒ `template-config.nix` + `ai/manifest.nix` + `doc/usage.md` |
+| `gates/validate-ai-packs.sh` | manifest `domain`/`description`; tools JSON fields + `risk` enum |
+| `gates/validate-module-surfaces.sh` | `commands.nix` ⇒ `doc/cli.md` (+ Status); `page.py` ↔ `registerGuiPage` |
 
 Enable Git pre-commit:
 
@@ -94,5 +102,8 @@ That sets `core.hooksPath=.githooks` and installs `.git/hooks/pre-commit` (idemp
 | Wizard writes invalid options | systemconfig-writes |
 | `false or true` enable | gui-catalog |
 | Tests shipping in product | gui-catalog |
+| Missing template / AI manifest / usage.md | module-shape |
+| Broken AI tool JSON / risk | ai-packs |
+| commands without `doc/cli.md` / dangling GUI page | module-surfaces |
 | GUI page import crash | gui-python smoke |
 | FS status parse / Off badge data | `test_domain_fs_status.py` |
