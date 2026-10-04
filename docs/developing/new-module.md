@@ -176,10 +176,15 @@ Keep help text short; elevated ops go through existing NCC root patterns used by
   group = "features";              # or "core"
 })
 (cliRegistry.registerGuiPage "mymod" ./ui/gui)
+# If the page needs a bake-time JSON catalog / bin:
+(cliRegistry.registerGuiEnv "mymod" {
+  NCC_MYMOD_CATALOG = "${catalogFile}";
+})
 ```
 
 Design notes: `gui-engine/doc/gui-design.md`.  
-Do not put unit tests next to `page.py`.
+Do not put unit tests next to `page.py`.  
+Pages must load catalogs from `NCC_*_CATALOG` only — never live `nix-instantiate`.
 
 ---
 

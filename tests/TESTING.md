@@ -65,6 +65,7 @@ Uniformity steps inside `validate-ncc-nix` (12–14):
 | `gates/validate-module-shape.sh` | discovery module ⇒ `template-config.nix` + `ai/manifest.nix` + `doc/usage.md` |
 | `gates/validate-ai-packs.sh` | manifest `domain`/`description`; tools JSON fields + `risk` enum |
 | `gates/validate-module-surfaces.sh` | `commands.nix` ⇒ `doc/cli.md` (+ Status); `page.py` ↔ `registerGuiPage` |
+| `gates/validate-gui-hotpath.sh` | no live `nixpkgs`/catalog eval in `ui/gui`; `registerGuiEnv` for catalogs |
 
 Enable Git pre-commit:
 
@@ -105,5 +106,7 @@ That sets `core.hooksPath=.githooks` and installs `.git/hooks/pre-commit` (idemp
 | Missing template / AI manifest / usage.md | module-shape |
 | Broken AI tool JSON / risk | ai-packs |
 | commands without `doc/cli.md` / dangling GUI page | module-surfaces |
+| Live `nix-instantiate` / `<nixpkgs>` in GUI catalog | gui-hotpath |
+| Missing `registerGuiEnv` for rice/catalog modules | gui-hotpath |
 | GUI page import crash | gui-python smoke |
 | FS status parse / Off badge data | `test_domain_fs_status.py` |

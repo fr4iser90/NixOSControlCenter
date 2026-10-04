@@ -32,22 +32,25 @@ in
       else if desktopEnable == null then false
       else desktopEnable;
 
-  # domainGui pkgs config — includes every registerGuiPage from modules
+  # domainGui pkgs config — includes every registerGuiPage + registerGuiEnv
   domainGui = pkgs: config:
     (import ./domain-gui.nix {
       inherit pkgs lib getModuleMetadata getModuleApi packagesRoot assistantRoot;
       guiPages = cliApi.guiPages config;
+      guiEnvs = cliApi.flatGuiEnvs config;
     }).nccDomainGui;
 
   rootGui = pkgs: config:
     (import ./root-gui.nix {
       inherit pkgs lib getModuleMetadata getModuleApi packagesRoot;
       guiPages = cliApi.guiPages config;
+      guiEnvs = cliApi.flatGuiEnvs config;
     }).nccGui;
 
   domainGuiBundle = pkgs: config:
     import ./domain-gui.nix {
       inherit pkgs lib getModuleMetadata getModuleApi packagesRoot assistantRoot;
       guiPages = cliApi.guiPages config;
+      guiEnvs = cliApi.flatGuiEnvs config;
     };
 }

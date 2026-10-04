@@ -95,5 +95,14 @@ in {
       internal = true;
       description = "Rich domain pages contributed by modules (not in gui-engine)";
     };
+
+    # Baked runtime env for root/domain GUI (catalog JSON paths, CLI bins, …).
+    # Modules register via registerGuiEnv — gui-engine exports without peer hardwires.
+    guiEnvs = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.attrsOf lib.types.str);
+      default = {};
+      internal = true;
+      description = "Per-domain env exports for ncc-gui / ncc-domain-gui (NCC_*_CATALOG, …)";
+    };
   };
 }

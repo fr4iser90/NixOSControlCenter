@@ -1,10 +1,8 @@
 # Shared domain GUI binary: `ncc-domain-gui <page>` (+ AI embed sources)
 # Peer roots come from getModuleMetadata (via gui-engine api) — no relative cross-module imports.
 # Domain pages come from cli-registry guiPages (each module’s ui/gui/).
-#
-# Catalogs for optional domains (hyprland rice store, …) are owned by those modules
-# (see <module>/gui/default.nix). Do not import peer mk-catalog-json here.
-{ pkgs, lib, getModuleMetadata, getModuleApi, packagesRoot, assistantRoot, guiPages ? {} }:
+# Domain catalogs come from cli-registry guiEnvs (registerGuiEnv) — no peer hardwires.
+{ pkgs, lib, getModuleMetadata, getModuleApi, packagesRoot, assistantRoot, guiPages ? {}, guiEnvs ? {} }:
 
 let
   eng = import ./package.nix { inherit pkgs; };
@@ -14,11 +12,11 @@ let
   };
   assistantSrc = "${assistantRoot}/python/ncc_assistant";
   pagesPkg = import ./lib/mk-domain-pages.nix { inherit lib pkgs guiPages; };
-  # Schema SSOT — same as ncc-migrate-config (no Python hardcode)
   expectedConfigVersion =
     (import "${(getModuleMetadata "system-manager").path}/components/config-migration/schema.nix" {
       inherit lib;
     }).currentVersion;
+  exportDomainEnvs = import ./lib/export-gui-envs.nix { inherit lib; } guiEnvs;
 
   pythonEnv = pkgs.python3.withPackages (ps: with ps; [
     pyside6
@@ -43,6 +41,7 @@ let
     export NCC_EXPECTED_CONFIG_VERSION="${expectedConfigVersion}"
     export QT_QPA_PLATFORM="''${QT_QPA_PLATFORM:-xcb}"
     export PATH="${packagesCli}/bin:${pkgs.nix}/bin:$PATH"
+    ${exportDomainEnvs}
     exec ${pythonEnv}/bin/python -m ncc_gui.domain_gui "$@"
   '';
 in

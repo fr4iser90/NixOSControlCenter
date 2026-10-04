@@ -38,7 +38,8 @@ Require **exit 0 in this turn**. Prefer this over `gates/validate-ncc-nix.sh` al
 | module shape | every discovery module: `template-config` + `ai/manifest` + `doc/usage.md` |
 | AI packs | tool JSON fields + `risk`; manifest `domain`/`description` |
 | surfaces | `commands.nix` ⇒ `doc/cli.md`; `page.py` ↔ `registerGuiPage` |
-| gui-python | page smoke / argv / session |
+| GUI hot-path | no live nixpkgs/catalog eval in `ui/gui`; `registerGuiEnv` |
+| gui-python | page smoke / argv / session / nav visibility |
 
 Details: [tests/TESTING.md](../../../tests/TESTING.md).
 

@@ -32,6 +32,11 @@ After pushing collection changes, bump `rev` + `hash` in `collection-pin.nix`.
 
 Docs: `nixos/core/base/hyprland/doc/usage.md`, `doc/architecture.md`.
 
+## GUI catalog (no live nix)
+
+Bake JSON via `lib/mk-catalog-json.nix` → `registerGuiEnv` (`NCC_HYPRLAND_CATALOG`).
+Root `ncc-gui` exports it. `ui/gui/page.py` must **never** `nix-instantiate` / `<nixpkgs>`.
+
 ## Agent constraints
 
 - Edit **git** trees (NCC and/or Collection). Do not poke live `/etc/nixos` or `/var/lib/ncc` unless the user pastes paths/output.

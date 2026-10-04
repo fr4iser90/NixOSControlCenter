@@ -196,6 +196,11 @@ in {
       alwaysVisible = false;
     })
     (cliRegistry.registerGuiPage "hyprland" ./ui/gui)
+    # Root ncc-gui exports these — no live nix-instantiate in the page hot path.
+    (cliRegistry.registerGuiEnv "hyprland" {
+      NCC_HYPRLAND_CATALOG = "${hyprlandGui.catalogFile}";
+      NCC_HYPRLAND_BIN = "${hyprlandCli}/bin/ncc-hyprland";
+    })
     (cliRegistry.registerCommandsFor moduleName allCommands)
     {
       environment.systemPackages = [

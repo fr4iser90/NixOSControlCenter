@@ -35,6 +35,12 @@ rec {
       path = pageDir;
     };
 
+  # Bake-time env for root/domain GUI (JSON catalogs, domain bins). Values are
+  # store paths / absolute strings — never peer module paths inside gui-engine.
+  # Example: registerGuiEnv "hyprland" { NCC_HYPRLAND_CATALOG = "${catalogFile}"; }
+  registerGuiEnv = id: attrs:
+    lib.setAttrByPath [ selfPath "guiEnvs" id ] attrs;
+
   getRegisteredCommands = config:
     let
       commandSets = (fromConfig config).commandSets or {};
@@ -62,4 +68,10 @@ rec {
   guiDomains = config: (fromConfig config).guiDomains or {};
 
   guiPages = config: (fromConfig config).guiPages or {};
+
+  guiEnvs = config: (fromConfig config).guiEnvs or {};
+
+  # Flatten { domain = { VAR = "…"; }; … } → { VAR = "…"; } for launcher export.
+  flatGuiEnvs = config:
+    lib.foldlAttrs (acc: _: vars: acc // vars) {} (guiEnvs config);
 }

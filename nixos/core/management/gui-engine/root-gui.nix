@@ -1,12 +1,12 @@
 # Root NCC GUI launcher (includes AI assistant sources for embed)
 #
-# Does not know peer module catalogs (hyprland, …). Those are set by the owning
-# module’s gui wrapper / page fallback (NCC_*_CATALOG or NIXOS_DIR eval).
-{ pkgs, lib, getModuleMetadata, getModuleApi, packagesRoot, guiPages ? {} }:
+# Peer catalogs (hyprland rices, …) come from cli-registry registerGuiEnv —
+# never hardwire peer module paths here.
+{ pkgs, lib, getModuleMetadata, getModuleApi, packagesRoot, guiPages ? {}, guiEnvs ? {} }:
 
 let
   shared = import ./domain-gui.nix {
-    inherit pkgs lib getModuleMetadata getModuleApi packagesRoot guiPages;
+    inherit pkgs lib getModuleMetadata getModuleApi packagesRoot guiPages guiEnvs;
     assistantRoot = (getModuleMetadata "ncc-assistant").path;
   };
   catalogFile = import "${packagesRoot}/lib/mk-catalog-json.nix" { inherit pkgs; };
@@ -15,6 +15,7 @@ let
     (import "${(getModuleMetadata "system-manager").path}/components/config-migration/schema.nix" {
       inherit lib;
     }).currentVersion;
+  exportDomainEnvs = import ./lib/export-gui-envs.nix { inherit lib; } guiEnvs;
   nccGui = pkgs.writeShellScriptBin "ncc-gui" ''
     set -euo pipefail
     export PYTHONPATH="${shared.src}''${PYTHONPATH:+:$PYTHONPATH}"
@@ -24,6 +25,7 @@ let
     export NCC_EXPECTED_CONFIG_VERSION="${expectedConfigVersion}"
     export QT_QPA_PLATFORM="''${QT_QPA_PLATFORM:-xcb}"
     export PATH="${pkgs.nix}/bin:$PATH"
+    ${exportDomainEnvs}
     exec ${shared.pythonEnv}/bin/python -c 'from ncc_gui.root import main; raise SystemExit(main())'
   '';
 in

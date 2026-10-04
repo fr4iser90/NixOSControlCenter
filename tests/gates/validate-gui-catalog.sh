@@ -132,6 +132,15 @@ print("  PASS: checked core domains not wrapped in config=mkIf enable")
 sys.exit(0)
 PY
 
+# ── 5) Catalog merge: stub enabled/alwaysVisible must not be clobbered ─────
+MERGE_CHECK="$ROOT/tests/lib/gui-catalog-merge-check.nix"
+if nix-instantiate --eval --strict -E "import $MERGE_CHECK { lib = import <nixpkgs/lib>; }" 2>/dev/null \
+  | grep -q true; then
+  pass "gui catalog merge keeps stub enabled/alwaysVisible (hyprland@Plasma)"
+else
+  fail "gui catalog merge clobbers registerGuiDomain.enabled (hyprland would show on Plasma)"
+fi
+
 echo "=== validate-gui-catalog summary ==="
 if [[ "$FAIL" -ne 0 ]]; then
   echo "FAILED — catalog / enable / test-leak invariants."

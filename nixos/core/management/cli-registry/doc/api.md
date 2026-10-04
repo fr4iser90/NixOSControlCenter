@@ -39,6 +39,20 @@ cliRegistry.registerGuiDomain "stacks" {
 }
 ```
 
+### `registerGuiEnv id attrs`
+
+Bake-time env exports for `ncc-gui` / `ncc-domain-gui` (JSON catalogs, bins).
+gui-engine flattens and exports without hardwiring peer module paths.
+
+```nix
+cliRegistry.registerGuiEnv "hyprland" {
+  NCC_HYPRLAND_CATALOG = "${catalogFile}";
+  NCC_HYPRLAND_BIN = "${hyprlandCli}/bin/ncc-hyprland";
+}
+```
+
+Domain pages must load catalogs from these env vars only — never `nix-instantiate` in the GUI hot path.
+
 ### `getRegisteredCommands config`
 
 Flattened list of all registered commands.

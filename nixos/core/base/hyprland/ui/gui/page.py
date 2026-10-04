@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt
@@ -38,58 +37,26 @@ def _hyprland_bin() -> str:
     return os.environ.get("NCC_HYPRLAND_BIN", "ncc-hyprland")
 
 
-def _catalog_json_path() -> Path | None:
+def load_catalog() -> dict:
+    """Load bake-time Hall of Fame JSON only — never live Nix eval in the GUI.
+
+    ``ncc-gui`` / ``ncc hyprland --gui`` must export ``NCC_HYPRLAND_CATALOG``
+    (via ``registerGuiEnv`` / hyprland gui wrapper).
+    """
     raw = os.environ.get("NCC_HYPRLAND_CATALOG", "").strip()
     if not raw:
-        return None
-    return Path(raw)
-
-
-def _catalog_mk_path() -> Path:
-    return (
-        Path(os.environ.get("NIXOS_DIR", "/etc/nixos"))
-        / "core"
-        / "base"
-        / "hyprland"
-        / "lib"
-        / "mk-catalog-json.nix"
-    )
-
-
-def load_catalog() -> dict:
-    catalog = _catalog_json_path()
-    if catalog is not None:
-        if not catalog.is_file():
-            raise RuntimeError(f"Hyprland catalog not found: {catalog}")
-        text = catalog.read_text(encoding="utf-8")
-        if not text.strip():
-            raise RuntimeError(f"Hyprland catalog file is empty: {catalog}")
-        return json.loads(text)
-
-    mk = _catalog_mk_path()
-    if not mk.is_file():
         raise RuntimeError(
-            "Hyprland catalog not found — set NCC_HYPRLAND_CATALOG (ncc hyprland --gui) "
-            "or ensure NIXOS_DIR points at a tree with core/base/hyprland/lib/mk-catalog-json.nix"
+            "Hyprland catalog not set (NCC_HYPRLAND_CATALOG). "
+            "Open via ncc / ncc hyprland --gui after system-update so the "
+            "baked catalog is exported — live Nix eval in the GUI is forbidden."
         )
-    proc = subprocess.run(
-        [
-            "nix-instantiate",
-            "--eval",
-            "--strict",
-            "-E",
-            f"import {mk} {{ pkgs = import <nixpkgs> {{}}; }}",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or "catalog eval failed")
-    out = Path(proc.stdout.strip())
-    if not out.is_file():
-        raise RuntimeError(f"Hyprland catalog output missing: {out}")
-    return json.loads(out.read_text(encoding="utf-8"))
+    catalog = Path(raw)
+    if not catalog.is_file():
+        raise RuntimeError(f"Hyprland catalog not found: {catalog}")
+    text = catalog.read_text(encoding="utf-8")
+    if not text.strip():
+        raise RuntimeError(f"Hyprland catalog file is empty: {catalog}")
+    return json.loads(text)
 
 
 def _parse_status(text: str) -> dict[str, str]:

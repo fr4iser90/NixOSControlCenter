@@ -104,35 +104,12 @@ let
     actions = [];
   }) guiDomainAttrs;
 
-  # Stubs first, then commands. Prefer registerGuiDomain label (sidebar name)
-  # over shortHelp-derived labels like "Enable/disable NCC modules".
-  catalogById = lib.foldl' (acc: item:
-    let
-      prev = acc.${item.id} or {};
-      group = item.group or prev.group or "features";
-      actions =
-        if (item.actions or []) != []
-        then item.actions
-        else (prev.actions or []);
-      # Stub label wins when present (explicit GUI name)
-      label =
-        if (prev.label or "") != ""
-        then prev.label
-        else (item.label or item.id);
-      alwaysVisible =
-        if item ? alwaysVisible then item.alwaysVisible
-        else (prev.alwaysVisible or false);
-    in
-      acc // {
-        ${item.id} = {
-          inherit (item) id;
-          inherit label;
-          description = item.description or prev.description or "";
-          enabled = if item ? enabled then item.enabled else (prev.enabled or false);
-          inherit group actions alwaysVisible;
-        };
-      }
-  ) {} (fromGuiStubs ++ fromCommands);
+  # Stubs first, then commands. registerGuiDomain.enabled/alwaysVisible win over
+  # command rows (which always set enabled=true) — otherwise conditional core
+  # domains like hyprland stay listed on Plasma.
+  catalogById = import ../lib/merge-gui-catalog.nix { inherit lib; } (
+    fromGuiStubs ++ fromCommands
+  );
   guiCatalogJson = builtins.toJSON (lib.attrValues catalogById);
   guiCatalog = pkgs.writeText "ncc-gui-catalog.json" guiCatalogJson;
 

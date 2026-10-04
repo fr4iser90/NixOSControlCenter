@@ -75,3 +75,4 @@ Shell gates must source install-wizard bash and call `nix-instantiate`. Python t
 | `gates/validate-module-shape.sh` | Uniform skeleton: template-config + AI manifest + usage.md |
 | `gates/validate-ai-packs.sh` | AI pack manifest + tools JSON contract |
 | `gates/validate-module-surfaces.sh` | `commands.nix` ↔ `doc/cli.md` ↔ GUI `page.py` |
+| `gates/validate-gui-hotpath.sh` | No live catalog eval in GUI; `registerGuiEnv` for catalogs |

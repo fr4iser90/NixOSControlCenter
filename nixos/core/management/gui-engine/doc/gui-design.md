@@ -406,10 +406,14 @@ Desktop entry: `ncc.desktop`, exec `ncc`, icon name `ncc` (hicolor from gui-engi
 4. Sidebar sections **Core** / **Features** (`registerGuiDomain.group`).
    Nav presence: `alwaysVisible` (default true for core) keeps Off managers listed;
    set `alwaysVisible = false` + bake `enabled` for conditional domains (discovery only —
-   shell must not hardcode domain ids).
-5. Disabled domains: **hidden** when not `alwaysVisible` (not grey stubs)
+   shell must not hardcode domain ids). Pure rules: `ncc_gui/nav_visibility.py`.
+5. Disabled domains: **hidden** when not `alwaysVisible` (not grey stubs).
+   Features stay listed with “· Off” unless Settings → **Hide inactive features**.
 6. Content = resolved page for selection; every `DomainPage` shows **Operating on: …**
 7. **Write gate:** Apply / `run_ncc_root` confirm when a remote host is selected/failed but session is still LOCAL
+8. **Heavy catalogs** (rices, package intents): bake at build time via
+   `registerGuiEnv` → `NCC_*_CATALOG`. Domain `ui/gui/page.py` must **never**
+   call `nix-instantiate` / `import <nixpkgs>` (stack-overflow class).
 
 **Never** put stretch between the session chip and the combo — that shoved the
 combo to the right. Stretch belongs only between the left cluster and Settings.
@@ -420,6 +424,7 @@ Settings (`~/.config/ncc/gui-chrome.json`):
 |-----|---------|
 | `show_target` | Target cluster on/off (fleet). When off → this machine only |
 | `activity_mode` | `collapsed` (default) \| `hidden` \| `open` — command log on domain pages |
+| `hide_inactive_features` | When true, hide Features with enable=false (default **false**) |
 
 ### Control Center settings dialog (⚙)
 

@@ -339,42 +339,16 @@ def _whoami_role() -> tuple[str, str, bool]:
 
 
 def load_catalog() -> dict:
+    """Bake-time packages JSON only — never live Nix eval in the GUI hot path."""
     catalog = _catalog_path()
     if catalog.suffix == ".json" and catalog.is_file():
         return json.loads(catalog.read_text(encoding="utf-8"))
-    if not catalog.is_file():
-        raise RuntimeError(
-            f"Packages catalog not found:\n{catalog}\n\n"
-            "Set NIXOS_DIR to your NCC nixos tree, or run system-update so "
-            "/etc/nixos contains core/base/packages/lib/catalog.nix."
-        )
-    expr = f"(import {catalog} {{}})"
-    # Prefer full JSON builder next to catalog.nix when present
-    mk = catalog.parent / "mk-catalog-json.nix"
-    if catalog.name == "catalog.nix" and mk.is_file():
-        # Cannot import writeText easily; eval intent+catalog via small expr
-        intent = catalog.parent / "intent-catalog.nix"
-        if intent.is_file():
-            expr = f"""
-              let
-                data = import {catalog} {{
-                  metadata = import {catalog.parent}/metadata.nix;
-                  setsDir = {catalog.parent.parent}/components/sets;
-                  recipesDir = {catalog.parent.parent}/components/recipes;
-                  userPresetsDir = {catalog.parent.parent}/components/user-presets;
-                }};
-                intents = import {intent};
-              in data // {{ categories = intents.categories; intents = intents.intents; }}
-            """
-    proc = subprocess.run(
-        ["nix-instantiate", "--eval", "--strict", "--json", "-E", expr],
-        check=False,
-        capture_output=True,
-        text=True,
+    raise RuntimeError(
+        "Packages catalog JSON not set (NCC_PACKAGES_CATALOG). "
+        "Open via ncc / ncc packages --gui after system-update so the baked "
+        "catalog is exported — live Nix eval in the GUI is forbidden.\n"
+        f"Got path: {catalog}"
     )
-    if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or "catalog eval failed")
-    return json.loads(proc.stdout)
 
 
 def load_active_modules() -> list[str]:

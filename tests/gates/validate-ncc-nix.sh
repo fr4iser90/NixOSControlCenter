@@ -19,6 +19,7 @@
 #  12) module shape (template-config + ai/manifest + doc/usage.md)
 #  13) AI pack contract (manifest + tools JSON)
 #  14) module surfaces (commands ↔ doc/cli.md ↔ GUI page registration)
+#  15) GUI hot-path (no live nixpkgs/catalog eval; registerGuiEnv for catalogs)
 #
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -34,7 +35,7 @@ echo "╚═══════════════════════�
 
 # ── 1) Bash embedding: entire nixos/ ────────────────────────────────────────
 echo ""
-echo "== 1/14  bash-in-nix (all of nixos/) =="
+echo "== 1/15  bash-in-nix (all of nixos/) =="
 if bash "$ROOT/tests/install-wizard/validate-bash-embedding.sh"; then
   pass "validate-bash-embedding.sh (nixos/)"
 else
@@ -43,7 +44,7 @@ fi
 
 # ── 2) Layer: no cross-module relative imports into foreign lib/ ─────────────
 echo ""
-echo "== 2/14  layer: no relative imports into other modules' lib/ =="
+echo "== 2/15  layer: no relative imports into other modules' lib/ =="
 LAYER_OUT=$(mktemp)
 set +e
 python3 - "$NIXOS" "$LAYER_OUT" <<'PY'
@@ -93,7 +94,7 @@ rm -f "$LAYER_OUT"
 
 # ── 3) Module modularity ────────────────────────────────────────────────────
 echo ""
-echo "== 3/14  module layer / modularity =="
+echo "== 3/15  module layer / modularity =="
 if bash "$ROOT/tests/gates/validate-module-layer.sh"; then
   pass "validate-module-layer.sh"
 else
@@ -102,7 +103,7 @@ fi
 
 # ── 4) Auto-detect migrations / version bumps ───────────────────────────────
 echo ""
-echo "== 4/14  module migrations auto-detect =="
+echo "== 4/15  module migrations auto-detect =="
 if bash "$ROOT/tests/gates/validate-module-migrations.sh"; then
   pass "validate-module-migrations.sh"
 else
@@ -111,7 +112,7 @@ fi
 
 # ── 5) Install-wizard packaging ─────────────────────────────────────────────
 echo ""
-echo "== 5/14  install-wizard packaging gate =="
+echo "== 5/15  install-wizard packaging gate =="
 if bash "$ROOT/tests/install-wizard/validate-install-wizard-nix.sh"; then
   pass "validate-install-wizard-nix.sh"
 else
@@ -120,7 +121,7 @@ fi
 
 # ── 6) Wizard writes vs module options.nix ───────────────────────────────────
 echo ""
-echo "== 6/14  systemConfig writes vs options.nix (SSOT) =="
+echo "== 6/15  systemConfig writes vs options.nix (SSOT) =="
 if bash "$ROOT/tests/gates/validate-systemconfig-writes.sh"; then
   pass "validate-systemconfig-writes.sh"
 else
@@ -129,7 +130,7 @@ fi
 
 # ── 7) Static relative import paths ──────────────────────────────────────────
 echo ""
-echo "== 7/14  nix import paths + parse (generic) =="
+echo "== 7/15  nix import paths + parse (generic) =="
 if bash "$ROOT/tests/gates/validate-nix-import-paths.sh"; then
   pass "validate-nix-import-paths.sh"
 else
@@ -138,7 +139,7 @@ fi
 
 # ── 8) Module fragment eval (prebuild + imported config.nix) ─────────────────
 echo ""
-echo "== 8/14  nix module eval (prebuild + config.nix imports) =="
+echo "== 8/15  nix module eval (prebuild + config.nix imports) =="
 if bash "$ROOT/tests/gates/validate-nix-module-eval.sh"; then
   pass "validate-nix-module-eval.sh"
 else
@@ -147,7 +148,7 @@ fi
 
 # ── 9) GUI catalog invariants ────────────────────────────────────────────────
 echo ""
-echo "== 9/14  GUI catalog invariants =="
+echo "== 9/15  GUI catalog invariants =="
 if bash "$ROOT/tests/gates/validate-gui-catalog.sh"; then
   pass "validate-gui-catalog.sh"
 else
@@ -156,7 +157,7 @@ fi
 
 # ── 10) Docs layout + kebab naming ───────────────────────────────────────────
 echo ""
-echo "== 10/14  docs layout + kebab-case =="
+echo "== 10/15  docs layout + kebab-case =="
 if bash "$ROOT/tests/gates/validate-docs-layout.sh"; then
   pass "validate-docs-layout.sh"
 else
@@ -165,7 +166,7 @@ fi
 
 # ── 11) Store-status probes ──────────────────────────────────────────────────
 echo ""
-echo "== 11/14  store-status probes =="
+echo "== 11/15  store-status probes =="
 if bash "$ROOT/tests/gates/validate-store-status-probes.sh"; then
   pass "validate-store-status-probes.sh"
 else
@@ -174,7 +175,7 @@ fi
 
 # ── 12) Uniform module skeleton ──────────────────────────────────────────────
 echo ""
-echo "== 12/14  module shape (template + ai + usage) =="
+echo "== 12/15  module shape (template + ai + usage) =="
 if bash "$ROOT/tests/gates/validate-module-shape.sh"; then
   pass "validate-module-shape.sh"
 else
@@ -183,7 +184,7 @@ fi
 
 # ── 13) AI pack contract ─────────────────────────────────────────────────────
 echo ""
-echo "== 13/14  AI packs (manifest + tools) =="
+echo "== 13/15  AI packs (manifest + tools) =="
 if bash "$ROOT/tests/gates/validate-ai-packs.sh"; then
   pass "validate-ai-packs.sh"
 else
@@ -192,11 +193,20 @@ fi
 
 # ── 14) CLI / GUI / docs surfaces ────────────────────────────────────────────
 echo ""
-echo "== 14/14  module surfaces (CLI docs + GUI pages) =="
+echo "== 14/15  module surfaces (CLI docs + GUI pages) =="
 if bash "$ROOT/tests/gates/validate-module-surfaces.sh"; then
   pass "validate-module-surfaces.sh"
 else
   fail "commands/doc/cli.md/GUI page surfaces inconsistent"
+fi
+
+# ── 15) GUI hot-path / baked catalogs ────────────────────────────────────────
+echo ""
+echo "== 15/15  GUI hot-path (no live catalog eval) =="
+if bash "$ROOT/tests/gates/validate-gui-hotpath.sh"; then
+  pass "validate-gui-hotpath.sh"
+else
+  fail "GUI hot-path / registerGuiEnv / catalog integrity"
 fi
 
 echo ""
@@ -206,5 +216,5 @@ if [[ "$FAIL" -ne 0 ]]; then
   echo "Fix issues above, then re-run: bash tests/gates/validate-ncc-nix.sh"
   exit 1
 fi
-echo "OK — bash + layer + modularity + migrations + wizard + options + import paths + module eval + catalog + docs-layout + store-status + module-shape + ai-packs + surfaces green."
+echo "OK — bash + layer + modularity + migrations + wizard + options + import paths + module eval + catalog + docs-layout + store-status + module-shape + ai-packs + surfaces + gui-hotpath green."
 exit 0

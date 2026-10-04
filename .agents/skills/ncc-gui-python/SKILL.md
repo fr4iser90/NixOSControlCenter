@@ -14,6 +14,9 @@ description: >-
 - Engine: `nixos/core/management/gui-engine/python/ncc_gui/`
 - **Never** add `nixos/**/test_*.py` (would deploy). Suites live in `tests/gui/`
 - Catalog: domains register via commands; gate `tests/gates/validate-gui-catalog.sh`
+- Heavy catalogs: bake JSON + `registerGuiEnv` → `NCC_*_CATALOG`. **Never**
+  `nix-instantiate` / `import <nixpkgs>` in `ui/gui` (gate: `validate-gui-hotpath`)
+- Sidebar rules: `ncc_gui/nav_visibility.py` (Core alwaysVisible; Features + Hide inactive)
 
 ## Python env
 

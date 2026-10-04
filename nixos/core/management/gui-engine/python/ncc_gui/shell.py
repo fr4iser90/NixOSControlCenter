@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 from ncc_gui.branding import app_icon
 from ncc_gui.catalog import DomainInfo
 from ncc_gui.chrome_prefs import hide_inactive_features
+from ncc_gui.nav_visibility import domain_nav_visible
 from ncc_gui.reload import generation_bus
 from ncc_gui.shell_state import STICKY_DOMAIN_IDS, ShellChromeState
 from ncc_gui.target_bar import TargetBar
@@ -607,20 +608,16 @@ class NccShell(QMainWindow):
             else:
                 active = catalog_on
 
-            # Gate: only allowlisted domains while remote is blocked/install/update.
-            if info.id in LOCAL_ONLY_DOMAINS:
-                # SSH stays local; still respect catalog presence.
-                visible = True
-            elif allow is not None:
-                visible = info.id in allow
-            elif info.always_visible:
-                visible = True
-            elif info.group == "core":
-                visible = catalog_on
-            elif hide_inactive:
-                visible = active
-            else:
-                visible = True
+            visible = domain_nav_visible(
+                always_visible=info.always_visible,
+                group=info.group,
+                catalog_on=catalog_on,
+                active=active,
+                hide_inactive_features=hide_inactive,
+                allow=allow,
+                domain_id=info.id,
+                local_only=LOCAL_ONLY_DOMAINS,
+            )
 
             info.enabled = visible
 
