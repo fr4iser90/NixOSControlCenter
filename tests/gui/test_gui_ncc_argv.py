@@ -22,6 +22,9 @@ NIXOS = REPO / "nixos"
 
 NAME_RE = re.compile(r'name\s*=\s*"([^"]+)"')
 PARENT_RE = re.compile(r'parent\s*=\s*"([^"]+)"')
+TYPE_RE = re.compile(r'type\s*=\s*"([^"]+)"')
+ARGS_RE = re.compile(r"arguments\s*=\s*\[([^\]]*)\]", re.DOTALL)
+ARG_STR_RE = re.compile(r'"([^"]+)"')
 NCC_KW = re.compile(
     r"""ncc\s*=\s*(?:\(|\[)\s*["']([a-z][a-z0-9-]*)["']"""
     r"""(?:\s*,\s*["']([a-z][a-z0-9-]*)["'])?""",
@@ -49,6 +52,14 @@ def _repo_commands() -> tuple[set[str], set[tuple[str, str]]]:
                     children.add((parents[0], name))
                 elif "registerCommandsFor" in text:
                     tops.add(name)
+                    # Manager ``arguments`` verbs expand to the same routes as
+                    # explicit parent=/name= children (cli-registry dispatcher).
+                    types = TYPE_RE.findall(block)
+                    if types and types[0] == "manager":
+                        for am in ARGS_RE.finditer(block):
+                            for verb in ARG_STR_RE.findall(am.group(1)):
+                                if verb and not verb.startswith("-"):
+                                    children.add((name, verb))
     return tops, children
 
 

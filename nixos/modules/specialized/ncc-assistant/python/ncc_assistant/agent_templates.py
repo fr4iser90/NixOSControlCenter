@@ -144,12 +144,14 @@ class AgentInstance:
     title: str
     params: dict[str, Any] = field(default_factory=dict)
     enabled_schedule: bool = False
+    provider_id: str | None = None
+    model: str | None = None
     created: str = ""
     updated: str = ""
     path: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             "id": self.id,
             "templateId": self.template_id,
             "title": self.title,
@@ -158,6 +160,11 @@ class AgentInstance:
             "created": self.created,
             "updated": self.updated,
         }
+        if self.provider_id:
+            d["providerId"] = self.provider_id
+        if self.model:
+            d["model"] = self.model
+        return d
 
     @classmethod
     def from_dict(cls, data: dict[str, Any], path: str | None = None) -> AgentInstance | None:
@@ -165,12 +172,18 @@ class AgentInstance:
         tid = str(data.get("templateId") or data.get("template_id") or "").strip()
         if not iid or not tid:
             return None
+        params = dict(data.get("params") or {})
+        # Legacy: provider/model nested in params
+        provider_id = data.get("providerId") or data.get("provider_id") or params.pop("_providerId", None)
+        model = data.get("model") or params.pop("_model", None)
         return cls(
             id=iid,
             template_id=tid,
             title=str(data.get("title") or iid),
-            params=dict(data.get("params") or {}),
+            params=params,
             enabled_schedule=bool(data.get("enabledSchedule", data.get("enabled_schedule", False))),
+            provider_id=str(provider_id).strip() if provider_id else None,
+            model=str(model).strip() if model else None,
             created=str(data.get("created") or ""),
             updated=str(data.get("updated") or ""),
             path=path,
@@ -419,6 +432,25 @@ def delete_instance(instance_id: str) -> bool:
     return True
 
 
+def settings_for_instance(inst: AgentInstance):
+    """Build Settings with instance provider/model + cached credentials."""
+    from dataclasses import replace
+
+    from .auth import with_cached_credentials
+    from .config import Settings
+    from .providers import apply_provider_settings, get_provider
+
+    settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
+    if inst.provider_id:
+        prov = get_provider(inst.provider_id)
+        if prov is not None:
+            settings = apply_provider_settings(settings, prov)
+            settings = with_cached_credentials(settings)
+    if inst.model:
+        settings = replace(settings, model=inst.model)
+    return settings
+
+
 def instantiate(
     template_id: str,
     params: dict[str, Any],
@@ -427,6 +459,9 @@ def instantiate(
     title: str | None = None,
     enable_schedule: bool = False,
     save_playbook: bool = True,
+    provider_id: str | None = None,
+    model: str | None = None,
+    update_existing: bool = False,
 ) -> dict[str, Any]:
     """
     Validate params, persist instance, optionally write a user playbook + schedule.
@@ -442,14 +477,34 @@ def instantiate(
     if errors:
         return {"ok": False, "error": "; ".join(errors), "errors": errors}
 
-    iid = (instance_id or f"{template_id}-{uuid.uuid4().hex[:8]}").strip()
+    if update_existing and instance_id:
+        prev = get_instance(instance_id)
+        if prev is None:
+            return {"ok": False, "error": f"Unknown instance: {instance_id}"}
+        iid = prev.id
+        created = prev.created
+        title_final = title or prev.title
+    else:
+        prev = None
+        iid = (instance_id or f"{template_id}-{uuid.uuid4().hex[:8]}").strip()
+        created = ""
+        title_final = title or f"{tmpl.title} ({iid})"
+
     inst = AgentInstance(
         id=iid,
         template_id=template_id,
-        title=title or f"{tmpl.title} ({iid})",
+        title=title_final,
         params=merged,
         enabled_schedule=enable_schedule,
+        provider_id=(provider_id or (prev.provider_id if prev else None)) or None,
+        model=(model or (prev.model if prev else None)) or None,
+        created=created,
     )
+    # Explicit empty string from UI means clear
+    if provider_id is not None:
+        inst.provider_id = provider_id.strip() or None
+    if model is not None:
+        inst.model = model.strip() or None
     path = save_instance(inst)
     goal = render_goal(tmpl, merged)
 
@@ -538,8 +593,6 @@ def instantiate(
 def run_instance(instance_id: str, *, dry_run: bool | None = None):
     """Yield agent events for a saved instance."""
     from .agent import run_agent
-    from .auth import with_cached_credentials
-    from .config import Settings
 
     inst = get_instance(instance_id)
     if inst is None:
@@ -548,7 +601,7 @@ def run_instance(instance_id: str, *, dry_run: bool | None = None):
     if tmpl is None:
         raise ValueError(f"Template missing for instance: {inst.template_id}")
     goal = render_goal(tmpl, inst.params)
-    settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
+    settings = settings_for_instance(inst)
     return run_agent(
         goal,
         settings,

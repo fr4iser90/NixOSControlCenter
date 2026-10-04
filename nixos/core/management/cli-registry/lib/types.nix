@@ -37,8 +37,14 @@
       arguments = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [];
-        description = "Allowed arguments for the command";
-        example = [ "--name" "--memory" "--cpu" ];
+        description = ''
+          Documented argv for this command. For a top-level ``type = "manager"``,
+          entries that do not start with ``-`` become ``ncc <manager> <verb>``
+          routes (thin wrappers that call the manager script with the verb).
+          Flag-like entries (``--json``, ``-d``, …) stay documentation-only.
+          Explicit ``parent =`` children always win over these expansions.
+        '';
+        example = [ "start" "stop" "--json" ];
       };
 
       dependencies = lib.mkOption {

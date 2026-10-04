@@ -73,9 +73,16 @@ ncc-assistant playbook run disk-nix-gc-advisor
 ncc ai          # Qt window (default)
 ncc ai gui
 ncc ai chat     # terminal fallback
+ncc ai companion   # desktop avatar + multi-chat (always-on-top)
+# or: ncc-assistant-companion
+# Drag avatar to move · + / Ctrl+N new chat · Ctrl+Tab switch · Hist/Skill/Cron/Jobs panels
 ```
 
 Tabs: **Chat**, **Agent**, **Templates**, **Tools**, **Jobs**, **Schedules**, **Settings**.
+
+**Companion:** small frameless window — drag the avatar to move, type below,
+Pause/Resume presence, Open full UI. Avatar animates idle / thinking / speaking /
+paused / error.
 
 ## Agent
 

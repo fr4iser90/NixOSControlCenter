@@ -34,8 +34,9 @@ in
               "playbook" "presence"
               "approve" "knowledge"
               "export" "eval"
-              "serve-openapi" "tray"
+              "serve-openapi" "tray" "companion"
               "watchdog" "probe" "rollback" "red-team"
+              "secrets" "workspaces" "templates" "mcp-install"
             ];
             shortHelp = "ai - AI Assistant";
             longHelp = ''
@@ -64,6 +65,10 @@ in
                 ncc ai export session|job|latest
                 ncc ai eval run
                 ncc ai tray
+                ncc ai companion
+                ncc ai secrets list|set|delete
+                ncc ai workspaces list|add|delete
+                ncc ai templates list|show|instantiate|run|instances
                 ncc ai watchdog list|fire EVENT
                 ncc ai probe disk
                 ncc ai rollback

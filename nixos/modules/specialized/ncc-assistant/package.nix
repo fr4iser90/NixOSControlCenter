@@ -194,8 +194,9 @@ let
     export NOTIFY_ON_SCHEDULE_START="${if (cfg.agent.notifications.notifyOnScheduleStart or false) then "1" else "0"}"
     export NOTIFY_ON_JOB_END="${if (cfg.agent.notifications.notifyOnJobEnd or true) then "1" else "0"}"
 
-    # Agent tray
+    # Agent tray / companion
     export AGENT_TRAY_ENABLE="${if (cfg.agent.tray.enable or false) then "1" else "0"}"
+    export AGENT_COMPANION_ENABLE="${if (cfg.agent.companion.enable or false) then "1" else "0"}"
 
     # Schedules + host profiles (for UI / rebuild guards)
     export NCC_ASSISTANT_SCHEDULES_JSON='${schedulesJson}'
@@ -218,7 +219,7 @@ let
     cmd="''${1:-}"
     interactive=0
     case "$cmd" in
-      ""|gui|chat|cli|mcp|tray|serve-openapi|help|-h|--help) interactive=1 ;;
+      ""|gui|chat|cli|mcp|tray|companion|serve-openapi|help|-h|--help) interactive=1 ;;
     esac
 
     if [ -z "''${NCC_CLI_NESTED:-}" ] && [ "$cmd" != "mcp" ]; then
@@ -232,6 +233,7 @@ let
           ""|gui) ${ui.messages.loading "Starting GUI…"} ;;
           chat|cli) ${ui.messages.loading "Starting chat…"} ;;
           tray) ${ui.messages.loading "Starting tray…"} ;;
+          companion) ${ui.messages.loading "Starting companion…"} ;;
           serve-openapi) ${ui.messages.loading "Starting OpenAPI server…"} ;;
         esac
       fi
@@ -271,6 +273,12 @@ let
     exec ${pythonEnv}/bin/python -m ncc_assistant tray
   '';
 
+  nccAssistantCompanion = pkgs.writeShellScriptBin "ncc-assistant-companion" ''
+    set -euo pipefail
+    ${envExports}
+    exec ${pythonEnv}/bin/python -m ncc_assistant companion
+  '';
+
   desktopItem = pkgs.makeDesktopItem {
     name = "ncc-assistant";
     desktopName = "NCC AI";
@@ -296,10 +304,14 @@ let
         name = "Start tray";
         exec = "${nccAssistantTray}/bin/ncc-assistant-tray";
       };
+      Companion = {
+        name = "Start companion";
+        exec = "${nccAssistantCompanion}/bin/ncc-assistant-companion";
+      };
     };
   };
 in
 {
-  inherit appRoot configHelper nccAssistant nccAssistantMcp nccAssistantTray pythonEnv desktopItem envExports envFile;
-  packages = [ nccAssistant nccAssistantMcp nccAssistantTray configHelper desktopItem ];
+  inherit appRoot configHelper nccAssistant nccAssistantMcp nccAssistantTray nccAssistantCompanion pythonEnv desktopItem envExports envFile;
+  packages = [ nccAssistant nccAssistantMcp nccAssistantTray nccAssistantCompanion configHelper desktopItem ];
 }

@@ -136,7 +136,7 @@ ncc chronicle …
 | Rule | Detail |
 |------|--------|
 | Canonical | Exactly one public path per action |
-| Dispatcher | Commands with `parent` match **only** `parent-name` (`ncc lock discover` → `lock-discover`), never bare `discover` |
+| Dispatcher | Commands with `parent` match **only** `parent-name` (`ncc lock discover` → `lock-discover`), never bare `discover`. Top-level managers may also list verbs in `arguments`; non-flag entries expand to the same `parent-name` routes (script gets the verb as argv[0]). |
 | Help | Only documents the canonical form |
 | Internal binaries | May still be named `ncc-*` in the store; never shown to users |
 

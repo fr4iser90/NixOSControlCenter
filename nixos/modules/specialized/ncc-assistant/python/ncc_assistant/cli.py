@@ -706,6 +706,10 @@ def main(argv: list[str] | None = None) -> int:
     serve_p.add_argument("--token", help="Bearer token for auth")
 
     sub.add_parser("tray", help="Start system tray daemon")
+    sub.add_parser(
+        "companion",
+        help="Desktop companion (avatar + mini chat, always-on-top)",
+    )
 
     watchdog_p = sub.add_parser("watchdog", help="Event-triggered agent watchdogs")
     watchdog_sub = watchdog_p.add_subparsers(dest="watchdog_cmd")
@@ -878,6 +882,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if command == "tray":
         return _cmd_tray(args)
+
+    if command == "companion":
+        from .companion import run_companion
+
+        return run_companion()
 
     if command == "watchdog":
         return _cmd_watchdog(args)

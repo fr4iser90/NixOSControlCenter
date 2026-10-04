@@ -21,6 +21,7 @@
   # agent.profile = "read-only";
   # agent.notifications.enable = true;
   # agent.tray.enable = false;
+  # agent.companion.enable = false;  # desktop avatar + mini chat (ncc ai companion)
 
   # --- Recommended schedules (opt-in: uncomment to enable) ---
   # Safe defaults: playbook + read-only + dryRun. Only one agent runs at a time.

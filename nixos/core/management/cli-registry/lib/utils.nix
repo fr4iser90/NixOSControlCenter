@@ -7,6 +7,49 @@ let
   dangerousIgnore = if (nccConfig.dangerousIgnore or false) then "true" else "false";
 in
 {
+  # Top-level managers may document verbs in ``arguments`` (e.g. ``ncc ai companion``)
+  # without registering each ``parent=`` child. The dispatcher only matches
+  # ``parent-name``, so expand non-flag verbs into thin wrappers that re-inject
+  # the verb as argv[0] for the manager script. Explicit children win on conflict.
+  expandManagerArgumentChildren = commands:
+    let
+      explicitKeys = lib.listToAttrs (
+        map (c: {
+          name = "${c.parent}-${c.name}";
+          value = true;
+        }) (lib.filter (c: (c.parent or null) != null) commands)
+      );
+      verbsOf = cmd:
+        lib.filter (a: builtins.isString a && a != "" && !(lib.hasPrefix "-" a))
+          (cmd.arguments or []);
+      isTopManager = cmd:
+        (cmd.parent or null) == null
+        && (cmd.type or "command") == "manager"
+        && (cmd.script or null) != null;
+      mkChild = cmd: arg: {
+        name = arg;
+        parent = cmd.name;
+        domain = cmd.domain or cmd.name;
+        description = "${cmd.name} ${arg}";
+        category = cmd.category or "other";
+        script = "${pkgs.writeShellScriptBin "ncc-${cmd.name}-${arg}" ''
+          exec ${cmd.script} ${lib.escapeShellArg arg} "$@"
+        ''}/bin/ncc-${cmd.name}-${arg}";
+        shortHelp = "${arg} - ${cmd.name} ${arg}";
+        longHelp = "See: ncc help ${cmd.name}";
+        internal = true;
+      };
+    in
+      lib.concatMap (
+        cmd:
+        if !(isTopManager cmd) then
+          [ ]
+        else
+          lib.filter (child: !(explicitKeys ? "${child.parent}-${child.name}")) (
+            map (mkChild cmd) (verbsOf cmd)
+          )
+      ) commands;
+
   # Generate case blocks for command execution
   generateExecCase = cmd: let
     permission = cmd.permission or null;

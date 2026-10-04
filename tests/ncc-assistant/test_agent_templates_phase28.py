@@ -152,6 +152,47 @@ class Phase28Tests(unittest.TestCase):
         text = at.load_skill_text("skills/agents-md-maintainer.md")
         self.assertIn("AGENTS.md", text)
 
+    def test_instance_stores_provider_model(self) -> None:
+        path = self.cfg / "repo"
+        path.mkdir()
+        (path / ".git").mkdir()
+        ws_mod.upsert_workspace("ncc", str(path))
+        result = at.instantiate(
+            "local-git-status",
+            {
+                "checkFrequency": "daily",
+                "timezone": "UTC",
+                "repositories": ["ncc"],
+            },
+            instance_id="llm-bind",
+            provider_id="my-provider",
+            model="coder",
+        )
+        self.assertTrue(result["ok"], result)
+        inst = at.get_instance("llm-bind")
+        assert inst is not None
+        self.assertEqual(inst.provider_id, "my-provider")
+        self.assertEqual(inst.model, "coder")
+        # Edit
+        result2 = at.instantiate(
+            "local-git-status",
+            {
+                "checkFrequency": "hourly",
+                "timezone": "UTC",
+                "repositories": ["ncc"],
+            },
+            instance_id="llm-bind",
+            provider_id="other",
+            model="chat",
+            update_existing=True,
+        )
+        self.assertTrue(result2["ok"], result2)
+        inst2 = at.get_instance("llm-bind")
+        assert inst2 is not None
+        self.assertEqual(inst2.provider_id, "other")
+        self.assertEqual(inst2.model, "chat")
+        self.assertEqual(inst2.params.get("checkFrequency"), "hourly")
+
     def test_normalize_on_calendar(self) -> None:
         self.assertEqual(sf.normalize_on_calendar("hourly"), "hourly")
         self.assertEqual(sf.normalize_on_calendar("every-15m"), "*:0/15")

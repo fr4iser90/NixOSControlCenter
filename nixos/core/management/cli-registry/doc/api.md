@@ -27,6 +27,13 @@ cliRegistry.registerCommandsFor "stacks" [
 ]
 ```
 
+**Manager `arguments`:** for a top-level `type = "manager"`, non-flag entries in
+`arguments` (e.g. `"companion"`, `"tray"`) are expanded by the dispatcher into
+`ncc <manager> <verb>` routes that call the manager script with the verb as
+argv[0]. Prefer explicit `parent =` children when the verb has its own script
+(packages/system). Use `arguments` when one binary handles all verbs
+(`ncc ai …`, `ncc chronicle …`).
+
 ### `registerGuiDomain id attrs`
 
 Optional sidebar stub (useful when the module is disabled and has no commands yet).

@@ -82,6 +82,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 | 26 | Eval harness | **done** (`eval/cases.json` + `ncc ai eval run`) |
 | 27 | Red-team mode | **done** (guards + playbook + CLI/GUI) |
 | 28 | [Agent templates / MCP / secrets](./plans/28-agent-templates-mcp-secrets.md) | **done** (catalog, secrets, workspaces, MCP placeholders) |
+| 29 | [Desktop companion avatar](./plans/29-desktop-companion-avatar.md) | **done** (v1.1 multi-chat + panels; plasmoid later) |
 
 ## Feature map (checklist)
 

@@ -24,12 +24,16 @@ let
     }
     else null;
 
-  resolvedCommands = cliRegistry.getRegisteredCommands config;
+  registeredCommands = cliRegistry.getRegisteredCommands config;
+  # Managers that list verbs in ``arguments`` (ai, chronicle, …) need synthetic
+  # ``parent-name`` cases — see expandManagerArgumentChildren.
+  resolvedCommands =
+    registeredCommands ++ ccLib.utils.expandManagerArgumentChildren registeredCommands;
   caseBlock = lib.concatMapStringsSep "\n  " ccLib.utils.generateExecCase resolvedCommands;
-  commandLongHelp = lib.concatMapStringsSep "\n  " ccLib.utils.generateLongHelpCase resolvedCommands;
-  commandList = ccLib.utils.generateCommandList resolvedCommands;
+  commandLongHelp = lib.concatMapStringsSep "\n  " ccLib.utils.generateLongHelpCase registeredCommands;
+  commandList = ccLib.utils.generateCommandList registeredCommands;
 
-  publicCommands = lib.filter (c: !(c.internal or false)) resolvedCommands;
+  publicCommands = lib.filter (c: !(c.internal or false)) registeredCommands;
 
   titleCase = name:
     let

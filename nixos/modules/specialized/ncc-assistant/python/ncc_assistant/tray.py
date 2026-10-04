@@ -48,6 +48,7 @@ def run_tray() -> int:
     act_resume = QAction("Resume agent (available)")
     act_pending = QAction("Show pending approvals")
     act_open = QAction("Open NCC AI")
+    act_companion = QAction("Open companion")
     act_quit = QAction("Quit tray")
 
     def on_pause() -> None:
@@ -79,10 +80,28 @@ def run_tray() -> int:
 
         run_gui()
 
+    def on_companion() -> None:
+        import shutil
+
+        from PySide6.QtCore import QProcess
+
+        bin_path = shutil.which("ncc-assistant-companion") or shutil.which(
+            "ncc-assistant"
+        )
+        if bin_path and bin_path.endswith("companion"):
+            QProcess.startDetached(bin_path, [])
+        elif bin_path:
+            QProcess.startDetached(bin_path, ["companion"])
+        else:
+            from .companion import run_companion
+
+            run_companion()
+
     act_pause.triggered.connect(on_pause)
     act_resume.triggered.connect(on_resume)
     act_pending.triggered.connect(on_pending)
     act_open.triggered.connect(on_open)
+    act_companion.triggered.connect(on_companion)
     act_quit.triggered.connect(app.quit)
 
     menu.addAction(act_pause)
@@ -90,6 +109,7 @@ def run_tray() -> int:
     menu.addSeparator()
     menu.addAction(act_pending)
     menu.addAction(act_open)
+    menu.addAction(act_companion)
     menu.addSeparator()
     menu.addAction(act_quit)
     tray.setContextMenu(menu)

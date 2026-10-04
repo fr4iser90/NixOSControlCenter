@@ -376,6 +376,14 @@ in
         };
       };
 
+      companion = {
+        enable = mkOption {
+          type = types.bool;
+          default = false;
+          description = "Ship desktop companion (avatar + mini chat) entry / optional autostart hint";
+        };
+      };
+
       schedules = mkOption {
         type = types.attrsOf scheduleModule;
         default = { };
