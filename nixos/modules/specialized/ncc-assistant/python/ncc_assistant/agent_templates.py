@@ -472,9 +472,16 @@ def instantiate(
 
     schedule_name = None
     if enable_schedule:
+        from .schedule_freq import normalize_on_calendar
         from .schedule_templates import ScheduleSpec, save_user_schedule
 
-        freq = str(merged.get("checkFrequency") or merged.get("onCalendar") or "daily")
+        freq = normalize_on_calendar(
+            str(merged.get("checkFrequency") or merged.get("onCalendar") or "daily")
+        )
+        # Persist normalized calendar back onto instance params for clarity
+        merged["checkFrequency"] = freq
+        inst.params = merged
+        save_instance(inst)
         schedule_name = f"tmpl-{iid}"
         save_user_schedule(
             ScheduleSpec(

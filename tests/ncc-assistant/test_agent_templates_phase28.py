@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT))
 
 from ncc_assistant import agent_templates as at  # noqa: E402
 from ncc_assistant import marketplace as mp  # noqa: E402
+from ncc_assistant import schedule_freq as sf  # noqa: E402
 from ncc_assistant import secrets as secrets_mod  # noqa: E402
 from ncc_assistant import workspaces as ws_mod  # noqa: E402
 
@@ -150,6 +151,23 @@ class Phase28Tests(unittest.TestCase):
     def test_skill_load(self) -> None:
         text = at.load_skill_text("skills/agents-md-maintainer.md")
         self.assertIn("AGENTS.md", text)
+
+    def test_normalize_on_calendar(self) -> None:
+        self.assertEqual(sf.normalize_on_calendar("hourly"), "hourly")
+        self.assertEqual(sf.normalize_on_calendar("every-15m"), "*:0/15")
+        self.assertEqual(
+            sf.normalize_on_calendar("daily-at", hour=3, minute=15),
+            "*-*-* 03:15:00",
+        )
+        self.assertEqual(
+            sf.normalize_on_calendar("weekly-at", hour=4, minute=0, weekday="Sun"),
+            "Sun *-*-* 04:00:00",
+        )
+        self.assertEqual(
+            sf.normalize_on_calendar("15 3 * * *"),
+            "*-*-* 03:15:00",
+        )
+        self.assertEqual(sf.normalize_on_calendar("*-*-* 02:45:00"), "*-*-* 02:45:00")
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, QTime, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -21,9 +21,121 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QTimeEdit,
     QVBoxLayout,
     QWidget,
 )
+
+
+class FrequencyPicker(QWidget):
+    """Preset / daily-at / weekly-at / custom OnCalendar picker."""
+
+    def __init__(self, parent: QWidget | None = None, *, default: str = "daily") -> None:
+        super().__init__(parent)
+        from .schedule_freq import FREQUENCY_PRESETS, WEEKDAYS
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+
+        self.preset = QComboBox()
+        for key, label, _tmpl in FREQUENCY_PRESETS:
+            self.preset.addItem(label, key)
+        lay.addWidget(self.preset)
+
+        self.time_row = QWidget()
+        tr = QHBoxLayout(self.time_row)
+        tr.setContentsMargins(0, 0, 0, 0)
+        self.weekday = QComboBox()
+        for key, label in WEEKDAYS:
+            self.weekday.addItem(label, key)
+        tr.addWidget(self.weekday)
+        self.time_edit = QTimeEdit()
+        self.time_edit.setDisplayFormat("HH:mm")
+        self.time_edit.setTime(QTime(3, 15))
+        tr.addWidget(self.time_edit)
+        lay.addWidget(self.time_row)
+
+        self.custom_edit = QLineEdit()
+        self.custom_edit.setPlaceholderText(
+            "systemd OnCalendar, e.g. *-*-* 03:15:00  or cron: 15 3 * * *"
+        )
+        lay.addWidget(self.custom_edit)
+
+        self.preview = QLabel("")
+        self.preview.setStyleSheet("color: palette(placeholder-text);")
+        self.preview.setWordWrap(True)
+        lay.addWidget(self.preview)
+
+        self.preset.currentIndexChanged.connect(self._sync_visibility)
+        self.weekday.currentIndexChanged.connect(self._update_preview)
+        self.time_edit.timeChanged.connect(lambda _t: self._update_preview())
+        self.custom_edit.textChanged.connect(lambda _t: self._update_preview())
+
+        # Apply default
+        from .schedule_freq import parse_stored_frequency
+
+        parsed = parse_stored_frequency(str(default or "daily"))
+        preset = parsed.get("preset") or "daily"
+        # Map aliases like "weekly" that normalize to themselves
+        idx = self.preset.findData(preset)
+        if idx < 0 and preset in ("hourly", "daily", "weekly"):
+            idx = self.preset.findData(preset)
+        if idx < 0:
+            idx = self.preset.findData("custom")
+        if idx >= 0:
+            self.preset.setCurrentIndex(idx)
+        if parsed.get("hour") is not None:
+            self.time_edit.setTime(
+                QTime(int(parsed["hour"]), int(parsed.get("minute") or 0))
+            )
+        if parsed.get("weekday"):
+            widx = self.weekday.findData(parsed["weekday"])
+            if widx >= 0:
+                self.weekday.setCurrentIndex(widx)
+        if parsed.get("custom"):
+            self.custom_edit.setText(str(parsed["custom"]))
+        self._sync_visibility()
+
+    def _sync_visibility(self) -> None:
+        key = self.preset.currentData()
+        self.time_row.setVisible(key in ("daily-at", "weekly-at"))
+        self.weekday.setVisible(key == "weekly-at")
+        self.custom_edit.setVisible(key == "custom")
+        self._update_preview()
+
+    def _update_preview(self) -> None:
+        cal = self.on_calendar()
+        self.preview.setText(f"Schedule: {cal}")
+
+    def on_calendar(self) -> str:
+        from .schedule_freq import normalize_on_calendar
+
+        key = str(self.preset.currentData() or "daily")
+        if key == "custom":
+            return normalize_on_calendar(self.custom_edit.text().strip() or "daily")
+        t = self.time_edit.time()
+        return normalize_on_calendar(
+            key,
+            hour=t.hour(),
+            minute=t.minute(),
+            weekday=str(self.weekday.currentData() or "Sun"),
+        )
+
+
+class TimezonePicker(QComboBox):
+    def __init__(self, parent: QWidget | None = None, *, default: str = "Europe/Berlin") -> None:
+        super().__init__(parent)
+        from .schedule_freq import COMMON_TIMEZONES
+
+        self.setEditable(True)
+        for tz in COMMON_TIMEZONES:
+            self.addItem(tz)
+        if default:
+            idx = self.findText(default)
+            if idx >= 0:
+                self.setCurrentIndex(idx)
+            else:
+                self.setEditText(default)
 
 
 class TemplateConfigureDialog(QDialog):
@@ -37,7 +149,7 @@ class TemplateConfigureDialog(QDialog):
         if self._tmpl is None:
             raise ValueError(f"Unknown template: {template_id}")
         self.setWindowTitle(f"Configure — {self._tmpl.title}")
-        self.resize(520, 560)
+        self.resize(540, 640)
         self._fields: dict[str, Any] = {}
 
         root = QVBoxLayout(self)
@@ -45,7 +157,14 @@ class TemplateConfigureDialog(QDialog):
         desc.setWordWrap(True)
         root.addWidget(desc)
 
-        form = QFormLayout()
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        form_host = QWidget()
+        form = QFormLayout(form_host)
+        scroll.setWidget(form_host)
+        root.addWidget(scroll, stretch=1)
+
         for p in self._tmpl.params:
             label = p.label + (" *" if p.required else "")
             widget: QWidget
@@ -88,6 +207,10 @@ class TemplateConfigureDialog(QDialog):
                         edit.setText(str(p.default))
                 edit.setPlaceholderText("comma-separated")
                 widget = edit
+            elif p.type == "cronOrInterval":
+                widget = FrequencyPicker(default=str(p.default or "daily"))
+            elif p.type == "timezone":
+                widget = TimezonePicker(default=str(p.default or "Europe/Berlin"))
             else:
                 edit = QLineEdit()
                 if p.default is not None:
@@ -97,7 +220,6 @@ class TemplateConfigureDialog(QDialog):
                 widget = edit
             self._fields[p.id] = (p, widget)
             form.addRow(label, widget)
-        root.addLayout(form)
 
         self.schedule_cb = QCheckBox("Enable schedule from check frequency")
         self.schedule_cb.setChecked(bool(self._tmpl.schedule_kind))
@@ -131,6 +253,10 @@ class TemplateConfigureDialog(QDialog):
             elif p.type == "stringList":
                 text = widget.text().strip()
                 params[pid] = [x.strip() for x in text.split(",") if x.strip()]
+            elif p.type == "cronOrInterval":
+                params[pid] = widget.on_calendar()
+            elif p.type == "timezone":
+                params[pid] = widget.currentText().strip()
             else:
                 params[pid] = widget.text().strip()
         return params

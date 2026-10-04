@@ -119,6 +119,22 @@ If the model list fails with **Auth failed**, update the LLM provider key (Chat
 auth dialog or Settings → providers). Stale keys no longer keep an old model
 selected as if the gateway still served it.
 
+### Where LLM provider / model data lives
+
+All under `~/.config/ncc-assistant/` (user-only, not `systemConfig`):
+
+| File | Contents | Protection |
+|------|----------|------------|
+| `providers.json` | Endpoint list (e.g. old `llm.fr4iser.com`) | `0600`, **no** API keys |
+| `credentials.json` | API keys per endpoint | `0600`, plaintext (needed for HTTP) |
+| `preferences.json` | Last provider id + last model | `0600` |
+| `secrets.json` | Agent/MCP tokens (`github_token`) | `0600`, plaintext |
+
+**Old host still selected?** Settings → **1 · LLM providers** → Edit/Remove
+`llm.fr4iser.com`, Add your current endpoint, then pick it in Chat’s provider
+combo. Or delete that entry from `providers.json` / clear `last_provider_id` in
+`preferences.json`.
+
 ## Jobs / playbooks / presence
 
 ```bash
