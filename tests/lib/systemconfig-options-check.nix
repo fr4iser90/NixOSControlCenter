@@ -1,5 +1,5 @@
 # Validate a loaded systemConfig attrset against discovered module options.nix types.
-# Used by tests/validate-systemconfig-writes.sh (install-wizard staged config).
+# Used by tests/gates/validate-systemconfig-writes.sh (install-wizard staged config).
 { pkgs, nixosRoot, systemConfig }:
 let
   lib = pkgs.lib;

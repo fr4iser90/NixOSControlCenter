@@ -11,7 +11,7 @@ Cross-cutting human docs. Product pitch: [root README](../README.md).
 | Filenames | **kebab-case** |
 | Module docs | **only** `nixos/<module>/doc/` (+ root `README.md` stub) |
 | Forbidden | `ai/docs/`, root `cli.md` / loose manuals |
-| Gate | `tests/validate-docs-layout.sh` |
+| Gate | `tests/gates/validate-docs-layout.sh` |
 | Rules | [AGENTS.md](../AGENTS.md), `docs/developing/docs-conventions.md` |
 
 ## Target tree

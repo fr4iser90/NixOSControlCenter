@@ -6,7 +6,7 @@
 # Additive edits do NOT require a bump.
 #
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 NIXOS="$ROOT/nixos"
 FAIL=0
 

@@ -2,7 +2,7 @@
 # HARD GATE — ONE docs home per module: <module>/doc/ (+ kebab-case).
 # Root may only have README.md / CHANGELOG.md. No ai/docs/, no root cli.md.
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 FAIL=0
 
 pass() { echo "  PASS: $*"; }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # HARD GATE — eval Nix module fragments that only fail at apply-time (let/import bindings).
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 NIXOS="$ROOT/nixos"
 FAIL=0
 

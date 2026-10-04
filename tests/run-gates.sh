@@ -3,7 +3,7 @@
 # Agents and CI should get exit 0 from this script.
 #
 # Layout:
-#   validate-ncc-nix.sh          — nixos/ integrity + GUI catalog invariants
+#   gates/validate-ncc-nix.sh    — nixos/ integrity + GUI catalog invariants
 #   gui/validate-gui-python.sh   — GUI Python (required; set SKIP_GUI=1 only in emergencies)
 #
 # Strategy: tests/TESTING.md
@@ -32,7 +32,7 @@ run() {
   fi
 }
 
-run "ncc-nix" bash "$ROOT/tests/validate-ncc-nix.sh"
+run "ncc-nix" bash "$ROOT/tests/gates/validate-ncc-nix.sh"
 
 if [[ "${SKIP_GUI:-}" != "1" ]]; then
   if command -v python3 >/dev/null 2>&1; then

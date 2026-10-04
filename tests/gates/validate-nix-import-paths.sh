@@ -3,7 +3,7 @@
 # Catches broken paths like components/lib/foo.nix vs components/system-checks/lib/foo.nix
 # before commit (the class of error that passes packaging gates but fails nix build switch).
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 NIXOS="$ROOT/nixos"
 FAIL=0
 

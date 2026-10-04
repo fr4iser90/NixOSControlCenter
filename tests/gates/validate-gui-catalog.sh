@@ -7,7 +7,7 @@
 #   - Core domains missing registerGuiDomain / registerGuiPage
 #
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 NIXOS="$ROOT/nixos"
 FAIL=0
 

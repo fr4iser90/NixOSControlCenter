@@ -1,5 +1,7 @@
 # CLI validation — what is automatic vs manual
 
+**Soft / optional** — not part of `tests/run-gates.sh`. Run before CLI/formatter doc changes, or via `tests/default.nix`.
+
 ## One command (automated)
 
 ```bash

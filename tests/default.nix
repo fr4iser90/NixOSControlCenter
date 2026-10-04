@@ -7,7 +7,7 @@ pkgs.runCommand "ncc-tests" {
   set -euo pipefail
   export NIX_PATH=nixpkgs=${pkgs.path}
   echo "=== hard gates (validate-ncc-nix) ==="
-  bash ${./validate-ncc-nix.sh}
+  bash ${./gates/validate-ncc-nix.sh}
   echo "=== cli-formatter / CLI validation ==="
   bash ${./cli-formatter/validate-cli.sh}
   echo "=== install-wizard ==="

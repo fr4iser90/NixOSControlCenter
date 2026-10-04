@@ -28,7 +28,7 @@ Laws: [AGENTS.md](../../../AGENTS.md) (discovery section)
 ## Docs
 
 One home: `<module>/doc/**/*.md`. README/CHANGELOG stubs at module root only.  
-No `ai/docs/`, no root `cli.md`. Gate: `tests/validate-docs-layout.sh`.
+No `ai/docs/`, no root `cli.md`. Gate: `tests/gates/validate-docs-layout.sh`.
 
 ## Migrations (only when hosts break without cleanup)
 

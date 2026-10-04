@@ -13,7 +13,7 @@ description: >-
 - Domain pages: `ui/gui/page.py` under the owning module
 - Engine: `nixos/core/management/gui-engine/python/ncc_gui/`
 - **Never** add `nixos/**/test_*.py` (would deploy). Suites live in `tests/gui/`
-- Catalog: domains register via commands; gate `tests/validate-gui-catalog.sh`
+- Catalog: domains register via commands; gate `tests/gates/validate-gui-catalog.sh`
 
 ## Python env
 
@@ -29,7 +29,7 @@ GUI is **not** system `python3` + PySide6. Prefer:
 bash tests/run-gates.sh
 # or at least:
 bash tests/gui/validate-gui-python.sh
-bash tests/validate-gui-catalog.sh
+bash tests/gates/validate-gui-catalog.sh
 ```
 
 Design notes: `nixos/core/management/gui-engine/doc/gui-design.md`.  

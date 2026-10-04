@@ -5,7 +5,7 @@
 **One docs home per module: `doc/`.**  
 Filenames: **kebab-case**. Root may only have `README.md` / `CHANGELOG.md`.
 
-Gate: `tests/validate-docs-layout.sh`. Laws: [AGENTS.md](../../AGENTS.md).
+Gate: `tests/gates/validate-docs-layout.sh`. Laws: [AGENTS.md](../../AGENTS.md).
 
 ---
 

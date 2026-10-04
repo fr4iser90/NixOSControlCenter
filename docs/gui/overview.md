@@ -28,4 +28,4 @@ See [`ui-matrix.md`](./ui-matrix.md) (GUI column). Core examples: hardware, pack
 
 - Core domains remain in the sidebar when disabled (Off badge)
 - Features may be hidden when inactive (chrome pref)
-- Tests for catalog invariants: `tests/validate-gui-catalog.sh` (via `run-gates.sh`)
+- Tests for catalog invariants: `tests/gates/validate-gui-catalog.sh` (via `run-gates.sh`)

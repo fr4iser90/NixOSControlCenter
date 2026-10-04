@@ -77,8 +77,10 @@ result-*
 .envrc
 
 # Python specific (zusätzlich)
-*.pyc
+*.py[cod]
+*$py.class
 __pycache__/
+**/__pycache__/
 .python-version
 .coverage
 htmlcov/

@@ -3,7 +3,7 @@
 # and must count system profile generations (not nixos-rebuild --list-generations).
 # GC preview must use nix-store --gc --print-dead (Nix 2.3x dropped it from collect-garbage).
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SRC="$ROOT/nixos/core/management/system-manager/scripts/ncc-store-gc.nix"
 FAIL=0
 pass() { echo "  PASS: $*"; }

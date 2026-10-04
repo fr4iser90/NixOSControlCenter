@@ -16,7 +16,7 @@ After any change under `nixos/` (or when the user will `system-update`):
 bash tests/run-gates.sh
 ```
 
-Require **exit 0 in this turn**. Prefer this over `validate-ncc-nix.sh` alone (includes GUI Python smoke).
+Require **exit 0 in this turn**. Prefer this over `gates/validate-ncc-nix.sh` alone (includes GUI Python smoke).
 
 ## Forbidden
 

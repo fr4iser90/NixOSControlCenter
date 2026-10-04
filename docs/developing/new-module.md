@@ -54,7 +54,7 @@ Modules under `nixos/modules/` are discovered by the tree; do **not** hardcode p
 
 **One docs home: `doc/`.** No `ai/docs/`, no root `cli.md`.  
 Assistant reads `doc/ai-*.md`. Tools stay in `ai/tools/`.  
-Law: [AGENTS.md](../../AGENTS.md) · Gate: `tests/validate-docs-layout.sh`.
+Law: [AGENTS.md](../../AGENTS.md) · Gate: `tests/gates/validate-docs-layout.sh`.
 
 SSOT for AI packs: [`domain-ai-packs.md`](../../nixos/modules/specialized/ncc-assistant/doc/domain-ai-packs.md).
 
@@ -229,7 +229,7 @@ Bump `_version` / metadata `version` **and** add `<module>/migrations/vFROM-to-v
 ```
 
 Details: [AGENTS.md](../../AGENTS.md) · [.agents/skills/ncc-module-work](../../.agents/skills/ncc-module-work/SKILL.md).  
-Gate: `tests/validate-module-migrations.sh` (via `validate-ncc-nix.sh`).
+Gate: `tests/gates/validate-module-migrations.sh` (via `gates/validate-ncc-nix.sh`).
 
 ---
 

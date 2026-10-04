@@ -19,10 +19,10 @@ bash tests/run-gates.sh
 Minimum Nix + catalog gate alone:
 
 ```bash
-bash tests/validate-ncc-nix.sh
+bash tests/gates/validate-ncc-nix.sh
 ```
 
-Git pre-commit is auto-wired (`scripts/install-git-hooks.sh` via Cursor sessionStart / `run-gates.sh`). Manual:
+Git pre-commit is wired by `scripts/install-git-hooks.sh` (also self-heals from `run-gates.sh`):
 
 ```bash
 bash scripts/install-git-hooks.sh
@@ -33,34 +33,33 @@ bash scripts/install-git-hooks.sh
 ```
 tests/
   TESTING.md                 Strategy (read this)
-  run-gates.sh               All hard gates
-  validate-ncc-nix.sh        Nix integrity + catalog invariants
-  validate-gui-catalog.sh    enable/or-true, core domain+page, no test leak
-  gui/validate-gui-python.sh GUI Python smoke + unit
-  gui/test_*.py              GUI / push_tree / fs_status / session
-  install-wizard/            Wizard + remote deploy
+  run-gates.sh               Entry — all hard gates
+  gates/                     Hard-gate validate-*.sh (Nix / layer / docs / catalog)
+    validate-ncc-nix.sh      Orchestrator for Nix integrity gates
+  gui/                       GUI Python smoke + unit (hard via run-gates)
+  install-wizard/            Wizard + remote deploy (subset in hard gate)
   lib/                       Shared Nix eval helpers
-  cli-formatter/             CLI formatter docs gate
-  hardware/                  Optional host-specific
-  ncc-assistant/             Assistant unit tests
-  packages/                  Packages intent store
-  ai-workspace-training/     Optional GPU bench (not a gate)
+  cli-formatter/             Soft / optional CLI formatter + docs audit
+  hardware/                  Soft / optional host-specific (e.g. Jetson)
+  ncc-assistant/             Soft / optional assistant unit tests
+  packages/                  Soft / optional packages intent store
+  ai-workspace-training/     Soft / optional GPU bench (not a gate)
 ```
 
 ## Why `.sh` and `.py` mixed?
 
 | Kind | Format | Examples |
 |------|--------|----------|
-| Nix / packaging / bash scripts | **`.sh`** (+ some `.nix` wrappers) | `validate-ncc-nix.sh`, `validate-systemconfig-writes.sh` |
+| Nix / packaging / bash scripts | **`.sh`** (+ some `.nix` wrappers) | `gates/validate-ncc-nix.sh`, `gates/validate-systemconfig-writes.sh` |
 | Python app logic (GUI, wizard, assistant) | **`.py`** | `tests/gui/`, `test_wizard_logic.py` |
 
 Shell gates must source install-wizard bash and call `nix-instantiate`. Python tests stay next to the Python concerns they exercise — still under **`tests/`**, not under `nixos/`.
 
-**Do not** migrate shell installer gates to Python. Add new **semantic config** checks via Nix eval (`tests/lib/systemconfig-options-check.nix`) and a thin `.sh` driver.
+**Do not** migrate shell installer gates to Python. Add new **semantic config** checks via Nix eval (`tests/lib/systemconfig-options-check.nix`) and a thin `.sh` driver under `gates/`.
 
 ## systemConfig SSOT validation
 
-`validate-systemconfig-writes.sh`:
+`gates/validate-systemconfig-writes.sh`:
 
 1. Runs `apply_install_template` for Desktop, Server, Jetson, fr4iser-home
 2. Loads staged leaves with `config-loader.nix`
@@ -70,6 +69,6 @@ Shell gates must source install-wizard bash and call `nix-instantiate`. Python t
 
 | Script | What |
 |--------|------|
-| `validate-nix-import-paths.sh` | Static `import ./…` resolve + parse all `.nix` |
-| `validate-nix-module-eval.sh` | Eval prebuild-checks + `import ./config.nix` module shapes |
-| `validate-gui-catalog.sh` | Catalog invariants + no tests under `nixos/` |
+| `gates/validate-nix-import-paths.sh` | Static `import ./…` resolve + parse all `.nix` |
+| `gates/validate-nix-module-eval.sh` | Eval prebuild-checks + `import ./config.nix` module shapes |
+| `gates/validate-gui-catalog.sh` | Catalog invariants + no tests under `nixos/` |

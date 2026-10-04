@@ -15,7 +15,7 @@
 **No.**
 
 - Deploy path syncs **`nixos/`** (and Host staging), not the git `tests/` tree.
-- Hard gate `validate-gui-catalog.sh` fails if `test_*.py` appears under `nixos/`.
+- Hard gate `gates/validate-gui-catalog.sh` fails if `test_*.py` appears under `nixos/`.
 - Store packages from modules must not `src = ../tests`.
 
 ## Layers (what to test)
@@ -23,9 +23,9 @@
 ```
 5 Surfaces     CLI · GUI · TUI          → shared smoke, not per-domain E2E
 4 Domain       scripts / page.py        → only when high risk
-3 systemConfig options + wizard writes  → validate-systemconfig-writes
+3 systemConfig options + wizard writes  → gates/validate-systemconfig-writes
 2 Wiring       getModule* / migrations  → module-layer + migrations
-1 Nix tree     parse / imports / bash   → validate-ncc-nix (main net)
+1 Nix tree     parse / imports / bash   → gates/validate-ncc-nix (main net)
 ```
 
 **Do not** create a full CLI+GUI+TUI suite per domain. Shared gates first; domain extras only for stacks/install/jetson/desktop-set style risk.
@@ -35,7 +35,7 @@
 ```bash
 bash tests/run-gates.sh
 # or:
-bash tests/validate-ncc-nix.sh   # Nix integrity + catalog invariants
+bash tests/gates/validate-ncc-nix.sh   # Nix integrity + catalog invariants
 bash tests/gui/validate-gui-python.sh   # GUI Python (required in run-gates)
 ```
 
@@ -52,21 +52,20 @@ Skip nix-build: `NCC_GUI_SKIP_NIX_PYTHON=1` (Qt tests skip; AST/smokes still run
 
 | Gate | Role |
 |------|------|
-| `validate-ncc-nix.sh` | bash-in-nix, layer, migrations, wizard packaging, options SSOT, imports, prebuild + **imported config.nix** eval, **GUI catalog** |
+| `gates/validate-ncc-nix.sh` | bash-in-nix, layer, migrations, wizard packaging, options SSOT, imports, prebuild + **imported config.nix** eval, **GUI catalog** |
 
-Step 8 (`validate-nix-module-eval.sh`) also force-evals `(import ./config.nix …)` values as NixOS modules (`lib.evalModules`). That catches top-level `lib.mkMerge` and mixed `config` + `warnings` — bugs that only showed up at `ncc system-update` before.
+Step 8 (`gates/validate-nix-module-eval.sh`) also force-evals `(import ./config.nix …)` values as NixOS modules (`lib.evalModules`). That catches top-level `lib.mkMerge` and mixed `config` + `warnings` — bugs that only showed up at `ncc system-update` before.
 | `gui/validate-gui-python.sh` | page smoke, argv, fs_status, session_ux, hot-path; optional soak |
-| `cli-formatter/validate-cli.sh` | CLI docs/formatter (via `tests/default.nix` / optional) |
+| `cli-formatter/validate-cli.sh` | Soft / optional — CLI docs/formatter (`tests/default.nix` or manual) |
 
-Enable Git pre-commit (automatic):
+Enable Git pre-commit:
 
 ```bash
-# Usually unnecessary — Cursor sessionStart + run-gates.sh call:
+# Usually unnecessary — run-gates.sh self-heals:
 bash scripts/install-git-hooks.sh
 ```
 
-That sets `core.hooksPath=.githooks` and installs `.git/hooks/pre-commit` (idempotent).  
-No manual `git config` needed for normal clones.
+That sets `core.hooksPath=.githooks` and installs `.git/hooks/pre-commit` (idempotent).
 
 ## Soft / optional
 

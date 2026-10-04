@@ -9,7 +9,7 @@
 #   - Core orchestration may discover; must not list peer module script paths
 #
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 NIXOS="$ROOT/nixos"
 MM_MIG="$NIXOS/core/management/module-manager/components/module-migration"
 PLANS="$MM_MIG/plans.nix"

@@ -18,7 +18,7 @@
 #  11) store-status probes (df + profile gens — not flake path-info / list-generations)
 #
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 NIXOS="$ROOT/nixos"
 FAIL=0
 
@@ -26,7 +26,7 @@ pass() { echo "  PASS: $*"; }
 fail() { echo "  FAIL: $*"; FAIL=1; }
 
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║  NCC HARD GATE — whole codebase (tests/validate-ncc-nix)     ║"
+echo "║  NCC HARD GATE — whole codebase (tests/gates/validate-ncc-nix)     ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 
 # ── 1) Bash embedding: entire nixos/ ────────────────────────────────────────
@@ -91,7 +91,7 @@ rm -f "$LAYER_OUT"
 # ── 3) Module modularity ────────────────────────────────────────────────────
 echo ""
 echo "== 3/11  module layer / modularity =="
-if bash "$ROOT/tests/validate-module-layer.sh"; then
+if bash "$ROOT/tests/gates/validate-module-layer.sh"; then
   pass "validate-module-layer.sh"
 else
   fail "module layer / modularity gate"
@@ -100,7 +100,7 @@ fi
 # ── 4) Auto-detect migrations / version bumps ───────────────────────────────
 echo ""
 echo "== 4/11  module migrations auto-detect =="
-if bash "$ROOT/tests/validate-module-migrations.sh"; then
+if bash "$ROOT/tests/gates/validate-module-migrations.sh"; then
   pass "validate-module-migrations.sh"
 else
   fail "missing migrations / version bumps for packaging-sensitive deletes"
@@ -118,7 +118,7 @@ fi
 # ── 6) Wizard writes vs module options.nix ───────────────────────────────────
 echo ""
 echo "== 6/11  systemConfig writes vs options.nix (SSOT) =="
-if bash "$ROOT/tests/validate-systemconfig-writes.sh"; then
+if bash "$ROOT/tests/gates/validate-systemconfig-writes.sh"; then
   pass "validate-systemconfig-writes.sh"
 else
   fail "staged systemConfig violates module options.nix"
@@ -127,7 +127,7 @@ fi
 # ── 7) Static relative import paths ──────────────────────────────────────────
 echo ""
 echo "== 7/11  nix import paths + parse (generic) =="
-if bash "$ROOT/tests/validate-nix-import-paths.sh"; then
+if bash "$ROOT/tests/gates/validate-nix-import-paths.sh"; then
   pass "validate-nix-import-paths.sh"
 else
   fail "broken relative import paths under nixos/"
@@ -136,7 +136,7 @@ fi
 # ── 8) Module fragment eval (prebuild + imported config.nix) ─────────────────
 echo ""
 echo "== 8/11  nix module eval (prebuild + config.nix imports) =="
-if bash "$ROOT/tests/validate-nix-module-eval.sh"; then
+if bash "$ROOT/tests/gates/validate-nix-module-eval.sh"; then
   pass "validate-nix-module-eval.sh"
 else
   fail "prebuild / imported config.nix module eval failed"
@@ -145,7 +145,7 @@ fi
 # ── 9) GUI catalog invariants ────────────────────────────────────────────────
 echo ""
 echo "== 9/11  GUI catalog invariants =="
-if bash "$ROOT/tests/validate-gui-catalog.sh"; then
+if bash "$ROOT/tests/gates/validate-gui-catalog.sh"; then
   pass "validate-gui-catalog.sh"
 else
   fail "GUI catalog / enable / test-leak invariants"
@@ -154,7 +154,7 @@ fi
 # ── 10) Docs layout + kebab naming ───────────────────────────────────────────
 echo ""
 echo "== 10/11  docs layout + kebab-case =="
-if bash "$ROOT/tests/validate-docs-layout.sh"; then
+if bash "$ROOT/tests/gates/validate-docs-layout.sh"; then
   pass "validate-docs-layout.sh"
 else
   fail "markdown outside doc/ or non-kebab names"
@@ -163,7 +163,7 @@ fi
 # ── 11) Store-status probes ──────────────────────────────────────────────────
 echo ""
 echo "== 11/11  store-status probes =="
-if bash "$ROOT/tests/validate-store-status-probes.sh"; then
+if bash "$ROOT/tests/gates/validate-store-status-probes.sh"; then
   pass "validate-store-status-probes.sh"
 else
   fail "store-status probe contract broken"
@@ -173,7 +173,7 @@ echo ""
 echo "=== NCC HARD GATE summary ==="
 if [[ "$FAIL" -ne 0 ]]; then
   echo "FAILED — do NOT claim Nix works; do NOT tell user to system-update."
-  echo "Fix issues above, then re-run: bash tests/validate-ncc-nix.sh"
+  echo "Fix issues above, then re-run: bash tests/gates/validate-ncc-nix.sh"
   exit 1
 fi
 echo "OK — bash + layer + modularity + migrations + wizard + options + import paths + module eval + catalog + docs-layout + store-status green."

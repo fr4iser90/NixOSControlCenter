@@ -39,7 +39,7 @@ pkgs.runCommand "ncc-install-wizard-tests" {
   '') built}
 
   echo ">>> validate-systemconfig-writes"
-  bash ${../validate-systemconfig-writes.sh}
+  bash ${../gates/validate-systemconfig-writes.sh}
 
   touch $out
 ''

@@ -5,7 +5,7 @@
 # then nix-evaluates lib.evalModules against discovered options (SSOT = options.nix).
 #
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 NIXOS="$ROOT/nixos"
 MM_LIB="$NIXOS/core/management/module-manager/lib"
 
