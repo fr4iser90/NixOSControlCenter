@@ -56,6 +56,8 @@ def _settings(*, api: str = "openai-compatible", endpoint: str = "http://127.0.0
         agent_confirm="never",
         agent_dry_run=True,
         agent_profile=None,
+        agent_harness="native",
+        agent_coding_harness="auto",
         notify_enable=False,
         notify_timeout_sec=1,
         notify_on_timeout="block",

@@ -76,6 +76,11 @@ ncc ai chat     # terminal fallback
 ncc ai companion   # desktop avatar + multi-chat (always-on-top)
 # or: ncc-assistant-companion
 # Drag avatar to move · + / Ctrl+N new chat · Ctrl+Tab switch · Hist/Skill/Cron/Jobs panels
+# Thinking + tool traces stream into the bubble when the model/harness provides them.
+
+ncc ai harness status              # native / qwen / dsh availability
+ncc ai agent run --harness qwen --goal "…"
+# agent.harness / agent.codingHarness in systemConfig (auto routes git/coding templates)
 ```
 
 Tabs: **Chat**, **Agent**, **Templates**, **Tools**, **Jobs**, **Schedules**, **Settings**.

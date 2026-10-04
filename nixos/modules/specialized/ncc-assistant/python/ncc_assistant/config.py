@@ -84,6 +84,9 @@ class Settings:
     agent_confirm: str  # "writes" | "always" | "never"
     agent_dry_run: bool
     agent_profile: str | None
+    # Harness: native | qwen | dsh  (+ codingHarness: same | auto)
+    agent_harness: str
+    agent_coding_harness: str
     # Notification settings
     notify_enable: bool
     notify_timeout_sec: int
@@ -176,6 +179,12 @@ class Settings:
             agent_confirm=os.environ.get("NCC_ASSISTANT_AGENT_CONFIRM", "writes"),
             agent_dry_run=_env_bool("NCC_ASSISTANT_AGENT_DRY_RUN", False),
             agent_profile=_env_optional_str("NCC_ASSISTANT_AGENT_PROFILE"),
+            agent_harness=(
+                _env_optional_str("NCC_ASSISTANT_HARNESS") or "native"
+            ).lower(),
+            agent_coding_harness=(
+                _env_optional_str("NCC_ASSISTANT_CODING_HARNESS") or "auto"
+            ).lower(),
             # Notification settings
             notify_enable=_env_bool("NCC_ASSISTANT_NOTIFY_ENABLE", True),
             notify_timeout_sec=int(os.environ.get("NCC_ASSISTANT_NOTIFY_TIMEOUT_SEC", "300")),

@@ -198,6 +198,10 @@ let
     export AGENT_TRAY_ENABLE="${if (cfg.agent.tray.enable or false) then "1" else "0"}"
     export AGENT_COMPANION_ENABLE="${if (cfg.agent.companion.enable or false) then "1" else "0"}"
 
+    # Swappable coding harness (native | qwen | dsh)
+    export NCC_ASSISTANT_HARNESS="${cfg.agent.harness or "native"}"
+    export NCC_ASSISTANT_CODING_HARNESS="${cfg.agent.codingHarness or "auto"}"
+
     # Schedules + host profiles (for UI / rebuild guards)
     export NCC_ASSISTANT_SCHEDULES_JSON='${schedulesJson}'
     export NCC_ASSISTANT_HOST_PROFILES_JSON='${hostProfilesJson}'

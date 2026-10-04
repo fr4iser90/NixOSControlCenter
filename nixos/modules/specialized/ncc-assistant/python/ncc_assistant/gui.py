@@ -1791,10 +1791,27 @@ class ChatPage(QWidget):
             # Lazy bubble on first token — do not show a fake "Generating…" wall.
             self._discard_empty_stream_bubble()
             self._stream_bubble = None
+        elif kind == "thinking_delta":
+            piece = event.get("text") or ""
+            if not piece:
+                return
+            self._set_activity("Thinking…")
+            if getattr(self, "_think_bubble", None) is None:
+                self._think_buf = piece
+                self._think_bubble = self._add_bubble(
+                    "Thinking", piece, markdown=False
+                )
+            else:
+                self._think_buf = (getattr(self, "_think_buf", "") or "") + piece
+                self._think_bubble.set_markdown(self._think_buf)
+            self._scroll_bottom()
         elif kind == "assistant_delta":
             piece = event.get("text") or ""
             if not piece:
                 return
+            # Close thinking bubble when answer tokens start
+            self._think_bubble = None
+            self._think_buf = ""
             if self._stream_bubble is None:
                 self._stream_bubble = self._add_bubble(
                     "Assistant", piece, markdown=True

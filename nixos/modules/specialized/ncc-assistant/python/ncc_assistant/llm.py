@@ -412,6 +412,14 @@ def _openai_stream(
                     model_name = chunk["model"]
                 choice = (chunk.get("choices") or [{}])[0]
                 delta = choice.get("delta") or {}
+                # OpenAI-compat / DeepSeek / Qwen reasoning channels
+                thinking = (
+                    delta.get("reasoning_content")
+                    or delta.get("reasoning")
+                    or delta.get("thinking")
+                )
+                if thinking:
+                    yield {"type": "thinking_delta", "text": str(thinking)}
                 piece = delta.get("content")
                 if piece:
                     content_parts.append(piece)

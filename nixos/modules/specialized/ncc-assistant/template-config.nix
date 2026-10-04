@@ -22,6 +22,8 @@
   # agent.notifications.enable = true;
   # agent.tray.enable = false;
   # agent.companion.enable = false;  # desktop avatar + mini chat (ncc ai companion)
+  # agent.harness = "native";        # native | qwen | dsh
+  # agent.codingHarness = "auto";    # auto | native | qwen | dsh (git/coding templates)
 
   # --- Recommended schedules (opt-in: uncomment to enable) ---
   # Safe defaults: playbook + read-only + dryRun. Only one agent runs at a time.

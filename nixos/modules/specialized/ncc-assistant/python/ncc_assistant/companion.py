@@ -76,15 +76,33 @@ class _CompanionChatWorker(QThread):
     event = Signal(str, object)  # slot_id, event
     failed = Signal(str, str)  # slot_id, message
 
-    def __init__(self, slot_id: str, session: Any, text: str, parent=None) -> None:
+    def __init__(
+        self,
+        slot_id: str,
+        text: str,
+        *,
+        harness_name: str,
+        session: Any | None = None,
+        cwd: str | None = None,
+        parent=None,
+    ) -> None:
         super().__init__(parent)
         self.slot_id = slot_id
         self._session = session
         self._text = text
+        self._harness_name = harness_name
+        self._cwd = cwd
 
     def run(self) -> None:
         try:
-            for ev in self._session.send(self._text, images=None, prompt_auth=None):
+            from .harness import get_harness
+
+            backend = get_harness(self._harness_name)
+            for ev in backend.send(
+                self._text,
+                cwd=self._cwd,
+                session=self._session if self._harness_name == "native" else None,
+            ):
                 self.event.emit(self.slot_id, ev)
         except Exception as exc:  # noqa: BLE001
             self.failed.emit(self.slot_id, f"{exc}\n{traceback.format_exc()}")
@@ -99,10 +117,12 @@ class ChatSlot:
     session: Any | None = None
     worker: _CompanionChatWorker | None = None
     reply_buf: str = ""
+    thinking_buf: str = ""
     transcript: str = ""
     busy: bool = False
     avatar_state: str = STATE_IDLE
     last_error: str = ""
+    harness: str = "native"
 
     @staticmethod
     def new(title: str = "Chat") -> "ChatSlot":
@@ -337,6 +357,10 @@ class CompanionWindow(QWidget):
         self.presence_lbl = QLabel("")
         self.presence_lbl.setStyleSheet("color: #667;")
         header.addWidget(self.presence_lbl)
+        self.harness_lbl = QLabel("native")
+        self.harness_lbl.setStyleSheet("color: #556; font-size: 10px;")
+        self.harness_lbl.setToolTip("Active harness (native / qwen / dsh)")
+        header.addWidget(self.harness_lbl)
         glass.addLayout(header)
 
         # Chat tabs
@@ -683,6 +707,15 @@ class CompanionWindow(QWidget):
             slot.avatar_state = STATE_IDLE
             self.avatar.set_state(STATE_IDLE)
 
+    def _pick_harness(self, text: str) -> str:
+        import os
+
+        from .harness import looks_like_coding_goal, resolve_harness_name
+
+        force = (os.environ.get("NCC_ASSISTANT_COMPANION_HARNESS") or "").strip() or None
+        tags = ["coding"] if looks_like_coding_goal(text) else []
+        return resolve_harness_name(tags=tags, force=force)
+
     def _send(self) -> None:
         text = self.input.text().strip()
         if not text:
@@ -690,17 +723,28 @@ class CompanionWindow(QWidget):
         slot = self._slot()
         if slot.busy:
             return
-        self._ensure_session(slot)
+        hname = self._pick_harness(text)
+        slot.harness = hname
+        if hname == "native":
+            self._ensure_session(slot)
         self.input.clear()
         slot.reply_buf = ""
+        slot.thinking_buf = ""
         slot.last_error = ""
-        slot.transcript = f"You: {text}\n\n…"
+        slot.transcript = f"You: {text}\n\n[{hname}] …"
         slot.busy = True
         slot.avatar_state = STATE_THINKING
         if slot.title.startswith("Chat ") and len(text) > 2:
             slot.title = text[:16] + ("…" if len(text) > 16 else "")
         self._apply_slot_ui()
-        worker = _CompanionChatWorker(slot.id, slot.session, text, self)
+        self.harness_lbl.setText(hname)
+        worker = _CompanionChatWorker(
+            slot.id,
+            text,
+            harness_name=hname,
+            session=slot.session,
+            parent=self,
+        )
         slot.worker = worker
         worker.event.connect(self._on_event)
         worker.failed.connect(self._on_fail)
@@ -717,18 +761,50 @@ class CompanionWindow(QWidget):
         else:
             self._rebuild_tabs()
 
+    def _compose_transcript(self, slot: ChatSlot) -> str:
+        parts: list[str] = []
+        if slot.thinking_buf.strip():
+            parts.append("── thinking ──\n" + slot.thinking_buf.strip()[-1200:])
+        if slot.reply_buf.strip():
+            if parts:
+                parts.append("\n── reply ──\n")
+            parts.append(slot.reply_buf.strip()[-2000:])
+        return "\n".join(parts) if parts else slot.transcript
+
     def _on_event(self, slot_id: str, event: object) -> None:
         if not isinstance(event, dict):
             return
         slot = self._slot(slot_id)
         kind = event.get("kind")
-        if kind == "delta":
+        if kind == "thinking_delta":
+            slot.avatar_state = STATE_THINKING
+            slot.thinking_buf += str(event.get("text") or "")
+            slot.transcript = self._compose_transcript(slot)
+        elif kind in ("assistant_delta", "delta"):
             slot.avatar_state = STATE_SPEAKING
             slot.reply_buf += str(event.get("text") or "")
-            slot.transcript = slot.reply_buf[-2000:]
+            slot.transcript = self._compose_transcript(slot)
         elif kind == "assistant":
             slot.reply_buf = str(event.get("text") or slot.reply_buf)
-            slot.transcript = slot.reply_buf[-2000:]
+            slot.transcript = self._compose_transcript(slot)
+        elif kind == "tool":
+            name = event.get("name") or "tool"
+            args = event.get("args") or {}
+            arg_s = str(args)
+            if len(arg_s) > 120:
+                arg_s = arg_s[:120] + "…"
+            slot.reply_buf += f"\n[tool] {name}({arg_s})\n"
+            slot.transcript = self._compose_transcript(slot)
+            slot.avatar_state = STATE_THINKING
+        elif kind == "tool_result":
+            name = event.get("name") or "tool"
+            body = str(event.get("text") or "")[:400]
+            slot.reply_buf += f"[result] {name}: {body}\n"
+            slot.transcript = self._compose_transcript(slot)
+        elif kind == "status":
+            phase = event.get("phase") or ""
+            if phase == "tool":
+                slot.avatar_state = STATE_THINKING
         elif kind == "error":
             slot.avatar_state = STATE_ERROR
             slot.transcript = str(event.get("text") or "error")
@@ -740,7 +816,8 @@ class CompanionWindow(QWidget):
             sb = self.bubble.verticalScrollBar()
             sb.setValue(sb.maximum())
             self.avatar.set_state(slot.avatar_state)
-            if kind in ("delta", "done"):
+            self.harness_lbl.setText(slot.harness)
+            if kind in ("assistant_delta", "delta", "thinking_delta", "tool", "done"):
                 self._rebuild_tabs()
 
     def _on_fail(self, slot_id: str, message: str) -> None:

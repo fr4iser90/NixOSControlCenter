@@ -11,6 +11,18 @@ This directory contains custom NixOS configurations that are automatically impor
 
 ## Examples
 
+Coding harnesses for NCC AI (`ncc ai harness …`):
+
+| File | Purpose |
+|------|---------|
+| `example_qwen_code_harness.nix` | nixpkgs `qwen-code` + disk TMPDIR wrapper + NCC wiring |
+| `example_deepseek_harness.nix` | `dsh` via nixpkgs (when available) or `npx` fallback |
+| `example_coding_harness.nix` | both (toggles at top of file) |
+
+Rename without the `example_` prefix to activate, then rebuild. Prefer these over `npm i -g` (tmpfs `/tmp` OOM).
+
+Wiring uses nested `systemConfig.modules.specialized.ncc-assistant` (via `setAttrByPath` on the module `configPath`). Do **not** write `systemConfig."modules.specialized.ncc-assistant"` — that option does not exist.
+
 The following examples demonstrate how to create custom configurations:
 
 ### KDE Connect Configuration (kde-connect.nix)

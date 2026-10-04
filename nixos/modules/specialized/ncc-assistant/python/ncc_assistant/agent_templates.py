@@ -58,6 +58,8 @@ class AgentTemplate:
     goal_template: str = ""
     dry_run: bool = True
     max_steps: int | None = 24
+    # native | qwen | dsh | null (inherit from coding tags / settings)
+    harness: str | None = None
     source: str = "builtin"
     path: str | None = None
 
@@ -90,6 +92,7 @@ class AgentTemplate:
             "goalTemplate": self.goal_template,
             "dryRun": self.dry_run,
             "maxSteps": self.max_steps,
+            "harness": self.harness,
             "source": self.source,
         }
 
@@ -132,6 +135,11 @@ class AgentTemplate:
             ),
             dry_run=bool(data.get("dryRun", data.get("dry_run", True))),
             max_steps=data.get("maxSteps", data.get("max_steps", 24)),
+            harness=(
+                str(data["harness"]).strip().lower()
+                if data.get("harness")
+                else None
+            ),
             source=source,
             path=path,
         )
@@ -591,8 +599,10 @@ def instantiate(
 
 
 def run_instance(instance_id: str, *, dry_run: bool | None = None):
-    """Yield agent events for a saved instance."""
+    """Yield agent events for a saved instance (native or external harness)."""
     from .agent import run_agent
+    from .harness import get_harness, resolve_harness_name
+    from .workspaces import get_workspace
 
     inst = get_instance(instance_id)
     if inst is None:
@@ -602,6 +612,28 @@ def run_instance(instance_id: str, *, dry_run: bool | None = None):
         raise ValueError(f"Template missing for instance: {inst.template_id}")
     goal = render_goal(tmpl, inst.params)
     settings = settings_for_instance(inst)
+    hname = resolve_harness_name(template_harness=tmpl.harness, tags=tmpl.tags)
+    if hname != "native":
+        cwd = None
+        repos = inst.params.get("repositories") or inst.params.get("workspace")
+        if isinstance(repos, list) and repos:
+            ws = get_workspace(str(repos[0]))
+            if ws and getattr(ws, "path", None):
+                cwd = str(ws.path)
+        elif isinstance(repos, str) and repos:
+            ws = get_workspace(repos)
+            if ws and getattr(ws, "path", None):
+                cwd = str(ws.path)
+
+        def _gen():
+            yield {
+                "kind": "status",
+                "text": f"Harness: {hname}",
+                "phase": "llm",
+            }
+            yield from get_harness(hname).send(goal, cwd=cwd)
+
+        return _gen()
     return run_agent(
         goal,
         settings,

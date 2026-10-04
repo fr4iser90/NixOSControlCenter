@@ -57,6 +57,7 @@ def _cmd_tool(args: argparse.Namespace) -> int:
 def _cmd_agent_run(args: argparse.Namespace) -> int:
     """Run agent with a goal."""
     from .agent import run_agent
+    from .harness import get_harness, looks_like_coding_goal, resolve_harness_name
 
     settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
 
@@ -79,26 +80,41 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
         return 1
 
     max_steps = args.max_steps or settings.agent_max_steps
+    force = getattr(args, "harness", None)
+    tags = ["coding"] if looks_like_coding_goal(goal) else []
+    hname = resolve_harness_name(tags=tags, force=force)
 
     print_info(f"Starting agent with goal: {goal}")
-    print_info(f"Max steps: {max_steps}, Dry run: {args.dry_run}, Profile: {args.profile or 'default'}")
+    print_info(
+        f"Harness: {hname}, Max steps: {max_steps}, "
+        f"Dry run: {args.dry_run}, Profile: {args.profile or 'default'}"
+    )
     print_info("---")
 
-    for event in run_agent(
-        goal,
-        settings,
-        max_steps=max_steps,
-        dry_run=args.dry_run,
-        profile=args.profile,
-        playbook=args.playbook,
-    ):
+    if hname != "native":
+        events = get_harness(hname).send(goal)
+    else:
+        events = run_agent(
+            goal,
+            settings,
+            max_steps=max_steps,
+            dry_run=args.dry_run,
+            profile=args.profile,
+            playbook=args.playbook,
+        )
+
+    for event in events:
         kind = event.get("kind")
         if kind == "job_started":
             print_info(f"Job started: {event.get('job_id')}")
         elif kind == "step":
             print_info(f"Step {event.get('step')}/{event.get('max_steps')}")
+        elif kind == "thinking_delta":
+            print_info(f"thinking: {event.get('text', '')[:200]}")
         elif kind == "assistant":
             print_info(f"Assistant: {event.get('text', '')[:500]}")
+        elif kind == "assistant_delta":
+            pass
         elif kind == "tool":
             print_info(f"Tool: {event.get('name')}({json.dumps(event.get('args', {}))})")
         elif kind == "tool_result":
@@ -646,6 +662,17 @@ def main(argv: list[str] | None = None) -> int:
     agent_run.add_argument("--dry-run", "-n", action="store_true", help="Dry run mode")
     agent_run.add_argument("--profile", "-p", help="Security profile")
     agent_run.add_argument("--playbook", help="Run from playbook")
+    agent_run.add_argument(
+        "--harness",
+        choices=["native", "qwen", "dsh"],
+        help="Force agent harness (default: settings / coding auto)",
+    )
+
+    harness_p = sub.add_parser("harness", help="Coding harness backends (native/qwen/dsh)")
+    harness_sub = harness_p.add_subparsers(dest="harness_cmd")
+    harness_sub.add_parser("status", help="Probe available harnesses")
+    harness_probe = harness_sub.add_parser("probe", help="Probe one harness")
+    harness_probe.add_argument("name", choices=["native", "qwen", "dsh"])
 
     jobs_p = sub.add_parser("jobs", help="Job management")
     jobs_sub = jobs_p.add_subparsers(dest="jobs_cmd")
@@ -887,6 +914,19 @@ def main(argv: list[str] | None = None) -> int:
         from .companion import run_companion
 
         return run_companion()
+
+    if command == "harness":
+        from .harness import available_harnesses, get_harness
+
+        if args.harness_cmd == "probe":
+            info = get_harness(args.name).probe()
+            print_info(f"{info.name}: {'ok' if info.available else 'missing'} — {info.detail}")
+            return 0 if info.available else 1
+        # status (default)
+        for info in available_harnesses():
+            mark = "OK" if info.available else "--"
+            print_info(f"[{mark}] {info.name:8}  {info.detail}")
+        return 0
 
     if command == "watchdog":
         return _cmd_watchdog(args)

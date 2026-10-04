@@ -34,7 +34,7 @@ in
               "playbook" "presence"
               "approve" "knowledge"
               "export" "eval"
-              "serve-openapi" "tray" "companion"
+              "serve-openapi" "tray" "companion" "harness"
               "watchdog" "probe" "rollback" "red-team"
               "secrets" "workspaces" "templates" "mcp-install"
             ];
@@ -66,6 +66,8 @@ in
                 ncc ai eval run
                 ncc ai tray
                 ncc ai companion
+                ncc ai harness status|probe NAME
+                ncc ai agent run --harness qwen|dsh|native --goal "…"
                 ncc ai secrets list|set|delete
                 ncc ai workspaces list|add|delete
                 ncc ai templates list|show|instantiate|run|instances

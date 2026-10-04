@@ -83,6 +83,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 | 27 | Red-team mode | **done** (guards + playbook + CLI/GUI) |
 | 28 | [Agent templates / MCP / secrets](./plans/28-agent-templates-mcp-secrets.md) | **done** (catalog, secrets, workspaces, MCP placeholders) |
 | 29 | [Desktop companion avatar](./plans/29-desktop-companion-avatar.md) | **done** (v1.1 multi-chat + panels; plasmoid later) |
+| 30 | [Swappable coding harness](./plans/30-swappable-coding-harness.md) | **done** (native/qwen/dsh adapters + thinking stream) |
 
 ## Feature map (checklist)
 

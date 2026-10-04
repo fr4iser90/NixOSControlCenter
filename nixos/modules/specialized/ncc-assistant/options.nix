@@ -384,6 +384,24 @@ in
         };
       };
 
+      harness = mkOption {
+        type = types.enum [ "native" "qwen" "dsh" ];
+        default = "native";
+        description = ''
+          Default agent/chat harness. ``native`` = NCC ChatSession + ToolRuntime.
+          ``qwen`` / ``dsh`` = external coding harness (must be installed on PATH).
+        '';
+      };
+
+      codingHarness = mkOption {
+        type = types.enum [ "auto" "native" "qwen" "dsh" ];
+        default = "auto";
+        description = ''
+          Harness for coding/git-tagged templates and coding-like goals.
+          ``auto`` picks qwen if installed, else dsh, else falls back to ``harness``.
+        '';
+      };
+
       schedules = mkOption {
         type = types.attrsOf scheduleModule;
         default = { };

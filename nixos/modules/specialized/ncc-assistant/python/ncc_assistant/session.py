@@ -307,7 +307,12 @@ class ChatSession:
                 tools,
                 cancel_event=self.cancel_event,
             ):
-                if ev.get("type") == "delta":
+                if ev.get("type") == "thinking_delta":
+                    yield {
+                        "kind": "thinking_delta",
+                        "text": str(ev.get("text") or ""),
+                    }
+                elif ev.get("type") == "delta":
                     piece = ev.get("text") or ""
                     content += piece
                     yield {"kind": "assistant_delta", "text": piece}

@@ -26,6 +26,9 @@ class CompanionWiringTests(unittest.TestCase):
         self.assertIn("CompanionWindow", names)
         self.assertIn("AvatarCanvas", names)
         self.assertIn("ChatSlot", names)
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("get_harness", text)
+        self.assertIn("thinking_delta", text)
 
     def test_cli_has_companion_command(self) -> None:
         path = ROOT / "ncc_assistant" / "cli.py"
