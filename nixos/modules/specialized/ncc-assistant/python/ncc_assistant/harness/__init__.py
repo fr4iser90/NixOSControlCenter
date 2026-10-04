@@ -6,6 +6,7 @@ from .resolve import (
     CODING_TAGS,
     available_harnesses,
     get_harness,
+    looks_like_coding_goal,
     resolve_harness_name,
 )
 from .types import HarnessBackend, HarnessInfo
@@ -16,5 +17,6 @@ __all__ = [
     "HarnessInfo",
     "available_harnesses",
     "get_harness",
+    "looks_like_coding_goal",
     "resolve_harness_name",
 ]

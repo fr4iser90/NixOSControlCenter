@@ -83,7 +83,12 @@ class HarnessModuleAstTests(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         self.assertIn("get_harness", text)
         self.assertIn("resolve_harness_name", text)
+        self.assertIn("looks_like_coding_goal", text)
         self.assertTrue(any(isinstance(n, ast.ImportFrom) for n in tree.body))
+        # Regression: cli/companion import from package root, not resolve.py
+        from ncc_assistant.harness import looks_like_coding_goal as exported  # noqa: PLC0415
+
+        self.assertTrue(callable(exported))
 
 
 if __name__ == "__main__":
