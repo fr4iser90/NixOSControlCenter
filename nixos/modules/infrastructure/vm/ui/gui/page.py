@@ -57,35 +57,48 @@ class VmPage(DomainPage):
         )
 
         target_bus().changed.connect(lambda _t: self.reload())
-        self.reload()
+        self.schedule_load(self.reload)
 
     def reload(self) -> None:
         current = self._selected.name if self._selected else None
-        self.list.clear()
-        proc = self.run_ncc("vm", "domains", follow_target=True, log=False, show_error=False)
-        rows: list[DomainRow] = []
-        for line in (proc.stdout or "").splitlines():
-            line = line.strip()
-            if not line or "=" not in line:
-                continue
-            name, state = line.split("=", 1)
-            name, state = name.strip(), state.strip()
-            if name:
-                rows.append(DomainRow(name=name, state=state or "?"))
-        pick = None
-        for row in rows:
-            item = QListWidgetItem(f"{row.name}  [{row.state}]")
-            item.setData(Qt.ItemDataRole.UserRole, row)
-            self.list.addItem(item)
-            if current and row.name == current:
-                pick = item
-        if pick:
-            self.list.setCurrentItem(pick)
-        elif self.list.count():
-            self.list.setCurrentRow(0)
-        else:
-            self._selected = None
-            self.detail.setText("No domains (is libvirt running?)")
+
+        def on_result(code: int, output: str) -> None:
+            self.list.clear()
+            rows: list[DomainRow] = []
+            for line in (output or "").splitlines():
+                line = line.strip()
+                if not line or "=" not in line:
+                    continue
+                name, state = line.split("=", 1)
+                name, state = name.strip(), state.strip()
+                if name:
+                    rows.append(DomainRow(name=name, state=state or "?"))
+            pick = None
+            for row in rows:
+                item = QListWidgetItem(f"{row.name}  [{row.state}]")
+                item.setData(Qt.ItemDataRole.UserRole, row)
+                self.list.addItem(item)
+                if current and row.name == current:
+                    pick = item
+            if pick:
+                self.list.setCurrentItem(pick)
+            elif self.list.count():
+                self.list.setCurrentRow(0)
+            else:
+                self._selected = None
+                self.detail.setText(
+                    "No domains (is libvirt running?)"
+                    if code == 0
+                    else (output.strip() or "Could not list domains.")
+                )
+
+        self.load_ncc_status(
+            "vm",
+            "domains",
+            label="Loading VMs…",
+            on_result=on_result,
+            follow_target=True,
+        )
 
     def _on_select(self, current: QListWidgetItem | None, _prev) -> None:
         if current is None:

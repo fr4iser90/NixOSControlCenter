@@ -16,16 +16,15 @@ from PySide6.QtWidgets import (
 from ncc_gui.commit_bar import PendingChange
 from ncc_gui.dialogs import error
 from ncc_gui.domain_fs_status import read_hardware_fs
-from ncc_gui.remote import run_ncc, target_from_env
+from ncc_gui.remote import target_from_env
 from ncc_gui.scaffold import DomainPage
 
 _OP = "hardware-autodetect"
 
 
-def _load_status() -> tuple[dict, str]:
-    proc = run_ncc("hardware", "status", "--json")
-    err = ((proc.stderr or "") + (proc.stdout or "")).strip()
-    if proc.returncode != 0:
+def _status_from_output(code: int, output: str) -> tuple[dict, str]:
+    err = (output or "").strip()
+    if code != 0:
         fs = read_hardware_fs(target_from_env())
         if fs.ok:
             return {
@@ -38,7 +37,7 @@ def _load_status() -> tuple[dict, str]:
             }, ""
         return {}, err or "ncc hardware status failed"
     try:
-        data = json.loads(proc.stdout or "{}")
+        data = json.loads(output or "{}")
     except json.JSONDecodeError:
         return {}, "Invalid JSON from ncc hardware status"
     if not isinstance(data, dict):
@@ -172,7 +171,7 @@ class HardwarePage(DomainPage):
         self.commit.set_pending_changed(self._on_pending_changed)
 
         self.auto_chk.stateChanged.connect(self._on_auto_toggled)
-        self.reload()
+        self.schedule_load(self.reload)
 
     def _pending_auto(self) -> bool | None:
         assert self.commit is not None
@@ -254,14 +253,23 @@ class HardwarePage(DomainPage):
         )
 
     def reload(self) -> None:
-        data, err = _load_status()
-        if err:
-            error(self, "Hardware", err)
-            self.log_append(f"• status error\n{err}\n")
-            return
-        self._status = data
-        self._live_auto = bool(data.get("autoDetect", True))
-        self._apply_labels()
+        def on_result(code: int, output: str) -> None:
+            data, err = _status_from_output(code, output)
+            if err:
+                error(self, "Hardware", err)
+                self.log_append(f"• status error\n{err}\n")
+                return
+            self._status = data
+            self._live_auto = bool(data.get("autoDetect", True))
+            self._apply_labels()
+
+        self.load_ncc_status(
+            "hardware",
+            "status",
+            "--json",
+            label="Loading hardware…",
+            on_result=on_result,
+        )
 
     def _flush_pending(self, changes: list[PendingChange]) -> None:
         assert self.commit is not None

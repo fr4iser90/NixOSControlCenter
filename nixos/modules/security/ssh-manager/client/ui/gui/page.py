@@ -258,8 +258,16 @@ class SshPage(DomainPage):
         self.commit.set_pending_changed(self._render_list)
 
         target_bus().sshClientEdit.connect(self._on_bus_edit_request)
-        self.reload()
-        self._refresh_server_status()
+        self.schedule_load(self._initial_load)
+
+    def _initial_load(self) -> None:
+        self.begin_load("Loading SSH…")
+        try:
+            self._live = load_servers()
+            self._render_list()
+            self._refresh_server_status()
+        finally:
+            self.end_load()
 
     def _on_bus_edit_request(self, target: object) -> None:
         """Header Edit: select host (user@host) and open the edit modal."""
@@ -314,8 +322,12 @@ class SshPage(DomainPage):
         return ServerEntry(host=host, user=user, alias=alias)
 
     def reload(self) -> None:
-        self._live = load_servers()
-        self._render_list()
+        self.begin_load("Loading SSH…")
+        try:
+            self._live = load_servers()
+            self._render_list()
+        finally:
+            self.end_load()
 
     def _render_list(self) -> None:
         current = self._selected.host if self._selected else None

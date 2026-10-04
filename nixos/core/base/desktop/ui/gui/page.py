@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel
 
 from ncc_gui.commit_bar import PendingChange
 from ncc_gui.domain_fs_status import read_desktop_fs
-from ncc_gui.remote import run_ncc, target_from_env
+from ncc_gui.remote import target_from_env
 from ncc_gui.scaffold import DomainPage
 
 _DESKTOP_OP = "desktop-set"
@@ -130,7 +130,7 @@ class DesktopPage(DomainPage):
         self.dark.currentIndexChanged.connect(self._on_field_changed)
         self.enable.stateChanged.connect(self._on_field_changed)
 
-        self.reload()
+        self.schedule_load(self.reload)
 
     def _set_combo(self, combo: QComboBox, value: str) -> None:
         for i in range(combo.count()):
@@ -276,42 +276,45 @@ class DesktopPage(DomainPage):
         }
 
     def reload(self) -> None:
-        proc = run_ncc("desktop", "status")
-        kv = _parse_kv(proc.stdout or "")
-        snap = self._snap_from_ncc_kv(kv)
-        source = "ncc desktop status"
-        if proc.returncode != 0 or snap is None:
-            fs = read_desktop_fs(target_from_env())
-            if fs.ok:
-                snap = fs.as_snapshot()
-                source = "systemConfig on target"
-            elif snap is None:
-                snap = dict(self._live)
-        if proc.returncode != 0:
-            from ncc_gui.ansi import strip_ansi
+        def on_result(code: int, output: str) -> None:
+            kv = _parse_kv(output)
+            snap = self._snap_from_ncc_kv(kv)
+            source = "ncc desktop status"
+            if code != 0 or snap is None:
+                fs = read_desktop_fs(target_from_env())
+                if fs.ok:
+                    snap = fs.as_snapshot()
+                    source = "systemConfig on target"
+                elif snap is None:
+                    snap = dict(self._live)
+            if code != 0:
+                from ncc_gui.ansi import strip_ansi
 
-            detail = strip_ansi(((proc.stdout or "") + (proc.stderr or "")).strip())
-            if snap is not None and source != "ncc desktop status":
-                self.log_append(
-                    f"• Reload: {source} (ncc desktop unavailable)\n"
-                    + (f"  {detail}\n" if detail else "")
-                )
+                detail = strip_ansi(output.strip())
+                if snap is not None and source != "ncc desktop status":
+                    self.log_append(
+                        f"• Reload: {source} (ncc desktop unavailable)\n"
+                        + (f"  {detail}\n" if detail else "")
+                    )
+                else:
+                    self.log_append(
+                        "• Reload failed\n" + (detail + "\n" if detail else "")
+                    )
+            elif source != "ncc desktop status":
+                self.log_append(f"• Reload: {source}\n")
+            self._live = snap
+            ch = self._pending_desktop()
+            if ch is not None and isinstance(ch.meta.get("snapshot"), dict):
+                snap = {str(k): str(v) for k, v in ch.meta["snapshot"].items()}
+                self._apply_snapshot(snap)
             else:
-                self.log_append(
-                    "• Reload failed\n" + (detail + "\n" if detail else "")
-                )
-        elif source != "ncc desktop status":
-            self.log_append(f"• Reload: {source}\n")
-        self._live = snap
-        # Keep draft if present; otherwise show live
-        ch = self._pending_desktop()
-        if ch is not None and isinstance(ch.meta.get("snapshot"), dict):
-            snap = {str(k): str(v) for k, v in ch.meta["snapshot"].items()}
-            self._apply_snapshot(snap)
-        else:
-            self._apply_snapshot(self._live)
-        self._sync_theme_visibility()
-        self._update_draft_label()
+                self._apply_snapshot(self._live)
+            self._sync_theme_visibility()
+            self._update_draft_label()
+
+        self.load_ncc_status(
+            "desktop", "status", label="Loading desktop…", on_result=on_result
+        )
 
     def _flush_pending(self, changes: list[PendingChange]) -> None:
         assert self.commit is not None

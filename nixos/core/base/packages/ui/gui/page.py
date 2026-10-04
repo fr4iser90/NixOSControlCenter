@@ -489,7 +489,7 @@ class PackagesPage(DomainPage):
         )
 
         self.tabs.currentChanged.connect(self._sync_actions_for_tab)
-        self.reload()
+        self.schedule_load(self.reload)
 
     def _build_store_tab(self) -> None:
         w = QWidget()
@@ -814,44 +814,53 @@ class PackagesPage(DomainPage):
             self.run_ncc_async(ch.argv, label=ch.summary, on_done=done)
 
     def reload(self) -> None:
-        self._me, self._role, self._can_system = _whoami_role()
-        self.role_lbl.setText(f"Signed in as {self._me} · role {self._role}")
-        self._system_type = str(load_core_hints().get("systemType") or "desktop")
-
+        self.begin_load("Loading packages…")
         try:
-            self._catalog = load_catalog()
-        except Exception as exc:  # noqa: BLE001
-            error(self, "Catalog", str(exc))
-            self._catalog = {"sets": [], "presets": [], "intents": [], "categories": []}
-        self._sets_by_name = {
-            s["name"]: s for s in (self._catalog.get("sets") or []) if s.get("name")
-        }
-        self._presets_by_name = {
-            p["name"]: p for p in (self._catalog.get("presets") or []) if p.get("name")
-        }
-        try:
-            self._active = set(load_active_modules())
-        except Exception:  # noqa: BLE001
-            self._active = set()
-        self._mine, self._system_pkgs = load_package_lists()
+            self._me, self._role, self._can_system = _whoami_role()
+            self.role_lbl.setText(f"Signed in as {self._me} · role {self._role}")
+            self._system_type = str(load_core_hints().get("systemType") or "desktop")
 
-        self._rebuild_store()
+            try:
+                self._catalog = load_catalog()
+            except Exception as exc:  # noqa: BLE001
+                error(self, "Catalog", str(exc))
+                self._catalog = {
+                    "sets": [],
+                    "presets": [],
+                    "intents": [],
+                    "categories": [],
+                }
+            self._sets_by_name = {
+                s["name"]: s for s in (self._catalog.get("sets") or []) if s.get("name")
+            }
+            self._presets_by_name = {
+                p["name"]: p for p in (self._catalog.get("presets") or []) if p.get("name")
+            }
+            try:
+                self._active = set(load_active_modules())
+            except Exception:  # noqa: BLE001
+                self._active = set()
+            self._mine, self._system_pkgs = load_package_lists()
 
-        self.mine_list.clear()
-        for name in sorted(self._mine):
-            self.mine_list.addItem(_make_item(name))
+            self._rebuild_store()
 
-        # Full inventory with section headers
-        self.system_list.clear()
-        for label, data in build_system_inventory(self._system_pkgs, self._active):
-            item = _make_item(label, data)
-            if data.get("kind") == "header":
-                item.setFlags(Qt.ItemFlag.NoItemFlags)
-            self.system_list.addItem(item)
+            self.mine_list.clear()
+            for name in sorted(self._mine):
+                self.mine_list.addItem(_make_item(name))
 
-        self._rebuild_available()
-        self._rebuild_active()
-        self._sync_actions_for_tab()
+            # Full inventory with section headers
+            self.system_list.clear()
+            for label, data in build_system_inventory(self._system_pkgs, self._active):
+                item = _make_item(label, data)
+                if data.get("kind") == "header":
+                    item.setFlags(Qt.ItemFlag.NoItemFlags)
+                self.system_list.addItem(item)
+
+            self._rebuild_available()
+            self._rebuild_active()
+            self._sync_actions_for_tab()
+        finally:
+            self.end_load()
 
     def _matches_machine(self, system_types: list | None) -> bool:
         """True if entry should show under current filter."""

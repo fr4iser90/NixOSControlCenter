@@ -119,7 +119,7 @@ class InstallPage(DomainPage):
         self.add_action("Refresh", self.reload, local=True)
 
         target_bus().changed.connect(lambda _t: self.reload())
-        self.reload()
+        self.schedule_load(self.reload)
 
     def _resolve_nixos_source(self) -> str:
         pf = getattr(self, "_pf", None)
@@ -135,6 +135,13 @@ class InstallPage(DomainPage):
         return target_from_env()
 
     def reload(self) -> None:
+        self.begin_load("Loading install…")
+        try:
+            self._reload_body()
+        finally:
+            self.end_load()
+
+    def _reload_body(self) -> None:
         t = target_from_env() or ""
         sess = current_session()
         pf = gather_preflight(remote_target=t)

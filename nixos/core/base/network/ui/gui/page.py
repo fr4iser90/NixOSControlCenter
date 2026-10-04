@@ -131,93 +131,96 @@ class NetworkPage(DomainPage):
             ncc=("network", "wifi"),
         )
 
-        self.reload()
+        self.schedule_load(self.reload)
 
     def reload(self) -> None:
-        proc = self.run_ncc("network", "status", "--json", log=False, show_error=False)
-        raw = (proc.stdout or "").strip()
-        if proc.returncode != 0 or not raw:
-            fs = read_network_fs(target_from_env())
-            if fs.ok:
-                self.ov_online.setText("—")
-                self.ov_host.setText(fs.hostname or "—")
-                en = (
-                    "enabled"
-                    if fs.enable is True
-                    else "disabled"
-                    if fs.enable is False
-                    else "—"
-                )
-                wifi = (
-                    f"wifi={fs.wifi_enable}"
-                    if fs.wifi_enable is not None
-                    else "wifi=—"
-                )
-                self.ov_summary.setText(
-                    f"Config only ({en}, {wifi}) — live status unavailable"
-                )
-                self.eth_box.setVisible(False)
-                self.wifi_box.setVisible(False)
-                self._wifi_present = False
-                self._eth_present = False
-                self._wifi_radio_on = False
-                self._sync_actions()
-                detail = ((proc.stderr or "") + (proc.stdout or "")).strip()
-                self.log_append(
-                    "• Reload: systemConfig on target (ncc network unavailable)\n"
-                    + (f"  {detail}\n" if detail else "")
-                )
+        def on_result(code: int, output: str) -> None:
+            raw = (output or "").strip()
+            if code != 0 or not raw:
+                fs = read_network_fs(target_from_env())
+                if fs.ok:
+                    self.ov_online.setText("—")
+                    self.ov_host.setText(fs.hostname or "—")
+                    en = (
+                        "enabled"
+                        if fs.enable is True
+                        else "disabled"
+                        if fs.enable is False
+                        else "—"
+                    )
+                    wifi = (
+                        f"wifi={fs.wifi_enable}"
+                        if fs.wifi_enable is not None
+                        else "wifi=—"
+                    )
+                    self.ov_summary.setText(
+                        f"Config only ({en}, {wifi}) — live status unavailable"
+                    )
+                    self.eth_box.setVisible(False)
+                    self.wifi_box.setVisible(False)
+                    self._wifi_present = False
+                    self._eth_present = False
+                    self._wifi_radio_on = False
+                    self._sync_actions()
+                    self.log_append(
+                        "• Reload: systemConfig on target (ncc network unavailable)\n"
+                        + (f"  {raw}\n" if raw else "")
+                    )
+                    return
+                error(self, "Network", raw or "status failed")
                 return
-            error(
-                self,
-                "Network",
-                (proc.stderr or proc.stdout or "status failed").strip(),
-            )
-            return
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError:
-            error(self, "Network", "Invalid status JSON")
-            return
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                error(self, "Network", "Invalid status JSON")
+                return
 
-        online = bool(data.get("online"))
-        self.ov_online.setText("Yes" if online else "No")
-        self.ov_host.setText(str(data.get("hostname") or "—"))
+            online = bool(data.get("online"))
+            self.ov_online.setText("Yes" if online else "No")
+            self.ov_host.setText(str(data.get("hostname") or "—"))
 
-        wifi = data.get("wifi") or {}
-        eth = data.get("ethernet") or {}
-        self._wifi_present = bool(wifi.get("present"))
-        self._eth_present = bool(eth.get("present"))
-        radio = str(wifi.get("radio") or "")
-        self._wifi_radio_on = radio == "enabled"
+            wifi = data.get("wifi") or {}
+            eth = data.get("ethernet") or {}
+            self._wifi_present = bool(wifi.get("present"))
+            self._eth_present = bool(eth.get("present"))
+            radio = str(wifi.get("radio") or "")
+            self._wifi_radio_on = radio == "enabled"
 
-        parts = []
-        if self._eth_present:
-            parts.append(f"Ethernet {eth.get('state') or '?'}")
-        if self._wifi_present:
-            parts.append(f"WiFi {wifi.get('state') or '?'} (radio {radio or '?'})")
-        if not parts:
-            parts.append("No WiFi or Ethernet device found")
-        self.ov_summary.setText(" · ".join(parts))
+            parts = []
+            if self._eth_present:
+                parts.append(f"Ethernet {eth.get('state') or '?'}")
+            if self._wifi_present:
+                parts.append(f"WiFi {wifi.get('state') or '?'} (radio {radio or '?'})")
+            if not parts:
+                parts.append("No WiFi or Ethernet device found")
+            self.ov_summary.setText(" · ".join(parts))
 
-        self.eth_box.setVisible(self._eth_present)
-        if self._eth_present:
-            self.eth_state.setText(str(eth.get("state") or "—"))
-            self.eth_device.setText(str(eth.get("device") or "—"))
-            self.eth_ip.setText(str(eth.get("ipv4") or "—") or "—")
-            self.eth_gw.setText(str(eth.get("gateway") or "—") or "—")
+            self.eth_box.setVisible(self._eth_present)
+            if self._eth_present:
+                self.eth_state.setText(str(eth.get("state") or "—"))
+                self.eth_device.setText(str(eth.get("device") or "—"))
+                self.eth_ip.setText(str(eth.get("ipv4") or "—") or "—")
+                self.eth_gw.setText(str(eth.get("gateway") or "—") or "—")
 
-        self.wifi_box.setVisible(self._wifi_present)
-        if self._wifi_present:
-            self.wifi_radio.setText(radio or "—")
-            self.wifi_state.setText(str(wifi.get("state") or "—"))
-            self.wifi_device.setText(str(wifi.get("device") or "—"))
-            self.wifi_conn.setText(str(wifi.get("connection") or "—") or "—")
-            self.wifi_ip.setText(str(wifi.get("ipv4") or "—") or "—")
-            self.wifi_off_hint.setVisible(not self._wifi_radio_on)
-            self.wifi_live.setVisible(self._wifi_radio_on)
+            self.wifi_box.setVisible(self._wifi_present)
+            if self._wifi_present:
+                self.wifi_radio.setText(radio or "—")
+                self.wifi_state.setText(str(wifi.get("state") or "—"))
+                self.wifi_device.setText(str(wifi.get("device") or "—"))
+                self.wifi_conn.setText(str(wifi.get("connection") or "—") or "—")
+                self.wifi_ip.setText(str(wifi.get("ipv4") or "—") or "—")
+                self.wifi_off_hint.setVisible(not self._wifi_radio_on)
+                self.wifi_live.setVisible(self._wifi_radio_on)
 
-        self._sync_actions()
+            self._sync_actions()
+
+        self.load_ncc_status(
+            "network",
+            "status",
+            "--json",
+            label="Loading network…",
+            on_result=on_result,
+        )
 
     def _sync_actions(self) -> None:
         self._btn_eth_up.setVisible(self._eth_present)

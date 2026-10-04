@@ -247,7 +247,7 @@ class UserPage(DomainPage):
         )
         self.add_action("Refresh", self.reload, local=True)
 
-        self.reload()
+        self.schedule_load(self.reload)
 
     def _set_manage_ui(self) -> None:
         self.btn_create.setVisible(self._can_manage)
@@ -256,13 +256,17 @@ class UserPage(DomainPage):
         self.you_are.setText(f"Signed in as {self._me} · role {self._role}")
 
     def reload(self) -> None:
-        self._me, self._role, self._can_manage = _whoami()
-        self._set_manage_ui()
-        users, err = _load_users()
-        if err:
-            self.log_append(f"• List error\n{err}\n")
-        self._live = users
-        self._render_list()
+        self.begin_load("Loading users…")
+        try:
+            self._me, self._role, self._can_manage = _whoami()
+            self._set_manage_ui()
+            users, err = _load_users()
+            if err:
+                self.log_append(f"• List error\n{err}\n")
+            self._live = users
+            self._render_list()
+        finally:
+            self.end_load()
 
     def _pending_by_name(self) -> dict[str, PendingChange]:
         assert self.commit is not None

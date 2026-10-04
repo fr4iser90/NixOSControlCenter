@@ -209,6 +209,12 @@ class NccShell(QMainWindow):
 
     def _destroy_page(self, page: QWidget) -> None:
         self._persist_page(page)
+        abort = getattr(page, "abort_background_work", None)
+        if callable(abort):
+            try:
+                abort()
+            except Exception:
+                pass
         page.setParent(None)
         page.deleteLater()
 

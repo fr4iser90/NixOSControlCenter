@@ -144,7 +144,7 @@ class ModulesPage(DomainPage):
         self.commit.set_pending_changed(self._apply_filter)
 
         target_bus().changed.connect(self._on_target_changed)
-        self.reload()
+        self.schedule_load(self.reload)
 
     def _on_target_changed(self, _t) -> None:
         assert self.commit is not None
@@ -154,48 +154,54 @@ class ModulesPage(DomainPage):
         self.reload()
 
     def reload(self) -> None:
-        proc = self.run_ncc(
+        def on_result(code: int, output: str) -> None:
+            self._rows = []
+            raw = (output or "").strip()
+            if code != 0 or not raw:
+                err = strip_ansi(raw)
+                self.detail.setPlainText(err or "Could not list modules.")
+                self.list.clear()
+                self.count_label.setText("0 modules")
+                if code != 0:
+                    error(self, "Module Manager", err or "list failed")
+                return
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                error(
+                    self,
+                    "Module Manager",
+                    "Invalid JSON from ncc modules list --json",
+                )
+                return
+            for item in data if isinstance(data, list) else []:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name") or item.get("id") or "").strip()
+                if not name:
+                    continue
+                self._rows.append(
+                    ModuleRow(
+                        name=name,
+                        status=str(item.get("status") or "unknown"),
+                        category=str(item.get("category") or ""),
+                        version=str(item.get("version") or "1.0"),
+                        description=str(item.get("description") or ""),
+                        path=str(item.get("path") or ""),
+                        scope=str(item.get("scope") or ""),
+                    )
+                )
+            self._rows.sort(key=lambda r: r.sort_key)
+            self._apply_filter()
+
+        self.load_ncc_status(
             "modules",
             "list",
             "--json",
+            label="Loading modules…",
+            on_result=on_result,
             follow_target=True,
-            log=False,
-            show_error=False,
         )
-        self._rows = []
-        raw = (proc.stdout or "").strip()
-        if proc.returncode != 0 or not raw:
-            err = strip_ansi(((proc.stdout or "") + (proc.stderr or "")).strip())
-            self.detail.setPlainText(err or "Could not list modules.")
-            self.list.clear()
-            self.count_label.setText("0 modules")
-            if proc.returncode != 0:
-                error(self, "Module Manager", err or "list failed")
-            return
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError:
-            error(self, "Module Manager", "Invalid JSON from ncc modules list --json")
-            return
-        for item in data if isinstance(data, list) else []:
-            if not isinstance(item, dict):
-                continue
-            name = str(item.get("name") or item.get("id") or "").strip()
-            if not name:
-                continue
-            self._rows.append(
-                ModuleRow(
-                    name=name,
-                    status=str(item.get("status") or "unknown"),
-                    category=str(item.get("category") or ""),
-                    version=str(item.get("version") or "1.0"),
-                    description=str(item.get("description") or ""),
-                    path=str(item.get("path") or ""),
-                    scope=str(item.get("scope") or ""),
-                )
-            )
-        self._rows.sort(key=lambda r: r.sort_key)
-        self._apply_filter()
 
     def _pending_by_name(self) -> dict[str, PendingChange]:
         assert self.commit is not None

@@ -65,6 +65,16 @@ QLabel#nccMuted {
   color: palette(window-text);
   padding-bottom: 8px;
 }
+QLabel#nccLoadingBanner {
+  font-size: 13px;
+  font-weight: 600;
+  color: palette(window-text);
+  background: palette(alternate-base);
+  border: 1px solid palette(mid);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0 0 4px 0;
+}
 /* Form status values — no extra bottom padding (that clips in QFormLayout). */
 QLabel#nccFormValue {
   font-size: 13px;

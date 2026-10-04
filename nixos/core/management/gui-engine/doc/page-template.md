@@ -2,7 +2,8 @@
 
 Copy into `nixos/.../<module>/ui/gui/page.py`. Binding rules:
 `gui-engine/doc/gui-design.md`. Perf/cache:
-`gui-engine/doc/performance.md`.
+`gui-engine/doc/performance.md`. Page load / Loading UI:
+`gui-engine/doc/page-load.md`.
 
 ```python
 """<Domain> — short end-user description."""
@@ -32,11 +33,17 @@ class ExamplePage(DomainPage):
 
         assert self.commit is not None
         self.commit.set_flush_handler(self._flush)
-        self.reload()
+        # Paint first — never sync self.reload() in __init__
+        self.schedule_load(self.reload)
 
     def reload(self) -> None:
-        """Fill widgets from status/CLI. Do not dump raw status into Activity."""
-        ...
+        """Fill widgets from status/CLI. Prefer load_ncc_status (async + banner)."""
+        def on_result(code: int, output: str) -> None:
+            ...
+
+        self.load_ncc_status(
+            "example", "status", label="Loading…", on_result=on_result
+        )
 
     def _stage_example(self) -> None:
         assert self.commit is not None

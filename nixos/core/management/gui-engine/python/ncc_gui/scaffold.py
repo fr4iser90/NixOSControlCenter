@@ -5,13 +5,16 @@ Use ``DomainPage`` for every domain ``ui/gui/page.py``. See doc/gui-design.md.
 
 from __future__ import annotations
 
+import inspect
+import os
 import shutil
 import subprocess
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-
 from PySide6.QtCore import QProcess, QProcessEnvironment, QSize, Qt, QTimer
 from PySide6.QtWidgets import (
+    QApplication,
     QFormLayout,
     QGridLayout,
     QGroupBox,
@@ -27,6 +30,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+# Keep QProcess wrappers alive until the OS child exits (nav unmount).
+_orphaned_procs: list[QProcess] = []
 
 from ncc_gui.ansi import strip_ansi
 from ncc_gui.chrome_prefs import activity_mode as chrome_activity_mode
@@ -84,7 +90,12 @@ class DomainPage(QWidget):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
         self._proc: QProcess | None = None
-        self._on_proc_done: Callable[[int], None] | None = None
+        self._on_proc_done: Callable[..., None] | None = None
+        self._proc_buf = ""
+        self._proc_activity = True
+        self._load_depth = 0
+        self._load_gen = 0
+        self._load_t0: float | None = None
         # Persist Activity across hard GUI re-exec (generation watcher).
         self._activity_key = (
             "".join(c if c.isalnum() or c in "-_" else "-" for c in title.strip().lower())
@@ -115,6 +126,13 @@ class DomainPage(QWidget):
         root.addWidget(self._scope, stretch=0)
         self._refresh_operating_scope()
         target_bus().sessionChanged.connect(self._on_session_scope)
+
+        # Loading banner (page-load.md) — hidden until begin_load
+        self._loading_banner = QLabel("")
+        self._loading_banner.setObjectName("nccLoadingBanner")
+        self._loading_banner.setWordWrap(True)
+        self._loading_banner.hide()
+        root.addWidget(self._loading_banner, stretch=0)
 
         # 2. Content (scrolls inside fixed chrome — does not push footer)
         self._content_host = QWidget()
@@ -407,12 +425,192 @@ class DomainPage(QWidget):
     def add_content_layout(self, layout) -> None:
         self._content.addLayout(layout)
 
+    def _process_running(self) -> bool:
+        return (
+            self._proc is not None
+            and self._proc.state() != QProcess.ProcessState.NotRunning
+        )
+
     def set_busy(self) -> bool:
         """True if a root process is already running (shows error)."""
-        if self._proc is not None and self._proc.state() != QProcess.ProcessState.NotRunning:
+        if self._process_running():
             error(self, "Busy", "A command is already running.")
             return True
         return False
+
+    def abort_background_work(self) -> None:
+        """Cancel scheduled load + kill in-flight ``ncc`` (shell unmount / quit).
+
+        Avoids ``QProcess: Destroyed while process is still running`` when the
+        document is rebuilt on navigate.
+        """
+        self._load_gen += 1
+        self._kill_proc(invoke_done=False)
+        self._load_depth = 0
+        self._load_t0 = None
+        self._loading_banner.hide()
+        self._content_host.setEnabled(True)
+        self._actions_box.setEnabled(True)
+
+    def _kill_proc(self, *, invoke_done: bool, code: int = -1) -> None:
+        """Stop the page QProcess without Qt destroy-while-running warnings."""
+        proc = self._proc
+        self._proc = None
+        output = self._proc_buf
+        self._proc_buf = ""
+        if proc is None:
+            if invoke_done:
+                self._invoke_proc_done(code, output)
+            return
+        try:
+            proc.readyReadStandardOutput.disconnect(self._on_root_out)
+        except (RuntimeError, TypeError):
+            pass
+        try:
+            proc.finished.disconnect()
+        except (RuntimeError, TypeError):
+            pass
+        # Detach before page deleteLater — child QProcess must not die with page.
+        app = QApplication.instance()
+        proc.setParent(app if app is not None else None)
+        if proc.state() != QProcess.ProcessState.NotRunning:
+            proc.terminate()
+            if not proc.waitForFinished(400):
+                proc.kill()
+                proc.waitForFinished(3000)
+        if proc.state() != QProcess.ProcessState.NotRunning:
+            _orphaned_procs.append(proc)
+
+            def _reap() -> None:
+                try:
+                    _orphaned_procs.remove(proc)
+                except ValueError:
+                    pass
+                proc.deleteLater()
+
+            proc.finished.connect(_reap)
+        else:
+            proc.deleteLater()
+        if invoke_done:
+            self._invoke_proc_done(code, output)
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        self.abort_background_work()
+        super().closeEvent(event)
+
+    # ----- page load / loading UI (doc/page-load.md) -----
+
+    @property
+    def is_loading(self) -> bool:
+        return self._load_depth > 0
+
+    def begin_load(self, message: str = "Loading…") -> None:
+        """Show loading banner; nestable with matching ``end_load``."""
+        self._load_depth += 1
+        if self._load_depth == 1:
+            self._load_t0 = time.monotonic()
+            self._loading_banner.setText(message or "Loading…")
+            self._loading_banner.show()
+            self._content_host.setEnabled(False)
+            self._actions_box.setEnabled(False)
+        else:
+            self._loading_banner.setText(message or self._loading_banner.text())
+
+    def end_load(self) -> None:
+        """Hide loading UI when the outermost ``begin_load`` completes."""
+        if self._load_depth <= 0:
+            return
+        self._load_depth -= 1
+        if self._load_depth > 0:
+            return
+        self._loading_banner.hide()
+        self._content_host.setEnabled(True)
+        self._actions_box.setEnabled(True)
+        if self._load_debug() and self._load_t0 is not None:
+            ms = (time.monotonic() - self._load_t0) * 1000
+            print(
+                f"ncc-gui load: {self._activity_key} ready in {ms:.0f}ms",
+                file=__import__("sys").stderr,
+            )
+        self._load_t0 = None
+
+    def schedule_load(self, fn: Callable[[], None]) -> None:
+        """Run ``fn`` after the current event-loop tick (first paint first).
+
+        Cancels any previously scheduled load on this page instance.
+        """
+        self._load_gen += 1
+        gen = self._load_gen
+        if self._load_debug():
+            print(
+                f"ncc-gui load: {self._activity_key} schedule gen={gen}",
+                file=__import__("sys").stderr,
+            )
+
+        def _run() -> None:
+            if gen != self._load_gen:
+                return
+            try:
+                fn()
+            except Exception as exc:  # noqa: BLE001
+                if self.is_loading:
+                    self.end_load()
+                error(self, "Load", str(exc))
+
+        QTimer.singleShot(0, _run)
+
+    def load_ncc_status(
+        self,
+        *args: str,
+        label: str = "Loading…",
+        on_result: Callable[[int, str], None],
+        follow_target: bool = False,
+    ) -> None:
+        """Async status load with loading banner; does not spam Activity."""
+        self.begin_load(label)
+
+        def done(code: int, output: str = "") -> None:
+            try:
+                on_result(code, output)
+            finally:
+                self.end_load()
+
+        self.run_ncc_async(
+            list(args),
+            label=label,
+            on_done=done,
+            activity=False,
+            follow_target=follow_target,
+        )
+
+    @staticmethod
+    def _load_debug() -> bool:
+        return os.environ.get("NCC_GUI_LOAD_DEBUG", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+
+    def _invoke_proc_done(self, code: int, output: str) -> None:
+        cb = self._on_proc_done
+        self._on_proc_done = None
+        if cb is None:
+            return
+        try:
+            params = list(inspect.signature(cb).parameters.values())
+            # Bound methods: skip self
+            if params and params[0].name in ("self", "cls"):
+                params = params[1:]
+            if len(params) >= 2:
+                cb(code, output)
+            else:
+                cb(code)
+        except (TypeError, ValueError):
+            try:
+                cb(code, output)  # type: ignore[call-arg]
+            except TypeError:
+                cb(code)
 
     # ----- actions -----
 
@@ -617,7 +815,12 @@ class DomainPage(QWidget):
             return
         where = f" @ {host}" if host else ""
         self._start_ncc_process(
-            program, argv, label=f"{label}{where}", on_done=on_done, env=env
+            program,
+            argv,
+            label=f"{label}{where}",
+            on_done=on_done,
+            env=env,
+            activity=True,
         )
 
     def run_ncc_async(
@@ -625,12 +828,32 @@ class DomainPage(QWidget):
         args: Sequence[str],
         *,
         label: str = "Run",
-        on_done: Callable[[int], None] | None = None,
+        on_done: Callable[..., None] | None = None,
         env: dict[str, str] | None = None,
+        activity: bool = True,
+        follow_target: bool = False,
     ) -> None:
-        """Async ``ncc …`` as the current user (script may self-elevate via ncc-priv)."""
-        ncc = shutil.which("ncc") or "ncc"
-        self._start_ncc_process(ncc, list(args), label=label, on_done=on_done, env=env)
+        """Async ``ncc …`` as the current user (script may self-elevate via ncc-priv).
+
+        ``on_done`` may be ``fn(code)`` or ``fn(code, output)``.
+        ``activity=False`` skips Activity log (status loads).
+        ``follow_target=True`` runs via ``ssh`` when a Target is connected.
+        """
+        from ncc_gui.remote import build_ncc_argv, target_from_env
+
+        host = target_from_env() if follow_target else None
+        full = build_ncc_argv(list(args), target=host)
+        program, argv = full[0], full[1:]
+        if program == "ncc":
+            program = shutil.which("ncc") or "ncc"
+        self._start_ncc_process(
+            program,
+            argv,
+            label=label,
+            on_done=on_done,
+            env=env,
+            activity=activity,
+        )
 
     def _start_ncc_process(
         self,
@@ -638,12 +861,23 @@ class DomainPage(QWidget):
         argv: Sequence[str],
         *,
         label: str,
-        on_done: Callable[[int], None] | None,
+        on_done: Callable[..., None] | None,
         env: dict[str, str] | None = None,
+        activity: bool = True,
     ) -> None:
-        if self.set_busy():
-            return
-        self.log_append(f"• {label}\n")
+        if self._process_running():
+            # Activity commands stay exclusive; status loads replace the prior proc.
+            if activity and self._proc_activity:
+                error(self, "Busy", "A command is already running.")
+                if on_done is not None:
+                    self._on_proc_done = on_done
+                    self._invoke_proc_done(-1, "")
+                return
+            self._kill_proc(invoke_done=True, code=-1)
+        self._proc_activity = activity
+        self._proc_buf = ""
+        if activity:
+            self.log_append(f"• {label}\n")
         self._on_proc_done = on_done
         self._proc = QProcess(self)
         self._proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
@@ -656,23 +890,27 @@ class DomainPage(QWidget):
         self._proc.setProcessEnvironment(pe)
         self._proc.start(program, list(argv))
         if not self._proc.waitForStarted(5000):
-            error(self, label, "Failed to start.")
+            if activity:
+                error(self, label, "Failed to start.")
             self._proc = None
-            self._on_proc_done = None
+            self._invoke_proc_done(-1, "")
 
     def _on_root_out(self) -> None:
         if self._proc is None:
             return
         data = bytes(self._proc.readAllStandardOutput()).decode("utf-8", errors="replace")
         if data:
-            self.log_write(data)
+            self._proc_buf += data
+            if self._proc_activity:
+                self.log_write(data)
 
     def _finish_root(self, code: int, label: str) -> None:
-        self.log_append(f"\n[{label}] exit {code}\n")
-        cb = self._on_proc_done
+        output = self._proc_buf
+        self._proc_buf = ""
+        if self._proc_activity:
+            self.log_append(f"\n[{label}] exit {code}\n")
         self._proc = None
-        self._on_proc_done = None
-        if code != 0:
+        if code != 0 and self._proc_activity:
             log = self.log.toPlainText() if self.log is not None else ""
             short, copyable = summarize_command_failure(
                 log, exit_code=code, label=label
@@ -684,8 +922,7 @@ class DomainPage(QWidget):
                 details=copyable,
                 copy_text=copyable,
             )
-        if cb is not None:
-            cb(code)
+        self._invoke_proc_done(code, output)
 
 
 # Back-compat alias

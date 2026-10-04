@@ -19,5 +19,6 @@ class ExamplePage(DomainPage):
 | [gui-design.md](./gui-design.md) | Layout / chrome / document model |
 | [page-template.md](./page-template.md) | Copy-paste page skeleton |
 | [performance.md](./performance.md) | Cache / hot paths |
+| [page-load.md](./page-load.md) | Nav load + Loading banner |
 
 See also module [README.md](../README.md).

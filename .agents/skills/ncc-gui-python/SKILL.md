@@ -17,6 +17,10 @@ description: >-
 - Heavy catalogs: bake JSON + `registerGuiEnv` → `NCC_*_CATALOG`. **Never**
   `nix-instantiate` / `import <nixpkgs>` in `ui/gui` (gate: `validate-gui-hotpath`)
 - Sidebar rules: `ncc_gui/nav_visibility.py` (Core alwaysVisible; Features + Hide inactive)
+- Page load: uniform kit protocol — `schedule_load` + `begin_load`/`end_load` /
+  `load_ncc_status`; never sync `self.reload()` in `__init__`. Gate:
+  `tests/gui/test_page_load_states.py` (contract + UI-thread ≤50 ms with stubbed
+  `ncc`; live `ready in` is debug-only). Doc: `gui-engine/doc/page-load.md`
 
 ## Python env
 

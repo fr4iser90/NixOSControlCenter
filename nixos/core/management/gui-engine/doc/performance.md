@@ -10,6 +10,7 @@ Layout/UX remain in [gui-design.md](./gui-design.md); this doc covers **what may
 3. **Soft generation (multi-domain shell)** — refresh **catalog/chrome**, then **recreate the current document** (`NccShell`). Do not keep a stack of stale domain pages. Standalone domain windows may `reload()` if visible. Sticky `ai`/`ssh` are parked on navigate but cleared/recreated on soft when relevant.
 4. **Target probe** — only on **Connect** (or explicit Refresh while remote). Never on every nav switch or idle timer.
 5. **Activity restore** — loading `~/.cache/ncc/gui-activity/` on page construct is OK (capped). Do **not** dump live `ncc … status` into Activity on load ([GUI-DESIGN §](./gui-design.md)).
+6. **Nav / construct** — paint skeleton first, then `schedule_load` + loading banner (`begin_load` / `end_load` / `load_ncc_status`). Binding: [page-load.md](./page-load.md).
 
 ### Chrome + Document
 

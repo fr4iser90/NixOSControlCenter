@@ -271,7 +271,7 @@ class HyprlandPage(DomainPage):
         self.add_action("Reload", self.reload, local=True)
         self.add_action("Rebuild…", self._rebuild, ncc=("system", "build"))
 
-        self.reload()
+        self.schedule_load(self.reload)
 
     def _store_rices_for_category(self, cat_kind: str, cat: dict) -> list[dict]:
         rices = list(self._gallery_rices)
@@ -524,54 +524,72 @@ class HyprlandPage(DomainPage):
             )
 
     def reload(self) -> None:
+        self.begin_load("Loading Hyprland…")
         try:
-            self._catalog = load_catalog()
-        except Exception as exc:  # noqa: BLE001
-            error(self, "Catalog", str(exc))
-            self._catalog = {"storeRices": [], "galleryRices": [], "categories": []}
-        self._store_rices = [
-            r
-            for r in (self._catalog.get("storeRices") or [])
-            if isinstance(r, dict) and r.get("applyable")
-        ]
-        self._gallery_rices = [
-            r
-            for r in (
-                self._catalog.get("galleryRices")
-                or self._catalog.get("rices")
-                or self._store_rices
-            )
-            if isinstance(r, dict)
-        ]
-
-        proc = run_ncc("hyprland", "status")
-        kv = _parse_status(proc.stdout or "")
-        if proc.returncode == 0:
-            self._live = {
-                "enable": kv.get("enable", "false"),
-                "rice": kv.get("rice", "null"),
-                "wallpaper.rice": kv.get("wallpaper.rice", "null"),
-                "wallpaper.path": kv.get("wallpaper.path", "null"),
-            }
-            installed = kv.get("collection.installed", "false") == "true"
-            method = kv.get("collection.method", "")
-            if installed and method:
-                self.log_append(
-                    f"• collection installed ({method}) hypr={kv.get('collection.hyprConfig', '')}\n"
+            try:
+                self._catalog = load_catalog()
+            except Exception as exc:  # noqa: BLE001
+                error(self, "Catalog", str(exc))
+                self._catalog = {"storeRices": [], "galleryRices": [], "categories": []}
+            self._store_rices = [
+                r
+                for r in (self._catalog.get("storeRices") or [])
+                if isinstance(r, dict) and r.get("applyable")
+            ]
+            self._gallery_rices = [
+                r
+                for r in (
+                    self._catalog.get("galleryRices")
+                    or self._catalog.get("rices")
+                    or self._store_rices
                 )
-        else:
-            self.log_append("• hyprland status unavailable — showing defaults\n")
+                if isinstance(r, dict)
+            ]
+        except Exception:
+            self.end_load()
+            raise
 
-        self._fill_categories()
-        ch = self._pending_hyprland()
-        if ch is not None and isinstance(ch.meta.get("snapshot"), dict):
-            snap = {str(k): str(v) for k, v in ch.meta["snapshot"].items()}
-            self._apply_snapshot(snap)
-        else:
-            self._apply_live_to_widgets()
-        self._update_draft_label()
-        if self.categories.count() > 0 and self.rices.count() == 0:
-            self.categories.setCurrentRow(0)
+        def on_status(code: int, output: str) -> None:
+            try:
+                kv = _parse_status(output or "")
+                if code == 0:
+                    self._live = {
+                        "enable": kv.get("enable", "false"),
+                        "rice": kv.get("rice", "null"),
+                        "wallpaper.rice": kv.get("wallpaper.rice", "null"),
+                        "wallpaper.path": kv.get("wallpaper.path", "null"),
+                    }
+                    installed = kv.get("collection.installed", "false") == "true"
+                    method = kv.get("collection.method", "")
+                    if installed and method:
+                        self.log_append(
+                            f"• collection installed ({method}) "
+                            f"hypr={kv.get('collection.hyprConfig', '')}\n"
+                        )
+                else:
+                    self.log_append(
+                        "• hyprland status unavailable — showing defaults\n"
+                    )
+
+                self._fill_categories()
+                ch = self._pending_hyprland()
+                if ch is not None and isinstance(ch.meta.get("snapshot"), dict):
+                    snap = {str(k): str(v) for k, v in ch.meta["snapshot"].items()}
+                    self._apply_snapshot(snap)
+                else:
+                    self._apply_live_to_widgets()
+                self._update_draft_label()
+                if self.categories.count() > 0 and self.rices.count() == 0:
+                    self.categories.setCurrentRow(0)
+            finally:
+                self.end_load()
+
+        self.run_ncc_async(
+            ["hyprland", "status"],
+            label="hyprland status",
+            on_done=on_status,
+            activity=False,
+        )
 
     def _flush_pending(self, changes: list[PendingChange]) -> None:
         assert self.commit is not None
