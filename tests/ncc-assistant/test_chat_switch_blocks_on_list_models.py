@@ -20,7 +20,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-ROOT = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
 sys.path.insert(0, str(ROOT))
 
 from ncc_assistant.config import Settings  # noqa: E402
@@ -78,10 +79,29 @@ class ListModelsHttpTests(unittest.TestCase):
             out = llm_mod.list_models(settings)
 
         kwargs = client_cls.call_args.kwargs
-        self.assertEqual(kwargs.get("timeout"), 30.0)
+        self.assertEqual(kwargs.get("timeout"), 5.0)
         url = mock_client.get.call_args.args[0]
         self.assertEqual(url, "http://ollama.local:11434/v1/models")
         self.assertEqual(out[0]["id"], "llama3")
+
+    def test_list_models_401_is_auth_error(self) -> None:
+        settings = _settings(endpoint="http://llm.local/v1")
+        mock_resp = MagicMock()
+        mock_resp.status_code = 401
+        mock_resp.text = "unauthorized"
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_client.__exit__.return_value = False
+        mock_client.get.return_value = mock_resp
+
+        with patch.object(llm_mod.httpx, "Client", return_value=mock_client):
+            with self.assertRaises(llm_mod.LLMError) as ctx:
+                llm_mod.list_models(settings)
+
+        self.assertEqual(ctx.exception.status_code, 401)
+        self.assertTrue(ctx.exception.is_auth)
+        self.assertIn("auth failed", str(ctx.exception).lower())
+        self.assertTrue(llm_mod.is_auth_failure_message(str(ctx.exception)))
 
     def test_list_models_blocks_for_slow_http(self) -> None:
         settings = _settings()

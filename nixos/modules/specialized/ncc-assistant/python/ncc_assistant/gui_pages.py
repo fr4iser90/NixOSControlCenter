@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QFrame,
     QGroupBox,
@@ -25,6 +26,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSpinBox,
     QSplitter,
@@ -507,7 +509,7 @@ class ToolsPage(QWidget):
         layout.addLayout(btn_row)
 
         market = QGroupBox("MCP marketplace")
-        m_layout = QHBoxLayout(market)
+        m_layout = QFormLayout(market)
         self.template_combo = QComboBox()
         try:
             from .marketplace import list_templates
@@ -516,10 +518,20 @@ class ToolsPage(QWidget):
                 self.template_combo.addItem(t.name, t.name)
         except Exception:
             pass
-        m_layout.addWidget(self.template_combo, stretch=1)
+        m_layout.addRow("Template", self.template_combo)
+        self.mcp_workspace_combo = QComboBox()
+        self.mcp_workspace_combo.addItem("(cwd / default)", "")
+        try:
+            from .workspaces import list_workspaces
+
+            for ws in list_workspaces():
+                self.mcp_workspace_combo.addItem(f"{ws.id} — {ws.path}", ws.id)
+        except Exception:
+            pass
+        m_layout.addRow("Workspace", self.mcp_workspace_combo)
         install_btn = QPushButton("Install template")
         install_btn.clicked.connect(self.install_template)
-        m_layout.addWidget(install_btn)
+        m_layout.addRow(install_btn)
         layout.addWidget(market)
 
         self.refresh_tools()
@@ -598,7 +610,8 @@ class ToolsPage(QWidget):
         try:
             from .marketplace import WRITE_RISK_WARNING, install_template
 
-            result = install_template(name)
+            ws = self.mcp_workspace_combo.currentData() or None
+            result = install_template(name, workspace_id=ws or None)
             msg = json.dumps(result, indent=2)
             if result.get("warning") or "write" in msg.lower():
                 msg = f"{WRITE_RISK_WARNING}\n\n{msg}"
@@ -1162,21 +1175,189 @@ class SchedulesPage(QWidget):
             QMessageBox.warning(self, "Watchdog", str(exc))
 
 
+class _SecretEditorDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None, *, name: str = "github_token") -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Agent secret")
+        self.resize(420, 200)
+        form = QFormLayout(self)
+        self.name_edit = QLineEdit(name)
+        form.addRow("Name", self.name_edit)
+        self.label_edit = QLineEdit()
+        self.label_edit.setPlaceholderText("GitHub PAT")
+        form.addRow("Label", self.label_edit)
+        self.value_edit = QLineEdit()
+        self.value_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.value_edit.setPlaceholderText("Paste token — never stored in systemConfig")
+        form.addRow("Value", self.value_edit)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        form.addRow(buttons)
+
+    def values(self) -> tuple[str, str, str]:
+        return (
+            self.name_edit.text().strip(),
+            self.value_edit.text(),
+            self.label_edit.text().strip(),
+        )
+
+
+class _WorkspaceEditorDialog(QDialog):
+    """Add one repo (folder picker) or scan a parent Git folder."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Add workspace")
+        self.resize(520, 360)
+        root = QVBoxLayout(self)
+
+        mode_row = QHBoxLayout()
+        self.mode_single = QPushButton("Single repo folder")
+        self.mode_single.setCheckable(True)
+        self.mode_single.setChecked(True)
+        self.mode_parent = QPushButton("Scan parent folder (e.g. ~/Git)")
+        self.mode_parent.setCheckable(True)
+        self.mode_single.clicked.connect(lambda: self._set_mode("single"))
+        self.mode_parent.clicked.connect(lambda: self._set_mode("parent"))
+        mode_row.addWidget(self.mode_single)
+        mode_row.addWidget(self.mode_parent)
+        root.addLayout(mode_row)
+
+        hint = QLabel(
+            "Single: pick one project that contains .git.\n"
+            "Scan parent: pick ~/Git (or similar); every child repo is registered "
+            "as its own workspace (id from folder name)."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: palette(placeholder-text);")
+        root.addWidget(hint)
+
+        form = QFormLayout()
+        path_row = QHBoxLayout()
+        self.path_edit = QLineEdit()
+        self.path_edit.setPlaceholderText(str(Path.home() / "Git"))
+        browse = QPushButton("Browse…")
+        browse.clicked.connect(self._browse)
+        path_row.addWidget(self.path_edit, stretch=1)
+        path_row.addWidget(browse)
+        form.addRow("Folder", path_row)
+
+        self.id_edit = QLineEdit()
+        self.id_edit.setPlaceholderText("auto from folder name")
+        form.addRow("Id", self.id_edit)
+        self.label_edit = QLineEdit()
+        form.addRow("Label", self.label_edit)
+        self.github_edit = QLineEdit()
+        self.github_edit.setPlaceholderText("owner/repo (optional, auto-detect)")
+        form.addRow("GitHub", self.github_edit)
+        root.addLayout(form)
+
+        self._mode = "single"
+        self._set_mode("single")
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        root.addWidget(buttons)
+
+    def _set_mode(self, mode: str) -> None:
+        self._mode = mode
+        self.mode_single.setChecked(mode == "single")
+        self.mode_parent.setChecked(mode == "parent")
+        single = mode == "single"
+        self.id_edit.setEnabled(single)
+        self.label_edit.setEnabled(single)
+        self.github_edit.setEnabled(single)
+
+    def _browse(self) -> None:
+        start = self.path_edit.text().strip() or str(Path.home() / "Git")
+        if not Path(start).is_dir():
+            start = str(Path.home())
+        chosen = QFileDialog.getExistingDirectory(self, "Select folder", start)
+        if not chosen:
+            return
+        self.path_edit.setText(chosen)
+        p = Path(chosen)
+        if self._mode == "single":
+            if not self.id_edit.text().strip():
+                from .workspaces import slug_from_path
+
+                self.id_edit.setText(slug_from_path(p))
+            if not self.label_edit.text().strip():
+                self.label_edit.setText(p.name)
+            if not self.github_edit.text().strip():
+                from .workspaces import detect_github_slug
+
+                gh = detect_github_slug(p)
+                if gh:
+                    self.github_edit.setText(gh)
+
+    def apply(self) -> list:
+        from .workspaces import import_from_parent, upsert_workspace
+
+        path = self.path_edit.text().strip()
+        if not path:
+            raise ValueError("Pick a folder.")
+        if self._mode == "parent":
+            return import_from_parent(path)
+        wid = self.id_edit.text().strip()
+        if not wid:
+            from .workspaces import slug_from_path
+
+            wid = slug_from_path(Path(path))
+        return [
+            upsert_workspace(
+                wid,
+                path,
+                label=self.label_edit.text().strip() or None,
+                github=self.github_edit.text().strip() or None,
+            )
+        ]
+
+
 class SettingsPage(QWidget):
+    """Scrollable settings: LLM → secrets → workspaces → agent → tools → memory."""
+
     providers_changed = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
 
-        providers_group = QGroupBox("LLM providers")
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        outer.addWidget(scroll)
+
+        host = QWidget()
+        layout = QVBoxLayout(host)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(14)
+        scroll.setWidget(host)
+
+        intro = QLabel(
+            "Configure how the assistant talks to models, which secrets/MCP tokens "
+            "it may use, and which local git workspaces templates can target."
+        )
+        intro.setWordWrap(True)
+        intro.setStyleSheet("color: palette(placeholder-text);")
+        layout.addWidget(intro)
+
+        # --- 1. LLM ---
+        providers_group = QGroupBox("1 · LLM providers")
         pg = QVBoxLayout(providers_group)
         self.provider_list = QListWidget()
-        self.provider_list.setMaximumHeight(160)
+        self.provider_list.setMinimumHeight(120)
+        self.provider_list.setMaximumHeight(180)
         self.provider_list.itemDoubleClicked.connect(lambda _i: self._edit_provider())
         pg.addWidget(self.provider_list)
-
         prow = QHBoxLayout()
         add_btn = QPushButton("Add…")
         add_btn.clicked.connect(self._add_provider)
@@ -1190,15 +1371,70 @@ class SettingsPage(QWidget):
         prow.addStretch()
         pg.addLayout(prow)
         hint = QLabel(
-            "API keys are masked in the editor and stored in credentials.json (0600). "
-            "Use custom auth headers and extra headers (x-ai-*, org ids, …) per provider."
+            "Chat/model API keys → credentials.json (0600). "
+            "If the model list says Auth failed, edit the provider and paste a fresh key."
         )
         hint.setWordWrap(True)
         hint.setStyleSheet("color: palette(placeholder-text);")
         pg.addWidget(hint)
         layout.addWidget(providers_group)
 
-        presence_group = QGroupBox("Presence")
+        # --- 2. Secrets ---
+        secrets_group = QGroupBox("2 · Agent secrets")
+        sg = QVBoxLayout(secrets_group)
+        self.secret_list = QListWidget()
+        self.secret_list.setMinimumHeight(90)
+        self.secret_list.setMaximumHeight(140)
+        sg.addWidget(self.secret_list)
+        srow = QHBoxLayout()
+        s_add = QPushButton("Add / rotate…")
+        s_add.clicked.connect(self._add_secret)
+        srow.addWidget(s_add)
+        s_del = QPushButton("Delete")
+        s_del.clicked.connect(self._delete_secret)
+        srow.addWidget(s_del)
+        srow.addStretch()
+        sg.addLayout(srow)
+        s_hint = QLabel(
+            "Named tokens for templates/MCP (typical: github_token). "
+            "Separate from LLM keys. Stored in secrets.json (0600), never in systemConfig."
+        )
+        s_hint.setWordWrap(True)
+        s_hint.setStyleSheet("color: palette(placeholder-text);")
+        sg.addWidget(s_hint)
+        layout.addWidget(secrets_group)
+
+        # --- 3. Workspaces ---
+        ws_group = QGroupBox("3 · Workspaces (local git)")
+        wg = QVBoxLayout(ws_group)
+        self.workspace_list = QListWidget()
+        self.workspace_list.setMinimumHeight(110)
+        self.workspace_list.setMaximumHeight(180)
+        wg.addWidget(self.workspace_list)
+        wrow = QHBoxLayout()
+        w_add = QPushButton("Add…")
+        w_add.clicked.connect(self._add_workspace)
+        wrow.addWidget(w_add)
+        w_scan = QPushButton("Scan ~/Git…")
+        w_scan.clicked.connect(self._scan_git_parent)
+        wrow.addWidget(w_scan)
+        w_del = QPushButton("Delete")
+        w_del.clicked.connect(self._delete_workspace)
+        wrow.addWidget(w_del)
+        wrow.addStretch()
+        wg.addLayout(wrow)
+        w_hint = QLabel(
+            "Each workspace is one git repo path used by Templates / git MCP.\n"
+            "• Add… → folder picker (single repo or scan a parent like ~/Git)\n"
+            "• Scan ~/Git… → quick pick of your projects folder"
+        )
+        w_hint.setWordWrap(True)
+        w_hint.setStyleSheet("color: palette(placeholder-text);")
+        wg.addWidget(w_hint)
+        layout.addWidget(ws_group)
+
+        # --- 4. Agent runtime ---
+        presence_group = QGroupBox("4 · Agent presence")
         presence_layout = QFormLayout(presence_group)
         self.presence_combo = QComboBox()
         self.presence_combo.addItems(["available", "paused", "autonomous"])
@@ -1212,7 +1448,7 @@ class SettingsPage(QWidget):
         presence_layout.addRow("Status", self.presence_combo)
         layout.addWidget(presence_group)
 
-        host_group = QGroupBox("Host profile")
+        host_group = QGroupBox("5 · Host profile")
         host_layout = QVBoxLayout(host_group)
         try:
             from .host_profiles import resolve_active_profile, list_host_profiles
@@ -1228,7 +1464,8 @@ class SettingsPage(QWidget):
             host_layout.addWidget(QLabel(f"(profiles: {exc})"))
         layout.addWidget(host_group)
 
-        config_group = QGroupBox("Configuration")
+        # --- 6. Tools / maintenance ---
+        config_group = QGroupBox("6 · Maintenance")
         config_layout = QVBoxLayout(config_group)
         config_layout.addWidget(QLabel(f"Confirm mode: {os.environ.get('AGENT_CONFIRM', 'writes')}"))
         config_layout.addWidget(
@@ -1256,19 +1493,115 @@ class SettingsPage(QWidget):
         config_layout.addWidget(red_btn)
         layout.addWidget(config_group)
 
-        memory_group = QGroupBox("Memory")
+        # --- 7. Memory ---
+        memory_group = QGroupBox("7 · Memory")
         memory_layout = QVBoxLayout(memory_group)
         self.memory_list = QListWidget()
-        self.memory_list.setMaximumHeight(140)
+        self.memory_list.setMinimumHeight(90)
+        self.memory_list.setMaximumHeight(160)
         memory_layout.addWidget(self.memory_list)
         forget_btn = QPushButton("Forget selected")
         forget_btn.clicked.connect(self._forget_memory)
         memory_layout.addWidget(forget_btn)
         layout.addWidget(memory_group)
 
-        layout.addStretch()
+        layout.addStretch(1)
         self._load_memory()
         self._reload_providers()
+        self._reload_secrets()
+        self._reload_workspaces()
+
+    def _reload_secrets(self) -> None:
+        from .secrets import list_secrets
+
+        self.secret_list.clear()
+        for s in list_secrets():
+            item = QListWidgetItem(f"{s.name}  ·  {s.label}  ·  updated {s.updated or '-'}")
+            item.setData(Qt.ItemDataRole.UserRole, s.name)
+            self.secret_list.addItem(item)
+
+    def _add_secret(self) -> None:
+        from .secrets import set_secret
+
+        dlg = _SecretEditorDialog(self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        name, value, label = dlg.values()
+        try:
+            set_secret(name, value, label=label or None)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Secrets", str(exc))
+            return
+        self._reload_secrets()
+
+    def _delete_secret(self) -> None:
+        from .secrets import delete_secret
+
+        item = self.secret_list.currentItem()
+        if not item:
+            return
+        name = str(item.data(Qt.ItemDataRole.UserRole))
+        if delete_secret(name):
+            self._reload_secrets()
+
+    def _reload_workspaces(self) -> None:
+        from .workspaces import list_workspaces
+
+        self.workspace_list.clear()
+        for ws in list_workspaces():
+            gh = f"  ·  github:{ws.github}" if ws.github else ""
+            item = QListWidgetItem(f"{ws.id}  ·  {ws.path}{gh}")
+            item.setData(Qt.ItemDataRole.UserRole, ws.id)
+            self.workspace_list.addItem(item)
+
+    def _add_workspace(self) -> None:
+        dlg = _WorkspaceEditorDialog(self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            imported = dlg.apply()
+        except ValueError as exc:
+            QMessageBox.warning(self, "Workspaces", str(exc))
+            return
+        self._reload_workspaces()
+        QMessageBox.information(
+            self,
+            "Workspaces",
+            f"Registered {len(imported)} workspace(s):\n"
+            + "\n".join(f"• {w.id} → {w.path}" for w in imported[:12]),
+        )
+
+    def _scan_git_parent(self) -> None:
+        from .workspaces import import_from_parent
+
+        start = str(Path.home() / "Git")
+        if not Path(start).is_dir():
+            start = str(Path.home())
+        chosen = QFileDialog.getExistingDirectory(
+            self, "Select parent folder containing git projects", start
+        )
+        if not chosen:
+            return
+        try:
+            imported = import_from_parent(chosen)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Workspaces", str(exc))
+            return
+        self._reload_workspaces()
+        QMessageBox.information(
+            self,
+            "Workspaces",
+            f"Imported {len(imported)} repo(s) from {chosen}",
+        )
+
+    def _delete_workspace(self) -> None:
+        from .workspaces import delete_workspace
+
+        item = self.workspace_list.currentItem()
+        if not item:
+            return
+        if delete_workspace(str(item.data(Qt.ItemDataRole.UserRole))):
+            self._reload_workspaces()
 
     def _reload_providers(self) -> None:
         from .providers import load_providers

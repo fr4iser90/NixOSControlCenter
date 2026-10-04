@@ -1,0 +1,32 @@
+{
+  "id": "ncc-module-review",
+  "title": "NCC module review",
+  "category": "Code review",
+  "description": "Review module changes against discovery laws, docs layout, and hard gates.",
+  "skill": "skills/ncc-module-review.md",
+  "profile": "read-only",
+  "mcp": ["git"],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": null,
+  "dryRun": true,
+  "maxSteps": 30,
+  "tags": ["review", "nixos", "ncc"],
+  "goalTemplate": "Review recent module changes in workspaces {{repositories}} against NCC laws. Tone: {{reviewTone}}.",
+  "params": [
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": true
+    },
+    {
+      "id": "reviewTone",
+      "label": "Review tone",
+      "type": "enum",
+      "options": ["brief", "detailed", "nitpicky"],
+      "default": "detailed",
+      "required": true
+    }
+  ]
+}

@@ -879,7 +879,9 @@ class DomainPage(QWidget):
         if activity:
             self.log_append(f"• {label}\n")
         self._on_proc_done = on_done
-        self._proc = QProcess(self)
+        # Parent = app, never the page: nav deleteLater must not destroy a live child.
+        app = QApplication.instance()
+        self._proc = QProcess(app if app is not None else None)
         self._proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self._proc.readyReadStandardOutput.connect(self._on_root_out)
         self._proc.finished.connect(lambda code, _s: self._finish_root(code, label))
@@ -892,7 +894,10 @@ class DomainPage(QWidget):
         if not self._proc.waitForStarted(5000):
             if activity:
                 error(self, label, "Failed to start.")
+            dead = self._proc
             self._proc = None
+            if dead is not None:
+                dead.deleteLater()
             self._invoke_proc_done(-1, "")
 
     def _on_root_out(self) -> None:
@@ -909,7 +914,10 @@ class DomainPage(QWidget):
         self._proc_buf = ""
         if self._proc_activity:
             self.log_append(f"\n[{label}] exit {code}\n")
+        proc = self._proc
         self._proc = None
+        if proc is not None:
+            proc.deleteLater()
         if code != 0 and self._proc_activity:
             log = self.log.toPlainText() if self.log is not None else ""
             short, copyable = summarize_command_failure(

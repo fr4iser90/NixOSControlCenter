@@ -444,7 +444,7 @@ class ModelsFetchWorker(QThread):
     """Background GET /models so ChatPage open stays responsive."""
 
     finished_ok = Signal(object)  # list[dict]
-    failed = Signal(str)
+    failed = Signal(str, bool)  # message, is_auth
 
     def __init__(self, settings: Settings, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -452,11 +452,15 @@ class ModelsFetchWorker(QThread):
 
     def run(self) -> None:
         try:
-            from .llm import list_models
+            from .llm import LLMError, list_models
 
             self.finished_ok.emit(list_models(self._settings))
+        except LLMError as exc:
+            self.failed.emit(str(exc), bool(exc.is_auth))
         except Exception as exc:  # noqa: BLE001
-            self.failed.emit(str(exc))
+            from .llm import is_auth_failure_message
+
+            self.failed.emit(str(exc), is_auth_failure_message(str(exc)))
 
 
 class ChatWorker(QThread):
@@ -494,6 +498,7 @@ from .gui_pages import (
     ToolTraceWidget,
     ToolsPage,
 )
+from .templates_ui import TemplatesPage
 
 
 class Bubble(QFrame):
@@ -1003,6 +1008,7 @@ class ChatPage(QWidget):
 
         self._models_worker: ModelsFetchWorker | None = None
         self._models_fetch_gen = 0
+        self._auth_prompt_open = False
 
         self._populate_providers()
         # Seed combo from settings only — GET /models runs in background.
@@ -1201,10 +1207,10 @@ class ChatPage(QWidget):
                 return
             self._on_models_loaded(models)
 
-        def _fail(message: str, g: int = gen) -> None:
+        def _fail(message: str, is_auth: bool = False, g: int = gen) -> None:
             if g != self._models_fetch_gen:
                 return
-            self._on_models_failed(message)
+            self._on_models_failed(message, is_auth=is_auth)
 
         worker.finished_ok.connect(_ok)
         worker.failed.connect(_fail)
@@ -1219,10 +1225,34 @@ class ChatPage(QWidget):
         self._populate_models(fetch=False)
         self._update_vision_ui()
 
-    @Slot(str)
-    def _on_models_failed(self, message: str) -> None:
+    def _on_models_failed(self, message: str, *, is_auth: bool = False) -> None:
+        from .llm import is_auth_failure_message
+
+        auth = is_auth or is_auth_failure_message(message)
+        short = message.strip().splitlines()[0] if message.strip() else "unknown error"
+        if auth:
+            tip = (
+                "Auth failed — API key missing/expired. "
+                "Update credentials to refresh the model list."
+            )
+            self.model_combo.setToolTip(f"{tip}\n\n{message}")
+            # Do not keep a stale last_model as if the gateway still serves it.
+            self.session.available_models = []
+            self._model_guard = True
+            self.model_combo.clear()
+            self.model_combo.addItem("(auth required — update API key)", "")
+            self._model_guard = False
+            self.status.setText(
+                f"Auth failed — update API key to load models ({short})"
+            )
+            self.status.show()
+            if not getattr(self, "_auth_prompt_open", False):
+                self._auth_prompt_open = True
+                QTimer.singleShot(0, self._prompt_models_reauth)
+            return
+
         self.model_combo.setToolTip(f"Could not list models: {message}")
-        # Keep configured / auto entry selectable.
+        # Non-auth failure: keep configured model selectable as offline fallback.
         if not self.session.available_models and self.session.settings.model:
             self.session.available_models = [
                 {
@@ -1231,8 +1261,28 @@ class ChatPage(QWidget):
                 }
             ]
             self._populate_models(fetch=False)
-        self.status.setText("Model list unavailable — using configured model")
+        self.status.setText(f"Model list unavailable — {short}")
         self.status.show()
+
+    def _prompt_models_reauth(self) -> None:
+        """Offer credential update after /models auth failure."""
+        try:
+            self.session.settings = prompt_auth_dialog(self.session.settings, self)
+            self.session.runtime = ToolRuntime(
+                self.session.settings, confirm_hook=self.confirm.confirm
+            )
+            self.status.setText("Auth updated — refreshing models…")
+            self.status.show()
+            self._populate_models(fetch=False)
+            self._update_meta()
+            QTimer.singleShot(0, self._start_models_fetch)
+        except RuntimeError:
+            self.status.setText(
+                "Auth cancelled — model list stale until you update the API key"
+            )
+            self.status.show()
+        finally:
+            self._auth_prompt_open = False
 
     def refresh_providers_ui(self) -> None:
         """Called from Settings after provider list edits."""
@@ -1907,6 +1957,8 @@ class AssistantPanel(QWidget):
         self.tabs.addTab(self.chat_page, "Chat")
         self.agent_page = AgentPage(confirm)
         self.tabs.addTab(self.agent_page, "Agent")
+        self.templates_page = TemplatesPage()
+        self.tabs.addTab(self.templates_page, "Templates")
         self.tools_page = ToolsPage()
         self.tabs.addTab(self.tools_page, "Tools")
         self.jobs_page = JobsPage()

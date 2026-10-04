@@ -1,0 +1,38 @@
+{
+  "id": "local-git-status",
+  "title": "Local git status",
+  "category": "Developer tools",
+  "description": "Periodic git status/diff summary for configured local workspace roots.",
+  "skill": "skills/local-git-status.md",
+  "profile": "read-only",
+  "mcp": ["git"],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "poll",
+  "dryRun": true,
+  "maxSteps": 12,
+  "tags": ["git", "status"],
+  "goalTemplate": "Summarize git status for workspaces {{repositories}}. Cadence {{checkFrequency}} ({{timezone}}).",
+  "params": [
+    {
+      "id": "checkFrequency",
+      "label": "Check frequency",
+      "type": "cronOrInterval",
+      "required": true,
+      "default": "daily"
+    },
+    {
+      "id": "timezone",
+      "label": "Timezone",
+      "type": "timezone",
+      "required": true,
+      "default": "Europe/Berlin"
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": true
+    }
+  ]
+}

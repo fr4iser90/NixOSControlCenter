@@ -81,6 +81,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 | 25 | Compact tool traces | **done** (`ToolTraceWidget` in Chat) |
 | 26 | Eval harness | **done** (`eval/cases.json` + `ncc ai eval run`) |
 | 27 | Red-team mode | **done** (guards + playbook + CLI/GUI) |
+| 28 | [Agent templates / MCP / secrets](./plans/28-agent-templates-mcp-secrets.md) | **done** (catalog, secrets, workspaces, MCP placeholders) |
 
 ## Feature map (checklist)
 
@@ -131,6 +132,13 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 - [x] Compact tool-trace UI
 - [x] Eval harness
 - [x] Red-team mode
+
+### Phase 28 (shipped)
+
+- [x] Agent template catalog + configure modal (GitHub review, AGENTS.md / skills maintainers)
+- [x] Named secrets store (Settings + CLI); secret refs in templates/MCP env
+- [x] Workspace registry (local git roots) + MCP placeholder expansion
+- [x] Clear auth failure when `/models` returns 401/403 (no stale model pretend-list)
 
 ## Known follow-ups (not blockers)
 
@@ -185,7 +193,11 @@ User-local state:
 
 ```text
 ~/.config/ncc-assistant/
-  credentials.json
+  credentials.json        # LLM provider keys
+  secrets.json            # named agent/MCP secrets (0600)
+  workspaces.json         # local git roots
+  preferences.json
+  providers.json
   presence.json
   memory.jsonl
   sessions/
@@ -195,6 +207,8 @@ User-local state:
   schedules/
   approvals/
   knowledge-overlay/
+  agent-templates/        # user workflow templates
+  agent-instances/        # configured instances
   watchdogs.json
   mcp-servers.json
   DISABLE                 # kill-switch

@@ -1,9 +1,11 @@
-"""CLI entry: ncc-assistant [gui|chat|mcp|agent|jobs|playbook|presence|approve|knowledge|export|eval|tools|serve-openapi|tray]."""
+"""CLI entry: ncc-assistant [gui|chat|mcp|agent|jobs|playbook|presence|approve|knowledge|export|eval|tools|secrets|workspaces|templates|serve-openapi|tray]."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import sys
+from getpass import getpass
 from pathlib import Path
 
 from .auth import with_cached_credentials
@@ -438,6 +440,185 @@ def _cmd_red_team(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def _cmd_secrets(args: argparse.Namespace) -> int:
+    from .secrets import delete_secret, list_secrets, set_secret
+
+    cmd = args.secrets_cmd
+    if cmd == "list":
+        items = [s.to_public_dict() for s in list_secrets()]
+        if args.json:
+            print(json.dumps(items, indent=2))
+        else:
+            if not items:
+                print_info("(no secrets)")
+            for s in items:
+                print(f"{s['name']:24} {s.get('label') or ''}  updated={s.get('updated') or '-'}")
+        return 0
+    if cmd == "set":
+        value = args.value
+        if not value:
+            if not sys.stdin.isatty():
+                print_err("Pass --value or run on a TTY to prompt.")
+                return 2
+            value = getpass(f"Value for secret {args.name}: ").strip()
+        try:
+            meta = set_secret(args.name, value, label=args.label)
+        except ValueError as exc:
+            print_err(str(exc))
+            return 2
+        print_ok(f"Saved secret {meta.name} (value not printed)")
+        return 0
+    if cmd == "delete":
+        if delete_secret(args.name):
+            print_ok(f"Deleted secret {args.name}")
+            return 0
+        print_err(f"Secret not found: {args.name}")
+        return 1
+    print_err("Usage: ncc ai secrets list|set|delete")
+    return 1
+
+
+def _cmd_workspaces(args: argparse.Namespace) -> int:
+    from .workspaces import delete_workspace, list_workspaces, upsert_workspace
+
+    cmd = args.workspaces_cmd
+    if cmd == "list":
+        items = [w.to_dict() for w in list_workspaces()]
+        if args.json:
+            print(json.dumps(items, indent=2))
+        else:
+            if not items:
+                print_info("(no workspaces)")
+            for w in items:
+                gh = f"  github:{w['github']}" if w.get("github") else ""
+                print(f"{w['id']:16} {w['path']}{gh}")
+        return 0
+    if cmd == "add":
+        try:
+            ws = upsert_workspace(
+                args.id,
+                args.path,
+                label=args.label,
+                github=args.github,
+            )
+        except ValueError as exc:
+            print_err(str(exc))
+            return 2
+        print_ok(f"Workspace {ws.id} → {ws.path}")
+        return 0
+    if cmd == "delete":
+        if delete_workspace(args.id):
+            print_ok(f"Deleted workspace {args.id}")
+            return 0
+        print_err(f"Workspace not found: {args.id}")
+        return 1
+    print_err("Usage: ncc ai workspaces list|add|delete")
+    return 1
+
+
+def _cmd_templates(args: argparse.Namespace) -> int:
+    from .agent_templates import (
+        get_agent_template,
+        instantiate,
+        list_agent_templates,
+        list_instances,
+        run_instance,
+        template_badges,
+    )
+
+    cmd = args.templates_cmd
+    if cmd == "list":
+        rows = []
+        for t in list_agent_templates():
+            badges = [b["label"] for b in template_badges(t)]
+            rows.append(
+                {
+                    "id": t.id,
+                    "title": t.title,
+                    "category": t.category,
+                    "tier": t.tier,
+                    "badges": badges,
+                }
+            )
+        if args.json:
+            print(json.dumps(rows, indent=2))
+        else:
+            for r in rows:
+                badge = f"  [{', '.join(r['badges'])}]" if r["badges"] else ""
+                print(f"{r['id']:28} {r['tier']:7} {r['title']}{badge}")
+        return 0
+    if cmd == "show":
+        t = get_agent_template(args.id)
+        if not t:
+            print_err(f"Unknown template: {args.id}")
+            return 1
+        payload = t.to_dict()
+        payload["badges"] = template_badges(t)
+        print(json.dumps(payload, indent=2))
+        return 0
+    if cmd == "instantiate":
+        try:
+            params = json.loads(Path(args.from_file).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print_err(f"Cannot read params: {exc}")
+            return 2
+        if not isinstance(params, dict):
+            print_err("Params file must be a JSON object")
+            return 2
+        result = instantiate(
+            args.id,
+            params,
+            instance_id=args.instance_id,
+            title=args.title,
+            enable_schedule=bool(args.schedule),
+        )
+        print(json.dumps({k: v for k, v in result.items() if k != "goal"} | {"goal_preview": (result.get("goal") or "")[:400]}, indent=2))
+        return 0 if result.get("ok") else 1
+    if cmd == "run":
+        try:
+            for event in run_instance(args.instance_id, dry_run=bool(args.dry_run) or None):
+                kind = event.get("kind")
+                if kind in ("job_started", "step", "agent_finish", "error", "budget"):
+                    print_info(f"{kind}: {json.dumps({k: v for k, v in event.items() if k != 'kind'}, default=str)[:300]}")
+        except ValueError as exc:
+            print_err(str(exc))
+            return 1
+        return 0
+    if cmd == "instances":
+        items = [i.to_dict() for i in list_instances()]
+        if args.json:
+            print(json.dumps(items, indent=2))
+        else:
+            if not items:
+                print_info("(no instances)")
+            for i in items:
+                print(f"{i['id']:32} {i['templateId']:24} {i['title']}")
+        return 0
+    print_err("Usage: ncc ai templates list|show|instantiate|run|instances")
+    return 1
+
+
+def _cmd_mcp_install(args: argparse.Namespace) -> int:
+    from .marketplace import install_template
+
+    overrides: dict[str, str] = {}
+    for item in args.secret or []:
+        if "=" not in item:
+            print_err(f"Expected ENV=secret_name, got: {item}")
+            return 2
+        env_key, secret_name = item.split("=", 1)
+        overrides[env_key.strip()] = secret_name.strip()
+    result = install_template(
+        args.name,
+        workspace_id=args.workspace,
+        secret_overrides=overrides or None,
+        install_as=args.install_as,
+    )
+    # Never dump secret values
+    print(json.dumps(result, indent=2))
+    return 0 if result.get("ok") else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="ncc ai",
@@ -558,6 +739,61 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("red-team", help="Run red-team guard checks")
 
+    secrets_p = sub.add_parser("secrets", help="Named agent secrets (not LLM provider keys)")
+    secrets_sub = secrets_p.add_subparsers(dest="secrets_cmd")
+    secrets_list = secrets_sub.add_parser("list", help="List secret names (no values)")
+    secrets_list.add_argument("--json", action="store_true")
+    secrets_set = secrets_sub.add_parser("set", help="Create or rotate a secret")
+    secrets_set.add_argument("name", help="Secret name (e.g. github_token)")
+    secrets_set.add_argument("--label", help="Display label")
+    secrets_set.add_argument(
+        "--value",
+        help="Secret value (omit to prompt; prefer prompt on TTY)",
+    )
+    secrets_del = secrets_sub.add_parser("delete", help="Delete a secret")
+    secrets_del.add_argument("name", help="Secret name")
+
+    ws_p = sub.add_parser("workspaces", help="Local git workspace registry")
+    ws_sub = ws_p.add_subparsers(dest="workspaces_cmd")
+    ws_list = ws_sub.add_parser("list", help="List workspaces")
+    ws_list.add_argument("--json", action="store_true")
+    ws_add = ws_sub.add_parser("add", help="Add or update a workspace")
+    ws_add.add_argument("--id", required=True, help="Workspace id")
+    ws_add.add_argument("--path", required=True, help="Local directory path")
+    ws_add.add_argument("--label", help="Display label")
+    ws_add.add_argument("--github", help="owner/repo")
+    ws_del = ws_sub.add_parser("delete", help="Remove a workspace")
+    ws_del.add_argument("id", help="Workspace id")
+
+    tmpl_p = sub.add_parser("templates", help="Agent workflow templates")
+    tmpl_sub = tmpl_p.add_subparsers(dest="templates_cmd")
+    tmpl_list = tmpl_sub.add_parser("list", help="List agent templates")
+    tmpl_list.add_argument("--json", action="store_true")
+    tmpl_show = tmpl_sub.add_parser("show", help="Show one template")
+    tmpl_show.add_argument("id", help="Template id")
+    tmpl_inst = tmpl_sub.add_parser("instantiate", help="Create instance from params JSON")
+    tmpl_inst.add_argument("id", help="Template id")
+    tmpl_inst.add_argument("--from", dest="from_file", required=True, help="Params JSON file")
+    tmpl_inst.add_argument("--instance-id", help="Instance id")
+    tmpl_inst.add_argument("--title", help="Instance title")
+    tmpl_inst.add_argument("--schedule", action="store_true", help="Also save a user schedule")
+    tmpl_run = tmpl_sub.add_parser("run", help="Run a saved instance")
+    tmpl_run.add_argument("instance_id", help="Instance id")
+    tmpl_run.add_argument("--dry-run", "-n", action="store_true")
+    tmpl_instances = tmpl_sub.add_parser("instances", help="List saved instances")
+    tmpl_instances.add_argument("--json", action="store_true")
+
+    mcp_p = sub.add_parser("mcp-install", help="Install an MCP marketplace template")
+    mcp_p.add_argument("name", help="MCP template name (git, github, …)")
+    mcp_p.add_argument("--workspace", help="Workspace id for {{workspace.path}}")
+    mcp_p.add_argument(
+        "--secret",
+        action="append",
+        default=[],
+        help="ENV=secret_name (e.g. GITHUB_PERSONAL_ACCESS_TOKEN=github_token)",
+    )
+    mcp_p.add_argument("--as", dest="install_as", help="Install under a custom server name")
+
     args = parser.parse_args(argv)
     command = args.command or "gui"
 
@@ -657,6 +893,18 @@ def main(argv: list[str] | None = None) -> int:
 
     if command == "red-team":
         return _cmd_red_team(args)
+
+    if command == "secrets":
+        return _cmd_secrets(args)
+
+    if command == "workspaces":
+        return _cmd_workspaces(args)
+
+    if command == "templates":
+        return _cmd_templates(args)
+
+    if command == "mcp-install":
+        return _cmd_mcp_install(args)
 
     from .gui import run_gui
     return run_gui(Settings.from_env(client_mode="chat"))

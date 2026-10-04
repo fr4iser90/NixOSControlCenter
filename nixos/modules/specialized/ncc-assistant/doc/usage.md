@@ -75,7 +75,7 @@ ncc ai gui
 ncc ai chat     # terminal fallback
 ```
 
-Tabs: **Chat**, **Agent**, **Tools**, **Jobs**, **Schedules**, **Settings**.
+Tabs: **Chat**, **Agent**, **Templates**, **Tools**, **Jobs**, **Schedules**, **Settings**.
 
 ## Agent
 
@@ -86,6 +86,38 @@ ncc-assistant agent run --playbook health-report
 
 Profiles: `read-only` (default), `config-writer`, `ops`  
 Aliases: `cautious` → config-writer, `autonomous` → ops
+
+## Templates / secrets / workspaces
+
+Workflow cards (AGENTS.md maintainer, skills maintainer, GitHub code review, …)
+live under the **Templates** tab. Configure → named instance + optional schedule.
+Secrets and workspaces are managed in **Settings** (or CLI). Never put tokens in
+`systemConfig`.
+
+```bash
+# Named secrets (0600 under ~/.config/ncc-assistant/secrets.json)
+ncc-assistant secrets set github_token
+ncc-assistant secrets list
+
+# Local git roots for MCP {{workspace.path}}
+# GUI: Settings → Workspaces → Add… (folder picker) or Scan ~/Git…
+ncc-assistant workspaces add --id ncc --path ~/Git/NixOSControlCenter
+ncc-assistant workspaces list
+
+# Catalog + instantiate
+ncc-assistant templates list
+ncc-assistant templates show github-code-review
+ncc-assistant templates instantiate agents-md-maintainer --from params.json --schedule
+ncc-assistant templates run <instance-id>
+
+# MCP with workspace / secret bind
+ncc-assistant mcp-install git --workspace ncc
+ncc-assistant mcp-install github --secret GITHUB_PERSONAL_ACCESS_TOKEN=github_token
+```
+
+If the model list fails with **Auth failed**, update the LLM provider key (Chat
+auth dialog or Settings → providers). Stale keys no longer keep an old model
+selected as if the gateway still served it.
 
 ## Jobs / playbooks / presence
 

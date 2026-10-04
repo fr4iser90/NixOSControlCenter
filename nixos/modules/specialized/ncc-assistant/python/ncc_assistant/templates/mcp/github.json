@@ -1,0 +1,13 @@
+{
+  "name": "github",
+  "description": "GitHub MCP server (issues, PRs, reviews) using a named secret token",
+  "command": "uvx",
+  "args": ["mcp-server-github"],
+  "env": {},
+  "envFromSecrets": {
+    "GITHUB_PERSONAL_ACCESS_TOKEN": "{{secret.github_token}}"
+  },
+  "risk": "network",
+  "placeholders": [],
+  "install_hint": "Requires a saved secret named github_token (or override via install)."
+}

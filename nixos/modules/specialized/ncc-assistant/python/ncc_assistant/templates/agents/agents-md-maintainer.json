@@ -1,0 +1,40 @@
+{
+  "id": "agents-md-maintainer",
+  "title": "AGENTS.md Maintainer",
+  "category": "Documentation",
+  "description": "Keep AGENTS.md current in your repositories. On a schedule, an agent reads the repository, creates or updates AGENTS.md, and reports drift.",
+  "skill": "skills/agents-md-maintainer.md",
+  "profile": "read-only",
+  "mcp": ["git"],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "poll",
+  "dryRun": true,
+  "maxSteps": 20,
+  "tags": ["docs", "agents", "ncc"],
+  "goalTemplate": "Maintain AGENTS.md in the configured workspaces. Check frequency context: {{checkFrequency}} (timezone {{timezone}}). Propose precise updates; do not invent new laws.",
+  "params": [
+    {
+      "id": "checkFrequency",
+      "label": "Check frequency",
+      "type": "cronOrInterval",
+      "required": true,
+      "default": "weekly",
+      "description": "How often to re-scan repositories."
+    },
+    {
+      "id": "timezone",
+      "label": "Timezone",
+      "type": "timezone",
+      "required": true,
+      "default": "Europe/Berlin"
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": true,
+      "description": "Workspaces whose AGENTS.md should be maintained."
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "id": "github-code-review",
+  "title": "GitHub code review",
+  "category": "Code review",
+  "description": "Review requested pull-request heads, record exact-head decisions, stop early on out-of-scope changes, and optionally request a code-aware human maintainer after approval or a maintainer-decision scope stop.",
+  "skill": "skills/github-code-review.md",
+  "profile": "read-only",
+  "mcp": ["git", "github"],
+  "requiresSecrets": ["github_token"],
+  "tier": "catalog",
+  "scheduleKind": "poll",
+  "dryRun": true,
+  "maxSteps": 40,
+  "tags": ["github", "review"],
+  "goalTemplate": "Review labelled pull requests for repositories {{repositories}}. Trigger label: {{triggerLabel}}. Requested reviewer: {{requestedReviewer}}. Tone: {{reviewTone}}. Maintainers: {{maintainers}}. Cadence {{checkFrequency}} ({{timezone}}). Use GitHub token secret {{githubTokenSecret}} (never print it).",
+  "params": [
+    {
+      "id": "checkFrequency",
+      "label": "Check frequency",
+      "type": "cronOrInterval",
+      "required": true,
+      "default": "hourly",
+      "description": "How often to look for newly labelled pull requests."
+    },
+    {
+      "id": "timezone",
+      "label": "Timezone",
+      "type": "timezone",
+      "required": true,
+      "default": "Europe/Berlin",
+      "description": "Timezone the schedule is interpreted in."
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": true,
+      "description": "Repositories whose pull requests will be reviewed. Each is polled independently."
+    },
+    {
+      "id": "triggerLabel",
+      "label": "Trigger label",
+      "type": "string",
+      "required": true,
+      "default": "needs-review",
+      "description": "Only pull requests carrying this label are reviewed."
+    },
+    {
+      "id": "requestedReviewer",
+      "label": "Requested reviewer",
+      "type": "string",
+      "required": true,
+      "description": "GitHub login whose review request starts an event-driven review."
+    },
+    {
+      "id": "reviewTone",
+      "label": "Review tone",
+      "type": "enum",
+      "options": ["brief", "detailed", "nitpicky"],
+      "default": "detailed",
+      "required": true,
+      "description": "How detailed the review comments should be."
+    },
+    {
+      "id": "maintainers",
+      "label": "Maintainers",
+      "type": "stringList",
+      "required": false,
+      "description": "Optional comma-separated GitHub collaborator logins."
+    },
+    {
+      "id": "githubTokenSecret",
+      "label": "GitHub token secret",
+      "type": "secretRef",
+      "secretKind": "github_token",
+      "required": true,
+      "default": "github_token",
+      "description": "Name of a saved secret. Include it so the agent can use GitHub."
+    }
+  ]
+}

@@ -12,11 +12,42 @@ from .config import Settings
 
 
 class LLMError(RuntimeError):
-    pass
+    """LLM / gateway failure. ``status_code`` set for HTTP errors when known."""
+
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+    @property
+    def is_auth(self) -> bool:
+        if self.status_code in (401, 403):
+            return True
+        return is_auth_failure_message(str(self))
 
 
 class CancelledError(LLMError):
     pass
+
+
+def is_auth_failure_message(message: str) -> bool:
+    """True when a gateway error string indicates missing/expired API key."""
+    low = (message or "").lower()
+    if "http 401" in low or "http 403" in low:
+        return True
+    if " 401 " in low or " 403 " in low:
+        return True
+    return any(
+        token in low
+        for token in (
+            "unauthorized",
+            "forbidden",
+            "invalid api key",
+            "invalid_api_key",
+            "auth failed",
+            "auth required",
+            "llm auth failed",
+        )
+    )
 
 
 def _format_http_error(settings: Settings, status: int, body: str) -> str:
@@ -25,6 +56,14 @@ def _format_http_error(settings: Settings, status: int, body: str) -> str:
     snippet = text[:500]
     looks_html = "<html" in text.lower() or "<center>" in text.lower()
     where = (settings.endpoint or "?").rstrip("/")
+    if status in (401, 403):
+        return (
+            f"LLM auth failed (HTTP {status}) at {where}\n\n"
+            "The cached API key is missing, expired, or rejected by the provider.\n"
+            "Update the key (Chat → auth prompt, or Settings → provider credentials).\n"
+            "Model list cannot refresh until auth succeeds — "
+            "an old selection may be stale."
+        )
     if looks_html and status >= 500:
         return (
             f"LLM gateway HTTP {status} at {where}\n\n"
@@ -61,7 +100,8 @@ def list_models(settings: Settings) -> list[dict[str, Any]]:
             resp = client.get(url, headers=_auth_headers(settings))
             if resp.status_code >= 400:
                 raise LLMError(
-                    _format_http_error(settings, resp.status_code, resp.text)
+                    _format_http_error(settings, resp.status_code, resp.text),
+                    status_code=resp.status_code,
                 )
             data = resp.json()
     except LLMError:
@@ -287,7 +327,10 @@ def _openai_compatible(
         payload = _openai_payload(settings, model, messages, tools, stream=False)
         resp = client.post(url, headers=headers, json=payload)
         if resp.status_code >= 400:
-            raise LLMError(_format_http_error(settings, resp.status_code, resp.text))
+            raise LLMError(
+                _format_http_error(settings, resp.status_code, resp.text),
+                status_code=resp.status_code,
+            )
         data = resp.json()
 
     choice = (data.get("choices") or [{}])[0]
@@ -344,7 +387,10 @@ def _openai_stream(
         with client.stream("POST", url, headers=headers, json=payload) as resp:
             if resp.status_code >= 400:
                 body = resp.read().decode("utf-8", errors="replace")
-                raise LLMError(_format_http_error(settings, resp.status_code, body))
+                raise LLMError(
+                    _format_http_error(settings, resp.status_code, body),
+                    status_code=resp.status_code,
+                )
 
             for line in resp.iter_lines():
                 if cancel_event and cancel_event.is_set():

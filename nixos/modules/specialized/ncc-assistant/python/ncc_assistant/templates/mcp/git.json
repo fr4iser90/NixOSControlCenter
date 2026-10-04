@@ -1,9 +1,10 @@
 {
   "name": "git",
-  "description": "Git repository MCP server (status, log, diff)",
+  "description": "Git repository MCP server (status, log, diff) bound to a workspace path",
   "command": "uvx",
-  "args": ["mcp-server-git", "--repository", "."],
+  "args": ["mcp-server-git", "--repository", "{{workspace.path}}"],
   "env": {},
   "risk": "write",
-  "install_hint": "Install via: uvx mcp-server-git — review repo path before enable."
+  "placeholders": ["workspace.path"],
+  "install_hint": "Install via: uvx mcp-server-git — bind a workspace before enable."
 }

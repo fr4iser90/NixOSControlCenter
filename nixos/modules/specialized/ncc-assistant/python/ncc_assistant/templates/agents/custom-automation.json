@@ -1,0 +1,45 @@
+{
+  "id": "custom-automation",
+  "title": "Custom automation",
+  "category": "Custom",
+  "description": "Create a custom automation from a prompt. Attach workspaces and optional MCP/git as needed.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": ["git"],
+  "requiresSecrets": [],
+  "tier": "beta",
+  "scheduleKind": "poll",
+  "dryRun": true,
+  "maxSteps": 24,
+  "tags": ["custom"],
+  "goalTemplate": "{{prompt}}",
+  "params": [
+    {
+      "id": "prompt",
+      "label": "Prompt",
+      "type": "string",
+      "required": true,
+      "description": "Goal / instructions for the agent."
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": false
+    },
+    {
+      "id": "checkFrequency",
+      "label": "Check frequency",
+      "type": "cronOrInterval",
+      "required": false,
+      "default": "daily"
+    },
+    {
+      "id": "timezone",
+      "label": "Timezone",
+      "type": "timezone",
+      "required": false,
+      "default": "Europe/Berlin"
+    }
+  ]
+}

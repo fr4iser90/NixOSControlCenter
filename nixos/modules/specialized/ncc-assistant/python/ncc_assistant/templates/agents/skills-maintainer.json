@@ -1,0 +1,38 @@
+{
+  "id": "skills-maintainer",
+  "title": "Skills Maintainer",
+  "category": "Documentation",
+  "description": "Audit and update .agents/skills SKILL.md files so agent workflows stay aligned with AGENTS.md and gates.",
+  "skill": "skills/skills-maintainer.md",
+  "profile": "read-only",
+  "mcp": ["git"],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "poll",
+  "dryRun": true,
+  "maxSteps": 24,
+  "tags": ["skills", "agents", "ncc"],
+  "goalTemplate": "Audit and maintain agent skills under .agents/skills for workspaces ({{repositories}}). Timezone {{timezone}}; cadence {{checkFrequency}}.",
+  "params": [
+    {
+      "id": "checkFrequency",
+      "label": "Check frequency",
+      "type": "cronOrInterval",
+      "required": true,
+      "default": "weekly"
+    },
+    {
+      "id": "timezone",
+      "label": "Timezone",
+      "type": "timezone",
+      "required": true,
+      "default": "Europe/Berlin"
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": true
+    }
+  ]
+}

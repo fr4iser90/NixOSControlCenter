@@ -114,6 +114,30 @@ def credentials_file() -> Path:
     return config_home() / "credentials.json"
 
 
+def secrets_file() -> Path:
+    """Named agent secrets (0600). Values never go in systemConfig."""
+    return config_home() / "secrets.json"
+
+
+def workspaces_file() -> Path:
+    """Local git workspace registry."""
+    return config_home() / "workspaces.json"
+
+
+def agent_templates_dir() -> Path:
+    """User-defined agent workflow templates."""
+    path = config_home() / "agent-templates"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def agent_instances_dir() -> Path:
+    """Configured agent template instances."""
+    path = config_home() / "agent-instances"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def is_disabled() -> bool:
     """Check if the kill-switch DISABLE file exists."""
     return disable_file().exists()
@@ -129,3 +153,5 @@ def ensure_all_dirs() -> None:
     schedules_dir()
     approvals_dir()
     knowledge_overlay_dir()
+    agent_templates_dir()
+    agent_instances_dir()
