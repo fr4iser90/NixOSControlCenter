@@ -316,20 +316,148 @@ class FocusWatchdogTests(unittest.TestCase):
         self.assertTrue(get_doomscroll_block_input())
         self.assertTrue(get_doomscroll_inject_chat())
 
-    def test_settings_ui_has_action_toggles(self) -> None:
-        text = (ROOT / "ncc_assistant" / "gui_pages.py").read_text(encoding="utf-8")
-        self.assertIn("4f · Doomscroll prevention", text)
-        self.assertIn("Block input (fullscreen overlay", text)
-        self.assertIn("Jump to Firefox desktop", text)
-        self.assertIn("Pause Firefox media", text)
-        self.assertIn("Also paste message into Companion chat", text)
+    def test_site_tags_enums_drive_match_and_block(self) -> None:
+        from ncc_assistant.focus import is_doomscroll_window
+        from ncc_assistant.preferences import (
+            get_doomscroll_block_domains,
+            set_doomscroll_apps,
+            set_doomscroll_site_tags,
+        )
+
+        set_doomscroll_apps(["brave"])
+        set_doomscroll_site_tags(["youtube-shorts", "tiktok"])
+        domains = get_doomscroll_block_domains()
+        self.assertIn("youtube.com", domains)
+        self.assertIn("tiktok.com", domains)
+        self.assertTrue(
+            is_doomscroll_window(
+                {
+                    "class": "brave-browser",
+                    "title": "Home",
+                    "url": "https://www.tiktok.com/@x",
+                }
+            )
+        )
+        self.assertTrue(
+            is_doomscroll_window(
+                {
+                    "class": "brave-browser",
+                    "title": "x",
+                    "url": "https://www.youtube.com/shorts/abc",
+                }
+            )
+        )
+        self.assertFalse(
+            is_doomscroll_window(
+                {"class": "brave-browser", "title": "NixOS Manual", "url": ""}
+            )
+        )
+
+    def test_lockout_applies_net_block(self) -> None:
+        from ncc_assistant.focus import tick
+        from ncc_assistant.paths import focus_state_file
+        from ncc_assistant.preferences import (
+            set_doomscroll_lockout_min,
+            set_doomscroll_max_videos,
+            set_doomscroll_site_tags,
+        )
+
+        set_doomscroll_site_tags(["youtube-shorts"])
+        set_doomscroll_max_videos(10)
+        set_doomscroll_lockout_min(10)
+        focus_state_file().parent.mkdir(parents=True, exist_ok=True)
+        focus_state_file().write_text(
+            json.dumps(
+                {
+                    "streak_sec": 30.0,
+                    "video_count": 9,
+                    "last_title": "https://www.youtube.com/shorts/aaa",
+                    "last_tick": time.time() - 5,
+                    "last_match": True,
+                    "last_intervene": 0.0,
+                    "lockout_until": 0.0,
+                    "snooze_until": 0.0,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        win = {
+            "class": "firefox",
+            "title": "Short - YouTube",
+            "url": "https://www.youtube.com/shorts/bbb",
+            "source": "mpris",
+        }
+        with mock.patch(
+            "ncc_assistant.presence.get_presence",
+            return_value=mock.Mock(state="available"),
+        ):
+            with mock.patch(
+                "ncc_assistant.notifications.notify_send", return_value=True
+            ):
+                with mock.patch(
+                    "ncc_assistant.focus_netblock.apply_net_block",
+                    return_value={"ok": True, "method": "nft", "minutes": 10},
+                ) as net:
+                    with mock.patch(
+                        "ncc_assistant.focus_actions.apply_intervene_side_effects",
+                        return_value={},
+                    ):
+                        result = tick(force_window=win)
+        self.assertTrue(result.get("intervened"))
+        net.assert_called()
+        self.assertEqual(result.get("actions", {}).get("net_block", {}).get("ok"), True)
+
+    def test_settings_ui_enums_only(self) -> None:
+        gui = (ROOT / "ncc_assistant" / "gui_pages.py").read_text(encoding="utf-8")
+        settings_ui = (
+            ROOT
+            / "ncc_assistant"
+            / "plugins"
+            / "doomscroll"
+            / "settings_ui.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("class PluginsPage", gui)
+        self.assertIn("Feature plugins", gui)
+        self.assertNotIn("4f · Doomscroll prevention", gui)
+        self.assertIn("Doomscroll prevention", settings_ui)
+        self.assertIn("Watch", settings_ui)
+        self.assertIn("When to interrupt", settings_ui)
+        self.assertIn("On interrupt", settings_ui)
+        self.assertIn("Session", settings_ui)
+        self.assertIn("Clear snooze", settings_ui)
+        self.assertIn("Pause media (MPRIS) on interrupt", settings_ui)
+        self.assertIn("Jump to browser desktop before interrupt", settings_ui)
+        self.assertIn("DOOMSCROLL_SITE_TAGS", settings_ui)
+        self.assertIn("doom_site_checks", settings_ui)
+        self.assertNotIn("Pause Firefox media", settings_ui)
+        self.assertNotIn("Apps (freeform)", settings_ui)
+        self.assertNotIn("Site extras (add freely)", settings_ui)
+        self.assertNotIn("doom_domains", settings_ui)
         companion = (ROOT / "ncc_assistant" / "companion.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn("_focus_tick", companion)
-        self.assertIn("_show_doomscroll_nudge", companion)
+        self.assertIn("tick_all", companion)
         self.assertIn("present_interrupt_dialog", companion)
-        self.assertIn("get_doomscroll_inject_chat", companion)
+        plugins_init = (ROOT / "ncc_assistant" / "plugins" / "__init__.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("FeaturePlugin", plugins_init)
+        self.assertIn("tick_all", plugins_init)
+
+    def test_plugin_registry_lists_doomscroll(self) -> None:
+        from ncc_assistant.plugins import get_plugin, list_plugins
+        from ncc_assistant.preferences import set_doomscroll_enable
+
+        ids = [p.id for p in list_plugins()]
+        self.assertIn("doomscroll", ids)
+        p = get_plugin("doomscroll")
+        self.assertIsNotNone(p)
+        assert p is not None
+        set_doomscroll_enable(False)
+        self.assertFalse(p.is_enabled())
+        p.set_enabled(True)
+        self.assertTrue(p.is_enabled())
 
     def test_pause_media_calls_mpris(self) -> None:
         from ncc_assistant import focus_actions

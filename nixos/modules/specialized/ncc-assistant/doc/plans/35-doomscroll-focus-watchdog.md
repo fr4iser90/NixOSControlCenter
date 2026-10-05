@@ -37,17 +37,20 @@ detect_desktop() → exactly one adapter
 | `doomscroll_after_min` | int 5–240 | `20` |
 | `doomscroll_cooldown_min` | int 5–240 | `30` |
 | `doomscroll_style` | `nudge` \| `companion` \| `agent` | `companion` |
-| `doomscroll_apps` | enum list | `["firefox"]` |
+| `doomscroll_apps` | enum checkboxes | `["firefox"]` |
 | `doomscroll_match_mode` | `browser-sites` \| `listed-apps` | `browser-sites` |
-| `doomscroll_site_pack` | enum | `social+video` |
+| `doomscroll_site_tags` | multi-select enums | `["youtube-shorts"]` — drives **match needles + nft domains** |
+| `doomscroll_lockout_min` | int 0–240 | `0` — timed nft block after interrupt |
 | `doomscroll_pause_media` | bool | `true` — MPRIS Pause on intervene |
 | `doomscroll_follow_target` | bool | `true` — jump to browser virtual desktop |
 | `doomscroll_block_input` | bool | `false` — fullscreen overlay until dismiss |
 | `doomscroll_inject_chat` | bool | `false` — also paste text into Companion chat |
 
+**No freitext** for sites/apps/domains. Selecting **YouTube Shorts** alone is enough for `/shorts/` match **and** `youtube.com` net-block. Legacy `doomscroll_site_pack` migrates → `site_tags` on read.
+
 ## Surfaces
 
-- Settings **4f · Doomscroll prevention**
+- Settings **Plugins** tab → Doomscroll prevention (was 4f; feature plugin)
 - Companion timer (~15s) + tray timer
 - CLI: `ncc ai focus status|tick|snooze`
 - Watchdog event `doomscroll-threshold` (agent style)

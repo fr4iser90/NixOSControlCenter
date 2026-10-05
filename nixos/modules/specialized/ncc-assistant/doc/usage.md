@@ -120,18 +120,24 @@ Agent / template / harness starts go through the capacity governor (“at capaci
 when full). Idle sweep (Companion timer) may start due schedules / `idle-ok`
 templates when armed; presence `paused` disables idle.
 
-**Daily workflows (Settings 4e + Workflows tab):** Issues/PRs via `gh`, local
-tasks/roadmap in `~/.config/ncc-assistant/workflows/daily.json`. Companion
-**Daily** icon shows a compact list. CLI: `ncc ai workflows show|refresh|tasks|roadmap`.
+**Daily workflows:** Data on **Workflows** tab / Companion Daily. **Morning Brief**
+(schedule, sources, enable) is a **Plugins** tab feature — not Settings core.
+CLI: `ncc ai workflows show|refresh|tasks|roadmap`.
 
-**Doomscroll prevention (Settings 4f):** Off by default. When enabled, Companion
-and tray probe the active window via **one** desktop adapter (Hyprland /
-Sway / Plasma Wayland MPRIS / X11 xdotool — never mixed). After N minutes (or N
-Shorts) matching, NCC can: notify, pause Firefox media (MPRIS), jump to the
-Firefox virtual desktop, show a dialog/fullscreen input-block overlay, and
-optionally inject chat text (off by default). Styles: notify / companion pop-up /
-agent watchdog.
-CLI: `ncc ai focus status|tick|snooze` (after update; fallback: `ncc-assistant focus status`).
+**Doomscroll prevention:** Feature **plugin** under the **Plugins** tab (not
+Settings, not MCP). Watch (Apps + Sites enums) → When → On interrupt → Session.
+Sites drive match + nft domains. Defaults: off · Firefox · YouTube Shorts · 20 min ·
+clips off · cooldown 30 · net block off · companion · pause+jump on.
+Always-on NixOS hosts (like Windows hosts file):
+
+```nix
+# systemConfig … ncc-assistant
+focus.hostsBlock.enable = true;
+focus.hostsBlock.domains = [ "youtube.com" "www.youtube.com" "tiktok.com" ];
+```
+
+→ `networking.extraHosts` (0.0.0.0 / ::1). **Domains only** — not `/shorts/` path.
+CLI: `ncc ai focus status|tick|snooze`.
 
 **Companion:** frameless overlay — drag avatar to move, resize via corner grip,
 session picker (grouped by workspace), template/Daily/tool/MCP/workspace icons.

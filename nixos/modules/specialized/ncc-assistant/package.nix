@@ -207,7 +207,7 @@ let
     export NCC_ASSISTANT_HOST_PROFILES_JSON='${hostProfilesJson}'
 
     export PYTHONPATH="${appRoot}''${PYTHONPATH:+:$PYTHONPATH}"
-    export PATH="${configHelper}/bin:${pkgs.jq}/bin:${pkgs.nix}/bin:$PATH"
+    export PATH="${configHelper}/bin:${nccFocusNetblock}/bin:${pkgs.jq}/bin:${pkgs.nix}/bin:$PATH"
     # Qt/Plasma: use system platform theme when available
     export QT_QPA_PLATFORM="''${QT_QPA_PLATFORM:-xcb}"
   '';
@@ -283,6 +283,89 @@ let
     exec ${pythonEnv}/bin/python -m ncc_assistant companion
   '';
 
+  # Timed domain sinkhole (nft). Needs root (pkexec/sudo). Domains only — not /shorts/ paths.
+  nccFocusNetblock = pkgs.writeShellScriptBin "ncc-focus-netblock" ''
+    set -euo pipefail
+    TABLE=inet
+    TNAME=ncc_focus_block
+    SET=blocked4
+    SET6=blocked6
+
+    usage() {
+      echo "Usage: ncc-focus-netblock apply --minutes N --domain d1 [--domain d2 ...]" >&2
+      echo "       ncc-focus-netblock clear" >&2
+      echo "       ncc-focus-netblock status" >&2
+      exit 2
+    }
+
+    need_root() {
+      if [ "$(id -u)" -ne 0 ]; then
+        if command -v pkexec >/dev/null 2>&1; then
+          exec pkexec "$0" "$@"
+        fi
+        echo "ncc-focus-netblock: need root (or pkexec)" >&2
+        exit 1
+      fi
+    }
+
+    clear_table() {
+      ${pkgs.nftables}/bin/nft delete table "$TABLE" "$TNAME" 2>/dev/null || true
+    }
+
+    cmd="''${1:-}"
+    case "$cmd" in
+      clear)
+        shift || true
+        need_root "$0" clear "$@"
+        clear_table
+        echo "cleared"
+        ;;
+      status)
+        ${pkgs.nftables}/bin/nft list table "$TABLE" "$TNAME" 2>/dev/null || echo "inactive"
+        ;;
+      apply)
+        shift || true
+        minutes=10
+        domains=()
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            --minutes) minutes="''${2:-10}"; shift 2 ;;
+            --domain) domains+=("''${2:-}"); shift 2 ;;
+            *) usage ;;
+          esac
+        done
+        if [ "''${#domains[@]}" -eq 0 ]; then
+          echo "ncc-focus-netblock: no --domain given" >&2
+          exit 2
+        fi
+        need_root "$0" apply --minutes "$minutes" $(printf -- '--domain %s ' "''${domains[@]}")
+        clear_table
+        ${pkgs.nftables}/bin/nft add table "$TABLE" "$TNAME"
+        ${pkgs.nftables}/bin/nft add set "$TABLE" "$TNAME" "$SET" '{ type ipv4_addr; flags interval; }'
+        ${pkgs.nftables}/bin/nft add set "$TABLE" "$TNAME" "$SET6" '{ type ipv6_addr; flags interval; }'
+        ${pkgs.nftables}/bin/nft add chain "$TABLE" "$TNAME" output '{ type filter hook output priority 0; policy accept; }'
+        ${pkgs.nftables}/bin/nft add rule "$TABLE" "$TNAME" output ip daddr @"$SET" drop
+        ${pkgs.nftables}/bin/nft add rule "$TABLE" "$TNAME" output ip6 daddr @"$SET6" drop
+        for d in "''${domains[@]}"; do
+          d="''${d,,}"
+          d="''${d#http://}"; d="''${d#https://}"; d="''${d%%/*}"
+          [ -z "$d" ] && continue
+          while read -r ip _; do
+            case "$ip" in
+              *:*) ${pkgs.nftables}/bin/nft add element "$TABLE" "$TNAME" "$SET6" "{ $ip }" 2>/dev/null || true ;;
+              *)   ${pkgs.nftables}/bin/nft add element "$TABLE" "$TNAME" "$SET" "{ $ip }" 2>/dev/null || true ;;
+            esac
+          done < <(${pkgs.getent}/bin/getent ahosts "$d" 2>/dev/null | awk '{print $1}' | sort -u)
+        done
+        # Auto-clear after N minutes (best-effort)
+        ${pkgs.systemd}/bin/systemd-run --quiet --on-active="''${minutes}m" --unit="ncc-focus-netblock-expire" \
+          "$0" clear >/dev/null 2>&1 || true
+        echo "applied minutes=$minutes domains=''${domains[*]}"
+        ;;
+      *) usage ;;
+    esac
+  '';
+
   desktopItem = pkgs.makeDesktopItem {
     name = "ncc-assistant";
     desktopName = "NCC AI";
@@ -316,6 +399,6 @@ let
   };
 in
 {
-  inherit appRoot configHelper nccAssistant nccAssistantMcp nccAssistantTray nccAssistantCompanion pythonEnv desktopItem envExports envFile;
-  packages = [ nccAssistant nccAssistantMcp nccAssistantTray nccAssistantCompanion configHelper desktopItem ];
+  inherit appRoot configHelper nccAssistant nccAssistantMcp nccAssistantTray nccAssistantCompanion nccFocusNetblock pythonEnv desktopItem envExports envFile;
+  packages = [ nccAssistant nccAssistantMcp nccAssistantTray nccAssistantCompanion nccFocusNetblock configHelper desktopItem ];
 }

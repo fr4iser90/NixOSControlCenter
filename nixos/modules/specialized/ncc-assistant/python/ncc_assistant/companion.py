@@ -1376,36 +1376,31 @@ class CompanionWindow(QWidget):
             pass
 
     def _focus_tick(self) -> None:
-        """Doomscroll / focus watchdog probe."""
+        """Feature-plugin ticks (doomscroll, morning-brief, …) via registry."""
         try:
-            from .focus import consume_pending_nudge, tick
-            from .preferences import get_doomscroll_enable, get_doomscroll_style
+            from .plugins import tick_all
 
-            if not get_doomscroll_enable():
-                return
-            result = tick()
-            nudge = None
-            if result.get("intervened"):
-                nudge = {
-                    "message": result.get("message") or "",
-                    "style": result.get("style") or get_doomscroll_style(),
-                    "streak_sec": result.get("streak_sec"),
-                    "window": result.get("window"),
-                }
-            else:
-                # Pick up nudge written by tray while companion was closed.
-                pending = consume_pending_nudge()
-                if pending and str(pending.get("style") or "") in (
-                    "companion",
-                    "agent",
-                    "nudge",
-                ):
-                    nudge = pending
-            if nudge and str(nudge.get("style") or "companion") in (
-                "companion",
-                "agent",
-            ):
-                self._show_doomscroll_nudge(nudge)
+            for ev in tick_all(host="companion"):
+                nudge = ev.get("companion_nudge")
+                if nudge:
+                    self._show_doomscroll_nudge(nudge)
+                brief = ev.get("companion_brief")
+                if brief:
+                    self._show_morning_brief(brief)
+        except Exception:
+            pass
+
+    def _show_morning_brief(self, brief: dict) -> None:
+        lines = brief.get("lines") if isinstance(brief, dict) else None
+        title = str((brief or {}).get("title") or "Morning Brief")
+        text = "\n".join(str(x) for x in (lines or [])) or "(empty brief)"
+        try:
+            QMessageBox.information(self, title, text)
+        except Exception:
+            pass
+        # Open Daily panel so the user can dig in
+        try:
+            self._toggle_panel(PANEL_DAILY)
         except Exception:
             pass
 

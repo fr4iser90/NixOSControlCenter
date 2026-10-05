@@ -1731,6 +1731,141 @@ class _WorkspaceEditorDialog(QDialog):
         ]
 
 
+class PluginsPage(QWidget):
+    """Feature plugins (doomscroll, …) — not MCP, templates, or watchdogs."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+
+        intro = QLabel(
+            "Desktop feature plugins you can enable/configure. "
+            "This is <b>not</b> the MCP marketplace (Tools), agent templates "
+            "(Templates), or event watchdogs (Schedules)."
+        )
+        intro.setWordWrap(True)
+        intro.setStyleSheet("color: palette(placeholder-text);")
+        layout.addWidget(intro)
+
+        split = QSplitter(Qt.Orientation.Horizontal)
+        layout.addWidget(split, 1)
+
+        left = QWidget()
+        left_lay = QVBoxLayout(left)
+        left_lay.setContentsMargins(0, 0, 0, 0)
+        self.plugin_list = QListWidget()
+        self.plugin_list.currentItemChanged.connect(self._on_plugin_selected)
+        left_lay.addWidget(self.plugin_list, 1)
+        enable_row = QHBoxLayout()
+        self.plugin_enable = QCheckBox("Enabled")
+        self.plugin_enable.toggled.connect(self._on_enable_toggled)
+        enable_row.addWidget(self.plugin_enable)
+        enable_row.addStretch(1)
+        left_lay.addLayout(enable_row)
+        split.addWidget(left)
+
+        right_scroll = QScrollArea()
+        right_scroll.setWidgetResizable(True)
+        right_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._config_host = QWidget()
+        self._config_lay = QVBoxLayout(self._config_host)
+        self._config_lay.setContentsMargins(0, 0, 0, 0)
+        self._config_placeholder = QLabel("Select a plugin to configure.")
+        self._config_placeholder.setStyleSheet("color: palette(placeholder-text);")
+        self._config_lay.addWidget(self._config_placeholder)
+        self._config_lay.addStretch(1)
+        right_scroll.setWidget(self._config_host)
+        split.addWidget(right_scroll)
+        split.setStretchFactor(0, 1)
+        split.setStretchFactor(1, 3)
+
+        self._active_config: QWidget | None = None
+        self._reload_plugins()
+
+    def _reload_plugins(self) -> None:
+        self.plugin_list.clear()
+        try:
+            from .plugins import list_plugins
+
+            for p in list_plugins():
+                item = QListWidgetItem(p.title)
+                item.setData(Qt.ItemDataRole.UserRole, p.id)
+                item.setToolTip(p.description)
+                suffix = " · on" if p.is_enabled() else " · off"
+                item.setText(f"{p.title}{suffix}")
+                self.plugin_list.addItem(item)
+        except Exception as exc:
+            self.plugin_list.addItem(f"(plugins unavailable: {exc})")
+        if self.plugin_list.count() > 0:
+            self.plugin_list.setCurrentRow(0)
+
+    def _current_plugin_id(self) -> str | None:
+        item = self.plugin_list.currentItem()
+        if not item:
+            return None
+        raw = item.data(Qt.ItemDataRole.UserRole)
+        return str(raw) if raw else None
+
+    def _on_plugin_selected(self, _cur: QListWidgetItem | None, _prev: QListWidgetItem | None = None) -> None:
+        pid = self._current_plugin_id()
+        if self._active_config is not None:
+            self._config_lay.removeWidget(self._active_config)
+            self._active_config.deleteLater()
+            self._active_config = None
+        self._config_placeholder.hide()
+        if not pid:
+            self._config_placeholder.setText("Select a plugin to configure.")
+            self._config_placeholder.show()
+            self.plugin_enable.blockSignals(True)
+            self.plugin_enable.setChecked(False)
+            self.plugin_enable.blockSignals(False)
+            return
+        try:
+            from .plugins import get_plugin
+
+            plugin = get_plugin(pid)
+            if plugin is None:
+                raise RuntimeError(f"unknown plugin {pid}")
+            self.plugin_enable.blockSignals(True)
+            self.plugin_enable.setChecked(plugin.is_enabled())
+            self.plugin_enable.blockSignals(False)
+            widget = plugin.build_settings_widget(self._config_host)
+            self._active_config = widget
+            self._config_lay.insertWidget(0, widget)
+        except Exception as exc:
+            self._config_placeholder.setText(f"Configure failed: {exc}")
+            self._config_placeholder.show()
+
+    def _on_enable_toggled(self, checked: bool) -> None:
+        pid = self._current_plugin_id()
+        if not pid:
+            return
+        try:
+            from .plugins import get_plugin
+
+            plugin = get_plugin(pid)
+            if plugin is None:
+                return
+            plugin.set_enabled(checked)
+            # Keep list label in sync
+            item = self.plugin_list.currentItem()
+            if item:
+                item.setText(f"{plugin.title}{' · on' if checked else ' · off'}")
+            # Sync enable checkbox inside plugin settings if present
+            if self._active_config is not None:
+                for attr in ("enable", "doom_enable"):
+                    if hasattr(self._active_config, attr):
+                        cb = getattr(self._active_config, attr)
+                        if hasattr(cb, "blockSignals"):
+                            cb.blockSignals(True)
+                            cb.setChecked(checked)
+                            cb.blockSignals(False)
+                        break
+        except Exception as exc:
+            QMessageBox.warning(self, "Plugins", str(exc))
+
+
 class SettingsPage(QWidget):
     """Scrollable settings: LLM → secrets → workspaces → agent → tools → memory."""
 
@@ -2027,268 +2162,32 @@ class SettingsPage(QWidget):
         cap_form.addRow(cap_hint)
         layout.addWidget(cap_group)
 
-        # --- 4e Daily workflows ---
-        daily_group = QGroupBox("4e · Daily workflows")
-        daily_form = QFormLayout(daily_group)
-        self.digest_enable = QCheckBox("Build daily Issues/PRs/tasks snapshot")
-        self.provider_combo_wf = QComboBox()
-        self.provider_combo_wf.addItem("GitHub", "github")
-        from .templates_ui import FrequencyPicker
-
-        digest_cal_default = "*-*-* 08:30:00"
-        try:
-            from .preferences import (
-                get_daily_digest_enable,
-                get_daily_digest_on_calendar,
-                get_workflow_providers,
-            )
-
-            self.digest_enable.setChecked(get_daily_digest_enable())
-            digest_cal_default = get_daily_digest_on_calendar()
-            provs = get_workflow_providers()
-            if provs:
-                pi = self.provider_combo_wf.findData(provs[0])
-                if pi >= 0:
-                    self.provider_combo_wf.setCurrentIndex(pi)
-        except Exception:
-            self.digest_enable.setChecked(True)
-        self.digest_cal = FrequencyPicker(default=digest_cal_default)
-
-        def _on_digest_en(checked: bool) -> None:
-            from .preferences import set_daily_digest_enable as _set
-
-            _set(checked)
-
-        def _on_digest_cal() -> None:
-            from .preferences import set_daily_digest_on_calendar as _set
-
-            try:
-                _set(self.digest_cal.on_calendar())
-            except Exception:
-                pass
-
-        def _on_wf_provider(_i: int = 0) -> None:
-            from .preferences import set_workflow_providers as _set
-
-            _set([str(self.provider_combo_wf.currentData() or "github")])
-
-        self.digest_enable.toggled.connect(_on_digest_en)
-        self.provider_combo_wf.currentIndexChanged.connect(_on_wf_provider)
-        # Persist calendar when user changes mode/time via any child control
-        for child in self.digest_cal.findChildren(QWidget):
-            if hasattr(child, "currentIndexChanged"):
-                child.currentIndexChanged.connect(lambda *_: _on_digest_cal())
-            if hasattr(child, "timeChanged"):
-                child.timeChanged.connect(lambda *_: _on_digest_cal())
-            if hasattr(child, "valueChanged"):
-                child.valueChanged.connect(lambda *_: _on_digest_cal())
-        daily_form.addRow(self.digest_enable)
-        daily_form.addRow("Provider", self.provider_combo_wf)
-        daily_form.addRow("Digest schedule", self.digest_cal)
-        daily_hint = QLabel(
-            "Refresh also available on the Workflows tab. Uses gh for the "
-            "active workspace remote (local system time for OnCalendar)."
+        # Daily digest config moved to Plugins → Morning Brief
+        daily_hint_g = QGroupBox("4e · Daily workflows")
+        daily_hint_lay = QVBoxLayout(daily_hint_g)
+        daily_hint_lab = QLabel(
+            "Morning Brief (schedule / sources / enable) is under the "
+            "<b>Plugins</b> tab. Edit Issues/PRs/tasks/roadmap on the "
+            "<b>Workflows</b> tab or Companion Daily."
         )
-        daily_hint.setWordWrap(True)
-        daily_hint.setStyleSheet("color: palette(placeholder-text);")
-        daily_form.addRow(daily_hint)
-        layout.addWidget(daily_group)
+        daily_hint_lab.setWordWrap(True)
+        daily_hint_lab.setStyleSheet("color: palette(placeholder-text);")
+        daily_hint_lay.addWidget(daily_hint_lab)
+        layout.addWidget(daily_hint_g)
 
-        # --- 4f Doomscroll / focus ---
-        focus_group = QGroupBox("4f · Doomscroll prevention")
-        focus_form = QFormLayout(focus_group)
-        self.doom_enable = QCheckBox("Enable focus watchdog")
-        self.doom_after = QSpinBox()
-        self.doom_after.setRange(1, 240)
-        self.doom_after.setSuffix(" min")
-        self.doom_videos = QSpinBox()
-        self.doom_videos.setRange(0, 50)
-        self.doom_videos.setSpecialValueText("off")
-        self.doom_videos.setToolTip(
-            "Count window-title changes while matching (YouTube Shorts swipe). "
-            "0 = time only. Intervene at whichever hits first: videos OR minutes."
+        # Feature plugins live under the Plugins tab (not Settings core).
+        plugins_hint = QGroupBox("Feature plugins")
+        plugins_hint_lay = QVBoxLayout(plugins_hint)
+        plugins_hint_lab = QLabel(
+            "Doomscroll, Morning Brief, and other desktop features are under the "
+            "<b>Plugins</b> tab — not here. Settings stays LLM / presence / "
+            "capacity / host. (MCP marketplace stays under Tools; agent "
+            "templates under Templates; watchdogs under Schedules.)"
         )
-        self.doom_cool = QSpinBox()
-        self.doom_cool.setRange(5, 240)
-        self.doom_cool.setSuffix(" min")
-        self.doom_style = QComboBox()
-        self.doom_style.addItem("Notify only", "nudge")
-        self.doom_style.addItem("Companion pop-up", "companion")
-        self.doom_style.addItem("Companion + agent nudge", "agent")
-        self.doom_apps = QComboBox()
-        self.doom_apps.addItem("Firefox / LibreWolf", "firefox")
-        self.doom_apps.addItem("Chromium family", "chromium")
-        self.doom_apps.addItem("All browsers", "browsers")
-        self.doom_match = QComboBox()
-        self.doom_match.addItem("Browser + site titles", "browser-sites")
-        self.doom_match.addItem("Any time in listed apps", "listed-apps")
-        self.doom_sites = QComboBox()
-        self.doom_sites.addItem("YouTube Shorts only", "youtube-shorts")
-        self.doom_sites.addItem("Social + video", "social+video")
-        self.doom_sites.addItem("Social only", "social")
-        self.doom_sites.addItem("Video only", "video")
-        self.doom_sites.addItem("Any browser title", "any-browser")
-        self.doom_pause = QCheckBox("Pause Firefox media (MPRIS) on interrupt")
-        self.doom_follow = QCheckBox("Jump to Firefox desktop before interrupt")
-        self.doom_block = QCheckBox("Block input (fullscreen overlay until dismiss)")
-        self.doom_chat = QCheckBox("Also paste message into Companion chat")
-        self.doom_pause.setToolTip("Stops the playing Short/video via MPRIS Pause.")
-        self.doom_follow.setToolTip(
-            "Plasma/Hyprland: switch to the browser's virtual desktop so the "
-            "dialog appears over Firefox — not on another desktop."
-        )
-        self.doom_block.setToolTip(
-            "Fullscreen always-on-top overlay. Browser underneath cannot receive "
-            "scroll/clicks until you dismiss. (Not a Firefox extension.)"
-        )
-        self.doom_chat.setToolTip(
-            "Off by default — interrupt is a dialog/overlay, not a chat bubble."
-        )
-        try:
-            from .preferences import (
-                get_doomscroll_after_min,
-                get_doomscroll_apps,
-                get_doomscroll_block_input,
-                get_doomscroll_cooldown_min,
-                get_doomscroll_enable,
-                get_doomscroll_follow_target,
-                get_doomscroll_inject_chat,
-                get_doomscroll_match_mode,
-                get_doomscroll_max_videos,
-                get_doomscroll_pause_media,
-                get_doomscroll_site_pack,
-                get_doomscroll_style,
-            )
-
-            self.doom_enable.setChecked(get_doomscroll_enable())
-            self.doom_after.setValue(get_doomscroll_after_min())
-            self.doom_videos.setValue(get_doomscroll_max_videos())
-            self.doom_cool.setValue(get_doomscroll_cooldown_min())
-            self.doom_pause.setChecked(get_doomscroll_pause_media())
-            self.doom_follow.setChecked(get_doomscroll_follow_target())
-            self.doom_block.setChecked(get_doomscroll_block_input())
-            self.doom_chat.setChecked(get_doomscroll_inject_chat())
-            for combo, val in (
-                (self.doom_style, get_doomscroll_style()),
-                (self.doom_apps, (get_doomscroll_apps() or ["firefox"])[0]),
-                (self.doom_match, get_doomscroll_match_mode()),
-                (self.doom_sites, get_doomscroll_site_pack()),
-            ):
-                i = combo.findData(val)
-                if i >= 0:
-                    combo.setCurrentIndex(i)
-        except Exception:
-            self.doom_enable.setChecked(False)
-            self.doom_after.setValue(20)
-            self.doom_videos.setValue(0)
-            self.doom_cool.setValue(30)
-            self.doom_pause.setChecked(True)
-            self.doom_follow.setChecked(True)
-            self.doom_block.setChecked(False)
-            self.doom_chat.setChecked(False)
-
-        def _save_doom_enable(checked: bool) -> None:
-            from .preferences import set_doomscroll_enable
-
-            set_doomscroll_enable(checked)
-
-        def _save_doom_after(v: int) -> None:
-            from .preferences import set_doomscroll_after_min
-
-            set_doomscroll_after_min(v)
-
-        def _save_doom_videos(v: int) -> None:
-            from .preferences import set_doomscroll_max_videos
-
-            set_doomscroll_max_videos(v)
-
-        def _save_doom_cool(v: int) -> None:
-            from .preferences import set_doomscroll_cooldown_min
-
-            set_doomscroll_cooldown_min(v)
-
-        def _save_doom_style(_i: int = 0) -> None:
-            from .preferences import set_doomscroll_style
-            from .watchdogs import ensure_doomscroll_watchdog
-
-            style = str(self.doom_style.currentData() or "companion")
-            set_doomscroll_style(style)
-            if style == "agent":
-                ensure_doomscroll_watchdog(enable_for_agent=True)
-
-        def _save_doom_apps(_i: int = 0) -> None:
-            from .preferences import set_doomscroll_apps
-
-            set_doomscroll_apps([str(self.doom_apps.currentData() or "firefox")])
-
-        def _save_doom_match(_i: int = 0) -> None:
-            from .preferences import set_doomscroll_match_mode
-
-            set_doomscroll_match_mode(str(self.doom_match.currentData() or "browser-sites"))
-
-        def _save_doom_sites(_i: int = 0) -> None:
-            from .preferences import set_doomscroll_site_pack
-
-            set_doomscroll_site_pack(str(self.doom_sites.currentData() or "social+video"))
-
-        def _save_doom_pause(checked: bool) -> None:
-            from .preferences import set_doomscroll_pause_media
-
-            set_doomscroll_pause_media(checked)
-
-        def _save_doom_follow(checked: bool) -> None:
-            from .preferences import set_doomscroll_follow_target
-
-            set_doomscroll_follow_target(checked)
-
-        def _save_doom_block(checked: bool) -> None:
-            from .preferences import set_doomscroll_block_input
-
-            set_doomscroll_block_input(checked)
-
-        def _save_doom_chat(checked: bool) -> None:
-            from .preferences import set_doomscroll_inject_chat
-
-            set_doomscroll_inject_chat(checked)
-
-        self.doom_enable.toggled.connect(_save_doom_enable)
-        self.doom_after.valueChanged.connect(_save_doom_after)
-        self.doom_videos.valueChanged.connect(_save_doom_videos)
-        self.doom_cool.valueChanged.connect(_save_doom_cool)
-        self.doom_style.currentIndexChanged.connect(_save_doom_style)
-        self.doom_apps.currentIndexChanged.connect(_save_doom_apps)
-        self.doom_match.currentIndexChanged.connect(_save_doom_match)
-        self.doom_sites.currentIndexChanged.connect(_save_doom_sites)
-        self.doom_pause.toggled.connect(_save_doom_pause)
-        self.doom_follow.toggled.connect(_save_doom_follow)
-        self.doom_block.toggled.connect(_save_doom_block)
-        self.doom_chat.toggled.connect(_save_doom_chat)
-
-        snooze_btn = QPushButton("Snooze 30 min")
-        snooze_btn.clicked.connect(self._doomscroll_snooze)
-        focus_form.addRow(self.doom_enable)
-        focus_form.addRow("Interrupt after (time)", self.doom_after)
-        focus_form.addRow("Or after N Shorts", self.doom_videos)
-        focus_form.addRow("Cooldown", self.doom_cool)
-        focus_form.addRow("Style", self.doom_style)
-        focus_form.addRow("Apps", self.doom_apps)
-        focus_form.addRow("Match", self.doom_match)
-        focus_form.addRow("Sites", self.doom_sites)
-        focus_form.addRow(self.doom_pause)
-        focus_form.addRow(self.doom_follow)
-        focus_form.addRow(self.doom_block)
-        focus_form.addRow(self.doom_chat)
-        focus_form.addRow("", snooze_btn)
-        focus_hint = QLabel(
-            "Recommended for Shorts: Enable · Sites=YouTube Shorts · time=5 · "
-            "N Shorts=10 · Style=Companion pop-up · Pause media · Jump to Firefox "
-            "desktop · Block input. Companion must run. True in-page scroll-lock "
-            "needs a browser extension (not shipped)."
-        )
-        focus_hint.setWordWrap(True)
-        focus_hint.setStyleSheet("color: palette(placeholder-text);")
-        focus_form.addRow(focus_hint)
-        layout.addWidget(focus_group)
+        plugins_hint_lab.setWordWrap(True)
+        plugins_hint_lab.setStyleSheet("color: palette(placeholder-text);")
+        plugins_hint_lay.addWidget(plugins_hint_lab)
+        layout.addWidget(plugins_hint)
 
         host_group = QGroupBox("5 · Host profile")
         host_layout = QVBoxLayout(host_group)
@@ -2504,15 +2403,6 @@ class SettingsPage(QWidget):
             set_presence(status)  # type: ignore[arg-type]
         except Exception:
             pass
-
-    def _doomscroll_snooze(self) -> None:
-        try:
-            from .focus import snooze
-
-            snooze(30)
-            QMessageBox.information(self, "Doomscroll", "Snoozed for 30 minutes.")
-        except Exception as exc:
-            QMessageBox.warning(self, "Doomscroll", str(exc))
 
     def _open_config_dir(self) -> None:
         import subprocess

@@ -25,6 +25,14 @@
   # agent.harness = "native";        # native | qwen | dsh
   # agent.codingHarness = "auto";    # auto | native | qwen | dsh (git/coding templates)
 
+  # Always-on domain sinkhole (Windows hosts equivalent via networking.extraHosts).
+  # Domains only — cannot block URL path /shorts/. Timed blocks use Settings 4f + nft.
+  # focus.hostsBlock.enable = true;
+  # focus.hostsBlock.domains = [
+  #   "youtube.com" "www.youtube.com" "m.youtube.com"
+  #   "tiktok.com" "www.tiktok.com"
+  # ];
+
   # --- Recommended schedules (opt-in: uncomment to enable) ---
   # Safe defaults: playbook + read-only + dryRun. Only one agent runs at a time.
   # Staggered nights so they don't compete for LLM slots.

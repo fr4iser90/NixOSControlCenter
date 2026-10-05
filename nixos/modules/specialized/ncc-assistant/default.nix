@@ -20,5 +20,6 @@ in
     ./options.nix
     ./commands.nix
     ./schedules.nix
+    ./focus-block.nix
   ];
 }

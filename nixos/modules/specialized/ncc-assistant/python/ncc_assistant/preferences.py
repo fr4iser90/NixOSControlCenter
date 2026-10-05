@@ -268,21 +268,197 @@ def set_workflow_providers(providers: list[str]) -> None:
     save_preferences({"workflow_providers": cleaned or ["github"]})
 
 
+# Morning Brief plugin (sources / auto-refresh / once-per-day latch)
+MORNING_BRIEF_SOURCES = ("github-prs", "github-issues", "tasks", "roadmap")
+
+
+def get_morning_brief_sources() -> list[str]:
+    raw = load_preferences().get("morning_brief_sources")
+    if isinstance(raw, list) and raw:
+        out = [
+            s
+            for s in (str(x).strip().lower() for x in raw)
+            if s in MORNING_BRIEF_SOURCES
+        ]
+        if out:
+            return out
+    return list(MORNING_BRIEF_SOURCES)
+
+
+def set_morning_brief_sources(sources: list[str] | str) -> None:
+    if isinstance(sources, str):
+        parts = [p.strip().lower() for p in sources.replace(";", ",").split(",")]
+    else:
+        parts = [str(x).strip().lower() for x in sources]
+    cleaned = [s for s in parts if s in MORNING_BRIEF_SOURCES]
+    save_preferences(
+        {"morning_brief_sources": cleaned or list(MORNING_BRIEF_SOURCES)}
+    )
+
+
+def get_morning_brief_auto_refresh() -> bool:
+    return bool(load_preferences().get("morning_brief_auto_refresh", True))
+
+
+def set_morning_brief_auto_refresh(enabled: bool) -> None:
+    save_preferences({"morning_brief_auto_refresh": bool(enabled)})
+
+
+def get_morning_brief_last_fired() -> str:
+    raw = load_preferences().get("morning_brief_last_fired", "")
+    return str(raw).strip() if raw else ""
+
+
+def set_morning_brief_last_fired(day: str) -> None:
+    save_preferences({"morning_brief_last_fired": str(day or "").strip()})
+
+
 # --- Phase 35: doomscroll / focus watchdog ---
 
 DOOMSCROLL_STYLES = ("nudge", "companion", "agent")
 DOOMSCROLL_MATCH_MODES = ("browser-sites", "listed-apps")
+
+# Multi-select enums only — no freestyle site/app lists in the primary UI.
+DOOMSCROLL_APP_CHOICES = ("firefox", "chromium", "brave", "librewolf", "browsers")
+
+DOOMSCROLL_SITE_TAGS: tuple[str, ...] = (
+    "youtube-shorts",
+    "youtube",
+    "reddit",
+    "tiktok",
+    "instagram",
+    "twitter",
+    "facebook",
+    "twitch",
+    "linkedin",
+    "threads",
+    "netflix",
+    "disney",
+    "prime-video",
+)
+
+# label, title/url needles, hosts/nft domains (one selection → match + block)
+DOOMSCROLL_SITE_TAG_META: dict[str, dict[str, Any]] = {
+    "youtube-shorts": {
+        "label": "YouTube Shorts",
+        "needles": ("/shorts/", "youtube.com/shorts", "#shorts"),
+        "domains": ("youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"),
+    },
+    "youtube": {
+        "label": "YouTube",
+        "needles": ("youtube", "youtu.be"),
+        "domains": ("youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"),
+    },
+    "reddit": {
+        "label": "Reddit",
+        "needles": ("reddit",),
+        "domains": ("reddit.com", "www.reddit.com", "old.reddit.com"),
+    },
+    "tiktok": {
+        "label": "TikTok",
+        "needles": ("tiktok",),
+        "domains": ("tiktok.com", "www.tiktok.com", "vm.tiktok.com"),
+    },
+    "instagram": {
+        "label": "Instagram",
+        "needles": ("instagram",),
+        "domains": ("instagram.com", "www.instagram.com"),
+    },
+    "twitter": {
+        "label": "Twitter / X",
+        "needles": ("twitter", "x.com"),
+        "domains": ("twitter.com", "www.twitter.com", "x.com", "www.x.com"),
+    },
+    "facebook": {
+        "label": "Facebook",
+        "needles": ("facebook",),
+        "domains": ("facebook.com", "www.facebook.com", "fb.com"),
+    },
+    "twitch": {
+        "label": "Twitch",
+        "needles": ("twitch",),
+        "domains": ("twitch.tv", "www.twitch.tv"),
+    },
+    "linkedin": {
+        "label": "LinkedIn",
+        "needles": ("linkedin",),
+        "domains": ("linkedin.com", "www.linkedin.com"),
+    },
+    "threads": {
+        "label": "Threads",
+        "needles": ("threads",),
+        "domains": ("threads.net", "www.threads.net"),
+    },
+    "netflix": {
+        "label": "Netflix",
+        "needles": ("netflix",),
+        "domains": ("netflix.com", "www.netflix.com"),
+    },
+    "disney": {
+        "label": "Disney+",
+        "needles": ("disney",),
+        "domains": ("disneyplus.com", "www.disneyplus.com"),
+    },
+    "prime-video": {
+        "label": "Prime Video",
+        "needles": ("prime video", "primevideo"),
+        "domains": ("primevideo.com", "www.primevideo.com"),
+    },
+}
+
+# Legacy single-pack keys (migrated → site_tags on read)
 DOOMSCROLL_SITE_PACKS = (
     "social",
     "video",
     "social+video",
     "youtube-shorts",
     "any-browser",
+    "custom",
 )
-DOOMSCROLL_APP_CHOICES = ("firefox", "chromium", "browsers")
+
 DEFAULT_DOOMSCROLL_AFTER_MIN = 20
 DEFAULT_DOOMSCROLL_COOLDOWN_MIN = 30
-DEFAULT_DOOMSCROLL_MAX_VIDEOS = 0  # 0 = video-count off; Shorts users set 10
+DEFAULT_DOOMSCROLL_MAX_VIDEOS = 0
+DEFAULT_DOOMSCROLL_LOCKOUT_MIN = 0
+
+
+def _parse_csv_list(raw: Any, *, lower: bool = True) -> list[str]:
+    """Split comma/newline/semicolon list into cleaned tokens."""
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        parts = [str(x) for x in raw]
+    else:
+        text = str(raw).replace(";", ",").replace("\n", ",")
+        parts = text.split(",")
+    out: list[str] = []
+    seen: set[str] = set()
+    for p in parts:
+        tok = p.strip()
+        if lower:
+            tok = tok.lower()
+        if not tok or tok in seen:
+            continue
+        seen.add(tok)
+        out.append(tok)
+    return out
+
+
+def _site_tags_from_legacy_pack(pack: str) -> list[str]:
+    p = (pack or "").strip().lower()
+    social = ["reddit", "tiktok", "instagram", "twitter", "facebook", "linkedin", "threads"]
+    video = ["youtube", "twitch", "netflix", "disney", "prime-video"]
+    if p == "youtube-shorts":
+        return ["youtube-shorts"]
+    if p == "social":
+        return social
+    if p == "video":
+        return video
+    if p == "social+video":
+        return social + video
+    if p == "any-browser":
+        return list(DOOMSCROLL_SITE_TAGS)
+    return ["youtube-shorts"]
 
 
 def get_doomscroll_enable() -> bool:
@@ -374,39 +550,114 @@ def set_doomscroll_match_mode(mode: str) -> None:
 
 
 def get_doomscroll_site_pack() -> str:
-    raw = load_preferences().get("doomscroll_site_pack", "social+video")
-    if isinstance(raw, str) and raw.strip().lower() in DOOMSCROLL_SITE_PACKS:
-        return raw.strip().lower()
-    return "social+video"
+    """Legacy single pack — prefer get_doomscroll_site_tags()."""
+    tags = get_doomscroll_site_tags()
+    if tags == ["youtube-shorts"]:
+        return "youtube-shorts"
+    return "custom"
 
 
 def set_doomscroll_site_pack(pack: str) -> None:
-    p = (pack or "").strip().lower()
-    if p in DOOMSCROLL_SITE_PACKS:
-        save_preferences({"doomscroll_site_pack": p})
+    """Legacy writer — converts pack → site_tags enums."""
+    set_doomscroll_site_tags(_site_tags_from_legacy_pack(pack))
+
+
+def get_doomscroll_site_tags() -> list[str]:
+    """Multi-select site enums (match + net-block domains derived from these)."""
+    raw = load_preferences().get("doomscroll_site_tags")
+    if isinstance(raw, list) and raw:
+        out = [t for t in _parse_csv_list(raw, lower=True) if t in DOOMSCROLL_SITE_TAG_META]
+        if out:
+            return out
+    # Migrate legacy site_pack
+    pack = load_preferences().get("doomscroll_site_pack", "youtube-shorts")
+    if isinstance(pack, str):
+        return _site_tags_from_legacy_pack(pack)
+    return ["youtube-shorts"]
+
+
+def set_doomscroll_site_tags(tags: list[str] | str) -> None:
+    cleaned = [t for t in _parse_csv_list(tags, lower=True) if t in DOOMSCROLL_SITE_TAG_META]
+    save_preferences({"doomscroll_site_tags": cleaned or ["youtube-shorts"]})
 
 
 def get_doomscroll_apps() -> list[str]:
+    """App enums only (firefox / chromium / brave / librewolf / browsers)."""
     raw = load_preferences().get("doomscroll_apps", ["firefox"])
-    if isinstance(raw, list):
-        out = [
-            str(x).strip().lower()
-            for x in raw
-            if str(x).strip().lower() in DOOMSCROLL_APP_CHOICES
-        ]
-        return out or ["firefox"]
-    if isinstance(raw, str) and raw.strip().lower() in DOOMSCROLL_APP_CHOICES:
-        return [raw.strip().lower()]
-    return ["firefox"]
+    out = [a for a in _parse_csv_list(raw, lower=True) if a in DOOMSCROLL_APP_CHOICES]
+    return out or ["firefox"]
 
 
-def set_doomscroll_apps(apps: list[str]) -> None:
-    cleaned = [
-        a
-        for a in (str(x).strip().lower() for x in apps)
-        if a in DOOMSCROLL_APP_CHOICES
-    ]
+def set_doomscroll_apps(apps: list[str] | str) -> None:
+    cleaned = [a for a in _parse_csv_list(apps, lower=True) if a in DOOMSCROLL_APP_CHOICES]
     save_preferences({"doomscroll_apps": cleaned or ["firefox"]})
+
+
+def get_doomscroll_site_extras() -> list[str]:
+    """Deprecated — always empty (enums only)."""
+    return []
+
+
+def set_doomscroll_site_extras(items: list[str] | str) -> None:
+    """Deprecated no-op — site needles come from site_tags enums."""
+    del items
+
+
+def get_doomscroll_lockout_min() -> int:
+    """After intervene: REAL net block duration in minutes (0 = no timed nft block)."""
+    raw = load_preferences().get("doomscroll_lockout_min", DEFAULT_DOOMSCROLL_LOCKOUT_MIN)
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_DOOMSCROLL_LOCKOUT_MIN
+    return max(0, min(n, 240))
+
+
+def set_doomscroll_lockout_min(n: int) -> None:
+    try:
+        v = int(n)
+    except (TypeError, ValueError):
+        return
+    save_preferences({"doomscroll_lockout_min": max(0, min(v, 240))})
+
+
+def domains_for_site_tags(tags: list[str] | None = None) -> list[str]:
+    """Hosts/nft domains derived from selected site enums (no separate block list)."""
+    selected = tags if tags is not None else get_doomscroll_site_tags()
+    out: list[str] = []
+    seen: set[str] = set()
+    for tag in selected:
+        meta = DOOMSCROLL_SITE_TAG_META.get(tag) or {}
+        for d in meta.get("domains") or ():
+            ds = str(d).lower()
+            if ds and ds not in seen:
+                seen.add(ds)
+                out.append(ds)
+    return out
+
+
+def needles_for_site_tags(tags: list[str] | None = None) -> list[str]:
+    selected = tags if tags is not None else get_doomscroll_site_tags()
+    out: list[str] = []
+    seen: set[str] = set()
+    for tag in selected:
+        meta = DOOMSCROLL_SITE_TAG_META.get(tag) or {}
+        for n in meta.get("needles") or ():
+            ns = str(n).lower()
+            if ns and ns not in seen:
+                seen.add(ns)
+                out.append(ns)
+    return out
+
+
+def get_doomscroll_block_domains() -> list[str]:
+    """Always derived from site_tags — selecting Shorts/YouTube/… is enough."""
+    return domains_for_site_tags()
+
+
+def set_doomscroll_block_domains(items: list[str] | str) -> None:
+    """Deprecated no-op — domains follow site_tags."""
+    del items
 
 
 def get_doomscroll_pause_media() -> bool:

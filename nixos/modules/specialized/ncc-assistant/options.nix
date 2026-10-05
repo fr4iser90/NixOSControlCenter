@@ -384,6 +384,33 @@ in
         };
       };
 
+      # Doomscroll: real DNS/hosts-style domain blocks (not URL-path /shorts/)
+      focus = {
+        hostsBlock = {
+          enable = mkOption {
+            type = types.bool;
+            default = false;
+            description = ''
+              When true, listed domains are added to networking.extraHosts (0.0.0.0 / ::1),
+              same idea as a Windows hosts file. Blocks whole domains — not URL paths
+              like /shorts/. Timed blocks after an interrupt use ncc-focus-netblock (nft).
+            '';
+          };
+          domains = mkOption {
+            type = types.listOf types.str;
+            default = [ ];
+            example = [
+              "www.youtube.com"
+              "youtube.com"
+              "m.youtube.com"
+              "www.tiktok.com"
+              "tiktok.com"
+            ];
+            description = "Domains to sinkhole via networking.extraHosts when hostsBlock.enable.";
+          };
+        };
+      };
+
       harness = mkOption {
         type = types.enum [ "native" "qwen" "dsh" ];
         default = "native";

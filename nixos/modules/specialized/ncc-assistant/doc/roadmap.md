@@ -88,7 +88,8 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 | 32 | [Companion shell UX](./plans/32-companion-shell-ux.md) | **done** (session picker, resize, workspace groups, tools/MCP/templates icons) |
 | 33 | [Companion persist / harness depth](./plans/33-companion-persist-harness-depth.md) | **done** (disk sessions, ws switch, MCP marketplace, auto-inject, multi-turn, skins) |
 | 34 | [Ops cockpit · idle · daily workflows · rulebooks](./plans/34-ops-cockpit-idle-rulebooks.md) | **done** (capacity, idle sweep, Workflows/Daily, creators/rulebooks) |
-| 35 | [Doomscroll / focus watchdog](./plans/35-doomscroll-focus-watchdog.md) | **done** (active-window probe, Settings 4f, Companion/tray nudge) |
+| 35 | [Doomscroll / focus watchdog](./plans/35-doomscroll-focus-watchdog.md) | **done** (active-window probe; now a Feature plugin) |
+| 36 | [Feature plugins](./plans/36-feature-plugins.md) | **in progress** (Plugins tab + doomscroll extracted; ≠ MCP/templates/watchdogs) |
 
 ## Feature map (checklist)
 
@@ -159,9 +160,18 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 ### Phase 35 (done)
 
 - [x] Doomscroll / focus watchdog (active window → Companion/notify interrupt)
-- [x] Settings 4f enums: apps, site pack, threshold, cooldown, style
+- [x] Enum-only apps/sites (domains derived from site tags)
 - [x] CLI `ncc ai focus status|tick|snooze`; tray probe
 - SSOT: [plans/35-doomscroll-focus-watchdog.md](./plans/35-doomscroll-focus-watchdog.md)
+
+### Phase 36 (in progress)
+
+- [x] FeaturePlugin protocol + `list_plugins` / `tick_all`
+- [x] Plugins tab (≠ MCP / Templates / Watchdogs)
+- [x] Doomscroll extracted from Settings 4f → Plugins
+- [x] Morning Brief plugin (schedule / sources; Settings 4e digest moved)
+- [ ] Optional catalog/marketplace for more plugins
+- SSOT: [plans/36-feature-plugins.md](./plans/36-feature-plugins.md)
 
 ## Known follow-ups (not blockers)
 

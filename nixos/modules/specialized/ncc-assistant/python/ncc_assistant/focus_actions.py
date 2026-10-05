@@ -141,6 +141,8 @@ def _resource_hints_for_apps() -> tuple[str, ...]:
             hints.extend(("chromium", "chrome", "brave", "vivaldi"))
         elif app == "browsers":
             hints.extend(("firefox", "chromium", "chrome", "brave"))
+        else:
+            hints.append(app)
     seen: set[str] = set()
     out: list[str] = []
     for h in hints:

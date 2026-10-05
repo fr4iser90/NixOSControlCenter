@@ -45,9 +45,10 @@ def run_tray() -> int:
         )
         try:
             from .focus import peek_pending_nudge
-            from .preferences import get_doomscroll_enable
+            from .plugins import get_plugin
 
-            if get_doomscroll_enable() and peek_pending_nudge():
+            doom = get_plugin("doomscroll")
+            if doom is not None and doom.is_enabled() and peek_pending_nudge():
                 tip += " · doomscroll!"
         except Exception:
             pass
@@ -55,15 +56,14 @@ def run_tray() -> int:
 
     def _focus_tick() -> None:
         try:
-            from .focus import tick
-            from .preferences import get_doomscroll_enable
+            from .plugins import tick_all
 
-            if get_doomscroll_enable():
-                result = tick()
-                if result.get("intervened"):
+            for ev in tick_all(host="tray"):
+                msg = ev.get("tray_message")
+                if isinstance(msg, dict):
                     tray.showMessage(
-                        "NCC · Doomscroll interrupt",
-                        str(result.get("message") or "Leave the feed."),
+                        str(msg.get("title") or "NCC"),
+                        str(msg.get("body") or ""),
                         QSystemTrayIcon.MessageIcon.Warning,
                         10_000,
                     )

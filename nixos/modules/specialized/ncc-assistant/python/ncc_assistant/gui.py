@@ -493,6 +493,7 @@ from .gui_pages import (
     AgentPage,
     DiffReviewDialog,
     JobsPage,
+    PluginsPage,
     SchedulesPage,
     SettingsPage,
     ThinkingBlock,
@@ -2122,6 +2123,8 @@ class AssistantPanel(QWidget):
         self.tabs.addTab(self.workflows_page, "Workflows")
         self.schedules_page = SchedulesPage()
         self.tabs.addTab(self.schedules_page, "Schedules")
+        self.plugins_page = PluginsPage()
+        self.tabs.addTab(self.plugins_page, "Plugins")
         self.settings_page = SettingsPage()
         self.settings_page.providers_changed.connect(self.chat_page.refresh_providers_ui)
         self.tabs.addTab(self.settings_page, "Settings")

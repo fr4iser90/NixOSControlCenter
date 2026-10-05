@@ -15,16 +15,19 @@ from .paths import focus_nudge_file, focus_state_file
 from .preferences import (
     get_doomscroll_after_min,
     get_doomscroll_apps,
+    get_doomscroll_block_domains,
     get_doomscroll_block_input,
     get_doomscroll_cooldown_min,
     get_doomscroll_enable,
     get_doomscroll_follow_target,
     get_doomscroll_inject_chat,
+    get_doomscroll_lockout_min,
     get_doomscroll_match_mode,
     get_doomscroll_max_videos,
     get_doomscroll_pause_media,
-    get_doomscroll_site_pack,
+    get_doomscroll_site_tags,
     get_doomscroll_style,
+    needles_for_site_tags,
 )
 
 # Window class / app_id fragments (lowercase)
@@ -36,6 +39,8 @@ APP_CLASS_MAP: dict[str, tuple[str, ...]] = {
         "librewolf",
         "navigator",
     ),
+    "librewolf": ("librewolf", "firefox"),
+    "brave": ("brave-browser", "brave", "brave-browser-stable"),
     "chromium": (
         "chromium",
         "chromium-browser",
@@ -47,25 +52,6 @@ APP_CLASS_MAP: dict[str, tuple[str, ...]] = {
         "chrome",
     ),
 }
-
-SITE_PACKS: dict[str, tuple[str, ...]] = {
-    "social": (
-        "reddit",
-        "twitter",
-        "x.com",
-        "instagram",
-        "facebook",
-        "tiktok",
-        "linkedin",
-        "threads",
-    ),
-    "video": ("youtube", "twitch", "netflix", "disney", "prime video"),
-    "youtube-shorts": ("shorts", "#shorts", "youtube shorts"),
-    "social+video": (),  # filled below
-    "any-browser": (),  # any matching app title counts
-}
-
-SITE_PACKS["social+video"] = SITE_PACKS["social"] + SITE_PACKS["video"]
 
 NUDGE_MESSAGES = (
     "Hey — you've been doomscrolling for a while. Close the tab and stretch.",
@@ -428,7 +414,7 @@ def _apps_match(win_class: str, apps: list[str]) -> bool:
         return False
     selected = apps or ["firefox"]
     if "browsers" in selected:
-        selected = list({*selected, "firefox", "chromium"})
+        selected = list({*selected, "firefox", "chromium", "brave", "librewolf"})
     for app in selected:
         if app == "browsers":
             continue
@@ -437,21 +423,21 @@ def _apps_match(win_class: str, apps: list[str]) -> bool:
             return True
     return False
 
-def _sites_match(title: str, pack: str, *, url: str = "") -> bool:
-    mode_pack = (pack or "social+video").strip().lower()
+
+def _sites_match(title: str, *, url: str = "") -> bool:
+    """Match against needles derived from selected site-tag enums."""
     t = (title or "").lower()
     u = (url or "").lower()
-    if mode_pack == "any-browser":
-        return True
-    if mode_pack == "youtube-shorts":
-        # Live evidence (Plasma+Firefox): caption often lacks the word "Shorts",
-        # but MPRIS xesam:url is https://www.youtube.com/shorts/<id>.
+    tags = get_doomscroll_site_tags()
+    # youtube-shorts: prefer URL /shorts/ (Plasma captions often omit the word)
+    if "youtube-shorts" in tags:
         if "/shorts/" in u or "youtube.com/shorts" in u:
             return True
-        has_yt = "youtube" in t or "youtu.be" in t or "youtube" in u
-        has_shorts = "shorts" in t or "#shorts" in t or "shorts" in u
-        return bool(has_shorts or (has_yt and "short" in t))
-    needles = SITE_PACKS.get(mode_pack) or SITE_PACKS["social+video"]
+        if ("shorts" in t or "#shorts" in t) and (
+            "youtube" in t or "youtube" in u or "youtu.be" in t
+        ):
+            return True
+    needles = needles_for_site_tags(tags)
     return any(n in t or n in u for n in needles)
 
 
@@ -465,7 +451,7 @@ def is_doomscroll_window(win: dict[str, str] | None) -> bool:
     if mode == "listed-apps":
         return True
     title = win.get("title") or win.get("mpris_title") or ""
-    return _sites_match(title, get_doomscroll_site_pack(), url=win.get("url") or "")
+    return _sites_match(title, url=win.get("url") or "")
 
 
 def _empty_state() -> dict[str, Any]:
@@ -477,6 +463,7 @@ def _empty_state() -> dict[str, Any]:
         "last_match": False,
         "last_intervene": 0.0,
         "snooze_until": 0.0,
+        "lockout_until": 0.0,
         "window": None,
     }
 
@@ -512,8 +499,22 @@ def snooze(minutes: int = 30) -> dict[str, Any]:
     state["streak_sec"] = 0.0
     state["video_count"] = 0
     state["last_title"] = ""
+    state["lockout_until"] = 0.0
     _save_state(state)
     clear_pending_nudge()
+    try:
+        from .focus_netblock import clear_net_block
+
+        clear_net_block()
+    except Exception:
+        pass
+    return status()
+
+
+def clear_snooze() -> dict[str, Any]:
+    state = _load_state()
+    state["snooze_until"] = 0.0
+    _save_state(state)
     return status()
 
 
@@ -567,6 +568,8 @@ def status() -> dict[str, Any]:
     streak = float(state.get("streak_sec") or 0.0)
     videos = int(state.get("video_count") or 0)
     hint = None
+    lockout_until = float(state.get("lockout_until") or 0.0)
+    lockout_left = max(0, int(lockout_until - time.time()))
     if not win or not (win.get("class") or win.get("title") or win.get("url")):
         if desktop == "plasma-wayland":
             hint = (
@@ -583,8 +586,7 @@ def status() -> dict[str, Any]:
             hint = f"No window adapter for desktop={desktop!r}."
     elif not is_doomscroll_window(win) and get_doomscroll_enable():
         hint = (
-            "Window seen but not matching site_pack/apps. For youtube-shorts, "
-            "need /shorts/ in MPRIS URL or 'Shorts' in the title."
+            "Window seen but not matching selected site tags / apps."
         )
     return {
         "enable": get_doomscroll_enable(),
@@ -592,9 +594,12 @@ def status() -> dict[str, Any]:
         "after_min": get_doomscroll_after_min(),
         "max_videos": get_doomscroll_max_videos(),
         "cooldown_min": get_doomscroll_cooldown_min(),
+        "lockout_min": get_doomscroll_lockout_min(),
+        "lockout_remaining_sec": lockout_left,
         "apps": get_doomscroll_apps(),
         "match_mode": get_doomscroll_match_mode(),
-        "site_pack": get_doomscroll_site_pack(),
+        "site_tags": get_doomscroll_site_tags(),
+        "block_domains": get_doomscroll_block_domains(),
         "desktop": desktop,
         "adapter": (win or {}).get("source") or desktop,
         "matching_now": is_doomscroll_window(win),
@@ -606,6 +611,24 @@ def status() -> dict[str, Any]:
         "streak_min": round(streak / 60.0, 2),
         "video_count": videos,
         "threshold_sec": thresh,
+        "metrics": {
+            "time": (
+                "Companion/tray ticks ~every 15s. While the active window matches, "
+                "streak_sec += delta (capped 120s/tick). Interrupt when "
+                f"streak_sec ≥ {get_doomscroll_after_min()}×60."
+            ),
+            "videos": (
+                "Each tick compares clip id = MPRIS url || mpris_title || window title. "
+                "When it changes while matching, video_count += 1. Interrupt when "
+                f"video_count ≥ {get_doomscroll_max_videos()} (0 = video metric off). "
+                "Whichever hits first (time OR videos) intervenes."
+            ),
+            "net_block": (
+                "After interrupt, if lockout_min>0: nft sinkhole domains derived "
+                "from selected site tags (YouTube Shorts → youtube.com, …). "
+                "No separate block list."
+            ),
+        },
         "window": win,
         "snooze_until": float(state.get("snooze_until") or 0.0),
         "last_intervene": float(state.get("last_intervene") or 0.0),
@@ -650,17 +673,29 @@ def _intervene(
     state["streak_sec"] = 0.0
     state["video_count"] = 0
     state["last_title"] = ""
+    lockout_m = get_doomscroll_lockout_min()
+    if lockout_m > 0:
+        state["lockout_until"] = time.time() + lockout_m * 60.0
+    else:
+        state["lockout_until"] = 0.0
     _save_state(state)
 
     actions: dict[str, Any] = {}
     try:
         from .focus_actions import apply_intervene_side_effects
 
-        # Pause media immediately even if Companion UI is late / on another desktop.
-        # follow_target also runs here for tray-only setups; Companion may re-run.
         actions = apply_intervene_side_effects()
     except Exception as exc:  # noqa: BLE001
         actions = {"error": str(exc)}
+
+    # REAL domain sinkhole (nft via ncc-focus-netblock) — not soft overlay.
+    if lockout_m > 0:
+        try:
+            from .focus_netblock import apply_net_block
+
+            actions["net_block"] = apply_net_block(minutes=lockout_m)
+        except Exception as exc:  # noqa: BLE001
+            actions["net_block"] = {"ok": False, "error": str(exc)}
 
     notified = False
     try:
@@ -763,6 +798,18 @@ def tick(*, force_window: dict[str, str] | None = None) -> dict[str, Any]:
     state["video_count"] = videos
     state["last_title"] = last_title
     state["window"] = win
+
+    # Clear nft block when lockout window ends.
+    prev_lockout = float(state.get("lockout_until") or 0.0)
+    if prev_lockout > 0 and now >= prev_lockout:
+        state["lockout_until"] = 0.0
+        try:
+            from .focus_netblock import clear_net_block
+
+            clear_net_block()
+        except Exception:
+            pass
+
     _save_state(state)
 
     cooldown = float(get_doomscroll_cooldown_min()) * 60.0
