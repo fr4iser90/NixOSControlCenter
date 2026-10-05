@@ -196,6 +196,8 @@ class DoomscrollSettingsWidget(QWidget):
             from ...preferences import set_doomscroll_enable
 
             set_doomscroll_enable(checked)
+            if checked:
+                self._maybe_offer_grant()
 
         def _save_doom_after(v: int) -> None:
             from ...preferences import set_doomscroll_after_min
@@ -216,6 +218,8 @@ class DoomscrollSettingsWidget(QWidget):
             from ...preferences import set_doomscroll_lockout_min
 
             set_doomscroll_lockout_min(v)
+            if v > 0:
+                self._maybe_offer_grant()
 
         def _save_doom_style(_i: int = 0) -> None:
             from ...preferences import set_doomscroll_style
@@ -287,6 +291,12 @@ class DoomscrollSettingsWidget(QWidget):
         clear_snooze_btn.clicked.connect(self._doomscroll_clear_snooze)
         refresh_btn = QPushButton("Refresh status")
         refresh_btn.clicked.connect(self._doomscroll_refresh_status)
+        grant_btn = QPushButton("Grant net-block privilege…")
+        grant_btn.setToolTip(
+            "Opt in + verify helper. Polkit rule makes apply passwordless mid-scroll "
+            "(needs system-update with focus-block polkit)."
+        )
+        grant_btn.clicked.connect(lambda: self._maybe_offer_grant(force=True))
         snooze_row = QWidget()
         snooze_lay = QHBoxLayout(snooze_row)
         snooze_lay.setContentsMargins(0, 0, 0, 0)
@@ -306,6 +316,7 @@ class DoomscrollSettingsWidget(QWidget):
         focus_form.addRow("Cooldown", self.doom_cool)
         focus_form.addRow(_section("On interrupt"))
         focus_form.addRow("Net block", self.doom_lockout)
+        focus_form.addRow("", grant_btn)
         focus_form.addRow("Style", self.doom_style)
         focus_form.addRow(self.doom_pause)
         focus_form.addRow(self.doom_follow)
@@ -319,13 +330,23 @@ class DoomscrollSettingsWidget(QWidget):
             "Feature plugin (Plugins tab) — not MCP / templates / watchdogs. "
             "Defaults: off · Firefox · YouTube Shorts · 20 min · clips off · "
             "cooldown 30 · net block off · companion · pause+jump on. "
-            "Sites drive match + block domains (no freitext)."
+            "Sites drive match + block domains (no freitext). "
+            "Net block needs Grant privilege once (Polkit), not mid-interrupt."
         )
         focus_hint.setWordWrap(True)
         focus_hint.setStyleSheet("color: palette(placeholder-text);")
         focus_form.addRow(focus_hint)
         root.addWidget(focus_group)
         self._doomscroll_refresh_status()
+
+    def _maybe_offer_grant(self, *, force: bool = False) -> None:
+        try:
+            from .privilege_ui import offer_netblock_grant
+
+            offer_netblock_grant(self, force=force)
+            self._doomscroll_refresh_status()
+        except Exception as exc:
+            QMessageBox.warning(self, "Doomscroll", str(exc))
 
     def _doomscroll_snooze(self) -> None:
         try:
@@ -373,6 +394,15 @@ class DoomscrollSettingsWidget(QWidget):
                 f"Block domains: {', '.join(domains[:4])}"
                 + ("…" if len(domains) > 4 else "")
             )
+            try:
+                from ...preferences import get_doomscroll_netblock_granted
+
+                parts.append(
+                    "net-block privilege: "
+                    + ("ok" if get_doomscroll_netblock_granted() else "not granted")
+                )
+            except Exception:
+                pass
             if st.get("matching_now"):
                 parts.append("matching now")
             self.doom_session_status.setText(" · ".join(parts))

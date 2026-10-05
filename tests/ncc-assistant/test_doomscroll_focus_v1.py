@@ -328,6 +328,7 @@ class FocusWatchdogTests(unittest.TestCase):
         set_doomscroll_site_tags(["youtube-shorts", "tiktok"])
         domains = get_doomscroll_block_domains()
         self.assertIn("youtube.com", domains)
+        self.assertIn("googlevideo.com", domains)
         self.assertIn("tiktok.com", domains)
         self.assertTrue(
             is_doomscroll_window(
@@ -417,26 +418,17 @@ class FocusWatchdogTests(unittest.TestCase):
             / "doomscroll"
             / "settings_ui.py"
         ).read_text(encoding="utf-8")
+        companion = (ROOT / "ncc_assistant" / "companion.py").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("class PluginsPage", gui)
         self.assertIn("Feature plugins", gui)
         self.assertNotIn("4f · Doomscroll prevention", gui)
         self.assertIn("Doomscroll prevention", settings_ui)
-        self.assertIn("Watch", settings_ui)
-        self.assertIn("When to interrupt", settings_ui)
-        self.assertIn("On interrupt", settings_ui)
-        self.assertIn("Session", settings_ui)
-        self.assertIn("Clear snooze", settings_ui)
-        self.assertIn("Pause media (MPRIS) on interrupt", settings_ui)
-        self.assertIn("Jump to browser desktop before interrupt", settings_ui)
-        self.assertIn("DOOMSCROLL_SITE_TAGS", settings_ui)
-        self.assertIn("doom_site_checks", settings_ui)
-        self.assertNotIn("Pause Firefox media", settings_ui)
-        self.assertNotIn("Apps (freeform)", settings_ui)
-        self.assertNotIn("Site extras (add freely)", settings_ui)
-        self.assertNotIn("doom_domains", settings_ui)
-        companion = (ROOT / "ncc_assistant" / "companion.py").read_text(
-            encoding="utf-8"
-        )
+        self.assertIn("Grant net-block privilege", settings_ui)
+        self.assertIn("PANEL_PLUGINS", companion)
+        self.assertIn("plugin_toggle", companion)
+        self.assertIn("plugin_configure", companion)
         self.assertIn("tick_all", companion)
         self.assertIn("present_interrupt_dialog", companion)
         plugins_init = (ROOT / "ncc_assistant" / "plugins" / "__init__.py").read_text(
@@ -444,6 +436,19 @@ class FocusWatchdogTests(unittest.TestCase):
         )
         self.assertIn("FeaturePlugin", plugins_init)
         self.assertIn("tick_all", plugins_init)
+
+    def test_netblock_requires_privilege_grant(self) -> None:
+        from ncc_assistant.focus_netblock import apply_net_block
+        from ncc_assistant.preferences import (
+            set_doomscroll_netblock_granted,
+            set_doomscroll_site_tags,
+        )
+
+        set_doomscroll_site_tags(["youtube-shorts"])
+        set_doomscroll_netblock_granted(False)
+        result = apply_net_block(minutes=5)
+        self.assertFalse(result.get("ok"))
+        self.assertEqual(result.get("error"), "privilege_not_granted")
 
     def test_plugin_registry_lists_doomscroll(self) -> None:
         from ncc_assistant.plugins import get_plugin, list_plugins

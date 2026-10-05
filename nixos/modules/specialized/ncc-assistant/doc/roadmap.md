@@ -169,7 +169,8 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 - [x] FeaturePlugin protocol + `list_plugins` / `tick_all`
 - [x] Plugins tab (≠ MCP / Templates / Watchdogs)
 - [x] Doomscroll extracted from Settings 4f → Plugins
-- [x] Morning Brief plugin (schedule / sources; Settings 4e digest moved)
+- [x] Companion Plugins panel (toggle / configure / grant net-block)
+- [x] Doomscroll: grant at setup + Polkit YES for `ncc-focus-netblock` (no mid-scroll password)
 - [ ] Optional catalog/marketplace for more plugins
 - SSOT: [plans/36-feature-plugins.md](./plans/36-feature-plugins.md)
 

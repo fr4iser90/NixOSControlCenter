@@ -26,6 +26,17 @@ in
   config = mkIf (cfg.enable or false) (mkMerge [
     {
       environment.systemPackages = [ pkg.nccFocusNetblock ];
+      # Passwordless for active local sessions — Grant is the NCC opt-in gate;
+      # mid-interrupt apply/clear must not pop Authentication Required.
+      environment.etc."polkit-1/actions/org.nixos.ncc.focus-netblock.policy".source =
+        pkg.nccFocusNetblockPolkitPolicy;
+      security.polkit.extraConfig = ''
+        polkit.addRule(function(action, subject) {
+          if (action.id == "org.nixos.ncc.focus-netblock" && subject.active) {
+            return polkit.Result.YES;
+          }
+        });
+      '';
     }
     (mkIf hostsOn {
       networking.extraHosts = hostsText;

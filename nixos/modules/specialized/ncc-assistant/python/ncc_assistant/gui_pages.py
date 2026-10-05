@@ -1862,6 +1862,13 @@ class PluginsPage(QWidget):
                             cb.setChecked(checked)
                             cb.blockSignals(False)
                         break
+            if checked and pid == "doomscroll":
+                try:
+                    from .plugins.doomscroll.privilege_ui import offer_netblock_grant
+
+                    offer_netblock_grant(self)
+                except Exception:
+                    pass
         except Exception as exc:
             QMessageBox.warning(self, "Plugins", str(exc))
 

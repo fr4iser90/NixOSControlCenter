@@ -137,10 +137,15 @@ focus.hostsBlock.domains = [ "youtube.com" "www.youtube.com" "tiktok.com" ];
 ```
 
 → `networking.extraHosts` (0.0.0.0 / ::1). **Domains only** — not `/shorts/` path.
+Timed lockout uses `ncc-focus-netblock` (nft + browser peer harvest + conntrack
+flush). Shorts need CDN hosts (`googlevideo.com`, …) — included in the YouTube
+site tags. Check `ncc ai focus status` → `net_block.active`.
 CLI: `ncc ai focus status|tick|snooze`.
 
 **Companion:** frameless overlay — drag avatar to move, resize via corner grip,
-session picker (grouped by workspace), template/Daily/tool/MCP/workspace icons.
+session picker (grouped by workspace), template/Daily/**Plugins**/tool/MCP/workspace icons.
+Plugins panel: toggle enable, Configure dialog, Grant net-block (Doomscroll opt-in;
+Polkit allows `ncc-focus-netblock` without password for active sessions).
 Default chrome theme is **Dark** (More → Theme; also Midnight / Light).
 Avatar animates idle / thinking / speaking / paused / error; idle badge when
 sweep is armed.

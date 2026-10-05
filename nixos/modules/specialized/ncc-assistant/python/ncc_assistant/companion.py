@@ -70,6 +70,7 @@ PANEL_NONE = "none"
 PANEL_HISTORY = "history"
 PANEL_TEMPLATES = "templates"
 PANEL_DAILY = "daily"
+PANEL_PLUGINS = "plugins"
 PANEL_TOOLS = "tools"
 PANEL_MCP = "mcp"
 PANEL_WORKSPACES = "workspaces"
@@ -695,6 +696,7 @@ class CompanionWindow(QWidget):
         primary = (
             (PANEL_TEMPLATES, "folder-templates", "▶", "Workflow templates"),
             (PANEL_DAILY, "view-calendar-day", "📅", "Daily workflows"),
+            (PANEL_PLUGINS, "application-x-addon", "🧩", "Feature plugins"),
             (PANEL_TOOLS, "applications-system", "🔧", "Tools registry"),
             (PANEL_MCP, "network-server", "🔌", "MCP servers"),
             (PANEL_WORKSPACES, "folder", "📁", "Workspaces"),
@@ -1412,6 +1414,10 @@ class CompanionWindow(QWidget):
         except Exception:
             pass
         msg = str(nudge.get("message") or "Time to leave the feed.")
+        nb = nudge.get("net_block") if isinstance(nudge.get("net_block"), dict) else None
+        if nb is not None and not nb.get("ok"):
+            err = nb.get("error") or nb.get("stderr") or "apply failed"
+            msg = f"{msg}\n\n(Net-block not active: {err})"
 
         # Optional chat injection (off by default — interrupt is a dialog/overlay).
         try:
@@ -1762,6 +1768,44 @@ class CompanionWindow(QWidget):
                 row = QListWidgetItem(line)
                 row.setData(Qt.ItemDataRole.UserRole, ("daily_line", line))
                 self.panel_list.addItem(row)
+        elif key == PANEL_PLUGINS:
+            self.panel_title.setText("Plugins — tap name = on/off")
+            try:
+                from .plugins import list_plugins
+                from .preferences import get_doomscroll_netblock_granted
+
+                plugins = list_plugins()
+            except Exception as exc:  # noqa: BLE001
+                self.panel_list.addItem(f"(error: {exc})")
+                return
+            if not plugins:
+                self.panel_list.addItem("(no plugins)")
+                return
+            for p in plugins:
+                mark = "✓" if p.is_enabled() else "·"
+                extra = ""
+                if p.id == "doomscroll":
+                    try:
+                        extra = (
+                            " · net✓"
+                            if get_doomscroll_netblock_granted()
+                            else " · net✗"
+                        )
+                    except Exception:
+                        extra = ""
+                row = QListWidgetItem(f"{mark} {p.title}{extra}")
+                row.setToolTip((p.description or p.id) + "\nTap = enable/disable.")
+                row.setData(Qt.ItemDataRole.UserRole, ("plugin_toggle", p.id))
+                self.panel_list.addItem(row)
+                cfg = QListWidgetItem(f"    ⚙ Configure {p.title}")
+                cfg.setData(Qt.ItemDataRole.UserRole, ("plugin_configure", p.id))
+                self.panel_list.addItem(cfg)
+            grant = QListWidgetItem("🔑 Grant doomscroll net-block privilege…")
+            grant.setData(Qt.ItemDataRole.UserRole, ("plugin_grant_netblock", ""))
+            self.panel_list.addItem(grant)
+            open_gui = QListWidgetItem("↗ Open full AI → Plugins tab")
+            open_gui.setData(Qt.ItemDataRole.UserRole, ("plugin_open_gui", ""))
+            self.panel_list.addItem(open_gui)
         elif key == PANEL_TOOLS:
             self.panel_title.setText("Tools — tap to toggle enable")
             try:
@@ -1932,6 +1976,38 @@ class CompanionWindow(QWidget):
             except Exception as exc:  # noqa: BLE001
                 QMessageBox.warning(self, "Daily", str(exc))
             self._fill_panel(PANEL_DAILY)
+            return
+        if kind == "plugin_toggle" and ref:
+            try:
+                from .plugins import get_plugin
+
+                plugin = get_plugin(str(ref))
+                if plugin is None:
+                    return
+                turning_on = not plugin.is_enabled()
+                plugin.set_enabled(turning_on)
+                if turning_on and str(ref) == "doomscroll":
+                    from .plugins.doomscroll.privilege_ui import offer_netblock_grant
+
+                    offer_netblock_grant(self)
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(self, "Plugins", str(exc))
+            self._fill_panel(PANEL_PLUGINS)
+            return
+        if kind == "plugin_configure":
+            self._configure_plugin(str(ref) if ref else None)
+            return
+        if kind == "plugin_grant_netblock":
+            try:
+                from .plugins.doomscroll.privilege_ui import offer_netblock_grant
+
+                offer_netblock_grant(self, force=True)
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(self, "Plugins", str(exc))
+            self._fill_panel(PANEL_PLUGINS)
+            return
+        if kind == "plugin_open_gui":
+            self._open_full()
             return
         if kind == "tool_toggle" and ref:
             try:
@@ -2258,6 +2334,37 @@ class CompanionWindow(QWidget):
             QMessageBox.information(self, "Avatar skin", tip)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Avatar skin", str(exc))
+
+    def _configure_plugin(self, plugin_id: str | None) -> None:
+        try:
+            from .plugins import get_plugin, list_plugins
+
+            pid = (plugin_id or "").strip()
+            if not pid:
+                plugins = list_plugins()
+                pid = plugins[0].id if plugins else ""
+            plugin = get_plugin(pid)
+            if plugin is None:
+                QMessageBox.information(self, "Plugins", "Unknown plugin.")
+                return
+            dlg = QDialog(self)
+            dlg.setWindowTitle(f"Configure · {plugin.title}")
+            dlg.resize(520, 640)
+            lay = QVBoxLayout(dlg)
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            body = plugin.build_settings_widget(dlg)
+            scroll.setWidget(body)
+            lay.addWidget(scroll, 1)
+            buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+            buttons.rejected.connect(dlg.reject)
+            buttons.accepted.connect(dlg.accept)
+            lay.addWidget(buttons)
+            dlg.exec()
+            self._fill_panel(PANEL_PLUGINS)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Plugins", str(exc))
 
     def _open_full(self) -> None:
         import shutil

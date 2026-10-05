@@ -560,6 +560,15 @@ def peek_pending_nudge() -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
+def _net_block_status_safe() -> dict[str, Any]:
+    try:
+        from .focus_netblock import net_block_status
+
+        return net_block_status()
+    except Exception as exc:  # noqa: BLE001
+        return {"active": False, "error": str(exc)}
+
+
 def status() -> dict[str, Any]:
     state = _load_state()
     desktop = detect_desktop()
@@ -634,6 +643,7 @@ def status() -> dict[str, Any]:
         "last_intervene": float(state.get("last_intervene") or 0.0),
         "pending_nudge": peek_pending_nudge() is not None,
         "hint": hint,
+        "net_block": _net_block_status_safe(),
     }
 
 

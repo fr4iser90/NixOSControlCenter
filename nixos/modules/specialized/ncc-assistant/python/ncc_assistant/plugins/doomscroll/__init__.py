@@ -31,11 +31,14 @@ class DoomscrollPlugin:
         result = tick()
         nudge: dict[str, Any] | None = None
         if result.get("intervened"):
+            actions = result.get("actions") if isinstance(result.get("actions"), dict) else {}
+            net_block = (actions or {}).get("net_block")
             nudge = {
                 "message": result.get("message") or "",
                 "style": result.get("style") or get_doomscroll_style(),
                 "streak_sec": result.get("streak_sec"),
                 "window": result.get("window"),
+                "net_block": net_block,
             }
         elif host == "companion":
             pending = consume_pending_nudge()

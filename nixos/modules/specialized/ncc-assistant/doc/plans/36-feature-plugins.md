@@ -36,6 +36,9 @@ Companion/tray: tick_all(host=…) instead of importing focus directly
 - [x] Settings 4f removed → pointer to Plugins
 - [x] Companion/tray use `tick_all`
 - [x] Morning Brief as second builtin plugin (digest schedule/sources)
+- [x] Companion Plugins panel (list / toggle / configure)
+- [x] Doomscroll net-block privilege grant at enable (`auth-check`)
+- [x] Polkit YES rule for `org.nixos.ncc.focus-netblock` (no mid-scroll password)
 - [x] Docs + tests
 
 ## Later

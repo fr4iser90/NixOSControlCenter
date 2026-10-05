@@ -342,12 +342,37 @@ DOOMSCROLL_SITE_TAG_META: dict[str, dict[str, Any]] = {
     "youtube-shorts": {
         "label": "YouTube Shorts",
         "needles": ("/shorts/", "youtube.com/shorts", "#shorts"),
-        "domains": ("youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"),
+        # Site + CDN/API — video bytes ride googlevideo, not only youtube.com.
+        "domains": (
+            "youtube.com",
+            "www.youtube.com",
+            "m.youtube.com",
+            "youtu.be",
+            "youtube-nocookie.com",
+            "www.youtube-nocookie.com",
+            "googlevideo.com",
+            "youtubei.googleapis.com",
+            "ytimg.com",
+            "i.ytimg.com",
+            "s.ytimg.com",
+        ),
     },
     "youtube": {
         "label": "YouTube",
         "needles": ("youtube", "youtu.be"),
-        "domains": ("youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"),
+        "domains": (
+            "youtube.com",
+            "www.youtube.com",
+            "m.youtube.com",
+            "youtu.be",
+            "youtube-nocookie.com",
+            "www.youtube-nocookie.com",
+            "googlevideo.com",
+            "youtubei.googleapis.com",
+            "ytimg.com",
+            "i.ytimg.com",
+            "s.ytimg.com",
+        ),
     },
     "reddit": {
         "label": "Reddit",
@@ -619,6 +644,15 @@ def set_doomscroll_lockout_min(n: int) -> None:
     except (TypeError, ValueError):
         return
     save_preferences({"doomscroll_lockout_min": max(0, min(v, 240))})
+
+
+def get_doomscroll_netblock_granted() -> bool:
+    """User opted in to timed nft net-block (Grant / auth-check)."""
+    return bool(load_preferences().get("doomscroll_netblock_granted", False))
+
+
+def set_doomscroll_netblock_granted(granted: bool) -> None:
+    save_preferences({"doomscroll_netblock_granted": bool(granted)})
 
 
 def domains_for_site_tags(tags: list[str] | None = None) -> list[str]:

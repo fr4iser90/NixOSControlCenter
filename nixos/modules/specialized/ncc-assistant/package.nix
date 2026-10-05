@@ -295,6 +295,7 @@ let
       echo "Usage: ncc-focus-netblock apply --minutes N --domain d1 [--domain d2 ...]" >&2
       echo "       ncc-focus-netblock clear" >&2
       echo "       ncc-focus-netblock status" >&2
+      echo "       ncc-focus-netblock auth-check   # opt-in smoke (Polkit YES if active)" >&2
       exit 2
     }
 
@@ -314,9 +315,15 @@ let
 
     cmd="''${1:-}"
     case "$cmd" in
+      auth-check)
+        shift || true
+        # need_root re-execs: pkexec "$0" <args> — pass only subcommand+args (never "$0")
+        need_root auth-check "$@"
+        echo "auth-ok"
+        ;;
       clear)
         shift || true
-        need_root "$0" clear "$@"
+        need_root clear "$@"
         clear_table
         echo "cleared"
         ;;
@@ -338,7 +345,7 @@ let
           echo "ncc-focus-netblock: no --domain given" >&2
           exit 2
         fi
-        need_root "$0" apply --minutes "$minutes" $(printf -- '--domain %s ' "''${domains[@]}")
+        need_root apply --minutes "$minutes" $(printf -- '--domain %s ' "''${domains[@]}")
         clear_table
         ${pkgs.nftables}/bin/nft add table "$TABLE" "$TNAME"
         ${pkgs.nftables}/bin/nft add set "$TABLE" "$TNAME" "$SET" '{ type ipv4_addr; flags interval; }'
@@ -346,24 +353,93 @@ let
         ${pkgs.nftables}/bin/nft add chain "$TABLE" "$TNAME" output '{ type filter hook output priority 0; policy accept; }'
         ${pkgs.nftables}/bin/nft add rule "$TABLE" "$TNAME" output ip daddr @"$SET" drop
         ${pkgs.nftables}/bin/nft add rule "$TABLE" "$TNAME" output ip6 daddr @"$SET6" drop
+
+        add_ip() {
+          local ip="''${1:-}"
+          [ -z "$ip" ] && return 0
+          case "$ip" in
+            *:*)
+              ${pkgs.nftables}/bin/nft add element "$TABLE" "$TNAME" "$SET6" "{ $ip }" 2>/dev/null || true
+              ;;
+            *)
+              ${pkgs.nftables}/bin/nft add element "$TABLE" "$TNAME" "$SET" "{ $ip }" 2>/dev/null || true
+              ;;
+          esac
+          # Kill established streams (Shorts CDN keeps playing otherwise).
+          ${pkgs.conntrack-tools}/bin/conntrack -D -d "$ip" >/dev/null 2>&1 || true
+          ${pkgs.conntrack-tools}/bin/conntrack -D -q "$ip" >/dev/null 2>&1 || true
+        }
+
+        ip_count=0
         for d in "''${domains[@]}"; do
           d="''${d,,}"
           d="''${d#http://}"; d="''${d#https://}"; d="''${d%%/*}"
           [ -z "$d" ] && continue
-          while read -r ip _; do
-            case "$ip" in
-              *:*) ${pkgs.nftables}/bin/nft add element "$TABLE" "$TNAME" "$SET6" "{ $ip }" 2>/dev/null || true ;;
-              *)   ${pkgs.nftables}/bin/nft add element "$TABLE" "$TNAME" "$SET" "{ $ip }" 2>/dev/null || true ;;
-            esac
+          while read -r ip; do
+            [ -z "$ip" ] && continue
+            add_ip "$ip"
+            ip_count=$((ip_count + 1))
           done < <(${pkgs.getent}/bin/getent ahosts "$d" 2>/dev/null | awk '{print $1}' | sort -u)
         done
+
+        # Harvest live browser peers (catches rr*.googlevideo.com CDN IPs in use).
+        while read -r ip; do
+          [ -z "$ip" ] && continue
+          add_ip "$ip"
+          ip_count=$((ip_count + 1))
+        done < <(
+          ${pkgs.iproute2}/bin/ss -H -tnp state established 2>/dev/null \
+            | ${pkgs.gawk}/bin/awk '
+              BEGIN { IGNORECASE=1 }
+              /firefox|chrome|chromium|brave|librewolf|navigator/ {
+                peer = $5
+                if (peer ~ /^\[/) {
+                  gsub(/^\[/, "", peer)
+                  sub(/\]:[0-9]+$/, "", peer)
+                } else {
+                  sub(/:[0-9]+$/, "", peer)
+                }
+                if (peer != "" && peer != "127.0.0.1" && peer != "::1") print peer
+              }' | sort -u
+        )
+
+        if [ "$ip_count" -eq 0 ]; then
+          echo "ncc-focus-netblock: resolved 0 IPs — block empty (DNS/getent failed)" >&2
+          clear_table
+          exit 3
+        fi
+
         # Auto-clear after N minutes (best-effort)
         ${pkgs.systemd}/bin/systemd-run --quiet --on-active="''${minutes}m" --unit="ncc-focus-netblock-expire" \
           "$0" clear >/dev/null 2>&1 || true
-        echo "applied minutes=$minutes domains=''${domains[*]}"
+        echo "applied minutes=$minutes ips≈$ip_count domains=''${domains[*]}"
         ;;
       *) usage ;;
     esac
+  '';
+
+  # Polkit action for ncc-focus-netblock. Rule in focus-block.nix returns YES for
+  # active sessions so Grant/apply never re-prompt mid-doomscroll (auth-check is
+  # opt-in smoke + preference gate only).
+  nccFocusNetblockPolkitPolicy = pkgs.writeText "org.nixos.ncc.focus-netblock.policy" ''
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE policyconfig PUBLIC
+     "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+     "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+    <policyconfig>
+      <vendor>NixOS Control Center</vendor>
+      <action id="org.nixos.ncc.focus-netblock">
+        <description>NCC: timed doomscroll domain sinkhole (nft)</description>
+        <message>Authentication is required to apply or clear the NCC focus net-block</message>
+        <defaults>
+          <allow_any>no</allow_any>
+          <allow_inactive>no</allow_inactive>
+          <allow_active>auth_admin</allow_active>
+        </defaults>
+        <annotate key="org.freedesktop.policykit.exec.path">${nccFocusNetblock}/bin/ncc-focus-netblock</annotate>
+        <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+      </action>
+    </policyconfig>
   '';
 
   desktopItem = pkgs.makeDesktopItem {
@@ -399,6 +475,6 @@ let
   };
 in
 {
-  inherit appRoot configHelper nccAssistant nccAssistantMcp nccAssistantTray nccAssistantCompanion nccFocusNetblock pythonEnv desktopItem envExports envFile;
+  inherit appRoot configHelper nccAssistant nccAssistantMcp nccAssistantTray nccAssistantCompanion nccFocusNetblock nccFocusNetblockPolkitPolicy pythonEnv desktopItem envExports envFile;
   packages = [ nccAssistant nccAssistantMcp nccAssistantTray nccAssistantCompanion nccFocusNetblock configHelper desktopItem ];
 }
