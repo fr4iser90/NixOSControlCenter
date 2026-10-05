@@ -1,9 +1,9 @@
 # NCC AI Assistant
 
 Chat with an LLM about your NixOS Control Center config, or expose the same
-tools to Cursor / Claude Code via MCP. Full feature map: [roadmap.md](./doc/roadmap.md).
+tools to Cursor / Claude Code via MCP. Full feature map: [roadmap.md](./roadmap.md).
 
-## Enable
+## Enable (NCC host)
 
 ```nix
 {
@@ -37,6 +37,26 @@ tools to Cursor / Claude Code via MCP. Full feature map: [roadmap.md](./doc/road
   };
 }
 ```
+
+## Import from another flake
+
+Pull this module (plus runtime) without copying a full NCC host tree:
+
+```nix
+inputs.ncc.url = "github:fr4iser90/NixOSControlCenter?dir=nixos";
+
+# nixosSystem:
+specialArgs = inputs.ncc.lib.mkNccSpecialArgs {
+  inherit (pkgs) lib;
+  systemConfig.modules.specialized.ncc-assistant.enable = true;
+};
+modules = [
+  inputs.ncc.nixosModules.ncc-runtime
+  inputs.ncc.nixosModules.ncc-assistant
+];
+```
+
+Guide: [flake-exports.md](../../../../../docs/developing/flake-exports.md).
 
 **Auth:** on 401/403 the GUI/CLI prompts once and caches
 `~/.config/ncc-assistant/credentials.json` (0600). Optional `apiKeyFile` for
@@ -86,17 +106,38 @@ ncc ai agent run --verbose --goal "…"   # full thinking/tool dumps
 # agent.harness / agent.codingHarness in systemConfig (auto routes git/coding templates)
 ```
 
-Tabs: **Chat**, **Agent**, **Templates**, **Tools**, **Jobs**, **Schedules**, **Settings**.
+Tabs: **Chat**, **Agent**, **Templates**, **Tools**, **Jobs**, **Workflows**,
+**Schedules**, **Settings**.
 
 **Retry / timeouts:** Chat and Companion show **Retry** after an error (resends the
 last user message). Settings → **4c · LLM request**: HTTP timeout (default 300s)
 and auto-retries on transient failures before the first streamed token
 (`preferences.json`: `llm_timeout_sec`, `llm_retries`).
 
+**Capacity & idle (Settings 4d):** `max_concurrency` (1–8), `idle_mode`
+(`off` / `schedules` / `schedules+backlog`), `idle_after_min`, `idle_max_jobs`.
+Agent / template / harness starts go through the capacity governor (“at capacity”
+when full). Idle sweep (Companion timer) may start due schedules / `idle-ok`
+templates when armed; presence `paused` disables idle.
+
+**Daily workflows (Settings 4e + Workflows tab):** Issues/PRs via `gh`, local
+tasks/roadmap in `~/.config/ncc-assistant/workflows/daily.json`. Companion
+**Daily** icon shows a compact list. CLI: `ncc ai workflows show|refresh|tasks|roadmap`.
+
+**Doomscroll prevention (Settings 4f):** Off by default. When enabled, Companion
+and tray probe the active window via **one** desktop adapter (Hyprland /
+Sway / Plasma Wayland MPRIS / X11 xdotool — never mixed). After N minutes (or N
+Shorts) matching, NCC can: notify, pause Firefox media (MPRIS), jump to the
+Firefox virtual desktop, show a dialog/fullscreen input-block overlay, and
+optionally inject chat text (off by default). Styles: notify / companion pop-up /
+agent watchdog.
+CLI: `ncc ai focus status|tick|snooze` (after update; fallback: `ncc-assistant focus status`).
+
 **Companion:** frameless overlay — drag avatar to move, resize via corner grip,
-session picker (grouped by workspace), template/tool/MCP/workspace icons.
+session picker (grouped by workspace), template/Daily/tool/MCP/workspace icons.
 Default chrome theme is **Dark** (More → Theme; also Midnight / Light).
-Avatar animates idle / thinking / speaking / paused / error.
+Avatar animates idle / thinking / speaking / paused / error; idle badge when
+sweep is armed.
 
 ## Agent
 
@@ -132,6 +173,14 @@ ncc-assistant templates list
 ncc-assistant templates show github-code-review
 ncc-assistant templates instantiate agents-md-maintainer --from params.json --schedule
 ncc-assistant templates run <instance-id>
+# Creators / rulebooks: roadmap-creator, design-concept-creator, task-breakdown,
+# impressum-creator, precommit-creator, githooks-creator, agents-md-creator, …
+
+# Daily workflows
+ncc-assistant workflows refresh
+ncc-assistant workflows tasks add "Ship docs" --priority p1
+ncc-assistant workflows roadmap add "Ops cockpit" --horizon now
+ncc-assistant workflows show
 
 # MCP with workspace / secret bind
 ncc-assistant mcp-install git --workspace ncc

@@ -1,0 +1,54 @@
+{
+  "id": "agents-md-creator",
+  "title": "AGENTS.md creator",
+  "category": "Rulebooks",
+  "description": "Scaffold/refresh AGENTS.md for a workspace (laws, layout). Diff-first.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": [
+    "git"
+  ],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 20,
+  "tags": [
+    "rulebook",
+    "agents",
+    "docs"
+  ],
+  "goalTemplate": "Scaffold or refresh AGENTS.md. Style: {{style}}. Scope: {{scope}}. Repos: {{repositories}}.\\n\\nPrefer diff against existing AGENTS.md. Keep hard laws if present; do not invent conflicting rules. Dry-run proposals only.",
+  "params": [
+    {
+      "id": "style",
+      "label": "Style",
+      "type": "enum",
+      "options": [
+        "ncc-like",
+        "minimal",
+        "verbose"
+      ],
+      "default": "ncc-like",
+      "required": true
+    },
+    {
+      "id": "scope",
+      "label": "Scope",
+      "type": "enum",
+      "options": [
+        "repo-root",
+        "module",
+        "monorepo"
+      ],
+      "default": "repo-root",
+      "required": true
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": true
+    }
+  ]
+}

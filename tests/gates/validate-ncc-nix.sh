@@ -20,6 +20,7 @@
 #  13) AI pack contract (manifest + tools JSON)
 #  14) module surfaces (commands ↔ doc/cli.md ↔ GUI page registration)
 #  15) GUI hot-path (no live nixpkgs/catalog eval; registerGuiEnv for catalogs)
+#  16) CLI manager args (argparse subcommands ↔ commands.nix arguments whitelist)
 #
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -202,11 +203,29 @@ fi
 
 # ── 15) GUI hot-path / baked catalogs ────────────────────────────────────────
 echo ""
-echo "== 15/15  GUI hot-path (no live catalog eval) =="
+echo "== 15/16  GUI hot-path (no live catalog eval) =="
 if bash "$ROOT/tests/gates/validate-gui-hotpath.sh"; then
   pass "validate-gui-hotpath.sh"
 else
   fail "GUI hot-path / registerGuiEnv / catalog integrity"
+fi
+
+# ── 16) CLI manager arguments ↔ argparse ─────────────────────────────────────
+echo ""
+echo "== 16/17  CLI manager args (ncc ai verbs ↔ commands.nix) =="
+if bash "$ROOT/tests/gates/validate-cli-manager-args.sh"; then
+  pass "validate-cli-manager-args.sh"
+else
+  fail "CLI manager arguments out of sync (argparse vs commands.nix whitelist)"
+fi
+
+# ── 17) Flake library exports (nixosModules / mkNccSpecialArgs) ───────────────
+echo ""
+echo "== 17/17  Flake nixosModules exports =="
+if bash "$ROOT/tests/gates/validate-flake-exports.sh"; then
+  pass "validate-flake-exports.sh"
+else
+  fail "flake nixosModules / lib.mkNccSpecialArgs exports broken"
 fi
 
 echo ""
@@ -216,5 +235,5 @@ if [[ "$FAIL" -ne 0 ]]; then
   echo "Fix issues above, then re-run: bash tests/gates/validate-ncc-nix.sh"
   exit 1
 fi
-echo "OK — bash + layer + modularity + migrations + wizard + options + import paths + module eval + catalog + docs-layout + store-status + module-shape + ai-packs + surfaces + gui-hotpath green."
+echo "OK — bash + layer + modularity + migrations + wizard + options + import paths + module eval + catalog + docs-layout + store-status + module-shape + ai-packs + surfaces + gui-hotpath + cli-manager-args + flake-exports green."
 exit 0

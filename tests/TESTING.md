@@ -66,6 +66,7 @@ Uniformity steps inside `validate-ncc-nix` (12–14):
 | `gates/validate-ai-packs.sh` | manifest `domain`/`description`; tools JSON fields + `risk` enum |
 | `gates/validate-module-surfaces.sh` | `commands.nix` ⇒ `doc/cli.md` (+ Status); `page.py` ↔ `registerGuiPage` |
 | `gates/validate-gui-hotpath.sh` | no live `nixpkgs`/catalog eval in `ui/gui`; `registerGuiEnv` for catalogs |
+| `gates/validate-cli-manager-args.sh` | `ncc ai` argparse verbs ↔ `commands.nix` `arguments` + `main()` dispatcher |
 
 Enable Git pre-commit:
 

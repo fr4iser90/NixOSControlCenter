@@ -1,0 +1,55 @@
+{
+  "id": "githooks-creator",
+  "title": "Git hooks creator",
+  "category": "Rulebooks",
+  "description": "Wire repo hooks aligned with NCC scripts/install-git-hooks.sh / .githooks patterns.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": [
+    "git"
+  ],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 16,
+  "tags": [
+    "rulebook",
+    "githooks",
+    "idle-ok",
+    "maintenance"
+  ],
+  "goalTemplate": "Propose .githooks setup for pack {{hookPack}}. Install note style: {{installStyle}}. Repos: {{repositories}}.\\n\\nAlign with NCC scripts/install-git-hooks.sh (core.hooksPath → .githooks). Never encourage --no-verify. Diff-first.",
+  "params": [
+    {
+      "id": "hookPack",
+      "label": "Hook pack",
+      "type": "enum",
+      "options": [
+        "pre-commit-only",
+        "pre-commit+commit-msg",
+        "ncc-gates"
+      ],
+      "default": "ncc-gates",
+      "required": true
+    },
+    {
+      "id": "installStyle",
+      "label": "Install style",
+      "type": "enum",
+      "options": [
+        "hooksPath",
+        "symlink",
+        "both"
+      ],
+      "default": "hooksPath",
+      "required": true
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": false
+    }
+  ]
+}

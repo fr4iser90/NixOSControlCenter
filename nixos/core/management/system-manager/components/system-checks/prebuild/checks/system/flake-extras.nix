@@ -21,12 +21,17 @@ NCC_INPUT_ALIASES = {
     "home-manager": {"home-manager-stable", "home-manager-unstable"},
 }
 
+# Never preserve as host-only extras (product self-name / mistaken self-import).
+DROP_HOST_EXTRAS = {"ncc"}
+
 
 def host_only_extras(live_names, in_names) -> list[str]:
     in_set = set(in_names)
     extras = []
     for n in live_names:
         if n in in_set:
+            continue
+        if n in DROP_HOST_EXTRAS:
             continue
         aliases = NCC_INPUT_ALIASES.get(n)
         if aliases and (in_set & aliases):
@@ -36,6 +41,8 @@ def host_only_extras(live_names, in_names) -> list[str]:
 
 
 def is_covered_by_ncc_alias(name: str, in_names) -> bool:
+    if name in DROP_HOST_EXTRAS:
+        return True
     aliases = NCC_INPUT_ALIASES.get(name)
     return bool(aliases and (set(in_names) & aliases))
 
@@ -91,13 +98,16 @@ def extract_input_names(path: str) -> list[str]:
 
 
 def extract_nixos_module_refs(path: str) -> list[str]:
-    text = Path(path).read_text(encoding="utf-8", errors="replace")
+    # Comments must not count (e.g. docs mentioning inputs.ncc.nixosModules).
+    text = strip_line_comments(Path(path).read_text(encoding="utf-8", errors="replace"))
     refs = []
     for m in re.finditer(
         r"\b([A-Za-z_][A-Za-z0-9_-]*)\.nixosModules(?:\.default)?\b",
         text,
     ):
         n = m.group(1)
+        if n in DROP_HOST_EXTRAS:
+            continue
         if n not in refs:
             refs.append(n)
     return refs
@@ -203,9 +213,11 @@ def merge_flake(live: str, incoming: str, out: str) -> list[str]:
             if is_covered_by_ncc_alias(ref, in_names):
                 continue
             extras.append(ref)
-    # Defense: never try to merge short names NCC already covers via *-stable
+    # Defense: never merge alias-covered names or DROP_HOST_EXTRAS (e.g. `ncc`)
     extras = sorted(
-        e for e in set(extras) if not is_covered_by_ncc_alias(e, in_names)
+        e
+        for e in set(extras)
+        if not is_covered_by_ncc_alias(e, in_names) and e not in DROP_HOST_EXTRAS
     )
 
     text = Path(incoming).read_text(encoding="utf-8", errors="replace")
@@ -216,11 +228,13 @@ def merge_flake(live: str, incoming: str, out: str) -> list[str]:
     decls = extract_input_decls(live, set(extras))
     decls = rewrite_follows(decls, in_names)
     if not decls.strip():
-        # Module-ref-only names (no matching inputs.* decl) — skip rather than abort
-        raise SystemExit(
-            f"could not extract declarations for extras: {extras} "
-            f"(try --drop-flake-extras if these are only nixpkgs/home-manager aliases)"
+        # No parseable inputs.* for remaining extras — stock incoming, do not block update.
+        print(
+            f"ncc: dropping unextractable host flake extras (no inputs.* decls): {extras}",
+            file=sys.stderr,
         )
+        Path(out).write_text(text, encoding="utf-8")
+        return []
 
     span = find_attr_block(strip_line_comments(text), "inputs")
     # operate on original text; find inputs block in original
@@ -258,7 +272,9 @@ def merge_flake(live: str, incoming: str, out: str) -> list[str]:
     text = add_outputs_args(text, extras)
 
     # Inject nixosModules.default for extras that used it on live
-    live_mod_refs = set(extract_nixos_module_refs(live)) & set(extras)
+    live_mod_refs = (
+        set(extract_nixos_module_refs(live)) & set(extras)
+    ) - DROP_HOST_EXTRAS
     if live_mod_refs:
         mods = " ++ [ " + " ".join(f"{n}.nixosModules.default" for n in sorted(live_mod_refs)) + " ]"
         # After systemModules in modules list

@@ -93,6 +93,12 @@
     nixosRelease = "26.05";
     stateVersion = nixosRelease;
 
+    mkNccSpecialArgs = import ./core/management/module-manager/lib/mk-ncc-special-args.nix;
+    featureNixosModules = import ./core/management/module-manager/lib/discover-feature-modules.nix {
+      lib = nixpkgs-stable.lib;
+      modulesDir = ./modules;
+    };
+
     mkSystem = system:
       let
         pkgs = import nixpkgs {
@@ -100,14 +106,9 @@
           config.allowUnfree = systemConfig.core.management.system-manager.allowUnfree or true;
         };
         lib = pkgs.lib;
-        discoveryLib = import ./core/management/module-manager/lib/discovery.nix;
-        moduleConfigLib = import ./core/management/module-manager/lib/module-config.nix;
-        discovery = discoveryLib { inherit lib; };
-        moduleConfig = moduleConfigLib { inherit lib systemConfig; };
-        getModuleConfig = moduleConfig.getModuleConfig;
-        getModuleMetadata = moduleConfig.getModuleMetadata;
-        getCurrentModuleMetadata = moduleConfig.getCurrentModuleMetadata;
-        getModuleApi = moduleConfig.getModuleApi;
+        nccArgs = mkNccSpecialArgs { inherit lib systemConfig; };
+        inherit (nccArgs)
+          discovery moduleConfig getModuleConfig getModuleMetadata getCurrentModuleMetadata getModuleApi;
         systemModules = [
           ./hardware-configuration.nix
           ./core
@@ -117,8 +118,7 @@
       in
         nixpkgs.lib.nixosSystem {
           inherit system;
-          specialArgs = {
-            inherit systemConfig discovery moduleConfig getModuleConfig getModuleMetadata getCurrentModuleMetadata getModuleApi;
+          specialArgs = nccArgs // {
             buildGoApplication = gomod2nix.legacyPackages.${system}.buildGoApplication;
             gomod2nix = gomod2nix.legacyPackages.${system};
           };
@@ -175,6 +175,20 @@
           "x86_64-linux";
 
   in {
+    # Other flakes can import NCC modules (one input, pick what you need).
+    # See docs/developing/flake-exports.md
+    lib = {
+      mkNccSpecialArgs = mkNccSpecialArgs;
+      featureNixosModules = featureNixosModules;
+    };
+
+    nixosModules = {
+      # Management stack (same tree system-update already syncs under core/)
+      default = ./core/management;
+      ncc-runtime = ./core/management;
+      # Every feature under modules/ (folder name → module path)
+    } // featureNixosModules;
+
     nixosConfigurations = {
       "${hostname}" = mkSystem primarySystem;
       "${hostname}-x86_64-linux" = mkSystem "x86_64-linux";

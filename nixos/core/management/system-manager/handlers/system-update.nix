@@ -1131,8 +1131,8 @@ EOF
           --incoming "$SOURCE_DIR/flake.nix" \
           --out "$FLAKE_PREVIEW_PATH"; then
         ${ui.messages.error "Could not build the merged preview"}
-        # Chicken-egg: old ncc treated nixpkgs/home-manager short names as extras.
-        # If those are the only ones, continue with stock NCC flake (safe — aliases exist).
+        # Chicken-egg / broken live extras (aliases, stray names like `ncc`):
+        # never block `ncc system-update --local` — continue with stock NCC flake.
         _alias_only=true
         while read -r _x; do
           [ -z "$_x" ] && continue
@@ -1142,12 +1142,12 @@ EOF
           esac
         done < <(echo "$EXTRAS_JSON" | ${pkgs.jq}/bin/jq -r '.hostOnlyExtras[]?' 2>/dev/null)
         if [ "$_alias_only" = "true" ] && [ -n "$EXTRAS_LIST" ] && [ "$EXTRAS_LIST" != "unknown" ]; then
-          ${ui.messages.warning "Only nixpkgs/home-manager aliases — using stock NCC flake (same as --drop-flake-extras)"}
-          FLAKE_COPY_SRC="$SOURCE_DIR/flake.nix"
-          return 0
+          ${ui.messages.warning "Only nixpkgs/home-manager aliases — using stock NCC flake"}
+        else
+          ${ui.messages.warning "Unmergeable host flake extras ($EXTRAS_LIST) — using stock NCC flake"}
         fi
-        ${ui.messages.info "Retry once: sudo ncc system update --local --drop-flake-extras --source-dir \"$SOURCE_DIR\""}
-        return 1
+        FLAKE_COPY_SRC="$SOURCE_DIR/flake.nix"
+        return 0
       fi
       FLAKE_MERGED_TMP="$FLAKE_PREVIEW_PATH"
       FLAKE_COPY_SRC="$FLAKE_PREVIEW_PATH"

@@ -1,0 +1,86 @@
+{
+  "id": "impressum-creator",
+  "title": "Impressum creator (DE stub)",
+  "category": "Rulebooks",
+  "description": "Structured DE Impressum stub from entity/country enums. Not legal advice.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": [
+    "git"
+  ],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 12,
+  "tags": [
+    "rulebook",
+    "legal-stub"
+  ],
+  "goalTemplate": "Generate a DE Impressum *stub* (not legal advice). Entity: {{entityType}}. Country: {{country}}. Legal name: {{legalName}}. Address: {{address}}. Email: {{email}}. Output: {{outputFile}}. Repos: {{repositories}}.\\n\\nProduce markdown stub with required fields only. Propose write to {{outputFile}} as dry-run diff. Never invent registration numbers or tax IDs.",
+  "params": [
+    {
+      "id": "entityType",
+      "label": "Entity type",
+      "type": "enum",
+      "options": [
+        "Einzelunternehmen",
+        "GmbH",
+        "UG",
+        "eK",
+        "Verein",
+        "other"
+      ],
+      "default": "Einzelunternehmen",
+      "required": true
+    },
+    {
+      "id": "country",
+      "label": "Country",
+      "type": "enum",
+      "options": [
+        "DE",
+        "AT",
+        "CH"
+      ],
+      "default": "DE",
+      "required": true
+    },
+    {
+      "id": "legalName",
+      "label": "Legal name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": "address",
+      "label": "Address",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": "email",
+      "label": "Contact email",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": "outputFile",
+      "label": "Output file",
+      "type": "enum",
+      "options": [
+        "impressum.md",
+        "doc/impressum.md",
+        "site/impressum.md"
+      ],
+      "default": "impressum.md",
+      "required": true
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": false
+    }
+  ]
+}

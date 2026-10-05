@@ -1,0 +1,72 @@
+{
+  "id": "design-concept-creator",
+  "title": "Design concept creator",
+  "category": "Creators",
+  "description": "Structured design brief: problem, users, flows, non-goals, visuals.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": [
+    "git"
+  ],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 24,
+  "tags": [
+    "creator",
+    "design"
+  ],
+  "goalTemplate": "Write a design concept brief. Audience: {{audience}}. Depth: {{depth}}. Output path hint: {{outputDir}}. Repos: {{repositories}}. Problem notes:\\n{{problem}}\\n\\nProduce structured MD (problem, users, flows, non-goals, visuals). Propose file under workspace {{outputDir}} (diff-first / dry-run). No invented brand assets.",
+  "params": [
+    {
+      "id": "problem",
+      "label": "Problem / idea",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": "audience",
+      "label": "Audience",
+      "type": "enum",
+      "options": [
+        "end-user",
+        "operator",
+        "developer",
+        "mixed"
+      ],
+      "default": "mixed",
+      "required": true
+    },
+    {
+      "id": "depth",
+      "label": "Depth",
+      "type": "enum",
+      "options": [
+        "sketch",
+        "standard",
+        "detailed"
+      ],
+      "default": "standard",
+      "required": true
+    },
+    {
+      "id": "outputDir",
+      "label": "Output dir",
+      "type": "enum",
+      "options": [
+        "doc",
+        "design",
+        "doc/design"
+      ],
+      "default": "doc",
+      "required": true
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": false
+    }
+  ]
+}

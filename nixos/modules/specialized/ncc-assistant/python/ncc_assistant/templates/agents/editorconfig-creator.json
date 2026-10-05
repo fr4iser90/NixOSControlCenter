@@ -1,0 +1,55 @@
+{
+  "id": "editorconfig-creator",
+  "title": "EditorConfig creator",
+  "category": "Rulebooks",
+  "description": ".editorconfig from language enum set.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": [
+    "git"
+  ],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 10,
+  "tags": [
+    "rulebook",
+    "editorconfig",
+    "idle-ok",
+    "maintenance"
+  ],
+  "goalTemplate": "Propose .editorconfig for languages {{languages}}. Indent: {{indent}}. Repos: {{repositories}}. Diff-first / dry-run.",
+  "params": [
+    {
+      "id": "languages",
+      "label": "Languages",
+      "type": "enum",
+      "options": [
+        "nix+python",
+        "python",
+        "js+ts",
+        "mixed"
+      ],
+      "default": "nix+python",
+      "required": true
+    },
+    {
+      "id": "indent",
+      "label": "Indent",
+      "type": "enum",
+      "options": [
+        "2-space",
+        "4-space"
+      ],
+      "default": "2-space",
+      "required": true
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": false
+    }
+  ]
+}

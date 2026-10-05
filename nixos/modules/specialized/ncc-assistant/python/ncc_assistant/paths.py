@@ -150,6 +150,36 @@ def agent_instances_dir() -> Path:
     return path
 
 
+def workflows_dir() -> Path:
+    """Daily workflows / tasks / roadmap store."""
+    path = config_home() / "workflows"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def workflows_daily_file() -> Path:
+    return workflows_dir() / "daily.json"
+
+
+def capacity_state_file() -> Path:
+    return config_home() / "capacity.json"
+
+
+def activity_file() -> Path:
+    """Last user activity timestamp for idle mode."""
+    return config_home() / "last-activity.json"
+
+
+def focus_state_file() -> Path:
+    """Doomscroll / focus watchdog streak state."""
+    return config_home() / "focus-state.json"
+
+
+def focus_nudge_file() -> Path:
+    """Pending doomscroll nudge for Companion to consume."""
+    return config_home() / "focus-nudge.json"
+
+
 def is_disabled() -> bool:
     """Check if the kill-switch DISABLE file exists."""
     return disable_file().exists()

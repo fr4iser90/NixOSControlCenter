@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -505,6 +506,7 @@ class AgentWorker(QThread):
         try:
             from .agent import AgentRunner, AgentSettings
             from .auth import with_cached_credentials
+            from .capacity import capacity_slot
             from .config import Settings
             from .harness import get_harness, looks_like_coding_goal, resolve_harness_name
 
@@ -515,29 +517,30 @@ class AgentWorker(QThread):
             hname = resolve_harness_name(tags=tags, force=force)
             self.event.emit({"kind": "status", "text": f"Harness: {hname}"})
 
-            if hname != "native":
-                for ev in get_harness(hname).send(self._goal):
+            with capacity_slot(f"gui-agent:{hname}"):
+                if hname != "native":
+                    for ev in get_harness(hname).send(self._goal):
+                        if self._cancelled:
+                            self.event.emit({"kind": "cancelled"})
+                            break
+                        self.event.emit(ev)
+                    self.finished_signal.emit()
+                    return
+
+                agent_settings = AgentSettings(
+                    goal=self._goal,
+                    max_steps=self._max_steps,
+                    dry_run=self._dry_run,
+                    profile=self._profile,
+                    playbook=self._playbook,
+                )
+                self._runner = AgentRunner(settings, agent_settings)
+                for ev in self._runner.run():
                     if self._cancelled:
                         self.event.emit({"kind": "cancelled"})
                         break
                     self.event.emit(ev)
                 self.finished_signal.emit()
-                return
-
-            agent_settings = AgentSettings(
-                goal=self._goal,
-                max_steps=self._max_steps,
-                dry_run=self._dry_run,
-                profile=self._profile,
-                playbook=self._playbook,
-            )
-            self._runner = AgentRunner(settings, agent_settings)
-            for ev in self._runner.run():
-                if self._cancelled:
-                    self.event.emit({"kind": "cancelled"})
-                    break
-                self.event.emit(ev)
-            self.finished_signal.emit()
         except Exception as exc:
             self.failed.emit(f"{exc}\n{traceback.format_exc()}")
             self.finished_signal.emit()
@@ -987,6 +990,137 @@ class JobsPage(QWidget):
         QMessageBox.information(self, "Rollback", "See details panel for backups & generations.")
 
 
+class WorkflowsPage(QWidget):
+    """Daily Issues / PRs / tasks / roadmap for the active workspace."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+
+        header = QHBoxLayout()
+        self.filter_combo = QComboBox()
+        self.filter_combo.addItems(["All", "Issues", "PRs", "Tasks", "Roadmap"])
+        self.filter_combo.currentIndexChanged.connect(self.refresh)
+        header.addWidget(QLabel("Show"))
+        header.addWidget(self.filter_combo)
+        refresh_btn = QPushButton("Refresh GitHub")
+        refresh_btn.clicked.connect(self.refresh_github)
+        header.addWidget(refresh_btn)
+        add_task_btn = QPushButton("Add task…")
+        add_task_btn.clicked.connect(self.add_task)
+        header.addWidget(add_task_btn)
+        add_rm_btn = QPushButton("Add roadmap…")
+        add_rm_btn.clicked.connect(self.add_roadmap)
+        header.addWidget(add_rm_btn)
+        header.addStretch()
+        layout.addLayout(header)
+
+        self.list = QListWidget()
+        layout.addWidget(self.list, stretch=1)
+        self.meta = QLabel("")
+        self.meta.setStyleSheet("color: palette(placeholder-text);")
+        layout.addWidget(self.meta)
+        self.refresh()
+
+    @Slot()
+    def refresh(self) -> None:
+        self.list.clear()
+        try:
+            from .workflows import load_daily
+
+            data = load_daily()
+        except Exception as exc:  # noqa: BLE001
+            self.list.addItem(f"(error: {exc})")
+            return
+        self.meta.setText(
+            f"Workspace: {data.get('workspaceId') or '(none)'} · "
+            f"Updated: {data.get('updatedAt') or '—'}"
+        )
+        filt = self.filter_combo.currentText()
+        rows: list[str] = []
+        if filt in ("All", "Issues"):
+            for it in data.get("issues") or []:
+                rows.append(
+                    f"[Issue #{it.get('id')}] {it.get('title')}  {it.get('url') or ''}"
+                )
+        if filt in ("All", "PRs"):
+            for pr in data.get("pullRequests") or []:
+                draft = " draft" if pr.get("draft") else ""
+                rows.append(
+                    f"[PR #{pr.get('id')} {pr.get('checks')}{draft}] "
+                    f"{pr.get('title')}  {pr.get('url') or ''}"
+                )
+        if filt in ("All", "Tasks"):
+            for t in data.get("tasks") or []:
+                rows.append(
+                    f"[Task {t.get('priority')} {t.get('status')}] {t.get('title')}"
+                )
+        if filt in ("All", "Roadmap"):
+            for r in data.get("roadmap") or []:
+                rows.append(f"[Roadmap·{r.get('horizon')}] {r.get('title')}")
+        if not rows:
+            self.list.addItem("(empty — Refresh GitHub or add a task)")
+            return
+        for line in rows:
+            self.list.addItem(line)
+
+    @Slot()
+    def refresh_github(self) -> None:
+        try:
+            from .idle import touch_activity
+            from .workflows import refresh_github_digest
+
+            touch_activity("workflows-refresh")
+            refresh_github_digest()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Workflows", str(exc))
+            return
+        self.refresh()
+
+    @Slot()
+    def add_task(self) -> None:
+        title, ok = QInputDialog.getText(self, "Add task", "Title:")
+        if not ok or not str(title).strip():
+            return
+        prio, ok2 = QInputDialog.getItem(
+            self, "Priority", "Priority:", ["p0", "p1", "p2"], 1, False
+        )
+        if not ok2:
+            return
+        try:
+            from .idle import touch_activity
+            from .workflows import add_task
+
+            touch_activity("workflows-task")
+            add_task(str(title).strip(), priority=str(prio))
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Workflows", str(exc))
+            return
+        self.refresh()
+
+    @Slot()
+    def add_roadmap(self) -> None:
+        title, ok = QInputDialog.getText(self, "Add roadmap item", "Title:")
+        if not ok or not str(title).strip():
+            return
+        hz, ok2 = QInputDialog.getItem(
+            self, "Horizon", "Horizon:", ["now", "next", "later"], 0, False
+        )
+        if not ok2:
+            return
+        try:
+            from .idle import touch_activity
+            from .workflows import add_roadmap_item
+
+            touch_activity("workflows-roadmap")
+            add_roadmap_item(str(title).strip(), horizon=str(hz))
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Workflows", str(exc))
+            return
+        self.refresh()
+
+
 class ScheduleEditDialog(QDialog):
     """Create/edit a user schedule."""
 
@@ -1376,8 +1510,11 @@ class SchedulesPage(QWidget):
 
             from .agent import run_agent
             from .auth import with_cached_credentials
+            from .capacity import CapacityError, capacity_slot
             from .config import Settings
+            from .idle import touch_activity
 
+            touch_activity("schedule-run")
             settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
             goal = spec.goal
             if spec.playbook and not goal:
@@ -1389,19 +1526,27 @@ class SchedulesPage(QWidget):
                 QMessageBox.warning(self, "Schedules", "No goal/playbook to run.")
                 return
             lines = [f"Running {spec.name}…"]
-            for ev in run_agent(
-                goal,
-                settings,
-                max_steps=spec.maxSteps or 15,
-                dry_run=spec.dryRun,
-                profile=spec.profile,
-                playbook=spec.playbook,
-            ):
-                kind = ev.get("kind")
-                if kind in ("agent_finish", "job_finished", "error", "budget_exhausted"):
-                    lines.append(json.dumps(ev)[:300])
+            with capacity_slot(f"schedule:{spec.name}"):
+                for ev in run_agent(
+                    goal,
+                    settings,
+                    max_steps=spec.maxSteps or 15,
+                    dry_run=spec.dryRun,
+                    profile=spec.profile,
+                    playbook=spec.playbook,
+                ):
+                    kind = ev.get("kind")
+                    if kind in (
+                        "agent_finish",
+                        "job_finished",
+                        "error",
+                        "budget_exhausted",
+                    ):
+                        lines.append(json.dumps(ev)[:300])
             self.detail.setPlainText("\n".join(lines))
             QMessageBox.information(self, "Schedules", f"Finished run for {spec.name} (see details).")
+        except CapacityError as exc:
+            QMessageBox.warning(self, "Schedules", str(exc))
         except Exception as exc:
             QMessageBox.warning(self, "Schedules", str(exc))
 
@@ -1807,6 +1952,344 @@ class SettingsPage(QWidget):
         llm_form.addRow(llm_hint)
         layout.addWidget(llm_net)
 
+        # --- 4d Capacity & idle ---
+        cap_group = QGroupBox("4d · Capacity & idle")
+        cap_form = QFormLayout(cap_group)
+        self.concurrency_spin = QSpinBox()
+        self.concurrency_spin.setRange(1, 8)
+        self.idle_mode_combo = QComboBox()
+        self.idle_mode_combo.addItem("Off", "off")
+        self.idle_mode_combo.addItem("Schedules only", "schedules")
+        self.idle_mode_combo.addItem("Schedules + backlog", "schedules+backlog")
+        self.idle_after_spin = QSpinBox()
+        self.idle_after_spin.setRange(5, 240)
+        self.idle_after_spin.setSuffix(" min")
+        self.idle_max_spin = QSpinBox()
+        self.idle_max_spin.setRange(1, 4)
+        try:
+            from .preferences import (
+                get_idle_after_min,
+                get_idle_max_jobs,
+                get_idle_mode,
+                get_max_concurrency,
+                set_idle_after_min,
+                set_idle_max_jobs,
+                set_idle_mode,
+                set_max_concurrency,
+            )
+
+            self.concurrency_spin.setValue(get_max_concurrency())
+            mi = self.idle_mode_combo.findData(get_idle_mode())
+            if mi >= 0:
+                self.idle_mode_combo.setCurrentIndex(mi)
+            self.idle_after_spin.setValue(get_idle_after_min())
+            self.idle_max_spin.setValue(get_idle_max_jobs())
+        except Exception:
+            self.concurrency_spin.setValue(2)
+            self.idle_after_spin.setValue(15)
+            self.idle_max_spin.setValue(1)
+
+        def _on_concurrency(v: int) -> None:
+            from .preferences import set_max_concurrency as _set
+
+            _set(v)
+
+        def _on_idle_mode(_i: int = 0) -> None:
+            from .preferences import set_idle_mode as _set
+
+            _set(str(self.idle_mode_combo.currentData() or "off"))
+
+        def _on_idle_after(v: int) -> None:
+            from .preferences import set_idle_after_min as _set
+
+            _set(v)
+
+        def _on_idle_max(v: int) -> None:
+            from .preferences import set_idle_max_jobs as _set
+
+            _set(v)
+
+        self.concurrency_spin.valueChanged.connect(_on_concurrency)
+        self.idle_mode_combo.currentIndexChanged.connect(_on_idle_mode)
+        self.idle_after_spin.valueChanged.connect(_on_idle_after)
+        self.idle_max_spin.valueChanged.connect(_on_idle_max)
+        cap_form.addRow("Max concurrency", self.concurrency_spin)
+        cap_form.addRow("Idle mode", self.idle_mode_combo)
+        cap_form.addRow("Idle after", self.idle_after_spin)
+        cap_form.addRow("Idle max jobs", self.idle_max_spin)
+        cap_hint = QLabel(
+            "When idle mode is on and presence is not paused, due schedules "
+            "(and idle-ok templates in backlog mode) may start after the delay. "
+            "Interactive runs respect max concurrency."
+        )
+        cap_hint.setWordWrap(True)
+        cap_hint.setStyleSheet("color: palette(placeholder-text);")
+        cap_form.addRow(cap_hint)
+        layout.addWidget(cap_group)
+
+        # --- 4e Daily workflows ---
+        daily_group = QGroupBox("4e · Daily workflows")
+        daily_form = QFormLayout(daily_group)
+        self.digest_enable = QCheckBox("Build daily Issues/PRs/tasks snapshot")
+        self.provider_combo_wf = QComboBox()
+        self.provider_combo_wf.addItem("GitHub", "github")
+        from .templates_ui import FrequencyPicker
+
+        digest_cal_default = "*-*-* 08:30:00"
+        try:
+            from .preferences import (
+                get_daily_digest_enable,
+                get_daily_digest_on_calendar,
+                get_workflow_providers,
+            )
+
+            self.digest_enable.setChecked(get_daily_digest_enable())
+            digest_cal_default = get_daily_digest_on_calendar()
+            provs = get_workflow_providers()
+            if provs:
+                pi = self.provider_combo_wf.findData(provs[0])
+                if pi >= 0:
+                    self.provider_combo_wf.setCurrentIndex(pi)
+        except Exception:
+            self.digest_enable.setChecked(True)
+        self.digest_cal = FrequencyPicker(default=digest_cal_default)
+
+        def _on_digest_en(checked: bool) -> None:
+            from .preferences import set_daily_digest_enable as _set
+
+            _set(checked)
+
+        def _on_digest_cal() -> None:
+            from .preferences import set_daily_digest_on_calendar as _set
+
+            try:
+                _set(self.digest_cal.on_calendar())
+            except Exception:
+                pass
+
+        def _on_wf_provider(_i: int = 0) -> None:
+            from .preferences import set_workflow_providers as _set
+
+            _set([str(self.provider_combo_wf.currentData() or "github")])
+
+        self.digest_enable.toggled.connect(_on_digest_en)
+        self.provider_combo_wf.currentIndexChanged.connect(_on_wf_provider)
+        # Persist calendar when user changes mode/time via any child control
+        for child in self.digest_cal.findChildren(QWidget):
+            if hasattr(child, "currentIndexChanged"):
+                child.currentIndexChanged.connect(lambda *_: _on_digest_cal())
+            if hasattr(child, "timeChanged"):
+                child.timeChanged.connect(lambda *_: _on_digest_cal())
+            if hasattr(child, "valueChanged"):
+                child.valueChanged.connect(lambda *_: _on_digest_cal())
+        daily_form.addRow(self.digest_enable)
+        daily_form.addRow("Provider", self.provider_combo_wf)
+        daily_form.addRow("Digest schedule", self.digest_cal)
+        daily_hint = QLabel(
+            "Refresh also available on the Workflows tab. Uses gh for the "
+            "active workspace remote (local system time for OnCalendar)."
+        )
+        daily_hint.setWordWrap(True)
+        daily_hint.setStyleSheet("color: palette(placeholder-text);")
+        daily_form.addRow(daily_hint)
+        layout.addWidget(daily_group)
+
+        # --- 4f Doomscroll / focus ---
+        focus_group = QGroupBox("4f · Doomscroll prevention")
+        focus_form = QFormLayout(focus_group)
+        self.doom_enable = QCheckBox("Enable focus watchdog")
+        self.doom_after = QSpinBox()
+        self.doom_after.setRange(1, 240)
+        self.doom_after.setSuffix(" min")
+        self.doom_videos = QSpinBox()
+        self.doom_videos.setRange(0, 50)
+        self.doom_videos.setSpecialValueText("off")
+        self.doom_videos.setToolTip(
+            "Count window-title changes while matching (YouTube Shorts swipe). "
+            "0 = time only. Intervene at whichever hits first: videos OR minutes."
+        )
+        self.doom_cool = QSpinBox()
+        self.doom_cool.setRange(5, 240)
+        self.doom_cool.setSuffix(" min")
+        self.doom_style = QComboBox()
+        self.doom_style.addItem("Notify only", "nudge")
+        self.doom_style.addItem("Companion pop-up", "companion")
+        self.doom_style.addItem("Companion + agent nudge", "agent")
+        self.doom_apps = QComboBox()
+        self.doom_apps.addItem("Firefox / LibreWolf", "firefox")
+        self.doom_apps.addItem("Chromium family", "chromium")
+        self.doom_apps.addItem("All browsers", "browsers")
+        self.doom_match = QComboBox()
+        self.doom_match.addItem("Browser + site titles", "browser-sites")
+        self.doom_match.addItem("Any time in listed apps", "listed-apps")
+        self.doom_sites = QComboBox()
+        self.doom_sites.addItem("YouTube Shorts only", "youtube-shorts")
+        self.doom_sites.addItem("Social + video", "social+video")
+        self.doom_sites.addItem("Social only", "social")
+        self.doom_sites.addItem("Video only", "video")
+        self.doom_sites.addItem("Any browser title", "any-browser")
+        self.doom_pause = QCheckBox("Pause Firefox media (MPRIS) on interrupt")
+        self.doom_follow = QCheckBox("Jump to Firefox desktop before interrupt")
+        self.doom_block = QCheckBox("Block input (fullscreen overlay until dismiss)")
+        self.doom_chat = QCheckBox("Also paste message into Companion chat")
+        self.doom_pause.setToolTip("Stops the playing Short/video via MPRIS Pause.")
+        self.doom_follow.setToolTip(
+            "Plasma/Hyprland: switch to the browser's virtual desktop so the "
+            "dialog appears over Firefox — not on another desktop."
+        )
+        self.doom_block.setToolTip(
+            "Fullscreen always-on-top overlay. Browser underneath cannot receive "
+            "scroll/clicks until you dismiss. (Not a Firefox extension.)"
+        )
+        self.doom_chat.setToolTip(
+            "Off by default — interrupt is a dialog/overlay, not a chat bubble."
+        )
+        try:
+            from .preferences import (
+                get_doomscroll_after_min,
+                get_doomscroll_apps,
+                get_doomscroll_block_input,
+                get_doomscroll_cooldown_min,
+                get_doomscroll_enable,
+                get_doomscroll_follow_target,
+                get_doomscroll_inject_chat,
+                get_doomscroll_match_mode,
+                get_doomscroll_max_videos,
+                get_doomscroll_pause_media,
+                get_doomscroll_site_pack,
+                get_doomscroll_style,
+            )
+
+            self.doom_enable.setChecked(get_doomscroll_enable())
+            self.doom_after.setValue(get_doomscroll_after_min())
+            self.doom_videos.setValue(get_doomscroll_max_videos())
+            self.doom_cool.setValue(get_doomscroll_cooldown_min())
+            self.doom_pause.setChecked(get_doomscroll_pause_media())
+            self.doom_follow.setChecked(get_doomscroll_follow_target())
+            self.doom_block.setChecked(get_doomscroll_block_input())
+            self.doom_chat.setChecked(get_doomscroll_inject_chat())
+            for combo, val in (
+                (self.doom_style, get_doomscroll_style()),
+                (self.doom_apps, (get_doomscroll_apps() or ["firefox"])[0]),
+                (self.doom_match, get_doomscroll_match_mode()),
+                (self.doom_sites, get_doomscroll_site_pack()),
+            ):
+                i = combo.findData(val)
+                if i >= 0:
+                    combo.setCurrentIndex(i)
+        except Exception:
+            self.doom_enable.setChecked(False)
+            self.doom_after.setValue(20)
+            self.doom_videos.setValue(0)
+            self.doom_cool.setValue(30)
+            self.doom_pause.setChecked(True)
+            self.doom_follow.setChecked(True)
+            self.doom_block.setChecked(False)
+            self.doom_chat.setChecked(False)
+
+        def _save_doom_enable(checked: bool) -> None:
+            from .preferences import set_doomscroll_enable
+
+            set_doomscroll_enable(checked)
+
+        def _save_doom_after(v: int) -> None:
+            from .preferences import set_doomscroll_after_min
+
+            set_doomscroll_after_min(v)
+
+        def _save_doom_videos(v: int) -> None:
+            from .preferences import set_doomscroll_max_videos
+
+            set_doomscroll_max_videos(v)
+
+        def _save_doom_cool(v: int) -> None:
+            from .preferences import set_doomscroll_cooldown_min
+
+            set_doomscroll_cooldown_min(v)
+
+        def _save_doom_style(_i: int = 0) -> None:
+            from .preferences import set_doomscroll_style
+            from .watchdogs import ensure_doomscroll_watchdog
+
+            style = str(self.doom_style.currentData() or "companion")
+            set_doomscroll_style(style)
+            if style == "agent":
+                ensure_doomscroll_watchdog(enable_for_agent=True)
+
+        def _save_doom_apps(_i: int = 0) -> None:
+            from .preferences import set_doomscroll_apps
+
+            set_doomscroll_apps([str(self.doom_apps.currentData() or "firefox")])
+
+        def _save_doom_match(_i: int = 0) -> None:
+            from .preferences import set_doomscroll_match_mode
+
+            set_doomscroll_match_mode(str(self.doom_match.currentData() or "browser-sites"))
+
+        def _save_doom_sites(_i: int = 0) -> None:
+            from .preferences import set_doomscroll_site_pack
+
+            set_doomscroll_site_pack(str(self.doom_sites.currentData() or "social+video"))
+
+        def _save_doom_pause(checked: bool) -> None:
+            from .preferences import set_doomscroll_pause_media
+
+            set_doomscroll_pause_media(checked)
+
+        def _save_doom_follow(checked: bool) -> None:
+            from .preferences import set_doomscroll_follow_target
+
+            set_doomscroll_follow_target(checked)
+
+        def _save_doom_block(checked: bool) -> None:
+            from .preferences import set_doomscroll_block_input
+
+            set_doomscroll_block_input(checked)
+
+        def _save_doom_chat(checked: bool) -> None:
+            from .preferences import set_doomscroll_inject_chat
+
+            set_doomscroll_inject_chat(checked)
+
+        self.doom_enable.toggled.connect(_save_doom_enable)
+        self.doom_after.valueChanged.connect(_save_doom_after)
+        self.doom_videos.valueChanged.connect(_save_doom_videos)
+        self.doom_cool.valueChanged.connect(_save_doom_cool)
+        self.doom_style.currentIndexChanged.connect(_save_doom_style)
+        self.doom_apps.currentIndexChanged.connect(_save_doom_apps)
+        self.doom_match.currentIndexChanged.connect(_save_doom_match)
+        self.doom_sites.currentIndexChanged.connect(_save_doom_sites)
+        self.doom_pause.toggled.connect(_save_doom_pause)
+        self.doom_follow.toggled.connect(_save_doom_follow)
+        self.doom_block.toggled.connect(_save_doom_block)
+        self.doom_chat.toggled.connect(_save_doom_chat)
+
+        snooze_btn = QPushButton("Snooze 30 min")
+        snooze_btn.clicked.connect(self._doomscroll_snooze)
+        focus_form.addRow(self.doom_enable)
+        focus_form.addRow("Interrupt after (time)", self.doom_after)
+        focus_form.addRow("Or after N Shorts", self.doom_videos)
+        focus_form.addRow("Cooldown", self.doom_cool)
+        focus_form.addRow("Style", self.doom_style)
+        focus_form.addRow("Apps", self.doom_apps)
+        focus_form.addRow("Match", self.doom_match)
+        focus_form.addRow("Sites", self.doom_sites)
+        focus_form.addRow(self.doom_pause)
+        focus_form.addRow(self.doom_follow)
+        focus_form.addRow(self.doom_block)
+        focus_form.addRow(self.doom_chat)
+        focus_form.addRow("", snooze_btn)
+        focus_hint = QLabel(
+            "Recommended for Shorts: Enable · Sites=YouTube Shorts · time=5 · "
+            "N Shorts=10 · Style=Companion pop-up · Pause media · Jump to Firefox "
+            "desktop · Block input. Companion must run. True in-page scroll-lock "
+            "needs a browser extension (not shipped)."
+        )
+        focus_hint.setWordWrap(True)
+        focus_hint.setStyleSheet("color: palette(placeholder-text);")
+        focus_form.addRow(focus_hint)
+        layout.addWidget(focus_group)
+
         host_group = QGroupBox("5 · Host profile")
         host_layout = QVBoxLayout(host_group)
         try:
@@ -2021,6 +2504,15 @@ class SettingsPage(QWidget):
             set_presence(status)  # type: ignore[arg-type]
         except Exception:
             pass
+
+    def _doomscroll_snooze(self) -> None:
+        try:
+            from .focus import snooze
+
+            snooze(30)
+            QMessageBox.information(self, "Doomscroll", "Snoozed for 30 minutes.")
+        except Exception as exc:
+            QMessageBox.warning(self, "Doomscroll", str(exc))
 
     def _open_config_dir(self) -> None:
         import subprocess

@@ -157,6 +157,294 @@ def set_llm_retries(retries: int) -> None:
     save_preferences({"llm_retries": max(0, min(n, 5))})
 
 
+# --- Phase 34: capacity / idle / daily workflows ---
+
+IDLE_MODES = ("off", "schedules", "schedules+backlog")
+DEFAULT_MAX_CONCURRENCY = 2
+DEFAULT_IDLE_AFTER_MIN = 15
+DEFAULT_IDLE_MAX_JOBS = 1
+DEFAULT_DAILY_DIGEST_CAL = "*-*-* 08:30:00"
+
+
+def get_max_concurrency() -> int:
+    raw = load_preferences().get("max_concurrency", DEFAULT_MAX_CONCURRENCY)
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_CONCURRENCY
+    return max(1, min(n, 8))
+
+
+def set_max_concurrency(n: int) -> None:
+    try:
+        v = int(n)
+    except (TypeError, ValueError):
+        return
+    save_preferences({"max_concurrency": max(1, min(v, 8))})
+
+
+def get_idle_mode() -> str:
+    raw = load_preferences().get("idle_mode", "off")
+    if isinstance(raw, str) and raw.strip().lower() in IDLE_MODES:
+        return raw.strip().lower()
+    return "off"
+
+
+def set_idle_mode(mode: str) -> None:
+    m = (mode or "").strip().lower()
+    if m in IDLE_MODES:
+        save_preferences({"idle_mode": m})
+
+
+def get_idle_after_min() -> int:
+    raw = load_preferences().get("idle_after_min", DEFAULT_IDLE_AFTER_MIN)
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_IDLE_AFTER_MIN
+    return max(5, min(n, 240))
+
+
+def set_idle_after_min(n: int) -> None:
+    try:
+        v = int(n)
+    except (TypeError, ValueError):
+        return
+    save_preferences({"idle_after_min": max(5, min(v, 240))})
+
+
+def get_idle_max_jobs() -> int:
+    raw = load_preferences().get("idle_max_jobs", DEFAULT_IDLE_MAX_JOBS)
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_IDLE_MAX_JOBS
+    return max(1, min(n, 4))
+
+
+def set_idle_max_jobs(n: int) -> None:
+    try:
+        v = int(n)
+    except (TypeError, ValueError):
+        return
+    save_preferences({"idle_max_jobs": max(1, min(v, 4))})
+
+
+def get_daily_digest_enable() -> bool:
+    raw = load_preferences().get("daily_digest_enable")
+    if raw is None:
+        return True
+    return bool(raw)
+
+
+def set_daily_digest_enable(enabled: bool) -> None:
+    save_preferences({"daily_digest_enable": bool(enabled)})
+
+
+def get_daily_digest_on_calendar() -> str:
+    raw = load_preferences().get("daily_digest_on_calendar", DEFAULT_DAILY_DIGEST_CAL)
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return DEFAULT_DAILY_DIGEST_CAL
+
+
+def set_daily_digest_on_calendar(cal: str) -> None:
+    c = (cal or "").strip()
+    if c:
+        save_preferences({"daily_digest_on_calendar": c})
+
+
+def get_workflow_providers() -> list[str]:
+    raw = load_preferences().get("workflow_providers", ["github"])
+    if isinstance(raw, list):
+        out = [str(x).strip().lower() for x in raw if str(x).strip()]
+        return out or ["github"]
+    return ["github"]
+
+
+def set_workflow_providers(providers: list[str]) -> None:
+    allowed = {"github"}
+    cleaned = [p for p in (str(x).strip().lower() for x in providers) if p in allowed]
+    save_preferences({"workflow_providers": cleaned or ["github"]})
+
+
+# --- Phase 35: doomscroll / focus watchdog ---
+
+DOOMSCROLL_STYLES = ("nudge", "companion", "agent")
+DOOMSCROLL_MATCH_MODES = ("browser-sites", "listed-apps")
+DOOMSCROLL_SITE_PACKS = (
+    "social",
+    "video",
+    "social+video",
+    "youtube-shorts",
+    "any-browser",
+)
+DOOMSCROLL_APP_CHOICES = ("firefox", "chromium", "browsers")
+DEFAULT_DOOMSCROLL_AFTER_MIN = 20
+DEFAULT_DOOMSCROLL_COOLDOWN_MIN = 30
+DEFAULT_DOOMSCROLL_MAX_VIDEOS = 0  # 0 = video-count off; Shorts users set 10
+
+
+def get_doomscroll_enable() -> bool:
+    return bool(load_preferences().get("doomscroll_enable", False))
+
+
+def set_doomscroll_enable(enabled: bool) -> None:
+    save_preferences({"doomscroll_enable": bool(enabled)})
+
+
+def get_doomscroll_after_min() -> int:
+    raw = load_preferences().get("doomscroll_after_min", DEFAULT_DOOMSCROLL_AFTER_MIN)
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_DOOMSCROLL_AFTER_MIN
+    return max(1, min(n, 240))
+
+
+def set_doomscroll_after_min(n: int) -> None:
+    try:
+        v = int(n)
+    except (TypeError, ValueError):
+        return
+    save_preferences({"doomscroll_after_min": max(1, min(v, 240))})
+
+
+def get_doomscroll_max_videos() -> int:
+    """Title-change count threshold (0 = ignore video count)."""
+    raw = load_preferences().get("doomscroll_max_videos", DEFAULT_DOOMSCROLL_MAX_VIDEOS)
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_DOOMSCROLL_MAX_VIDEOS
+    return max(0, min(n, 50))
+
+
+def set_doomscroll_max_videos(n: int) -> None:
+    try:
+        v = int(n)
+    except (TypeError, ValueError):
+        return
+    save_preferences({"doomscroll_max_videos": max(0, min(v, 50))})
+
+
+def get_doomscroll_cooldown_min() -> int:
+    raw = load_preferences().get(
+        "doomscroll_cooldown_min", DEFAULT_DOOMSCROLL_COOLDOWN_MIN
+    )
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_DOOMSCROLL_COOLDOWN_MIN
+    return max(5, min(n, 240))
+
+
+def set_doomscroll_cooldown_min(n: int) -> None:
+    try:
+        v = int(n)
+    except (TypeError, ValueError):
+        return
+    save_preferences({"doomscroll_cooldown_min": max(5, min(v, 240))})
+
+
+def get_doomscroll_style() -> str:
+    raw = load_preferences().get("doomscroll_style", "companion")
+    if isinstance(raw, str) and raw.strip().lower() in DOOMSCROLL_STYLES:
+        return raw.strip().lower()
+    return "companion"
+
+
+def set_doomscroll_style(style: str) -> None:
+    s = (style or "").strip().lower()
+    if s in DOOMSCROLL_STYLES:
+        save_preferences({"doomscroll_style": s})
+
+
+def get_doomscroll_match_mode() -> str:
+    raw = load_preferences().get("doomscroll_match_mode", "browser-sites")
+    if isinstance(raw, str) and raw.strip().lower() in DOOMSCROLL_MATCH_MODES:
+        return raw.strip().lower()
+    return "browser-sites"
+
+
+def set_doomscroll_match_mode(mode: str) -> None:
+    m = (mode or "").strip().lower()
+    if m in DOOMSCROLL_MATCH_MODES:
+        save_preferences({"doomscroll_match_mode": m})
+
+
+def get_doomscroll_site_pack() -> str:
+    raw = load_preferences().get("doomscroll_site_pack", "social+video")
+    if isinstance(raw, str) and raw.strip().lower() in DOOMSCROLL_SITE_PACKS:
+        return raw.strip().lower()
+    return "social+video"
+
+
+def set_doomscroll_site_pack(pack: str) -> None:
+    p = (pack or "").strip().lower()
+    if p in DOOMSCROLL_SITE_PACKS:
+        save_preferences({"doomscroll_site_pack": p})
+
+
+def get_doomscroll_apps() -> list[str]:
+    raw = load_preferences().get("doomscroll_apps", ["firefox"])
+    if isinstance(raw, list):
+        out = [
+            str(x).strip().lower()
+            for x in raw
+            if str(x).strip().lower() in DOOMSCROLL_APP_CHOICES
+        ]
+        return out or ["firefox"]
+    if isinstance(raw, str) and raw.strip().lower() in DOOMSCROLL_APP_CHOICES:
+        return [raw.strip().lower()]
+    return ["firefox"]
+
+
+def set_doomscroll_apps(apps: list[str]) -> None:
+    cleaned = [
+        a
+        for a in (str(x).strip().lower() for x in apps)
+        if a in DOOMSCROLL_APP_CHOICES
+    ]
+    save_preferences({"doomscroll_apps": cleaned or ["firefox"]})
+
+
+def get_doomscroll_pause_media() -> bool:
+    """Pause Firefox/Chromium MPRIS media on intervene (default on)."""
+    return bool(load_preferences().get("doomscroll_pause_media", True))
+
+
+def set_doomscroll_pause_media(enabled: bool) -> None:
+    save_preferences({"doomscroll_pause_media": bool(enabled)})
+
+
+def get_doomscroll_block_input() -> bool:
+    """Fullscreen overlay until dismiss — blocks clicks through to the browser."""
+    return bool(load_preferences().get("doomscroll_block_input", False))
+
+
+def set_doomscroll_block_input(enabled: bool) -> None:
+    save_preferences({"doomscroll_block_input": bool(enabled)})
+
+
+def get_doomscroll_follow_target() -> bool:
+    """Jump to the browser's virtual desktop before showing the interrupt."""
+    return bool(load_preferences().get("doomscroll_follow_target", True))
+
+
+def set_doomscroll_follow_target(enabled: bool) -> None:
+    save_preferences({"doomscroll_follow_target": bool(enabled)})
+
+
+def get_doomscroll_inject_chat() -> bool:
+    """Also paste the interrupt text into the Companion chat bubble (default off)."""
+    return bool(load_preferences().get("doomscroll_inject_chat", False))
+
+
+def set_doomscroll_inject_chat(enabled: bool) -> None:
+    save_preferences({"doomscroll_inject_chat": bool(enabled)})
+
+
 def apply_startup_preferences(settings: Any) -> Any:
     """Apply last provider / model from preferences (Nix model env wins if set)."""
     from dataclasses import replace

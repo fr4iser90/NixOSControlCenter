@@ -36,7 +36,8 @@ in
               "export" "eval"
               "serve-openapi" "tray" "companion" "harness"
               "watchdog" "probe" "rollback" "red-team"
-              "secrets" "workspaces" "templates" "mcp-install"
+              "secrets" "workspaces" "templates" "workflows" "focus"
+              "mcp-install"
             ];
             shortHelp = "ai - AI Assistant";
             longHelp = ''
@@ -71,6 +72,10 @@ in
                 ncc ai secrets list|set|delete
                 ncc ai workspaces list|add|delete
                 ncc ai templates list|show|instantiate|run|instances
+                ncc ai workflows show|refresh|tasks|roadmap
+                ncc ai focus status|tick|snooze
+                ncc ai mcp-install NAME
+                ncc ai serve-openapi
                 ncc ai watchdog list|fire EVENT
                 ncc ai probe disk
                 ncc ai rollback

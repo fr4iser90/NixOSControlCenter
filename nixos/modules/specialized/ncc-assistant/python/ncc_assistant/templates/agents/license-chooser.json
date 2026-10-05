@@ -1,0 +1,57 @@
+{
+  "id": "license-chooser",
+  "title": "License chooser",
+  "category": "Rulebooks",
+  "description": "SPDX license enum → LICENSE file proposal (diff-first).",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": [
+    "git"
+  ],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 10,
+  "tags": [
+    "rulebook",
+    "license"
+  ],
+  "goalTemplate": "Propose LICENSE for SPDX {{spdx}}. Year: {{year}}. Copyright holder: {{holder}}. Repos: {{repositories}}.\\n\\nUse standard license text for the SPDX id. Diff-first; do not overwrite without confirm. Not legal advice.",
+  "params": [
+    {
+      "id": "spdx",
+      "label": "SPDX license",
+      "type": "enum",
+      "options": [
+        "MIT",
+        "Apache-2.0",
+        "GPL-3.0-only",
+        "AGPL-3.0-only",
+        "BSD-3-Clause",
+        "Unlicense"
+      ],
+      "default": "MIT",
+      "required": true
+    },
+    {
+      "id": "year",
+      "label": "Year",
+      "type": "string",
+      "required": true,
+      "default": "2026"
+    },
+    {
+      "id": "holder",
+      "label": "Copyright holder",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": false
+    }
+  ]
+}

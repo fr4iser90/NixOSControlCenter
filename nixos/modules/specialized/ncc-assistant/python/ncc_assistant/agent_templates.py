@@ -601,6 +601,7 @@ def instantiate(
 def run_instance(instance_id: str, *, dry_run: bool | None = None):
     """Yield agent events for a saved instance (native or external harness)."""
     from .agent import run_agent
+    from .capacity import CapacityError, acquire_or_raise, release
     from .harness import get_harness, resolve_harness_name
     from .workspaces import get_workspace
 
@@ -613,6 +614,17 @@ def run_instance(instance_id: str, *, dry_run: bool | None = None):
     goal = render_goal(tmpl, inst.params)
     settings = settings_for_instance(inst)
     hname = resolve_harness_name(template_harness=tmpl.harness, tags=tmpl.tags)
+    try:
+        token = acquire_or_raise(f"instance:{instance_id}")
+    except CapacityError:
+        raise
+
+    def _wrap(events):
+        try:
+            yield from events
+        finally:
+            release(token)
+
     if hname != "native":
         cwd = None
         repos = inst.params.get("repositories") or inst.params.get("workspace")
@@ -633,12 +645,14 @@ def run_instance(instance_id: str, *, dry_run: bool | None = None):
             }
             yield from get_harness(hname).send(goal, cwd=cwd)
 
-        return _gen()
-    return run_agent(
-        goal,
-        settings,
-        max_steps=tmpl.max_steps or settings.agent_max_steps,
-        dry_run=tmpl.dry_run if dry_run is None else dry_run,
-        profile=tmpl.profile,
-        playbook=f"tmpl-{inst.id}",
+        return _wrap(_gen())
+    return _wrap(
+        run_agent(
+            goal,
+            settings,
+            max_steps=tmpl.max_steps or settings.agent_max_steps,
+            dry_run=tmpl.dry_run if dry_run is None else dry_run,
+            profile=tmpl.profile,
+            playbook=f"tmpl-{inst.id}",
+        )
     )

@@ -1,0 +1,39 @@
+{
+  "id": "task-breakdown",
+  "title": "Task breakdown",
+  "category": "Creators",
+  "description": "Goal → prioritized Task list in the daily workflows store.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": [],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 16,
+  "tags": [
+    "creator",
+    "tasks"
+  ],
+  "goalTemplate": "Break down this goal into prioritized tasks (p0/p1/p2, status todo). Max tasks: {{maxTasks}}. Goal:\\n{{goal}}\\n\\nUse `ncc ai workflows tasks add` for each task. Do not mark done. Keep titles actionable.",
+  "params": [
+    {
+      "id": "goal",
+      "label": "Goal",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": "maxTasks",
+      "label": "Max tasks",
+      "type": "enum",
+      "options": [
+        "5",
+        "8",
+        "12"
+      ],
+      "default": "8",
+      "required": true
+    }
+  ]
+}

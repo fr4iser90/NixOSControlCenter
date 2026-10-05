@@ -71,6 +71,21 @@ def list_watchdogs() -> list[Watchdog]:
                 "dry_run": True,
                 "cooldown_sec": 3600,
             },
+            {
+                "id": "doomscroll-threshold",
+                "event": "doomscroll-threshold",
+                "enable": False,
+                "goal": (
+                    "The user crossed the doomscroll focus threshold (prolonged "
+                    "browser social/video time). Give a short, kind interrupt: "
+                    "acknowledge the rabbit hole, suggest one concrete next step "
+                    "(stand up, close tab, 5-min timer, or pick a task). No tools, "
+                    "no lectures, max ~6 sentences."
+                ),
+                "profile": "read-only",
+                "dry_run": True,
+                "cooldown_sec": 1800,
+            },
         ]
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"watchdogs": defaults}, indent=2) + "\n", encoding="utf-8")
@@ -79,6 +94,49 @@ def list_watchdogs() -> list[Watchdog]:
     if isinstance(items, dict):
         items = [{"id": k, **v} for k, v in items.items()]
     return [Watchdog.from_dict(x) for x in items if isinstance(x, dict) and x.get("id")]
+
+
+def ensure_doomscroll_watchdog(*, enable_for_agent: bool = False) -> None:
+    """Make sure doomscroll-threshold exists in watchdogs.json."""
+    path = watchdogs_file()
+    items = list_watchdogs()
+    found = False
+    out: list[dict[str, Any]] = []
+    for w in items:
+        d = {
+            "id": w.id,
+            "event": w.event,
+            "goal": w.goal,
+            "enable": w.enable,
+            "playbook": w.playbook,
+            "profile": w.profile,
+            "dry_run": w.dry_run,
+            "cooldown_sec": w.cooldown_sec,
+            "notify_only_when_paused": w.notify_only_when_paused,
+        }
+        if w.id == "doomscroll-threshold":
+            found = True
+            if enable_for_agent:
+                d["enable"] = True
+        out.append(d)
+    if not found:
+        out.append(
+            {
+                "id": "doomscroll-threshold",
+                "event": "doomscroll-threshold",
+                "goal": (
+                    "The user crossed the doomscroll focus threshold. Give a short, "
+                    "kind interrupt and one concrete next step. No tools, max ~6 sentences."
+                ),
+                "enable": bool(enable_for_agent),
+                "profile": "read-only",
+                "dry_run": True,
+                "cooldown_sec": 1800,
+                "notify_only_when_paused": False,
+            }
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"watchdogs": out}, indent=2) + "\n", encoding="utf-8")
 
 
 def _load_cooldowns() -> dict[str, float]:

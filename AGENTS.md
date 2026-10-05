@@ -65,6 +65,7 @@ Details: [tests/TESTING.md](tests/TESTING.md).
 | Doc | Use when |
 |-----|----------|
 | [docs/developing/new-module.md](docs/developing/new-module.md) | Adding a module |
+| [docs/developing/flake-exports.md](docs/developing/flake-exports.md) | Import NCC modules into another flake |
 | [docs/developing/docs-conventions.md](docs/developing/docs-conventions.md) | Docs layout |
 | [nixos/core/management/cli-formatter/doc/standards.md](nixos/core/management/cli-formatter/doc/standards.md) | `ncc` quiet checklist UX |
 | [nixos/core/base/hyprland/doc/usage.md](nixos/core/base/hyprland/doc/usage.md) | Rice install / apply |

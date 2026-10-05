@@ -1,4 +1,4 @@
-"""CLI entry: ncc-assistant [gui|chat|mcp|agent|jobs|playbook|presence|approve|knowledge|export|eval|tools|secrets|workspaces|templates|serve-openapi|tray]."""
+"""CLI entry: ncc-assistant [gui|chat|mcp|agent|jobs|playbook|presence|approve|knowledge|export|eval|tools|secrets|workspaces|templates|workflows|focus|serve-openapi|tray]."""
 
 from __future__ import annotations
 
@@ -57,6 +57,7 @@ def _cmd_tool(args: argparse.Namespace) -> int:
 def _cmd_agent_run(args: argparse.Namespace) -> int:
     """Run agent with a goal."""
     from .agent import run_agent
+    from .capacity import CapacityError, capacity_slot
     from .harness import get_harness, looks_like_coding_goal, resolve_harness_name
 
     settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
@@ -92,67 +93,83 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
     )
     print_info("---")
 
-    if hname != "native":
-        events = get_harness(hname).send(goal)
-    else:
-        events = run_agent(
-            goal,
-            settings,
-            max_steps=max_steps,
-            dry_run=args.dry_run,
-            profile=args.profile,
-            playbook=args.playbook,
-        )
+    try:
+        with capacity_slot(f"agent:{hname}"):
+            if hname != "native":
+                events = get_harness(hname).send(goal)
+            else:
+                events = run_agent(
+                    goal,
+                    settings,
+                    max_steps=max_steps,
+                    dry_run=args.dry_run,
+                    profile=args.profile,
+                    playbook=args.playbook,
+                )
 
-    thinking_open = False
-    for event in events:
-        kind = event.get("kind")
-        if kind == "job_started":
-            print_info(f"Job started: {event.get('job_id')}")
-        elif kind == "step":
-            print_info(f"Step {event.get('step')}/{event.get('max_steps')}")
-        elif kind == "thinking_delta":
-            if verbose:
-                print_info(f"thinking: {event.get('text', '')[:200]}")
-            elif not thinking_open:
-                print_info("Thinking…")
-                thinking_open = True
-        elif kind == "assistant":
             thinking_open = False
-            print_info(f"Assistant: {event.get('text', '')[:500]}")
-        elif kind == "assistant_delta":
-            thinking_open = False
-        elif kind == "tool":
-            thinking_open = False
-            name = event.get("name")
-            if verbose:
-                print_info(f"Tool: {name}({json.dumps(event.get('args', {}))})")
-            else:
-                print_info(f"▸ {name}")
-        elif kind == "tool_result":
-            text = event.get("text", "")
-            if verbose:
-                print_info(f"Result: {text[:300]}{'...' if len(text) > 300 else ''}")
-            else:
-                print_info(f"  ↳ {text[:120]}{'…' if len(text) > 120 else ''}")
-        elif kind == "status":
-            if verbose:
-                print_info(f"status: {event.get('text') or event.get('phase') or ''}")
-        elif kind == "run_spawn":
-            print_info(
-                f"▸ Subagent: {event.get('title') or event.get('name') or 'child'}"
-            )
-        elif kind == "agent_finish":
-            print_ok(f"Agent finished: {event.get('summary')}")
-            print_info(f"Success: {event.get('success')}")
-        elif kind == "error":
-            print_err(event.get("text", ""))
-        elif kind == "job_finished":
-            print_ok(f"Job {event.get('job_id')} completed (success={event.get('success')})")
-        elif kind == "job_failed":
-            print_err(f"Job {event.get('job_id')} failed: {event.get('error')}")
-        elif kind == "job_cancelled":
-            print_info(f"Job {event.get('job_id')} cancelled")
+            for event in events:
+                kind = event.get("kind")
+                if kind == "job_started":
+                    print_info(f"Job started: {event.get('job_id')}")
+                elif kind == "step":
+                    print_info(f"Step {event.get('step')}/{event.get('max_steps')}")
+                elif kind == "thinking_delta":
+                    if verbose:
+                        print_info(f"thinking: {event.get('text', '')[:200]}")
+                    elif not thinking_open:
+                        print_info("Thinking…")
+                        thinking_open = True
+                elif kind == "assistant":
+                    thinking_open = False
+                    print_info(f"Assistant: {event.get('text', '')[:500]}")
+                elif kind == "assistant_delta":
+                    thinking_open = False
+                elif kind == "tool":
+                    thinking_open = False
+                    name = event.get("name")
+                    if verbose:
+                        print_info(f"Tool: {name}({json.dumps(event.get('args', {}))})")
+                    else:
+                        print_info(f"▸ {name}")
+                elif kind == "tool_result":
+                    text = event.get("text", "")
+                    if verbose:
+                        print_info(
+                            f"Result: {text[:300]}{'...' if len(text) > 300 else ''}"
+                        )
+                    else:
+                        print_info(
+                            f"  ↳ {text[:120]}{'…' if len(text) > 120 else ''}"
+                        )
+                elif kind == "status":
+                    if verbose:
+                        print_info(
+                            f"status: {event.get('text') or event.get('phase') or ''}"
+                        )
+                elif kind == "run_spawn":
+                    print_info(
+                        f"▸ Subagent: {event.get('title') or event.get('name') or 'child'}"
+                    )
+                elif kind == "agent_finish":
+                    print_ok(f"Agent finished: {event.get('summary')}")
+                    print_info(f"Success: {event.get('success')}")
+                elif kind == "error":
+                    print_err(event.get("text", ""))
+                elif kind == "job_finished":
+                    print_ok(
+                        f"Job {event.get('job_id')} completed "
+                        f"(success={event.get('success')})"
+                    )
+                elif kind == "job_failed":
+                    print_err(
+                        f"Job {event.get('job_id')} failed: {event.get('error')}"
+                    )
+                elif kind == "job_cancelled":
+                    print_info(f"Job {event.get('job_id')} cancelled")
+    except CapacityError as exc:
+        print_err(str(exc))
+        return 1
 
     return 0
 
@@ -613,11 +630,16 @@ def _cmd_templates(args: argparse.Namespace) -> int:
         print(json.dumps({k: v for k, v in result.items() if k != "goal"} | {"goal_preview": (result.get("goal") or "")[:400]}, indent=2))
         return 0 if result.get("ok") else 1
     if cmd == "run":
+        from .capacity import CapacityError
+
         try:
             for event in run_instance(args.instance_id, dry_run=bool(args.dry_run) or None):
                 kind = event.get("kind")
                 if kind in ("job_started", "step", "agent_finish", "error", "budget"):
                     print_info(f"{kind}: {json.dumps({k: v for k, v in event.items() if k != 'kind'}, default=str)[:300]}")
+        except CapacityError as exc:
+            print_err(str(exc))
+            return 1
         except ValueError as exc:
             print_err(str(exc))
             return 1
@@ -633,6 +655,125 @@ def _cmd_templates(args: argparse.Namespace) -> int:
                 print(f"{i['id']:32} {i['templateId']:24} {i['title']}")
         return 0
     print_err("Usage: ncc ai templates list|show|instantiate|run|instances")
+    return 1
+
+
+def _cmd_workflows(args: argparse.Namespace) -> int:
+    from .workflows import (
+        add_roadmap_item,
+        add_task,
+        complete_task,
+        list_roadmap,
+        list_tasks,
+        load_daily,
+        refresh_github_digest,
+        update_roadmap_item,
+        update_task,
+    )
+
+    cmd = args.workflows_cmd
+    if cmd == "show":
+        print(json.dumps(load_daily(), indent=2))
+        return 0
+    if cmd == "refresh":
+        data = refresh_github_digest()
+        print_ok(
+            f"Digest updated: {len(data.get('issues') or [])} issues, "
+            f"{len(data.get('pullRequests') or [])} PRs"
+        )
+        return 0
+    if cmd == "tasks":
+        sub = args.workflows_tasks_cmd
+        if sub == "list":
+            items = list_tasks()
+            if getattr(args, "json", False):
+                print(json.dumps(items, indent=2))
+            else:
+                for t in items:
+                    print(
+                        f"{t.get('id')}  [{t.get('priority')}] {t.get('status'):5}  "
+                        f"{t.get('title')}"
+                    )
+            return 0
+        if sub == "add":
+            t = add_task(
+                args.title,
+                priority=args.priority or "p1",
+                status=args.status or "todo",
+            )
+            print_ok(f"Task {t['id']}: {t['title']}")
+            return 0
+        if sub == "complete":
+            t = complete_task(args.id)
+            if not t:
+                print_err(f"Task not found: {args.id}")
+                return 1
+            print_ok(f"Completed {t['id']}")
+            return 0
+        if sub == "update":
+            fields: dict = {}
+            if args.title:
+                fields["title"] = args.title
+            if args.status:
+                fields["status"] = args.status
+            if args.priority:
+                fields["priority"] = args.priority
+            t = update_task(args.id, **fields)
+            if not t:
+                print_err(f"Task not found: {args.id}")
+                return 1
+            print_ok(f"Updated {t['id']}")
+            return 0
+        print_err("Usage: ncc ai workflows tasks list|add|complete|update")
+        return 1
+    if cmd == "roadmap":
+        sub = args.workflows_roadmap_cmd
+        if sub == "list":
+            items = list_roadmap()
+            if getattr(args, "json", False):
+                print(json.dumps(items, indent=2))
+            else:
+                for r in items:
+                    print(f"{r.get('id')}  [{r.get('horizon')}] {r.get('title')}")
+            return 0
+        if sub == "add":
+            r = add_roadmap_item(args.title, horizon=args.horizon or "now")
+            print_ok(f"Roadmap {r['id']}: {r['title']}")
+            return 0
+        if sub == "update":
+            fields = {}
+            if args.title:
+                fields["title"] = args.title
+            if args.horizon:
+                fields["horizon"] = args.horizon
+            r = update_roadmap_item(args.id, **fields)
+            if not r:
+                print_err(f"Roadmap item not found: {args.id}")
+                return 1
+            print_ok(f"Updated {r['id']}")
+            return 0
+        print_err("Usage: ncc ai workflows roadmap list|add|update")
+        return 1
+    print_err("Usage: ncc ai workflows show|refresh|tasks|roadmap")
+    return 1
+
+
+def _cmd_focus(args: argparse.Namespace) -> int:
+    from .focus import snooze, status, tick
+
+    cmd = args.focus_cmd
+    if cmd == "status":
+        print(json.dumps(status(), indent=2))
+        return 0
+    if cmd == "tick":
+        print(json.dumps(tick(), indent=2))
+        return 0
+    if cmd == "snooze":
+        mins = int(getattr(args, "minutes", 30) or 30)
+        print(json.dumps(snooze(mins), indent=2))
+        print_ok(f"Snoozed {mins} min")
+        return 0
+    print_err("Usage: ncc ai focus status|tick|snooze")
     return 1
 
 
@@ -842,6 +983,46 @@ def main(argv: list[str] | None = None) -> int:
     tmpl_instances = tmpl_sub.add_parser("instances", help="List saved instances")
     tmpl_instances.add_argument("--json", action="store_true")
 
+    wf_p = sub.add_parser("workflows", help="Daily workflows / tasks / roadmap")
+    wf_sub = wf_p.add_subparsers(dest="workflows_cmd")
+    wf_sub.add_parser("show", help="Show daily.json digest")
+    wf_sub.add_parser("refresh", help="Refresh GitHub Issues/PRs into daily.json")
+    wf_tasks = wf_sub.add_parser("tasks", help="Local task CRUD")
+    wf_tasks_sub = wf_tasks.add_subparsers(dest="workflows_tasks_cmd")
+    wf_tl = wf_tasks_sub.add_parser("list", help="List tasks")
+    wf_tl.add_argument("--json", action="store_true")
+    wf_ta = wf_tasks_sub.add_parser("add", help="Add a task")
+    wf_ta.add_argument("title")
+    wf_ta.add_argument("--priority", choices=["p0", "p1", "p2"], default="p1")
+    wf_ta.add_argument("--status", choices=["todo", "doing", "done"], default="todo")
+    wf_tc = wf_tasks_sub.add_parser("complete", help="Mark task done")
+    wf_tc.add_argument("id")
+    wf_tu = wf_tasks_sub.add_parser("update", help="Update a task")
+    wf_tu.add_argument("id")
+    wf_tu.add_argument("--title")
+    wf_tu.add_argument("--priority", choices=["p0", "p1", "p2"])
+    wf_tu.add_argument("--status", choices=["todo", "doing", "done"])
+    wf_rm = wf_sub.add_parser("roadmap", help="Roadmap item CRUD")
+    wf_rm_sub = wf_rm.add_subparsers(dest="workflows_roadmap_cmd")
+    wf_rl = wf_rm_sub.add_parser("list", help="List roadmap items")
+    wf_rl.add_argument("--json", action="store_true")
+    wf_ra = wf_rm_sub.add_parser("add", help="Add roadmap item")
+    wf_ra.add_argument("title")
+    wf_ra.add_argument("--horizon", choices=["now", "next", "later"], default="now")
+    wf_ru = wf_rm_sub.add_parser("update", help="Update roadmap item")
+    wf_ru.add_argument("id")
+    wf_ru.add_argument("--title")
+    wf_ru.add_argument("--horizon", choices=["now", "next", "later"])
+
+    focus_p = sub.add_parser("focus", help="Doomscroll / focus watchdog")
+    focus_sub = focus_p.add_subparsers(dest="focus_cmd")
+    focus_sub.add_parser("status", help="Show focus streak / settings")
+    focus_sub.add_parser("tick", help="Run one probe tick")
+    focus_snooze = focus_sub.add_parser("snooze", help="Snooze interventions")
+    focus_snooze.add_argument(
+        "--minutes", "-m", type=int, default=30, help="Snooze minutes (default 30)"
+    )
+
     mcp_p = sub.add_parser("mcp-install", help="Install an MCP marketplace template")
     mcp_p.add_argument("name", help="MCP template name (git, github, …)")
     mcp_p.add_argument("--workspace", help="Workspace id for {{workspace.path}}")
@@ -979,6 +1160,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if command == "templates":
         return _cmd_templates(args)
+
+    if command == "workflows":
+        return _cmd_workflows(args)
+
+    if command == "focus":
+        return _cmd_focus(args)
 
     if command == "mcp-install":
         return _cmd_mcp_install(args)

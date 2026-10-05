@@ -1,0 +1,62 @@
+{
+  "id": "skill-pack-creator",
+  "title": "Skill pack creator",
+  "category": "Rulebooks",
+  "description": "New .agents/skills/<name>/SKILL.md from enum domains.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": [
+    "git"
+  ],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 16,
+  "tags": [
+    "rulebook",
+    "skills"
+  ],
+  "goalTemplate": "Create skill pack '{{skillName}}' for domain {{domain}}. Depth: {{depth}}. Repos: {{repositories}}.\\n\\nPropose .agents/skills/{{skillName}}/SKILL.md (diff-first). Follow Cursor/portable skill conventions. No secrets in skill body.",
+  "params": [
+    {
+      "id": "skillName",
+      "label": "Skill name (kebab)",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": "domain",
+      "label": "Domain",
+      "type": "enum",
+      "options": [
+        "nixos",
+        "python",
+        "git",
+        "docs",
+        "ops",
+        "gui"
+      ],
+      "default": "nixos",
+      "required": true
+    },
+    {
+      "id": "depth",
+      "label": "Depth",
+      "type": "enum",
+      "options": [
+        "stub",
+        "standard",
+        "detailed"
+      ],
+      "default": "standard",
+      "required": true
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": false
+    }
+  ]
+}

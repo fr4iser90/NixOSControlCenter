@@ -498,6 +498,7 @@ from .gui_pages import (
     ThinkingBlock,
     ToolTraceWidget,
     ToolsPage,
+    WorkflowsPage,
 )
 from .templates_ui import TemplatesPage
 
@@ -2117,6 +2118,8 @@ class AssistantPanel(QWidget):
         self.tabs.addTab(self.tools_page, "Tools")
         self.jobs_page = JobsPage()
         self.tabs.addTab(self.jobs_page, "Jobs")
+        self.workflows_page = WorkflowsPage()
+        self.tabs.addTab(self.workflows_page, "Workflows")
         self.schedules_page = SchedulesPage()
         self.tabs.addTab(self.schedules_page, "Schedules")
         self.settings_page = SettingsPage()

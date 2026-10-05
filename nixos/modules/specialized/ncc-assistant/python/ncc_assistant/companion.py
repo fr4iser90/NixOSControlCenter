@@ -69,6 +69,7 @@ STATE_ERROR = "error"
 PANEL_NONE = "none"
 PANEL_HISTORY = "history"
 PANEL_TEMPLATES = "templates"
+PANEL_DAILY = "daily"
 PANEL_TOOLS = "tools"
 PANEL_MCP = "mcp"
 PANEL_WORKSPACES = "workspaces"
@@ -201,6 +202,7 @@ class _CompanionTemplateWorker(QThread):
             from .agent import run_agent
             from .agent_templates import get_agent_template, render_goal
             from .auth import with_cached_credentials
+            from .capacity import capacity_slot
             from .config import Settings
             from .harness import get_harness, resolve_harness_name
             from .workspaces import get_workspace
@@ -229,18 +231,19 @@ class _CompanionTemplateWorker(QThread):
                 ws = get_workspace(repos)
                 if ws:
                     cwd = str(ws.path)
-            if hname != "native":
-                for ev in get_harness(hname).send(goal, cwd=cwd):
-                    self.event.emit(self.slot_id, ev)
-            else:
-                for ev in run_agent(
-                    goal,
-                    settings,
-                    max_steps=tmpl.max_steps or 24,
-                    dry_run=tmpl.dry_run,
-                    profile=tmpl.profile,
-                ):
-                    self.event.emit(self.slot_id, ev)
+            with capacity_slot(f"template:{self._template_id}"):
+                if hname != "native":
+                    for ev in get_harness(hname).send(goal, cwd=cwd):
+                        self.event.emit(self.slot_id, ev)
+                else:
+                    for ev in run_agent(
+                        goal,
+                        settings,
+                        max_steps=tmpl.max_steps or 24,
+                        dry_run=tmpl.dry_run,
+                        profile=tmpl.profile,
+                    ):
+                        self.event.emit(self.slot_id, ev)
         except Exception as exc:  # noqa: BLE001
             self.failed.emit(self.slot_id, f"{exc}\n{traceback.format_exc()}")
 
@@ -691,6 +694,7 @@ class CompanionWindow(QWidget):
         tools.setSpacing(2)
         primary = (
             (PANEL_TEMPLATES, "folder-templates", "▶", "Workflow templates"),
+            (PANEL_DAILY, "view-calendar-day", "📅", "Daily workflows"),
             (PANEL_TOOLS, "applications-system", "🔧", "Tools registry"),
             (PANEL_MCP, "network-server", "🔌", "MCP servers"),
             (PANEL_WORKSPACES, "folder", "📁", "Workspaces"),
@@ -835,10 +839,20 @@ class CompanionWindow(QWidget):
         self._presence_timer.setInterval(2000)
         self._presence_timer.timeout.connect(self._sync_presence)
         self._presence_timer.start()
+        self._idle_timer = QTimer(self)
+        self._idle_timer.setInterval(60_000)
+        self._idle_timer.timeout.connect(self._idle_tick)
+        self._idle_timer.start()
+        self._idle_armed = False
+        self._focus_timer = QTimer(self)
+        self._focus_timer.setInterval(15_000)
+        self._focus_timer.timeout.connect(self._focus_tick)
+        self._focus_timer.start()
         self._reload_workspace_chip()
         self._sync_presence()
         self._apply_slot_ui()
         self._restore_geometry()
+        QTimer.singleShot(800, self._focus_tick)
 
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
@@ -1319,8 +1333,25 @@ class CompanionWindow(QWidget):
         except Exception:
             st = "available"
         busy_n = sum(1 for s in self._slots if s.busy)
+        idle_mark = ""
+        try:
+            from .idle import is_idle_eligible
+            from .preferences import get_idle_mode
+
+            self._idle_armed = get_idle_mode() != "off" and is_idle_eligible()
+            if get_idle_mode() != "off":
+                idle_mark = " · idle✓" if self._idle_armed else " · idle…"
+        except Exception:
+            self._idle_armed = False
         extra = f" · {busy_n} busy" if busy_n else ""
-        self.presence_lbl.setText(f"{st}{extra}")
+        self.presence_lbl.setText(f"{st}{extra}{idle_mark}")
+        if hasattr(self, "avatar"):
+            tip = self.avatar.toolTip() or ""
+            base = tip.split(" · idle")[0] if " · idle" in tip else tip
+            if self._idle_armed:
+                self.avatar.setToolTip((base + " · idle sweep armed").strip(" ·"))
+            elif base:
+                self.avatar.setToolTip(base)
         slot = self._slot()
         if slot.busy:
             return
@@ -1330,6 +1361,106 @@ class CompanionWindow(QWidget):
         elif slot.avatar_state not in (STATE_ERROR, STATE_SPEAKING, STATE_THINKING):
             slot.avatar_state = STATE_IDLE
             self.avatar.set_state(STATE_IDLE)
+
+    def _idle_tick(self) -> None:
+        """Periodic idle sweep (schedules / idle-ok) when armed."""
+        try:
+            from .idle import is_idle_eligible, maybe_sweep
+            from .preferences import get_idle_mode
+
+            if get_idle_mode() == "off" or not is_idle_eligible():
+                return
+            # Run in-thread briefly; jobs are short dry-runs / schedule goals.
+            maybe_sweep(start=True)
+        except Exception:
+            pass
+
+    def _focus_tick(self) -> None:
+        """Doomscroll / focus watchdog probe."""
+        try:
+            from .focus import consume_pending_nudge, tick
+            from .preferences import get_doomscroll_enable, get_doomscroll_style
+
+            if not get_doomscroll_enable():
+                return
+            result = tick()
+            nudge = None
+            if result.get("intervened"):
+                nudge = {
+                    "message": result.get("message") or "",
+                    "style": result.get("style") or get_doomscroll_style(),
+                    "streak_sec": result.get("streak_sec"),
+                    "window": result.get("window"),
+                }
+            else:
+                # Pick up nudge written by tray while companion was closed.
+                pending = consume_pending_nudge()
+                if pending and str(pending.get("style") or "") in (
+                    "companion",
+                    "agent",
+                    "nudge",
+                ):
+                    nudge = pending
+            if nudge and str(nudge.get("style") or "companion") in (
+                "companion",
+                "agent",
+            ):
+                self._show_doomscroll_nudge(nudge)
+        except Exception:
+            pass
+
+    def _show_doomscroll_nudge(self, nudge: dict) -> None:
+        try:
+            from .focus import clear_pending_nudge
+
+            clear_pending_nudge()
+        except Exception:
+            pass
+        msg = str(nudge.get("message") or "Time to leave the feed.")
+
+        # Optional chat injection (off by default — interrupt is a dialog/overlay).
+        try:
+            from .preferences import get_doomscroll_inject_chat
+
+            if get_doomscroll_inject_chat():
+                self.raise_()
+                self.activateWindow()
+                slot = self._slot()
+                if not slot.busy:
+                    slot.reply_buf = msg
+                    slot.avatar_state = STATE_SPEAKING
+                    slot.activity = "Doomscroll interrupt"
+                    self._apply_slot_ui()
+                try:
+                    self.avatar.set_state(STATE_SPEAKING)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        try:
+            from .focus_actions import present_interrupt_dialog
+
+            choice = present_interrupt_dialog(msg, parent=self)
+        except Exception:
+            # Fallback if Qt overlay fails
+            QMessageBox.information(self, "Doomscroll interrupt", msg)
+            choice = "dismiss"
+
+        try:
+            from .idle import touch_activity
+
+            touch_activity("doomscroll-nudge")
+        except Exception:
+            pass
+
+        if choice == "snooze":
+            try:
+                from .focus import snooze as focus_snooze
+
+                focus_snooze(30)
+            except Exception:
+                pass
 
     def _pick_harness(self, slot: ChatSlot, text: str) -> str:
         import os
@@ -1379,6 +1510,12 @@ class CompanionWindow(QWidget):
         slot = self._slot()
         if slot.busy:
             return
+        try:
+            from .idle import touch_activity
+
+            touch_activity("companion-send")
+        except Exception:
+            pass
         hname = self._pick_harness(slot, text)
         slot.harness = hname
         if hname == "native":
@@ -1614,6 +1751,22 @@ class CompanionWindow(QWidget):
                 row.setToolTip(t.description or t.id)
                 row.setData(Qt.ItemDataRole.UserRole, ("template", t.id))
                 self.panel_list.addItem(row)
+        elif key == PANEL_DAILY:
+            self.panel_title.setText("Daily — PRs · issues · tasks (tap Refresh)")
+            refresh = QListWidgetItem("↻ Refresh GitHub digest")
+            refresh.setData(Qt.ItemDataRole.UserRole, ("daily_refresh", ""))
+            self.panel_list.addItem(refresh)
+            try:
+                from .workflows import daily_summary_lines
+
+                lines = daily_summary_lines()
+            except Exception as exc:  # noqa: BLE001
+                self.panel_list.addItem(f"(error: {exc})")
+                return
+            for line in lines:
+                row = QListWidgetItem(line)
+                row.setData(Qt.ItemDataRole.UserRole, ("daily_line", line))
+                self.panel_list.addItem(row)
         elif key == PANEL_TOOLS:
             self.panel_title.setText("Tools — tap to toggle enable")
             try:
@@ -1773,6 +1926,17 @@ class CompanionWindow(QWidget):
             return
         if kind == "template" and ref:
             self._run_template(str(ref))
+            return
+        if kind == "daily_refresh":
+            try:
+                from .idle import touch_activity
+                from .workflows import refresh_github_digest
+
+                touch_activity("companion-daily")
+                refresh_github_digest()
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(self, "Daily", str(exc))
+            self._fill_panel(PANEL_DAILY)
             return
         if kind == "tool_toggle" and ref:
             try:
@@ -1964,6 +2128,12 @@ class CompanionWindow(QWidget):
         params = self._template_params(template_id)
         if params is None:
             return
+        try:
+            from .idle import touch_activity
+
+            touch_activity("companion-template")
+        except Exception:
+            pass
         from .agent_templates import get_agent_template
 
         tmpl = get_agent_template(template_id)

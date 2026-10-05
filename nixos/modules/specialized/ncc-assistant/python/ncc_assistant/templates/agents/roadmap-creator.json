@@ -1,0 +1,58 @@
+{
+  "id": "roadmap-creator",
+  "title": "Roadmap creator",
+  "category": "Creators",
+  "description": "Turn goals/notes into roadmap chips (now/next/later) and optional MD draft under workspace doc/.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": [
+    "git"
+  ],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 20,
+  "tags": [
+    "creator",
+    "roadmap"
+  ],
+  "goalTemplate": "Create a roadmap from notes. Horizon bias: {{horizonBias}}. Export MD: {{exportMd}}. Workspace repos: {{repositories}}. Notes:\\n{{notes}}\\n\\nWrite RoadmapItems via ncc ai workflows roadmap add (horizon now|next|later). If exportMd=yes, propose a short markdown section for workspace doc/roadmap (diff-first, dry-run). Do not invent legal/tax advice.",
+  "params": [
+    {
+      "id": "notes",
+      "label": "Goals / notes",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": "horizonBias",
+      "label": "Horizon bias",
+      "type": "enum",
+      "options": [
+        "balanced",
+        "now-heavy",
+        "later-heavy"
+      ],
+      "default": "balanced",
+      "required": true
+    },
+    {
+      "id": "exportMd",
+      "label": "Export MD draft",
+      "type": "enum",
+      "options": [
+        "no",
+        "yes"
+      ],
+      "default": "no",
+      "required": true
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": false
+    }
+  ]
+}

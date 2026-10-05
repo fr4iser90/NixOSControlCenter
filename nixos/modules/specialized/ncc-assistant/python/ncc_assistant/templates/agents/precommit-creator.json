@@ -1,0 +1,58 @@
+{
+  "id": "precommit-creator",
+  "title": "Pre-commit creator",
+  "category": "Rulebooks",
+  "description": "Generate/extend .pre-commit-config.yaml from enum hook packs. Align with NCC gates (no --no-verify culture).",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": [
+    "git"
+  ],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 16,
+  "tags": [
+    "rulebook",
+    "precommit",
+    "idle-ok",
+    "maintenance"
+  ],
+  "goalTemplate": "Propose .pre-commit-config.yaml for hook pack {{hookPack}}. Language set: {{languages}}. Repos: {{repositories}}.\\n\\nMatch NCC gate philosophy: never suggest skipping hooks with --no-verify. Diff-first / dry-run only.",
+  "params": [
+    {
+      "id": "hookPack",
+      "label": "Hook pack",
+      "type": "enum",
+      "options": [
+        "minimal",
+        "python",
+        "nix-python",
+        "full"
+      ],
+      "default": "nix-python",
+      "required": true
+    },
+    {
+      "id": "languages",
+      "label": "Languages",
+      "type": "enum",
+      "options": [
+        "python",
+        "nix",
+        "python+nix",
+        "js+python",
+        "mixed"
+      ],
+      "default": "python+nix",
+      "required": true
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": false
+    }
+  ]
+}
