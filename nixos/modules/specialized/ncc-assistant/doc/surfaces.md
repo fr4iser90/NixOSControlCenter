@@ -191,6 +191,94 @@ If you need two buckets, you probably split the design wrong (e.g. brief must no
 
 ---
 
+## Companion shell UX (what opens where)
+
+**Pattern (OpenHands / Cursor / Qwen Code):** left rail navigates; main pane is content. No tutorial footers in the chrome.
+
+```
+┌────┬──────────────────────────────────────┐
+│ 💬 │  NCC  Workspace[…] Harness[Auto]     │  Home
+│ ── │         [ Avatar 160×160 ]           │
+│ ▶  │  Session ▾          Rename    New    │  Work
+│ ⏰ │  ┌ activity / thinking / tools ┐     │
+│ ☰  │  │  transcript                 │     │
+│ ── │  │  Message…            Send   │     │
+│ 🔧 │  └─────────────────────────────┘     │  Caps
+│ 🔌 │                                      │
+│ 🧩 │                                      │
+│ ── │                                      │
+│ 📁 │                                      │  Context
+│ ⏱ │                                      │
+│ ── │                                      │
+│ ⚙  │                                      │  System
+│    │                                      │
+│ UI │                                      │  Window
+│ ×  │                                      │
+└────┴──────────────────────────────────────┘
+```
+
+### Sidebar icons (grouped top→bottom)
+
+| Group | Icon | Opens in main | Submenu? |
+|-------|------|----------------|----------|
+| **Home** | 💬 Chat | Chat pane | **No** |
+| **Work** | ▶ Workflows | Workflow list | **No** |
+| | ⏰ Cron | Schedule list | **No** |
+| | ☰ Jobs | Agent jobs | **No** |
+| **Caps** | 🔧 Tools | Tool list | **No** |
+| | 🔌 MCP | MCP list | **No** |
+| | 🧩 Plugins | Plugin list | **No** |
+| **Context** | 📁 Workspaces | Workspace list | **No** |
+| | ⏱ History | Past sessions | **No** |
+| **System** | ⚙ Settings | Presence / theme / skin / inject | **No** |
+| **Window** | UI · × | Full AI / Quit | **No** |
+
+Thin rules separate groups. **No sidebar QMenu / overflow.** Session switcher is the only menu (session row).
+
+**Session row** (under avatar): `[Session ▾]` · `Rename` · `New` — one toolbar, same height.
+
+### What belongs where
+
+| Zone | Contents | Not here |
+|------|----------|----------|
+| **Header** | Product name `NCC`; status only if unusual (`Paused`, `Autonomous`, `N busy`, idle armed); workspace + harness chips | Raw enum `available`; how-to tips |
+| **Avatar** | 160×160 under header (drag to move) | Icon rail |
+| **Session row** | `[Session ▾]` · `Rename` · `New` (same height) | Surface navigation; tiny misplaced icons |
+| **Sidebar** | Grouped rail: Home (Chat) → Work (Workflows/Cron/Jobs) → Caps (Tools/MCP/Plugins) → Context (Workspaces/History) → System (Settings) → Window (UI/Quit) | Random icon dump; QMenus |
+| **Chat pane** | Activity line; **thinking** block (collapsible); **tool traces** (name/args/result); transcript; composer | Catalog lists; cron tables |
+| **Surface pane** | Short title (`Workflows`, `Cron`, …) + actionable list | “Tap to…” instructions |
+| **Dialogs** | Workflow configure (prompt transparency); cron inspect/delete | — |
+| **Footer** | Resize grip only | “Sidebar = navigate…” tutorials |
+
+### Chat stream (harness-style, like Qwen / DeepSeek)
+
+During a run the main pane shows, top→bottom:
+
+1. **Activity** — short phase (`Thinking…`, `Template … · qwen`).
+2. **Thinking** — model reasoning (`ThinkingBlock`, collapsible).
+3. **Tool traces** — each call as a compact card (name, args, result) — same idea as Qwen Code / OpenHands tool panels.
+4. **Transcript** — assistant reply text in the bubble.
+5. **Composer** — next user message.
+
+Skills / prompt injections are **not** dumped as chrome tips. They appear inside the **workflow configure** dialog (Rendered prompt / Skill tabs) before Run, and as part of the agent goal once a workflow/template run starts.
+
+### Rules (uniform)
+
+| Click | Opens | Never |
+|-------|--------|--------|
+| Sidebar **Chat** | Main chat | — |
+| Sidebar **surface** | List in main pane | Full AI window |
+| Same surface again | Back to chat | — |
+| **← Back to chat** | Chat | — |
+| Workflow row | Configure dialog (prompt / Run once / OK) | Session picker |
+| Cron row | Detail dialog; **Delete** if user | Full UI |
+| Plugin / Tool / MCP row | Toggle / configure here | Unrelated jump |
+| Workspace row | Set ★ active → chat | — |
+| History row | Load session into slot | — |
+| **UI** | Full AI window (opt-in) | Default for every tap |
+
+---
+
 ## Related paths
 
 | Path | Role |

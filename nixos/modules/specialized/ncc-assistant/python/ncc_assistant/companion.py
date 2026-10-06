@@ -14,6 +14,7 @@ from typing import Any
 from PySide6.QtCore import (
     QPoint,
     QRectF,
+    QSize,
     Qt,
     QThread,
     QTimer,
@@ -76,6 +77,7 @@ PANEL_MCP = "mcp"
 PANEL_WORKSPACES = "workspaces"
 PANEL_CRON = "cron"
 PANEL_JOBS = "jobs"
+PANEL_SETTINGS = "settings"
 
 
 def _icon_button(
@@ -87,8 +89,10 @@ def _icon_button(
 ) -> QToolButton:
     btn = QToolButton()
     btn.setAutoRaise(True)
-    btn.setToolTip(tip)
     btn.setCheckable(checkable)
+    btn.setFixedSize(36, 36)
+    btn.setIconSize(QSize(20, 20))
+    btn.setToolTip(tip)
     icon = QIcon.fromTheme(theme)
     if not icon.isNull():
         btn.setIcon(icon)
@@ -96,6 +100,19 @@ def _icon_button(
     else:
         btn.setText(fallback)
     return btn
+
+
+def _rail_separator(parent: QWidget | None = None) -> QFrame:
+    """Thin horizontal rule between icon groups in the sidebar rail."""
+    line = QFrame(parent)
+    line.setObjectName("nccRailSep")
+    line.setFrameShape(QFrame.Shape.HLine)
+    line.setFixedHeight(1)
+    line.setMaximumWidth(28)
+    line.setStyleSheet(
+        "QFrame#nccRailSep { background: rgba(127,127,127,90); border: none; max-height: 1px; }"
+    )
+    return line
 
 
 def _start_system_move(widget: QWidget) -> bool:
@@ -424,11 +441,17 @@ class AvatarCanvas(QWidget):
                 y = (h - scaled.height()) // 2
                 p.drawPixmap(x, y, scaled)
                 return
-        cx, cy = w / 2, h / 2 + 8
+        # Painted character is authored for a 160×160 canvas — scale to widget size.
+        design = 160.0
+        scale = min(w, h) / design if min(w, h) > 0 else 1.0
+        p.translate(w / 2.0, h / 2.0)
+        p.scale(scale, scale)
+        p.translate(-design / 2.0, -design / 2.0)
+        cx, cy = design / 2, design / 2 + 8
 
         p.setBrush(QColor(0, 0, 0, 40))
         p.setPen(Qt.PenStyle.NoPen)
-        p.drawEllipse(QRectF(cx - 42, h - 22, 84, 14))
+        p.drawEllipse(QRectF(cx - 42, design - 22, 84, 14))
 
         bounce = 0.0
         if self._state == STATE_THINKING:
@@ -571,8 +594,9 @@ class CompanionWindow(QWidget):
             | Qt.WindowType.WindowStaysOnTopHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setMinimumSize(280, 420)
-        self.resize(340, 560)
+        # Sidebar + main column — wide enough for chat to breathe
+        self.setMinimumSize(420, 520)
+        self.resize(480, 680)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         from .companion_store import load_companion_chats
@@ -603,26 +627,167 @@ class CompanionWindow(QWidget):
         self._persist_timer.setSingleShot(True)
         self._persist_timer.timeout.connect(self._persist_chats)
 
-        root = QVBoxLayout(self)
+        # Left rail = nav icons only (no menus). Avatar under NCC header.
+        root = QHBoxLayout(self)
         root.setContentsMargins(8, 8, 8, 8)
-        root.setSpacing(6)
+        root.setSpacing(8)
 
-        # Transparent drag zone + avatar (painted or skin frames)
-        self.avatar = AvatarCanvas()
-        try:
-            from .avatar_skins import get_active_skin_id, resolve_skin
+        self.sidebar = QFrame()
+        self.sidebar.setObjectName("nccSidebar")
+        self.sidebar.setFixedWidth(52)
+        side = QVBoxLayout(self.sidebar)
+        side.setContentsMargins(8, 8, 8, 8)
+        side.setSpacing(4)
 
-            self.avatar.apply_skin(resolve_skin(get_active_skin_id()))
-        except Exception:
-            pass
-        root.addWidget(self.avatar, alignment=Qt.AlignmentFlag.AlignHCenter)
+        def _add_rail_btn(
+            key: str | None,
+            *,
+            tip: str,
+            theme: str,
+            fallback: str,
+            on_click,
+            checkable: bool = True,
+        ) -> QToolButton:
+            btn = _icon_button(
+                tip=tip, theme=theme, fallback=fallback, checkable=checkable
+            )
+            btn.clicked.connect(on_click)
+            side.addWidget(btn, alignment=Qt.AlignmentFlag.AlignHCenter)
+            if key is not None:
+                self._tool_btns[key] = btn
+            return btn
 
-        # Solid glass panel for interactive chrome
+        # Grouped rail (top→bottom): Home | Work | Caps | Context | System | Window
+        # Separators make the order readable — not a random icon dump.
+        self._chat_nav_btn = _add_rail_btn(
+            None,
+            tip="Chat — conversation (home)",
+            theme="user-available",
+            fallback="💬",
+            on_click=lambda: self._toggle_panel(PANEL_NONE),
+        )
+        self._chat_nav_btn.setChecked(True)
+
+        side.addWidget(_rail_separator(self.sidebar), alignment=Qt.AlignmentFlag.AlignHCenter)
+        # Work — run / schedule / jobs
+        for key, theme, fallback, tip in (
+            (
+                PANEL_TEMPLATES,
+                "folder-templates",
+                "▶",
+                "Workflows — click a row to configure / run",
+            ),
+            (
+                PANEL_CRON,
+                "view-calendar",
+                "⏰",
+                "Cron — click a row for details / delete",
+            ),
+            (
+                PANEL_JOBS,
+                "view-list-details",
+                "☰",
+                "Agent jobs — recent runs",
+            ),
+        ):
+            _add_rail_btn(
+                key,
+                tip=tip,
+                theme=theme,
+                fallback=fallback,
+                on_click=lambda checked=False, k=key: self._toggle_panel(k),
+            )
+
+        side.addWidget(_rail_separator(self.sidebar), alignment=Qt.AlignmentFlag.AlignHCenter)
+        # Capabilities — what the agent can use
+        for key, theme, fallback, tip in (
+            (
+                PANEL_TOOLS,
+                "applications-system",
+                "🔧",
+                "Tools — enable / disable agent tools",
+            ),
+            (
+                PANEL_MCP,
+                "network-server",
+                "🔌",
+                "MCP — servers for the agent (install / toggle)",
+            ),
+            (
+                PANEL_PLUGINS,
+                "application-x-addon",
+                "🧩",
+                "Plugins — desktop features (e.g. Doomscroll)",
+            ),
+        ):
+            _add_rail_btn(
+                key,
+                tip=tip,
+                theme=theme,
+                fallback=fallback,
+                on_click=lambda checked=False, k=key: self._toggle_panel(k),
+            )
+
+        side.addWidget(_rail_separator(self.sidebar), alignment=Qt.AlignmentFlag.AlignHCenter)
+        # Context — where / what you talked about
+        for key, theme, fallback, tip in (
+            (
+                PANEL_WORKSPACES,
+                "folder",
+                "📁",
+                "Workspaces — git roots; click to set ★ active",
+            ),
+            (
+                PANEL_HISTORY,
+                "document-open-recent",
+                "⏱",
+                "History — load a past chat session",
+            ),
+        ):
+            _add_rail_btn(
+                key,
+                tip=tip,
+                theme=theme,
+                fallback=fallback,
+                on_click=lambda checked=False, k=key: self._toggle_panel(k),
+            )
+
+        side.addWidget(_rail_separator(self.sidebar), alignment=Qt.AlignmentFlag.AlignHCenter)
+        _add_rail_btn(
+            PANEL_SETTINGS,
+            tip="Settings — presence, theme, avatar skin, inject MCP",
+            theme="preferences-system",
+            fallback="⚙",
+            on_click=lambda: self._toggle_panel(PANEL_SETTINGS),
+        )
+
+        side.addStretch(1)
+        # Window chrome — always at bottom
+        _add_rail_btn(
+            None,
+            tip="Open full AI window (settings, deep Cron edit)",
+            theme="window-new",
+            fallback="UI",
+            on_click=self._open_full,
+            checkable=False,
+        )
+        _add_rail_btn(
+            None,
+            tip="Quit companion",
+            theme="window-close",
+            fallback="×",
+            on_click=QApplication.instance().quit,
+            checkable=False,
+        )
+
+        root.addWidget(self.sidebar)
+
+        # —— Main column (glass) ——
         self.panel = QFrame()
         self.panel.setObjectName("glass")
-        glass = QVBoxLayout(self.panel)
-        glass.setContentsMargins(10, 10, 10, 10)
-        glass.setSpacing(6)
+        main = QVBoxLayout(self.panel)
+        main.setContentsMargins(10, 10, 10, 10)
+        main.setSpacing(6)
 
         header = QHBoxLayout()
         title = QLabel("NCC")
@@ -633,34 +798,62 @@ class CompanionWindow(QWidget):
         header.addWidget(title)
         self.presence_lbl = QLabel("")
         self.presence_lbl.setObjectName("nccMuted")
+        self.presence_lbl.setToolTip(
+            "Agent presence — only shown when paused, autonomous, or busy"
+        )
         header.addWidget(self.presence_lbl)
         header.addStretch()
+        ws_lab = QLabel("Workspace")
+        ws_lab.setObjectName("nccMuted")
+        ws_lab.setToolTip("Active git root for chats and workflows")
+        header.addWidget(ws_lab)
         self.workspace_combo = QComboBox()
-        self.workspace_combo.setToolTip("Active workspace (scopes new chats + templates)")
-        self.workspace_combo.setMaximumWidth(120)
+        self.workspace_combo.setToolTip(
+            "Active workspace (★) — scopes digests, workflow defaults, new chats"
+        )
+        self.workspace_combo.setMaximumWidth(140)
         self.workspace_combo.currentIndexChanged.connect(self._on_workspace_chip_changed)
         header.addWidget(self.workspace_combo)
+        har_lab = QLabel("Harness")
+        har_lab.setObjectName("nccMuted")
+        har_lab.setToolTip(
+            "How the agent runs: Auto picks native/qwen/dsh from the goal; "
+            "or force Native / Qwen / DSH"
+        )
+        header.addWidget(har_lab)
         self.harness_combo = QComboBox()
         self.harness_combo.setToolTip(
-            "Harness for this chat (auto resolves coding goals → qwen/dsh)"
+            "Auto = choose harness from goal/tags; Native/Qwen/DSH = force that backend"
         )
         for key, label in (
-            ("auto", "auto"),
-            ("native", "native"),
-            ("qwen", "qwen"),
-            ("dsh", "dsh"),
+            ("auto", "Auto"),
+            ("native", "Native"),
+            ("qwen", "Qwen"),
+            ("dsh", "DSH"),
         ):
             self.harness_combo.addItem(label, key)
-        self.harness_combo.setMaximumWidth(90)
+        self.harness_combo.setMaximumWidth(100)
         self.harness_combo.currentIndexChanged.connect(self._on_harness_chip_changed)
         header.addWidget(self.harness_combo)
         self.harness_resolved_lbl = QLabel("")
         self.harness_resolved_lbl.setObjectName("nccMuted")
-        self.harness_resolved_lbl.setToolTip("Resolved harness for last / next send")
+        self.harness_resolved_lbl.setToolTip(
+            "Harness Auto selected for this chat (last / next run)"
+        )
         header.addWidget(self.harness_resolved_lbl)
-        glass.addLayout(header)
+        main.addLayout(header)
 
-        # Breadcrumb for nested subagent chats
+        # Avatar under NCC header (160×160) — not in the icon rail.
+        self.avatar = AvatarCanvas()
+        self.avatar.setToolTip("Drag to move companion")
+        try:
+            from .avatar_skins import get_active_skin_id, resolve_skin
+
+            self.avatar.apply_skin(resolve_skin(get_active_skin_id()))
+        except Exception:
+            pass
+        main.addWidget(self.avatar, alignment=Qt.AlignmentFlag.AlignHCenter)
+
         crumb = QHBoxLayout()
         self.parent_btn = QToolButton()
         self.parent_btn.setText("↑ parent")
@@ -671,76 +864,38 @@ class CompanionWindow(QWidget):
         self.breadcrumb_lbl = QLabel("")
         self.breadcrumb_lbl.setObjectName("nccMuted")
         crumb.addWidget(self.breadcrumb_lbl, stretch=1)
-        glass.addLayout(crumb)
+        main.addLayout(crumb)
 
-        # Active session chip (replaces tab strip)
+        # One session toolbar: [Session ▾][Rename][New] — same height, left→right.
         sess_row = QHBoxLayout()
+        sess_row.setSpacing(6)
         self.session_btn = QToolButton()
-        self.session_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.session_btn.setObjectName("nccSessionBtn")
+        self.session_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
         self.session_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.session_btn.setToolTip("Sessions — switch, new, rename")
-        sess_icon = QIcon.fromTheme("document-open-recent")
-        if not sess_icon.isNull():
-            self.session_btn.setIcon(sess_icon)
+        self.session_btn.setToolTip("Switch chat session")
         self.session_btn.setText("Chat 1 ▾")
+        self.session_btn.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        self.session_btn.setMinimumHeight(32)
         self._session_menu = QMenu(self)
         self.session_btn.setMenu(self._session_menu)
         self._session_menu.aboutToShow.connect(self._rebuild_session_menu)
         sess_row.addWidget(self.session_btn, stretch=1)
-        rename_btn = _icon_button(
-            tip="Rename session", theme="document-edit", fallback="✎"
-        )
-        rename_btn.clicked.connect(self._rename_session)
-        sess_row.addWidget(rename_btn)
-        glass.addLayout(sess_row)
-
-        # Icon toolbar — primary surfaces + overflow
-        tools = QHBoxLayout()
-        tools.setSpacing(2)
-        primary = (
-            (PANEL_TEMPLATES, "folder-templates", "▶", "Workflows (once / cron)"),
-            (PANEL_CRON, "view-calendar", "⏰", "Cron / schedules"),
-            (PANEL_PLUGINS, "application-x-addon", "🧩", "Plugins"),
-            (PANEL_TOOLS, "applications-system", "🔧", "Tools"),
-            (PANEL_MCP, "network-server", "🔌", "MCP"),
-            (PANEL_WORKSPACES, "folder", "📁", "Workspaces"),
-            (PANEL_HISTORY, "document-open-recent", "⏱", "History"),
-        )
-        for key, theme, fallback, tip in primary:
-            btn = _icon_button(tip=tip, theme=theme, fallback=fallback, checkable=True)
-            btn.clicked.connect(lambda checked=False, k=key: self._toggle_panel(k))
-            tools.addWidget(btn)
-            self._tool_btns[key] = btn
-
-        more_btn = _icon_button(tip="More…", theme="application-menu", fallback="⋯")
-        more_menu = QMenu(self)
-        more_menu.addAction("Agent jobs", lambda: self._toggle_panel(PANEL_JOBS))
-        more_menu.addSeparator()
-        more_menu.addAction("Pause presence", self._pause)
-        more_menu.addAction("Resume presence", self._resume)
-        more_menu.addSeparator()
-        theme_menu = more_menu.addMenu("Theme")
-        from .companion_themes import list_themes
-
-        for tid, label in list_themes():
-            theme_menu.addAction(label, lambda t=tid: self._set_theme(t))
-        more_menu.addAction("Avatar skin…", self._pick_avatar_skin)
-        more_menu.addAction("Inject NCC MCP into qwen/dsh", self._inject_mcp_now)
-        more_btn.setMenu(more_menu)
-        more_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        tools.addWidget(more_btn)
-
-        tools.addStretch()
-        new_btn = _icon_button(tip="New chat", theme="list-add", fallback="+")
-        new_btn.clicked.connect(self._new_chat)
-        tools.addWidget(new_btn)
-        open_btn = _icon_button(tip="Open full AI UI", theme="window-new", fallback="UI")
-        open_btn.clicked.connect(self._open_full)
-        tools.addWidget(open_btn)
-        quit_btn = _icon_button(tip="Quit companion", theme="window-close", fallback="×")
-        quit_btn.clicked.connect(QApplication.instance().quit)
-        tools.addWidget(quit_btn)
-        glass.addLayout(tools)
+        self.rename_btn = QPushButton("Rename")
+        self.rename_btn.setObjectName("nccSessionAction")
+        self.rename_btn.setToolTip("Rename this chat (F2)")
+        self.rename_btn.setFixedHeight(32)
+        self.rename_btn.clicked.connect(self._rename_session)
+        sess_row.addWidget(self.rename_btn)
+        self.new_chat_btn = QPushButton("New")
+        self.new_chat_btn.setObjectName("nccSessionAction")
+        self.new_chat_btn.setToolTip("New chat (Ctrl+N)")
+        self.new_chat_btn.setFixedHeight(32)
+        self.new_chat_btn.clicked.connect(self._new_chat)
+        sess_row.addWidget(self.new_chat_btn)
+        main.addLayout(sess_row)
 
         self.stack = QStackedWidget()
         self.chat_page = QWidget()
@@ -782,10 +937,12 @@ class CompanionWindow(QWidget):
         self.bubble = QTextEdit()
         self.bubble.setReadOnly(True)
         self.bubble.setPlaceholderText("Ask me something…")
-        self.bubble.setMaximumHeight(120)
-        self.bubble.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.bubble.setMinimumHeight(120)
+        self.bubble.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         self.bubble.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
-        chat_l.addWidget(self.bubble)
+        chat_l.addWidget(self.bubble, stretch=1)
 
         row = QHBoxLayout()
         self.input = QLineEdit()
@@ -810,25 +967,30 @@ class CompanionWindow(QWidget):
         self.panel_title = QLabel("")
         self.panel_title.setStyleSheet("font-weight: 600;")
         list_l.addWidget(self.panel_title)
+        self.panel_hint = QLabel("")
+        self.panel_hint.setObjectName("nccMuted")
+        self.panel_hint.setWordWrap(True)
+        self.panel_hint.hide()
+        list_l.addWidget(self.panel_hint)
         self.panel_list = QListWidget()
         self.panel_list.itemActivated.connect(self._on_panel_item)
         self.panel_list.itemClicked.connect(self._on_panel_item)
-        list_l.addWidget(self.panel_list)
-        back = QPushButton("Back to chat")
+        list_l.addWidget(self.panel_list, stretch=1)
+        back = QPushButton("← Back to chat")
+        back.setToolTip("Same as sidebar Chat button")
         back.clicked.connect(lambda: self._toggle_panel(PANEL_NONE))
         list_l.addWidget(back)
 
         self.stack.addWidget(self.chat_page)
         self.stack.addWidget(self.list_page)
-        glass.addWidget(self.stack)
+        main.addWidget(self.stack, stretch=1)
 
-        tip_row = QHBoxLayout()
-        tip = QLabel("Drag avatar · Esc · ↘ corner resize")
-        tip.setObjectName("nccMuted")
-        tip_row.addWidget(tip, stretch=1)
+        # Resize grip only — no tutorial footer copy in the chrome.
+        grip_row = QHBoxLayout()
+        grip_row.addStretch(1)
         self.resize_grip = ResizeCorner(self.panel)
-        tip_row.addWidget(self.resize_grip, alignment=Qt.AlignmentFlag.AlignRight)
-        glass.addLayout(tip_row)
+        grip_row.addWidget(self.resize_grip, alignment=Qt.AlignmentFlag.AlignRight)
+        main.addLayout(grip_row)
 
         root.addWidget(self.panel, stretch=1)
 
@@ -1155,8 +1317,8 @@ class CompanionWindow(QWidget):
         if idx >= 0:
             self.harness_combo.setCurrentIndex(idx)
         self.harness_combo.blockSignals(False)
-        if mode == "auto":
-            self.harness_resolved_lbl.setText(f"→ {slot.harness}" if slot.harness else "")
+        if mode == "auto" and slot.harness:
+            self.harness_resolved_lbl.setText(f"→ {slot.harness}")
         else:
             self.harness_resolved_lbl.setText("")
 
@@ -1348,8 +1510,17 @@ class CompanionWindow(QWidget):
                 idle_mark = " · idle✓" if self._idle_armed else " · idle…"
         except Exception:
             self._idle_armed = False
-        extra = f" · {busy_n} busy" if busy_n else ""
-        self.presence_lbl.setText(f"{st}{extra}{idle_mark}")
+        # Header status: only when not the quiet default. Never show raw "available".
+        parts: list[str] = []
+        if st == "paused":
+            parts.append("Paused")
+        elif st == "autonomous":
+            parts.append("Autonomous")
+        if busy_n:
+            parts.append(f"{busy_n} busy")
+        if idle_mark:
+            parts.append(idle_mark.strip(" ·"))
+        self.presence_lbl.setText(" · ".join(parts))
         if hasattr(self, "avatar"):
             tip = self.avatar.toolTip() or ""
             base = tip.split(" · idle")[0] if " · idle" in tip else tip
@@ -1687,14 +1858,17 @@ class CompanionWindow(QWidget):
             self._apply_slot_ui()
 
     def _toggle_panel(self, key: str) -> None:
+        # Same surface again → back to chat (consistent toggle).
         if key == PANEL_NONE or (key == self._panel and key != PANEL_NONE):
             self._panel = PANEL_NONE
             self.stack.setCurrentWidget(self.chat_page)
             for b in self._tool_btns.values():
                 b.setChecked(False)
+            self._chat_nav_btn.setChecked(True)
             self._focus_input()
             return
         self._panel = key
+        self._chat_nav_btn.setChecked(False)
         for k, b in self._tool_btns.items():
             b.setChecked(k == key)
         self.stack.setCurrentWidget(self.list_page)
@@ -1702,6 +1876,8 @@ class CompanionWindow(QWidget):
 
     def _fill_panel(self, key: str) -> None:
         self.panel_list.clear()
+        self.panel_hint.hide()
+        self.panel_hint.setText("")
         if key == PANEL_HISTORY:
             self.panel_title.setText("Session history")
             try:
@@ -1722,7 +1898,7 @@ class CompanionWindow(QWidget):
                 row.setData(Qt.ItemDataRole.UserRole, ("history", sid))
                 self.panel_list.addItem(row)
         elif key == PANEL_TEMPLATES:
-            self.panel_title.setText("Workflows — once or cron")
+            self.panel_title.setText("Workflows")
             try:
                 from .agent_templates import list_agent_templates
 
@@ -1752,7 +1928,7 @@ class CompanionWindow(QWidget):
             self.panel_list.addItem(row)
 
         elif key == PANEL_PLUGINS:
-            self.panel_title.setText("Plugins — tap name = on/off")
+            self.panel_title.setText("Plugins")
             try:
                 from .plugins import list_plugins
                 from .preferences import get_doomscroll_netblock_granted
@@ -1790,7 +1966,7 @@ class CompanionWindow(QWidget):
             open_gui.setData(Qt.ItemDataRole.UserRole, ("plugin_open_gui", ""))
             self.panel_list.addItem(open_gui)
         elif key == PANEL_TOOLS:
-            self.panel_title.setText("Tools — tap to toggle enable")
+            self.panel_title.setText("Tools")
             try:
                 from .registry import get_registry
 
@@ -1808,9 +1984,7 @@ class CompanionWindow(QWidget):
                 row.setData(Qt.ItemDataRole.UserRole, ("tool_toggle", t.name))
                 self.panel_list.addItem(row)
         elif key == PANEL_MCP:
-            self.panel_title.setText(
-                "MCP — NCC inject · client servers · install catalog"
-            )
+            self.panel_title.setText("MCP")
             try:
                 from .marketplace import (
                     installed_mcp_names,
@@ -1843,12 +2017,11 @@ class CompanionWindow(QWidget):
             for entry in installed:
                 on = bool(entry.get("enabled", True))
                 en = "ON" if on else "OFF"
-                row = QListWidgetItem(f"● {entry['name']}  ·  {en} · tap toggle")
+                row = QListWidgetItem(f"● {entry['name']}  ·  {en}")
                 row.setToolTip(
                     f"{'Enabled' if on else 'Disabled'} in "
                     f"~/.config/ncc-assistant/mcp-servers.json\n"
-                    f"{entry.get('command') or ''}\n"
-                    "Tap to enable/disable. Separate row removes the entry."
+                    f"{entry.get('command') or ''}"
                 )
                 row.setData(
                     Qt.ItemDataRole.UserRole, ("mcp_toggle", entry["name"])
@@ -1878,7 +2051,7 @@ class CompanionWindow(QWidget):
                     row.setData(Qt.ItemDataRole.UserRole, ("mcp_install", tmpl.name))
                 self.panel_list.addItem(row)
         elif key == PANEL_WORKSPACES:
-            self.panel_title.setText("Workspaces — tap set active · + add")
+            self.panel_title.setText("Workspaces")
             add = QListWidgetItem("+ Add workspace folder…")
             add.setData(Qt.ItemDataRole.UserRole, ("ws_add", ""))
             self.panel_list.addItem(add)
@@ -1900,6 +2073,7 @@ class CompanionWindow(QWidget):
                 self.panel_list.addItem(row)
         elif key == PANEL_CRON:
             self.panel_title.setText("Cron")
+            # No instructional hint — list + click → detail dialog is enough.
             try:
                 from .schedule_templates import list_nix_schedules, list_user_schedules
 
@@ -1915,8 +2089,15 @@ class CompanionWindow(QWidget):
             for src, spec in rows:
                 name = getattr(spec, "name", None) or str(spec)
                 cal = getattr(spec, "on_calendar", None) or getattr(spec, "onCalendar", "") or ""
-                row = QListWidgetItem(f"[{src}] {name}  {cal}")
-                row.setData(Qt.ItemDataRole.UserRole, ("cron", name))
+                en = "on" if getattr(spec, "enable", True) else "off"
+                row = QListWidgetItem(f"[{src}] {name}  ·  {cal}  ·  {en}")
+                tip = getattr(spec, "description", "") or ""
+                pb = getattr(spec, "playbook", None) or ""
+                if pb:
+                    tip = (tip + f"\nplaybook: {pb}").strip()
+                row.setToolTip(tip or name)
+                kind = "cron_user" if src == "user" else "cron_nix"
+                row.setData(Qt.ItemDataRole.UserRole, (kind, name))
                 self.panel_list.addItem(row)
         elif key == PANEL_JOBS:
             self.panel_title.setText("Agent jobs")
@@ -1937,12 +2118,49 @@ class CompanionWindow(QWidget):
                 row = QListWidgetItem(f"{st} · {goal}")
                 row.setData(Qt.ItemDataRole.UserRole, ("job", jid))
                 self.panel_list.addItem(row)
+        elif key == PANEL_SETTINGS:
+            self.panel_title.setText("Settings")
+            rows = [
+                ("Pause presence", ("settings", "pause")),
+                ("Resume presence", ("settings", "resume")),
+                ("Avatar skin…", ("settings", "avatar_skin")),
+                ("Inject NCC MCP into qwen/dsh", ("settings", "inject_mcp")),
+            ]
+            for label, data in rows:
+                row = QListWidgetItem(label)
+                row.setData(Qt.ItemDataRole.UserRole, data)
+                self.panel_list.addItem(row)
+            try:
+                from .companion_themes import list_themes
+
+                for tid, label in list_themes():
+                    row = QListWidgetItem(f"Theme · {label}")
+                    row.setData(Qt.ItemDataRole.UserRole, ("theme", tid))
+                    self.panel_list.addItem(row)
+            except Exception as exc:  # noqa: BLE001
+                self.panel_list.addItem(f"(themes error: {exc})")
 
     def _on_panel_item(self, item: QListWidgetItem) -> None:
         data = item.data(Qt.ItemDataRole.UserRole)
         if not data or not isinstance(data, tuple) or len(data) != 2:
             return
         kind, ref = data
+        if kind == "settings":
+            action = str(ref)
+            if action == "pause":
+                self._pause()
+            elif action == "resume":
+                self._resume()
+            elif action == "avatar_skin":
+                self._pick_avatar_skin()
+            elif action == "inject_mcp":
+                self._inject_mcp_now()
+            self._fill_panel(PANEL_SETTINGS)
+            return
+        if kind == "theme" and ref:
+            self._set_theme(str(ref))
+            self._fill_panel(PANEL_SETTINGS)
+            return
         if kind == "history" and ref:
             self._load_session_into_slot(str(ref))
             return
@@ -2133,8 +2351,78 @@ class CompanionWindow(QWidget):
                 slot.workspace_id = str(ref)
             self._toggle_panel(PANEL_NONE)
             return
-        if kind in ("cron", "job"):
+        if kind == "cron_user" and ref:
+            self._cron_inspect(str(ref), editable=True)
+            return
+        if kind == "cron_nix" and ref:
+            self._cron_inspect(str(ref), editable=False)
+            return
+        if kind == "job":
             self._open_full()
+
+    def _cron_inspect(self, name: str, *, editable: bool) -> None:
+        """Show schedule details; allow delete for user schedules (not Nix)."""
+        from .schedule_templates import (
+            delete_user_schedule,
+            get_user_schedule,
+            list_nix_schedules,
+        )
+
+        spec = get_user_schedule(name)
+        if spec is None:
+            for s in list_nix_schedules():
+                if getattr(s, "name", None) == name:
+                    spec = s
+                    break
+        if spec is None:
+            QMessageBox.warning(self, "Cron", f"Schedule not found: {name}")
+            return
+        cal = getattr(spec, "onCalendar", None) or getattr(spec, "on_calendar", "") or ""
+        lines = [
+            f"Name: {spec.name}",
+            f"When: {cal}",
+            f"Enabled: {bool(getattr(spec, 'enable', True))}",
+            f"Kind: {getattr(spec, 'kind', 'agent')}",
+            f"Profile: {getattr(spec, 'profile', '')}",
+            f"dryRun: {getattr(spec, 'dryRun', True)}",
+            f"Playbook: {getattr(spec, 'playbook', None) or '—'}",
+            f"Goal: {(getattr(spec, 'goal', None) or '—')[:200]}",
+            f"Source: {'user' if editable else 'nix (read-only)'}",
+        ]
+        desc = (getattr(spec, "description", None) or "").strip()
+        if desc:
+            lines.insert(1, f"Description: {desc}")
+
+        box = QMessageBox(self)
+        box.setWindowTitle("Cron schedule")
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setText(spec.name)
+        box.setInformativeText("\n".join(lines))
+        delete_btn = None
+        if editable:
+            delete_btn = box.addButton(
+                "Delete…", QMessageBox.ButtonRole.DestructiveRole
+            )
+        close_btn = box.addButton(QMessageBox.StandardButton.Close)
+        box.setDefaultButton(close_btn)
+        box.exec()
+        if editable and delete_btn is not None and box.clickedButton() == delete_btn:
+            confirm = QMessageBox.question(
+                self,
+                "Delete schedule",
+                f"Delete user schedule “{name}”?\nThis cannot be undone.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if confirm == QMessageBox.StandardButton.Yes:
+                try:
+                    if delete_user_schedule(name):
+                        QMessageBox.information(self, "Cron", f"Deleted “{name}”.")
+                    else:
+                        QMessageBox.warning(self, "Cron", f"Could not delete “{name}”.")
+                except Exception as exc:  # noqa: BLE001
+                    QMessageBox.warning(self, "Cron", str(exc))
+                self._fill_panel(PANEL_CRON)
 
     def _template_seed_params(self, template_id: str) -> dict[str, Any]:
         from .agent_templates import get_agent_template

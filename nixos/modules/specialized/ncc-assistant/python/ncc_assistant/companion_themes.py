@@ -106,6 +106,11 @@ def get_theme(theme_id: str | None) -> CompanionTheme:
 def stylesheet_for(theme: CompanionTheme) -> str:
     t = theme
     return f"""
+    QFrame#nccSidebar {{
+      background: {t.alt};
+      border: 1px solid {t.border};
+      border-radius: 12px;
+    }}
     QFrame#glass {{
       background: {t.glass_bg};
       border: 1px solid {t.glass_border};
