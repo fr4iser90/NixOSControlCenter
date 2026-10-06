@@ -36,7 +36,7 @@ in
               "export" "eval"
               "serve-openapi" "tray" "companion" "harness"
               "watchdog" "probe" "rollback" "red-team"
-              "secrets" "workspaces" "templates" "workflows" "focus"
+              "secrets" "workspaces" "templates" "workflows" "focus" "workflow"
               "mcp-install"
             ];
             shortHelp = "ai - AI Assistant";
@@ -74,6 +74,7 @@ in
                 ncc ai templates list|show|instantiate|run|instances
                 ncc ai workflows show|refresh|tasks|roadmap
                 ncc ai focus status|tick|snooze
+                ncc ai workflow audit|lifecycle|fleet|plan|status|next|resume|task-start|task-finish|branch|validate|commit|pr|merge|bump
                 ncc ai mcp-install NAME
                 ncc ai serve-openapi
                 ncc ai watchdog list|fire EVENT

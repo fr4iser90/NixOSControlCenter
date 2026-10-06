@@ -9,10 +9,10 @@ from typing import Any
 # Top-level schedule mode for UI (enums — not free text).
 # Daily/Weekly modes always include a clock time (local system timezone).
 SCHEDULE_MODES: list[tuple[str, str]] = [
-    ("simple", "Simple preset (no clock — midnight/hourly)"),
-    ("daily-at", "Daily at clock time"),
-    ("weekly-at", "Weekly: weekday + clock time"),
-    ("cron", "Cron (field pickers)"),
+    ("daily-at", "Daily at clock time (e.g. 08:40)"),
+    ("weekly-at", "Weekly: weekday + clock (e.g. Mon 08:40)"),
+    ("cron", "Cron (min / hour / day / month / weekday)"),
+    ("simple", "Simple preset (hourly / midnight)"),
     ("advanced", "Advanced (raw OnCalendar)"),
 ]
 

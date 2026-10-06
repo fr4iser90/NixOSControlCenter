@@ -154,6 +154,8 @@ class AgentInstance:
     enabled_schedule: bool = False
     provider_id: str | None = None
     model: str | None = None
+    # User-edited full agent prompt; None = always re-render from catalog template+skill.
+    prompt_override: str | None = None
     created: str = ""
     updated: str = ""
     path: str | None = None
@@ -172,6 +174,8 @@ class AgentInstance:
             d["providerId"] = self.provider_id
         if self.model:
             d["model"] = self.model
+        if self.prompt_override:
+            d["promptOverride"] = self.prompt_override
         return d
 
     @classmethod
@@ -184,6 +188,9 @@ class AgentInstance:
         # Legacy: provider/model nested in params
         provider_id = data.get("providerId") or data.get("provider_id") or params.pop("_providerId", None)
         model = data.get("model") or params.pop("_model", None)
+        override = data.get("promptOverride") or data.get("prompt_override") or params.pop(
+            "_promptOverride", None
+        )
         return cls(
             id=iid,
             template_id=tid,
@@ -192,6 +199,7 @@ class AgentInstance:
             enabled_schedule=bool(data.get("enabledSchedule", data.get("enabled_schedule", False))),
             provider_id=str(provider_id).strip() if provider_id else None,
             model=str(model).strip() if model else None,
+            prompt_override=str(override).strip() if override else None,
             created=str(data.get("created") or ""),
             updated=str(data.get("updated") or ""),
             path=path,
@@ -394,6 +402,19 @@ def render_goal(tmpl: AgentTemplate, params: dict[str, Any]) -> str:
     return "\n\n".join(parts)
 
 
+def resolve_goal(
+    tmpl: AgentTemplate,
+    params: dict[str, Any],
+    *,
+    prompt_override: str | None = None,
+) -> str:
+    """Catalog render, or a user-edited full prompt override (instance / this run)."""
+    override = (prompt_override or "").strip()
+    if override:
+        return override
+    return render_goal(tmpl, params)
+
+
 def list_instances() -> list[AgentInstance]:
     out: list[AgentInstance] = []
     for path in sorted(agent_instances_dir().glob("*.json")):
@@ -470,9 +491,16 @@ def instantiate(
     provider_id: str | None = None,
     model: str | None = None,
     update_existing: bool = False,
+    prompt_override: str | None = None,
+    save_prompt_override: bool | None = None,
 ) -> dict[str, Any]:
     """
     Validate params, persist instance, optionally write a user playbook + schedule.
+
+    ``prompt_override`` is the full agent prompt text. When ``save_prompt_override``
+    is True it is stored on the instance; when False the stored override is left
+    unchanged (or cleared if explicitly empty string + save). Catalog skill/JSON
+    files are never rewritten.
     """
     tmpl = get_agent_template(template_id)
     if tmpl is None:
@@ -498,6 +526,12 @@ def instantiate(
         created = ""
         title_final = title or f"{tmpl.title} ({iid})"
 
+    stored_override = prev.prompt_override if prev else None
+    if save_prompt_override is True:
+        stored_override = (prompt_override or "").strip() or None
+    elif save_prompt_override is False and prev is None:
+        stored_override = None
+
     inst = AgentInstance(
         id=iid,
         template_id=template_id,
@@ -506,6 +540,7 @@ def instantiate(
         enabled_schedule=enable_schedule,
         provider_id=(provider_id or (prev.provider_id if prev else None)) or None,
         model=(model or (prev.model if prev else None)) or None,
+        prompt_override=stored_override,
         created=created,
     )
     # Explicit empty string from UI means clear
@@ -514,7 +549,13 @@ def instantiate(
     if model is not None:
         inst.model = model.strip() or None
     path = save_instance(inst)
-    goal = render_goal(tmpl, merged)
+    # Playbook / schedule: prefer ephemeral override for this save if provided,
+    # else stored instance override, else catalog render.
+    goal = resolve_goal(
+        tmpl,
+        merged,
+        prompt_override=prompt_override if (prompt_override or "").strip() else stored_override,
+    )
 
     playbook_name = None
     if save_playbook:
@@ -598,7 +639,12 @@ def instantiate(
     }
 
 
-def run_instance(instance_id: str, *, dry_run: bool | None = None):
+def run_instance(
+    instance_id: str,
+    *,
+    dry_run: bool | None = None,
+    prompt_override: str | None = None,
+):
     """Yield agent events for a saved instance (native or external harness)."""
     from .agent import run_agent
     from .capacity import CapacityError, acquire_or_raise, release
@@ -611,7 +657,13 @@ def run_instance(instance_id: str, *, dry_run: bool | None = None):
     tmpl = get_agent_template(inst.template_id)
     if tmpl is None:
         raise ValueError(f"Template missing for instance: {inst.template_id}")
-    goal = render_goal(tmpl, inst.params)
+    goal = resolve_goal(
+        tmpl,
+        inst.params,
+        prompt_override=prompt_override
+        if (prompt_override or "").strip()
+        else inst.prompt_override,
+    )
     settings = settings_for_instance(inst)
     hname = resolve_harness_name(template_harness=tmpl.harness, tags=tmpl.tags)
     try:

@@ -69,7 +69,7 @@ STATE_ERROR = "error"
 PANEL_NONE = "none"
 PANEL_HISTORY = "history"
 PANEL_TEMPLATES = "templates"
-PANEL_DAILY = "daily"
+PANEL_WORKFLOWS = "workflows"
 PANEL_PLUGINS = "plugins"
 PANEL_TOOLS = "tools"
 PANEL_MCP = "mcp"
@@ -190,6 +190,7 @@ class _CompanionTemplateWorker(QThread):
         params: dict[str, Any],
         *,
         harness_force: str | None = None,
+        prompt_override: str | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -197,11 +198,12 @@ class _CompanionTemplateWorker(QThread):
         self._template_id = template_id
         self._params = params
         self._harness_force = harness_force
+        self._prompt_override = prompt_override
 
     def run(self) -> None:
         try:
             from .agent import run_agent
-            from .agent_templates import get_agent_template, render_goal
+            from .agent_templates import get_agent_template, resolve_goal
             from .auth import with_cached_credentials
             from .capacity import capacity_slot
             from .config import Settings
@@ -211,7 +213,9 @@ class _CompanionTemplateWorker(QThread):
             tmpl = get_agent_template(self._template_id)
             if tmpl is None:
                 raise ValueError(f"Unknown template: {self._template_id}")
-            goal = render_goal(tmpl, self._params)
+            goal = resolve_goal(
+                tmpl, self._params, prompt_override=self._prompt_override
+            )
             settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
             hname = resolve_harness_name(
                 template_harness=tmpl.harness,
@@ -694,13 +698,13 @@ class CompanionWindow(QWidget):
         tools = QHBoxLayout()
         tools.setSpacing(2)
         primary = (
-            (PANEL_TEMPLATES, "folder-templates", "▶", "Workflow templates"),
-            (PANEL_DAILY, "view-calendar-day", "📅", "Daily workflows"),
-            (PANEL_PLUGINS, "application-x-addon", "🧩", "Feature plugins"),
-            (PANEL_TOOLS, "applications-system", "🔧", "Tools registry"),
-            (PANEL_MCP, "network-server", "🔌", "MCP servers"),
+            (PANEL_TEMPLATES, "folder-templates", "▶", "Workflows (once / cron)"),
+            (PANEL_CRON, "view-calendar", "⏰", "Cron / schedules"),
+            (PANEL_PLUGINS, "application-x-addon", "🧩", "Plugins"),
+            (PANEL_TOOLS, "applications-system", "🔧", "Tools"),
+            (PANEL_MCP, "network-server", "🔌", "MCP"),
             (PANEL_WORKSPACES, "folder", "📁", "Workspaces"),
-            (PANEL_HISTORY, "document-open-recent", "⏱", "Saved session history"),
+            (PANEL_HISTORY, "document-open-recent", "⏱", "History"),
         )
         for key, theme, fallback, tip in primary:
             btn = _icon_button(tip=tip, theme=theme, fallback=fallback, checkable=True)
@@ -710,7 +714,6 @@ class CompanionWindow(QWidget):
 
         more_btn = _icon_button(tip="More…", theme="application-menu", fallback="⋯")
         more_menu = QMenu(self)
-        more_menu.addAction("Schedules / cron", lambda: self._toggle_panel(PANEL_CRON))
         more_menu.addAction("Agent jobs", lambda: self._toggle_panel(PANEL_JOBS))
         more_menu.addSeparator()
         more_menu.addAction("Pause presence", self._pause)
@@ -1378,7 +1381,7 @@ class CompanionWindow(QWidget):
             pass
 
     def _focus_tick(self) -> None:
-        """Feature-plugin ticks (doomscroll, morning-brief, …) via registry."""
+        """Feature plugins only (doomscroll). Brief = workflow template + cron."""
         try:
             from .plugins import tick_all
 
@@ -1386,23 +1389,6 @@ class CompanionWindow(QWidget):
                 nudge = ev.get("companion_nudge")
                 if nudge:
                     self._show_doomscroll_nudge(nudge)
-                brief = ev.get("companion_brief")
-                if brief:
-                    self._show_morning_brief(brief)
-        except Exception:
-            pass
-
-    def _show_morning_brief(self, brief: dict) -> None:
-        lines = brief.get("lines") if isinstance(brief, dict) else None
-        title = str((brief or {}).get("title") or "Morning Brief")
-        text = "\n".join(str(x) for x in (lines or [])) or "(empty brief)"
-        try:
-            QMessageBox.information(self, title, text)
-        except Exception:
-            pass
-        # Open Daily panel so the user can dig in
-        try:
-            self._toggle_panel(PANEL_DAILY)
         except Exception:
             pass
 
@@ -1736,7 +1722,7 @@ class CompanionWindow(QWidget):
                 row.setData(Qt.ItemDataRole.UserRole, ("history", sid))
                 self.panel_list.addItem(row)
         elif key == PANEL_TEMPLATES:
-            self.panel_title.setText("Workflow templates — tap to run")
+            self.panel_title.setText("Workflows — once or cron")
             try:
                 from .agent_templates import list_agent_templates
 
@@ -1752,22 +1738,19 @@ class CompanionWindow(QWidget):
                 row.setToolTip(t.description or t.id)
                 row.setData(Qt.ItemDataRole.UserRole, ("template", t.id))
                 self.panel_list.addItem(row)
-        elif key == PANEL_DAILY:
-            self.panel_title.setText("Daily — PRs · issues · tasks (tap Refresh)")
-            refresh = QListWidgetItem("↻ Refresh GitHub digest")
-            refresh.setData(Qt.ItemDataRole.UserRole, ("daily_refresh", ""))
-            self.panel_list.addItem(refresh)
-            try:
-                from .workflows import daily_summary_lines
+        elif key == PANEL_WORKFLOWS:
+            # Legacy panel id — board removed; Workflows + Cron only.
+            self.panel_title.setText("Use Workflows")
+            self.panel_list.addItem(
+                "Use ▶ Workflows (once / cron). No separate board."
+            )
+            self.panel_list.addItem(
+                "Briefing: workflow workspace-brief (once or Cron schedule)."
+            )
+            row = QListWidgetItem("→ Open workspace-brief workflow")
+            row.setData(Qt.ItemDataRole.UserRole, ("template", "workspace-brief"))
+            self.panel_list.addItem(row)
 
-                lines = daily_summary_lines()
-            except Exception as exc:  # noqa: BLE001
-                self.panel_list.addItem(f"(error: {exc})")
-                return
-            for line in lines:
-                row = QListWidgetItem(line)
-                row.setData(Qt.ItemDataRole.UserRole, ("daily_line", line))
-                self.panel_list.addItem(row)
         elif key == PANEL_PLUGINS:
             self.panel_title.setText("Plugins — tap name = on/off")
             try:
@@ -1916,7 +1899,7 @@ class CompanionWindow(QWidget):
                 row.setData(Qt.ItemDataRole.UserRole, ("ws_select", ws.id))
                 self.panel_list.addItem(row)
         elif key == PANEL_CRON:
-            self.panel_title.setText("Schedules")
+            self.panel_title.setText("Cron")
             try:
                 from .schedule_templates import list_nix_schedules, list_user_schedules
 
@@ -1974,8 +1957,88 @@ class CompanionWindow(QWidget):
                 touch_activity("companion-daily")
                 refresh_github_digest()
             except Exception as exc:  # noqa: BLE001
-                QMessageBox.warning(self, "Daily", str(exc))
-            self._fill_panel(PANEL_DAILY)
+                QMessageBox.warning(self, "Workflows", str(exc))
+            self._fill_panel(PANEL_WORKFLOWS)
+            return
+        if kind == "workflow_audit":
+            try:
+                from .idle import touch_activity
+                from .workspace_workflow import audit_workspace, format_audit_text
+
+                touch_activity("companion-workflow")
+                report = audit_workspace()
+                QMessageBox.information(
+                    self, "Analyze project", format_audit_text(report)
+                )
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(self, "Workflow", str(exc))
+            self._fill_panel(PANEL_WORKFLOWS)
+            return
+        if kind == "workflow_plan":
+            try:
+                from .idle import touch_activity
+                from .workspace_workflow import plan_from_audit
+
+                touch_activity("companion-workflow")
+                result = plan_from_audit()
+                n = len(result.get("created_tasks") or [])
+                skip = len(result.get("skipped_gaps") or [])
+                QMessageBox.information(
+                    self,
+                    "Derive tasks",
+                    f"Workspace {result.get('workspace_id')}\n"
+                    f"Created {n} task(s), skipped {skip} existing gap(s).\n\n"
+                    "Next: Workflows → step 3 (one task → one branch → validate → PR).",
+                )
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(self, "Workflow", str(exc))
+            self._fill_panel(PANEL_WORKFLOWS)
+            return
+        if kind == "workflow_lifecycle":
+            try:
+                from .idle import touch_activity
+                from .workspace_lifecycle import format_lifecycle_text, lifecycle_report
+
+                touch_activity("companion-workflow")
+                QMessageBox.information(
+                    self,
+                    "Lifecycle",
+                    format_lifecycle_text(lifecycle_report()),
+                )
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(self, "Lifecycle", str(exc))
+            self._fill_panel(PANEL_WORKFLOWS)
+            return
+        if kind == "workflow_fleet":
+            try:
+                from .idle import touch_activity
+                from .workspace_lifecycle import fleet_lifecycle, format_fleet_text
+
+                touch_activity("companion-workflow")
+                QMessageBox.information(
+                    self,
+                    "Fleet lifecycle",
+                    format_fleet_text(fleet_lifecycle()),
+                )
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(self, "Fleet", str(exc))
+            self._fill_panel(PANEL_WORKFLOWS)
+            return
+        if kind == "workflow_once_hint":
+            QMessageBox.information(
+                self,
+                "One-shot templates",
+                "Use the Templates tab (Creators / Rulebooks), once each:\n\n"
+                "• changelog-creator\n"
+                "• contributing-creator\n"
+                "• security-md-creator\n"
+                "• gitignore-creator\n"
+                "• github-actions-creator\n"
+                "• codeowners-creator\n"
+                "• workspace-lifecycle / workspace-archive-suggest\n\n"
+                "Gaps for these are p2 — plan creates tasks; "
+                "autonomous-agent-run stays on p0/p1 unless you raise priority.",
+            )
             return
         if kind == "plugin_toggle" and ref:
             try:
@@ -2073,29 +2136,38 @@ class CompanionWindow(QWidget):
         if kind in ("cron", "job"):
             self._open_full()
 
-    def _template_params(self, template_id: str) -> dict[str, Any] | None:
+    def _template_seed_params(self, template_id: str) -> dict[str, Any]:
         from .agent_templates import get_agent_template
+
+        tmpl = get_agent_template(template_id)
+        seed: dict[str, Any] = {}
+        if tmpl is None:
+            return seed
+        for p in tmpl.params:
+            if p.default is not None:
+                seed[p.id] = p.default
+        ws = self._active_workspace_id or self._slot().workspace_id
+        if ws:
+            for p in tmpl.params:
+                if p.type == "workspaceList":
+                    seed[p.id] = [ws]
+                elif p.type == "workspace":
+                    seed[p.id] = ws
+        return seed
+
+    def _run_template(self, template_id: str) -> None:
+        slot = self._slot()
+        if slot.busy:
+            QMessageBox.information(self, "Templates", "Current chat is busy.")
+            return
+        from .agent_templates import get_agent_template, instantiate
+        from .templates_ui import TemplateConfigureDialog
 
         tmpl = get_agent_template(template_id)
         if tmpl is None:
             QMessageBox.warning(self, "Templates", f"Unknown: {template_id}")
-            return None
-        params: dict[str, Any] = {
-            p.id: p.default for p in tmpl.params if p.default is not None
-        }
-        ws = self._active_workspace_id or self._slot().workspace_id
-        for p in tmpl.params:
-            if p.type in ("workspaceList", "workspace") and ws:
-                if p.type == "workspaceList":
-                    params[p.id] = [ws]
-                else:
-                    params[p.id] = ws
-
-        if tmpl.params:
-            filled = self._template_param_dialog(tmpl, params)
-            if filled is None:
-                return None
-            return filled
+            return
+        ws = self._active_workspace_id or slot.workspace_id
         if any(
             p.type in ("workspaceList", "workspace") and p.required for p in tmpl.params
         ) and not ws:
@@ -2104,110 +2176,52 @@ class CompanionWindow(QWidget):
                 "Templates",
                 "Select or add a workspace first (📁), then retry.",
             )
-            return None
-        return params
-
-    def _template_param_dialog(
-        self, tmpl: Any, seed: dict[str, Any]
-    ) -> dict[str, Any] | None:
-        dlg = QDialog(self)
-        dlg.setWindowTitle(f"Template · {tmpl.title}")
-        form = QFormLayout(dlg)
-        widgets: dict[str, QWidget] = {}
-        ws_ids: list[str] = []
+            return
         try:
-            from .workspaces import list_workspaces
-
-            ws_ids = [w.id for w in list_workspaces()]
-        except Exception:
-            pass
-        from .templates_ui import FrequencyPicker, TimezonePicker
-
-        for p in tmpl.params:
-            if p.type in ("workspaceList", "workspace"):
-                combo = QComboBox()
-                combo.addItem("(none)", "")
-                for wid in ws_ids:
-                    combo.addItem(wid, wid)
-                cur = seed.get(p.id)
-                if isinstance(cur, list) and cur:
-                    cur = cur[0]
-                idx = combo.findData(str(cur or self._active_workspace_id or ""))
-                if idx >= 0:
-                    combo.setCurrentIndex(idx)
-                form.addRow(p.label + (" *" if p.required else ""), combo)
-                widgets[p.id] = combo
-            elif p.type == "enum" and p.options:
-                combo = QComboBox()
-                for opt in p.options:
-                    combo.addItem(str(opt), str(opt))
-                if seed.get(p.id) is not None:
-                    i = combo.findData(str(seed[p.id]))
-                    if i >= 0:
-                        combo.setCurrentIndex(i)
-                form.addRow(p.label + (" *" if p.required else ""), combo)
-                widgets[p.id] = combo
-            elif p.type == "cronOrInterval":
-                picker = FrequencyPicker(
-                    default=str(seed.get(p.id) or p.default or "daily")
-                )
-                form.addRow(p.label + (" *" if p.required else ""), picker)
-                widgets[p.id] = picker
-            elif p.type == "timezone":
-                tz = TimezonePicker(
-                    default=str(seed.get(p.id) or p.default or "Europe/Berlin")
-                )
-                form.addRow(p.label + (" *" if p.required else ""), tz)
-                widgets[p.id] = tz
-            else:
-                edit = QLineEdit(str(seed.get(p.id) or p.default or ""))
-                form.addRow(p.label + (" *" if p.required else ""), edit)
-                widgets[p.id] = edit
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(dlg.accept)
-        buttons.rejected.connect(dlg.reject)
-        form.addRow(buttons)
+            dlg = TemplateConfigureDialog(
+                template_id,
+                self,
+                seed_params=self._template_seed_params(template_id),
+            )
+        except ValueError as exc:
+            QMessageBox.warning(self, "Templates", str(exc))
+            return
         if dlg.exec() != QDialog.DialogCode.Accepted:
-            return None
-        out: dict[str, Any] = dict(seed)
-        for p in tmpl.params:
-            w = widgets.get(p.id)
-            if isinstance(w, FrequencyPicker):
-                out[p.id] = w.on_calendar()
-            elif isinstance(w, TimezonePicker):
-                out[p.id] = w.currentText().strip()
-            elif isinstance(w, QComboBox):
-                val = w.currentData()
-                if p.type == "workspaceList":
-                    out[p.id] = [val] if val else []
-                else:
-                    out[p.id] = val
-            elif isinstance(w, QLineEdit):
-                out[p.id] = w.text().strip()
-            if p.required and out.get(p.id) in (None, "", []):
-                QMessageBox.warning(self, "Templates", f"Required: {p.label}")
-                return None
-        return out
-
-    def _run_template(self, template_id: str) -> None:
-        slot = self._slot()
-        if slot.busy:
-            QMessageBox.information(self, "Templates", "Current chat is busy.")
             return
-        params = self._template_params(template_id)
-        if params is None:
+        payload = dlg.result_payload()
+        result = instantiate(
+            template_id,
+            payload["params"],
+            enable_schedule=bool(payload.get("enable_schedule")),
+            provider_id=str(payload.get("provider_id") or ""),
+            model=str(payload.get("model") or ""),
+            prompt_override=payload.get("prompt_override"),
+            save_prompt_override=bool(payload.get("save_prompt_override")),
+        )
+        if not result.get("ok"):
+            QMessageBox.warning(
+                self, "Templates", result.get("error") or "Failed to save instance"
+            )
             return
+        if not payload.get("run_after"):
+            sched = result.get("schedule") or "(none)"
+            inst = result.get("instance") or {}
+            ov = "yes" if inst.get("promptOverride") else "catalog"
+            QMessageBox.information(
+                self,
+                "Templates",
+                f"Saved instance {inst.get('id')}\n"
+                f"Prompt override: {ov}\n"
+                f"Schedule: {sched}",
+            )
+            return
+        params = dict(payload.get("params") or {})
         try:
             from .idle import touch_activity
 
             touch_activity("companion-template")
         except Exception:
             pass
-        from .agent_templates import get_agent_template
-
-        tmpl = get_agent_template(template_id)
         title = (tmpl.title if tmpl else template_id)[:24]
         force = None
         mode = (slot.harness_mode or "auto").strip().lower()
@@ -2231,6 +2245,7 @@ class CompanionWindow(QWidget):
             template_id,
             params,
             harness_force=force,
+            prompt_override=payload.get("prompt_override"),
             parent=self,
         )
         slot.worker = worker

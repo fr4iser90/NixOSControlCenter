@@ -499,7 +499,6 @@ from .gui_pages import (
     ThinkingBlock,
     ToolTraceWidget,
     ToolsPage,
-    WorkflowsPage,
 )
 from .templates_ui import TemplatesPage
 
@@ -2114,15 +2113,14 @@ class AssistantPanel(QWidget):
         self.agent_page = AgentPage(confirm)
         self.tabs.addTab(self.agent_page, "Agent")
         self.templates_page = TemplatesPage()
-        self.tabs.addTab(self.templates_page, "Templates")
+        self.tabs.addTab(self.templates_page, "Workflows")
         self.tools_page = ToolsPage()
         self.tabs.addTab(self.tools_page, "Tools")
         self.jobs_page = JobsPage()
         self.tabs.addTab(self.jobs_page, "Jobs")
-        self.workflows_page = WorkflowsPage()
-        self.tabs.addTab(self.workflows_page, "Workflows")
+        # No separate "Daily/Workflows board" tab — templates + cron only.
         self.schedules_page = SchedulesPage()
-        self.tabs.addTab(self.schedules_page, "Schedules")
+        self.tabs.addTab(self.schedules_page, "Cron")
         self.plugins_page = PluginsPage()
         self.tabs.addTab(self.plugins_page, "Plugins")
         self.settings_page = SettingsPage()

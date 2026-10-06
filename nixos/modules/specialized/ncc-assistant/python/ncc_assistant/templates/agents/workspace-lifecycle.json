@@ -1,0 +1,22 @@
+{
+  "id": "workspace-lifecycle",
+  "title": "Workspace lifecycle (active / once / later / archive)",
+  "category": "Creators",
+  "description": "Classify whether this git is actively worked, a finished one-shot, parked for later, or an archive candidate. Prefer CLI lifecycle.",
+  "skill": "skills/workspace-lifecycle.md",
+  "profile": "read-only",
+  "mcp": ["git"],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 12,
+  "tags": ["creator", "workflow", "lifecycle", "idle-ok"],
+  "goalTemplate": "Classify lifecycle for repositories {{repositories}}. Thresholds: active≤{{activeDays}}d, once≥{{onceDays}}d, archive≥{{archiveDays}}d.\\n\\n1) Run `ncc ai workflow lifecycle --workspace <id> --json` (or `--all` for fleet).\\n2) Explain state: active | once | later | archive-candidate.\\n3) Recommend next templates (autonomous-agent-run, changelog-creator, workspace-archive-suggest, …).\\n4) Do not write files. Do not archive anything.",
+  "params": [
+    {"id": "activeDays", "label": "Active if commit within (days)", "type": "enum", "options": ["7", "14", "30"], "default": "14", "required": true},
+    {"id": "onceDays", "label": "One-shot quiet after (days)", "type": "enum", "options": ["60", "90", "120"], "default": "90", "required": true},
+    {"id": "archiveDays", "label": "Archive candidate after (days)", "type": "enum", "options": ["120", "180", "365"], "default": "180", "required": true},
+    {"id": "repositories", "label": "Repositories", "type": "workspaceList", "required": false}
+  ]
+}

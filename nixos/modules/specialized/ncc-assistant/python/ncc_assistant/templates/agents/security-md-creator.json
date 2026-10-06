@@ -1,0 +1,22 @@
+{
+  "id": "security-md-creator",
+  "title": "SECURITY.md creator",
+  "category": "Rulebooks",
+  "description": "SECURITY.md vulnerability reporting stub. One-shot.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": ["git"],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 10,
+  "tags": ["rulebook", "security", "once"],
+  "goalTemplate": "Propose SECURITY.md for {{repositories}}. Contact: {{contact}}. Supported versions policy: {{versions}}. Diff-first. Path: {{outputFile}}. Never invent CVEs.",
+  "params": [
+    {"id": "contact", "label": "Security contact", "type": "string", "required": true},
+    {"id": "versions", "label": "Versions policy", "type": "enum", "options": ["latest-only", "n-1", "lts"], "default": "latest-only", "required": true},
+    {"id": "outputFile", "label": "Output file", "type": "enum", "options": ["SECURITY.md", "docs/SECURITY.md", ".github/SECURITY.md"], "default": "SECURITY.md", "required": true},
+    {"id": "repositories", "label": "Repositories", "type": "workspaceList", "required": false}
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "id": "workspace-audit",
+  "title": "Workspace audit",
+  "category": "Creators",
+  "description": "Deterministic gap scan (AGENTS, skills, Impressum, Datenschutz, roadmap, …) for one workspace. Prefer CLI workflow audit; this template narrates the report.",
+  "skill": "skills/workspace-audit.md",
+  "profile": "read-only",
+  "mcp": [
+    "git"
+  ],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 10,
+  "tags": [
+    "creator",
+    "workflow",
+    "idle-ok"
+  ],
+  "goalTemplate": "Run a workspace audit for repositories {{repositories}} (depth {{depth}}).\\n\\n1) Prefer: `ncc ai workflow audit --workspace <id> --json` and `ncc ai workflow lifecycle --workspace <id> --json`.\\n2) Summarize missing gaps and next templates (impressum-creator, privacy-policy-creator, agents-md-creator, skill-pack-creator, changelog-creator, contributing-creator, security-md-creator, gitignore-creator, github-actions-creator, codeowners-creator, autonomous-agent-run, workspace-archive-suggest, …).\\n3) Do not write files. If planTasks=yes, run `ncc ai workflow plan --workspace <id>`.",
+  "params": [
+    {
+      "id": "depth",
+      "label": "Depth",
+      "type": "enum",
+      "options": [
+        "gaps-only",
+        "gaps+hints"
+      ],
+      "default": "gaps+hints",
+      "required": true
+    },
+    {
+      "id": "planTasks",
+      "label": "Create Daily tasks from gaps",
+      "type": "enum",
+      "options": [
+        "no",
+        "yes"
+      ],
+      "default": "no",
+      "required": true
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": false
+    }
+  ]
+}

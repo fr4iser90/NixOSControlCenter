@@ -90,6 +90,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 | 34 | [Ops cockpit · idle · daily workflows · rulebooks](./plans/34-ops-cockpit-idle-rulebooks.md) | **done** (capacity, idle sweep, Workflows/Daily, creators/rulebooks) |
 | 35 | [Doomscroll / focus watchdog](./plans/35-doomscroll-focus-watchdog.md) | **done** (active-window probe; now a Feature plugin) |
 | 36 | [Feature plugins](./plans/36-feature-plugins.md) | **in progress** (Plugins tab + doomscroll extracted; ≠ MCP/templates/watchdogs) |
+| 37 | [Autonomous workspace workflow](./plans/37-autonomous-workspace-workflow.md) | **done** (per-task PR + resume + CONFIRM) |
 
 ## Feature map (checklist)
 
@@ -173,6 +174,18 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 - [x] Doomscroll: grant at setup + Polkit YES for `ncc-focus-netblock` (no mid-scroll password)
 - [ ] Optional catalog/marketplace for more plugins
 - SSOT: [plans/36-feature-plugins.md](./plans/36-feature-plugins.md)
+
+### Phase 37 (done)
+
+- [x] Workspace audit (gap enums) + `ncc ai workflow audit|plan|status`
+- [x] Stable `gap:<id>` task links + `next|resume|task-start|task-finish`
+- [x] Lifecycle / fleet: `active|once|later|archive-candidate` + archive suggest
+- [x] One-shot templates: changelog, contributing, SECURITY, gitignore, GHA, CODEOWNERS
+- [x] Templates: `workspace-audit`, `workspace-lifecycle`, `workspace-archive-suggest`, `autonomous-agent-*`
+- [x] Per-task branch/PR; validate hard gate before PR; progress checkpoint
+- [x] Ship: `merge|bump` require `--confirm CONFIRM` + template `autonomous-agent-ship`
+- [x] Companion Daily: analyze / plan / agent / ship / lifecycle / fleet
+- SSOT: [plans/37-autonomous-workspace-workflow.md](./plans/37-autonomous-workspace-workflow.md)
 
 ## Known follow-ups (not blockers)
 

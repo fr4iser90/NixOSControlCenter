@@ -1,0 +1,20 @@
+{
+  "id": "workspace-archive-suggest",
+  "title": "Archive suggest (fleet / one repo)",
+  "category": "Creators",
+  "description": "Written archive plan for quiet repos. Dry-run only — never archives on GitHub.",
+  "skill": "skills/workspace-archive-suggest.md",
+  "profile": "read-only",
+  "mcp": ["git", "github"],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 16,
+  "tags": ["creator", "workflow", "archive", "idle-ok"],
+  "goalTemplate": "Propose archive / keep / continue for repositories {{repositories}}. Scope: {{scope}}.\\n\\n1) Prefer `ncc ai workflow fleet --json` or `lifecycle --workspace <id> --json`.\\n2) For each archive-candidate: why, risk, GitHub archive steps (manual), whether to remove from NCC workspaces.\\n3) For later/once: keep vs resume suggestions.\\n4) Never call gh api to archive. Never delete. Dry-run report only.",
+  "params": [
+    {"id": "scope", "label": "Scope", "type": "enum", "options": ["active-workspace", "fleet-archive-only", "fleet-all"], "default": "fleet-archive-only", "required": true},
+    {"id": "repositories", "label": "Repositories", "type": "workspaceList", "required": false}
+  ]
+}

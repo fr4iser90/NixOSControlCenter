@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Morning Brief feature plugin tests (no display)."""
+"""Workspace brief = workflow template; not a plugin. No Daily board."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
 sys.path.insert(0, str(ROOT))
 
 
-class MorningBriefTests(unittest.TestCase):
+class WorkspaceBriefArchitectureTests(unittest.TestCase):
     def setUp(self) -> None:
         self._td = tempfile.TemporaryDirectory()
         self.addCleanup(self._td.cleanup)
@@ -26,54 +26,58 @@ class MorningBriefTests(unittest.TestCase):
         self._patch.start()
         self.addCleanup(self._patch.stop)
 
-    def test_plugin_registered(self) -> None:
+    def test_brief_is_not_a_plugin(self) -> None:
         from ncc_assistant.plugins import get_plugin, list_plugins
 
         ids = [p.id for p in list_plugins()]
-        self.assertIn("morning-brief", ids)
+        self.assertNotIn("morning-brief", ids)
         self.assertIn("doomscroll", ids)
-        p = get_plugin("morning-brief")
-        self.assertIsNotNone(p)
-        assert p is not None
-        self.assertEqual(p.title, "Morning Brief")
+        self.assertIsNone(get_plugin("morning-brief"))
 
-    def test_parse_digest_hhmm(self) -> None:
-        from ncc_assistant.plugins.morning_brief.logic import parse_digest_hhmm
+    def test_workspace_brief_template_exists(self) -> None:
+        from ncc_assistant.agent_templates import get_agent_template
+
+        tmpl = get_agent_template("workspace-brief")
+        self.assertIsNotNone(tmpl)
+        assert tmpl is not None
+        self.assertEqual(tmpl.schedule_kind, "poll")
+        self.assertTrue(tmpl.dry_run)
+        self.assertIn("repositories", [p.id for p in tmpl.params])
+
+    def test_companion_has_no_daily_toolbar(self) -> None:
+        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        self.assertIn("Workflows (once / cron)", text)
+        self.assertIn("PANEL_CRON", text)
+        # primary toolbar must not advertise a Daily board
+        primary = text.split("primary = (", 1)[1].split(")", 1)[0]
+        self.assertNotIn("PANEL_WORKFLOWS", primary)
+        self.assertNotIn("maybe_fire_brief", text)
+
+    def test_gui_tabs_no_workflows_board(self) -> None:
+        gui = (ROOT / "ncc_assistant" / "gui.py").read_text(encoding="utf-8")
+        self.assertIn('addTab(self.templates_page, "Workflows")', gui)
+        self.assertIn('addTab(self.schedules_page, "Cron")', gui)
+        self.assertNotIn('addTab(self.workflows_page', gui)
+
+    def test_parse_digest_hhmm_still_works(self) -> None:
+        from ncc_assistant.morning_brief import parse_digest_hhmm
 
         self.assertEqual(parse_digest_hhmm("*-*-* 08:30:00"), (8, 30))
-        self.assertEqual(parse_digest_hhmm("daily"), (0, 0))
-        self.assertIsNone(parse_digest_hhmm("hourly"))
 
-    def test_due_once_per_day(self) -> None:
-        from ncc_assistant.plugins.morning_brief.logic import due_for_brief
+    def test_due_respects_enable(self) -> None:
+        from ncc_assistant.morning_brief import due_for_brief
         from ncc_assistant.preferences import (
+            set_daily_digest_enable,
             set_daily_digest_on_calendar,
             set_morning_brief_last_fired,
         )
 
+        set_daily_digest_enable(False)
         set_daily_digest_on_calendar("*-*-* 08:30:00")
         set_morning_brief_last_fired("")
         tz = ZoneInfo("Europe/Berlin")
-        before = datetime(2026, 10, 5, 8, 0, tzinfo=tz)
         after = datetime(2026, 10, 5, 9, 0, tzinfo=tz)
-        self.assertFalse(due_for_brief(now=before))
-        self.assertTrue(due_for_brief(now=after))
-        set_morning_brief_last_fired("2026-10-05")
         self.assertFalse(due_for_brief(now=after))
-
-    def test_settings_moved_to_plugin(self) -> None:
-        gui = (ROOT / "ncc_assistant" / "gui_pages.py").read_text(encoding="utf-8")
-        settings = (
-            ROOT
-            / "ncc_assistant"
-            / "plugins"
-            / "morning_brief"
-            / "settings_ui.py"
-        ).read_text(encoding="utf-8")
-        self.assertIn("Morning Brief", settings)
-        self.assertIn("MORNING_BRIEF_SOURCES", settings)
-        self.assertIn("Plugins</b> tab", gui)
-        self.assertNotIn("Build daily Issues/PRs/tasks snapshot", gui)
 
 
 if __name__ == "__main__":

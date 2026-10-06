@@ -1,0 +1,22 @@
+{
+  "id": "codeowners-creator",
+  "title": "CODEOWNERS creator",
+  "category": "Rulebooks",
+  "description": "CODEOWNERS stub for GitHub review routing. One-shot.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": ["git"],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 10,
+  "tags": ["rulebook", "github", "once"],
+  "goalTemplate": "Propose CODEOWNERS for {{repositories}}. Owner: {{owner}}. Scope: {{scope}}. Path: {{outputFile}}. Diff-first. Owner must be a GitHub handle or team the user provided — never invent orgs.",
+  "params": [
+    {"id": "owner", "label": "GitHub owner (@user or @org/team)", "type": "string", "required": true},
+    {"id": "scope", "label": "Scope", "type": "enum", "options": ["all", "docs", "nixos", "python"], "default": "all", "required": true},
+    {"id": "outputFile", "label": "Output file", "type": "enum", "options": [".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"], "default": ".github/CODEOWNERS", "required": true},
+    {"id": "repositories", "label": "Repositories", "type": "workspaceList", "required": false}
+  ]
+}

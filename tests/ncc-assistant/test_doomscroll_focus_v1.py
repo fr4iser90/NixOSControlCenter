@@ -404,10 +404,26 @@ class FocusWatchdogTests(unittest.TestCase):
                         "ncc_assistant.focus_actions.apply_intervene_side_effects",
                         return_value={},
                     ):
-                        result = tick(force_window=win)
+                        with mock.patch(
+                            "ncc_assistant.focus_actions.leave_feed_tab",
+                            return_value={
+                                "ok": True,
+                                "method": "wtype",
+                                "action": "about:blank",
+                            },
+                        ) as leave:
+                            with mock.patch(
+                                "ncc_assistant.focus_actions.follow_target_desktop",
+                                return_value=True,
+                            ):
+                                result = tick(force_window=win)
         self.assertTrue(result.get("intervened"))
         net.assert_called()
+        leave.assert_called()
         self.assertEqual(result.get("actions", {}).get("net_block", {}).get("ok"), True)
+        self.assertEqual(
+            result.get("actions", {}).get("left_feed", {}).get("action"), "about:blank"
+        )
 
     def test_settings_ui_enums_only(self) -> None:
         gui = (ROOT / "ncc_assistant" / "gui_pages.py").read_text(encoding="utf-8")

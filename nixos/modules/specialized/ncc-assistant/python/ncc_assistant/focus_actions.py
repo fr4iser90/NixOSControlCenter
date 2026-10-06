@@ -165,6 +165,61 @@ def follow_target_desktop() -> bool:
     return False
 
 
+def leave_feed_tab() -> dict[str, Any]:
+    """
+    Bust SPA/media cache: navigate focused browser tab to about:blank.
+    Call after follow_target so the browser has keyboard focus.
+    Wayland: wtype; X11: xdotool; fallback ydotool.
+    """
+    from .focus import _run
+
+    time.sleep(0.2)
+
+    def _seq(steps: list[list[str]], *, method: str) -> dict[str, Any]:
+        ok = True
+        for cmd in steps:
+            if _run(cmd, timeout=3.0) is None:
+                ok = False
+            time.sleep(0.08)
+        return {"ok": ok, "method": method, "action": "about:blank"}
+
+    if shutil.which("wtype"):
+        return _seq(
+            [
+                ["wtype", "-M", "ctrl", "l", "-m", "ctrl"],
+                ["wtype", "about:blank"],
+                ["wtype", "-k", "Return"],
+            ],
+            method="wtype",
+        )
+
+    if shutil.which("xdotool"):
+        return _seq(
+            [
+                ["xdotool", "key", "--clearmodifiers", "ctrl+l"],
+                ["xdotool", "type", "--clearmodifiers", "--delay", "12", "about:blank"],
+                ["xdotool", "key", "--clearmodifiers", "Return"],
+            ],
+            method="xdotool",
+        )
+
+    if shutil.which("ydotool"):
+        return _seq(
+            [
+                ["ydotool", "key", "29:1", "38:1", "38:0", "29:0"],  # ctrl+l
+                ["ydotool", "type", "about:blank"],
+                ["ydotool", "key", "28:1", "28:0"],  # Enter
+            ],
+            method="ydotool",
+        )
+
+    return {
+        "ok": False,
+        "error": "no_key_tool",
+        "hint": "Install wtype (Plasma/Wayland) or xdotool to leave the feed tab.",
+    }
+
+
 def apply_intervene_side_effects() -> dict[str, Any]:
     """Run configured non-UI actions (pause / follow). Call before showing dialog."""
     out: dict[str, Any] = {"paused": False, "followed": False}

@@ -1,0 +1,20 @@
+{
+  "id": "gitignore-creator",
+  "title": "Gitignore creator",
+  "category": "Rulebooks",
+  "description": ".gitignore from stack enum. One-shot.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": ["git"],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 10,
+  "tags": ["rulebook", "git", "once", "idle-ok"],
+  "goalTemplate": "Propose .gitignore for stack {{stack}} in {{repositories}}. Merge with existing if present (diff-first). Never ignore AGENTS.md or LICENSE.",
+  "params": [
+    {"id": "stack", "label": "Stack", "type": "enum", "options": ["nix+python", "node", "python", "rust", "mixed"], "default": "nix+python", "required": true},
+    {"id": "repositories", "label": "Repositories", "type": "workspaceList", "required": false}
+  ]
+}

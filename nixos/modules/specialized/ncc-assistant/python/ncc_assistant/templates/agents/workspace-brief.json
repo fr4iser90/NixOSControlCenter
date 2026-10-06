@@ -1,0 +1,47 @@
+{
+  "id": "workspace-brief",
+  "title": "Workspace brief (PRs / issues / tasks)",
+  "category": "Workflows",
+  "description": "Refresh GitHub digest for selected repos and summarize open PRs, issues, and local tasks. Run once or attach Cron — not a plugin.",
+  "skill": "skills/workspace-brief.md",
+  "profile": "read-only",
+  "mcp": [
+    "git",
+    "github"
+  ],
+  "requiresSecrets": [
+    "github_token"
+  ],
+  "tier": "catalog",
+  "scheduleKind": "poll",
+  "dryRun": true,
+  "maxSteps": 16,
+  "tags": [
+    "brief",
+    "status",
+    "idle-ok"
+  ],
+  "goalTemplate": "Workspace brief for repositories {{repositories}}. Cadence context: {{checkFrequency}} ({{timezone}}).\\n\\n1) For each selected workspace id, run `ncc ai workflows refresh` with that workspace active (or refresh via tool) so Issues/PRs are current.\\n2) Run `ncc ai workflows show` / read digest — summarize open PRs, issues, and todo/doing tasks.\\n3) Optionally note lifecycle: `ncc ai workflow lifecycle --workspace <id> --json`.\\n4) If digest refresh fails: report the error clearly (auth / no workspace / gh). Do NOT invent PRs.\\n5) If nothing is open: say so in one line — no fake empty spam.\\n6) Do not merge, do not write files, do not archive.",
+  "params": [
+    {
+      "id": "checkFrequency",
+      "label": "Check frequency",
+      "type": "cronOrInterval",
+      "required": true,
+      "default": "daily"
+    },
+    {
+      "id": "timezone",
+      "label": "Timezone",
+      "type": "timezone",
+      "required": true,
+      "default": "Europe/Berlin"
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": true
+    }
+  ]
+}

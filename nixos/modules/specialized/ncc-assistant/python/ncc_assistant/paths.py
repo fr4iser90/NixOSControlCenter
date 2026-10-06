@@ -161,6 +161,14 @@ def workflows_daily_file() -> Path:
     return workflows_dir() / "daily.json"
 
 
+def workflow_progress_file(workspace_id: str) -> Path:
+    """Per-workspace autonomous workflow checkpoint (resume)."""
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in (workspace_id or "default"))
+    d = workflows_dir() / "progress"
+    d.mkdir(parents=True, exist_ok=True)
+    return d / f"{safe}.json"
+
+
 def capacity_state_file() -> Path:
     return config_home() / "capacity.json"
 

@@ -2169,27 +2169,25 @@ class SettingsPage(QWidget):
         cap_form.addRow(cap_hint)
         layout.addWidget(cap_group)
 
-        # Daily digest config moved to Plugins → Morning Brief
-        daily_hint_g = QGroupBox("4e · Daily workflows")
-        daily_hint_lay = QVBoxLayout(daily_hint_g)
-        daily_hint_lab = QLabel(
-            "Morning Brief (schedule / sources / enable) is under the "
-            "<b>Plugins</b> tab. Edit Issues/PRs/tasks/roadmap on the "
-            "<b>Workflows</b> tab or Companion Daily."
+        # Briefing = workflow template + cron (not Settings, not Plugins).
+        brief_hint_g = QGroupBox("4e · Workspace brief")
+        brief_hint_lay = QVBoxLayout(brief_hint_g)
+        brief_hint_lab = QLabel(
+            "Status briefing is the <b>workspace-brief</b> workflow template "
+            "(Once or Cron) under <b>Workflows</b> — not a plugin."
         )
-        daily_hint_lab.setWordWrap(True)
-        daily_hint_lab.setStyleSheet("color: palette(placeholder-text);")
-        daily_hint_lay.addWidget(daily_hint_lab)
-        layout.addWidget(daily_hint_g)
+        brief_hint_lab.setWordWrap(True)
+        brief_hint_lab.setStyleSheet("color: palette(placeholder-text);")
+        brief_hint_lay.addWidget(brief_hint_lab)
+        layout.addWidget(brief_hint_g)
 
         # Feature plugins live under the Plugins tab (not Settings core).
         plugins_hint = QGroupBox("Feature plugins")
         plugins_hint_lay = QVBoxLayout(plugins_hint)
         plugins_hint_lab = QLabel(
-            "Doomscroll, Morning Brief, and other desktop features are under the "
-            "<b>Plugins</b> tab — not here. Settings stays LLM / presence / "
-            "capacity / host. (MCP marketplace stays under Tools; agent "
-            "templates under Templates; watchdogs under Schedules.)"
+            "Desktop extras (e.g. Doomscroll) are under the <b>Plugins</b> tab. "
+            "Workflows + Cron are separate. Settings stays LLM / "
+            "presence / capacity / host."
         )
         plugins_hint_lab.setWordWrap(True)
         plugins_hint_lab.setStyleSheet("color: palette(placeholder-text);")

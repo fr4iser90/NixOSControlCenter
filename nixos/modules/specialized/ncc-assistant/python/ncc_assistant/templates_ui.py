@@ -21,6 +21,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
+    QTabWidget,
+    QTextEdit,
     QTimeEdit,
     QVBoxLayout,
     QWidget,
@@ -28,7 +31,7 @@ from PySide6.QtWidgets import (
 
 
 class FrequencyPicker(QWidget):
-    """Schedule picker: mode enum → Simple / Daily / Weekly / Cron fields / Advanced."""
+    """Schedule picker: mode enum → Daily clock / Weekly / Cron / Simple / Advanced."""
 
     def __init__(self, parent: QWidget | None = None, *, default: str = "daily") -> None:
         super().__init__(parent)
@@ -46,9 +49,18 @@ class FrequencyPicker(QWidget):
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(4)
+        lay.setSpacing(6)
+        self.setMinimumWidth(320)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
+        mode_tag = QLabel("Schedule mode")
+        mode_tag.setStyleSheet("color: palette(placeholder-text); font-size: 10px;")
+        lay.addWidget(mode_tag)
         self.mode = QComboBox()
+        self.mode.setToolTip(
+            "Daily/Weekly: weekday + clock (e.g. Monday 08:40). "
+            "Cron: field pickers. Simple: midnight/hourly presets."
+        )
         for key, label in SCHEDULE_MODES:
             self.mode.addItem(label, key)
         lay.addWidget(self.mode)
@@ -152,8 +164,25 @@ class FrequencyPicker(QWidget):
         ):
             c.currentIndexChanged.connect(self._update_preview)
 
-        parsed = parse_stored_frequency(str(default or "daily"))
-        mode = str(parsed.get("mode") or "simple")
+        raw_default = str(default or "daily").strip()
+        parsed = parse_stored_frequency(raw_default)
+        # Bare "daily"/"weekly" aliases → clock UI (08:30), not midnight-only simple.
+        if raw_default.lower() in ("daily", "day") and parsed.get("mode") == "simple":
+            parsed = {
+                "mode": "daily-at",
+                "hour": 8,
+                "minute": 30,
+                "on_calendar": "*-*-* 08:30:00",
+            }
+        elif raw_default.lower() in ("weekly", "week") and parsed.get("mode") == "simple":
+            parsed = {
+                "mode": "weekly-at",
+                "weekday": "Mon",
+                "hour": 8,
+                "minute": 30,
+                "on_calendar": "Mon *-*-* 08:30:00",
+            }
+        mode = str(parsed.get("mode") or "daily-at")
         midx = self.mode.findData(mode)
         if midx < 0:
             midx = self.mode.findData("simple")
@@ -315,6 +344,7 @@ class TemplateConfigureDialog(QDialog):
         *,
         instance: Any | None = None,
         run_once_mode: bool = False,
+        seed_params: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(parent)
         from .agent_templates import get_agent_template
@@ -332,9 +362,12 @@ class TemplateConfigureDialog(QDialog):
         else:
             title_verb = "Configure"
         self.setWindowTitle(f"{title_verb} — {self._tmpl.title}")
-        self.resize(540, 680)
+        self.resize(640, 820)
         self._fields: dict[str, Any] = {}
         existing_params = dict(instance.params) if instance is not None else {}
+        if seed_params:
+            for k, v in seed_params.items():
+                existing_params.setdefault(k, v)
 
         root = QVBoxLayout(self)
         desc = QLabel(self._tmpl.description)
@@ -467,9 +500,14 @@ class TemplateConfigureDialog(QDialog):
                     edit.setToolTip(p.description)
                 widget = edit
             self._fields[p.id] = (p, widget)
-            form.addRow(label, widget)
+            # Frequency picker is multi-row — full width, not squeezed into form field col.
+            if p.type == "cronOrInterval":
+                form.addRow(QLabel(label))
+                form.addRow(widget)
+            else:
+                form.addRow(label, widget)
 
-        self.schedule_cb = QCheckBox("Enable recurring schedule (from frequency below)")
+        self.schedule_cb = QCheckBox("Enable recurring schedule (from Check frequency)")
         if self._run_once_mode:
             self.schedule_cb.setChecked(False)
             self.schedule_cb.setEnabled(False)
@@ -480,6 +518,11 @@ class TemplateConfigureDialog(QDialog):
             self.schedule_cb.setChecked(bool(self._tmpl.schedule_kind))
         root.addWidget(self.schedule_cb)
 
+        root.addWidget(self._build_transparency_panel(), stretch=1)
+        from PySide6.QtCore import QTimer
+
+        QTimer.singleShot(0, self._initial_prompt_fill)
+
         buttons = QDialogButtonBox()
         self._run_after = False
         if self._run_once_mode:
@@ -488,9 +531,9 @@ class TemplateConfigureDialog(QDialog):
             )
             run_btn.clicked.connect(self._accept_run)
         else:
-            save_label = "Save changes" if self._editing else "Save instance"
-            save_btn = buttons.addButton(
-                save_label, QDialogButtonBox.ButtonRole.AcceptRole
+            ok_btn = buttons.addButton("OK", QDialogButtonBox.ButtonRole.AcceptRole)
+            ok_btn.setToolTip(
+                "Save instance; enable schedule if the checkbox above is on"
             )
             run_btn = buttons.addButton(
                 "Run once", QDialogButtonBox.ButtonRole.ActionRole
@@ -498,7 +541,7 @@ class TemplateConfigureDialog(QDialog):
             run_btn.setToolTip(
                 "Save without enabling a new schedule, then run immediately"
             )
-            save_btn.clicked.connect(self._accept_save)
+            ok_btn.clicked.connect(self._accept_save)
             run_btn.clicked.connect(self._accept_run_once)
         cancel = buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
         cancel.clicked.connect(self.reject)
@@ -535,6 +578,121 @@ class TemplateConfigureDialog(QDialog):
             else:
                 self.model_combo.setEditText(current)
         self.model_combo.blockSignals(False)
+
+    def _build_transparency_panel(self) -> QWidget:
+        """OpenHands-style: show + edit agent prompt; catalog skill/goal read-only."""
+        from .agent_templates import load_skill_text
+
+        box = QGroupBox("What will run (transparent · editable)")
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(4)
+
+        t = self._tmpl
+        mcp = ", ".join(t.mcp) if t.mcp else "(none)"
+        secrets = ", ".join(t.requires_secrets) if t.requires_secrets else "(none)"
+        meta = QLabel(
+            f"<b>Profile</b> {t.profile} · <b>MCP</b> {mcp} · "
+            f"<b>Secrets</b> {secrets} · <b>dryRun</b> {t.dry_run} · "
+            f"<b>maxSteps</b> {t.max_steps or '—'} · "
+            f"<b>harness</b> {t.harness or 'auto'} · "
+            f"<b>skill</b> <code>{t.skill or '(inline goal only)'}</code>"
+        )
+        meta.setWordWrap(True)
+        meta.setTextFormat(Qt.TextFormat.RichText)
+        lay.addWidget(meta)
+
+        hint = QLabel(
+            "<b>Rendered prompt</b> is what the agent gets — edit freely. "
+            "Catalog <b>Goal</b> / <b>Skill</b> stay read-only (packaged SSOT). "
+            "Run once: edits apply to this run only unless you save the override. "
+            "OK + checkbox: persist override on this instance (not the catalog)."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: palette(placeholder-text);")
+        lay.addWidget(hint)
+
+        tabs = QTabWidget()
+        self._prompt_preview = QTextEdit()
+        self._prompt_preview.setReadOnly(False)
+        self._prompt_preview.setPlaceholderText("Agent prompt (editable)…")
+        self._prompt_preview.setAcceptRichText(False)
+        tabs.addTab(self._prompt_preview, "Rendered prompt ✎")
+
+        self._goal_view = QTextEdit()
+        self._goal_view.setReadOnly(True)
+        goal_raw = (t.goal_template or "").replace("\\n", "\n")
+        self._goal_view.setPlainText(goal_raw or "(no goalTemplate)")
+        tabs.addTab(self._goal_view, "Goal template")
+
+        self._skill_view = QTextEdit()
+        self._skill_view.setReadOnly(True)
+        skill_text = load_skill_text(t.skill)
+        if skill_text.strip():
+            self._skill_view.setPlainText(skill_text)
+        elif t.skill:
+            self._skill_view.setPlainText(
+                f"(skill file not found: {t.skill})\n"
+                "Packaged under prompts/ or NCC_PROMPTS_ROOT."
+            )
+        else:
+            self._skill_view.setPlainText("(no skill file — goal template only)")
+        tabs.addTab(self._skill_view, "Skill script")
+        lay.addWidget(tabs, stretch=1)
+
+        self._save_prompt_cb = QCheckBox(
+            "Save edited prompt on this instance (keep for later runs / Cron)"
+        )
+        self._save_prompt_cb.setChecked(
+            bool(self._instance and getattr(self._instance, "prompt_override", None))
+        )
+        if self._run_once_mode:
+            self._save_prompt_cb.setToolTip(
+                "Off = this Run once only. On = also store override on the saved instance."
+            )
+        lay.addWidget(self._save_prompt_cb)
+
+        row = QHBoxLayout()
+        refresh = QPushButton("Reset to catalog render")
+        refresh.setToolTip(
+            "Re-build from goal template + skill + current params (discards edits)"
+        )
+        refresh.clicked.connect(self._refresh_prompt_preview)
+        row.addWidget(refresh)
+        row.addStretch()
+        lay.addLayout(row)
+        box.setMinimumHeight(240)
+        self._catalog_prompt_baseline = ""
+        return box
+
+    def _refresh_prompt_preview(self) -> None:
+        from .agent_templates import render_goal
+
+        try:
+            params = self._collect_params()
+            text = render_goal(self._tmpl, params)
+        except Exception as exc:  # noqa: BLE001
+            text = f"(preview error: {exc})"
+        self._catalog_prompt_baseline = text
+        self._prompt_preview.setPlainText(text)
+
+    def _initial_prompt_fill(self) -> None:
+        """Prefer saved instance override; else catalog render."""
+        saved = ""
+        if self._instance is not None:
+            saved = (getattr(self._instance, "prompt_override", None) or "").strip()
+        if saved:
+            self._prompt_preview.setPlainText(saved)
+            try:
+                from .agent_templates import render_goal
+
+                self._catalog_prompt_baseline = render_goal(
+                    self._tmpl, self._collect_params()
+                )
+            except Exception:
+                self._catalog_prompt_baseline = ""
+            return
+        self._refresh_prompt_preview()
 
     def _collect_params(self) -> dict[str, Any]:
         params: dict[str, Any] = {}
@@ -587,6 +745,8 @@ class TemplateConfigureDialog(QDialog):
         enable_sched = bool(self.schedule_cb.isChecked()) and not self._run_once_mode
         if self._run_after and self._run_once_mode:
             enable_sched = False
+        # Editor text is the prompt for this action (ephemeral unless save checkbox).
+        run_prompt = self._prompt_preview.toPlainText().strip() or None
         return {
             "params": self._collect_params(),
             "enable_schedule": enable_sched,
@@ -595,6 +755,8 @@ class TemplateConfigureDialog(QDialog):
             "model": model,
             "instance_id": self._instance.id if self._instance else None,
             "update_existing": self._editing,
+            "prompt_override": run_prompt,
+            "save_prompt_override": bool(self._save_prompt_cb.isChecked()),
         }
 
 
@@ -657,16 +819,25 @@ class _InstanceRunWorker(QThread):
     finished_ok = Signal(str)
     failed = Signal(str)
 
-    def __init__(self, instance_id: str, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        instance_id: str,
+        parent: QWidget | None = None,
+        *,
+        prompt_override: str | None = None,
+    ) -> None:
         super().__init__(parent)
         self._instance_id = instance_id
+        self._prompt_override = prompt_override
 
     def run(self) -> None:
         try:
             from .agent_templates import run_instance
 
             summary = "finished"
-            for ev in run_instance(self._instance_id):
+            for ev in run_instance(
+                self._instance_id, prompt_override=self._prompt_override
+            ):
                 if ev.get("kind") == "agent_finish":
                     summary = str(ev.get("summary") or "finished")
                 elif ev.get("kind") == "error":
@@ -686,9 +857,10 @@ class TemplatesPage(QWidget):
         layout.setContentsMargins(12, 12, 12, 12)
 
         intro = QLabel(
-            "Workflow templates: <b>Run once</b> executes immediately (no timer). "
-            "<b>⚙ Configure</b> saves an instance and optionally enables a recurring "
-            "schedule (Simple / Daily / Weekly / Cron enums — not free-text)."
+            "Workflows: dialog shows <b>prompt</b> (editable). "
+            "Run once = this run; checkbox = save override on instance. "
+            "Catalog skill/goal stay packaged. Briefing = <code>workspace-brief</code>. "
+            "Definitions: module <code>doc/surfaces.md</code>."
         )
         intro.setWordWrap(True)
         layout.addWidget(intro)
@@ -750,7 +922,7 @@ class TemplatesPage(QWidget):
                 card.run_once.connect(self._run_once_configure)
                 self._host_layout.addWidget(card)
 
-        section("Workflow templates", catalog)
+        section("Workflows", catalog)
         section("Beta / experimental", beta)
         self._host_layout.addStretch()
 
@@ -759,8 +931,9 @@ class TemplatesPage(QWidget):
             llm = ""
             if inst.provider_id or inst.model:
                 llm = f"  ·  {inst.provider_id or 'default'}/{inst.model or 'auto'}"
+            ov = "  ·  prompt✎" if inst.prompt_override else ""
             item = QListWidgetItem(
-                f"{inst.title}  ·  {inst.template_id}  ·  {inst.id}{llm}"
+                f"{inst.title}  ·  {inst.template_id}  ·  {inst.id}{llm}{ov}"
             )
             item.setData(Qt.ItemDataRole.UserRole, inst.id)
             self.instance_list.addItem(item)
@@ -776,17 +949,21 @@ class TemplatesPage(QWidget):
             provider_id=str(payload.get("provider_id") or ""),
             model=str(payload.get("model") or ""),
             update_existing=bool(payload.get("update_existing")),
+            prompt_override=payload.get("prompt_override"),
+            save_prompt_override=bool(payload.get("save_prompt_override")),
         )
         if not result.get("ok"):
             QMessageBox.warning(self, "Templates", result.get("error") or "Failed")
             return None
         llm = result["instance"]
+        ov = "yes" if llm.get("promptOverride") else "catalog"
         QMessageBox.information(
             self,
             "Templates",
             f"Saved instance {llm.get('id')}\n"
             f"Provider: {llm.get('providerId') or '(default)'}  "
             f"Model: {llm.get('model') or '(auto)'}\n"
+            f"Prompt override: {ov}\n"
             f"Playbook: {result.get('playbook')}\n"
             f"Schedule: {result.get('schedule') or '(none)'}",
         )
@@ -804,7 +981,7 @@ class TemplatesPage(QWidget):
         payload = dlg.result_payload()
         iid = self._save_from_dialog(template_id, payload)
         if iid and payload.get("run_after"):
-            self._run_instance(iid)
+            self._run_instance(iid, prompt_override=payload.get("prompt_override"))
 
     def _run_once_configure(self, template_id: str) -> None:
         try:
@@ -819,7 +996,7 @@ class TemplatesPage(QWidget):
         payload["run_after"] = True
         iid = self._save_from_dialog(template_id, payload)
         if iid:
-            self._run_instance(iid)
+            self._run_instance(iid, prompt_override=payload.get("prompt_override"))
 
     def _edit_selected(self) -> None:
         from .agent_templates import get_instance
@@ -842,7 +1019,7 @@ class TemplatesPage(QWidget):
         payload = dlg.result_payload()
         iid = self._save_from_dialog(inst.template_id, payload)
         if iid and payload.get("run_after"):
-            self._run_instance(iid)
+            self._run_instance(iid, prompt_override=payload.get("prompt_override"))
 
     def _run_selected(self) -> None:
         item = self.instance_list.currentItem()
@@ -851,11 +1028,15 @@ class TemplatesPage(QWidget):
             return
         self._run_instance(str(item.data(Qt.ItemDataRole.UserRole)))
 
-    def _run_instance(self, instance_id: str) -> None:
+    def _run_instance(
+        self, instance_id: str, *, prompt_override: str | None = None
+    ) -> None:
         if self._run_worker and self._run_worker.isRunning():
             QMessageBox.information(self, "Templates", "A run is already in progress.")
             return
-        worker = _InstanceRunWorker(instance_id, self)
+        worker = _InstanceRunWorker(
+            instance_id, self, prompt_override=prompt_override
+        )
         self._run_worker = worker
 
         def _ok(summary: str) -> None:

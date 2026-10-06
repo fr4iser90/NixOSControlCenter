@@ -120,6 +120,10 @@ def update_task(task_id: str, **fields: Any) -> dict[str, Any] | None:
             t["status"] = fields["status"]
         if "priority" in fields and fields["priority"] in TASK_PRIORITIES:
             t["priority"] = fields["priority"]
+        if "links" in fields and isinstance(fields["links"], list):
+            t["links"] = [str(x) for x in fields["links"]][:20]
+        if "workspaceId" in fields and fields["workspaceId"] is not None:
+            t["workspaceId"] = str(fields["workspaceId"])
         tasks[i] = t
         data["tasks"] = tasks
         save_daily(data)
@@ -127,8 +131,23 @@ def update_task(task_id: str, **fields: Any) -> dict[str, Any] | None:
     return None
 
 
+def append_task_link(task_id: str, link: str) -> dict[str, Any] | None:
+    task = next((t for t in list_tasks() if str(t.get("id")) == str(task_id)), None)
+    if task is None:
+        return None
+    links = [str(x) for x in (task.get("links") or [])]
+    s = str(link).strip()
+    if s and s not in links:
+        links.append(s)
+    return update_task(task_id, links=links)
+
+
 def complete_task(task_id: str) -> dict[str, Any] | None:
     return update_task(task_id, status="done")
+
+
+def get_task(task_id: str) -> dict[str, Any] | None:
+    return next((t for t in list_tasks() if str(t.get("id")) == str(task_id)), None)
 
 
 def add_roadmap_item(
@@ -213,12 +232,33 @@ def refresh_github_digest(*, workspace_id: str | None = None) -> dict[str, Any]:
     data = load_daily()
     wid = workspace_id or get_active_workspace_id() or data.get("workspaceId") or ""
     data["workspaceId"] = wid
+    if not str(wid).strip():
+        save_daily(data)
+        return {
+            **data,
+            "ok": False,
+            "error": "no_active_workspace",
+            "hint": "Set an active workspace (★) before refreshing Daily.",
+        }
     providers = get_workflow_providers()
     if "github" not in providers:
         save_daily(data)
-        return data
+        return {
+            **data,
+            "ok": False,
+            "error": "github_provider_disabled",
+            "hint": "Enable GitHub as workflow provider in Daily brief settings.",
+        }
 
     cwd = _workspace_cwd(str(wid) if wid else None)
+    if not cwd:
+        save_daily(data)
+        return {
+            **data,
+            "ok": False,
+            "error": "workspace_path_missing",
+            "hint": f"Workspace {wid!r} has no path — re-add it under Workspaces.",
+        }
     issues_raw = _gh_json(
         [
             "issue",
@@ -245,6 +285,18 @@ def refresh_github_digest(*, workspace_id: str | None = None) -> dict[str, Any]:
         ],
         cwd=cwd,
     )
+    if issues_raw is None and prs_raw is None:
+        save_daily(data)
+        return {
+            **data,
+            "ok": False,
+            "error": "gh_failed",
+            "hint": (
+                "gh could not list issues/PRs (auth? remote? wrong folder?). "
+                "Fix GitHub login, then Refresh again."
+            ),
+            "path": cwd,
+        }
 
     issues: list[dict[str, Any]] = []
     if isinstance(issues_raw, list):
@@ -302,7 +354,14 @@ def refresh_github_digest(*, workspace_id: str | None = None) -> dict[str, Any]:
     data["issues"] = issues
     data["pullRequests"] = pull_requests
     save_daily(data)
-    return data
+    return {
+        **data,
+        "ok": True,
+        "error": None,
+        "path": cwd,
+        "issue_count": len(issues),
+        "pr_count": len(pull_requests),
+    }
 
 
 def daily_summary_lines(limit: int = 12) -> list[str]:

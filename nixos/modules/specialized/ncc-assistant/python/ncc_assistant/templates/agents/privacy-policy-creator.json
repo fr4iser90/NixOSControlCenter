@@ -1,0 +1,92 @@
+{
+  "id": "privacy-policy-creator",
+  "title": "Privacy policy creator (DE stub)",
+  "category": "Rulebooks",
+  "description": "Structured German privacy-policy stub from enums. Not legal advice. English template IDs/params; DE content only in the generated file if requested.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": [
+    "git"
+  ],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 12,
+  "tags": [
+    "rulebook",
+    "legal-stub"
+  ],
+  "goalTemplate": "Generate a German privacy-policy *stub* (not legal advice) for EU/DE hosting. Controller: {{controllerName}}. Country: {{country}}. Contact email: {{email}}. Hosting region: {{hostingRegion}}. Analytics/cookies: {{analytics}}. Output file: {{outputFile}}. Repos: {{repositories}}.\\n\\nWrite markdown sections: controller, hosting, cookies, data-subject rights, contact. Propose write to {{outputFile}} as dry-run diff. Never invent registration numbers, fines, or tax IDs.",
+  "params": [
+    {
+      "id": "controllerName",
+      "label": "Controller name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": "country",
+      "label": "Country",
+      "type": "enum",
+      "options": [
+        "DE",
+        "AT",
+        "CH"
+      ],
+      "default": "DE",
+      "required": true
+    },
+    {
+      "id": "email",
+      "label": "Privacy contact email",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": "hostingRegion",
+      "label": "Hosting region",
+      "type": "enum",
+      "options": [
+        "EU",
+        "DE",
+        "other"
+      ],
+      "default": "EU",
+      "required": true
+    },
+    {
+      "id": "analytics",
+      "label": "Analytics / cookies",
+      "type": "enum",
+      "options": [
+        "none",
+        "plausible",
+        "matomo",
+        "other"
+      ],
+      "default": "none",
+      "required": true
+    },
+    {
+      "id": "outputFile",
+      "label": "Output file",
+      "type": "enum",
+      "options": [
+        "privacy.md",
+        "doc/privacy.md",
+        "datenschutz.md",
+        "doc/datenschutz.md",
+        "site/privacy.md"
+      ],
+      "default": "privacy.md",
+      "required": true
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": false
+    }
+  ]
+}

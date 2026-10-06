@@ -1,7 +1,10 @@
 # NCC AI Assistant
 
 Chat with an LLM about your NixOS Control Center config, or expose the same
-tools to Cursor / Claude Code via MCP. Full feature map: [roadmap.md](./roadmap.md).
+tools to Cursor / Claude Code via MCP.
+
+**Definitions (Workflow / Skill / Cron / Tool / Plugin):** [surfaces.md](./surfaces.md)  
+Feature map: [roadmap.md](./roadmap.md).
 
 ## Enable (NCC host)
 
@@ -106,8 +109,8 @@ ncc ai agent run --verbose --goal "…"   # full thinking/tool dumps
 # agent.harness / agent.codingHarness in systemConfig (auto routes git/coding templates)
 ```
 
-Tabs: **Chat**, **Agent**, **Templates**, **Tools**, **Jobs**, **Workflows**,
-**Schedules**, **Settings**.
+Tabs: **Chat**, **Agent**, **Workflows**, **Tools**, **Jobs**,
+**Cron**, **Plugins**, **Settings**.
 
 **Retry / timeouts:** Chat and Companion show **Retry** after an error (resends the
 last user message). Settings → **4c · LLM request**: HTTP timeout (default 300s)
@@ -120,9 +123,18 @@ Agent / template / harness starts go through the capacity governor (“at capaci
 when full). Idle sweep (Companion timer) may start due schedules / `idle-ok`
 templates when armed; presence `paused` disables idle.
 
-**Daily workflows:** Data on **Workflows** tab / Companion Daily. **Morning Brief**
-(schedule, sources, enable) is a **Plugins** tab feature — not Settings core.
-CLI: `ncc ai workflows show|refresh|tasks|roadmap`.
+**Surfaces (Companion / GUI):** **Workflows** (once or Cron) ·
+**Plugins** (desktop extras, e.g. Doomscroll) · **Tools** · **MCP** ·
+**Workspaces** · **Cron**. There is **no Daily board**.
+See [surfaces.md](./surfaces.md).
+
+**Briefing:** workflow `workspace-brief` — run Once or schedule under
+**Cron**. Not a plugin.
+
+**Repo automation:** register a git root under Workspaces (★ active), then run
+workflows (`autonomous-agent-run`, creators, `workspace-brief`, …)
+Once or via Cron. Helpers: `ncc ai workflow audit|plan|task-start|task-finish|…`
+(`task-finish` refuses PR if validators fail; `merge`/`bump` need `--confirm CONFIRM`).
 
 **Doomscroll prevention:** Feature **plugin** under the **Plugins** tab (not
 Settings, not MCP). Watch (Apps + Sites enums) → When → On interrupt → Session.
@@ -138,12 +150,14 @@ focus.hostsBlock.domains = [ "youtube.com" "www.youtube.com" "tiktok.com" ];
 
 → `networking.extraHosts` (0.0.0.0 / ::1). **Domains only** — not `/shorts/` path.
 Timed lockout uses `ncc-focus-netblock` (nft + browser peer harvest + conntrack
-flush). Shorts need CDN hosts (`googlevideo.com`, …) — included in the YouTube
-site tags. Check `ncc ai focus status` → `net_block.active`.
+flush) then navigates the feed tab to `about:blank` (wtype/xdotool) so cached
+SPA clips cannot keep playing. Shorts include CDN hosts (`googlevideo.com`, …).
+Check `ncc ai focus status` → `net_block.active` (uses lockout marker; raw nft
+list often needs root). Needs `wtype` on Plasma Wayland for leave-tab.
 CLI: `ncc ai focus status|tick|snooze`.
 
 **Companion:** frameless overlay — drag avatar to move, resize via corner grip,
-session picker (grouped by workspace), template/Daily/**Plugins**/tool/MCP/workspace icons.
+session picker (grouped by workspace), Workflows / Cron / Plugins / Tools / MCP / Workspaces.
 Plugins panel: toggle enable, Configure dialog, Grant net-block (Doomscroll opt-in;
 Polkit allows `ncc-focus-netblock` without password for active sessions).
 Default chrome theme is **Dark** (More → Theme; also Midnight / Light).
@@ -185,13 +199,27 @@ ncc-assistant templates show github-code-review
 ncc-assistant templates instantiate agents-md-maintainer --from params.json --schedule
 ncc-assistant templates run <instance-id>
 # Creators / rulebooks: roadmap-creator, design-concept-creator, task-breakdown,
-# impressum-creator, precommit-creator, githooks-creator, agents-md-creator, …
+# impressum-creator, privacy-policy-creator, precommit-creator, githooks-creator,
+# agents-md-creator, workspace-audit, autonomous-agent-run, autonomous-agent-ship, …
 
-# Daily workflows
+# Workspace workflow (one project first)
+ncc-assistant workflow audit --workspace myapp
+ncc-assistant workflow plan --workspace myapp
+ncc-assistant workflow next --workspace myapp --json
+ncc-assistant workflow task-start --workspace myapp
+ncc-assistant workflow task-finish --workspace myapp -m "workflow: fill gap"
+ncc-assistant workflow resume --workspace myapp
+# merge / bump ONLY with explicit confirm:
+ncc-assistant workflow merge --workspace myapp --confirm CONFIRM
+ncc-assistant workflow bump --workspace myapp --confirm CONFIRM --part patch
+ncc-assistant workflow status
+
+# Digest helpers (active workspace ★) — briefing UI is template workspace-brief
 ncc-assistant workflows refresh
 ncc-assistant workflows tasks add "Ship docs" --priority p1
 ncc-assistant workflows roadmap add "Ops cockpit" --horizon now
 ncc-assistant workflows show
+ncc-assistant templates show workspace-brief
 
 # MCP with workspace / secret bind
 ncc-assistant mcp-install git --workspace ncc

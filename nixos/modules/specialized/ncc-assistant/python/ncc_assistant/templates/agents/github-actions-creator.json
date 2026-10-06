@@ -1,0 +1,22 @@
+{
+  "id": "github-actions-creator",
+  "title": "GitHub Actions CI creator",
+  "category": "Rulebooks",
+  "description": "Minimal .github/workflows CI stub. One-shot dry-run.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": ["git"],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 14,
+  "tags": ["rulebook", "ci", "once"],
+  "goalTemplate": "Propose a minimal GitHub Actions workflow for {{repositories}}. Kind: {{kind}}. Triggers: {{triggers}}. Prefer tests/run-gates.sh or npm test / pytest when present. Diff-first under .github/workflows/{{filename}}.",
+  "params": [
+    {"id": "kind", "label": "CI kind", "type": "enum", "options": ["gates", "node-test", "pytest", "cargo-test", "noop-check"], "default": "gates", "required": true},
+    {"id": "triggers", "label": "Triggers", "type": "enum", "options": ["pr", "push-main", "pr+push-main"], "default": "pr+push-main", "required": true},
+    {"id": "filename", "label": "Workflow file", "type": "enum", "options": ["ci.yml", "test.yml", "gates.yml"], "default": "ci.yml", "required": true},
+    {"id": "repositories", "label": "Repositories", "type": "workspaceList", "required": false}
+  ]
+}

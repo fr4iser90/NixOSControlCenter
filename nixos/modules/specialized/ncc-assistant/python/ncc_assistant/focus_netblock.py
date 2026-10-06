@@ -159,7 +159,10 @@ def net_block_status() -> dict[str, Any]:
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {"active": False, "error": str(exc)}
     text = (proc.stdout or "").strip()
+    active = text.startswith("active") or (
+        text != "inactive" and "ncc_focus_block" in text
+    )
     return {
-        "active": text != "inactive" and "ncc_focus_block" in text,
+        "active": active,
         "raw": text[:2000],
     }

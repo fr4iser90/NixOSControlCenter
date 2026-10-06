@@ -1,0 +1,21 @@
+{
+  "id": "contributing-creator",
+  "title": "Contributing guide creator",
+  "category": "Rulebooks",
+  "description": "CONTRIBUTING.md stub (PR flow, tests, style). One-shot.",
+  "skill": null,
+  "profile": "read-only",
+  "mcp": ["git"],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 12,
+  "tags": ["rulebook", "docs", "once"],
+  "goalTemplate": "Propose CONTRIBUTING.md for {{repositories}}. Audience: {{audience}}. Include setup, branch naming, tests, PR checklist. Diff-first. Path: {{outputFile}}.",
+  "params": [
+    {"id": "audience", "label": "Audience", "type": "enum", "options": ["solo", "small-team", "opensource"], "default": "solo", "required": true},
+    {"id": "outputFile", "label": "Output file", "type": "enum", "options": ["CONTRIBUTING.md", "docs/CONTRIBUTING.md"], "default": "CONTRIBUTING.md", "required": true},
+    {"id": "repositories", "label": "Repositories", "type": "workspaceList", "required": false}
+  ]
+}

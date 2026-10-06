@@ -560,13 +560,44 @@ def peek_pending_nudge() -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
-def _net_block_status_safe() -> dict[str, Any]:
+def _net_block_status_safe(state: dict[str, Any] | None = None) -> dict[str, Any]:
+    """
+    nft list usually needs root — as a user it looks inactive even while blocking.
+    Prefer lockout_until + net_block_applied, merge helper marker / nft when visible.
+    """
+    st = state if state is not None else _load_state()
+    lockout_until = float(st.get("lockout_until") or 0.0)
+    lockout_left = max(0, int(lockout_until - time.time()))
+    applied = bool(st.get("net_block_applied"))
+    nft: dict[str, Any] = {"active": False}
     try:
         from .focus_netblock import net_block_status
 
-        return net_block_status()
+        nft = net_block_status()
     except Exception as exc:  # noqa: BLE001
-        return {"active": False, "error": str(exc)}
+        nft = {"active": False, "error": str(exc)}
+    marker_active = False
+    marker_until = 0
+    try:
+        marker = Path("/run/ncc-focus-netblock")
+        if marker.is_file():
+            text = marker.read_text(encoding="utf-8")
+            for line in text.splitlines():
+                if line.startswith("until="):
+                    marker_until = int(float(line.split("=", 1)[1].strip()))
+                    marker_active = marker_until > time.time()
+    except (OSError, ValueError):
+        pass
+    active = bool(nft.get("active")) or marker_active or (lockout_left > 0 and applied)
+    return {
+        "active": active,
+        "nft_visible": bool(nft.get("active")),
+        "applied": applied,
+        "marker_active": marker_active,
+        "lockout_remaining_sec": lockout_left,
+        "raw": nft.get("raw") or ("inactive" if not active else "active"),
+        "error": nft.get("error"),
+    }
 
 
 def status() -> dict[str, Any]:
@@ -633,9 +664,9 @@ def status() -> dict[str, Any]:
                 "Whichever hits first (time OR videos) intervenes."
             ),
             "net_block": (
-                "After interrupt, if lockout_min>0: nft sinkhole domains derived "
-                "from selected site tags (YouTube Shorts → youtube.com, …). "
-                "No separate block list."
+                "After interrupt, if lockout_min>0: nft sinkhole + leave tab "
+                "(about:blank) so SPA/cache clips cannot keep playing. "
+                "Domains from site tags (Shorts → youtube.com + googlevideo, …)."
             ),
         },
         "window": win,
@@ -643,7 +674,7 @@ def status() -> dict[str, Any]:
         "last_intervene": float(state.get("last_intervene") or 0.0),
         "pending_nudge": peek_pending_nudge() is not None,
         "hint": hint,
-        "net_block": _net_block_status_safe(),
+        "net_block": _net_block_status_safe(state),
     }
 
 
@@ -688,6 +719,7 @@ def _intervene(
         state["lockout_until"] = time.time() + lockout_m * 60.0
     else:
         state["lockout_until"] = 0.0
+        state["net_block_applied"] = False
     _save_state(state)
 
     actions: dict[str, Any] = {}
@@ -706,6 +738,20 @@ def _intervene(
             actions["net_block"] = apply_net_block(minutes=lockout_m)
         except Exception as exc:  # noqa: BLE001
             actions["net_block"] = {"ok": False, "error": str(exc)}
+        nb_ok = bool((actions.get("net_block") or {}).get("ok"))
+        state["net_block_applied"] = nb_ok
+        _save_state(state)
+        # Bust SPA/disk-cache clips still playable after nft drop.
+        try:
+            from .focus_actions import follow_target_desktop, leave_feed_tab
+            from .preferences import get_doomscroll_follow_target
+
+            if get_doomscroll_follow_target():
+                follow_target_desktop()
+                time.sleep(0.25)
+            actions["left_feed"] = leave_feed_tab()
+        except Exception as exc:  # noqa: BLE001
+            actions["left_feed"] = {"ok": False, "error": str(exc)}
 
     notified = False
     try:
@@ -813,6 +859,7 @@ def tick(*, force_window: dict[str, str] | None = None) -> dict[str, Any]:
     prev_lockout = float(state.get("lockout_until") or 0.0)
     if prev_lockout > 0 and now >= prev_lockout:
         state["lockout_until"] = 0.0
+        state["net_block_applied"] = False
         try:
             from .focus_netblock import clear_net_block
 

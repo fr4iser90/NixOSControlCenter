@@ -1,0 +1,72 @@
+{
+  "id": "autonomous-agent-run",
+  "title": "Autonomous agent: per-task branch → PR",
+  "category": "Creators",
+  "description": "Pro loop: plan → task-start → implement one gap → task-finish (validate hard). One task = one PR. Resume-aware.",
+  "skill": "skills/autonomous-agent-run.md",
+  "profile": "config-writer",
+  "mcp": [
+    "git",
+    "github"
+  ],
+  "requiresSecrets": [
+    "github_token"
+  ],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": false,
+  "maxSteps": 80,
+  "tags": [
+    "creator",
+    "autonomous",
+    "workflow",
+    "execute"
+  ],
+  "goalTemplate": "You run the Companion autonomous workflow for repositories {{repositories}}. Scope: {{scope}}. Max tasks this run: {{maxTasks}}.\\n\\nHARD RULES:\\n- One Daily task = one branch = one PR.\\n- Use stable CLI; never invent confirm/merge.\\n- After each task-finish, check resume/next before starting another.\\n- If validate fails: stop that task, leave status doing, do NOT open PR.\\n- Prefer p0 then p1. Do not touch p2 unless scope says improve.\\n\\nLOOP:\\n1) `ncc ai workflow audit --workspace <id> --json`\\n2) `ncc ai workflow plan --workspace <id>` (idempotent via gap: links)\\n3) `ncc ai workflow resume --workspace <id> --json`\\n4) Repeat up to {{maxTasks}} times:\\n   a) `ncc ai workflow task-start --workspace <id> [--task ID]`\\n   b) Implement ONLY that gap/task (AGENTS.md, skills, imprint/privacy stubs, roadmap, …). No unrelated edits.\\n   c) `ncc ai workflow task-finish --workspace <id> --task ID -m \\\"…\\\"`\\n   d) On validate_failed: fix if cheap within budget, else STOP and report.\\n5) If no gaps and scope is gaps-then-improve / improve-and-do: invent ≤{{maxImprove}} improvements as Daily tasks (priority p1), then same loop.\\n6) STOP before merge/version — user runs autonomous-agent-ship with confirm=CONFIRM.\\nStream thinking, tools, and a clear summary with PR URLs.",
+  "params": [
+    {
+      "id": "scope",
+      "label": "Scope",
+      "type": "enum",
+      "options": [
+        "gaps-only",
+        "gaps-then-improve",
+        "improve-and-do"
+      ],
+      "default": "gaps-only",
+      "required": true
+    },
+    {
+      "id": "maxTasks",
+      "label": "Max tasks this run",
+      "type": "enum",
+      "options": [
+        "1",
+        "2",
+        "3",
+        "5"
+      ],
+      "default": "2",
+      "required": true
+    },
+    {
+      "id": "maxImprove",
+      "label": "Max improve tasks",
+      "type": "enum",
+      "options": [
+        "0",
+        "1",
+        "2",
+        "3"
+      ],
+      "default": "1",
+      "required": true
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": false
+    }
+  ]
+}

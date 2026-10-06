@@ -1,0 +1,80 @@
+{
+  "id": "autonomous-agent-ship",
+  "title": "Autonomous agent: merge / version (CONFIRM)",
+  "category": "Creators",
+  "description": "Merge current PR and optionally bump version. Requires confirm=CONFIRM.",
+  "skill": "skills/autonomous-agent-ship.md",
+  "profile": "ops",
+  "mcp": [
+    "git",
+    "github"
+  ],
+  "requiresSecrets": [
+    "github_token"
+  ],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": false,
+  "maxSteps": 20,
+  "tags": [
+    "creator",
+    "workflow",
+    "ship"
+  ],
+  "goalTemplate": "SHIP step of the Companion autonomous workflow for repositories {{repositories}}. User confirm token: {{confirm}}. Do bump: {{doBump}}. Bump part: {{bumpPart}}.\\n\\n1) `ncc ai workflow status --workspace <id> --json`\\n2) ONLY if {{confirm}} is exactly CONFIRM: `ncc ai workflow merge --workspace <id> --confirm CONFIRM --strategy {{mergeStrategy}}`\\n3) If doBump=yes AND confirm is CONFIRM: `ncc ai workflow bump --workspace <id> --confirm CONFIRM --part {{bumpPart}}`\\n4) If confirm is not CONFIRM: refuse.\\nNever force-push. Never invent confirm.",
+  "params": [
+    {
+      "id": "confirm",
+      "label": "Confirm token",
+      "type": "enum",
+      "options": [
+        "NO",
+        "CONFIRM"
+      ],
+      "default": "NO",
+      "required": true,
+      "description": "Must select CONFIRM to allow merge/bump."
+    },
+    {
+      "id": "mergeStrategy",
+      "label": "Merge strategy",
+      "type": "enum",
+      "options": [
+        "squash",
+        "merge",
+        "rebase"
+      ],
+      "default": "squash",
+      "required": true
+    },
+    {
+      "id": "doBump",
+      "label": "Bump package.json version after merge",
+      "type": "enum",
+      "options": [
+        "no",
+        "yes"
+      ],
+      "default": "no",
+      "required": true
+    },
+    {
+      "id": "bumpPart",
+      "label": "Semver part",
+      "type": "enum",
+      "options": [
+        "patch",
+        "minor",
+        "major"
+      ],
+      "default": "patch",
+      "required": true
+    },
+    {
+      "id": "repositories",
+      "label": "Repositories",
+      "type": "workspaceList",
+      "required": false
+    }
+  ]
+}

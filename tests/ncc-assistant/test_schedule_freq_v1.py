@@ -25,7 +25,7 @@ class ScheduleFreqTests(unittest.TestCase):
     def test_modes_are_enums(self) -> None:
         ids = [m[0] for m in SCHEDULE_MODES]
         self.assertEqual(
-            ids, ["simple", "daily-at", "weekly-at", "cron", "advanced"]
+            ids, ["daily-at", "weekly-at", "cron", "simple", "advanced"]
         )
 
     def test_daily_at(self) -> None:
@@ -77,10 +77,54 @@ class TemplatesUiAstTests(unittest.TestCase):
         text = (ROOT / "ncc_assistant" / "templates_ui.py").read_text(encoding="utf-8")
         self.assertIn("run_once_mode", text)
         self.assertIn('"Run once"', text)
+        self.assertIn('"OK"', text)
         self.assertIn("run_once = Signal", text)
         self.assertIn("SCHEDULE_MODES", text)
         self.assertIn("cron_row", text)
         self.assertIn("_run_once_configure", text)
+        self.assertIn("seed_params", text)
+
+    def test_companion_uses_full_configure_dialog(self) -> None:
+        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        self.assertIn("TemplateConfigureDialog", text)
+        self.assertNotIn("def _template_param_dialog", text)
+
+    def test_configure_dialog_exposes_prompt_transparency(self) -> None:
+        text = (ROOT / "ncc_assistant" / "templates_ui.py").read_text(encoding="utf-8")
+        self.assertIn("What will run (transparent", text)
+        self.assertIn("_refresh_prompt_preview", text)
+        self.assertIn("Rendered prompt", text)
+        self.assertIn("Skill script", text)
+        self.assertIn("save_prompt_override", text)
+        self.assertIn("load_skill_text", text)
+        self.assertIn("render_goal", text)
+
+    def test_skill_and_goal_compose(self) -> None:
+        from ncc_assistant.agent_templates import (
+            get_agent_template,
+            load_skill_text,
+            render_goal,
+            resolve_goal,
+        )
+
+        tmpl = get_agent_template("workspace-brief")
+        self.assertIsNotNone(tmpl)
+        assert tmpl is not None
+        skill = load_skill_text(tmpl.skill)
+        self.assertIn("Workspace brief", skill)
+        params = {
+            "checkFrequency": "*-*-* 08:30:00",
+            "timezone": "Europe/Berlin",
+            "repositories": [],
+        }
+        rendered = render_goal(tmpl, params)
+        self.assertIn("Skill instructions:", rendered)
+        self.assertIn("Workspace brief", rendered)
+        self.assertEqual(
+            resolve_goal(tmpl, params, prompt_override="CUSTOM ONLY"),
+            "CUSTOM ONLY",
+        )
+        self.assertEqual(resolve_goal(tmpl, params), rendered)
 
     def test_schedules_use_picker(self) -> None:
         text = (ROOT / "ncc_assistant" / "gui_pages.py").read_text(encoding="utf-8")

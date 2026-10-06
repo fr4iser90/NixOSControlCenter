@@ -207,7 +207,8 @@ let
     export NCC_ASSISTANT_HOST_PROFILES_JSON='${hostProfilesJson}'
 
     export PYTHONPATH="${appRoot}''${PYTHONPATH:+:$PYTHONPATH}"
-    export PATH="${configHelper}/bin:${nccFocusNetblock}/bin:${pkgs.jq}/bin:${pkgs.nix}/bin:$PATH"
+    # wtype: leave-feed tab (about:blank) on Plasma Wayland after net-block
+    export PATH="${configHelper}/bin:${nccFocusNetblock}/bin:${pkgs.wtype}/bin:${pkgs.jq}/bin:${pkgs.nix}/bin:$PATH"
     # Qt/Plasma: use system platform theme when available
     export QT_QPA_PLATFORM="''${QT_QPA_PLATFORM:-xcb}"
   '';
@@ -290,6 +291,8 @@ let
     TNAME=ncc_focus_block
     SET=blocked4
     SET6=blocked6
+    # User-readable marker (nft list needs root — status would look inactive otherwise)
+    MARKER=/run/ncc-focus-netblock
 
     usage() {
       echo "Usage: ncc-focus-netblock apply --minutes N --domain d1 [--domain d2 ...]" >&2
@@ -311,6 +314,13 @@ let
 
     clear_table() {
       ${pkgs.nftables}/bin/nft delete table "$TABLE" "$TNAME" 2>/dev/null || true
+      rm -f "$MARKER" 2>/dev/null || true
+    }
+
+    write_marker() {
+      local until_ts="''${1:-0}"
+      printf 'until=%s\nactive=1\n' "$until_ts" > "$MARKER" 2>/dev/null || true
+      chmod 644 "$MARKER" 2>/dev/null || true
     }
 
     cmd="''${1:-}"
@@ -328,7 +338,20 @@ let
         echo "cleared"
         ;;
       status)
-        ${pkgs.nftables}/bin/nft list table "$TABLE" "$TNAME" 2>/dev/null || echo "inactive"
+        if [ -f "$MARKER" ]; then
+          until_line="$(grep -E '^until=' "$MARKER" 2>/dev/null || true)"
+          until_ts="''${until_line#until=}"
+          now_ts="$(${pkgs.coreutils}/bin/date +%s)"
+          if [ -n "$until_ts" ] && [ "$until_ts" -gt "$now_ts" ] 2>/dev/null; then
+            echo "active ''${until_line}"
+            ${pkgs.nftables}/bin/nft list table "$TABLE" "$TNAME" 2>/dev/null || true
+            exit 0
+          fi
+        fi
+        if ${pkgs.nftables}/bin/nft list table "$TABLE" "$TNAME" 2>/dev/null; then
+          exit 0
+        fi
+        echo "inactive"
         ;;
       apply)
         shift || true
@@ -408,6 +431,9 @@ let
           clear_table
           exit 3
         fi
+
+        until_ts=$(( $(${pkgs.coreutils}/bin/date +%s) + minutes * 60 ))
+        write_marker "$until_ts"
 
         # Auto-clear after N minutes (best-effort)
         ${pkgs.systemd}/bin/systemd-run --quiet --on-active="''${minutes}m" --unit="ncc-focus-netblock-expire" \

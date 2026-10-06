@@ -1,4 +1,4 @@
-"""CLI entry: ncc-assistant [gui|chat|mcp|agent|jobs|playbook|presence|approve|knowledge|export|eval|tools|secrets|workspaces|templates|workflows|focus|serve-openapi|tray]."""
+"""CLI entry: ncc-assistant [gui|chat|mcp|agent|jobs|playbook|presence|approve|knowledge|export|eval|tools|secrets|workspaces|templates|workflows|focus|workflow|serve-openapi|tray]."""
 
 from __future__ import annotations
 
@@ -777,6 +777,263 @@ def _cmd_focus(args: argparse.Namespace) -> int:
     return 1
 
 
+def _cmd_workflow(args: argparse.Namespace) -> int:
+    from .workflow_execute import (
+        bump_version,
+        commit_all,
+        ensure_branch,
+        execute_status,
+        merge_pull_request,
+        open_pull_request,
+        resume_status,
+        task_finish,
+        task_start,
+        validate_workspace,
+    )
+    from .workspace_lifecycle import (
+        fleet_lifecycle,
+        format_fleet_text,
+        format_lifecycle_text,
+        lifecycle_report,
+    )
+    from .workspace_workflow import (
+        audit_workspace,
+        dump_audit_json,
+        format_audit_text,
+        next_open_task,
+        plan_from_audit,
+        task_gap_id,
+        workflow_status,
+    )
+
+    cmd = args.workflow_cmd
+    wid = getattr(args, "workspace", None) or None
+    try:
+        if cmd == "audit":
+            report = audit_workspace(wid)
+            if getattr(args, "json", False):
+                print(dump_audit_json(report))
+            else:
+                print(format_audit_text(report))
+            return 0
+        if cmd == "lifecycle":
+            if getattr(args, "all", False):
+                fleet = fleet_lifecycle(
+                    active_days=int(getattr(args, "active_days", 14) or 14),
+                    once_days=int(getattr(args, "once_days", 90) or 90),
+                    archive_days=int(getattr(args, "archive_days", 180) or 180),
+                )
+                if getattr(args, "json", False):
+                    print(json.dumps(fleet, indent=2, ensure_ascii=False))
+                else:
+                    print(format_fleet_text(fleet))
+                return 0
+            rep = lifecycle_report(
+                wid,
+                active_days=int(getattr(args, "active_days", 14) or 14),
+                once_days=int(getattr(args, "once_days", 90) or 90),
+                archive_days=int(getattr(args, "archive_days", 180) or 180),
+            )
+            if getattr(args, "json", False):
+                print(json.dumps(rep, indent=2, ensure_ascii=False))
+            else:
+                print(format_lifecycle_text(rep))
+            return 0
+        if cmd == "fleet":
+            fleet = fleet_lifecycle(
+                active_days=int(getattr(args, "active_days", 14) or 14),
+                once_days=int(getattr(args, "once_days", 90) or 90),
+                archive_days=int(getattr(args, "archive_days", 180) or 180),
+            )
+            if getattr(args, "json", False):
+                print(json.dumps(fleet, indent=2, ensure_ascii=False))
+            else:
+                print(format_fleet_text(fleet))
+            return 0
+        if cmd == "plan":
+            result = plan_from_audit(
+                wid, create_roadmap=not getattr(args, "no_roadmap", False)
+            )
+            if getattr(args, "json", False):
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+            else:
+                print_ok(
+                    f"Workspace {result['workspace_id']}: "
+                    f"+{len(result.get('created_tasks') or [])} tasks, "
+                    f"skipped {len(result.get('skipped_gaps') or [])} gaps"
+                )
+                for t in result.get("created_tasks") or []:
+                    print(
+                        f"  {t.get('id')}  [{t.get('priority')}] {t.get('title')}"
+                    )
+            return 0
+        if cmd == "status":
+            st = workflow_status(wid)
+            ex = execute_status(wid)
+            payload = {**st, "execute": ex}
+            if getattr(args, "json", False):
+                print(json.dumps(payload, indent=2, ensure_ascii=False))
+            else:
+                print(
+                    f"{st['workspace_id']}  gaps={st['missing_count']}  "
+                    f"open_tasks={st['open_tasks']}  "
+                    f"branch={ex.get('branch')}  dirty={ex.get('dirty')}"
+                )
+                if st.get("missing"):
+                    print("  missing: " + ", ".join(st["missing"]))
+                nxt = st.get("next")
+                if nxt:
+                    print(
+                        f"  next: [{nxt.get('priority')}] {nxt.get('gap')}  "
+                        f"{nxt.get('title')}"
+                    )
+                for t in st.get("tasks") or []:
+                    print(
+                        f"  [{t.get('priority')}] {t.get('status')}  "
+                        f"{t.get('gap') or '—'}  {t.get('title')}"
+                    )
+                if ex.get("pr_url"):
+                    print(f"  pr: {ex['pr_url']}")
+            return 0
+        if cmd == "next":
+            nxt = next_open_task(wid)
+            payload = {
+                "ok": bool(nxt),
+                "workspace_id": resolve_wid(wid),
+                "task": (
+                    {
+                        "id": nxt.get("id"),
+                        "title": nxt.get("title"),
+                        "status": nxt.get("status"),
+                        "priority": nxt.get("priority"),
+                        "gap": task_gap_id(nxt),
+                        "links": list(nxt.get("links") or []),
+                    }
+                    if nxt
+                    else None
+                ),
+            }
+            if getattr(args, "json", False):
+                print(json.dumps(payload, indent=2, ensure_ascii=False))
+            elif nxt:
+                print_ok(
+                    f"next [{nxt.get('priority')}] {task_gap_id(nxt)}  "
+                    f"{nxt.get('id')}  {nxt.get('title')}"
+                )
+            else:
+                print_info("No open p0/p1 tasks")
+            return 0
+        if cmd == "resume":
+            result = resume_status(wid)
+            if getattr(args, "json", False):
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+            else:
+                print_ok(str(result.get("hint") or "resume"))
+                cur = result.get("current_task")
+                if cur:
+                    print(
+                        f"  current: {cur.get('id')} [{cur.get('gap')}] "
+                        f"branch={cur.get('branch')}"
+                    )
+                nxt = result.get("next")
+                if nxt:
+                    print(
+                        f"  next: {nxt.get('id')} [{nxt.get('gap')}] "
+                        f"{nxt.get('title')}"
+                    )
+            return 0
+        if cmd == "task-start":
+            result = task_start(
+                wid,
+                task_id=getattr(args, "task", None) or None,
+                allow_dirty=bool(getattr(args, "allow_dirty", False)),
+            )
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            return 0 if result.get("ok") else 1
+        if cmd == "task-finish":
+            result = task_finish(
+                wid,
+                task_id=getattr(args, "task", None) or None,
+                message=getattr(args, "message", "") or "",
+                title=getattr(args, "title", "") or "",
+                body=getattr(args, "body", "") or "",
+                skip_rebase=bool(getattr(args, "skip_rebase", False)),
+                draft=bool(getattr(args, "draft", False)),
+            )
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            return 0 if result.get("ok") else 1
+        if cmd == "branch":
+            result = ensure_branch(
+                wid,
+                branch=getattr(args, "name", None) or None,
+                prefix=getattr(args, "prefix", None) or "work",
+                task_id=getattr(args, "task", None) or None,
+                from_default=bool(getattr(args, "from_default", False)),
+                allow_dirty=bool(getattr(args, "allow_dirty", False)),
+            )
+            if getattr(args, "json", False):
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+            elif result.get("ok"):
+                print_ok(
+                    f"branch {result.get('branch')} "
+                    f"({'existing' if result.get('already') else 'created'})"
+                )
+            else:
+                print_err(str(result.get("error") or "branch failed"))
+            return 0 if result.get("ok") else 1
+        if cmd == "validate":
+            result = validate_workspace(wid)
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            return 0 if result.get("ok") else 1
+        if cmd == "commit":
+            result = commit_all(wid, message=getattr(args, "message", "") or "")
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            return 0 if result.get("ok") else 1
+        if cmd == "pr":
+            result = open_pull_request(
+                wid,
+                title=getattr(args, "title", "") or "ncc workflow updates",
+                body=getattr(args, "body", "") or "",
+                draft=bool(getattr(args, "draft", False)),
+                require_clean_validate=bool(
+                    getattr(args, "require_validate", False)
+                ),
+            )
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            return 0 if result.get("ok") else 1
+        if cmd == "merge":
+            result = merge_pull_request(
+                wid,
+                pr=getattr(args, "pr", None) or None,
+                confirm=getattr(args, "confirm", "") or "",
+                strategy=getattr(args, "strategy", None) or "squash",
+            )
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            return 0 if result.get("ok") else 1
+        if cmd == "bump":
+            result = bump_version(
+                wid,
+                confirm=getattr(args, "confirm", "") or "",
+                part=getattr(args, "part", None) or "patch",
+            )
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            return 0 if result.get("ok") else 1
+    except (ValueError, RuntimeError) as exc:
+        print_err(str(exc))
+        return 1
+    print_err(
+        "Usage: ncc ai workflow audit|lifecycle|fleet|plan|status|next|resume|"
+        "task-start|task-finish|branch|validate|commit|pr|merge|bump"
+    )
+    return 1
+
+
+def resolve_wid(workspace_id: str | None) -> str:
+    from .workspace_workflow import resolve_workspace_id
+
+    return resolve_workspace_id(workspace_id)
+
+
 def _cmd_mcp_install(args: argparse.Namespace) -> int:
     from .marketplace import install_template
 
@@ -1023,6 +1280,137 @@ def main(argv: list[str] | None = None) -> int:
         "--minutes", "-m", type=int, default=30, help="Snooze minutes (default 30)"
     )
 
+    workflow_p = sub.add_parser(
+        "workflow", help="Workspace workflow: audit gaps / plan Daily tasks"
+    )
+    workflow_sub = workflow_p.add_subparsers(dest="workflow_cmd")
+    st_audit = workflow_sub.add_parser("audit", help="Scan workspace for structural gaps")
+    st_audit.add_argument("--workspace", "-w", help="Workspace id (default: active)")
+    st_audit.add_argument("--json", action="store_true")
+    st_life = workflow_sub.add_parser(
+        "lifecycle",
+        help="Classify workspace: active / once / later / archive-candidate",
+    )
+    st_life.add_argument("--workspace", "-w")
+    st_life.add_argument(
+        "--all",
+        action="store_true",
+        help="Scan all registered workspaces (same as fleet)",
+    )
+    st_life.add_argument("--json", action="store_true")
+    st_life.add_argument("--active-days", type=int, default=14)
+    st_life.add_argument("--once-days", type=int, default=90)
+    st_life.add_argument("--archive-days", type=int, default=180)
+    st_fleet = workflow_sub.add_parser(
+        "fleet",
+        help="Lifecycle for all workspaces + archive candidates",
+    )
+    st_fleet.add_argument("--json", action="store_true")
+    st_fleet.add_argument("--active-days", type=int, default=14)
+    st_fleet.add_argument("--once-days", type=int, default=90)
+    st_fleet.add_argument("--archive-days", type=int, default=180)
+    st_plan = workflow_sub.add_parser(
+        "plan", help="Create Daily tasks from missing gaps"
+    )
+    st_plan.add_argument("--workspace", "-w", help="Workspace id (default: active)")
+    st_plan.add_argument("--json", action="store_true")
+    st_plan.add_argument(
+        "--no-roadmap",
+        action="store_true",
+        help="Do not add a roadmap chip for the gap set",
+    )
+    st_status = workflow_sub.add_parser("status", help="Gaps + open tasks + execute status")
+    st_status.add_argument("--workspace", "-w", help="Workspace id (default: active)")
+    st_status.add_argument("--json", action="store_true")
+    st_next = workflow_sub.add_parser("next", help="Show next open p0/p1 task")
+    st_next.add_argument("--workspace", "-w")
+    st_next.add_argument("--json", action="store_true")
+    st_resume = workflow_sub.add_parser(
+        "resume", help="Show checkpoint + what to run next"
+    )
+    st_resume.add_argument("--workspace", "-w")
+    st_resume.add_argument("--json", action="store_true")
+    st_tstart = workflow_sub.add_parser(
+        "task-start",
+        help="Mark task doing + create per-task branch from default",
+    )
+    st_tstart.add_argument("--workspace", "-w")
+    st_tstart.add_argument("--task", "-t", help="Task id (default: resume/next)")
+    st_tstart.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="Allow starting with a dirty worktree",
+    )
+    st_tfin = workflow_sub.add_parser(
+        "task-finish",
+        help="Validate → commit → rebase → PR → mark done (hard validate gate)",
+    )
+    st_tfin.add_argument("--workspace", "-w")
+    st_tfin.add_argument("--task", "-t", help="Task id (default: current)")
+    st_tfin.add_argument("-m", "--message", default="", help="Commit message")
+    st_tfin.add_argument("--title", default="", help="PR title")
+    st_tfin.add_argument("--body", default="", help="PR body")
+    st_tfin.add_argument("--draft", action="store_true")
+    st_tfin.add_argument(
+        "--skip-rebase",
+        action="store_true",
+        help="Skip rebase onto default before push",
+    )
+    st_branch = workflow_sub.add_parser("branch", help="Create/switch ncc/workflow-* branch")
+    st_branch.add_argument("--workspace", "-w")
+    st_branch.add_argument("--name", help="Full branch name (must start with ncc/workflow-)")
+    st_branch.add_argument("--prefix", default="work", help="Slug prefix for auto name")
+    st_branch.add_argument("--task", help="Task id fragment for branch name")
+    st_branch.add_argument(
+        "--from-default",
+        action="store_true",
+        help="Checkout default branch before creating",
+    )
+    st_branch.add_argument("--allow-dirty", action="store_true")
+    st_branch.add_argument("--json", action="store_true")
+    st_val = workflow_sub.add_parser("validate", help="Run detected project validators")
+    st_val.add_argument("--workspace", "-w")
+    st_commit = workflow_sub.add_parser("commit", help="git add -A && commit")
+    st_commit.add_argument("--workspace", "-w")
+    st_commit.add_argument("-m", "--message", default="ncc workflow: workspace updates")
+    st_pr = workflow_sub.add_parser("pr", help="Push branch + open GitHub PR (gh)")
+    st_pr.add_argument("--workspace", "-w")
+    st_pr.add_argument("--title", default="ncc workflow updates")
+    st_pr.add_argument("--body", default="")
+    st_pr.add_argument("--draft", action="store_true")
+    st_pr.add_argument(
+        "--require-validate",
+        action="store_true",
+        help="Refuse PR if project validators fail",
+    )
+    st_merge = workflow_sub.add_parser(
+        "merge", help='Merge current PR (requires --confirm CONFIRM)'
+    )
+    st_merge.add_argument("--workspace", "-w")
+    st_merge.add_argument("--pr", help="PR number or URL (default: current branch PR)")
+    st_merge.add_argument(
+        "--confirm",
+        required=True,
+        help='Must be the literal token CONFIRM',
+    )
+    st_merge.add_argument(
+        "--strategy",
+        choices=["squash", "merge", "rebase"],
+        default="squash",
+    )
+    st_bump = workflow_sub.add_parser(
+        "bump", help='Bump package.json version (requires --confirm CONFIRM)'
+    )
+    st_bump.add_argument("--workspace", "-w")
+    st_bump.add_argument(
+        "--confirm",
+        required=True,
+        help='Must be the literal token CONFIRM',
+    )
+    st_bump.add_argument(
+        "--part", choices=["major", "minor", "patch"], default="patch"
+    )
+
     mcp_p = sub.add_parser("mcp-install", help="Install an MCP marketplace template")
     mcp_p.add_argument("name", help="MCP template name (git, github, …)")
     mcp_p.add_argument("--workspace", help="Workspace id for {{workspace.path}}")
@@ -1166,6 +1554,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if command == "focus":
         return _cmd_focus(args)
+
+    if command == "workflow":
+        return _cmd_workflow(args)
 
     if command == "mcp-install":
         return _cmd_mcp_install(args)

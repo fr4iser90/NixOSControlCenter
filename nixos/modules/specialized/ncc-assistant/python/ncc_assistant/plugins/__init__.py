@@ -1,7 +1,6 @@
-"""Feature plugins — not MCP, not agent templates, not watchdogs.
+"""Feature plugins — desktop extras only (e.g. doomscroll).
 
-Builtin desktop/UX features (doomscroll, …) register here so Settings stays
-core-only and Companion/tray tick via discovery instead of hardwires.
+Not workflow templates, not Cron, not briefing (use template workspace-brief).
 """
 
 from __future__ import annotations
@@ -31,11 +30,10 @@ class FeaturePlugin(Protocol):
 
 
 def list_plugins() -> list[FeaturePlugin]:
-    """Builtin feature plugins (catalog later)."""
+    """Builtin feature plugins (workspace-brief is a template, not a plugin)."""
     from .doomscroll import DoomscrollPlugin
-    from .morning_brief import MorningBriefPlugin
 
-    return [DoomscrollPlugin(), MorningBriefPlugin()]
+    return [DoomscrollPlugin()]
 
 
 def get_plugin(plugin_id: str) -> FeaturePlugin | None:

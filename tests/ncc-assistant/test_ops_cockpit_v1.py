@@ -156,12 +156,13 @@ class TemplateAstTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("4d · Capacity & idle", gui_pages)
-        self.assertIn("4e · Daily workflows", gui_pages)
-        self.assertIn("class WorkflowsPage", gui_pages)
+        self.assertIn("4e · Workspace brief", gui_pages)
+        self.assertIn("workspace-brief", gui_pages)
         companion = (ROOT / "ncc_assistant" / "companion.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn("PANEL_DAILY", companion)
+        self.assertIn("Workflows (once / cron)", companion)
+        self.assertNotIn("PANEL_DAILY", companion)
         self.assertIn("_idle_tick", companion)
         capacity = ROOT / "ncc_assistant" / "capacity.py"
         tree = ast.parse(capacity.read_text(encoding="utf-8"))
