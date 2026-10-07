@@ -16,6 +16,9 @@ def record_has_content(rec: dict[str, Any]) -> bool:
     hist = rec.get("history") or []
     if isinstance(hist, list) and len(hist) > 0:
         return True
+    transcript = rec.get("transcript") or []
+    if isinstance(transcript, list) and len(transcript) > 0:
+        return True
     if str(rec.get("user_prompt") or "").strip():
         return True
     if str(rec.get("reply_buf") or "").strip():
@@ -46,11 +49,46 @@ def load_companion_chats() -> list[dict[str, Any]]:
     ]
 
 
+STORE_VERSION = 2
+TRANSCRIPT_KEEP = 60
+TEXT_MAX = 6000
+RESULT_MAX = 1200
+ARGS_MAX = 2000
+
+
+def transcript_for_store(items: Any) -> list[dict[str, Any]]:
+    """Trim the render model for disk (full tool output stays in the ChatSession)."""
+    out: list[dict[str, Any]] = []
+    for item in list(items or [])[-TRANSCRIPT_KEEP:]:
+        if not isinstance(item, dict):
+            continue
+        kind = str(item.get("kind") or "")
+        if not kind:
+            continue
+        rec: dict[str, Any] = {"kind": kind}
+        text = str(item.get("text") or "")
+        if text:
+            rec["text"] = text[-TEXT_MAX:]
+        if kind == "tool":
+            rec["name"] = str(item.get("name") or "tool")
+            args = item.get("args")
+            if isinstance(args, dict) and args:
+                raw = json.dumps(args, ensure_ascii=False)
+                rec["args"] = (
+                    args if len(raw) <= ARGS_MAX else {"truncated": raw[:ARGS_MAX]}
+                )
+            result = str(item.get("result") or "")
+            if result:
+                rec["result"] = result[-RESULT_MAX:]
+        out.append(rec)
+    return out
+
+
 def save_companion_chats(chats: list[dict[str, Any]]) -> None:
     path = companion_store_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     kept = [c for c in chats if record_has_content(c)]
-    payload = {"version": 1, "chats": kept}
+    payload = {"version": STORE_VERSION, "chats": kept}
     path.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
@@ -70,6 +108,10 @@ def slot_to_record(slot: Any) -> dict[str, Any]:
         "harness_mode": getattr(slot, "harness_mode", "auto"),
         "harness": getattr(slot, "harness", "native"),
         "parent_id": getattr(slot, "parent_id", None),
+        # Native ChatSession id — reload it so a restart keeps the model context.
+        "session_id": getattr(slot, "session_id", None) or "",
+        "transcript": transcript_for_store(getattr(slot, "transcript", None)),
+        "last_error": getattr(slot, "last_error", "") or "",
         "user_prompt": getattr(slot, "user_prompt", "") or "",
         "reply_buf": (getattr(slot, "reply_buf", "") or "")[-8000:],
         "thinking_buf": (getattr(slot, "thinking_buf", "") or "")[-4000:],

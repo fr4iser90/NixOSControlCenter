@@ -29,7 +29,6 @@ class NativeHarness:
         history: list[dict[str, Any]] | None = None,
     ) -> Iterator[Event]:
         del cwd  # native uses Settings / workspaces, not process cwd
-        del history  # native ChatSession already holds messages
         if session is None:
             from ..config import Settings
             from ..preferences import apply_startup_preferences
@@ -41,6 +40,34 @@ class NativeHarness:
                 interactive_auth=False,
                 refresh_models=False,
             )
+        seed_history(session, history)
         if cancel_event is not None:
             session.cancel_event = cancel_event
         yield from session.send(text, images=None, prompt_auth=None)
+
+
+def seed_history(
+    session: Any, history: list[dict[str, Any]] | None
+) -> None:
+    """Fold the caller's turns into a ChatSession that has none of its own.
+
+    Companion restores chats from its own store, so the native session may start
+    empty while the surface still shows earlier turns — without this the model
+    would lose context the user can see.
+    """
+    if session is None or not history:
+        return
+    turns = [
+        {"role": str(t.get("role") or ""), "content": str(t.get("content") or "")}
+        for t in list(history)[-24:]
+        if isinstance(t, dict)
+        and str(t.get("role") or "") in ("user", "assistant")
+        and str(t.get("content") or "").strip()
+    ]
+    if not turns:
+        return
+    has_turns = any(m.get("role") != "system" for m in session.messages or [])
+    if has_turns:
+        return
+    session.messages.extend(turns)
+    session.refresh_system_prompt()

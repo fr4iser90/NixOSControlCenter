@@ -53,11 +53,20 @@ class CompanionShellAstTests(unittest.TestCase):
     def test_chat_grows_and_cron_inspect(self) -> None:
         text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
         self.assertNotIn("bubble.setMaximumHeight(120)", text)
-        self.assertIn("chat_l.addWidget(self.bubble, stretch=1)", text)
+        self.assertIn("chat_l.addWidget(self.feed_scroll, stretch=1)", text)
         self.assertIn("main.addWidget(self.stack, stretch=1)", text)
         self.assertIn("def _cron_inspect", text)
         self.assertIn("cron_user", text)
         self.assertIn("delete_user_schedule", text)
+
+    def test_tool_traces_render_in_the_feed(self) -> None:
+        """Tool cards live in the chat feed — no fixed-height band, no reply widget."""
+        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        for gone in ("tools_scroll", "tools_host", "_rebuild_tool_widgets", "self.bubble"):
+            self.assertNotIn(gone, text)
+        self.assertIn("self._feed_tool_widget(item)", text)
+        self.assertIn("compact=self._tool_compact()", text)
+        self.assertIn("get_trace_density", text)
 
     def test_sidebar_nav_rail(self) -> None:
         text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")

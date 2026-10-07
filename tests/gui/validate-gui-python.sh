@@ -67,6 +67,7 @@ run() {
 run "${ROOT}/tests/gui/test_settings_import_smoke.py"
 run "${ROOT}/tests/gui/test_domain_pages_smoke.py"
 run "${ROOT}/tests/gui/test_companion_window_smoke.py"
+run "${ROOT}/tests/gui/test_companion_feed_smoke.py"
 run "${ROOT}/tests/gui/test_gui_ncc_argv.py"
 run "${ROOT}/tests/gui/test_domain_fs_status.py"
 run "${ROOT}/tests/gui/test_nav_visibility.py"

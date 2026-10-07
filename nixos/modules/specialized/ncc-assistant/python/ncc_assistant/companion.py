@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import os
 import sys
@@ -292,12 +293,18 @@ class ChatSlot:
     workspace_id: str | None = None
     title_locked: bool = False  # True after user rename
     history: list | None = None  # [{role, content}] multi-turn for harnesses
+    session_id: str | None = None  # native ChatSession on disk, reloaded on start
+    # Ordered render model — one entry per user / thinking / tool / assistant / error.
+    transcript: list | None = None
+    turn_start: int = 0  # index in transcript where the in-flight turn begins
 
     def __post_init__(self) -> None:
         if self.tool_traces is None:
             self.tool_traces = []
         if self.history is None:
             self.history = []
+        if self.transcript is None:
+            self.transcript = []
 
     @staticmethod
     def new(
@@ -328,8 +335,144 @@ class ChatSlot:
             thinking_buf=str(rec.get("thinking_buf") or ""),
             history=list(rec.get("history") or []),
             tool_traces=list(rec.get("tool_traces") or []),
+            session_id=str(rec.get("session_id") or "") or None,
+            last_error=str(rec.get("last_error") or ""),
+            transcript=transcript_from_record(rec),
         )
         return slot
+
+
+TRANSCRIPT_MAX_ITEMS = 200
+
+
+def transcript_append(slot: "ChatSlot", item: dict[str, Any]) -> dict[str, Any]:
+    """Append one render item, keeping the stored transcript bounded.
+
+    Returns the item that ends up in the transcript (the caller's dict, or the
+    duplicate it collapsed into) so live widgets can tell "new" from "repeat".
+    """
+    items = list(slot.transcript or [])
+    if (
+        item.get("kind") == "error"
+        and items
+        and items[-1].get("kind") == "error"
+        and items[-1].get("text") == item.get("text")
+    ):
+        return items[-1]
+    items.append(item)
+    slot.transcript = items[-TRANSCRIPT_MAX_ITEMS:]
+    return item
+
+
+def find_tool_trace(items: list[Any] | None, name: str = "") -> dict[str, Any] | None:
+    """Oldest-open-result pairing: events carry no tool id, so match by name first."""
+    rows = [
+        i
+        for i in items or []
+        if isinstance(i, dict) and i.get("kind") in (None, "tool") and "name" in i
+    ]
+    open_rows = [r for r in rows if not str(r.get("result") or "")]
+    if name:
+        for row in reversed(open_rows):
+            if str(row.get("name") or "") == name:
+                return row
+    if open_rows:
+        return open_rows[0]
+    return None
+
+
+def transcript_from_record(rec: dict[str, Any]) -> list[dict[str, Any]]:
+    """Restore the ordered transcript; stores older than v2 only keep history + buffers."""
+    raw = rec.get("transcript")
+    if isinstance(raw, list):
+        items = [it for it in raw if isinstance(it, dict) and it.get("kind")]
+        if items:
+            return items[-TRANSCRIPT_MAX_ITEMS:]
+    items = []
+    for m in rec.get("history") or []:
+        if not isinstance(m, dict):
+            continue
+        role = str(m.get("role") or "")
+        text = str(m.get("content") or "").strip()
+        if not text:
+            continue
+        if role == "user":
+            items.append({"kind": "user", "text": text})
+        elif role == "assistant":
+            items.append({"kind": "assistant", "text": text})
+    thinking = str(rec.get("thinking_buf") or "").strip()
+    if thinking:
+        items.append({"kind": "thinking", "text": thinking})
+    for tr in rec.get("tool_traces") or []:
+        if not isinstance(tr, dict):
+            continue
+        items.append(
+            {
+                "kind": "tool",
+                "name": str(tr.get("name") or "tool"),
+                "args": tr.get("args") or {},
+                "result": str(tr.get("result") or ""),
+            }
+        )
+    prompt = str(rec.get("user_prompt") or "").strip()
+    reply = str(rec.get("reply_buf") or "").strip()
+    last_user = next((i for i in reversed(items) if i["kind"] == "user"), None)
+    if prompt and (last_user is None or last_user.get("text") != prompt):
+        items.append({"kind": "user", "text": prompt})
+    last_reply = next((i for i in reversed(items) if i["kind"] == "assistant"), None)
+    if reply and (
+        last_reply is None or last_reply.get("text") not in (reply, reply[-4000:])
+    ):
+        items.append({"kind": "assistant", "text": reply})
+    error = str(rec.get("last_error") or "").strip()
+    if error:
+        items.append({"kind": "error", "text": error})
+    return items[-TRANSCRIPT_MAX_ITEMS:]
+
+
+def transcript_from_messages(msgs: list[Any]) -> list[dict[str, Any]]:
+    """Build a transcript out of a persisted ChatSession message list."""
+    items: list[dict[str, Any]] = []
+    pending_tools: dict[str, dict[str, Any]] = {}
+    for m in msgs:
+        if not isinstance(m, dict):
+            continue
+        role = str(m.get("role") or "")
+        if role == "system":
+            continue
+        text = str(m.get("content") or "")
+        if role == "user":
+            if text.strip():
+                items.append({"kind": "user", "text": text})
+        elif role == "assistant":
+            if text.strip():
+                items.append({"kind": "assistant", "text": text})
+        elif role == "tool":
+            name = str(m.get("name") or "tool")
+            key = str(m.get("tool_call_id") or name)
+            item = pending_tools.pop(key, None)
+            if item is None:
+                item = {"kind": "tool", "name": name, "args": {}, "result": ""}
+                items.append(item)
+            item["result"] = text
+        for tc in m.get("tool_calls") or []:
+            if not isinstance(tc, dict):
+                continue
+            fn = tc.get("function") or {}
+            raw_args = fn.get("arguments") or "{}"
+            try:
+                args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+            except json.JSONDecodeError:
+                args = {}
+            item = {
+                "kind": "tool",
+                "name": str(fn.get("name") or "tool"),
+                "args": args if isinstance(args, dict) else {},
+                "result": "",
+            }
+            items.append(item)
+            pending_tools[str(tc.get("id") or fn.get("name") or "tool")] = item
+    return items[-TRANSCRIPT_MAX_ITEMS:]
 
 
 def _looks_like_subagent_spawn(event: dict[str, Any]) -> bool:
@@ -908,41 +1051,27 @@ class CompanionWindow(QWidget):
         self.activity_lbl.setMinimumHeight(14)
         chat_l.addWidget(self.activity_lbl)
 
-        from .gui_pages import ThinkingBlock
-        from .preferences import get_expand_thinking_while_streaming
-
-        self.think_block = ThinkingBlock(
-            compact=True,
-            expand_while_streaming=get_expand_thinking_while_streaming(),
-        )
-        chat_l.addWidget(self.think_block)
-
-        self.tools_scroll = QScrollArea()
-        self.tools_scroll.setWidgetResizable(True)
-        self.tools_scroll.setMaximumHeight(100)
-        self.tools_scroll.setHorizontalScrollBarPolicy(
+        # Activity, thinking, tool cards, replies and errors share one scrollable
+        # column so a trace renders where it happened (doc/surfaces.md "Chat stream").
+        self.feed_scroll = QScrollArea()
+        self.feed_scroll.setWidgetResizable(True)
+        self.feed_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.feed_scroll.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
-        self.tools_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.tools_host = QWidget()
-        self.tools_layout = QVBoxLayout(self.tools_host)
-        self.tools_layout.setContentsMargins(0, 0, 0, 0)
-        self.tools_layout.setSpacing(3)
-        self.tools_layout.addStretch()
-        self.tools_scroll.setWidget(self.tools_host)
-        self.tools_scroll.hide()
-        chat_l.addWidget(self.tools_scroll)
-        self._tool_widgets: list[Any] = []
-
-        self.bubble = QTextEdit()
-        self.bubble.setReadOnly(True)
-        self.bubble.setPlaceholderText("Ask me something…")
-        self.bubble.setMinimumHeight(120)
-        self.bubble.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
-        self.bubble.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
-        chat_l.addWidget(self.bubble, stretch=1)
+        self.feed_host = QWidget()
+        self.feed = QVBoxLayout(self.feed_host)
+        self.feed.setContentsMargins(0, 0, 0, 0)
+        self.feed.setSpacing(6)
+        self.feed.addStretch()
+        self.feed_scroll.setWidget(self.feed_host)
+        chat_l.addWidget(self.feed_scroll, stretch=1)
+        self._feed_tool_rows: list[list[Any]] = []
+        # Live widgets mirror exactly one in-flight transcript item.
+        self._think_live: Any | None = None
+        self._think_item: dict[str, Any] | None = None
+        self._reply_live: Any | None = None
+        self._reply_item: dict[str, Any] | None = None
 
         row = QHBoxLayout()
         self.input = QLineEdit()
@@ -1273,37 +1402,169 @@ class CompanionWindow(QWidget):
         self._apply_slot_ui()
         self._schedule_persist()
 
-    def _clear_tool_widgets(self) -> None:
-        for w in self._tool_widgets:
-            self.tools_layout.removeWidget(w)
-            w.deleteLater()
-        self._tool_widgets.clear()
-        self.tools_scroll.hide()
+    def _drain_feed(self) -> None:
+        while self.feed.count() > 1:
+            item = self.feed.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+        self._feed_tool_rows = []
+        self._think_live = None
+        self._think_item = None
+        self._reply_live = None
+        self._reply_item = None
 
-    def _rebuild_tool_widgets(self, slot: ChatSlot) -> None:
+    def _feed_append(self, widget: QWidget) -> None:
+        # Keep the trailing stretch so a short feed stays top-aligned.
+        self.feed.insertWidget(self.feed.count() - 1, widget)
+
+    def _feed_scroll_bottom(self) -> None:
+        sb = self.feed_scroll.verticalScrollBar()
+        sb.setValue(sb.maximum())
+
+    def _tool_compact(self) -> bool:
+        try:
+            from .preferences import get_trace_density
+
+            return get_trace_density() != "expanded"
+        except Exception:
+            return True
+
+    def _feed_tool_widget(self, item: dict[str, Any]) -> Any:
         from .gui_pages import ToolTraceWidget
 
-        self._clear_tool_widgets()
-        traces = slot.tool_traces or []
-        if not traces:
-            return
-        self.tools_scroll.show()
-        stretch = self.tools_layout.takeAt(self.tools_layout.count() - 1)
-        for tr in traces:
-            w = ToolTraceWidget(
-                str(tr.get("name") or "tool"),
-                tr.get("args") or {},
-                compact=True,
+        widget = ToolTraceWidget(
+            str(item.get("name") or "tool"),
+            item.get("args") or {},
+            compact=self._tool_compact(),
+        )
+        result = str(item.get("result") or "")
+        if result:
+            widget.set_result(result)
+        self._feed_append(widget)
+        self._feed_tool_rows.append([item, widget])
+        return widget
+
+    def _new_thinking_block(self) -> Any:
+        from .gui_pages import ThinkingBlock
+        from .preferences import get_expand_thinking_while_streaming
+
+        widget = ThinkingBlock(
+            compact=True,
+            expand_while_streaming=get_expand_thinking_while_streaming(),
+        )
+        self._feed_append(widget)
+        return widget
+
+    def _live_thinking(self, slot: ChatSlot) -> Any:
+        if self._think_live is None:
+            self._think_item = transcript_append(
+                slot, {"kind": "thinking", "text": ""}
             )
-            result = tr.get("result")
-            if result:
-                w.set_result(str(result))
-            self.tools_layout.addWidget(w)
-            self._tool_widgets.append(w)
-        if stretch is not None:
-            self.tools_layout.addStretch()
-        else:
-            self.tools_layout.addStretch()
+            self._think_live = self._new_thinking_block()
+        return self._think_live
+
+    def _live_reply(self, slot: ChatSlot) -> Any:
+        if self._reply_live is None:
+            self._reply_item = transcript_append(
+                slot, {"kind": "assistant", "text": ""}
+            )
+            from .gui import Bubble
+
+            widget = Bubble("Assistant", "", markdown=True)
+            self._feed_append(widget)
+            self._reply_live = widget
+        return self._reply_live
+
+    def _close_live(self) -> None:
+        # Next thinking / text belongs to a new block (tool round or turn over).
+        self._think_live = None
+        self._think_item = None
+        self._reply_live = None
+        self._reply_item = None
+
+    def _collapse_thinking(self, *, finish: bool = False) -> None:
+        widget = self._think_live
+        if widget is None:
+            return
+        if finish:
+            widget.finish()
+        widget.collapse()
+
+    def _feed_item(self, item: dict[str, Any], *, live: bool = False) -> Any:
+        kind = str(item.get("kind") or "")
+        if kind == "tool":
+            return self._feed_tool_widget(item)
+        text = str(item.get("text") or "")
+        if kind == "thinking":
+            widget = self._new_thinking_block() if live else None
+            if widget is None:
+                from .gui_pages import ThinkingBlock
+
+                widget = ThinkingBlock(compact=True)
+                self._feed_append(widget)
+            widget.append_text(text)
+            if not live:
+                widget.finish()
+                widget.collapse()
+            return widget
+        from .gui import Bubble
+
+        widget = None
+        if kind == "user":
+            widget = Bubble("You", text)
+        elif kind in ("assistant", "notice"):
+            role = "Assistant" if kind == "assistant" else "Notice"
+            widget = Bubble(role, text, markdown=kind == "assistant")
+        elif kind == "error":
+            widget = Bubble("Error", text)
+        if widget is None:
+            return None
+        self._feed_append(widget)
+        return widget
+
+    def _rebuild_feed(self, slot: ChatSlot) -> None:
+        self._drain_feed()
+        items = [i for i in (slot.transcript or []) if isinstance(i, dict)]
+        if not items:
+            hint = QLabel("Ask me something…")
+            hint.setObjectName("nccMuted")
+            hint.setWordWrap(True)
+            self._feed_append(hint)
+            return
+        last = len(items) - 1
+        for index, item in enumerate(items):
+            # Only the newest item can still receive deltas.
+            widget = self._feed_item(item, live=(slot.busy and index == last))
+            if not (slot.busy and index == last):
+                continue
+            kind = str(item.get("kind") or "")
+            if kind == "thinking":
+                self._think_live, self._think_item = widget, item
+            elif kind == "assistant":
+                self._reply_live, self._reply_item = widget, item
+        if slot.busy and items:
+            # A chat streamed while in the background: its turn lives in the
+            # buffers only, so adopt the text as a live block here.
+            turn_kinds = {
+                str(i.get("kind") or "")
+                for i in items[max(int(slot.turn_start), 0) :]
+            }
+            thinking = str(slot.thinking_buf or "")
+            reply = str(slot.reply_buf or "")
+            if thinking.strip() and "thinking" not in turn_kinds:
+                block = self._live_thinking(slot)
+                block.append_text(thinking)
+                if self._think_item is not None:
+                    self._think_item["text"] = block.text()
+                block.collapse()
+            if reply.strip() and "assistant" not in turn_kinds:
+                bubble = self._live_reply(slot)
+                bubble.set_markdown(reply)
+                if self._reply_item is not None:
+                    self._reply_item["text"] = bubble.plain_text()
+        self._feed_scroll_bottom()
 
     def _set_activity(self, slot: ChatSlot, text: str) -> None:
         slot.activity = text
@@ -1376,22 +1637,7 @@ class CompanionWindow(QWidget):
 
     def _apply_slot_ui(self) -> None:
         slot = self._slot()
-        parts: list[str] = []
-        if slot.user_prompt:
-            parts.append(f"You: {slot.user_prompt}")
-        if slot.reply_buf.strip():
-            parts.append(slot.reply_buf.strip()[-2000:])
-        elif slot.last_error:
-            parts.append(f"Error: {slot.last_error}")
-        self.bubble.setPlainText("\n\n".join(parts))
-        sb = self.bubble.verticalScrollBar()
-        sb.setValue(sb.maximum())
-        self.think_block.clear()
-        if slot.thinking_buf.strip():
-            self.think_block.append_text(slot.thinking_buf)
-            self.think_block.finish()
-            self.think_block.collapse()
-        self._rebuild_tool_widgets(slot)
+        self._rebuild_feed(slot)
         self.activity_lbl.setText(slot.activity)
         self.avatar.set_state(slot.avatar_state)
         self.send_btn.setEnabled(not slot.busy)
@@ -1451,14 +1697,30 @@ class CompanionWindow(QWidget):
 
     def _ensure_session(self, slot: ChatSlot) -> None:
         if slot.session is not None:
+            if not slot.session_id:
+                slot.session_id = getattr(slot.session, "session_id", None)
             return
         from .session import ChatSession
 
+        data = None
+        if slot.session_id:
+            from .history import load_session
+
+            data = load_session(slot.session_id)
+        messages = None
+        if isinstance(data, dict):
+            raw = data.get("messages")
+            if isinstance(raw, list):
+                messages = list(raw)
         slot.session = ChatSession.create(
             self._shared_settings(),
             interactive_auth=False,
             refresh_models=False,
+            messages=messages,
+            session_id=slot.session_id,
+            title=slot.title,
         )
+        slot.session_id = getattr(slot.session, "session_id", None) or slot.session_id
 
     def _load_session_into_slot(self, session_id: str) -> None:
         from .history import load_session
@@ -1478,13 +1740,17 @@ class CompanionWindow(QWidget):
             session_id=session_id,
             title=title,
         )
-        # Last assistant text for bubble
-        last = ""
-        for m in reversed(msgs if isinstance(msgs, list) else []):
-            if isinstance(m, dict) and m.get("role") == "assistant":
-                last = str(m.get("content") or "")[:2000]
-                break
-        slot.reply_buf = last or f"(loaded {title})"
+        slot.session_id = session_id
+        slot.transcript = transcript_from_messages(
+            msgs if isinstance(msgs, list) else []
+        )
+        if not slot.transcript:
+            slot.transcript = [{"kind": "assistant", "text": f"(loaded {title})"}]
+        slot.history = [
+            {"role": str(m.get("role")), "content": str(m.get("content") or "")}
+            for m in (msgs if isinstance(msgs, list) else [])
+            if isinstance(m, dict) and m.get("role") in ("user", "assistant")
+        ][-40:]
         slot.workspace_id = self._active_workspace_id
         slot.title_locked = True
         self._slots.append(slot)
@@ -1585,7 +1851,7 @@ class CompanionWindow(QWidget):
                 self.activateWindow()
                 slot = self._slot()
                 if not slot.busy:
-                    slot.reply_buf = msg
+                    transcript_append(slot, {"kind": "notice", "text": msg})
                     slot.avatar_state = STATE_SPEAKING
                     slot.activity = "Doomscroll interrupt"
                     self._apply_slot_ui()
@@ -1684,6 +1950,9 @@ class CompanionWindow(QWidget):
         slot.tool_traces = []
         slot.last_error = ""
         slot.user_prompt = text
+        # Prior turns stay visible; this turn is appended and streamed in place.
+        transcript_append(slot, {"kind": "user", "text": text})
+        slot.turn_start = len(slot.transcript or []) - 1
         slot.busy = True
         slot.avatar_state = STATE_THINKING
         slot.activity = f"Streaming ({hname})"
@@ -1726,26 +1995,47 @@ class CompanionWindow(QWidget):
         slot.busy = False
         slot.worker = None
         slot.activity = ""
+        turn = list(slot.transcript or [])[slot.turn_start :]
+        answered = [i for i in turn if i.get("kind") == "assistant"]
+        # Harnesses that stream without a final assistant event still leave a reply.
+        if not slot.last_error and not answered and slot.reply_buf.strip():
+            transcript_append(
+                slot, {"kind": "assistant", "text": slot.reply_buf.strip()}
+            )
         # Failed turns stay out of history so Retry can resend cleanly.
         if not slot.last_error:
             if slot.user_prompt:
                 slot.history = list(slot.history or [])
                 slot.history.append({"role": "user", "content": slot.user_prompt})
-            if slot.reply_buf.strip():
+            reply = "\n\n".join(
+                str(i.get("text") or "").strip() for i in answered if i.get("text")
+            )
+            if not reply and slot.reply_buf.strip():
+                reply = slot.reply_buf.strip()
+            if reply:
                 slot.history = list(slot.history or [])
                 slot.history.append(
-                    {"role": "assistant", "content": slot.reply_buf.strip()[-4000:]}
+                    {"role": "assistant", "content": reply[-4000:]}
                 )
             slot.history = (slot.history or [])[-40:]
-        if slot.thinking_buf.strip() and slot_id == self._active_id:
-            self.think_block.finish()
-            self.think_block.collapse()
-        self._schedule_persist()
+        slot.reply_buf = ""
+        slot.thinking_buf = ""
         if slot_id == self._active_id:
-            self._apply_slot_ui()
-            self._sync_presence()
-        else:
+            self._collapse_thinking(finish=True)
+            self._close_live()
+            self._feed_scroll_bottom()
+            self.avatar.set_state(slot.avatar_state)
+            self.send_btn.setEnabled(True)
+            can_retry = bool(slot.last_error) and bool(
+                (slot.user_prompt or "").strip()
+            )
+            self.retry_btn.setVisible(can_retry)
+            self.retry_btn.setEnabled(can_retry)
+        self._schedule_persist()
+        if slot_id != self._active_id:
             self._sync_session_chip()
+        else:
+            self._sync_presence()
 
     def _on_event(self, slot_id: str, event: object) -> None:
         if not isinstance(event, dict):
@@ -1771,18 +2061,38 @@ class CompanionWindow(QWidget):
             slot.thinking_buf += piece
             self._set_activity(slot, "Thinking…")
             if slot_id == self._active_id and piece:
-                self.think_block.append_text(piece)
+                block = self._live_thinking(slot)
+                block.append_text(piece)
+                if self._think_item is not None:
+                    self._think_item["text"] = block.text()
         elif kind in ("assistant_delta", "delta"):
             slot.avatar_state = STATE_SPEAKING
-            slot.reply_buf += str(event.get("text") or "")
+            piece = str(event.get("text") or "")
+            slot.reply_buf += piece
             self._set_activity(slot, f"Streaming ({slot.harness})")
-            if slot_id == self._active_id:
-                self.think_block.collapse()
+            if slot_id == self._active_id and piece:
+                self._collapse_thinking()
+                bubble = self._live_reply(slot)
+                bubble.append_markdown(piece)
+                if self._reply_item is not None:
+                    self._reply_item["text"] = bubble.plain_text()
         elif kind == "assistant":
-            slot.reply_buf = str(event.get("text") or slot.reply_buf)
+            text = str(event.get("text") or slot.reply_buf)
+            slot.reply_buf = text
             if slot_id == self._active_id:
-                self.think_block.finish()
-                self.think_block.collapse()
+                self._collapse_thinking(finish=True)
+                bubble = self._live_reply(slot)
+                bubble.set_markdown(text)
+                if self._reply_item is not None:
+                    self._reply_item["text"] = text
+            elif not (slot.transcript or []) or (slot.transcript or [])[-1].get(
+                "kind"
+            ) != "assistant":
+                # Background chat: no live bubble, so the final text is the model.
+                transcript_append(slot, {"kind": "assistant", "text": text})
+            # A tool round may follow; further text opens the next bubble.
+            self._reply_live = None
+            self._reply_item = None
         elif kind == "tool":
             name = str(event.get("name") or "tool")
             args = event.get("args") or {}
@@ -1790,57 +2100,76 @@ class CompanionWindow(QWidget):
             slot.tool_traces.append({"name": name, "args": args, "result": ""})
             slot.avatar_state = STATE_THINKING
             self._set_activity(slot, f"Running {name}")
+            item = transcript_append(
+                slot, {"kind": "tool", "name": name, "args": args, "result": ""}
+            )
+            self._close_live()
             if slot_id == self._active_id:
-                from .gui_pages import ToolTraceWidget
-
-                if not self.tools_scroll.isVisible():
-                    self.tools_scroll.show()
-                stretch = self.tools_layout.takeAt(self.tools_layout.count() - 1)
-                w = ToolTraceWidget(name, args, compact=True)
-                self.tools_layout.addWidget(w)
-                self._tool_widgets.append(w)
-                if stretch is not None:
-                    self.tools_layout.addItem(stretch)
-                else:
-                    self.tools_layout.addStretch()
+                self._collapse_thinking()
+                self._feed_tool_widget(item)
         elif kind == "tool_result":
             body = str(event.get("text") or "")
-            traces = slot.tool_traces or []
-            if traces:
-                traces[-1]["result"] = body[:4000]
-            if slot_id == self._active_id and self._tool_widgets:
-                self._tool_widgets[-1].set_result(body)
+            name = str(event.get("name") or "")
+            item = find_tool_trace(slot.transcript, name)
+            if item is None:
+                item = transcript_append(
+                    slot,
+                    {"kind": "tool", "name": name or "tool", "args": {}, "result": body},
+                )
+                if slot_id == self._active_id:
+                    self._feed_tool_widget(item)
+            else:
+                item["result"] = body[:4000]
+                if slot_id == self._active_id:
+                    for row in self._feed_tool_rows:
+                        if row[0] is item:
+                            row[1].set_result(body)
+                            break
+            legacy = find_tool_trace(slot.tool_traces, name)
+            if legacy is not None:
+                legacy["result"] = body[:4000]
         elif kind == "status":
             phase = str(event.get("phase") or "")
             text = str(event.get("text") or "")
             if phase == "tool" or text:
                 slot.avatar_state = STATE_THINKING
                 self._set_activity(slot, text or "Working…")
-            # never append status into answer bubble
+            # status belongs in the activity line, never in the answer
         elif kind == "error":
             slot.avatar_state = STATE_ERROR
-            slot.last_error = str(event.get("text") or "error")
+            text = str(event.get("text") or "error")
+            slot.last_error = text
             slot.reply_buf = ""
             self._set_activity(slot, "")
+            kept = transcript_append(slot, {"kind": "error", "text": text})
+            if (
+                slot_id == self._active_id
+                and (slot.transcript or [])
+                and (slot.transcript or [])[-1] is kept
+            ):
+                self._collapse_thinking(finish=True)
+                self._feed_item(kept)
+            self._close_live()
         elif kind == "done":
             self._set_activity(slot, "")
             if slot.avatar_state != STATE_PAUSED:
                 slot.avatar_state = STATE_IDLE
             if slot_id == self._active_id:
-                self.think_block.finish()
-                self.think_block.collapse()
+                self._collapse_thinking(finish=True)
+                self._close_live()
 
         if slot_id == self._active_id:
-            parts: list[str] = []
-            if slot.user_prompt:
-                parts.append(f"You: {slot.user_prompt}")
-            if slot.last_error:
-                parts.append(f"Error: {slot.last_error}")
-            elif slot.reply_buf.strip():
-                parts.append(slot.reply_buf.strip()[-2000:])
-            self.bubble.setPlainText("\n\n".join(parts))
-            sb = self.bubble.verticalScrollBar()
-            sb.setValue(sb.maximum())
+            if kind in (
+                "assistant_delta",
+                "delta",
+                "thinking_delta",
+                "tool",
+                "tool_result",
+                "assistant",
+                "error",
+                "done",
+            ):
+                self._feed_scroll_bottom()
             self.avatar.set_state(slot.avatar_state)
             self._sync_harness_chip(slot)
             if kind in ("assistant_delta", "delta", "thinking_delta", "tool", "done", "run_spawn"):
@@ -1854,6 +2183,7 @@ class CompanionWindow(QWidget):
         slot.reply_buf = ""
         slot.busy = False
         slot.activity = ""
+        transcript_append(slot, {"kind": "error", "text": short})
         if slot_id == self._active_id:
             self._apply_slot_ui()
 
@@ -2516,11 +2846,10 @@ class CompanionWindow(QWidget):
         if mode in ("native", "qwen", "dsh"):
             force = mode
         self._toggle_panel(PANEL_NONE)
-        slot.reply_buf = ""
-        slot.thinking_buf = ""
-        slot.tool_traces = []
         slot.last_error = ""
         slot.user_prompt = f"[template] {title}"
+        transcript_append(slot, {"kind": "user", "text": slot.user_prompt})
+        slot.turn_start = len(slot.transcript or []) - 1
         slot.busy = True
         slot.avatar_state = STATE_THINKING
         slot.activity = f"Template ({title})"
