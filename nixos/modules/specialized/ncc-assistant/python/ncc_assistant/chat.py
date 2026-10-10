@@ -56,9 +56,55 @@ def run_chat(
             continue
 
         for event in session.send(user):
+            if event.get("kind") == "ask":
+                # The generator is parked inside the tool; answer it or nothing moves.
+                session.answer_ask(str(event.get("ask_id") or ""), _ask_answer(event))
+                continue
             _print_event(event)
 
     return 0
+
+
+def _ask_answer(event: dict) -> str | None:
+    """Ask the human on stdin and return what the tool should hand back to the model.
+
+    Returning None is a real answer here — it means dismissed, and the tool then tells
+    the model to proceed on its own assumptions instead of asking again.
+    """
+    header = str(event.get("header") or "").strip()
+    print(f"\nask{' [' + header + ']' if header else ''}> {event.get('question', '')}")
+
+    options = [o for o in (event.get("options") or []) if isinstance(o, dict)]
+    if options:
+        for i, opt in enumerate(options, start=1):
+            label = str(opt.get("label") or "").strip()
+            desc = str(opt.get("description") or "").strip()
+            print(f"  {i}. {label}" + (f" — {desc}" if desc else ""))
+        hint = "number(s), or your own text" if event.get("multi") else "number, or your own text"
+    else:
+        hint = "free text"
+
+    try:
+        raw = input(f"answer ({hint}, Enter to skip)> ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return None
+    if not raw:
+        return None
+
+    if not options:
+        return raw
+
+    picked = [
+        options[int(part) - 1].get("label", "")
+        for part in raw.replace(" ", ",").split(",")
+        if part.strip().isdigit() and 1 <= int(part) <= len(options)
+    ]
+    if not picked:
+        return raw  # free text is always a valid answer
+    if not event.get("multi"):
+        return str(picked[0])
+    return ", ".join(str(label) for label in picked)
 
 
 def _print_event(event: dict, *, verbose: bool = False) -> None:

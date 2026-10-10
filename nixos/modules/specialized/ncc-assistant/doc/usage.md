@@ -392,7 +392,28 @@ ncc-assistant-mcp
 | `run_preflight` | Prebuild script |
 | `config_health_report` | Drift / health |
 | `list_config_backups` / `list_boot_generations` | Rollback guidance |
+| `ask_user` | Ask the human a question (options → chips) |
 | `memory_*` | Durable notes |
+
+### `ask_user` — the model asks instead of guessing
+
+One tool, one card: question, short header and up to four options render where the chat
+runs, and what you pick comes back to the model as the tool result.
+
+| Surface | How you answer |
+|---------|----------------|
+| Companion / GUI | Option chips on the card; the free-text row always works; `Skip` = no answer |
+| `ncc ai` (REPL) | Numbered options on stdin — `2`, or `1,2` when `multi_select`; other text goes verbatim, Enter skips |
+| MCP / agent runs / schedules | No interactive surface → `{"ok": false, "error": "No interactive surface…"}` |
+
+- The card is shown **before** the tool waits, so chips are live the moment the model asks.
+- A question waits at most **600 s**; on timeout or `Skip` the tool returns `answered: false`
+  plus a note not to ask again, so the run continues on stated assumptions instead of looping.
+- `multi_select: true` collects every checked chip and is answered with `Send` (or `Enter`).
+- A reloaded companion chat shows the question with the answer that was given; that card is
+  closed — its worker is gone, so nothing could receive an answer any more.
+- Questions only, never write approval: `apply_module_config` / `apply_system` still go
+  through the confirm path, so a question can't stack a second prompt onto a write.
 
 ## Safety
 

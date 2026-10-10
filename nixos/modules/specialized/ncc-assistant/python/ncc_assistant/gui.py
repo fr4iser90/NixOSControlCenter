@@ -516,6 +516,7 @@ class ContextProbeWorker(QThread):
 
 from .gui_pages import (
     AgentPage,
+    AskWidget,
     DiffReviewDialog,
     JobsPage,
     PluginsPage,
@@ -879,6 +880,8 @@ class ChatPage(QWidget):
         self._provider_guard = False
         self._stick_bottom = True
         self._view_mode = "chat"  # "chat" | "transcript"
+        # ask_id -> live question card; the worker is parked until one of them answers.
+        self._ask_cards: dict[str, AskWidget] = {}
 
         root = QHBoxLayout(self)
         root.setContentsMargins(8, 8, 8, 8)
@@ -1346,8 +1349,8 @@ class ChatPage(QWidget):
         """Offer credential update after /models auth failure."""
         try:
             self.session.settings = prompt_auth_dialog(self.session.settings, self)
-            self.session.runtime = ToolRuntime(
-                self.session.settings, confirm_hook=self.confirm.confirm
+            self.session.attach_runtime(
+                ToolRuntime(self.session.settings, confirm_hook=self.confirm.confirm)
             )
             self.status.setText("Auth updated — refreshing models…")
             self.status.show()
@@ -1742,8 +1745,8 @@ class ChatPage(QWidget):
         settings = apply_provider_settings(self.session.settings, prov)
         settings = with_cached_credentials(settings)
         self.session.settings = settings
-        self.session.runtime = ToolRuntime(
-            settings, confirm_hook=self.confirm.confirm
+        self.session.attach_runtime(
+            ToolRuntime(settings, confirm_hook=self.confirm.confirm)
         )
         set_last_provider(prov.id, prov.endpoint)
         self.session.drop_context_meter()
@@ -1788,8 +1791,8 @@ class ChatPage(QWidget):
         settings = apply_provider_settings(self.session.settings, updated)
         settings = with_cached_credentials(settings)
         self.session.settings = settings
-        self.session.runtime = ToolRuntime(
-            settings, confirm_hook=self.confirm.confirm
+        self.session.attach_runtime(
+            ToolRuntime(settings, confirm_hook=self.confirm.confirm)
         )
         set_last_provider(updated.id, updated.endpoint)
         self.session.drop_context_meter()
@@ -1815,6 +1818,7 @@ class ChatPage(QWidget):
             w = item.widget()
             if w:
                 w.deleteLater()
+        self._ask_cards = {}
         self._invalidate_ctx()
         self._refresh_landing()
         self.sidebar.refresh(self.session.session_id)
@@ -1865,6 +1869,8 @@ class ChatPage(QWidget):
             w = item.widget()
             if w:
                 w.deleteLater()
+        # Cards from the previous session belong to a worker that no longer exists.
+        self._ask_cards = {}
         self._populate_models(fetch=False)
         self._update_vision_ui()
         self._replay_history_bubbles()
@@ -2087,6 +2093,8 @@ class ChatPage(QWidget):
             self._last_trace = trace
             self.feed.addWidget(trace)
             self._scroll_bottom()
+        elif kind == "ask":
+            self._show_ask_card(dict(event))
         elif kind == "tool_result":
             body = event.get("text") or ""
             if getattr(self, "_last_trace", None) is not None:
@@ -2138,6 +2146,7 @@ class ChatPage(QWidget):
             self._set_activity(None)
             self._discard_empty_stream_bubble()
             self._stream_bubble = None
+            self._settle_ask_cards()
             self._add_bubble("Error", event.get("text") or "")
             self._arm_retry(True)
             self._maybe_reauth(str(event.get("text") or ""))
@@ -2151,10 +2160,37 @@ class ChatPage(QWidget):
             self._finish_think_block()
             self._think_block = None
             self._discard_empty_stream_bubble()
+            self._settle_ask_cards()
             self._update_meta()
             self.session.persist()
             self.sidebar.refresh(self.session.session_id)
             self._maybe_refresh_transcript()
+
+    def _show_ask_card(self, event: dict) -> None:
+        """Render one `ask_user` question; its chips release the parked tool call."""
+        from .preferences import get_trace_density
+
+        self._discard_empty_stream_bubble()
+        self._set_activity("Waiting for your answer")
+        ask_id = str(event.get("ask_id") or "")
+        card = AskWidget(
+            event,
+            on_answer=lambda text: self._answer_ask(ask_id, text),
+            compact=get_trace_density() == "compact",
+        )
+        self._ask_cards[ask_id] = card
+        self.feed.addWidget(card)
+        self._scroll_bottom()
+
+    def _answer_ask(self, ask_id: str, text: str | None) -> None:
+        # The tool blocks on this; nothing else in the GUI can un-park the worker.
+        self.session.answer_ask(ask_id, text)
+
+    def _settle_ask_cards(self) -> None:
+        """Close every card the run left open — no one can answer them any more."""
+        for card in self._ask_cards.values():
+            card.set_answered(None)
+        self._ask_cards = {}
 
     def _maybe_reauth(self, err: str) -> None:
         low = err.lower()
@@ -2162,8 +2198,8 @@ class ChatPage(QWidget):
             return
         try:
             self.session.settings = prompt_auth_dialog(self.session.settings, self)
-            self.session.runtime = ToolRuntime(
-                self.session.settings, confirm_hook=self.confirm.confirm
+            self.session.attach_runtime(
+                ToolRuntime(self.session.settings, confirm_hook=self.confirm.confirm)
             )
             self.session.drop_context_meter()
             self._populate_models(fetch=False)

@@ -1113,6 +1113,8 @@ class CompanionWindow(QWidget):
         self.feed_scroll.setWidget(self.feed_host)
         chat_l.addWidget(self.feed_scroll, stretch=1)
         self._feed_tool_rows: list[list[Any]] = []
+        # ask_id -> [[transcript item, card]] for questions still awaiting an answer.
+        self._feed_ask_rows: dict[str, list[list[Any]]] = {}
         # Live widgets mirror exactly one in-flight transcript item.
         self._think_live: Any | None = None
         self._think_item: dict[str, Any] | None = None
@@ -1532,6 +1534,7 @@ class CompanionWindow(QWidget):
                 w.setParent(None)
                 w.deleteLater()
         self._feed_tool_rows = []
+        self._feed_ask_rows = {}
         self._think_live = None
         self._think_item = None
         self._reply_live = None
@@ -1567,6 +1570,60 @@ class CompanionWindow(QWidget):
         self._feed_append(widget)
         self._feed_tool_rows.append([item, widget])
         return widget
+
+    def _feed_ask_widget(self, item: dict[str, Any], *, live: bool = False) -> Any:
+        """Question card — interactive only while its tool call is still parked."""
+        from .gui_pages import AskWidget
+
+        ask_id = str(item.get("ask_id") or "")
+        slot = self._slot() if live else None
+        interactive = live and self._ask_is_pending(slot, ask_id)
+        widget = AskWidget(
+            dict(item),
+            on_answer=(
+                (lambda text, sid=self._active_id: self._answer_ask(sid, ask_id, text))
+                if interactive
+                else None
+            ),
+            compact=self._tool_compact(),
+        )
+        if not interactive:
+            widget.set_answered(item.get("answer"))
+        self._feed_append(widget)
+        if interactive:
+            self._feed_ask_rows.setdefault(ask_id, []).append([item, widget])
+        return widget
+
+    def _ask_is_pending(self, slot: ChatSlot | None, ask_id: str) -> bool:
+        """Is anyone still waiting inside `ask_user` for this question?
+
+        Reloaded transcripts render the same card, and its answer has nowhere to go —
+        the worker that asked is gone.
+        """
+        session = getattr(slot, "session", None)
+        if session is None or not ask_id:
+            return False
+        try:
+            return ask_id in list(session.pending_ask_ids())
+        except Exception:
+            return False
+
+    def _answer_ask(self, slot_id: str, ask_id: str, text: str | None) -> None:
+        """Release the parked worker and remember the answer for the store."""
+        for pair in self._feed_ask_rows.get(ask_id, []):
+            pair[0]["answer"] = text
+        self._schedule_persist()
+        slot = self._slot(slot_id)
+        session = getattr(slot, "session", None)
+        if session is not None:
+            session.answer_ask(ask_id, text)
+
+    def _settle_ask_cards(self) -> None:
+        """The run ended: a card nobody answered can never be answered now."""
+        for rows in self._feed_ask_rows.values():
+            for item, widget in rows:
+                widget.set_answered(item.get("answer"))
+        self._feed_ask_rows = {}
 
     def _new_thinking_block(self) -> Any:
         from .gui_pages import ThinkingBlock
@@ -1618,6 +1675,8 @@ class CompanionWindow(QWidget):
         kind = str(item.get("kind") or "")
         if kind == "tool":
             return self._feed_tool_widget(item)
+        if kind == "ask":
+            return self._feed_ask_widget(item, live=live)
         text = str(item.get("text") or "")
         if kind == "thinking":
             widget = self._new_thinking_block() if live else None
@@ -2118,6 +2177,9 @@ class CompanionWindow(QWidget):
         slot.busy = False
         slot.worker = None
         slot.activity = ""
+        if slot_id == self._active_id:
+            # A question the run left unanswered can never be answered now.
+            self._settle_ask_cards()
         turn = list(slot.transcript or [])[slot.turn_start :]
         answered = [i for i in turn if i.get("kind") == "assistant"]
         # Harnesses that stream without a final assistant event still leave a reply.
@@ -2230,6 +2292,28 @@ class CompanionWindow(QWidget):
             if slot_id == self._active_id:
                 self._collapse_thinking()
                 self._feed_tool_widget(item)
+        elif kind == "ask":
+            # The worker blocks right after this event, so the card must be on screen now.
+            item = transcript_append(
+                slot,
+                {
+                    "kind": "ask",
+                    "ask_id": str(event.get("ask_id") or ""),
+                    "question": str(event.get("question") or ""),
+                    "header": str(event.get("header") or ""),
+                    "options": [
+                        dict(o) for o in (event.get("options") or []) if isinstance(o, dict)
+                    ],
+                    "multi": bool(event.get("multi")),
+                    "answer": None,
+                },
+            )
+            slot.avatar_state = STATE_THINKING
+            self._set_activity(slot, "Waiting for your answer")
+            self._close_live()
+            if slot_id == self._active_id:
+                self._collapse_thinking()
+                self._feed_ask_widget(item, live=True)
         elif kind == "tool_result":
             body = str(event.get("text") or "")
             name = str(event.get("name") or "")
@@ -2313,6 +2397,7 @@ class CompanionWindow(QWidget):
                 "delta",
                 "thinking_delta",
                 "tool",
+                "ask",
                 "tool_result",
                 "assistant",
                 "error",

@@ -280,6 +280,56 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "ask_user",
+        "description": (
+            "Ask the human one question and wait for the answer. Use it when a "
+            "decision or a fact only the user has would otherwise make you "
+            "guess — not to confirm a write (that prompt is automatic) and not "
+            "for anything a tool can tell you. Offer 2-4 short, mutually "
+            "exclusive options unless multi_select is true; lead with your "
+            "recommendation and suffix its label with \" (Recommended)\". The "
+            "user can always answer in free text instead of picking."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "description": "One clear question, ending with a question mark",
+                },
+                "header": {
+                    "type": "string",
+                    "description": "Very short label shown above the options",
+                },
+                "options": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {
+                                "type": "string",
+                                "description": "Choice text the user clicks (1-5 words)",
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "What this choice means or costs",
+                            },
+                        },
+                        "required": ["label"],
+                    },
+                    "minItems": 2,
+                    "maxItems": 4,
+                },
+                "multi_select": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Allow picking more than one option",
+                },
+            },
+            "required": ["question"],
+        },
+    },
+    {
         "name": "agent_finish",
         "description": (
             "Signal that the agent has completed its goal or cannot proceed. "
@@ -296,6 +346,36 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
 ]
 MUTATING_TOOLS = {"apply_module_config", "apply_system", "restore_config_backup"}
+
+
+def normalize_ask_options(raw: Any) -> list[dict[str, str]]:
+    """Normalise model-supplied options; a bare string entry stays usable."""
+    out: list[dict[str, str]] = []
+    for item in raw or []:
+        if isinstance(item, dict):
+            label = str(item.get("label") or "").strip()
+            desc = str(item.get("description") or "").strip()
+        else:
+            label, desc = str(item or "").strip(), ""
+        if not label:
+            continue
+        out.append({"label": label[:120], "description": desc[:300]})
+    return out[:4]
+
+
+def ask_payload(tool_call_id: Any, args: dict[str, Any]) -> dict[str, Any]:
+    """The one shape an `ask_user` question takes — tool result, event and card.
+
+    Kept here so the surface that renders the question cannot drift from the tool
+    that waits for the answer.
+    """
+    return {
+        "ask_id": str(tool_call_id or ""),
+        "question": str(args.get("question") or "").strip()[:1000],
+        "header": str(args.get("header") or "").strip()[:24],
+        "options": normalize_ask_options(args.get("options")),
+        "multi": bool(args.get("multi_select")),
+    }
 
 
 def _tool_is_mutating(name: str, entry: Any | None = None) -> bool:
@@ -316,9 +396,13 @@ class ToolRuntime:
         confirm_hook: Callable[[dict[str, Any]], bool] | None = None,
         *,
         dry_run: bool = False,
+        ask_hook: Callable[[dict[str, Any]], str | None] | None = None,
     ):
         self.settings = settings
         self.confirm_hook = confirm_hook
+        # Interactive surfaces install this to answer `ask_user` (see session.py);
+        # without it the tool says so instead of blocking a headless run forever.
+        self.ask_hook = ask_hook
         self._index: dict[str, Any] | None = None
         self._dry_run = dry_run
         self._call_counts: dict[str, int] = {}
@@ -819,6 +903,41 @@ class ToolRuntime:
         )
         result = svc.wait_for_decision(decision.id, timeout_sec=timeout)
         return result == "allow"
+
+    def _ask_user(self, args: dict[str, Any], ask_id: str | None) -> dict[str, Any]:
+        """`ask_user`: one question out, the human's answer back as the tool result."""
+        payload = ask_payload(ask_id, args)
+        if not payload["question"]:
+            return {"ok": False, "error": "Missing argument: question"}
+        if self.ask_hook is None:
+            return {
+                "ok": False,
+                "error": (
+                    "No interactive surface to ask on. Ask in your reply instead "
+                    "and stop there."
+                ),
+            }
+        answer = self.ask_hook(payload)
+        text = str(answer).strip() if answer else ""
+        if not text:
+            return {
+                "ok": True,
+                "question": payload["question"],
+                "answered": False,
+                "answer": None,
+                "note": (
+                    "The user gave no answer (dismissed, cancelled, or not "
+                    "there). Do not ask again — continue with your best "
+                    "judgement and state what you assumed."
+                ),
+            }
+        return {
+            "ok": True,
+            "question": payload["question"],
+            "answered": True,
+            "answer": text[:4000],
+        }
+
     def _record_call(self, name: str) -> None:
         """Record a tool call for rate limiting."""
         self._call_counts[name] = self._call_counts.get(name, 0) + 1
@@ -1115,7 +1234,13 @@ class ToolRuntime:
         """Agent finish handler (actual finish is handled by AgentRunner)."""
         return {"ok": True, "message": "Agent finished", "summary": summary, "success": success}
 
-    def call(self, name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+    def call(
+        self,
+        name: str,
+        arguments: dict[str, Any] | None = None,
+        *,
+        ask_id: str | None = None,
+    ) -> dict[str, Any]:
         args = dict(arguments or {})
         try:
             from .registry import get_registry
@@ -1175,6 +1300,10 @@ class ToolRuntime:
                     return {"ok": False, "error": f"Shell tool {name} has no command"}
                 self._record_call(name)
                 return self._call_shell_tool(name, args, tool_entry.command)
+
+            if name == "ask_user":
+                self._record_call(name)
+                return self._ask_user(args, ask_id)
 
             if name == "apply_module_config":
                 wants_write = args.get("confirm") in (True, "true", "1", 1)

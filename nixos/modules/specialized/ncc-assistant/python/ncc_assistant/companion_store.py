@@ -80,6 +80,26 @@ def transcript_for_store(items: Any) -> list[dict[str, Any]]:
             result = str(item.get("result") or "")
             if result:
                 rec["result"] = result[-RESULT_MAX:]
+        if kind == "ask":
+            # Card renders from the question, not `text`; the answer is what the
+            # reloaded card shows instead of live chips (that worker is gone).
+            rec["ask_id"] = str(item.get("ask_id") or "")
+            rec["question"] = str(item.get("question") or "")[:TEXT_MAX]
+            header = str(item.get("header") or "")
+            if header:
+                rec["header"] = header
+            rec["options"] = [
+                {
+                    "label": str(o.get("label") or "")[:120],
+                    "description": str(o.get("description") or "")[:300],
+                }
+                for o in (item.get("options") or [])
+                if isinstance(o, dict) and str(o.get("label") or "").strip()
+            ][:4]
+            rec["multi"] = bool(item.get("multi"))
+            answer = str(item.get("answer") or "")
+            if answer:
+                rec["answer"] = answer[:TEXT_MAX]
         out.append(rec)
     return out
 

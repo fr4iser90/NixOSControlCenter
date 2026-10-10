@@ -430,6 +430,152 @@ class ToolTraceWidget(QFrame):
         self._fit_body_height()
 
 
+class AskWidget(QFrame):
+    """`ask_user` card — the question, its option chips, one answer back to the tool.
+
+    Chat surfaces disable the composer while a run is in flight, so the card carries its
+    own free-text row: chips are the fast path, typing is always allowed. `on_answer`
+    fires at most once; `set_answered()` closes the card from outside — run ended, or a
+    transcript reloaded where the answer could no longer reach anyone.
+    """
+
+    _RADIUS = 8
+    _MARGINS = (10, 8, 10, 8)
+    _SPACING = 6
+
+    def __init__(
+        self,
+        payload: dict,
+        on_answer=None,
+        parent: QWidget | None = None,
+        *,
+        compact: bool = False,
+    ) -> None:
+        super().__init__(parent)
+        self.setObjectName("nccAsk")
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        self.ask_id = str(payload.get("ask_id") or "")
+        self._on_answer = on_answer
+        self._multi = bool(payload.get("multi"))
+        self._settled = False
+        self.setStyleSheet(
+            "QFrame#nccAsk {"
+            "  background: palette(base);"
+            "  border: 1px solid palette(highlight);"
+            f"  border-radius: {self._RADIUS}px;"
+            "}"
+        )
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(*(4, 4, 4, 4) if compact else self._MARGINS)
+        layout.setSpacing(self._SPACING)
+
+        header = str(payload.get("header") or "").strip()
+        title = QLabel("Ask" + (f" · {header}" if header else ""))
+        title.setObjectName("nccAskTitle")
+        title.setStyleSheet(
+            "QLabel#nccAskTitle {"
+            "  font-weight: 700; font-size: 11px;"
+            "  color: palette(highlight); padding: 0; margin: 0;"
+            "}"
+        )
+        layout.addWidget(title)
+
+        question = QLabel(str(payload.get("question") or "").strip())
+        question.setObjectName("nccAskQuestion")
+        question.setWordWrap(True)
+        question.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        question.setStyleSheet(
+            "QLabel#nccAskQuestion {"
+            "  font-size: 13px; color: palette(window-text); padding: 0; margin: 0;"
+            "}"
+        )
+        layout.addWidget(question)
+
+        self._buttons: list[QPushButton] = []
+        for opt in payload.get("options") or []:
+            if not isinstance(opt, dict):
+                continue
+            label = str(opt.get("label") or "").strip()
+            if not label:
+                continue
+            btn = QPushButton(label)
+            desc = str(opt.get("description") or "").strip()
+            btn.setToolTip(desc or label)
+            btn.setStyleSheet(
+                "QPushButton {"
+                "  text-align: left; padding: 6px 8px;"
+                "  border: 1px solid palette(mid); border-radius: 6px;"
+                "  background: palette(alternate-base);"
+                "}"
+                "QPushButton:hover { border-color: palette(highlight); }"
+                "QPushButton:checked { border: 2px solid palette(highlight); }"
+                "QPushButton:disabled { color: palette(mid); }"
+            )
+            if self._multi:
+                # Toggle only — Send collects every checked chip.
+                btn.setCheckable(True)
+            else:
+                btn.clicked.connect(lambda _checked, text=label: self._answer(text))
+            self._buttons.append(btn)
+            layout.addWidget(btn)
+
+        row = QHBoxLayout()
+        row.setSpacing(4)
+        self._input = QLineEdit()
+        self._input.setPlaceholderText(
+            "Select one or more, or type your own…"
+            if self._multi
+            else "Answer, or type your own…"
+        )
+        self._input.returnPressed.connect(self._send_text)
+        send = QPushButton("Send")
+        send.clicked.connect(self._send_text)
+        skip = QPushButton("Skip")
+        skip.setToolTip("No answer — the assistant continues on its own assumptions")
+        skip.clicked.connect(lambda: self._answer(None))
+        row.addWidget(self._input, stretch=1)
+        row.addWidget(send)
+        row.addWidget(skip)
+        layout.addLayout(row)
+
+        self._status = QLabel("")
+        self._status.setObjectName("nccAskStatus")
+        self._status.setStyleSheet(
+            "QLabel#nccAskStatus {"
+            "  font-size: 11px; color: palette(mid); padding: 0; margin: 0;"
+            "}"
+        )
+        self._status.setVisible(False)
+        layout.addWidget(self._status)
+
+    def _send_text(self) -> None:
+        text = self._input.text().strip()
+        if not text and self._multi:
+            picked = [btn.text() for btn in self._buttons if btn.isChecked()]
+            if picked:
+                self._answer(", ".join(str(label) for label in picked))
+            return
+        if text:
+            self._answer(text)
+
+    def _answer(self, text: str | None) -> None:
+        callback = None if self._settled else self._on_answer
+        self.set_answered(text)
+        if callback is not None:
+            callback(text)
+
+    def set_answered(self, text: str | None) -> None:
+        """Settle the card. Safe to call again — the first answer is what stays shown."""
+        if not self._settled:
+            self._settled = True
+            for widget in list(self._buttons) + [self._input]:
+                widget.setEnabled(False)
+            self._status.setText(f"Answered · {text}" if text else "No answer")
+            self._status.setVisible(True)
+
+
 class DiffReviewDialog(QDialog):
     """Side-by-side / unified diff review with Apply selected (phase 8)."""
 

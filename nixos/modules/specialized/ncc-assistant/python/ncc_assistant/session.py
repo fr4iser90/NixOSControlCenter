@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import threading
+import time
+import uuid
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Iterator
 
@@ -29,11 +31,13 @@ from .llm import (
     list_models,
     model_supports_vision,
 )
-from .runtime import ToolRuntime
+from .runtime import ToolRuntime, ask_payload
 
 Event = dict[str, Any]
 PromptAuthFn = Callable[[Settings], Settings]
 ConfirmHook = Callable[[dict[str, Any]], bool]
+AskHook = Callable[[dict[str, Any]], str | None]
+ASK_TIMEOUT_SEC = 600.0
 
 
 @dataclass
@@ -51,6 +55,12 @@ class ChatSession:
     # Compaction deletes the message a title came from, so a real title is latched
     # once instead of being re-derived from whatever survived compaction.
     title_locked: bool = False
+    # ask_id → pending `ask_user`. The worker blocks in `_wait_ask`; whichever
+    # surface rendered the question releases it through `answer_ask`.
+    _asks: dict[str, dict[str, Any]] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    _ask_lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
     def ctx_meter(self) -> ContextMeter:
         """Token meter; built on first use because detecting the window is HTTP."""
@@ -95,6 +105,7 @@ class ChatSession:
             self.messages.insert(0, {"role": "system", "content": prompt})
 
     def __post_init__(self) -> None:
+        self._install_ask_hook()
         if not self.messages:
             self.messages = [
                 {
@@ -158,8 +169,90 @@ class ChatSession:
     def set_confirm_hook(self, hook: ConfirmHook | None) -> None:
         self.runtime.confirm_hook = hook
 
+    def attach_runtime(self, runtime: ToolRuntime) -> None:
+        """Swap the runtime (new credentials, new provider) and keep `ask_user` alive.
+
+        Surfaces that rebuild the runtime would otherwise leave the next question
+        with no hook, and the model would get "No interactive surface" mid-chat.
+        """
+        self.runtime = runtime
+        self._install_ask_hook()
+
+    def _install_ask_hook(self) -> None:
+        """`ask_user` waits on this session, not on a desktop notification."""
+        self.runtime.ask_hook = self._wait_ask
+
+    def _begin_ask(self, name: str, tool_call_id: Any, args: dict[str, Any]) -> Event | None:
+        """Register a pending question and return what to report to the surface.
+
+        Must run *before* the tool call: the hook that waits for the answer runs
+        inside this generator, so a surface could never report the question after.
+        """
+        if str(name or "") != "ask_user":
+            return None
+        payload = ask_payload(tool_call_id, args)
+        if not payload["question"]:
+            return None  # the tool answers with its own error
+        if not payload["ask_id"]:
+            # Some gateways drop tool_call ids; the surface still needs one to answer into.
+            payload["ask_id"] = f"ask-{uuid.uuid4().hex[:8]}"
+        self.abandon_asks()  # a second live question means the first was orphaned
+        with self._ask_lock:
+            self._asks[payload["ask_id"]] = {
+                "settled": threading.Event(),
+                "answer": None,
+                "cancelled": False,
+            }
+        return payload
+
+    def _wait_ask(self, payload: dict[str, Any]) -> str | None:
+        """The hook `ToolRuntime` calls: wait for an answer, a cancel, or the deadline.
+
+        Polls the settle flag instead of blocking on it so a cancel (which only
+        sets `cancel_event`) frees the worker without a second signal path.
+        """
+        ask_id = str(payload.get("ask_id") or "")
+        with self._ask_lock:
+            entry = self._asks.get(ask_id)
+        if entry is None:
+            return None
+        deadline = time.monotonic() + ASK_TIMEOUT_SEC
+        while not entry["settled"].wait(timeout=0.25):
+            if self.cancel_event.is_set() or time.monotonic() >= deadline:
+                with self._ask_lock:
+                    entry["cancelled"] = True
+                    entry["settled"].set()
+                break
+        with self._ask_lock:
+            self._asks.pop(ask_id, None)
+            answer = None if entry.get("cancelled") else entry.get("answer")
+        return None if answer is None else str(answer)
+
+    def answer_ask(self, ask_id: str, text: str | None) -> bool:
+        """Give the waiting tool the human's answer (``None``/empty = skipped)."""
+        with self._ask_lock:
+            entry = self._asks.get(str(ask_id or ""))
+            if entry is None:
+                return False
+            entry["answer"] = text
+            entry["settled"].set()
+        return True
+
+    def abandon_asks(self) -> None:
+        """Free every pending question (cancelled run, chat closed under it)."""
+        with self._ask_lock:
+            for entry in self._asks.values():
+                entry["cancelled"] = True
+                entry["settled"].set()
+            self._asks.clear()
+
+    def pending_ask_ids(self) -> list[str]:
+        with self._ask_lock:
+            return list(self._asks)
+
     def request_cancel(self) -> None:
         self.cancel_event.set()
+        self.abandon_asks()
 
     def clear_cancel(self) -> None:
         self.cancel_event.clear()
@@ -194,6 +287,7 @@ class ChatSession:
         self.runtime = ToolRuntime(
             self.settings, confirm_hook=self.runtime.confirm_hook
         )
+        self._install_ask_hook()
         # Window size is per model — the probe is keyed on endpoint|model.
         self.meter = None
         self.refresh_model_label()
@@ -233,6 +327,7 @@ class ChatSession:
         )
 
     def reset_conversation(self) -> None:
+        self.abandon_asks()
         self.session_id = new_session_id()
         self.title = "New chat"
         self.title_locked = False
@@ -336,6 +431,7 @@ class ChatSession:
                 self.runtime = ToolRuntime(
                     self.settings, confirm_hook=self.runtime.confirm_hook
                 )
+                self._install_ask_hook()
                 self.refresh_model_label()
                 yield {"kind": "status", "text": "Auth updated — retrying…"}
                 try:
@@ -449,12 +545,17 @@ class ChatSession:
                 except json.JSONDecodeError:
                     args = {}
                 yield {"kind": "tool", "name": name, "args": args}
+                ask = self._begin_ask(name, tc.get("id"), args)
+                if ask is not None:
+                    yield {"kind": "ask", **ask}
                 yield {
                     "kind": "status",
                     "text": f"Running tool: {name}",
                     "phase": "tool",
                 }
-                result = self.runtime.call(name, args)
+                result = self.runtime.call(
+                    name, args, ask_id=(ask or {}).get("ask_id") or tc.get("id")
+                )
                 payload = json.dumps(result, ensure_ascii=False, indent=2)
                 if len(payload) > 6000:
                     payload = payload[:6000] + "\n... (truncated)"
