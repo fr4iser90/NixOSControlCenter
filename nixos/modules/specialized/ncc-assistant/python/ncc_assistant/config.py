@@ -54,6 +54,33 @@ def is_unlimited(limit: int | None) -> bool:
     return limit is None or int(limit) <= 0
 
 
+# qwen-code's compaction budget, read out of the 0.23.4 bundle
+# (chunks/chunk-AT4T4DRH.js: computeThresholds + DEFAULT_PCT / SUMMARY_RESERVE /
+# AUTOCOMPACT_BUFFER). Tokens, not seconds.
+COMPACT_SUMMARY_RESERVE_TOKENS = 20_000
+COMPACT_BUFFER_TOKENS = 13_000
+DEFAULT_AUTO_COMPACT_FRACTION = 0.85
+# Used until the gateway answers with real usage; also the fallback window when
+# nothing advertises one (Ollama's own num_ctx default is 4096, so this is generous).
+DEFAULT_CONTEXT_WINDOW_TOKENS = 8192
+CHARS_PER_TOKEN = 4
+
+
+def compact_threshold_for(window: int, override: int | None = None) -> int:
+    """Token count at which compaction fires — qwen-code's computeThresholds().
+
+    ``min(0.85 * window, window - 20000 - 13000)``, the absolute ceiling only
+    applying while it is positive. So a 4k/8k local context compacts at 85% of
+    the window and a 200k gateway at ~167k rather than 170k.
+    """
+    if override is not None and int(override) > 0:
+        return int(override)
+    window = max(1024, int(window))
+    proportional = int(DEFAULT_AUTO_COMPACT_FRACTION * window)
+    ceiling = window - COMPACT_SUMMARY_RESERVE_TOKENS - COMPACT_BUFFER_TOKENS
+    return min(proportional, ceiling) if ceiling > 0 else proportional
+
+
 def normalize_endpoint(url: str) -> str:
     """Ensure OpenAI-compatible base ends with /v1 when only a host was given."""
     u = url.strip().rstrip("/")
@@ -112,6 +139,11 @@ class Settings:
     extra_headers: tuple[tuple[str, str], ...] = field(default_factory=tuple)
     # Tool rounds per chat message; UNLIMITED (-1) = keep going until the model stops
     chat_max_rounds: int = UNLIMITED
+    # Context window in tokens; None → auto-detect from the gateway
+    context_window: int | None = None
+    # Compact when the prompt nears this many tokens; None/-1 → derived per window
+    compact_threshold: int = UNLIMITED
+    auto_compact: bool = True
 
     @property
     def provider(self) -> str:
@@ -212,6 +244,16 @@ class Settings:
             mcp_servers_json=_env_optional_str("NCC_ASSISTANT_MCP_SERVERS_JSON"),
             extra_headers=(),
             chat_max_rounds=_env_int("NCC_ASSISTANT_CHAT_MAX_ROUNDS", UNLIMITED),
+            context_window=(
+                cw
+                if (cw := _env_optional_int("NCC_ASSISTANT_CONTEXT_WINDOW"))
+                and cw > 0
+                else None
+            ),
+            compact_threshold=_env_int(
+                "NCC_ASSISTANT_COMPACT_THRESHOLD", UNLIMITED
+            ),
+            auto_compact=_env_bool("NCC_ASSISTANT_AUTO_COMPACT", True),
         )
 
     def load_system_prompt(self) -> str:

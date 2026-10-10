@@ -249,6 +249,58 @@ All under `~/.config/ncc-assistant/` (user-only, not `systemConfig`):
 combo. Or delete that entry from `providers.json` / clear `last_provider_id` in
 `preferences.json`.
 
+## Chat context & compaction
+
+Every chat surface keeps one rolling transcript, so back-and-forth keeps its
+thread. What is on file is measured, not guessed: the gateway's own `usage` from
+the last response is the anchor, anything appended since then is estimated
+(~4 chars/token, images flat 800), plus the fixed per-request floor (system
+prompt + tool schemas).
+
+**Observe**
+
+| Surface | Reading | Manual compaction |
+|---------|---------|-------------------|
+| GUI chat | `ctx 42%` chip in the chat toolbar | **Compact** button (same toolbar) |
+| Companion | `ctx 42%` button under the session picker | its menu → **Compact this chat** |
+| `ncc ai chat` (REPL) | `/context` | `/compact` |
+| CLI | `ncc ai context show [--session ID] [--json]` | `ncc ai context compact [--session ID] [--keep N]` |
+
+Chip semantics: `~` prefix = no real `usage` yet (pure estimate, e.g. right
+after a compaction); **bold** = at/over the threshold; `ctx ?` (Companion) = the
+window could not be read — the chat itself is fine. Hover for used/window, free
+tokens, threshold, whether auto-compaction is on, and how the window was found.
+
+**Window size** is discovered per `endpoint + model`: llama.cpp `/props`,
+Ollama `num_ctx` (falling back to the model's trained length), `/models`
+`max_model_len`. A runtime cap always wins over a trained length. When nothing
+advertises one, fallback is 8192 tokens.
+
+**Automatic compaction** (like qwen-code): before a request whose projected size
+crosses the threshold, older turns are replaced by one LLM summary and the
+newest turns are kept verbatim. The threshold is qwen-code's own
+`computeThresholds`: **85 % of the window, capped at `window − 33 000`**
+(20 000 kept for the summary output + 13 000 buffer) whenever that cap is
+positive — 6 963 tokens at an 8 192 window, 167 000 at 200 000. No extra safety
+buffer: the pending user message is already counted when the check runs. A hard
+`context length exceeded` error from the gateway triggers the same
+compact-then-retry-once path. Tool calls and their results are never split.
+Each compaction is reported once per surface
+(`Context compacted — ~N tokens freed`).
+
+```nix
+# systemConfig … ncc-assistant  (all values in tokens)
+agent.contextWindow = null;     # null = probe the gateway; 32768 = pin it (no probe)
+agent.compactThreshold = -1;    # -1 = derive like qwen-code; >0 = used as-is
+agent.autoCompact = true;       # false = never compact on its own (manual only)
+```
+
+`autoCompact = false` keeps the full transcript until you compact by hand, so an
+over-long prompt fails instead of losing detail. Switching provider or model
+re-reads the window; `--keep N` overrides how many newest turns survive.
+External harness sessions (`agent.harness = "qwen" | "dsh"`) compact inside that
+tool, not here.
+
 ## Jobs / playbooks / presence
 
 ```bash

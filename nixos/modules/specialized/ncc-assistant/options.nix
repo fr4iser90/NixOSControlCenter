@@ -305,6 +305,41 @@ in
         '';
       };
 
+      contextWindow = mkOption {
+        type = types.nullOr types.int;
+        default = null;
+        description = ''
+          Context window for chat in tokens. null (default) lets the assistant
+          discover it from the gateway (llama.cpp /props, Ollama num_ctx,
+          /models max_model_len) per endpoint+model and falls back to 8192 when
+          nothing advertises one. Set a number to override a wrong or missing
+          reading — that value is then used without probing.
+        '';
+      };
+
+      compactThreshold = mkOption {
+        type = types.int;
+        default = -1;
+        description = ''
+          Token count at which a chat is compacted (older turns replaced by an
+          LLM summary). -1 (default) derives it like qwen-code: 85 percent of
+          the context window, capped at the window minus 33000 tokens (20000
+          kept for the summary output plus a 13000 buffer) whenever that cap is
+          positive — 6963 at an 8192 window, 167000 at 200000. A positive value
+          is used as-is in tokens.
+        '';
+      };
+
+      autoCompact = mkOption {
+        type = types.bool;
+        default = true;
+        description = ''
+          Compact automatically before a request that would pass the threshold.
+          false keeps the whole transcript and relies on manual compaction
+          (ncc ai context compact), so an over-long prompt fails instead.
+        '';
+      };
+
       timeoutSec = mkOption {
         type = types.int;
         default = 1800;

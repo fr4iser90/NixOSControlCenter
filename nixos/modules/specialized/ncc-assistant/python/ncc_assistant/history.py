@@ -116,8 +116,14 @@ def session_plaintext(session_id: str, *, include_system: bool = False) -> str:
 
 
 def title_from_messages(messages: list[dict[str, Any]]) -> str:
+    from .context import is_summary_message
+
     for msg in messages:
         if msg.get("role") != "user":
+            continue
+        if is_summary_message(msg):
+            # A compaction summary is a user message too — it must not steal the
+            # title from the question that started the session.
             continue
         content = msg.get("content")
         if isinstance(content, str) and content.strip():

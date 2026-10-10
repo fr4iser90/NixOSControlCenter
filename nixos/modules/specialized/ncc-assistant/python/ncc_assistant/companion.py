@@ -195,6 +195,39 @@ class _CompanionChatWorker(QThread):
             self.failed.emit(self.slot_id, f"{exc}\n{traceback.format_exc()}")
 
 
+class _CompanionContextWorker(QThread):
+    """Read or compact a slot's context meter; the window probe is HTTP, so off-UI.
+
+    Failures come back as a context event with `error` instead of `failed` — a bad
+    probe must not mark the chat itself as errored (that would arm Retry)."""
+
+    event = Signal(str, object)
+
+    def __init__(
+        self,
+        slot_id: str,
+        session: Any,
+        *,
+        compact: bool = False,
+        parent=None,
+    ) -> None:
+        super().__init__(parent)
+        self.slot_id = slot_id
+        self._session = session
+        self._compact = compact
+
+    def run(self) -> None:
+        try:
+            if self._compact:
+                for ev in self._session.compact_now():
+                    self.event.emit(self.slot_id, ev)
+            else:
+                report = self._session.context_report()
+                self.event.emit(self.slot_id, {"kind": "context", **report})
+        except Exception as exc:  # noqa: BLE001
+            self.event.emit(self.slot_id, {"kind": "context", "error": str(exc)})
+
+
 class _CompanionTemplateWorker(QThread):
     """Run an agent template goal into a companion slot (same event contract)."""
 
@@ -765,6 +798,9 @@ class CompanionWindow(QWidget):
         self._drag_origin: QPoint | None = None
         self._win_origin: QPoint | None = None
         self._tool_btns: dict[str, QToolButton] = {}
+        # Per-slot context-meter readings: display only, never part of the transcript.
+        self._ctx_by_slot: dict[str, dict] = {}
+        self._ctx_worker: Any | None = None
         self._persist_timer = QTimer(self)
         self._persist_timer.setInterval(2000)
         self._persist_timer.setSingleShot(True)
@@ -1038,6 +1074,16 @@ class CompanionWindow(QWidget):
         self.new_chat_btn.setFixedHeight(32)
         self.new_chat_btn.clicked.connect(self._new_chat)
         sess_row.addWidget(self.new_chat_btn)
+        self.ctx_btn = QToolButton()
+        self.ctx_btn.setObjectName("nccSessionAction")
+        self.ctx_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.ctx_btn.setText("ctx —")
+        self.ctx_btn.setFixedHeight(32)
+        self.ctx_btn.hide()
+        self._ctx_menu = QMenu(self)
+        self._ctx_menu.addAction("Compact this chat", self._compact_active)
+        self.ctx_btn.setMenu(self._ctx_menu)
+        sess_row.addWidget(self.ctx_btn)
         main.addLayout(sess_row)
 
         self.stack = QStackedWidget()
@@ -1293,6 +1339,82 @@ class CompanionWindow(QWidget):
         mark = " ✦" if slot.busy else ""
         nest = "▸ " if slot.parent_id else ""
         self.session_btn.setText(f"{nest}{slot.title}{mark} ▾"[:28])
+        self._paint_ctx()
+
+    def _paint_ctx(self) -> None:
+        """How full the model's context is for the visible chat (`~` = estimated)."""
+        report = self._ctx_by_slot.get(self._active_id) or {}
+        error = str(report.get("error") or "")
+        if error:
+            self.ctx_btn.setText("ctx ?")
+            self.ctx_btn.setToolTip(f"Context window unreadable: {error}")
+            self.ctx_btn.show()
+            return
+        window = int(report.get("window") or 0)
+        if not window:
+            self.ctx_btn.hide()
+            return
+        used = int(report.get("used") or 0)
+        percent = int(report.get("percent") or 0)
+        wave = "~" if report.get("basis") == "estimate" else ""
+        self.ctx_btn.setText(f"ctx {wave}{percent}%")
+        tip = (
+            f"{used:,} / {window:,} tokens ({percent}%)\n"
+            f"free: {int(report.get('free') or 0):,} · compaction at "
+            f"{int(report.get('threshold') or 0):,} tokens "
+            f"({'automatic' if report.get('auto') else 'manual only'})\n"
+            f"window via {report.get('window_source')} · "
+            f"measured by {report.get('basis')}\n"
+            "Menu: compact this chat."
+        )
+        if report.get("compactions"):
+            tip += f"\n{report['compactions']} compacted"
+        self.ctx_btn.setToolTip(tip)
+        self.ctx_btn.show()
+
+    def _probe_context(self, slot: ChatSlot) -> None:
+        """One background read per chat that already has messages on file."""
+        if self._ctx_worker is not None or slot.busy or slot.session is None:
+            return
+        if slot.id in self._ctx_by_slot:
+            return
+        if len(getattr(slot.session, "messages", None) or []) < 2:
+            return  # empty chat — the first reply carries the real reading
+        self._ctx_worker = _CompanionContextWorker(slot.id, slot.session, parent=self)
+        self._ctx_worker.event.connect(self._on_event)
+        self._ctx_worker.finished.connect(
+            lambda sid=slot.id: self._on_ctx_worker_done(sid)
+        )
+        self._ctx_worker.start()
+
+    def _compact_active(self) -> None:
+        slot = self._slot()
+        if slot.busy or self._ctx_worker is not None or slot.session is None:
+            return
+        slot.busy = True
+        slot.avatar_state = STATE_THINKING
+        self._set_activity(slot, "Compacting context")
+        self.send_btn.setEnabled(False)
+        self._sync_session_chip()
+        self._ctx_worker = _CompanionContextWorker(
+            slot.id, slot.session, compact=True, parent=self
+        )
+        self._ctx_worker.event.connect(self._on_event)
+        self._ctx_worker.finished.connect(
+            lambda sid=slot.id: self._on_ctx_worker_done(sid)
+        )
+        self._ctx_worker.start()
+
+    def _on_ctx_worker_done(self, slot_id: str) -> None:
+        self._ctx_worker = None
+        slot = self._slot(slot_id)
+        slot.busy = False
+        if slot.avatar_state == STATE_THINKING:
+            slot.avatar_state = STATE_IDLE
+        if slot_id == self._active_id:
+            self.avatar.set_state(slot.avatar_state)
+            self.send_btn.setEnabled(True)
+        self._sync_session_chip()
 
     def _rebuild_session_menu(self) -> None:
         self._session_menu.clear()
@@ -1652,6 +1774,7 @@ class CompanionWindow(QWidget):
         self._sync_harness_chip(slot)
         self._update_breadcrumb(slot)
         self._sync_session_chip()
+        self._probe_context(slot)
         # Sync workspace combo to slot without clobbering global active on view-only
         self.workspace_combo.blockSignals(True)
         widx = self.workspace_combo.findData(slot.workspace_id or "")
@@ -2128,6 +2251,15 @@ class CompanionWindow(QWidget):
             legacy = find_tool_trace(slot.tool_traces, name)
             if legacy is not None:
                 legacy["result"] = body[:4000]
+        elif kind == "context":
+            self._ctx_by_slot[slot_id] = dict(event)
+            if event.get("compacted"):
+                saved = int(event.get("saved") or 0)
+                self._set_activity(
+                    slot, f"Context compacted — ~{saved:,} tokens freed"
+                )
+            if slot_id == self._active_id:
+                self._paint_ctx()
         elif kind == "status":
             phase = str(event.get("phase") or "")
             text = str(event.get("text") or "")

@@ -14,6 +14,7 @@ from .auth import (
     with_cached_credentials,
 )
 from .config import Settings, UNLIMITED, is_unlimited
+from .context import KEEP_RECENT_MESSAGES, ContextMeter, compact_stream
 from .history import (
     new_session_id,
     save_session,
@@ -23,6 +24,7 @@ from .history import (
 from .llm import (
     CancelledError,
     LLMError,
+    is_context_length_error,
     iter_chat_completion,
     list_models,
     model_supports_vision,
@@ -45,6 +47,36 @@ class ChatSession:
     title: str = "New chat"
     cancel_event: threading.Event = field(default_factory=threading.Event)
     available_models: list[dict[str, Any]] = field(default_factory=list)
+    meter: ContextMeter | None = None
+    # Compaction deletes the message a title came from, so a real title is latched
+    # once instead of being re-derived from whatever survived compaction.
+    title_locked: bool = False
+
+    def ctx_meter(self) -> ContextMeter:
+        """Token meter; built on first use because detecting the window is HTTP."""
+        if self.meter is None:
+            self.meter = ContextMeter.for_settings(self.settings)
+        return self.meter
+
+    def context_report(self) -> dict[str, Any]:
+        return self.ctx_meter().report(self.messages)
+
+    def drop_context_meter(self) -> None:
+        """Settings changed (provider swap) — the old window/anchor no longer applies."""
+        self.meter = None
+
+    def _context_event(self) -> Event:
+        return {"kind": "context", **self.context_report()}
+
+    def compact_now(self, keep: int | None = None) -> Iterator[Event]:
+        """Manual compaction (`/compact`) — same code path as the automatic one."""
+        yield from compact_stream(
+            self.settings,
+            self.messages,
+            self.ctx_meter(),
+            KEEP_RECENT_MESSAGES if keep is None else max(2, int(keep)),
+        )
+        self.persist()
 
     def _system_prompt(self) -> str:
         from .registry import tools_prompt_section
@@ -114,6 +146,7 @@ class ChatSession:
             session.session_id = session_id
         if title:
             session.title = title
+            session.title_locked = True
         if refresh_models:
             # HTTP GET /models — avoid on chat-switch (pass refresh_models=False).
             session.refresh_models()
@@ -161,6 +194,8 @@ class ChatSession:
         self.runtime = ToolRuntime(
             self.settings, confirm_hook=self.runtime.confirm_hook
         )
+        # Window size is per model — the probe is keyed on endpoint|model.
+        self.meter = None
         self.refresh_model_label()
 
     def current_model_vision(self) -> bool:
@@ -171,7 +206,11 @@ class ChatSession:
         return model_supports_vision(mid)
 
     def persist(self) -> None:
-        self.title = title_from_messages(self.messages) or self.title
+        if not self.title_locked:
+            derived = title_from_messages(self.messages)
+            if derived and derived != "New chat":
+                self.title = derived
+                self.title_locked = True
         provider_name = ""
         try:
             from .providers import find_provider_by_endpoint
@@ -196,12 +235,16 @@ class ChatSession:
     def reset_conversation(self) -> None:
         self.session_id = new_session_id()
         self.title = "New chat"
+        self.title_locked = False
         self.messages = [
             {
                 "role": "system",
                 "content": self._system_prompt(),
             }
         ]
+        if self.meter is not None:
+            self.meter.reset_anchor()
+            self.meter.compactions = 0
         self.persist()
 
     def send(
@@ -257,6 +300,28 @@ class ChatSession:
             yield {"kind": "error", "text": "Generation cancelled."}
             self.persist()
         except LLMError as exc:
+            if is_context_length_error(exc):
+                # The estimate under-shot, or the gateway's window is smaller
+                # than advertised. Compact for real and give the turn one more
+                # chance instead of surfacing a raw 400.
+                yield {
+                    "kind": "status",
+                    "text": "Context limit hit — compacting and retrying once…",
+                    "phase": "compact",
+                }
+                yield from compact_stream(
+                    self.settings, self.messages, self.ctx_meter()
+                )
+                try:
+                    yield from self._run_turn(tools)
+                except (CancelledError, LLMError) as retry_exc:
+                    # No messages.pop() here: compaction rewrote the history, so a
+                    # blind pop could delete the summary instead of the prompt.
+                    yield {"kind": "error", "text": str(retry_exc)}
+                else:
+                    self.persist()
+                yield {"kind": "done"}
+                return
             refreshed = None
             if prompt_auth is not None:
                 low = str(exc).lower()
@@ -296,10 +361,17 @@ class ChatSession:
 
     def _run_turn(self, tools: list[dict[str, Any]]) -> Iterator[Event]:
         rounds = 0
+        meter = self.ctx_meter()
+        meter.note_tools(tools)
         while is_unlimited(self.max_rounds) or rounds < self.max_rounds:
             rounds += 1
             if self.cancel_event.is_set():
                 raise CancelledError("cancelled")
+
+            # Compact before the request that would cross the threshold, not
+            # after the gateway rejects it — a rejected prompt costs the round.
+            if self.settings.auto_compact and meter.over_threshold(self.messages):
+                yield from compact_stream(self.settings, self.messages, meter)
 
             yield {
                 "kind": "status",
@@ -310,6 +382,8 @@ class ChatSession:
 
             content = ""
             tool_calls: list[dict[str, Any]] = []
+            usage: dict[str, Any] = {}
+            sent = len(self.messages)
             for ev in iter_chat_completion(
                 self.settings,
                 self.messages,
@@ -329,8 +403,10 @@ class ChatSession:
                     msg = ev.get("message") or {}
                     content = msg.get("content") or content
                     tool_calls = msg.get("tool_calls") or []
+                    usage = msg.get("usage") or usage
                     if msg.get("model"):
                         self.model_label = str(msg["model"])
+            meter.observe(sent, usage)
 
             assistant_msg: dict[str, Any] = {
                 "role": "assistant",
@@ -346,6 +422,7 @@ class ChatSession:
                     "text": content or "(empty response)",
                     "streamed": True,
                 }
+                yield self._context_event()
                 return
 
             # Tool-only rounds often have empty/whitespace content — do not emit
@@ -394,6 +471,8 @@ class ChatSession:
                         "content": payload,
                     }
                 )
+
+            yield self._context_event()
 
         # Only reachable with an explicit budget: surfaces drop event kinds they do
         # not know, so this stays an assistant bubble rather than a new kind.

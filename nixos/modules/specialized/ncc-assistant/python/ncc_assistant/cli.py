@@ -783,6 +783,72 @@ def _cmd_focus(args: argparse.Namespace) -> int:
     return 1
 
 
+def _cmd_context(args: argparse.Namespace) -> int:
+    """Observe or compact the context window of a saved chat session."""
+    from .history import list_sessions, load_session
+    from .session import ChatSession
+
+    session_id = getattr(args, "session", None)
+    if session_id:
+        data = load_session(session_id)
+        if not data:
+            print_err(f"no such session: {session_id}")
+            return 1
+    else:
+        latest = list_sessions(1)
+        if not latest:
+            print_err("no saved chat sessions")
+            return 1
+        data = load_session(latest[0]["id"])
+        if not data:
+            print_err("latest session vanished")
+            return 1
+
+    session = ChatSession.create(
+        Settings.from_env(client_mode="chat"),
+        interactive_auth=False,
+        messages=list(data.get("messages") or []),
+        session_id=str(data.get("id") or ""),
+        title=data.get("title"),
+        refresh_models=False,
+    )
+
+    if getattr(args, "context_cmd", None) == "compact":
+        events = list(session.compact_now(getattr(args, "keep", None)))
+        final = events[-1] if events else {}
+        if getattr(args, "json", False):
+            print(json.dumps(final, indent=2, ensure_ascii=False))
+        elif final.get("compacted"):
+            print_ok(f"Compacted — ~{final.get('saved', 0):,} tokens freed")
+        else:
+            print_err("Compaction did not change the session")
+            return 1
+        return 0
+
+    report = {
+        **session.context_report(),
+        "session": session.session_id,
+        "title": session.title,
+    }
+    if getattr(args, "json", False):
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return 0
+    print_ok(
+        f"{report['used']:,}/{report['window']:,} tokens ({report['percent']}%) "
+        f"— window via {report['window_source']}, measured by {report['basis']}"
+    )
+    print_info(
+        f"compacts at {report['threshold']:,} ({report['threshold_percent']}%), "
+        f"{'auto' if report['auto'] else 'manual only'}, "
+        f"{report['compactions']} compaction(s)"
+    )
+    print_info(
+        f"session {report['session']} — {report['title']} "
+        f"({report['messages']} messages)"
+    )
+    return 0
+
+
 def _cmd_workflow(args: argparse.Namespace) -> int:
     from .workflow_execute import (
         bump_version,
@@ -1283,6 +1349,20 @@ def main(argv: list[str] | None = None) -> int:
     wf_ru.add_argument("--title")
     wf_ru.add_argument("--horizon", choices=["now", "next", "later"])
 
+    ctx_p = sub.add_parser(
+        "context", help="Context window of a chat session (observe / compact)"
+    )
+    ctx_sub = ctx_p.add_subparsers(dest="context_cmd")
+    ctx_show = ctx_sub.add_parser("show", help="Tokens used, window source, threshold")
+    ctx_show.add_argument("--session", "-s", help="Session id (default: most recent)")
+    ctx_show.add_argument("--json", action="store_true", help="Output as JSON")
+    ctx_compact = ctx_sub.add_parser("compact", help="Summarize older turns now")
+    ctx_compact.add_argument("--session", "-s", help="Session id (default: most recent)")
+    ctx_compact.add_argument(
+        "--keep", type=int, help="Recent messages kept verbatim (default: 8)"
+    )
+    ctx_compact.add_argument("--json", action="store_true", help="Output as JSON")
+
     focus_p = sub.add_parser("focus", help="Doomscroll / focus watchdog")
     focus_sub = focus_p.add_subparsers(dest="focus_cmd")
     focus_sub.add_parser("status", help="Show focus streak / settings")
@@ -1564,6 +1644,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if command == "workflows":
         return _cmd_workflows(args)
+
+    if command == "context":
+        return _cmd_context(args)
 
     if command == "focus":
         return _cmd_focus(args)

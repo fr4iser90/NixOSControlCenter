@@ -122,6 +122,229 @@ def _auth_headers(settings: Settings) -> dict[str, str]:
     return headers
 
 
+# --- token accounting -------------------------------------------------------
+
+_INPUT_TOKEN_KEYS = ("prompt_tokens", "input_tokens", "prompt_eval_count")
+_OUTPUT_TOKEN_KEYS = ("completion_tokens", "output_tokens", "eval_count")
+
+
+def _token_int(raw: dict[str, Any], keys: tuple[str, ...]) -> int:
+    for key in keys:
+        value = raw.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        if value >= 0:
+            return int(value)
+    return 0
+
+
+def normalize_usage(raw: Any) -> dict[str, int]:
+    """Map OpenAI / Anthropic / Ollama usage spellings onto {input,output,total}.
+
+    Gateways disagree on names (prompt_tokens vs input_tokens vs
+    prompt_eval_count) and some omit total_tokens, so callers work off this
+    shape instead of the provider payload.
+    """
+    if not isinstance(raw, dict):
+        return {}
+    inp = _token_int(raw, _INPUT_TOKEN_KEYS)
+    out = _token_int(raw, _OUTPUT_TOKEN_KEYS)
+    total = _token_int(raw, ("total_tokens",))
+    if not total and (inp or out):
+        total = inp + out
+    if not inp and total >= out:
+        inp = total - out
+    if not total:
+        return {}
+    return {"input": inp, "output": out, "total": total}
+
+
+# --- context window ---------------------------------------------------------
+
+CONTEXT_WINDOW_CACHE: dict[str, dict[str, Any]] = {}
+_STREAM_OPTIONS_REJECTORS: set[str] = set()
+
+_WINDOW_KEYS_RUN = ("n_ctx", "num_ctx", "n_ctx_train")
+_WINDOW_KEYS_MODEL = ("context_length", "max_model_len", "context_window")
+
+
+def _ollama_base(endpoint: str) -> str:
+    u = (endpoint or "").strip().rstrip("/")
+    if u.endswith("/v1"):
+        return u[: -len("/v1")]
+    return u
+
+
+def _window_from_value(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 0
+    n = int(value)
+    return n if 256 <= n <= 100_000_000 else 0
+
+
+def _window_from_modelfile(text: str) -> int:
+    """`num_ctx 4096` in an Ollama Modelfile/PARAMETERS blob is the real cap."""
+    import re
+
+    m = re.search(r"(?:^|[\s,;(\"'])num_ctx[\s=]+(\d+)", text or "")
+    return _window_from_value(int(m.group(1))) if m else 0
+
+
+def _window_from_mapping(payload: Any, keys: tuple[str, ...]) -> int:
+    if not isinstance(payload, dict):
+        return 0
+    for key in keys:
+        n = _window_from_value(payload.get(key))
+        if n:
+            return n
+    for nested in ("meta", "details", "parameters"):
+        data = payload.get(nested)
+        if isinstance(data, dict):
+            n = _window_from_mapping(data, keys)
+            if n:
+                return n
+        elif isinstance(data, str):
+            n = _window_from_modelfile(data)
+            if n:
+                return n
+    return 0
+
+
+def _window_from_model_info(model_info: Any) -> int:
+    """Ollama nests `llama.context_length` — that is the trained length."""
+    if not isinstance(model_info, dict):
+        return 0
+    best = 0
+    for key, value in model_info.items():
+        if str(key).endswith("context_length") or str(key).endswith("max_model_len"):
+            best = max(best, _window_from_value(value))
+    return best
+
+
+def detect_context_window(
+    settings: Settings, *, timeout: float = 5.0, use_cache: bool = True
+) -> dict[str, Any] | None:
+    """Best-effort "{tokens, source}" for the live model. Never raises.
+
+    Runtime caps (llama.cpp n_ctx, Ollama num_ctx) win over the trained
+    context_length: asking for 32k against a runtime num_ctx of 4k fails at
+    request time, which is exactly the failure this number must predict.
+    """
+    if settings.api == "anthropic":
+        return None
+    cache_key = f"{settings.endpoint}|{settings.model or ''}"
+    if use_cache and cache_key in CONTEXT_WINDOW_CACHE:
+        return CONTEXT_WINDOW_CACHE[cache_key]
+
+    base = _ollama_base(settings.endpoint)
+    headers = _auth_headers(settings)
+    found: dict[str, Any] | None = None
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            model = settings.model or ""
+            if not model:
+                try:
+                    model = resolve_model(settings, client)
+                except (LLMError, httpx.HTTPError):
+                    model = ""
+
+            for path in ("/props", "/v1/props"):
+                try:
+                    resp = client.get(f"{base}{path}", headers=headers)
+                except httpx.HTTPError:
+                    continue
+                if resp.status_code != 200:
+                    continue
+                try:
+                    props = resp.json()
+                except (ValueError, TypeError):
+                    continue
+                n = _window_from_mapping(props, _WINDOW_KEYS_RUN)
+                if n:
+                    found = {"tokens": n, "source": f"{path} n_ctx"}
+                    break
+
+            if found is None and model:
+                try:
+                    resp = client.post(
+                        f"{base}/api/show", headers=headers, json={"name": model}
+                    )
+                except httpx.HTTPError:
+                    resp = None
+                if resp is not None and resp.status_code == 200:
+                    try:
+                        show = resp.json()
+                    except (ValueError, TypeError):
+                        show = {}
+                    n = _window_from_modelfile(str(show.get("parameters") or ""))
+                    if n:
+                        found = {"tokens": n, "source": "ollama num_ctx"}
+                    else:
+                        n = _window_from_model_info(show.get("model_info"))
+                        if n:
+                            found = {"tokens": n, "source": "ollama context_length"}
+
+            if found is None:
+                try:
+                    resp = client.get(
+                        f"{settings.endpoint.rstrip('/')}/models", headers=headers
+                    )
+                except httpx.HTTPError:
+                    resp = None
+                if resp is not None and resp.status_code == 200:
+                    try:
+                        data = resp.json()
+                    except (ValueError, TypeError):
+                        data = {}
+                    entries = data.get("data") or data.get("models") or []
+                    for entry in entries:
+                        if not isinstance(entry, dict):
+                            continue
+                        if model and (entry.get("id") or entry.get("name")) != model:
+                            continue
+                        n = _window_from_mapping(entry, _WINDOW_KEYS_MODEL)
+                        if n:
+                            found = {"tokens": n, "source": "/models metadata"}
+                            break
+    except httpx.HTTPError:
+        found = None
+
+    if found is not None and use_cache:
+        CONTEXT_WINDOW_CACHE[cache_key] = found
+    return found
+
+
+_CONTEXT_LENGTH_MARKERS = (
+    "context_length_exceeded",
+    "context length",
+    "context window",
+    "maximum context",
+    "exceeds the available context",
+    "too many tokens",
+    "prompt is too long",
+    "input is too long",
+    "reduce the length",
+    "num_ctx",
+)
+
+
+def is_context_length_error(exc: BaseException) -> bool:
+    """True when the gateway refused the prompt for being too long."""
+    if isinstance(exc, LLMError) and exc.status_code not in (None, 400, 413):
+        return False
+    low = str(exc).lower()
+    return any(marker in low for marker in _CONTEXT_LENGTH_MARKERS)
+
+
+def _rejects_stream_options(exc: BaseException) -> bool:
+    """Gateways that choke on stream_options.include_usage answer 400 about it."""
+    low = str(exc).lower()
+    if "stream_options" in low or "include_usage" in low:
+        return True
+    return "unknown field" in low or "unsupported field" in low
+
+
+
 def list_models(settings: Settings) -> list[dict[str, Any]]:
     """Return model dicts from GET {endpoint}/models (id + raw metadata)."""
     if settings.api == "anthropic":
@@ -374,6 +597,10 @@ def _openai_payload(
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
+    if stream and model not in _STREAM_OPTIONS_REJECTORS:
+        # Without this, streaming responses carry no usage at all and context
+        # accounting would have to stay a pure estimate.
+        payload["stream_options"] = {"include_usage": True}
     return payload
 
 
@@ -403,6 +630,7 @@ def _openai_compatible(
         "content": message.get("content") or "",
         "tool_calls": message.get("tool_calls") or [],
         "model": model,
+        "usage": normalize_usage(data.get("usage")),
         "raw": data,
     }
 
@@ -440,55 +668,84 @@ def _openai_stream(
     url = f"{settings.endpoint}/chat/completions"
     headers = {"Content-Type": "application/json", **_auth_headers(settings)}
 
-    content_parts: list[str] = []
-    tool_acc: dict[int, dict[str, Any]] = {}
-    model_name = settings.model or ""
-
     with httpx.Client(timeout=_request_timeout()) as client:
         model_name = resolve_model(settings, client)
-        payload = _openai_payload(settings, model_name, messages, tools, stream=True)
-        with client.stream("POST", url, headers=headers, json=payload) as resp:
-            if resp.status_code >= 400:
-                body = resp.read().decode("utf-8", errors="replace")
-                raise LLMError(
-                    _format_http_error(settings, resp.status_code, body),
-                    status_code=resp.status_code,
+        for attempt in range(2):
+            payload = _openai_payload(settings, model_name, messages, tools, stream=True)
+            try:
+                yield from _openai_stream_body(
+                    settings, client, url, headers, payload, cancel_event, model_name
                 )
+                return
+            except LLMError as exc:
+                # Only reachable before the first chunk, so nothing is doubled.
+                if (
+                    attempt == 0
+                    and model_name not in _STREAM_OPTIONS_REJECTORS
+                    and _rejects_stream_options(exc)
+                ):
+                    _STREAM_OPTIONS_REJECTORS.add(model_name)
+                    continue
+                raise
 
-            for line in resp.iter_lines():
-                if cancel_event and cancel_event.is_set():
-                    raise CancelledError("cancelled")
-                if not line:
-                    continue
-                if line.startswith(":"):
-                    continue
-                if not line.startswith("data:"):
-                    continue
-                data_s = line[5:].strip()
-                if data_s == "[DONE]":
-                    break
-                try:
-                    chunk = json.loads(data_s)
-                except json.JSONDecodeError:
-                    continue
-                if chunk.get("model"):
-                    model_name = chunk["model"]
-                choice = (chunk.get("choices") or [{}])[0]
-                delta = choice.get("delta") or {}
-                # OpenAI-compat / DeepSeek / Qwen reasoning channels
-                thinking = (
-                    delta.get("reasoning_content")
-                    or delta.get("reasoning")
-                    or delta.get("thinking")
-                )
-                if thinking:
-                    yield {"type": "thinking_delta", "text": str(thinking)}
-                piece = delta.get("content")
-                if piece:
-                    content_parts.append(piece)
-                    yield {"type": "delta", "text": piece}
-                if delta.get("tool_calls"):
-                    _merge_tool_call_delta(tool_acc, delta["tool_calls"])
+
+def _openai_stream_body(
+    settings: Settings,
+    client: httpx.Client,
+    url: str,
+    headers: dict[str, str],
+    payload: dict[str, Any],
+    cancel_event: threading.Event | None,
+    model_name: str,
+) -> Iterator[dict[str, Any]]:
+    content_parts: list[str] = []
+    tool_acc: dict[int, dict[str, Any]] = {}
+    usage: dict[str, int] = {}
+
+    with client.stream("POST", url, headers=headers, json=payload) as resp:
+        if resp.status_code >= 400:
+            body = resp.read().decode("utf-8", errors="replace")
+            raise LLMError(
+                _format_http_error(settings, resp.status_code, body),
+                status_code=resp.status_code,
+            )
+
+        for line in resp.iter_lines():
+            if cancel_event and cancel_event.is_set():
+                raise CancelledError("cancelled")
+            if not line:
+                continue
+            if line.startswith(":"):
+                continue
+            if not line.startswith("data:"):
+                continue
+            data_s = line[5:].strip()
+            if data_s == "[DONE]":
+                break
+            try:
+                chunk = json.loads(data_s)
+            except json.JSONDecodeError:
+                continue
+            if chunk.get("model"):
+                model_name = chunk["model"]
+            if chunk.get("usage"):
+                usage = normalize_usage(chunk["usage"]) or usage
+            choice = (chunk.get("choices") or [{}])[0]
+            delta = choice.get("delta") or {}
+            # OpenAI-compat / DeepSeek / Qwen reasoning channels
+            thinking = (
+                delta.get("reasoning_content")
+                or delta.get("reasoning")
+                or delta.get("thinking")
+            )
+            if thinking:
+                yield {"type": "thinking_delta", "text": str(thinking)}
+            piece = delta.get("content")
+            if piece:
+                content_parts.append(piece)
+                yield {"type": "delta", "text": piece}
+            if delta.get("tool_calls"):
+                _merge_tool_call_delta(tool_acc, delta["tool_calls"])
 
     cleaned: list[dict[str, Any]] = []
     for i in sorted(tool_acc):
@@ -512,6 +769,7 @@ def _openai_stream(
             "content": "".join(content_parts),
             "tool_calls": cleaned,
             "model": model_name,
+            "usage": usage,
         },
     }
 
@@ -642,5 +900,6 @@ def _anthropic(
         "content": "\n".join(text_parts),
         "tool_calls": tool_calls,
         "model": settings.model,
+        "usage": normalize_usage(data.get("usage")),
         "raw": data,
     }

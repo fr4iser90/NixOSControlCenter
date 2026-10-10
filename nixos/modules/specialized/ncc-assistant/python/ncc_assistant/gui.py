@@ -470,23 +470,48 @@ class ChatWorker(QThread):
     def __init__(
         self,
         session: ChatSession,
-        text: str,
+        text: str = "",
         images: list[dict[str, str]] | None = None,
         parent=None,
+        compact: bool = False,
     ) -> None:
         super().__init__(parent)
         self._session = session
         self._text = text
         self._images = images or []
+        self._compact = compact
 
     def run(self) -> None:
         try:
-            for ev in self._session.send(
-                self._text, images=self._images, prompt_auth=None
-            ):
+            events = (
+                self._session.compact_now()
+                if self._compact
+                else self._session.send(
+                    self._text, images=self._images, prompt_auth=None
+                )
+            )
+            for ev in events:
                 self.event.emit(ev)
         except Exception as exc:
             self.failed.emit(f"{exc}\n{traceback.format_exc()}")
+
+
+class ContextProbeWorker(QThread):
+    """Reads the context meter off the UI thread — the window probe is HTTP."""
+
+    finished_ok = Signal(object)
+
+    def __init__(self, session: ChatSession, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self._session = session
+        # Guards against painting a reading for a session the user left mid-probe.
+        self.session_id = session.session_id
+
+    def run(self) -> None:
+        try:
+            self.finished_ok.emit(self._session.context_report())
+        except Exception:  # noqa: BLE001 — a missing reading must not nag
+            pass
 
 
 from .gui_pages import (
@@ -841,6 +866,8 @@ class ChatPage(QWidget):
         self.session.set_confirm_hook(self.confirm.confirm)
 
         self._worker: ChatWorker | None = None
+        self._ctx_probe: ContextProbeWorker | None = None
+        self._ctx: dict | None = None
         self._last_user = ""
         self._can_retry = False
         self._busy = False
@@ -944,6 +971,19 @@ class ChatPage(QWidget):
         )
         self.view_btn.clicked.connect(self.toggle_view)
         bar.addWidget(self.view_btn)
+
+        self.ctx_lbl = QLabel("")
+        self.ctx_lbl.setStyleSheet("color: palette(mid); font-size: 11px;")
+        self.ctx_lbl.hide()
+        bar.addWidget(self.ctx_lbl)
+
+        self.compact_btn = QPushButton("Compact")
+        self.compact_btn.setToolTip(
+            "Summarise the older turns now so the window has room again.\n"
+            "Automatic compaction already runs before a request would overflow."
+        )
+        self.compact_btn.clicked.connect(self.on_compact_context)
+        bar.addWidget(self.compact_btn)
 
         bar.addStretch()
         layout.addLayout(bar)
@@ -1581,6 +1621,7 @@ class ChatPage(QWidget):
         self.provider_add_btn.setEnabled(not busy)
         self.provider_edit_btn.setEnabled(not busy)
         self.stop_btn.setEnabled(busy)
+        self.compact_btn.setEnabled(not busy)
         if busy:
             self.retry_btn.setEnabled(False)
         elif not busy:
@@ -1599,6 +1640,79 @@ class ChatPage(QWidget):
         self.attach_label.setText(f"Attached ({n}): {names}")
         self.attach_label.show()
 
+    def _paint_ctx(self) -> None:
+        """Toolbar chip: how full the window is. `~` marks an estimated reading."""
+        report = self._ctx
+        if not report or not report.get("window"):
+            self.ctx_lbl.hide()
+            return
+        used = int(report.get("used") or 0)
+        window = int(report.get("window") or 0)
+        percent = int(report.get("percent") or 0)
+        threshold = int(report.get("threshold") or 0)
+        near = percent >= int(report.get("threshold_percent") or 100)
+        wave = "~" if report.get("basis") == "estimate" else ""
+        self.ctx_lbl.setText(f"ctx {wave}{percent}%")
+        self.ctx_lbl.setStyleSheet(
+            "font-size: 11px; font-weight: 700;"
+            if near
+            else "color: palette(mid); font-size: 11px;"
+        )
+        tip = (
+            f"{used:,} / {window:,} tokens ({percent}%)\n"
+            f"free: {int(report.get('free') or 0):,} · "
+            f"compaction at {threshold:,} tokens "
+            f"({'automatic' if report.get('auto') else 'manual only'})\n"
+            f"window via {report.get('window_source')} · "
+            f"measured by {report.get('basis')}\n"
+            f"{int(report.get('messages') or 0)} messages"
+        )
+        if report.get("compactions"):
+            tip += f" · {report['compactions']} compacted"
+        self.ctx_lbl.setToolTip(tip)
+        self.ctx_lbl.show()
+
+    def _invalidate_ctx(self) -> None:
+        """New conversation, model or endpoint → the previous reading means nothing."""
+        self._ctx = None
+        self._paint_ctx()
+        QTimer.singleShot(0, self._probe_context)
+
+    def _probe_context(self) -> None:
+        """Off the UI thread — detecting the window talks HTTP to the gateway."""
+        if self._busy or self._ctx_probe is not None:
+            return
+        worker = ContextProbeWorker(self.session, self)
+        worker.finished_ok.connect(self._on_ctx_report)
+        worker.finished.connect(self._ctx_probe_done)
+        worker.finished.connect(worker.deleteLater)
+        self._ctx_probe = worker
+        worker.start()
+
+    def _ctx_probe_done(self) -> None:
+        self._ctx_probe = None
+
+    def _on_ctx_report(self, report: object) -> None:
+        probe = self._ctx_probe
+        if not isinstance(report, dict) or probe is None:
+            return
+        if probe.session_id != self.session.session_id:
+            return  # session switched while probing — that reading is stale
+        self._ctx = report
+        self._paint_ctx()
+
+    @Slot()
+    def on_compact_context(self) -> None:
+        if self._busy:
+            return
+        self._set_busy(True)
+        self._set_activity("Compacting context")
+        self._worker = ChatWorker(self.session, compact=True, parent=self)
+        self._worker.event.connect(self.on_event)
+        self._worker.failed.connect(self.on_fail)
+        self._worker.finished.connect(self._on_worker_finished)
+        self._worker.start()
+
     @Slot(int)
     def on_model_changed(self, _index: int) -> None:
         if self._model_guard:
@@ -1613,6 +1727,7 @@ class ChatPage(QWidget):
             self.session.set_model(None)
             self._update_vision_ui()
             self._update_meta()
+        self._invalidate_ctx()
 
     @Slot(int)
     def on_provider_changed(self, _index: int) -> None:
@@ -1631,8 +1746,10 @@ class ChatPage(QWidget):
             settings, confirm_hook=self.confirm.confirm
         )
         set_last_provider(prov.id, prov.endpoint)
+        self.session.drop_context_meter()
         self._populate_models(fetch=False)
         self._update_vision_ui()
+        self._invalidate_ctx()
         QTimer.singleShot(0, self._start_models_fetch)
 
     @Slot()
@@ -1675,8 +1792,10 @@ class ChatPage(QWidget):
             settings, confirm_hook=self.confirm.confirm
         )
         set_last_provider(updated.id, updated.endpoint)
+        self.session.drop_context_meter()
         self._populate_models(fetch=False)
         self._update_vision_ui()
+        self._invalidate_ctx()
         QTimer.singleShot(0, self._start_models_fetch)
 
     @Slot(str)
@@ -1696,6 +1815,7 @@ class ChatPage(QWidget):
             w = item.widget()
             if w:
                 w.deleteLater()
+        self._invalidate_ctx()
         self._refresh_landing()
         self.sidebar.refresh(self.session.session_id)
         self._maybe_refresh_transcript()
@@ -1751,6 +1871,7 @@ class ChatPage(QWidget):
         self._refresh_landing()
         self.sidebar.refresh(self.session.session_id)
         self._maybe_refresh_transcript()
+        self._invalidate_ctx()
 
     @Slot(dict)
     def on_confirm_request(self, payload: dict) -> None:
@@ -2003,6 +2124,14 @@ class ChatPage(QWidget):
                             + ", ".join(dlg.selected_paths)
                             + "\nAsk the assistant to apply with confirm, or use Rollback assistant.",
                         )
+        elif kind == "context":
+            self._ctx = dict(event)
+            self._paint_ctx()
+            if event.get("compacted"):
+                saved = int(event.get("saved") or 0)
+                self._add_bubble(
+                    "Status", f"Context compacted — ~{saved:,} tokens freed."
+                )
         elif kind == "status":
             self._set_activity(str(event.get("text") or "Working"))
         elif kind == "error":
@@ -2036,8 +2165,10 @@ class ChatPage(QWidget):
             self.session.runtime = ToolRuntime(
                 self.session.settings, confirm_hook=self.confirm.confirm
             )
+            self.session.drop_context_meter()
             self._populate_models(fetch=False)
             self._update_meta()
+            self._invalidate_ctx()
             QTimer.singleShot(0, self._start_models_fetch)
             if self._last_user:
                 self.composer.setPlainText(self._last_user)

@@ -177,6 +177,12 @@ let
     export AGENT_MAX_STEPS="${toString (cfg.agent.maxSteps or (-1))}"
     export NCC_ASSISTANT_AGENT_MAX_STEPS="${toString (cfg.agent.maxSteps or (-1))}"
     export NCC_ASSISTANT_CHAT_MAX_ROUNDS="${toString (cfg.agent.chatMaxRounds or (-1))}"
+    # Chat context window + compaction, all in tokens. Unset window = probe the gateway.
+    ${lib.optionalString ((cfg.agent.contextWindow or null) != null) ''
+      export NCC_ASSISTANT_CONTEXT_WINDOW="${toString cfg.agent.contextWindow}"
+    ''}
+    export NCC_ASSISTANT_COMPACT_THRESHOLD="${toString (cfg.agent.compactThreshold or (-1))}"
+    export NCC_ASSISTANT_AUTO_COMPACT="${if (cfg.agent.autoCompact or true) then "1" else "0"}"
     export AGENT_TIMEOUT_SEC="${toString (cfg.agent.timeoutSec or 1800)}"
     export AGENT_ALLOW_WRITE="${if (cfg.agent.allowWrite or false) then "1" else "0"}"
     export AGENT_ALLOW_REBUILD="${if (cfg.agent.allowRebuild or false) then "1" else "0"}"
