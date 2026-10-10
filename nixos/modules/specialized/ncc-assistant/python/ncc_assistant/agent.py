@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Iterator
 
 from .audit import append_audit
-from .config import Settings
+from .config import Settings, UNLIMITED, is_unlimited
 from .jobs import get_job_store, JobEvent, JobMeta, AgentLock
 from .llm import iter_chat_completion, LLMError, CancelledError
 from .paths import is_disabled
@@ -32,7 +32,7 @@ def _now_iso() -> str:
 class AgentSettings:
     """Settings for an agent run."""
     goal: str
-    max_steps: int = 50
+    max_steps: int = UNLIMITED
     allow_write: bool | None = None
     allow_rebuild: bool | None = None
     allow_shell: bool | None = None
@@ -40,6 +40,11 @@ class AgentSettings:
     profile: str | None = None
     playbook: str | None = None
     confirm_mode: str = "writes"  # writes | always | never
+
+    @property
+    def step_budget_label(self) -> str:
+        """Human-readable step budget — the sentinel must not read as "-1"."""
+        return "unlimited" if is_unlimited(self.max_steps) else str(self.max_steps)
 
 
 Event = dict[str, Any]
@@ -103,7 +108,7 @@ You are running in agent mode to accomplish a specific goal.
 **Goal:** {self.agent_settings.goal}
 
 **Constraints:**
-- Maximum steps: {self.agent_settings.max_steps}
+- Maximum steps: {self.agent_settings.step_budget_label}
 - Profile: {self._profile.name}
 - Writes allowed: {self._profile.allow_write}
 - Rebuild allowed: {self._profile.allow_rebuild}
@@ -176,7 +181,10 @@ You are running in agent mode to accomplish a specific goal.
         tools = self._get_tools()
 
         try:
-            while self._step < self.agent_settings.max_steps and not self._finished:
+            while (
+                is_unlimited(self.agent_settings.max_steps)
+                or self._step < self.agent_settings.max_steps
+            ) and not self._finished:
                 if self.cancel_event.is_set():
                     raise CancelledError("Agent cancelled")
 
@@ -193,7 +201,7 @@ You are running in agent mode to accomplish a specific goal.
 
                 yield from self._run_step(tools)
 
-            if not self._finished:
+            if not self._finished and not is_unlimited(self.agent_settings.max_steps):
                 yield {
                     "kind": "budget_exhausted",
                     "text": f"Max steps reached ({self.agent_settings.max_steps})",
@@ -201,10 +209,17 @@ You are running in agent mode to accomplish a specific goal.
                 }
                 yield {"kind": "status", "text": "Max steps reached"}
 
+            if self._finished:
+                summary = "Agent completed"
+            elif is_unlimited(self.agent_settings.max_steps):
+                summary = "Agent stopped"
+            else:
+                summary = "Max steps reached"
+
             self._store.finalize(
                 self._job.id,
                 success=self._finished,
-                summary="Agent completed" if self._finished else "Max steps reached",
+                summary=summary,
             )
             yield {"kind": "job_finished", "job_id": self._job.id, "success": self._finished}
 
@@ -392,7 +407,7 @@ def run_agent(
     goal: str,
     settings: Settings | None = None,
     *,
-    max_steps: int = 50,
+    max_steps: int = UNLIMITED,
     dry_run: bool = False,
     profile: str | None = None,
     playbook: str | None = None,

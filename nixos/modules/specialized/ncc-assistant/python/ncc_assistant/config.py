@@ -39,6 +39,21 @@ def _env_optional_float(name: str) -> float | None:
     return float(raw)
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = _env_optional_int(name)
+    return default if raw is None else raw
+
+
+# Run-length budgets are opt-in: the sentinel below means "no limit", mirroring
+# qwen-code's model.maxSessionTurns / maxToolCalls / maxWallTimeSeconds (all -1).
+UNLIMITED = -1
+
+
+def is_unlimited(limit: int | None) -> bool:
+    """True when a run-length budget is unset — any value <= 0 disables it."""
+    return limit is None or int(limit) <= 0
+
+
 def normalize_endpoint(url: str) -> str:
     """Ensure OpenAI-compatible base ends with /v1 when only a host was given."""
     u = url.strip().rstrip("/")
@@ -95,6 +110,8 @@ class Settings:
     mcp_servers_json: str | None
     # Extra HTTP headers (org, x-ai-*, …); primary API key stays in api_key
     extra_headers: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+    # Tool rounds per chat message; UNLIMITED (-1) = keep going until the model stops
+    chat_max_rounds: int = UNLIMITED
 
     @property
     def provider(self) -> str:
@@ -173,7 +190,9 @@ class Settings:
             nixos_dir=os.environ.get("NIXOS_DIR", "/etc/nixos"),
             # Agent settings
             allow_shell=_env_bool("NCC_ASSISTANT_ALLOW_SHELL", False),
-            agent_max_steps=int(os.environ.get("NCC_ASSISTANT_AGENT_MAX_STEPS", "50")),
+            agent_max_steps=_env_int(
+                "NCC_ASSISTANT_AGENT_MAX_STEPS", UNLIMITED
+            ),
             agent_allow_write=_env_bool("NCC_ASSISTANT_AGENT_ALLOW_WRITE", False),
             agent_allow_rebuild=_env_bool("NCC_ASSISTANT_AGENT_ALLOW_REBUILD", False),
             agent_confirm=os.environ.get("NCC_ASSISTANT_AGENT_CONFIRM", "writes"),
@@ -192,6 +211,7 @@ class Settings:
             # MCP settings
             mcp_servers_json=_env_optional_str("NCC_ASSISTANT_MCP_SERVERS_JSON"),
             extra_headers=(),
+            chat_max_rounds=_env_int("NCC_ASSISTANT_CHAT_MAX_ROUNDS", UNLIMITED),
         )
 
     def load_system_prompt(self) -> str:

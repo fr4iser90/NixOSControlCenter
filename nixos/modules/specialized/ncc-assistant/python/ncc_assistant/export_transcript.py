@@ -171,7 +171,7 @@ def export_job_markdown(
                 text = data.get("text", "")
                 if text:
                     lines.append(f"**Assistant:** {text[:500]}")
-            elif kind == "error":
+            elif kind in ("error", "protocol_error"):
                 error = data.get("text", data.get("error", ""))
                 lines.append(f"**Error:** {error}")
             elif kind == "status":

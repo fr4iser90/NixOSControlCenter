@@ -12,7 +12,7 @@
   "dryRun": true,
   "maxSteps": 24,
   "tags": ["skills", "agents", "ncc"],
-  "goalTemplate": "Audit and maintain agent skills under .agents/skills for workspaces ({{repositories}}). Timezone {{timezone}}; cadence {{checkFrequency}}.",
+  "goalTemplate": "Audit and maintain agent skills under .agents/skills for workspaces ({{repositories}}). Timezone {{timezone}}; cadence {{checkFrequency}}. Write and summarise in {{outputLanguage}}.",
   "params": [
     {
       "id": "checkFrequency",
@@ -27,6 +27,19 @@
       "type": "timezone",
       "required": true,
       "default": "Europe/Berlin"
+    },
+    {
+      "id": "outputLanguage",
+      "label": "Language",
+      "type": "enum",
+      "options": [
+        "English",
+        "Deutsch",
+        "Auto (keep file)"
+      ],
+      "default": "English",
+      "required": true,
+      "description": "Language of SKILL.md edits and the agent summary. Auto = keep the language the skill already uses."
     },
     {
       "id": "repositories",

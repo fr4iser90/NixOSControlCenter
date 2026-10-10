@@ -12,10 +12,11 @@
   "dryRun": true,
   "maxSteps": 12,
   "tags": ["rulebook", "docs", "once"],
-  "goalTemplate": "Propose CHANGELOG.md (Keep a Changelog) for {{repositories}}. Style: {{style}}. Seed from recent git tags/commits if present. Diff-first dry-run. Output path: {{outputFile}}.",
+  "goalTemplate": "Propose CHANGELOG.md (Keep a Changelog) for {{repositories}}. Style: {{style}}. Language: {{outputLanguage}}. Seed from recent git tags/commits if present. Diff-first dry-run. Output path: {{outputFile}}.",
   "params": [
     {"id": "style", "label": "Style", "type": "enum", "options": ["keep-a-changelog", "simple"], "default": "keep-a-changelog", "required": true},
     {"id": "outputFile", "label": "Output file", "type": "enum", "options": ["CHANGELOG.md", "docs/CHANGELOG.md"], "default": "CHANGELOG.md", "required": true},
+    {"id": "outputLanguage", "label": "Language", "type": "enum", "options": ["English", "Deutsch", "Auto (keep file)"], "default": "English", "required": true, "description": "Language of the changelog entries. Auto = keep the language CHANGELOG.md already uses."},
     {"id": "repositories", "label": "Repositories", "type": "workspaceList", "required": false}
   ]
 }

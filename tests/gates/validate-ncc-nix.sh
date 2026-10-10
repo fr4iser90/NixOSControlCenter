@@ -11,7 +11,7 @@
 #   4) auto-detect missing migrations / version bumps (packaging-sensitive deletes)
 #   5) install-wizard packaging + packages catalog (system-update path)
 #   6) staged systemConfig vs module options.nix (wizard write SSOT)
-#   7) static relative import paths exist + nix parse (all nixos/)
+#   7) static relative import paths exist (all nixos/; no parsing — see 18)
 #   8) prebuild module fragments eval (import paths at apply-time)
 #   9) GUI catalog invariants (enable or true, core domain+page, no tests in nixos/)
 #  10) docs layout + kebab-case (module doc/, no loose root markdown)
@@ -131,7 +131,7 @@ fi
 
 # ── 7) Static relative import paths ──────────────────────────────────────────
 echo ""
-echo "== 7/15  nix import paths + parse (generic) =="
+echo "== 7/18  nix import paths (generic, no parse) =="
 if bash "$ROOT/tests/gates/validate-nix-import-paths.sh"; then
   pass "validate-nix-import-paths.sh"
 else
@@ -221,11 +221,20 @@ fi
 
 # ── 17) Flake library exports (nixosModules / mkNccSpecialArgs) ───────────────
 echo ""
-echo "== 17/17  Flake nixosModules exports =="
+echo "== 17/18  Flake nixosModules exports =="
 if bash "$ROOT/tests/gates/validate-flake-exports.sh"; then
   pass "validate-flake-exports.sh"
 else
   fail "flake nixosModules / lib.mkNccSpecialArgs exports broken"
+fi
+
+# ── 18) Build-parser syntax (`nix eval`, not legacy nix-instantiate --parse) ──
+echo ""
+echo "== 18/18  Nix syntax with the build parser =="
+if bash "$ROOT/tests/gates/validate-nix-parse.sh"; then
+  pass "validate-nix-parse.sh"
+else
+  fail "nix build switch would fail: Nix syntax not accepted by the build parser"
 fi
 
 echo ""
@@ -235,5 +244,5 @@ if [[ "$FAIL" -ne 0 ]]; then
   echo "Fix issues above, then re-run: bash tests/gates/validate-ncc-nix.sh"
   exit 1
 fi
-echo "OK — bash + layer + modularity + migrations + wizard + options + import paths + module eval + catalog + docs-layout + store-status + module-shape + ai-packs + surfaces + gui-hotpath + cli-manager-args + flake-exports green."
+echo "OK — bash + layer + modularity + migrations + wizard + options + import paths + module eval + catalog + docs-layout + store-status + module-shape + ai-packs + surfaces + gui-hotpath + cli-manager-args + flake-exports + nix-parse green."
 exit 0

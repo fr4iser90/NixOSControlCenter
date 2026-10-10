@@ -18,7 +18,7 @@
     "agents",
     "docs"
   ],
-  "goalTemplate": "Scaffold or refresh AGENTS.md. Style: {{style}}. Scope: {{scope}}. Repos: {{repositories}}.\\n\\nPrefer diff against existing AGENTS.md. Keep hard laws if present; do not invent conflicting rules. Dry-run proposals only.",
+  "goalTemplate": "Scaffold or refresh AGENTS.md. Style: {{style}}. Scope: {{scope}}. Language: {{outputLanguage}}. Repos: {{repositories}}.\\n\\nPrefer diff against existing AGENTS.md. Keep hard laws if present; do not invent conflicting rules. Dry-run proposals only.",
   "params": [
     {
       "id": "style",
@@ -43,6 +43,19 @@
       ],
       "default": "repo-root",
       "required": true
+    },
+    {
+      "id": "outputLanguage",
+      "label": "Language",
+      "type": "enum",
+      "options": [
+        "English",
+        "Deutsch",
+        "Auto (keep file)"
+      ],
+      "default": "English",
+      "required": true,
+      "description": "Language of AGENTS.md and the agent summary. Auto = match the repo's existing docs."
     },
     {
       "id": "repositories",

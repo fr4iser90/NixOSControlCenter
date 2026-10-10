@@ -206,6 +206,38 @@ class CompanionFeedSmoke(unittest.TestCase):
         self.assertTrue(slot.last_error)
         self.assertFalse(self.win.retry_btn.isHidden())
 
+    def test_echoed_tool_call_shows_a_notice_not_an_answer(self) -> None:
+        # A model can write its call into the reply text instead of a structured
+        # tool_use block. Whatever streamed for that turn must leave the feed —
+        # markup reads as a finished tool round when nothing ran.
+        echoed = (
+            "<" + "tool_call>\n"
+            + "<" + 'function name="read_file"' + ">\n"
+            + "<" + "/tool_call>"
+        )
+        slot = self._slot()
+        self._run_turn(
+            "read the file",
+            [
+                {"kind": "assistant_start"},
+                {"kind": "assistant_delta", "text": echoed},
+                {
+                    "kind": "protocol_error",
+                    "text": "1 tool call echoed as text — nothing was executed.",
+                    "drop_live_reply": True,
+                },
+                {"kind": "done"},
+            ],
+        )
+        self.assertEqual([i["kind"] for i in slot.transcript], ["user", "protocol_error"])
+        bubbles = [w for w in self._feed() if type(w).__name__ == "Bubble"]
+        shown = "\n".join(w.plain_text() for w in bubbles)
+        self.assertIn("nothing was executed", shown)
+        self.assertNotIn("function name", shown)
+        self.assertTrue(slot.last_error)
+        self.assertIsNone(self.win._reply_live)
+        self.assertIsNone(self.win._reply_item)
+
     # -- pure transcript model (needs the package import, so lives here) ---
     def test_tool_result_pairing_rules(self) -> None:
         find_tool_trace = self.companion.find_tool_trace

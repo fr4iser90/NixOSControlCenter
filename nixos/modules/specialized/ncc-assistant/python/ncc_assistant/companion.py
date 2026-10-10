@@ -262,7 +262,7 @@ class _CompanionTemplateWorker(QThread):
                     for ev in run_agent(
                         goal,
                         settings,
-                        max_steps=tmpl.max_steps or 24,
+                        max_steps=tmpl.max_steps or settings.agent_max_steps,
                         dry_run=tmpl.dry_run,
                         profile=tmpl.profile,
                     ):
@@ -1517,7 +1517,7 @@ class CompanionWindow(QWidget):
         elif kind in ("assistant", "notice"):
             role = "Assistant" if kind == "assistant" else "Notice"
             widget = Bubble(role, text, markdown=kind == "assistant")
-        elif kind == "error":
+        elif kind in ("error", "protocol_error"):
             widget = Bubble("Error", text)
         if widget is None:
             return None
@@ -2150,6 +2150,23 @@ class CompanionWindow(QWidget):
                 self._collapse_thinking(finish=True)
                 self._feed_item(kept)
             self._close_live()
+        elif kind == "protocol_error":
+            # Tool syntax the model echoed as text is not an answer: whatever was
+            # streamed for this turn goes, so nothing reads as a finished run.
+            text = str(event.get("text") or "tool call echoed as text")
+            slot.avatar_state = STATE_ERROR
+            slot.last_error = text
+            slot.reply_buf = ""
+            self._set_activity(slot, "")
+            if event.get("drop_live_reply") and self._reply_item is not None:
+                items = list(slot.transcript or [])
+                if any(i is self._reply_item for i in items):
+                    slot.transcript = [i for i in items if i is not self._reply_item]
+            self._reply_live = None
+            self._reply_item = None
+            transcript_append(slot, {"kind": "protocol_error", "text": text})
+            if slot_id == self._active_id:
+                self._rebuild_feed(slot)
         elif kind == "done":
             self._set_activity(slot, "")
             if slot.avatar_state != STATE_PAUSED:
@@ -2167,6 +2184,7 @@ class CompanionWindow(QWidget):
                 "tool_result",
                 "assistant",
                 "error",
+                "protocol_error",
                 "done",
             ):
                 self._feed_scroll_bottom()

@@ -180,8 +180,11 @@ Workflow cards (AGENTS.md maintainer, skills maintainer, GitHub code review, …
 live under the **Templates** tab. **Run once** = params + immediate run (no timer).
 **⚙ Configure** = save instance + optional recurring schedule. Frequency uses
 enums: Simple / Daily at time / Weekly / Cron field pickers (Advanced raw
-OnCalendar only when needed). Secrets and workspaces are in **Settings** (or CLI).
-Never put tokens in `systemConfig`.
+OnCalendar only when needed). Cards that write prose also have **Language**
+(English / Deutsch / Auto — Auto keeps the language the file already uses);
+generators whose output is canonical or machine-format (SPDX licenses,
+`.gitignore`, CODEOWNERS, CI YAML) have none on purpose. Secrets and workspaces
+are in **Settings** (or CLI). Never put tokens in `systemConfig`.
 
 ```bash
 # Named secrets (0600 under ~/.config/ncc-assistant/secrets.json)

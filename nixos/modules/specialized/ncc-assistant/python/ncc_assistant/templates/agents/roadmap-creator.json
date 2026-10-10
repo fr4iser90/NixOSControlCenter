@@ -17,7 +17,7 @@
     "creator",
     "roadmap"
   ],
-  "goalTemplate": "Create a roadmap from notes. Horizon bias: {{horizonBias}}. Export MD: {{exportMd}}. Workspace repos: {{repositories}}. Notes:\\n{{notes}}\\n\\nWrite RoadmapItems via ncc ai workflows roadmap add (horizon now|next|later). If exportMd=yes, propose a short markdown section for workspace doc/roadmap (diff-first, dry-run). Do not invent legal/tax advice.",
+  "goalTemplate": "Create a roadmap from notes. Horizon bias: {{horizonBias}}. Export MD: {{exportMd}}. Language: {{outputLanguage}}. Workspace repos: {{repositories}}. Notes:\\n{{notes}}\\n\\nWrite RoadmapItems via ncc ai workflows roadmap add (horizon now|next|later). If exportMd=yes, propose a short markdown section for workspace doc/roadmap (diff-first, dry-run). Do not invent legal/tax advice.",
   "params": [
     {
       "id": "notes",
@@ -47,6 +47,19 @@
       ],
       "default": "no",
       "required": true
+    },
+    {
+      "id": "outputLanguage",
+      "label": "Language",
+      "type": "enum",
+      "options": [
+        "English",
+        "Deutsch",
+        "Auto (keep file)"
+      ],
+      "default": "English",
+      "required": true,
+      "description": "Language of roadmap titles and the MD draft. Auto = match the repo's existing docs."
     },
     {
       "id": "repositories",

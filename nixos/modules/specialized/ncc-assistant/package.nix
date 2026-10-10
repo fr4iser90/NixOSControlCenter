@@ -173,7 +173,10 @@ let
 
     # Agent configuration
     export AGENT_ENABLE="${if (cfg.agent.enable or true) then "1" else "0"}"
-    export AGENT_MAX_STEPS="${toString (cfg.agent.maxSteps or 24)}"
+    # Both naming conventions: GUI reads AGENT_MAX_STEPS, Settings reads the prefixed one.
+    export AGENT_MAX_STEPS="${toString (cfg.agent.maxSteps or (-1))}"
+    export NCC_ASSISTANT_AGENT_MAX_STEPS="${toString (cfg.agent.maxSteps or (-1))}"
+    export NCC_ASSISTANT_CHAT_MAX_ROUNDS="${toString (cfg.agent.chatMaxRounds or (-1))}"
     export AGENT_TIMEOUT_SEC="${toString (cfg.agent.timeoutSec or 1800)}"
     export AGENT_ALLOW_WRITE="${if (cfg.agent.allowWrite or false) then "1" else "0"}"
     export AGENT_ALLOW_REBUILD="${if (cfg.agent.allowRebuild or false) then "1" else "0"}"

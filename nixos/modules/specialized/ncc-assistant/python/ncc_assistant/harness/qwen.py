@@ -57,6 +57,35 @@ def _thinking_from_message(message: dict[str, Any]) -> str:
     return ""
 
 
+TOOL_ECHO_MARKERS = ('<tool_call>', '</tool_call>', "<function=", "<parameter=")
+
+
+def tool_echo_in_text(text: str) -> bool:
+    """True when a text block carries tool syntax instead of a structured call.
+
+    A model whose endpoint skips native function calling writes the call in its
+    trained XML grammar. Rendering that as an answer makes a run that executed
+    nothing look like a finished tool round, so it must never reach the reply.
+    """
+    low = (text or "").lower()
+    return any(marker in low for marker in TOOL_ECHO_MARKERS)
+
+
+def tool_echo_notice(text: str, limit: int = 400) -> str:
+    """Notice text: what happened, how many calls, and what the model asked for."""
+    body = " ".join((text or "").split())
+    low = (text or "").lower()
+    calls = max(low.count('<tool_call>'), low.count('</tool_call>')) or 1
+    head = (
+        f"{calls} tool call{'s' if calls != 1 else ''} echoed as text — nothing was executed. "
+        "The model wrote tool syntax into its reply instead of a structured "
+        "tool_use block, so this harness had nothing to run."
+    )
+    if not body:
+        return head
+    return f"{head}\n\nEchoed: {body[:limit]}{'…' if len(body) > limit else ''}"
+
+
 def map_qwen_line(obj: dict[str, Any]) -> list[Event]:
     """Map one Qwen stream-json object → zero or more NCC events."""
     out: list[Event] = []
@@ -264,6 +293,9 @@ class QwenHarness:
 
         assert proc.stdout is not None
         reply_bits: list[str] = []
+        echo_bits: list[str] = []
+        emitted_reply = False
+        last_reply = ""
         try:
             for line in proc.stdout:
                 if cancel_event is not None and cancel_event.is_set():
@@ -278,14 +310,35 @@ class QwenHarness:
                     obj = json.loads(line)
                 except json.JSONDecodeError:
                     # plain text fallback
-                    yield {"kind": "assistant_delta", "text": line + "\n"}
-                    reply_bits.append(line + "\n")
+                    piece = line + "\n"
+                    if tool_echo_in_text(piece):
+                        echo_bits.append(piece)
+                    else:
+                        yield {"kind": "assistant_delta", "text": piece}
+                        reply_bits.append(piece)
                     continue
                 if not isinstance(obj, dict):
                     continue
                 for ev in map_qwen_line(obj):
-                    if ev.get("kind") == "assistant_delta":
-                        reply_bits.append(str(ev.get("text") or ""))
+                    ev_kind = str(ev.get("kind") or "")
+                    if ev_kind == "assistant_delta":
+                        piece = str(ev.get("text") or "")
+                        if tool_echo_in_text(piece):
+                            # The notice below shows the echo; the answer must stay clean.
+                            echo_bits.append(piece)
+                            continue
+                        reply_bits.append(piece)
+                    elif ev_kind == "assistant":
+                        text = str(ev.get("text") or "")
+                        if tool_echo_in_text(text):
+                            echo_bits.append(text)
+                            continue
+                        if emitted_reply and text.strip() == last_reply.strip():
+                            # One turn arrives as message object, result object, and
+                            # the join of its deltas; surfaces open a bubble per event.
+                            continue
+                        emitted_reply = True
+                        last_reply = text
                     yield ev
             rc = proc.wait(timeout=5)
         except Exception as exc:  # noqa: BLE001
@@ -297,12 +350,20 @@ class QwenHarness:
         err = ""
         if proc.stderr is not None:
             err = (proc.stderr.read() or "").strip()
-        if rc != 0 and not reply_bits:
+        echoed = "".join(echo_bits)
+        if rc != 0 and not reply_bits and not echoed:
             yield {
                 "kind": "error",
                 "text": err.splitlines()[0][:400] if err else f"qwen exited {rc}",
             }
-        elif reply_bits:
+        if tool_echo_in_text(echoed):
+            yield {
+                "kind": "protocol_error",
+                "text": tool_echo_notice(echoed),
+                # Tells a surface that streamed this echo to drop what it shows.
+                "drop_live_reply": True,
+            }
+        elif reply_bits and not emitted_reply:
             joined = "".join(reply_bits).strip()
             if joined:
                 yield {"kind": "assistant", "text": joined[-4000:], "streamed": True}

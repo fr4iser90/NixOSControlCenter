@@ -12,11 +12,12 @@
   "dryRun": true,
   "maxSteps": 10,
   "tags": ["rulebook", "security", "once"],
-  "goalTemplate": "Propose SECURITY.md for {{repositories}}. Contact: {{contact}}. Supported versions policy: {{versions}}. Diff-first. Path: {{outputFile}}. Never invent CVEs.",
+  "goalTemplate": "Propose SECURITY.md for {{repositories}}. Contact: {{contact}}. Supported versions policy: {{versions}}. Language: {{outputLanguage}}. Diff-first. Path: {{outputFile}}. Never invent CVEs.",
   "params": [
     {"id": "contact", "label": "Security contact", "type": "string", "required": true},
     {"id": "versions", "label": "Versions policy", "type": "enum", "options": ["latest-only", "n-1", "lts"], "default": "latest-only", "required": true},
     {"id": "outputFile", "label": "Output file", "type": "enum", "options": ["SECURITY.md", "docs/SECURITY.md", ".github/SECURITY.md"], "default": "SECURITY.md", "required": true},
+    {"id": "outputLanguage", "label": "Language", "type": "enum", "options": ["English", "Deutsch", "Auto (keep file)"], "default": "English", "required": true, "description": "Language of SECURITY.md. Auto = keep the language the file already uses."},
     {"id": "repositories", "label": "Repositories", "type": "workspaceList", "required": false}
   ]
 }

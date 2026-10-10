@@ -12,7 +12,7 @@
   "dryRun": true,
   "maxSteps": 20,
   "tags": ["docs", "agents", "ncc"],
-  "goalTemplate": "Maintain AGENTS.md in the configured workspaces. Check frequency context: {{checkFrequency}} (timezone {{timezone}}). Propose precise updates; do not invent new laws.",
+  "goalTemplate": "Maintain AGENTS.md in the configured workspaces. Check frequency context: {{checkFrequency}} (timezone {{timezone}}). Write and summarise in {{outputLanguage}}. Propose precise updates; do not invent new laws.",
   "params": [
     {
       "id": "checkFrequency",
@@ -28,6 +28,19 @@
       "type": "timezone",
       "required": true,
       "default": "Europe/Berlin"
+    },
+    {
+      "id": "outputLanguage",
+      "label": "Language",
+      "type": "enum",
+      "options": [
+        "English",
+        "Deutsch",
+        "Auto (keep file)"
+      ],
+      "default": "English",
+      "required": true,
+      "description": "Language of AGENTS.md and the agent summary. Auto = keep the language the file already uses."
     },
     {
       "id": "repositories",

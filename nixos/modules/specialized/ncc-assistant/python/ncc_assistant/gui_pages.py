@@ -41,7 +41,21 @@ from PySide6.QtWidgets import (
 )
 
 
+from .config import is_unlimited
 from .trace_format import format_thinking_header, format_tool_header
+
+
+def _env_steps(default: int = -1) -> int:
+    """Step budget from the Nix wrapper; anything unset/unparseable = unlimited."""
+    try:
+        return int(os.environ.get("AGENT_MAX_STEPS", str(default)))
+    except ValueError:
+        return default
+
+
+def _steps_label(value: int) -> str:
+    """Render the sentinel as text — a budget of -1 must not show up in the UI."""
+    return "unlimited" if is_unlimited(value) else str(value)
 
 
 class ThinkingBlock(QFrame):
@@ -584,8 +598,9 @@ class AgentPage(QWidget):
         form.addRow("", self.dry_run_check)
 
         self.max_steps_spin = QSpinBox()
-        self.max_steps_spin.setRange(1, 100)
-        self.max_steps_spin.setValue(int(os.environ.get("AGENT_MAX_STEPS", "24")))
+        self.max_steps_spin.setRange(-1, 500)
+        self.max_steps_spin.setSpecialValueText("unlimited")
+        self.max_steps_spin.setValue(_env_steps())
         form.addRow("Max steps", self.max_steps_spin)
 
         self.harness_combo = QComboBox()
@@ -617,7 +632,9 @@ class AgentPage(QWidget):
         self.stop_btn.clicked.connect(self.on_stop)
         btn_row.addWidget(self.stop_btn)
         btn_row.addStretch()
-        self.budget_label = QLabel("Steps: 0 / 24 · tokens: —")
+        self.budget_label = QLabel(
+            f"Steps: 0 / {_steps_label(self.max_steps_spin.value())} · tokens: —"
+        )
         btn_row.addWidget(self.budget_label)
         layout.addLayout(btn_row)
 
@@ -694,7 +711,7 @@ class AgentPage(QWidget):
         if not isinstance(event, dict):
             return
         kind = event.get("kind", "")
-        max_s = self.max_steps_spin.value()
+        max_s = _steps_label(self.max_steps_spin.value())
         if kind == "step":
             step = event.get("step", 0)
             tokens = event.get("tokens") or event.get("usage") or "—"
@@ -734,7 +751,7 @@ class AgentPage(QWidget):
             self.log.append(f"\n[Job done] {event.get('job_id')} success={event.get('success')}")
         elif kind == "cancelled":
             self.log.append("\n[Cancelled]")
-        elif kind == "error":
+        elif kind in ("error", "protocol_error"):
             self.log.append(f"\n[Error] {event.get('text', '')}")
 
     @Slot(str)
@@ -1208,8 +1225,11 @@ class ScheduleEditDialog(QDialog):
         form.addRow("", self.enable_check)
 
         self.max_steps = QSpinBox()
-        self.max_steps.setRange(1, 100)
-        self.max_steps.setValue(int(spec.maxSteps) if spec and spec.maxSteps else 15)
+        self.max_steps.setRange(-1, 500)
+        self.max_steps.setSpecialValueText("unlimited")
+        self.max_steps.setValue(
+            int(spec.maxSteps) if spec and spec.maxSteps else _env_steps()
+        )
         form.addRow("Max steps", self.max_steps)
 
         layout.addLayout(form)
@@ -1530,7 +1550,7 @@ class SchedulesPage(QWidget):
                 for ev in run_agent(
                     goal,
                     settings,
-                    max_steps=spec.maxSteps or 15,
+                    max_steps=spec.maxSteps or settings.agent_max_steps,
                     dry_run=spec.dryRun,
                     profile=spec.profile,
                     playbook=spec.playbook,

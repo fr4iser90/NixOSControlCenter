@@ -17,7 +17,7 @@
     "rulebook",
     "legal-stub"
   ],
-  "goalTemplate": "Generate a DE Impressum *stub* (not legal advice). Entity: {{entityType}}. Country: {{country}}. Legal name: {{legalName}}. Address: {{address}}. Email: {{email}}. Output: {{outputFile}}. Repos: {{repositories}}.\\n\\nProduce markdown stub with required fields only. Propose write to {{outputFile}} as dry-run diff. Never invent registration numbers or tax IDs.",
+  "goalTemplate": "Generate a DE Impressum *stub* (not legal advice) in {{outputLanguage}}. Entity: {{entityType}}. Country: {{country}}. Legal name: {{legalName}}. Address: {{address}}. Email: {{email}}. Output: {{outputFile}}. Repos: {{repositories}}.\\n\\nProduce markdown stub with required fields only. Propose write to {{outputFile}} as dry-run diff. Never invent registration numbers or tax IDs.",
   "params": [
     {
       "id": "entityType",
@@ -75,6 +75,19 @@
       ],
       "default": "impressum.md",
       "required": true
+    },
+    {
+      "id": "outputLanguage",
+      "label": "Language",
+      "type": "enum",
+      "options": [
+        "English",
+        "Deutsch",
+        "Auto (keep file)"
+      ],
+      "default": "English",
+      "required": true,
+      "description": "Language of the stub. Auto = German — the Impressum audience is DE authorities."
     },
     {
       "id": "repositories",

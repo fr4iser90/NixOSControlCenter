@@ -287,8 +287,22 @@ in
 
       maxSteps = mkOption {
         type = types.int;
-        default = 24;
-        description = "Maximum tool steps per agent run";
+        default = -1;
+        description = ''
+          Maximum tool steps per agent run. -1 (default) means unlimited, like
+          qwen-code's model.maxSessionTurns; set a positive integer to opt in to a
+          budget. Schedules and playbooks that set maxSteps keep their own value.
+        '';
+      };
+
+      chatMaxRounds = mkOption {
+        type = types.int;
+        default = -1;
+        description = ''
+          Tool-call rounds per chat message (Companion / GUI chat / ncc-assistant chat).
+          -1 (default) means unlimited, like qwen-code; set a positive integer to cap
+          a round-hungry model.
+        '';
       };
 
       timeoutSec = mkOption {

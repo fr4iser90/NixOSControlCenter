@@ -8,10 +8,16 @@ from .runtime import ToolRuntime
 from .session import ChatSession
 
 
-def run_chat(settings: Settings, runtime: ToolRuntime | None = None) -> int:
+def run_chat(
+    settings: Settings,
+    runtime: ToolRuntime | None = None,
+    max_rounds: int | None = None,
+) -> int:
     del runtime  # session owns runtime
     try:
-        session = ChatSession.create(settings, interactive_auth=True)
+        session = ChatSession.create(
+            settings, interactive_auth=True, max_rounds=max_rounds
+        )
     except RuntimeError as exc:
         print_err(f"auth failed: {exc}")
         return 1

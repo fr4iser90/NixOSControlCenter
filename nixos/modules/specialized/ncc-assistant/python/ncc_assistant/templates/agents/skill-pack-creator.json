@@ -17,7 +17,7 @@
     "rulebook",
     "skills"
   ],
-  "goalTemplate": "Create skill pack '{{skillName}}' for domain {{domain}}. Depth: {{depth}}. Repos: {{repositories}}.\\n\\nPropose .agents/skills/{{skillName}}/SKILL.md (diff-first). Follow Cursor/portable skill conventions. No secrets in skill body.",
+  "goalTemplate": "Create skill pack '{{skillName}}' for domain {{domain}}. Depth: {{depth}}. Language: {{outputLanguage}}. Repos: {{repositories}}.\\n\\nPropose .agents/skills/{{skillName}}/SKILL.md (diff-first). Follow Cursor/portable skill conventions. No secrets in skill body.",
   "params": [
     {
       "id": "skillName",
@@ -51,6 +51,19 @@
       ],
       "default": "standard",
       "required": true
+    },
+    {
+      "id": "outputLanguage",
+      "label": "Language",
+      "type": "enum",
+      "options": [
+        "English",
+        "Deutsch",
+        "Auto (keep file)"
+      ],
+      "default": "English",
+      "required": true,
+      "description": "Language of the skill body. Auto = match the repo's existing skills."
     },
     {
       "id": "repositories",

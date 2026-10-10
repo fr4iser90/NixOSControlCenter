@@ -11,7 +11,7 @@ from pathlib import Path
 from .auth import with_cached_credentials
 from .chat import run_chat
 from .cli_print import print_err, print_info, print_ok
-from .config import Settings
+from .config import Settings, is_unlimited
 from .runtime import TOOL_DEFINITIONS, ToolRuntime
 
 
@@ -88,7 +88,8 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
     verbose = bool(getattr(args, "verbose", False))
     print_info(f"Starting agent with goal: {goal}")
     print_info(
-        f"Harness: {hname}, Max steps: {max_steps}, "
+        f"Harness: {hname}, "
+        f"Max steps: {'unlimited' if is_unlimited(max_steps) else max_steps}, "
         f"Dry run: {args.dry_run}, Profile: {args.profile or 'default'}"
     )
     print_info("---")
@@ -113,7 +114,12 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
                 if kind == "job_started":
                     print_info(f"Job started: {event.get('job_id')}")
                 elif kind == "step":
-                    print_info(f"Step {event.get('step')}/{event.get('max_steps')}")
+                    limit = event.get("max_steps")
+                    print_info(
+                        f"Step {event.get('step')}"
+                        if is_unlimited(limit)
+                        else f"Step {event.get('step')}/{limit}"
+                    )
                 elif kind == "thinking_delta":
                     if verbose:
                         print_info(f"thinking: {event.get('text', '')[:200]}")
@@ -154,7 +160,7 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
                 elif kind == "agent_finish":
                     print_ok(f"Agent finished: {event.get('summary')}")
                     print_info(f"Success: {event.get('success')}")
-                elif kind == "error":
+                elif kind in ("error", "protocol_error"):
                     print_err(event.get("text", ""))
                 elif kind == "job_finished":
                     print_ok(
@@ -1063,7 +1069,13 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=False)
 
     sub.add_parser("gui", help="Graphical chat window (default)")
-    sub.add_parser("chat", help="Terminal chat (legacy)")
+    chat_p = sub.add_parser("chat", help="Terminal chat (legacy)")
+    chat_p.add_argument(
+        "--max-rounds",
+        type=int,
+        default=None,
+        help="Tool rounds per message (default: unlimited — set a positive int to cap)",
+    )
     sub.add_parser("cli", help="Alias for terminal chat")
     sub.add_parser("mcp", help="Run MCP server on stdio")
 
@@ -1440,7 +1452,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if command in ("chat", "cli"):
         settings = Settings.from_env(client_mode="chat")
-        return run_chat(settings)
+        # Flag wins over settings; None/0 → settings.chat_max_rounds (unlimited).
+        return run_chat(settings, max_rounds=getattr(args, "max_rounds", None) or None)
 
     if command == "agent":
         if args.agent_cmd == "run":

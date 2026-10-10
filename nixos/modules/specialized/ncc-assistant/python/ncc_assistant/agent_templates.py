@@ -57,7 +57,8 @@ class AgentTemplate:
     tier: str = "catalog"  # catalog | beta (UI section only — not a quality claim)
     goal_template: str = ""
     dry_run: bool = True
-    max_steps: int | None = 24
+    # None / <= 0 = no step budget (inherits settings.agent_max_steps)
+    max_steps: int | None = None
     # native | qwen | dsh | null (inherit from coding tags / settings)
     harness: str | None = None
     source: str = "builtin"
@@ -134,7 +135,7 @@ class AgentTemplate:
                 data.get("goalTemplate") or data.get("goal_template") or data.get("goal") or ""
             ),
             dry_run=bool(data.get("dryRun", data.get("dry_run", True))),
-            max_steps=data.get("maxSteps", data.get("max_steps", 24)),
+            max_steps=data.get("maxSteps", data.get("max_steps")),
             harness=(
                 str(data["harness"]).strip().lower()
                 if data.get("harness")

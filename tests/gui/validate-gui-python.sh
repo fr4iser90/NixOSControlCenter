@@ -76,6 +76,7 @@ run "${ROOT}/tests/gui/test_hyprland_catalog_hotpath.py"
 run "${ROOT}/tests/gui/test_session_ux.py"
 run "${ROOT}/tests/gui/test_hot_path_perf.py"
 run "${ROOT}/tests/gui/test_dialogs_copy.py"
+run "${ROOT}/tests/gui/test_template_language_param.py"
 
 if [[ "$HAS_QT" -eq 1 ]]; then
   run "${ROOT}/tests/gui/test_reload_generation.py"

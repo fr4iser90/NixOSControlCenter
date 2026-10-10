@@ -2,7 +2,7 @@
   "id": "privacy-policy-creator",
   "title": "Privacy policy creator (DE stub)",
   "category": "Rulebooks",
-  "description": "Structured German privacy-policy stub from enums. Not legal advice. English template IDs/params; DE content only in the generated file if requested.",
+  "description": "Structured privacy-policy stub from enums. Not legal advice. The language of the generated file comes from the Language param.",
   "skill": null,
   "profile": "read-only",
   "mcp": [
@@ -17,7 +17,7 @@
     "rulebook",
     "legal-stub"
   ],
-  "goalTemplate": "Generate a German privacy-policy *stub* (not legal advice) for EU/DE hosting. Controller: {{controllerName}}. Country: {{country}}. Contact email: {{email}}. Hosting region: {{hostingRegion}}. Analytics/cookies: {{analytics}}. Output file: {{outputFile}}. Repos: {{repositories}}.\\n\\nWrite markdown sections: controller, hosting, cookies, data-subject rights, contact. Propose write to {{outputFile}} as dry-run diff. Never invent registration numbers, fines, or tax IDs.",
+  "goalTemplate": "Generate a privacy-policy *stub* (not legal advice) for EU/DE hosting, written in {{outputLanguage}}. Controller: {{controllerName}}. Country: {{country}}. Contact email: {{email}}. Hosting region: {{hostingRegion}}. Analytics/cookies: {{analytics}}. Output file: {{outputFile}}. Repos: {{repositories}}.\\n\\nWrite markdown sections: controller, hosting, cookies, data-subject rights, contact. Propose write to {{outputFile}} as dry-run diff. Never invent registration numbers, fines, or tax IDs.",
   "params": [
     {
       "id": "controllerName",
@@ -81,6 +81,19 @@
       ],
       "default": "privacy.md",
       "required": true
+    },
+    {
+      "id": "outputLanguage",
+      "label": "Language",
+      "type": "enum",
+      "options": [
+        "English",
+        "Deutsch",
+        "Auto (keep file)"
+      ],
+      "default": "English",
+      "required": true,
+      "description": "Language of the stub. Auto = German — the DSGVO audience is DE data subjects."
     },
     {
       "id": "repositories",

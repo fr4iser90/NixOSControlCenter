@@ -50,7 +50,7 @@ let
 
   mkAgentExec = name: schedule:
     let
-      maxSteps = if schedule.maxSteps != null then toString schedule.maxSteps else toString (cfg.agent.maxSteps or 24);
+      maxSteps = if schedule.maxSteps != null then schedule.maxSteps else (cfg.agent.maxSteps or (-1));
       dryRun = if schedule.dryRun != null then schedule.dryRun else (cfg.agent.dryRun or false);
       profile = if schedule.profile != null then schedule.profile else (cfg.agent.profile or "read-only");
       playbook = schedule.playbook or null;
@@ -58,8 +58,8 @@ let
       agentArgs = [
         "${pkg.nccAssistant}/bin/ncc-assistant"
         "agent" "run"
-        "--max-steps" maxSteps
-      ] ++ optionals (profile != null) [ "--profile" (lib.escapeShellArg profile) ]
+      ] ++ optionals (maxSteps > 0) [ "--max-steps" (toString maxSteps) ]
+        ++ optionals (profile != null) [ "--profile" (lib.escapeShellArg profile) ]
         ++ optionals dryRun [ "--dry-run" ]
         ++ optionals (playbook != null) [ "--playbook" (lib.escapeShellArg playbook) ]
         ++ optionals (goal != null && goal != "") [ "--goal" (lib.escapeShellArg goal) ];

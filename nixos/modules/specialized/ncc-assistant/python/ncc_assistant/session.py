@@ -13,7 +13,7 @@ from .auth import (
     refresh_auth_on_unauthorized,
     with_cached_credentials,
 )
-from .config import Settings
+from .config import Settings, UNLIMITED, is_unlimited
 from .history import (
     new_session_id,
     save_session,
@@ -40,7 +40,7 @@ class ChatSession:
     runtime: ToolRuntime
     messages: list[dict[str, Any]] = field(default_factory=list)
     model_label: str = "auto"
-    max_rounds: int = 8
+    max_rounds: int = UNLIMITED
     session_id: str = field(default_factory=new_session_id)
     title: str = "New chat"
     cancel_event: threading.Event = field(default_factory=threading.Event)
@@ -84,6 +84,7 @@ class ChatSession:
         title: str | None = None,
         refresh_models: bool = True,
         available_models: list[dict[str, Any]] | None = None,
+        max_rounds: int | None = None,
     ) -> "ChatSession":
         settings = settings or Settings.from_env(client_mode="chat")
         settings = with_cached_credentials(settings)
@@ -99,7 +100,13 @@ class ChatSession:
             settings = ensure_auth(settings, interactive=True)
 
         runtime = ToolRuntime(settings, confirm_hook=confirm_hook)
-        session = cls(settings=settings, runtime=runtime)
+        session = cls(
+            settings=settings,
+            runtime=runtime,
+            max_rounds=(
+                settings.chat_max_rounds if max_rounds is None else int(max_rounds)
+            ),
+        )
         if messages is not None:
             session.messages = messages
             session.refresh_system_prompt()
@@ -288,7 +295,9 @@ class ChatSession:
         yield {"kind": "done"}
 
     def _run_turn(self, tools: list[dict[str, Any]]) -> Iterator[Event]:
-        for _ in range(self.max_rounds):
+        rounds = 0
+        while is_unlimited(self.max_rounds) or rounds < self.max_rounds:
+            rounds += 1
             if self.cancel_event.is_set():
                 raise CancelledError("cancelled")
 
@@ -386,9 +395,11 @@ class ChatSession:
                     }
                 )
 
+        # Only reachable with an explicit budget: surfaces drop event kinds they do
+        # not know, so this stays an assistant bubble rather than a new kind.
         yield {
             "kind": "assistant",
-            "text": "(stopped after max tool rounds)",
+            "text": f"(stopped after {self.max_rounds} tool rounds)",
         }
 
 
