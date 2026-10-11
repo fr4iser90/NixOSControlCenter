@@ -91,6 +91,8 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 | 35 | [Doomscroll / focus watchdog](./plans/35-doomscroll-focus-watchdog.md) | **done** (active-window probe; now a Feature plugin) |
 | 36 | [Feature plugins](./plans/36-feature-plugins.md) | **in progress** (Plugins tab + doomscroll extracted; ≠ MCP/templates/watchdogs) |
 | 37 | [Autonomous workspace workflow](./plans/37-autonomous-workspace-workflow.md) | **done** (per-task PR + resume + CONFIRM) |
+| 38 | [Repo & account fact store](./plans/38-repo-account-fact-store.md) | **proposed** (identity = remote not path; git/github read tools) |
+| 39 | [Permission ladder & per-schedule grants](./plans/39-permission-ladder-and-schedule-grants.md) | **proposed** (grants reach the process; action steps + non-negotiable floor) |
 
 ## Feature map (checklist)
 
@@ -186,6 +188,34 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 - [x] Ship: `merge|bump` require `--confirm CONFIRM` + template `autonomous-agent-ship`
 - [x] Companion Daily: analyze / plan / agent / ship / lifecycle / fleet
 - SSOT: [plans/37-autonomous-workspace-workflow.md](./plans/37-autonomous-workspace-workflow.md)
+
+### State hygiene (shipped, no standalone plan)
+
+- [x] `0600` on every written state file (`secrets.json` already was; now also `mcp-servers.json`,
+  `workspaces.json`, `approvals/*`, `audit.jsonl`)
+- [x] Retention before each agent run + on demand: `ncc ai maintenance run`
+  (50 finished jobs / 30 days, 5000 audit lines, decided approvals older than 7 days)
+- [x] `tools.allowShell` alone runs nothing — an empty `shellAllowlist` denies every command
+- [x] Tests: `tests/ncc-assistant/test_state_hygiene_v1.py`
+
+### Phase 38 (proposed)
+
+- Repo & account fact store: identity = normalised `origin` remote, path is only a binding
+- Working-tree facts always fresh, `gh`-facts TTL-cached, `measured` vs `inferred` labelled
+- New read-only tool family `repo_*` / `github_*`; GitHub state becomes tasks (`sourceKey`)
+- `workspaces rename|move` rewrite every reference (tasks, MCP bindings, progress files) or roll back
+- SSOT: [plans/38-repo-account-fact-store.md](./plans/38-repo-account-fact-store.md)
+
+### Phase 39 (proposed)
+
+- Fix the inert transport: schedule grants reach the unit's argv; wrapper stops overwriting them
+- Host config = ceiling, schedule = step (`permissions.repo` / `.system`); more than the ceiling
+  is an error, not a silent downgrade
+- Non-negotiable floor in code: no force-push, no `--no-verify`, no protected-branch
+  push/merge, no `git add -A`, no staging of secret-shaped paths
+- Budgets (runs/day, PRs/day, diff size) checked before the LLM call; permission decisions audited
+  with actor
+- SSOT: [plans/39-permission-ladder-and-schedule-grants.md](./plans/39-permission-ladder-and-schedule-grants.md)
 
 ## Known follow-ups (not blockers)
 

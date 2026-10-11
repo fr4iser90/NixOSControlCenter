@@ -35,7 +35,7 @@ durable artifacts: logs, status, diffs, exit reason — inspectable in the UI.
 | J5 | CLI `ncc ai jobs list\|show\|log` | P1 |
 | J6 | GUI Jobs table + detail view | P0 |
 | J7 | Retry job (re-run same goal + policy) | P1 |
-| J8 | Prune: keep last N or older than D days | P2 |
+| J8 | Prune: keep last N or older than D days | **shipped** — `maintenance.py`: 50 jobs / 30 days, terminal states only; `ncc ai maintenance run` |
 | J9 | Lockfile per host for concurrent agent runs | P0 |
 
 ## On-disk layout (draft)
