@@ -156,6 +156,13 @@ You are running in agent mode to accomplish a specific goal.
 
     def _run_with_lock(self) -> Iterator[Event]:
         """Run agent with lock held."""
+        from .maintenance import run_retention
+
+        try:
+            run_retention()
+        except Exception as exc:  # noqa: BLE001 — housekeeping must never fail a run
+            append_audit("retention_failed", actor="agent", detail=str(exc))
+
         self._job = self._store.create(
             self.agent_settings.goal,
             profile=self.agent_settings.profile,

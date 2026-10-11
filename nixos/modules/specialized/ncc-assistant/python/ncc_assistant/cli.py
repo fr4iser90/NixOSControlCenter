@@ -307,6 +307,22 @@ def _cmd_approve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_maintenance_run(args: argparse.Namespace) -> int:
+    """Apply retention to jobs, audit log, and decided approvals."""
+    from .maintenance import run_retention
+
+    stats = run_retention()
+    if getattr(args, "json", False):
+        print(json.dumps(stats, indent=2))
+        return 0
+    print_ok(
+        f"Retention: {stats['jobs_removed']} job(s) removed, "
+        f"{stats['audit_lines_dropped']} audit line(s) dropped, "
+        f"{stats['approvals_removed']} approval(s) removed"
+    )
+    return 0
+
+
 def _cmd_knowledge_sync(args: argparse.Namespace) -> int:
     """Sync knowledge overlay."""
     from .paths import knowledge_overlay_dir
@@ -1188,6 +1204,13 @@ def main(argv: list[str] | None = None) -> int:
     jobs_log = jobs_sub.add_parser("log", help="Show job event log")
     jobs_log.add_argument("job_id", help="Job ID")
 
+    maintenance_p = sub.add_parser(
+        "maintenance", help="Retention for jobs, audit log, and approvals"
+    )
+    maintenance_sub = maintenance_p.add_subparsers(dest="maintenance_cmd")
+    maintenance_run = maintenance_sub.add_parser("run", help="Apply retention now")
+    maintenance_run.add_argument("--json", action="store_true")
+
     playbook_p = sub.add_parser("playbook", help="Playbook management")
     playbook_sub = playbook_p.add_subparsers(dest="playbook_cmd")
     playbook_list = playbook_sub.add_parser("list", help="List playbooks")
@@ -1548,6 +1571,12 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_jobs_show(args)
         if args.jobs_cmd == "log":
             return _cmd_jobs_log(args)
+        parser.print_help()
+        return 1
+
+    if command == "maintenance":
+        if args.maintenance_cmd == "run":
+            return _cmd_maintenance_run(args)
         parser.print_help()
         return 1
 

@@ -11,6 +11,17 @@ from typing import Any
 
 from .paths import mcp_servers_file
 
+
+def _write_servers(path: Path, data: dict[str, Any]) -> None:
+    """Persist MCP servers; entries can hold resolved secrets, so keep mode 0600."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+
+
 WRITE_RISK_WARNING = (
     "WARNING: This MCP template can write or mutate files/systems. "
     "Review command, args, and paths before enabling. "
@@ -239,8 +250,7 @@ def install_template(
         entry["workspaceId"] = workspace_id
 
     existing[entry_name] = entry
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+    _write_servers(path, existing)
 
     result: dict[str, Any] = {
         "ok": True,
@@ -301,7 +311,7 @@ def set_mcp_enabled(name: str, enabled: bool) -> bool:
         return False
     entry["enabled"] = bool(enabled)
     data[name] = entry
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    _write_servers(path, data)
     return True
 
 
@@ -316,5 +326,5 @@ def remove_mcp_server(name: str) -> bool:
     if not isinstance(data, dict) or name not in data:
         return False
     del data[name]
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    _write_servers(path, data)
     return True

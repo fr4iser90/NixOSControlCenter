@@ -872,7 +872,8 @@ class ToolRuntime:
     def _shell_allowlisted(self, command: str) -> bool:
         raw = os.environ.get("NCC_ASSISTANT_SHELL_ALLOWLIST", "").strip()
         if not raw:
-            return True  # empty allowlist = allow when shell enabled
+            # No allowlist is not a licence for anything: shell tools stay denied.
+            return False
         prefixes = [p.strip() for p in raw.split(":") if p.strip()]
         cmd = command.strip()
         return any(cmd == p or cmd.startswith(p + " ") for p in prefixes)
@@ -965,6 +966,14 @@ class ToolRuntime:
             cmd = cmd.replace(placeholder, str(value))
 
         if not self._shell_allowlisted(cmd):
+            if not os.environ.get("NCC_ASSISTANT_SHELL_ALLOWLIST", "").strip():
+                return {
+                    "ok": False,
+                    "error": (
+                        "Shell tools are enabled but tools.shellAllowlist is empty, "
+                        "so every command is denied. List command prefixes in systemConfig."
+                    ),
+                }
             return {
                 "ok": False,
                 "error": (

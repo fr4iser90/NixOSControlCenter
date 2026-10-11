@@ -261,7 +261,10 @@ in
         type = types.listOf types.str;
         default = [ ];
         example = [ "systemctl status" "journalctl" "df" ];
-        description = "Shell commands allowed when allowShell is true (prefix match)";
+        description = ''
+          Shell command prefixes allowed when allowShell is true. An empty list
+          denies every command: allowShell alone never runs a command.
+        '';
       };
 
       mcpServers = mkOption {

@@ -420,7 +420,19 @@ runs, and what you pick comes back to the model as the tool result.
 - Kill-switch: `~/.config/ncc-assistant/DISABLE`
 - Presence `paused` blocks mutating tools; schedules skip when paused
 - Notification decisions timeout → `block` by default (`onTimeout`)
-- Shell tools need `tools.allowShell` + optional `shellAllowlist`
+- Shell tools need `tools.allowShell` **and** a non-empty `tools.shellAllowlist`. An empty
+  allowlist denies every command — enabling the shell is not a licence for any command.
+- Written `0600`: `secrets.json`, `mcp-servers.json` (resolved tokens), `workspaces.json`,
+  `approvals/*`, `audit.jsonl`
+- State that would grow forever is pruned before each agent run, or on demand:
+
+```bash
+ncc ai maintenance run [--json]     # = ncc-assistant maintenance run
+```
+
+Keeps the newest 50 finished jobs (30 days max), the last 5000 `audit.jsonl` lines, and
+deletes decided approvals older than 7 days. Running/pending jobs and undecided approvals
+are never touched.
 
 ## Debug
 

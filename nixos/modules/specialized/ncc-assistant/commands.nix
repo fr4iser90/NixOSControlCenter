@@ -39,6 +39,7 @@ in
               "secrets" "workspaces" "templates" "workflows" "focus" "workflow"
               "context"
               "mcp-install"
+              "maintenance"
             ];
             shortHelp = "ai - AI Assistant";
             longHelp = ''
@@ -78,6 +79,7 @@ in
                 ncc ai context show|compact [--session ID] [--json]
                 ncc ai workflow audit|lifecycle|fleet|plan|status|next|resume|task-start|task-finish|branch|validate|commit|pr|merge|bump
                 ncc ai mcp-install NAME
+                ncc ai maintenance run [--json]
                 ncc ai serve-openapi
                 ncc ai watchdog list|fire EVENT
                 ncc ai probe disk

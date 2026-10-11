@@ -290,7 +290,12 @@ class DecisionService:
 
     def _write(self, decision: PendingDecision) -> None:
         path = self._decision_path(decision.id)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(decision.to_dict(), indent=2) + "\n", encoding="utf-8")
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
 
     def get(self, decision_id: str) -> PendingDecision | None:
         """Get a decision by ID."""

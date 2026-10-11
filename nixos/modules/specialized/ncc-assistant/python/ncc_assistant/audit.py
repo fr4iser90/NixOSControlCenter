@@ -117,6 +117,10 @@ def append_audit(
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry.to_dict(), ensure_ascii=False) + "\n")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
 
     return entry
 
