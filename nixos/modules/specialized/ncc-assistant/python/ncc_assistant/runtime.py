@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .config import Settings
+from .permissions import check_shell_command, evaluate_system
 
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
@@ -965,6 +966,12 @@ class ToolRuntime:
             placeholder = "{{" + key + "}}"
             cmd = cmd.replace(placeholder, str(value))
 
+        # Checked after substitution: an argument must not smuggle a forbidden git call
+        # into an allowlisted template.
+        floor = check_shell_command(cmd)
+        if not floor.allowed:
+            return {"ok": False, **floor.as_dict()}
+
         if not self._shell_allowlisted(cmd):
             if not os.environ.get("NCC_ASSISTANT_SHELL_ALLOWLIST", "").strip():
                 return {
@@ -1019,6 +1026,10 @@ class ToolRuntime:
             }
         if risk == "rebuild" and not self.settings.allow_rebuild:
             return {"ok": False, "error": "Rebuilds disabled (allowRebuild=false)."}
+        if risk in ("write", "rebuild"):
+            ladder = evaluate_system("rebuild" if risk == "rebuild" else "config_write")
+            if not ladder.allowed:
+                return {"ok": False, **ladder.as_dict()}
 
         perm = getattr(entry, "permission", None)
         role = invoker_role()
@@ -1272,6 +1283,18 @@ class ToolRuntime:
             presence_err = self._check_presence_for_mutating(name) if mutating else None
             if presence_err:
                 return {"ok": False, "error": presence_err}
+
+            if mutating:
+                # The system axis of the active grant (schedule runs). Without a grant
+                # context this allows everything, so chat and a human CLI stay unchanged.
+                risk = getattr(tool_entry, "risk", "read") if tool_entry else "read"
+                action = "rebuild" if name == "apply_system" or risk == "rebuild" else "config_write"
+                ladder = evaluate_system(action)
+                if not ladder.allowed:
+                    from .audit import append_audit
+
+                    append_audit("deny", tool=name, result="denied", detail=ladder.code)
+                    return {"ok": False, **ladder.as_dict()}
 
             if self._dry_run and mutating:
                 return {

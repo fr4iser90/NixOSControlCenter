@@ -40,6 +40,7 @@ in
               "context"
               "mcp-install"
               "maintenance"
+              "permissions"
             ];
             shortHelp = "ai - AI Assistant";
             longHelp = ''
@@ -54,6 +55,7 @@ in
 
               Agent:
                 ncc ai agent run --goal "..."
+                ncc ai agent run --goal "..." --grant repo=pr --grant system=none
                 ncc ai jobs list
                 ncc ai playbook list|run NAME
 
@@ -80,6 +82,7 @@ in
                 ncc ai workflow audit|lifecycle|fleet|plan|status|next|resume|task-start|task-finish|branch|validate|commit|pr|merge|bump
                 ncc ai mcp-install NAME
                 ncc ai maintenance run [--json]
+                ncc ai permissions show [--grant repo=pr] [--json]
                 ncc ai serve-openapi
                 ncc ai watchdog list|fire EVENT
                 ncc ai probe disk

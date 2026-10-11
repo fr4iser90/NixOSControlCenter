@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from .paths import workflow_progress_file
+from .permissions import check_git_argv, current_grant, evaluate_repo, protected_branch, secret_paths
 from .workspace_workflow import (
     next_open_task,
     resolve_workspace_id,
@@ -80,7 +81,42 @@ def _run(
 
 
 def _git(root: Path, *args: str, timeout: float = 60.0) -> dict[str, Any]:
+    verdict = check_git_argv(args)
+    if not verdict.allowed:
+        # Refuse before spawning git: the floor is not something git can be argued out of.
+        return {
+            "ok": False,
+            "cmd": ["git", *args],
+            "returncode": 126,
+            "stdout": "",
+            "stderr": f"{verdict.reason} {verdict.hint}".strip(),
+            **verdict.as_dict(),
+        }
     return _run(["git", *args], cwd=root, timeout=timeout)
+
+
+def _repo_grant(action: str) -> dict[str, Any] | None:
+    """Denial payload when this run's grant does not cover ``action``.
+
+    Returns None outside a grant context (human at the CLI) — those keep the rights the
+    tool always had; the floor above still applies to everyone.
+    """
+    verdict = evaluate_repo(action)
+    return None if verdict.allowed else verdict.as_dict()
+
+
+def _human_decision(action: str, confirm: str, hint: str) -> dict[str, Any] | None:
+    """Denial payload for actions that normally need the ``CONFIRM`` token.
+
+    Inside a grant context the token is typed by the model, not by a person, so the
+    ladder alone decides there. Outside one (a human at the CLI) the token keeps
+    working exactly as it did before.
+    """
+    if current_grant() is not None:
+        return _repo_grant(action)
+    if (confirm or "").strip() != CONFIRM_TOKEN:
+        return {"error": "confirm_required", "hint": f"Pass confirm=\"{CONFIRM_TOKEN}\" {hint}"}
+    return None
 
 
 def _is_dirty(root: Path) -> bool:
@@ -322,8 +358,33 @@ def commit_all(
     """Stage all + commit (no push)."""
     wid, root = _repo_root(workspace_id)
     msg = (message or "").strip() or "ncc workflow: workspace updates"
-    _git(root, "add", "-A")
+
+    denied = _repo_grant("commit")
+    if denied:
+        return {"ok": False, "workspace_id": wid, **denied}
+
     status = _git(root, "status", "--porcelain")
+    if not status.get("ok"):
+        # Never read a failed status as "clean" — that would hide both the failure and
+        # the secret scan below.
+        return {
+            "ok": False,
+            "workspace_id": wid,
+            "error": "status_failed",
+            "reason": status.get("stderr") or "git status failed",
+        }
+    # ``add -A`` is exactly how secrets get committed, so screen it before staging.
+    blocked = secret_paths((status.get("stdout") or "").splitlines())
+    if blocked:
+        return {
+            "ok": False,
+            "workspace_id": wid,
+            "error": "denied_secret_path",
+            "denied": "denied_secret_path",
+            "secretPaths": blocked,
+            "reason": "git add -A would stage files that look like credentials",
+            "hint": "Add them to .gitignore, or stage the real changes yourself with git add <path>.",
+        }
     if not status.get("stdout"):
         return {
             "ok": True,
@@ -331,6 +392,7 @@ def commit_all(
             "committed": False,
             "reason": "nothing_to_commit",
         }
+    _git(root, "add", "-A")
     res = _git(root, "commit", "-m", msg)
     return {
         "ok": bool(res["ok"]),
@@ -347,6 +409,21 @@ def push_branch(workspace_id: str | None = None, *, set_upstream: bool = True) -
     branch = cur.get("stdout") or ""
     if not branch or branch == "HEAD":
         return {"ok": False, "error": "detached HEAD", "workspace_id": wid}
+
+    denied = _repo_grant("push")
+    if denied:
+        return {"ok": False, "workspace_id": wid, "branch": branch, **denied}
+    if current_grant() is not None and protected_branch(branch):
+        return {
+            "ok": False,
+            "workspace_id": wid,
+            "branch": branch,
+            "error": "denied_protected_branch",
+            "denied": "denied_protected_branch",
+            "reason": f"{branch} is protected",
+            "hint": "Push a ncc/… branch and open a PR; getting onto trunk is a human decision.",
+        }
+
     args = ["push"]
     if set_upstream:
         args.extend(["-u", "origin", branch])
@@ -374,6 +451,9 @@ def open_pull_request(
     if not shutil.which("gh"):
         raise ValueError("gh CLI not on PATH")
     wid, root = _repo_root(workspace_id)
+    denied = _repo_grant("pr")
+    if denied:
+        return {"ok": False, "workspace_id": wid, **denied}
     if require_clean_validate:
         val = validate_workspace(wid)
         if not val.get("ok"):
@@ -417,13 +497,10 @@ def merge_pull_request(
     confirm: str = "",
     strategy: str = "squash",
 ) -> dict[str, Any]:
-    """Merge PR only when confirm == CONFIRM."""
-    if (confirm or "").strip() != CONFIRM_TOKEN:
-        return {
-            "ok": False,
-            "error": "confirm_required",
-            "hint": f'Pass confirm="{CONFIRM_TOKEN}" to merge.',
-        }
+    """Merge PR only on a human decision — a token counts outside grant context only."""
+    denied = _human_decision("merge", confirm, "to merge.")
+    if denied:
+        return {"ok": False, **denied}
     if not shutil.which("gh"):
         raise ValueError("gh CLI not on PATH")
     wid, root = _repo_root(workspace_id)
@@ -450,13 +527,10 @@ def bump_version(
     confirm: str = "",
     part: str = "patch",
 ) -> dict[str, Any]:
-    """Bump package.json version only with confirm=CONFIRM."""
-    if (confirm or "").strip() != CONFIRM_TOKEN:
-        return {
-            "ok": False,
-            "error": "confirm_required",
-            "hint": f'Pass confirm="{CONFIRM_TOKEN}" to bump version.',
-        }
+    """Bump package.json version only on a human decision (grant ``release`` or token)."""
+    denied = _human_decision("release", confirm, "to bump version.")
+    if denied:
+        return {"ok": False, **denied}
     wid, root = _repo_root(workspace_id)
     part = part if part in ("major", "minor", "patch") else "patch"
     pkg_path = root / "package.json"

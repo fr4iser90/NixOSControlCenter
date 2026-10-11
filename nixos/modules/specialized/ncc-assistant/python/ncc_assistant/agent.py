@@ -3,16 +3,29 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Iterator
+from typing import Any, Iterator, Sequence
 
 from .audit import append_audit
 from .config import Settings, UNLIMITED, is_unlimited
 from .jobs import get_job_store, JobEvent, JobMeta, AgentLock
 from .llm import iter_chat_completion, LLMError, CancelledError
 from .paths import is_disabled
+from .permissions import (
+    DEFAULT_REPO_CEILING,
+    ENV_ACTOR,
+    ENV_REPO_CEILING,
+    Grant,
+    current_grant,
+    parse_grant_pairs,
+    resolve_grant,
+    set_process_grant,
+    step_rank,
+    system_ceiling,
+)
 from .presence import is_paused, get_presence
 from .profiles import (
     Profile,
@@ -40,6 +53,8 @@ class AgentSettings:
     profile: str | None = None
     playbook: str | None = None
     confirm_mode: str = "writes"  # writes | always | never
+    #: ``repo=pr`` / ``system=none`` pairs — narrows the host ceiling for this run only.
+    grant: tuple[str, ...] = ()
 
     @property
     def step_budget_label(self) -> str:
@@ -48,6 +63,30 @@ class AgentSettings:
 
 
 Event = dict[str, Any]
+
+
+def resolve_run_grant(
+    settings: Settings, grant_pairs: Sequence[str] | None
+) -> tuple[Grant | None, list[str]]:
+    """Narrow the host ceiling for one run.
+
+    No request anywhere (no ``--grant``, no unit env, no host ceiling) leaves the ladder
+    out: chat and a human at the CLI keep exactly the rights they had. A request above
+    the ceiling is returned as a violation instead of being clamped silently.
+    """
+    try:
+        requested = parse_grant_pairs(grant_pairs)
+    except ValueError as exc:
+        return None, [str(exc)]
+    ceiling = (os.environ.get(ENV_REPO_CEILING) or "").strip()
+    if not requested and current_grant() is None and not ceiling:
+        return None, []
+    return resolve_grant(
+        requested=requested,
+        repo_ceiling=ceiling or DEFAULT_REPO_CEILING,
+        system_ceiling_step=system_ceiling(settings.writes_enabled, settings.allow_rebuild),
+        actor=os.environ.get(ENV_ACTOR) or "cli",
+    )
 
 
 class AgentRunner:
@@ -72,16 +111,35 @@ class AgentRunner:
         self._step = 0
         self._finished = False
 
+        self.grant, self.grant_violations = self._resolve_grant()
+        allow_write = agent_settings.allow_write
+        allow_rebuild = agent_settings.allow_rebuild
+        if self.grant is not None:
+            # The ladder may only lower what profile and host already allow.
+            if step_rank("system", self.grant.system) < step_rank("system", "config-write"):
+                allow_write = False
+            if step_rank("system", self.grant.system) < step_rank("system", "rebuild"):
+                allow_rebuild = False
+            set_process_grant(self.grant)
+
         self._profile = resolve_profile(
             agent_settings.profile,
-            allow_write_override=agent_settings.allow_write,
-            allow_rebuild_override=agent_settings.allow_rebuild,
+            allow_write_override=allow_write,
+            allow_rebuild_override=allow_rebuild,
             allow_shell_override=agent_settings.allow_shell,
         )
         self._profile_ctx = ProfileContext(self._profile)
 
         from .runtime import ToolRuntime
         self._runtime = ToolRuntime(settings)
+
+    def _resolve_grant(self) -> tuple[Grant | None, list[str]]:
+        return resolve_run_grant(self.settings, self.agent_settings.grant)
+
+    def grant_summary(self) -> str:
+        if self.grant is None:
+            return "host default (no grant requested)"
+        return f"repo={self.grant.repo} system={self.grant.system} actor={self.grant.actor}"
 
     def _check_preconditions(self) -> str | None:
         """Check if agent can run. Returns error message or None."""
@@ -114,6 +172,9 @@ You are running in agent mode to accomplish a specific goal.
 - Rebuild allowed: {self._profile.allow_rebuild}
 - Shell allowed: {self._profile.allow_shell}
 - Dry run: {self.agent_settings.dry_run}
+- Permission grant: {self.grant_summary()}
+- Never allowed, whatever the grant: force-push, skipping hooks (--no-verify), pushing
+  or merging onto a protected branch, staging secret files. Stop and hand off instead.
 
 **Instructions:**
 1. Work systematically toward the goal
@@ -139,6 +200,18 @@ You are running in agent mode to accomplish a specific goal.
 
     def run(self) -> Iterator[Event]:
         """Run the agent and yield events."""
+        if self.grant_violations:
+            # Asking above the ceiling is a configuration error, not a reason to run
+            # quietly with less than the operator asked for.
+            detail = "\n- ".join(self.grant_violations)
+            append_audit("grant_denied", actor=self.grant.actor if self.grant else "cli", detail=detail)
+            yield {
+                "kind": "error",
+                "text": f"Grant refused:\n- {detail}",
+                "violations": list(self.grant_violations),
+            }
+            return
+
         error = self._check_preconditions()
         if error:
             yield {"kind": "error", "text": error}
@@ -178,6 +251,12 @@ You are running in agent mode to accomplish a specific goal.
             actor="agent",
             job_id=self._job.id,
             detail=f"Goal: {self.agent_settings.goal}",
+        )
+        append_audit(
+            "grant_evaluated",
+            actor=(self.grant.actor if self.grant else "cli"),
+            job_id=self._job.id,
+            detail=self.grant_summary(),
         )
 
         self._messages = [
@@ -418,6 +497,7 @@ def run_agent(
     dry_run: bool = False,
     profile: str | None = None,
     playbook: str | None = None,
+    grant: Sequence[str] | None = None,
 ) -> Iterator[Event]:
     """Convenience function to run an agent."""
     if settings is None:
@@ -429,6 +509,7 @@ def run_agent(
         dry_run=dry_run,
         profile=profile,
         playbook=playbook,
+        grant=tuple(grant or ()),
     )
 
     runner = AgentRunner(settings, agent_settings)

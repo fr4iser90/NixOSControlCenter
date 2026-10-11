@@ -109,6 +109,36 @@ let
         default = null;
         description = "Override agent.profile for this schedule";
       };
+      permissions = {
+        repo = mkOption {
+          type = types.nullOr (types.enum [
+            "observe"
+            "propose"
+            "commit"
+            "push"
+            "pr"
+            "merge"
+            "release"
+          ]);
+          default = null;
+          example = "push";
+          description = ''
+            Repo step for this schedule (phase 39 permission ladder). Null derives the
+            step from dryRun / profile / allowWrite, so existing hosts keep behaving as
+            before. Only narrows the host ceiling
+            ({{Option|systemConfig.aiAssistant.grants.repoCeiling}}) — it never widens it.
+          '';
+        };
+        system = mkOption {
+          type = types.nullOr (types.enum [ "none" "config-write" "rebuild" ]);
+          default = null;
+          example = "none";
+          description = ''
+            System step for this schedule. Null derives it from dryRun / allowWrite /
+            allowRebuild. A schedule can never gain rights the host denies.
+          '';
+        };
+      };
       model = mkOption {
         type = types.nullOr types.str;
         default = null;
@@ -247,6 +277,30 @@ in
       type = types.bool;
       default = false;
       description = "Acknowledge dangerous configurations (e.g. scheduled rebuilds)";
+    };
+
+    # Permission ladder (phase 39): the host is the ceiling, runs and schedules narrow.
+    grants = {
+      repoCeiling = mkOption {
+        type = types.enum [
+          "observe"
+          "propose"
+          "commit"
+          "push"
+          "pr"
+          "merge"
+          "release"
+        ];
+        default = "pr";
+        description = ''
+          Highest repo step any agent run on this host may reach: observe, propose,
+          commit, push, pr, merge, release. The default pr is exactly what the
+          workflow tools could already do, so hosts that set nothing keep behaving
+          as before. Schedules and --grant may only lower this; asking for more is
+          refused, not clamped. merge/release additionally need a human unless the
+          grant explicitly carries them.
+        '';
+      };
     };
 
     # Tools configuration

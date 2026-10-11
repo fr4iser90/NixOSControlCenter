@@ -48,6 +48,85 @@ let
     fi
   '';
 
+  # --- Permission ladder (phase 39) -------------------------------------------------
+  # Host config is the ceiling; a schedule only names the step it needs. Steps must stay
+  # in sync with python/ncc_assistant/permissions.py (REPO_STEPS / SYSTEM_STEPS).
+  repoSteps = [ "observe" "propose" "commit" "push" "pr" "merge" "release" ];
+  systemSteps = [ "none" "config-write" "rebuild" ];
+  # Nix has no builtins.elemIndex: rank every step once, then look the rank up.
+  rankTable = steps:
+    builtins.listToAttrs
+      (builtins.genList (i: { name = builtins.elemAt steps i; value = i; }) (builtins.length steps));
+  repoRanks = rankTable repoSteps;
+  systemRanks = rankTable systemSteps;
+  stepRank = ranks: name: if ranks ? ${name} then ranks.${name} else -1;
+  clampStep = ranks: want: max:
+    if (stepRank ranks want) > (stepRank ranks max) then max else want;
+  maxStep = ranks: a: b:
+    if (stepRank ranks a) >= (stepRank ranks b) then a else b;
+
+  hostCeiling = {
+    repo = cfg.grants.repoCeiling or "pr";
+    system =
+      if (cfg.agent.allowRebuild or false) then "rebuild"
+      else if (cfg.agent.allowWrite or false) then "config-write"
+      else "none";
+  };
+
+  # Legacy profile → ladder steps, so hosts that predate permissions.* keep their meaning.
+  profileStepMap = {
+    "chat" = { repo = "observe"; system = "none"; };
+    "read-only" = { repo = "observe"; system = "none"; };
+    "config-writer" = { repo = "propose"; system = "config-write"; };
+    "ops" = { repo = "propose"; system = "rebuild"; };
+  };
+  profileSteps = profile: profileStepMap.${profile} or { repo = null; system = null; };
+
+  effectiveGrant = schedule:
+    let
+      perms = schedule.permissions or {};
+      dry = if (schedule.dryRun or null) != null then schedule.dryRun else (cfg.agent.dryRun or false);
+      writes = if (schedule.allowWrite or null) != null then schedule.allowWrite else (cfg.agent.allowWrite or false);
+      rebuilds = if (schedule.allowRebuild or null) != null then schedule.allowRebuild else (cfg.agent.allowRebuild or false);
+      fromProfile = profileSteps (if (schedule.profile or null) != null then schedule.profile else (cfg.agent.profile or "read-only"));
+      # Legacy hosts switch on allowWrite/allowRebuild while the profile still says
+      # "read-only" (resolve_profile lets the flag override it), so the wider of the
+      # two is what the schedule could do before the ladder existed.
+      derivedRepo =
+        if dry then "observe"
+        else
+          maxStep repoRanks
+            (if fromProfile.repo != null then fromProfile.repo else "observe")
+            (if writes then "pr" else "observe");
+      derivedSystem =
+        if dry then "none"
+        else
+          maxStep systemRanks
+            (if fromProfile.system != null then fromProfile.system else "none")
+            (if rebuilds then "rebuild" else if writes then "config-write" else "none");
+      explicitRepo = perms.repo or null;
+      explicitSystem = perms.system or null;
+    in
+    {
+      # Derived steps never widen the host; an explicit step stays as asked so the run
+      # refuses loudly instead of quietly doing less.
+      repo = if explicitRepo != null then explicitRepo else clampStep repoRanks derivedRepo hostCeiling.repo;
+      system =
+        if explicitSystem != null then explicitSystem else clampStep systemRanks derivedSystem hostCeiling.system;
+    };
+
+  grantConflicts = filterAttrs (_: s:
+    let
+      perms = s.permissions or {};
+      dry = if (s.dryRun or null) != null then s.dryRun else (cfg.agent.dryRun or false);
+      explicitRepo = perms.repo or null;
+      explicitSystem = perms.system or null;
+    in
+      (explicitRepo != null && (stepRank repoRanks explicitRepo) > (stepRank repoRanks hostCeiling.repo))
+      || (explicitSystem != null && (stepRank systemRanks explicitSystem) > (stepRank systemRanks hostCeiling.system))
+      || (dry && explicitRepo != null && (stepRank repoRanks explicitRepo) > (stepRank repoRanks "propose"))
+  ) enabledSchedules;
+
   mkAgentExec = name: schedule:
     let
       maxSteps = if schedule.maxSteps != null then schedule.maxSteps else (cfg.agent.maxSteps or (-1));
@@ -55,10 +134,12 @@ let
       profile = if schedule.profile != null then schedule.profile else (cfg.agent.profile or "read-only");
       playbook = schedule.playbook or null;
       goal = schedule.goal or null;
+      grant = effectiveGrant schedule;
       agentArgs = [
         "${pkg.nccAssistant}/bin/ncc-assistant"
         "agent" "run"
       ] ++ optionals (maxSteps > 0) [ "--max-steps" (toString maxSteps) ]
+        ++ [ "--grant" "repo=${grant.repo}" "--grant" "system=${grant.system}" ]
         ++ optionals (profile != null) [ "--profile" (lib.escapeShellArg profile) ]
         ++ optionals dryRun [ "--dry-run" ]
         ++ optionals (playbook != null) [ "--playbook" (lib.escapeShellArg playbook) ]
@@ -88,7 +169,12 @@ let
       exec ${concatStringsSep " " probeArgs}
     '';
 
-  mkScheduleService = name: schedule: {
+  mkScheduleService = name: schedule:
+    let
+      grant = effectiveGrant schedule;
+      writes = (stepRank systemRanks grant.system) >= (stepRank systemRanks "config-write");
+      rebuilds = grant.system == "rebuild";
+    in {
     "ncc-assistant-schedule-${name}" = {
       description = "NCC Assistant scheduled job: ${name}";
       after = [ "network-online.target" ];
@@ -109,8 +195,14 @@ let
         NCC_KNOWLEDGE_ROOT = "${pkg.appRoot}/knowledge";
         NCC_PROMPTS_ROOT = "${pkg.appRoot}/prompts";
         AGENT_CONFIRM = "writes";
-        AGENT_ALLOW_WRITE = "0";
-        AGENT_ALLOW_REBUILD = "0";
+        # Derived from this schedule's grant — the unit is the narrowest scope, so it
+        # writes only what its own step allows (ncc ai permissions show).
+        AGENT_ALLOW_WRITE = if writes then "1" else "0";
+        AGENT_ALLOW_REBUILD = if rebuilds then "1" else "0";
+        NCC_ASSISTANT_AGENT_ALLOW_WRITE = if writes then "1" else "0";
+        NCC_ASSISTANT_AGENT_ALLOW_REBUILD = if rebuilds then "1" else "0";
+        NCC_ASSISTANT_ACTOR = "schedule";
+        NCC_ASSISTANT_GRANT_REPO_CEILING = hostCeiling.repo;
         NOTIFY_ON_JOB_END = "1";
       } // optionalAttrs (schedule.model != null) {
         NCC_ASSISTANT_MODEL = schedule.model;
@@ -147,6 +239,18 @@ in
     })
 
     {
+      warnings = mapAttrsToList (name: s:
+        let
+          perms = s.permissions or {};
+          dry = if (s.dryRun or null) != null then s.dryRun else (cfg.agent.dryRun or false);
+        in
+          ''
+            ncc-assistant: schedule '${name}' asks for repo=${perms.repo or "-"} system=${perms.system or "-"}
+            above this host's ceiling repo=${hostCeiling.repo} system=${hostCeiling.system}${optionalString dry " (and dryRun=true)"};
+            the run will refuse instead of quietly doing less. Lower permissions.* or raise
+            agent.grants.repoCeiling / agent.allowWrite / agent.allowRebuild.
+          '') grantConflicts;
+
       assertions = [
         {
           assertion = !hasDangerousSchedules || (cfg.forceDangerous or false);

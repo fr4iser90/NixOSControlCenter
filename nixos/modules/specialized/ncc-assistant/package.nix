@@ -135,6 +135,13 @@ let
 
   hostProfilesJson = builtins.toJSON (cfg.profiles or { });
 
+  # envExports is inlined into every wrapper body, so it runs *after* systemd applied
+  # Environment= — a plain assignment would erase a schedule unit's narrowing, while
+  # leaving the variable untouched would let an inherited value widen the host. The host
+  # value is the ceiling: false stays a hard "0", true lets the unit lower it to "0".
+  narrowBoolExport = name: hostValue:
+    if hostValue then ''export ${name}="''${${name}:-1}"'' else ''export ${name}="0"'';
+
   envExports = ''
     export NCC_ASSISTANT_ROOT="${appRoot}"
     export NCC_KNOWLEDGE_ROOT="${appRoot}/knowledge"
@@ -184,8 +191,12 @@ let
     export NCC_ASSISTANT_COMPACT_THRESHOLD="${toString (cfg.agent.compactThreshold or (-1))}"
     export NCC_ASSISTANT_AUTO_COMPACT="${if (cfg.agent.autoCompact or true) then "1" else "0"}"
     export AGENT_TIMEOUT_SEC="${toString (cfg.agent.timeoutSec or 1800)}"
-    export AGENT_ALLOW_WRITE="${if (cfg.agent.allowWrite or false) then "1" else "0"}"
-    export AGENT_ALLOW_REBUILD="${if (cfg.agent.allowRebuild or false) then "1" else "0"}"
+    # Permission gates: the narrowest scope (schedule unit, --grant) may lower these,
+    # never raise them above what the host allows.
+    ${narrowBoolExport "AGENT_ALLOW_WRITE" (cfg.agent.allowWrite or false)}
+    ${narrowBoolExport "AGENT_ALLOW_REBUILD" (cfg.agent.allowRebuild or false)}
+    ${narrowBoolExport "NCC_ASSISTANT_AGENT_ALLOW_WRITE" (cfg.agent.allowWrite or false)}
+    ${narrowBoolExport "NCC_ASSISTANT_AGENT_ALLOW_REBUILD" (cfg.agent.allowRebuild or false)}
     export AGENT_CONFIRM="${cfg.agent.confirm or "writes"}"
     export AGENT_DRY_RUN="${if (cfg.agent.dryRun or false) then "1" else "0"}"
     ${lib.optionalString ((cfg.agent.profile or null) != null) ''

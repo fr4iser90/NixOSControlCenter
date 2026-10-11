@@ -56,9 +56,10 @@ def _cmd_tool(args: argparse.Namespace) -> int:
 
 def _cmd_agent_run(args: argparse.Namespace) -> int:
     """Run agent with a goal."""
-    from .agent import run_agent
+    from .agent import resolve_run_grant, run_agent
     from .capacity import CapacityError, capacity_slot
     from .harness import get_harness, looks_like_coding_goal, resolve_harness_name
+    from .permissions import set_process_grant
 
     settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
 
@@ -85,12 +86,31 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
     tags = ["coding"] if looks_like_coding_goal(goal) else []
     hname = resolve_harness_name(tags=tags, force=force)
 
+    grants = tuple(getattr(args, "grant", ()) or ())
+    run_grant, grant_violations = resolve_run_grant(settings, grants)
+    if grant_violations:
+        for line in grant_violations:
+            print_err(line)
+        print_err("Grant refused — raise the host option or lower --grant.")
+        return 2
+    if hname != "native" and run_grant is not None:
+        # External harnesses do not build an AgentRunner; publish the grant for their children.
+        set_process_grant(run_grant)
+
     verbose = bool(getattr(args, "verbose", False))
     print_info(f"Starting agent with goal: {goal}")
     print_info(
         f"Harness: {hname}, "
         f"Max steps: {'unlimited' if is_unlimited(max_steps) else max_steps}, "
         f"Dry run: {args.dry_run}, Profile: {args.profile or 'default'}"
+    )
+    print_info(
+        "Grant: "
+        + (
+            f"repo={run_grant.repo} system={run_grant.system} actor={run_grant.actor}"
+            if run_grant is not None
+            else "host default (none requested)"
+        )
     )
     print_info("---")
 
@@ -106,6 +126,7 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
                     dry_run=args.dry_run,
                     profile=args.profile,
                     playbook=args.playbook,
+                    grant=grants,
                 )
 
             thinking_open = False
@@ -320,6 +341,68 @@ def _cmd_maintenance_run(args: argparse.Namespace) -> int:
         f"{stats['audit_lines_dropped']} audit line(s) dropped, "
         f"{stats['approvals_removed']} approval(s) removed"
     )
+    return 0
+
+
+def _cmd_permissions_show(args: argparse.Namespace) -> int:
+    """Show the permission ladder as this host sees it right now."""
+    import os
+
+    from .agent import resolve_run_grant
+    from .permissions import (
+        DEFAULT_REPO_CEILING,
+        ENV_REPO_CEILING,
+        PROTECTED_BRANCHES,
+        REPO_STEPS,
+        SYSTEM_STEPS,
+        current_grant,
+        invoker_role,
+        system_ceiling,
+    )
+
+    settings = Settings.from_env()
+    repo_ceiling = (os.environ.get(ENV_REPO_CEILING) or "").strip() or DEFAULT_REPO_CEILING
+    system_ceiling_step = system_ceiling(settings.writes_enabled, settings.allow_rebuild)
+    grant, violations = resolve_run_grant(settings, getattr(args, "grant", None))
+    active = current_grant()
+    payload = {
+        "invokerRole": invoker_role(),
+        "ceiling": {"repo": repo_ceiling, "system": system_ceiling_step},
+        "effective": grant.as_dict() if grant else {"repo": repo_ceiling, "system": system_ceiling_step},
+        "activeRunGrant": active.as_dict() if active else None,
+        "ladder": {"repo": list(REPO_STEPS), "system": list(SYSTEM_STEPS)},
+        "protectedBranches": list(PROTECTED_BRANCHES),
+        "floor": [
+            "force-push (flag, +refspec, or --push-option force)",
+            "hook bypass (--no-verify, --no-gpg-sign, -c commit.gpgsign=…)",
+            "protected branches for direct pushes",
+            "secret paths are never staged",
+        ],
+        "violations": violations,
+    }
+    if getattr(args, "json", False):
+        print(json.dumps(payload, indent=2))
+        return 0 if not violations else 1
+
+    print_ok(f"Invoker role: {payload['invokerRole']}")
+    print_info(f"Host ceiling:  repo={repo_ceiling} system={system_ceiling_step}")
+    print_info(
+        "This run:      "
+        + (
+            f"repo={grant.repo} system={grant.system} actor={grant.actor}"
+            if grant is not None
+            else "no grant requested — host config decides"
+        )
+    )
+    print_info(f"Ladder repo:   {' > '.join(REPO_STEPS)}")
+    print_info(f"Ladder system: {' > '.join(SYSTEM_STEPS)}")
+    print_info(f"Protected:     {', '.join(PROTECTED_BRANCHES)}")
+    print_info("Never allowed: " + "; ".join(payload["floor"]))
+    for line in violations:
+        print_err(line)
+    if violations:
+        print_err("Grant refused — raise the host option or lower the grant.")
+        return 1
     return 0
 
 
@@ -1182,6 +1265,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Force agent harness (default: settings / coding auto)",
     )
     agent_run.add_argument(
+        "--grant",
+        action="append",
+        default=[],
+        metavar="AXIS=STEP",
+        help="Narrow this run, e.g. repo=pr or system=none (never widens the host ceiling)",
+    )
+    agent_run.add_argument(
         "--verbose",
         "-v",
         action="store_true",
@@ -1210,6 +1300,20 @@ def main(argv: list[str] | None = None) -> int:
     maintenance_sub = maintenance_p.add_subparsers(dest="maintenance_cmd")
     maintenance_run = maintenance_sub.add_parser("run", help="Apply retention now")
     maintenance_run.add_argument("--json", action="store_true")
+
+    perms_p = sub.add_parser(
+        "permissions", help="Permission ladder: effective rights for runs and schedules"
+    )
+    perms_sub = perms_p.add_subparsers(dest="permissions_cmd")
+    perms_show = perms_sub.add_parser("show", help="Show ceiling, active grant, and the floor")
+    perms_show.add_argument(
+        "--grant",
+        action="append",
+        default=[],
+        metavar="AXIS=STEP",
+        help="Preview a run that asks for this grant instead of the current one",
+    )
+    perms_show.add_argument("--json", action="store_true")
 
     playbook_p = sub.add_parser("playbook", help="Playbook management")
     playbook_sub = playbook_p.add_subparsers(dest="playbook_cmd")
@@ -1577,6 +1681,12 @@ def main(argv: list[str] | None = None) -> int:
     if command == "maintenance":
         if args.maintenance_cmd == "run":
             return _cmd_maintenance_run(args)
+        parser.print_help()
+        return 1
+
+    if command == "permissions":
+        if args.permissions_cmd == "show":
+            return _cmd_permissions_show(args)
         parser.print_help()
         return 1
 
