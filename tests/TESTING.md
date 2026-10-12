@@ -49,6 +49,14 @@ PySide6 (Qt surfaces are gated by `gui/validate-gui-python.sh`). Interpreter:
 `NCC_ASSISTANT_PYTHON` (explicit) or `python3`; **pytest is required** — with unittest alone
 the bare functions would never run and the gate would report green.
 
+**No desktop bubbles, no blocking waits.** The hooks run on a desktop where `notify-send`
+exists, and the run path notifies on every terminal job state, so
+[`ncc-assistant/conftest.py`](ncc-assistant/conftest.py) hides that binary for the whole
+session (autouse `shutil.which` guard). Capability removal, not a convention: it also holds
+for a test that forgets to stub, and it stops `notify_send_actions` from freezing the gate on
+`--wait`. A test that needs the real argv patches `shutil.which` itself — its nested patch
+wins. `test_desktop_quiet_gate_v1.py` fails if the guard disappears.
+
 ### PySide6 / Qt tests
 
 NCC does **not** install PySide6 on system `python3`. The GUI uses a dedicated
@@ -124,3 +132,4 @@ That sets `core.hooksPath=.githooks` and installs `.git/hooks/pre-commit` (idemp
 | FS status parse / Off badge data | `test_domain_fs_status.py` |
 | Option exported but read by nobody | `test_schedule_notify_v1.py` |
 | Wrapper overwrites what a schedule unit declared | `test_wrapper_grant_env_v1.py` |
+| Gate pops desktop bubbles / hangs on `--wait` | `test_desktop_quiet_gate_v1.py` |
