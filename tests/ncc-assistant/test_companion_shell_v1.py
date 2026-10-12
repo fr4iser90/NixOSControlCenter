@@ -85,9 +85,11 @@ class CompanionShellAstTests(unittest.TestCase):
         self.assertIn("PANEL_SETTINGS", text)
         self.assertIn("_rail_separator", text)
         self.assertIn("Grouped rail", text)
-        # Work before Caps: Jobs before Tools; Plugins after MCP
-        self.assertLess(text.index("PANEL_JOBS"), text.index("PANEL_TOOLS"))
-        self.assertLess(text.index("PANEL_MCP"), text.index("PANEL_PLUGINS"))
+        # Work before Caps: Jobs before Tools; Plugins after MCP. Probed inside the rail —
+        # the PANEL_* constant block above it is unordered and says nothing about the rail.
+        rail = text.split("# Grouped rail", 1)[1].split("side.addStretch(1)", 1)[0]
+        self.assertLess(rail.index("PANEL_JOBS"), rail.index("PANEL_TOOLS"))
+        self.assertLess(rail.index("PANEL_MCP"), rail.index("PANEL_PLUGINS"))
         self.assertIn('QPushButton("Rename")', text)
         self.assertIn('QPushButton("New")', text)
         self.assertNotIn("tools.addStretch()", text)

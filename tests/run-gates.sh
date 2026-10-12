@@ -3,8 +3,9 @@
 # Agents and CI should get exit 0 from this script.
 #
 # Layout:
-#   gates/validate-ncc-nix.sh    — nixos/ integrity + GUI catalog invariants
-#   gui/validate-gui-python.sh   — GUI Python (required; set SKIP_GUI=1 only in emergencies)
+#   gates/validate-ncc-nix.sh              — nixos/ integrity + GUI catalog invariants
+#   gates/validate-ncc-assistant-python.sh — assistant Python suite (no PySide6 needed)
+#   gui/validate-gui-python.sh             — GUI Python (required; set SKIP_GUI=1 only in emergencies)
 #
 # Strategy: tests/TESTING.md
 set -euo pipefail
@@ -33,6 +34,7 @@ run() {
 }
 
 run "ncc-nix" bash "$ROOT/tests/gates/validate-ncc-nix.sh"
+run "ncc-assistant-python" bash "$ROOT/tests/gates/validate-ncc-assistant-python.sh"
 
 if [[ "${SKIP_GUI:-}" != "1" ]]; then
   if command -v python3 >/dev/null 2>&1; then

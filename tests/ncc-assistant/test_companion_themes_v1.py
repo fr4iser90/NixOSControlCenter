@@ -46,11 +46,16 @@ class CompanionThemesTests(unittest.TestCase):
         ids = [t[0] for t in list_themes()]
         self.assertEqual(set(ids), set(THEMES))
 
-    def test_companion_wires_theme_menu(self) -> None:
+    def test_companion_wires_theme_switcher(self) -> None:
         text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
         self.assertIn("_apply_theme", text)
         self.assertIn('_set_theme', text)
-        self.assertIn('addMenu("Theme")', text)
+        # 12875545 dropped the overflow menu: theme rows are built in the Settings panel
+        # list and routed back to _set_theme from the item handler.
+        self.assertIn('f"Theme · {label}"', text)
+        self.assertIn('("theme", tid)', text)
+        self.assertIn('if kind == "theme" and ref', text)
+        self.assertNotIn('addMenu("Theme")', text)
         self.assertIn("companion_themes", text)
         self.assertIn('setObjectName("nccMuted")', text)
         self.assertNotIn("rgba(244, 246, 248", text)

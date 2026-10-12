@@ -48,9 +48,9 @@ class WorkspaceBriefArchitectureTests(unittest.TestCase):
         text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
         self.assertIn("Workflows (once / cron)", text)
         self.assertIn("PANEL_CRON", text)
-        # primary toolbar must not advertise a Daily board
-        primary = text.split("primary = (", 1)[1].split(")", 1)[0]
-        self.assertNotIn("PANEL_WORKFLOWS", primary)
+        # The rail replaced the icon toolbar (12875545) and must not advertise a Daily board
+        rail = text.split("# Grouped rail", 1)[1].split("side.addStretch(1)", 1)[0]
+        self.assertNotIn("PANEL_WORKFLOWS", rail)
         self.assertNotIn("maybe_fire_brief", text)
 
     def test_gui_tabs_no_workflows_board(self) -> None:
