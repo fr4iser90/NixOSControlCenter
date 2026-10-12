@@ -203,7 +203,9 @@ let
         NCC_ASSISTANT_AGENT_ALLOW_REBUILD = if rebuilds then "1" else "0";
         NCC_ASSISTANT_ACTOR = "schedule";
         NCC_ASSISTANT_GRANT_REPO_CEILING = hostCeiling.repo;
-        NOTIFY_ON_JOB_END = "1";
+        # No NOTIFY_ON_* here on purpose: schedules have no per-schedule notify option, and
+        # anything set in this unit outranks agent.notifications.* — the wrapper keeps the
+        # host value unless the narrowest scope declared its own.
       } // optionalAttrs (schedule.model != null) {
         NCC_ASSISTANT_MODEL = schedule.model;
       } // optionalAttrs ((cfg.model or null) != null && schedule.model == null) {

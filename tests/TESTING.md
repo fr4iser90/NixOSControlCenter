@@ -35,9 +35,19 @@
 ```bash
 bash tests/run-gates.sh
 # or:
-bash tests/gates/validate-ncc-nix.sh   # Nix integrity + catalog invariants
-bash tests/gui/validate-gui-python.sh   # GUI Python (required in run-gates)
+bash tests/gates/validate-ncc-nix.sh              # Nix integrity + catalog invariants
+bash tests/gates/validate-ncc-assistant-python.sh # assistant Python suite (needs pytest)
+bash tests/gui/validate-gui-python.sh             # GUI Python (required in run-gates)
 ```
+
+### ncc-assistant Python suite
+
+Plain `unittest` + bare pytest functions over
+[`nixos/modules/specialized/ncc-assistant/python`](nixos/modules/specialized/ncc-assistant/python)
+— permission ladder, wrapper env semantics, notifications, companion source probes. No
+PySide6 (Qt surfaces are gated by `gui/validate-gui-python.sh`). Interpreter:
+`NCC_ASSISTANT_PYTHON` (explicit) or `python3`; **pytest is required** — with unittest alone
+the bare functions would never run and the gate would report green.
 
 ### PySide6 / Qt tests
 
@@ -54,6 +64,7 @@ Skip nix-build: `NCC_GUI_SKIP_NIX_PYTHON=1` (Qt tests skip; AST/smokes still run
 |------|------|
 | `gates/validate-ncc-nix.sh` | bash-in-nix, layer, migrations, wizard packaging, options SSOT, imports, prebuild + **imported config.nix** eval, **GUI catalog**, **module shape**, **AI packs**, **CLI/GUI surfaces** |
 | `gui/validate-gui-python.sh` | page smoke, argv, fs_status, session_ux, hot-path; optional soak |
+| `gates/validate-ncc-assistant-python.sh` | grant ladder, wrapper env (narrow-only, defaults not verdicts), notify wiring, companion probes |
 | `cli-formatter/validate-cli.sh` | Soft / optional — formatter/ANSI extras (`doc/cli.md` already hard-gated) |
 
 Step 8 (`gates/validate-nix-module-eval.sh`) also force-evals `(import ./config.nix …)` values as NixOS modules (`lib.evalModules`). That catches top-level `lib.mkMerge` and mixed `config` + `warnings` — bugs that only showed up at `ncc system-update` before.
@@ -111,3 +122,5 @@ That sets `core.hooksPath=.githooks` and installs `.git/hooks/pre-commit` (idemp
 | Missing `registerGuiEnv` for rice/catalog modules | gui-hotpath |
 | GUI page import crash | gui-python smoke |
 | FS status parse / Off badge data | `test_domain_fs_status.py` |
+| Option exported but read by nobody | `test_schedule_notify_v1.py` |
+| Wrapper overwrites what a schedule unit declared | `test_wrapper_grant_env_v1.py` |

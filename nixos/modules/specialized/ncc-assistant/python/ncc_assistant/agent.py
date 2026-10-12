@@ -13,6 +13,7 @@ from .audit import append_audit
 from .config import Settings, UNLIMITED, is_unlimited
 from .jobs import get_job_store, JobEvent, JobMeta, AgentLock
 from .llm import iter_chat_completion, LLMError, CancelledError
+from .notifications import JOB_END_LABELS, notify_job_end, notify_schedule_start
 from .paths import is_disabled
 from .permissions import (
     DEFAULT_REPO_CEILING,
@@ -223,7 +224,13 @@ You are running in agent mode to accomplish a specific goal.
             return
 
         try:
-            yield from self._run_with_lock()
+            for event in self._run_with_lock():
+                kind = event.get("kind")
+                if kind == "job_started":
+                    notify_schedule_start(self.agent_settings.goal)
+                elif kind in JOB_END_LABELS:
+                    notify_job_end(str(kind), self.agent_settings.goal, str(event.get("error") or ""))
+                yield event
         finally:
             lock.release()
 

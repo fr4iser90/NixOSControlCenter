@@ -34,6 +34,13 @@ def _notifications_enabled() -> bool:
     return True
 
 
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 def notify_send(
     title: str,
     body: str = "",
@@ -141,6 +148,41 @@ def notify_agent_event(
     if not _notifications_enabled():
         return False
     return notify_send(f"NCC Assistant: {event}", detail, urgency=urgency)
+
+
+#: Terminal run states → the word shown in the notification.
+JOB_END_LABELS = {
+    "job_finished": "finished",
+    "job_cancelled": "cancelled",
+    "job_failed": "failed",
+}
+
+
+def notify_schedule_start(goal: str) -> bool:
+    """agent.notifications.notifyOnScheduleStart.
+
+    Only a unit run has someone to tell — an interactive ``ncc ai`` session already shows on
+    the terminal — so this fires for the actor that schedule units set for themselves.
+    """
+    from .permissions import ENV_ACTOR
+
+    if (os.environ.get(ENV_ACTOR) or "").strip() != "schedule":
+        return False
+    if not _env_flag("NOTIFY_ON_SCHEDULE_START", False):
+        return False
+    return notify_agent_event("Schedule started", goal[:160], urgency="low")
+
+
+def notify_job_end(kind: str, goal: str, detail: str = "") -> bool:
+    """agent.notifications.notifyOnJobEnd — every terminal state, not just success."""
+    if not _env_flag("NOTIFY_ON_JOB_END", True):
+        return False
+    label = JOB_END_LABELS.get(kind)
+    if label is None:
+        return False
+    urgency = {"finished": "normal", "cancelled": "low", "failed": "critical"}[label]
+    body = "\n".join(part for part in (goal[:120], detail[:240]) if part)
+    return notify_agent_event(f"Job {label}", body, urgency=urgency)
 
 
 @dataclass

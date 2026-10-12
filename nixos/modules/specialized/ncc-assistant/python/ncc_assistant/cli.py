@@ -553,8 +553,10 @@ def _cmd_watchdog(args: argparse.Namespace) -> int:
 
 
 def _cmd_probe_disk(args: argparse.Namespace) -> int:
+    from .notifications import notify_schedule_start
     from .probes import run_disk_probe_and_maybe_escalate, run_disk_nix_probe
 
+    notify_schedule_start(f"disk probe ({args.threshold}%)")
     if args.escalate or args.force:
         result = run_disk_probe_and_maybe_escalate(
             threshold_pct=float(args.threshold),

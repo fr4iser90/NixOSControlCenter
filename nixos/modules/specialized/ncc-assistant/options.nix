@@ -464,13 +464,17 @@ in
         notifyOnScheduleStart = mkOption {
           type = types.bool;
           default = false;
-          description = "Send notification when scheduled job starts";
+          description = ''
+            Send a notification when a run started by a schedule unit begins (agent goal or
+            disk probe). Only runs whose actor is schedule notify — an interactive session is
+            already on screen.
+          '';
         };
 
         notifyOnJobEnd = mkOption {
           type = types.bool;
           default = true;
-          description = "Send notification when job completes";
+          description = "Send notification when an agent run ends, whatever the outcome: finished, cancelled or failed";
         };
       };
 
