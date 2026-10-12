@@ -142,6 +142,11 @@ let
   narrowBoolExport = name: hostValue:
     if hostValue then ''export ${name}="''${${name}:-1}"'' else ''export ${name}="0"'';
 
+  # Not a gate: the host value is a default, never a verdict. A schedule unit that names its
+  # own model is the narrowest scope that declared it and must survive this file, so unlike
+  # narrowBoolExport an inherited value is allowed to override the host default here.
+  respectUnitExport = name: defaultValue: ''export ${name}="''${${name}:-${defaultValue}}"'';
+
   envExports = ''
     export NCC_ASSISTANT_ROOT="${appRoot}"
     export NCC_KNOWLEDGE_ROOT="${appRoot}/knowledge"
@@ -150,7 +155,7 @@ let
     export NCC_ASSISTANT_API="${resolvedApi}"
     export NCC_ASSISTANT_ENDPOINT="${cfg.endpoint or "http://localhost:11434/v1"}"
     ${lib.optionalString ((cfg.model or null) != null) ''
-      export NCC_ASSISTANT_MODEL="${cfg.model}"
+      ${respectUnitExport "NCC_ASSISTANT_MODEL" cfg.model}
     ''}
     ${lib.optionalString ((cfg.maxTokens or null) != null) ''
       export NCC_ASSISTANT_MAX_TOKENS="${toString cfg.maxTokens}"
