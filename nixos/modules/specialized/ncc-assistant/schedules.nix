@@ -201,7 +201,10 @@ let
         AGENT_ALLOW_REBUILD = if rebuilds then "1" else "0";
         NCC_ASSISTANT_AGENT_ALLOW_WRITE = if writes then "1" else "0";
         NCC_ASSISTANT_AGENT_ALLOW_REBUILD = if rebuilds then "1" else "0";
-        NCC_ASSISTANT_ACTOR = "schedule";
+        # Named per schedule: "schedule" says a timer fired, "schedule:<id>" says which one, so
+        # audit.jsonl and `ncc ai approve list` can be read per unit. notifications.is_schedule_actor
+        # accepts both spellings, so an older hand-set env value still counts.
+        NCC_ASSISTANT_ACTOR = "schedule:${name}";
         NCC_ASSISTANT_GRANT_REPO_CEILING = hostCeiling.repo;
         # No NOTIFY_ON_* here on purpose: schedules have no per-schedule notify option, and
         # anything set in this unit outranks agent.notifications.* — the wrapper keeps the

@@ -11,8 +11,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .audit import append_audit
 from .paths import workflow_progress_file
-from .permissions import check_git_argv, current_grant, evaluate_repo, protected_branch, secret_paths
+from .permissions import (
+    ENV_ACTOR,
+    check_git_argv,
+    current_grant,
+    evaluate_repo,
+    git_subcommand,
+    protected_branch,
+    secret_paths,
+)
 from .workspace_workflow import (
     next_open_task,
     resolve_workspace_id,
@@ -80,10 +89,57 @@ def _run(
     return out
 
 
+#: git subcommands that change the repository (or the remote). Reads stay out of the audit.
+_GIT_ACTIONS = frozenset({"commit", "push", "merge", "tag", "rebase", "reset"})
+
+
+def _actor() -> str:
+    """Whose line this is in ``audit.jsonl`` — a schedule id, ``companion``, or ``cli``."""
+    grant = current_grant()
+    if grant is not None:
+        return grant.actor
+    return (os.environ.get(ENV_ACTOR) or "").strip() or "cli"
+
+
+def _audit_git(action: str, *, ok: bool, detail: str = "") -> None:
+    if action not in _GIT_ACTIONS:
+        return
+    append_audit(
+        "git_action",
+        actor=_actor(),
+        tool=f"git {action}",
+        result="ok" if ok else "error",
+        detail=detail[:240],
+    )
+
+
+def _audit_floor(code: str, reason: str, *, tool: str) -> None:
+    """The floor is code, not config — so a refusal is worth finding in the log later."""
+    append_audit(
+        "floor_denied",
+        actor=_actor(),
+        tool=tool,
+        result="denied",
+        detail=f"{code}: {reason}"[:240],
+    )
+
+
+def _audit_publish(kind: str, *, ok: bool, detail: str = "") -> None:
+    """``gh pr create`` / ``gh pr merge`` move the repo's history too — audited as one stream."""
+    append_audit(
+        "git_action",
+        actor=_actor(),
+        tool=f"gh pr {kind}",
+        result="ok" if ok else "error",
+        detail=detail[:240],
+    )
+
+
 def _git(root: Path, *args: str, timeout: float = 60.0) -> dict[str, Any]:
     verdict = check_git_argv(args)
     if not verdict.allowed:
         # Refuse before spawning git: the floor is not something git can be argued out of.
+        _audit_floor(verdict.code, verdict.reason, tool=f"git {git_subcommand(args)}")
         return {
             "ok": False,
             "cmd": ["git", *args],
@@ -92,7 +148,13 @@ def _git(root: Path, *args: str, timeout: float = 60.0) -> dict[str, Any]:
             "stderr": f"{verdict.reason} {verdict.hint}".strip(),
             **verdict.as_dict(),
         }
-    return _run(["git", *args], cwd=root, timeout=timeout)
+    result = _run(["git", *args], cwd=root, timeout=timeout)
+    _audit_git(
+        git_subcommand(args),
+        ok=bool(result.get("ok")),
+        detail=result.get("stderr") or result.get("stdout") or "",
+    )
+    return result
 
 
 def _repo_grant(action: str) -> dict[str, Any] | None:
@@ -376,6 +438,11 @@ def commit_all(
     # ``add -A`` is exactly how secrets get committed, so screen it before staging.
     blocked = secret_paths((status.get("stdout") or "").splitlines())
     if blocked:
+        _audit_floor(
+            "denied_secret_path",
+            f"git add -A would stage {', '.join(blocked)}",
+            tool="git commit",
+        )
         return {
             "ok": False,
             "workspace_id": wid,
@@ -414,6 +481,7 @@ def push_branch(workspace_id: str | None = None, *, set_upstream: bool = True) -
     if denied:
         return {"ok": False, "workspace_id": wid, "branch": branch, **denied}
     if current_grant() is not None and protected_branch(branch):
+        _audit_floor("denied_protected_branch", f"{branch} is protected", tool="git push")
         return {
             "ok": False,
             "workspace_id": wid,
@@ -479,6 +547,7 @@ def open_pull_request(
     if draft:
         cmd.append("--draft")
     res = _run(cmd, cwd=root, timeout=120.0)
+    _audit_publish("create", ok=bool(res["ok"]), detail=res.get("stderr") or res.get("stdout") or "")
     return {
         "ok": bool(res["ok"]),
         "workspace_id": wid,
@@ -510,6 +579,7 @@ def merge_pull_request(
         cmd.append(str(pr))
     cmd.extend([f"--{strat}", "--delete-branch"])
     res = _run(cmd, cwd=root, timeout=180.0)
+    _audit_publish("merge", ok=bool(res["ok"]), detail=res.get("stderr") or res.get("stdout") or "")
     return {
         "ok": bool(res["ok"]),
         "workspace_id": wid,

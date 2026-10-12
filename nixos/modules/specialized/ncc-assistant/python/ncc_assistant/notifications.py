@@ -158,15 +158,29 @@ JOB_END_LABELS = {
 }
 
 
+def actor_identity() -> str:
+    """Who this process acts for: ``schedule:<id>`` / ``companion`` / ``cli``.
+
+    Schedule units declare ``NCC_ASSISTANT_ACTOR=schedule:<name>``; a bare ``schedule``
+    (older unit, hand-set env) still counts as one.
+    """
+    from .permissions import ENV_ACTOR
+
+    return (os.environ.get(ENV_ACTOR) or "").strip() or "cli"
+
+
+def is_schedule_actor() -> bool:
+    actor = actor_identity()
+    return actor == "schedule" or actor.startswith("schedule:")
+
+
 def notify_schedule_start(goal: str) -> bool:
     """agent.notifications.notifyOnScheduleStart.
 
     Only a unit run has someone to tell — an interactive ``ncc ai`` session already shows on
     the terminal — so this fires for the actor that schedule units set for themselves.
     """
-    from .permissions import ENV_ACTOR
-
-    if (os.environ.get(ENV_ACTOR) or "").strip() != "schedule":
+    if not is_schedule_actor():
         return False
     if not _env_flag("NOTIFY_ON_SCHEDULE_START", False):
         return False
@@ -196,10 +210,20 @@ class PendingDecision:
     tool: str | None = None
     args: dict[str, Any] | None = None
     job_id: str | None = None
+    #: Who asked: ``schedule:<id>`` / ``companion`` / ``cli`` — recorded, not inferred later.
+    actor: str = "cli"
+    #: The run's effective ladder at request time, e.g. ``{"repo": "pr", "system": "none"}``.
+    grant: dict[str, str] | None = None
     created_at: str = field(default_factory=_now_iso)
     expires_at: str | None = None
     result: DecisionResult | None = None
     decided_at: str | None = None
+
+    def grant_label(self) -> str:
+        """``repo=pr system=none`` — the one line that answers "what was it allowed to do"."""
+        if not self.grant:
+            return "no grant (human)"
+        return " ".join(f"{axis}={step}" for axis, step in sorted(self.grant.items()))
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -216,6 +240,8 @@ class PendingDecision:
             tool=data.get("tool"),
             args=data.get("args"),
             job_id=data.get("job_id"),
+            actor=data.get("actor") or "cli",
+            grant=data.get("grant") if isinstance(data.get("grant"), dict) else None,
             created_at=data.get("created_at", _now_iso()),
             expires_at=data.get("expires_at"),
             result=data.get("result"),
@@ -251,11 +277,15 @@ class DecisionService:
         timeout_sec: int | None = None,
     ) -> PendingDecision:
         """Create a pending decision and show an actionable desktop notification."""
+        from .permissions import current_grant
+
         expires_at = None
         if timeout_sec:
             from datetime import timedelta
             expires_at = (datetime.now(timezone.utc) + timedelta(seconds=timeout_sec)).isoformat()
 
+        # Record who asked and how far they were allowed to go, while both are still known.
+        grant = current_grant()
         decision = PendingDecision(
             kind=kind,
             title=title,
@@ -264,6 +294,12 @@ class DecisionService:
             tool=tool,
             args=args,
             job_id=job_id,
+            actor=grant.actor if grant else actor_identity(),
+            grant=(
+                {"repo": grant.repo, "system": grant.system}
+                if grant
+                else None
+            ),
             expires_at=expires_at,
         )
 

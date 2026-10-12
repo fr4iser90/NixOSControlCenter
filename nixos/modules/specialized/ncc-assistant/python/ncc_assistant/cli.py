@@ -309,6 +309,9 @@ def _cmd_approve(args: argparse.Namespace) -> int:
         for d in pending:
             print(f"[{d.id}] {d.kind}: {d.title}")
             print(f"    {d.summary}")
+            # Who asked, and how far that run was allowed to go — the ladder is meaningless
+            # if an approval cannot be read back as one actor's decision.
+            print(f"    asked by {d.actor} · {d.grant_label()}")
         return 0
 
     if not args.decision_id:

@@ -414,6 +414,11 @@ def _git_subcommand(args: Sequence[str]) -> str:
     return ""
 
 
+def git_subcommand(argv: Sequence[str]) -> str:
+    """The subcommand of a git argv (``push`` in ``git -c x=y push``) — for audit labels."""
+    return _git_subcommand([str(a) for a in argv if str(a).strip()])
+
+
 def check_git_argv(argv: Sequence[str]) -> Decision:
     """Floor for git invocations: force-push and hook bypass are never allowed."""
     args = [str(a) for a in argv if str(a).strip()]
