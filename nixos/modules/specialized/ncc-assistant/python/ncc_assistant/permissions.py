@@ -168,8 +168,10 @@ PROTECTED_BRANCHES: tuple[str, ...] = ("main", "master")
 AGENT_BRANCH_PREFIX = "ncc/"
 
 _HOOK_BYPASS_FLAGS = frozenset({"--no-verify", "--no-gpg-sign"})
+# ``\.env[^/]*`` rather than ``\.env(\..*)?$``: the deny list is the plan's ``.env*``, and a
+# suffix-less credential file (``.envrc`` for direnv, ``.envlocal``) is the same secret.
 _SECRET_PATH_RE = re.compile(
-    r"(^|/)(\.env(\..*)?$|.*\.(pem|p12|pfx|key)$|.*id_(rsa|ed25519|ecdsa).*$"
+    r"(^|/)(\.env[^/]*$|.*\.(pem|p12|pfx|key)$|.*id_(rsa|ed25519|ecdsa).*$"
     r"|secrets\.json$|.*credentials.*$|.*\.npmrc$|.*\.netrc$)",
     re.IGNORECASE,
 )
@@ -374,6 +376,17 @@ def is_agent_branch(name: str | None) -> bool:
 _PORCELAIN_STATUS_RE = re.compile(r"^\s*[MADRCU?!?]{1,2}\s+")
 
 
+def porcelain_path(entry: str) -> str:
+    """The path a ``git status --porcelain`` line names, or an empty string.
+
+    A rename is reported as ``old -> new``, and the destination is the path staging
+    has to cover — the source arrives as its own deletion line when the rename is
+    still unstaged, which is the only case where both sides matter.
+    """
+    candidate = _PORCELAIN_STATUS_RE.sub("", str(entry).strip()).strip().strip('"')
+    return candidate.rsplit(" -> ", 1)[-1].strip().strip('"')
+
+
 def secret_paths(paths: Iterable[str]) -> list[str]:
     """Paths that must never be staged, whatever the grant says.
 
@@ -381,10 +394,7 @@ def secret_paths(paths: Iterable[str]) -> list[str]:
     """
     out: list[str] = []
     for raw in paths:
-        candidate = str(raw).strip()
-        candidate = _PORCELAIN_STATUS_RE.sub("", candidate)
-        # ``git status --porcelain`` reports renames as "old -> new".
-        candidate = candidate.split(" -> ")[-1].strip().strip('"')
+        candidate = porcelain_path(raw)
         if candidate and _SECRET_PATH_RE.search(candidate):
             out.append(candidate)
     return out

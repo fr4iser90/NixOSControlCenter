@@ -390,7 +390,7 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
             "force-push (flag, +refspec, or --push-option force)",
             "hook bypass (--no-verify, --no-gpg-sign, -c commit.gpgsign=…)",
             "protected branches for direct pushes",
-            "secret paths are never staged",
+            "secret paths are never staged, and nothing stages blindly: commits take a pathset",
         ],
         "budget": budget,
         "violations": violations,
@@ -1177,7 +1177,11 @@ def _cmd_workflow(args: argparse.Namespace) -> int:
             print(json.dumps(result, indent=2, ensure_ascii=False))
             return 0 if result.get("ok") else 1
         if cmd == "commit":
-            result = commit_all(wid, message=getattr(args, "message", "") or "")
+            result = commit_all(
+                wid,
+                message=getattr(args, "message", "") or "",
+                paths=getattr(args, "paths", None),
+            )
             print(json.dumps(result, indent=2, ensure_ascii=False))
             return 0 if result.get("ok") else 1
         if cmd == "pr":
@@ -1609,9 +1613,17 @@ def main(argv: list[str] | None = None) -> int:
     st_branch.add_argument("--json", action="store_true")
     st_val = workflow_sub.add_parser("validate", help="Run detected project validators")
     st_val.add_argument("--workspace", "-w")
-    st_commit = workflow_sub.add_parser("commit", help="git add -A && commit")
+    st_commit = workflow_sub.add_parser("commit", help="Stage a pathset + commit (no push)")
     st_commit.add_argument("--workspace", "-w")
     st_commit.add_argument("-m", "--message", default="ncc workflow: workspace updates")
+    st_commit.add_argument(
+        "--path",
+        dest="paths",
+        action="append",
+        metavar="PATH",
+        help="Stage only this path (repeatable). Default: what git reports dirty, "
+        "path by path — never git add -A. Secret-shaped paths are refused either way.",
+    )
     st_pr = workflow_sub.add_parser("pr", help="Push branch + open GitHub PR (gh)")
     st_pr.add_argument("--workspace", "-w")
     st_pr.add_argument("--title", default="ncc workflow updates")

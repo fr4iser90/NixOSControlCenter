@@ -9,7 +9,7 @@ import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable, Sequence
 
 from .audit import append_audit
 from . import budgets
@@ -20,6 +20,7 @@ from .permissions import (
     current_grant,
     evaluate_repo,
     git_subcommand,
+    porcelain_path,
     protected_branch,
     secret_paths,
 )
@@ -441,12 +442,59 @@ def validate_workspace(workspace_id: str | None = None) -> dict[str, Any]:
     }
 
 
+#: A pathset that covers everything is ``git add -A`` under another name, so it is refused
+#: rather than honoured: the point of naming paths is that a file can be refused by name.
+_BLANKET_PATHS = frozenset({".", "./", "*", "./*", "**"})
+
+
+def _dirty_pathset(status_stdout: str) -> list[str]:
+    """Every path ``git status --porcelain --untracked-files=all`` names."""
+    out: list[str] = []
+    for entry in status_stdout.splitlines():
+        path = porcelain_path(entry)
+        if path and path not in out:
+            out.append(path)
+    return out
+
+
+def _named_pathset(root: Path, requested: Iterable[str]) -> tuple[list[str], list[str], list[str]]:
+    """Repo-relative paths to stage, and the two kinds of request that are refused.
+
+    ``outside`` covers a path that walks out of the checkout (``../…``) — it would stage
+    work the run was never given a grant for, and git only refuses it by accident.
+    """
+    keep: list[str] = []
+    blanket: list[str] = []
+    outside: list[str] = []
+    for raw in requested:
+        text = str(raw).strip().replace("\\", "/")
+        if not text:
+            continue
+        if text in _BLANKET_PATHS:
+            blanket.append(text)
+            continue
+        relative = os.path.relpath(os.path.abspath(os.path.join(str(root), text)), str(root))
+        if relative == os.curdir or relative.startswith(f"{os.pardir}{os.sep}") or relative == os.pardir:
+            outside.append(text)
+            continue
+        if relative not in keep:
+            keep.append(relative)
+    return keep, blanket, outside
+
+
 def commit_all(
     workspace_id: str | None = None,
     *,
     message: str,
+    paths: Sequence[str] | None = None,
 ) -> dict[str, Any]:
-    """Stage all + commit (no push)."""
+    """Commit an explicit pathset (no push).
+
+    ``paths`` is what this run actually changed. Left out, the pathset is whatever git
+    reports dirty — still staged path by path, never with ``git add -A``: a blanket stage
+    takes whatever is in the tree, including a key nobody meant to commit, and there is no
+    way to refuse one once it is in the index.
+    """
     wid, root = _repo_root(workspace_id)
     msg = (message or "").strip() or "ncc workflow: workspace updates"
 
@@ -454,41 +502,108 @@ def commit_all(
     if denied:
         return {"ok": False, "workspace_id": wid, **denied}
 
-    status = _git(root, "status", "--porcelain")
+    # ``--untracked-files=all`` is not a detail: the default report collapses an untracked
+    # directory into ``keys/``, so a secret inside one reads as a folder to the screen
+    # below while staging takes the file. ``core.quotepath=false`` keeps a non-ASCII name
+    # literal — git would otherwise hand back an escape sequence that is not a pathspec.
+    status = _git(
+        root, "-c", "core.quotepath=false", "status", "--porcelain", "--untracked-files=all"
+    )
     if not status.get("ok"):
         # Never read a failed status as "clean" — that would hide both the failure and
-        # the secret scan below.
+        # the secret screen below.
         return {
             "ok": False,
             "workspace_id": wid,
             "error": "status_failed",
             "reason": status.get("stderr") or "git status failed",
         }
-    # ``add -A`` is exactly how secrets get committed, so screen it before staging.
-    blocked = secret_paths((status.get("stdout") or "").splitlines())
-    if blocked:
+
+    if paths is None:
+        pathset, blanket, outside = _dirty_pathset(status.get("stdout") or ""), [], []
+    else:
+        pathset, blanket, outside = _named_pathset(root, paths)
+
+    if blanket:
         _audit_floor(
-            "denied_secret_path",
-            f"git add -A would stage {', '.join(blocked)}",
+            "denied_blanket_path",
+            f"commit pathset names the whole tree: {', '.join(blanket)}",
             tool="git commit",
         )
         return {
             "ok": False,
             "workspace_id": wid,
+            "committed": False,
+            "error": "denied_blanket_path",
+            "denied": "denied_blanket_path",
+            "rejectedPaths": blanket,
+            "reason": "staging the whole tree is how secrets get committed",
+            "hint": "Name the changed paths (--path, repeatable), or leave --path out to "
+            "stage what git reports dirty.",
+        }
+    if outside:
+        _audit_floor(
+            "denied_path_outside_repo",
+            f"commit pathset leaves the checkout: {', '.join(outside)}",
+            tool="git commit",
+        )
+        return {
+            "ok": False,
+            "workspace_id": wid,
+            "committed": False,
+            "error": "denied_path_outside_repo",
+            "denied": "denied_path_outside_repo",
+            "rejectedPaths": outside,
+            "reason": "the pathset reaches outside the workspace this run works on",
+            "hint": "Pass paths relative to the repository root.",
+        }
+    # The deny list is unconditional: an explicit --path is not a way past it, and one hit
+    # refuses the whole commit rather than quietly dropping a file the caller asked for.
+    blocked = secret_paths(pathset)
+    if blocked:
+        _audit_floor(
+            "denied_secret_path",
+            f"refused to stage {', '.join(blocked)}",
+            tool="git commit",
+        )
+        return {
+            "ok": False,
+            "workspace_id": wid,
+            "committed": False,
             "error": "denied_secret_path",
             "denied": "denied_secret_path",
             "secretPaths": blocked,
-            "reason": "git add -A would stage files that look like credentials",
+            "reason": "the pathset contains files that look like credentials",
             "hint": "Add them to .gitignore, or stage the real changes yourself with git add <path>.",
         }
-    if not status.get("stdout"):
+    if not pathset:
         return {
             "ok": True,
             "workspace_id": wid,
             "committed": False,
             "reason": "nothing_to_commit",
         }
-    _git(root, "add", "-A")
+
+    added = _git(root, "add", "--", *pathset)
+    if not added.get("ok"):
+        return {
+            "ok": False,
+            "workspace_id": wid,
+            "committed": False,
+            "error": "stage_failed",
+            "paths": pathset,
+            "reason": added.get("stderr") or "git add failed",
+        }
+    if not (_git(root, "diff", "--cached", "--name-only").get("stdout") or "").strip():
+        # Every named path was already committed. git would fail the commit on an empty
+        # index, and "nothing happened" is the honest answer rather than an error.
+        return {
+            "ok": True,
+            "workspace_id": wid,
+            "committed": False,
+            "paths": pathset,
+            "reason": "nothing_to_commit",
+        }
     # The diff cap is measured on what is actually staged, then unstaged again: the work
     # stays local and the workspace task stays open.
     if budgets.applies():
@@ -496,7 +611,8 @@ def commit_all(
         lines = budgets.staged_diff_lines(numstat.get("stdout") or "")
         verdict = budgets.check_diff_lines(lines)
         if not verdict.allowed:
-            _git(root, "reset")
+            # Scoped to the pathset: a human's staged work is not this run's to unstage.
+            _git(root, "reset", "-q", "--", *pathset)
             return {
                 "ok": False,
                 "workspace_id": wid,
@@ -509,6 +625,7 @@ def commit_all(
         "ok": bool(res["ok"]),
         "workspace_id": wid,
         "committed": bool(res["ok"]),
+        "stagedPaths": pathset,
         "stdout": res.get("stdout"),
         "stderr": res.get("stderr"),
     }
@@ -683,7 +800,9 @@ def bump_version(
     pkg_path.write_text(
         json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
-    commit = commit_all(wid, message=f"chore: bump version to {new_v}")
+    commit = commit_all(
+        wid, message=f"chore: bump version to {new_v}", paths=("package.json",)
+    )
     return {
         "ok": True,
         "workspace_id": wid,
