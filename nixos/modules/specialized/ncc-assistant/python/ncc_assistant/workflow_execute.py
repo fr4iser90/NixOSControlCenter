@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from .audit import append_audit
+from . import budgets
 from .paths import workflow_progress_file
 from .permissions import (
     ENV_ACTOR,
@@ -183,6 +184,34 @@ def _human_decision(action: str, confirm: str, hint: str) -> dict[str, Any] | No
 
 def _is_dirty(root: Path) -> bool:
     return bool(_git(root, "status", "--porcelain").get("stdout"))
+
+
+def _repo_key(root: Path) -> str:
+    """Stable id for per-repo budget counters — ``org/repo``, or the directory when local."""
+    url = (_git(root, "remote", "get-url", "origin").get("stdout") or "").strip()
+    if not url:
+        return f"local:{root.name}"
+    path = re.sub(r"^(git@|https?://)", "", url)
+    if ":" in path.split("/", 1)[0]:
+        path = path.split(":", 1)[1]
+    path = re.sub(r"\.git$", "", path)
+    parts = [p for p in path.strip("/").split("/") if p]
+    return "/".join(parts[-2:]) if len(parts) >= 2 else (parts[-1] if parts else root.name)
+
+
+def _pr_budget_hold(root: Path) -> dict[str, Any] | None:
+    """PRs/day and open agent PRs — a breach holds the PR, never the branch or the commit.
+
+    Returning the push result alongside the denial is what makes this recoverable: the work
+    is on the remote and ``ncc ai workflow pr`` can open it tomorrow.
+    """
+    if not budgets.applies():
+        return None
+    key = _repo_key(root)
+    for verdict in (budgets.check_prs(key), budgets.check_open_agent_prs(key)):
+        if not verdict.allowed:
+            return {**verdict.as_dict(), "prHeld": True}
+    return None
 
 
 def detect_default_branch(root: Path) -> str:
@@ -460,6 +489,21 @@ def commit_all(
             "reason": "nothing_to_commit",
         }
     _git(root, "add", "-A")
+    # The diff cap is measured on what is actually staged, then unstaged again: the work
+    # stays local and the workspace task stays open.
+    if budgets.applies():
+        numstat = _git(root, "diff", "--cached", "--numstat")
+        lines = budgets.staged_diff_lines(numstat.get("stdout") or "")
+        verdict = budgets.check_diff_lines(lines)
+        if not verdict.allowed:
+            _git(root, "reset")
+            return {
+                "ok": False,
+                "workspace_id": wid,
+                "committed": False,
+                "diffLines": lines,
+                **verdict.as_dict(),
+            }
     res = _git(root, "commit", "-m", msg)
     return {
         "ok": bool(res["ok"]),
@@ -535,6 +579,9 @@ def open_pull_request(
     cur = _git(root, "rev-parse", "--abbrev-ref", "HEAD")
     branch = cur.get("stdout") or ""
     push = push_branch(wid)
+    held = _pr_budget_hold(root)
+    if held:
+        return {"ok": False, "workspace_id": wid, "branch": branch, "push": push, **held}
     cmd = [
         "gh",
         "pr",
@@ -548,6 +595,8 @@ def open_pull_request(
         cmd.append("--draft")
     res = _run(cmd, cwd=root, timeout=120.0)
     _audit_publish("create", ok=bool(res["ok"]), detail=res.get("stderr") or res.get("stdout") or "")
+    if res["ok"] and budgets.applies():
+        budgets.record_pr(_repo_key(root))
     return {
         "ok": bool(res["ok"]),
         "workspace_id": wid,
@@ -580,6 +629,9 @@ def merge_pull_request(
     cmd.extend([f"--{strat}", "--delete-branch"])
     res = _run(cmd, cwd=root, timeout=180.0)
     _audit_publish("merge", ok=bool(res["ok"]), detail=res.get("stderr") or res.get("stdout") or "")
+    if res["ok"] and budgets.applies():
+        # A PR that lands frees the slot it held in the open-PR budget.
+        budgets.record_merge(_repo_key(root))
     return {
         "ok": bool(res["ok"]),
         "workspace_id": wid,

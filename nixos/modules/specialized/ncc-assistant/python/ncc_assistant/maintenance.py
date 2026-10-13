@@ -95,10 +95,18 @@ def prune_approvals(*, max_age_days: int = DEFAULT_APPROVAL_MAX_AGE_DAYS) -> int
     return get_decision_service().cleanup_old(max_age_days=max_age_days)
 
 
+def prune_budget() -> int:
+    """Drop day-keyed budget counters past their retention window."""
+    from .budgets import prune
+
+    return prune()
+
+
 def run_retention() -> dict[str, int]:
     """Run every retention pass. Never raises — each pass fails closed to 0."""
     return {
         "jobs_removed": prune_jobs(),
         "audit_lines_dropped": prune_audit(),
         "approvals_removed": prune_approvals(),
+        "budget_days_dropped": prune_budget(),
     }

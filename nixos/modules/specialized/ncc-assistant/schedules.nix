@@ -73,6 +73,44 @@ let
       else "none";
   };
 
+  # Per-day budgets (phase 39 L8). A schedule may only narrow the host's counters; a
+  # counter neither side sets stays out of the environment so budgets.py keeps its own
+  # default. 0 means "no cap here", so it outranks nothing but never lifts a cap.
+  budgetKeys = {
+    maxRunsPerDay = "NCC_ASSISTANT_BUDGET_MAX_RUNS_PER_DAY";
+    maxPrsPerDay = "NCC_ASSISTANT_BUDGET_MAX_PRS_PER_DAY";
+    maxDiffLines = "NCC_ASSISTANT_BUDGET_MAX_DIFF_LINES";
+    maxOpenAgentPrs = "NCC_ASSISTANT_BUDGET_MAX_OPEN_AGENT_PRS";
+  };
+  budgetCapped = value: value != null && value != 0;
+  budgetValue = budget: key:
+    let
+      want = budget.${key} or null;
+      ceiling = (cfg.grants.budget or { }).${key} or null;
+    in
+      if !budgetCapped want && !budgetCapped ceiling then
+        (if want == 0 || ceiling == 0 then 0 else null)
+      else if !budgetCapped want then ceiling
+      else if !budgetCapped ceiling then want
+      else if want <= ceiling then want
+      else ceiling;
+  budgetOverreach = budget: key:
+    let
+      want = budget.${key} or null;
+      ceiling = (cfg.grants.budget or { }).${key} or null;
+    in
+      budgetCapped want && budgetCapped ceiling && want > ceiling;
+  budgetEnvironment = schedule:
+    let budget = (schedule.permissions or { }).budget or { }; in
+    mapAttrs' (key: var: nameValuePair var (toString (budgetValue budget key)))
+      # filterAttrs calls the predicate name: value — here the name is the budget key and
+      # the value its env var, so the lookup has to use the first argument.
+      (filterAttrs (key: _: (budgetValue budget key) != null) budgetKeys);
+  scheduleBudget = s: (s.permissions or { }).budget or { };
+  budgetConflicts = filterAttrs (_: s:
+    any (k: budgetOverreach (scheduleBudget s) k) (attrNames budgetKeys)
+  ) enabledSchedules;
+
   # Legacy profile → ladder steps, so hosts that predate permissions.* keep their meaning.
   profileStepMap = {
     "chat" = { repo = "observe"; system = "none"; };
@@ -209,7 +247,7 @@ let
         # No NOTIFY_ON_* here on purpose: schedules have no per-schedule notify option, and
         # anything set in this unit outranks agent.notifications.* — the wrapper keeps the
         # host value unless the narrowest scope declared its own.
-      } // optionalAttrs (schedule.model != null) {
+      } // budgetEnvironment schedule // optionalAttrs (schedule.model != null) {
         NCC_ASSISTANT_MODEL = schedule.model;
       } // optionalAttrs ((cfg.model or null) != null && schedule.model == null) {
         NCC_ASSISTANT_MODEL = cfg.model;
@@ -254,7 +292,15 @@ in
             above this host's ceiling repo=${hostCeiling.repo} system=${hostCeiling.system}${optionalString dry " (and dryRun=true)"};
             the run will refuse instead of quietly doing less. Lower permissions.* or raise
             agent.grants.repoCeiling / agent.allowWrite / agent.allowRebuild.
-          '') grantConflicts;
+          '') grantConflicts
+        ++ mapAttrsToList (name: s:
+          ''
+            ncc-assistant: schedule '${name}' asks for budget ${concatStringsSep ", "
+              (map (k: "${k}=${toString ((scheduleBudget s).${k})}")
+                (filter (k: budgetOverreach (scheduleBudget s) k) (attrNames budgetKeys)))}
+            above agent.grants.budget; the host value is what the unit gets. Budgets narrow,
+            they never widen.
+          '') budgetConflicts;
 
       assertions = [
         {

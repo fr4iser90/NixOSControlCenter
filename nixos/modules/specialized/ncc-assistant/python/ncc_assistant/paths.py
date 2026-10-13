@@ -173,6 +173,11 @@ def capacity_state_file() -> Path:
     return config_home() / "capacity.json"
 
 
+def budget_file() -> Path:
+    """Day-keyed budget counters (runs, PRs) for phase 39 — pruned by ``maintenance run``."""
+    return config_home() / "budget.json"
+
+
 def activity_file() -> Path:
     """Last user activity timestamp for idle mode."""
     return config_home() / "last-activity.json"

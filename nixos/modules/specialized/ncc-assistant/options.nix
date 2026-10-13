@@ -3,6 +3,52 @@
 let
   inherit (lib) mkOption mkEnableOption types;
 
+  # Phase 39 L8: what a run may spend per day. Null means "use the built-in default"
+  # (see budgets.py) and 0 turns the counter off, so the numbers live in one place.
+  budgetModule = types.submodule {
+    options = {
+      maxRunsPerDay = mkOption {
+        type = types.nullOr types.ints.unsigned;
+        default = null;
+        example = 1;
+        description = ''
+          Agent runs per day (UTC) for this actor. Null keeps the built-in default of
+          no limit; 0 also means no limit. A run that would exceed it is skipped before
+          the LLM call — it costs nothing and the unit still exits 0.
+        '';
+      };
+      maxPrsPerDay = mkOption {
+        type = types.nullOr types.ints.unsigned;
+        default = null;
+        example = 3;
+        description = ''
+          Agent pull requests per repository per day. Default 3. Over budget the work
+          stops at push: the branch is on the remote, the PR is held for tomorrow.
+        '';
+      };
+      maxDiffLines = mkOption {
+        type = types.nullOr types.ints.unsigned;
+        default = null;
+        example = 800;
+        description = ''
+          Changed lines (added plus removed) allowed in one commit, measured on what is
+          already staged. Default 800. Over budget the commit is refused and unstaged,
+          so the work stays local and the task stays open.
+        '';
+      };
+      maxOpenAgentPrs = mkOption {
+        type = types.nullOr types.ints.unsigned;
+        default = null;
+        example = 5;
+        description = ''
+          Agent pull requests kept open per repository. Default 5, counted locally from
+          PRs this assistant opened minus the ones it merged. Over budget no new PR is
+          opened until one lands or is closed.
+        '';
+      };
+    };
+  };
+
   mcpServerModule = types.submodule {
     options = {
       enable = mkOption {
@@ -136,6 +182,16 @@ let
           description = ''
             System step for this schedule. Null derives it from dryRun / allowWrite /
             allowRebuild. A schedule can never gain rights the host denies.
+          '';
+        };
+        budget = mkOption {
+          type = budgetModule;
+          default = { };
+          example = { maxRunsPerDay = 1; maxPrsPerDay = 3; maxDiffLines = 800; };
+          description = ''
+            Per-day budgets for this schedule, narrowing
+            {{Option|systemConfig.aiAssistant.grants.budget}}. Each counter left null
+            takes the host value; a schedule never gets more room than the host.
           '';
         };
       };
@@ -299,6 +355,17 @@ in
           as before. Schedules and --grant may only lower this; asking for more is
           refused, not clamped. merge/release additionally need a human unless the
           grant explicitly carries them.
+        '';
+      };
+      budget = mkOption {
+        type = budgetModule;
+        default = { };
+        example = { maxRunsPerDay = 1; maxDiffLines = 400; };
+        description = ''
+          Per-day budgets for granted runs (phase 39). They bind schedules and
+          {{Command|ncc ai agent run --grant …}}, not a human at the CLI: with no grant
+          in play the counters are not consulted. Leave a counter null for the built-in
+          default, set 0 to switch it off. Schedules may lower these, never raise them.
         '';
       };
     };

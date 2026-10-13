@@ -134,6 +134,14 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
                 kind = event.get("kind")
                 if kind == "job_started":
                     print_info(f"Job started: {event.get('job_id')}")
+                elif kind == "skipped":
+                    # A budget breach is not a failure and must not fail the unit: the run
+                    # stopped before the LLM call, so nothing was spent and nothing broke.
+                    print_info(
+                        f"Skipped ({event.get('reason')}): {event.get('text') or 'budget reached'}"
+                    )
+                    if event.get("hint"):
+                        print_info(str(event["hint"]))
                 elif kind == "step":
                     limit = event.get("max_steps")
                     print_info(
@@ -368,6 +376,9 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
     system_ceiling_step = system_ceiling(settings.writes_enabled, settings.allow_rebuild)
     grant, violations = resolve_run_grant(settings, getattr(args, "grant", None))
     active = current_grant()
+    from . import budgets
+
+    budget = budgets.summary()
     payload = {
         "invokerRole": invoker_role(),
         "ceiling": {"repo": repo_ceiling, "system": system_ceiling_step},
@@ -381,6 +392,7 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
             "protected branches for direct pushes",
             "secret paths are never staged",
         ],
+        "budget": budget,
         "violations": violations,
     }
     if getattr(args, "json", False):
@@ -401,6 +413,9 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
     print_info(f"Ladder system: {' > '.join(SYSTEM_STEPS)}")
     print_info(f"Protected:     {', '.join(PROTECTED_BRANCHES)}")
     print_info("Never allowed: " + "; ".join(payload["floor"]))
+    limits = ", ".join(f"{name}={cap}" for name, cap in budget["limits"].items()) or "no caps"
+    print_info(f"Budget:        {limits}{'' if budget['applies'] else ' (not in force — no grant)'}")
+    print_info(f"Budget today:  {json.dumps(budget['today'], sort_keys=True)}")
     for line in violations:
         print_err(line)
     if violations:

@@ -218,6 +218,21 @@ You are running in agent mode to accomplish a specific goal.
             yield {"kind": "error", "text": error}
             return
 
+        from . import budgets
+
+        if budgets.applies():
+            run_budget = budgets.check_run()
+            if not run_budget.allowed:
+                # A breach must cost nothing: no job, no LLM call, and the unit still
+                # exits clean because there was nothing wrong — only nothing left to do.
+                yield {
+                    "kind": "skipped",
+                    "reason": run_budget.code,
+                    "text": run_budget.reason,
+                    "hint": run_budget.hint,
+                }
+                return
+
         lock = AgentLock()
         if not lock.acquire(blocking=False):
             yield {"kind": "error", "text": "Another agent is already running"}
@@ -238,10 +253,15 @@ You are running in agent mode to accomplish a specific goal.
         """Run agent with lock held."""
         from .maintenance import run_retention
 
+        from . import budgets
+
         try:
             run_retention()
         except Exception as exc:  # noqa: BLE001 — housekeeping must never fail a run
             append_audit("retention_failed", actor="agent", detail=str(exc))
+
+        # Counted once the lock is held: a run that never started must not spend budget.
+        budgets.record_run()
 
         self._job = self._store.create(
             self.agent_settings.goal,
