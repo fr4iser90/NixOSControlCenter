@@ -326,6 +326,14 @@ def current_grant() -> Grant | None:
     )
 
 
+def audit_actor() -> str:
+    """Whose audit line a refusal is, for the callers that log outside ``workflow_execute``."""
+    grant = current_grant()
+    if grant is not None:
+        return grant.actor
+    return (os.environ.get(ENV_ACTOR) or "").strip() or "cli"
+
+
 def evaluate(action: str, *, axis: str, grant: Grant | None = None) -> Decision:
     """May ``action`` run under the active (or given) grant?
 
@@ -409,19 +417,44 @@ _GLOBAL_VALUE_FLAGS = frozenset(
     {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix"}
 )
 
+#: A pathset that names the whole tree stages whatever happens to be present, including a file
+#: this module would refuse by name — so it is refused where it is typed, not honoured.
+BLANKET_PATHS = frozenset({".", "./", "*", "./*", "**"})
 
-def _git_subcommand(args: Sequence[str]) -> str:
-    index = 0
+#: The verbs that move work into the index, and the flags that mean "everything there is".
+_STAGING_SUBCOMMANDS = frozenset({"add", "stage"})
+_STAGING_ALL_FLAGS = frozenset({"-A", "--all", "-u", "--update"})
+_COMMIT_ALL_FLAGS = frozenset({"-a", "--all"})
+#: Commit options whose value is free text: a message names no file, and refusing
+#: ``commit -m "note the .env change"`` would refuse ordinary work.
+_COMMIT_VALUE_FLAGS = frozenset(
+    {"-m", "--message", "-F", "--file", "-c", "-C", "--reuse-message", "--reedit-message",
+     "--fixup", "--revert", "--author", "--date", "--cleanup", "--trailer", "-t", "--template"}
+)
+
+#: What the shell tool must not do with git: write history, the index, or a remote. A shell
+#: string carries no grant check, no branch floor and no ``git_action`` audit line, so the
+#: capability is removed there rather than run unguarded — see ``check_shell_command``.
+_SHELL_FORBIDDEN_GIT_ACTIONS = frozenset(
+    {"add", "am", "apply", "cherry-pick", "commit", "merge", "mv", "push", "rebase", "remove",
+     "reset", "restore", "revert", "rm", "stage", "tag"}
+)
+
+
+def _split_git_argv(args: Sequence[str]) -> tuple[str, Sequence[str]]:
+    subcommand, index = "", 0
     while index < len(args):
         arg = args[index]
-        if arg in _GLOBAL_VALUE_FLAGS:
-            index += 2
-            continue
         if arg.startswith("-"):
-            index += 1
+            index += 2 if arg.split("=", 1)[0] in _GLOBAL_VALUE_FLAGS and "=" not in arg else 1
             continue
-        return arg
-    return ""
+        return arg, args[index + 1 :]
+    return "", ()
+
+
+def _git_subcommand(args: Sequence[str]) -> str:
+    """The subcommand a git argv runs, skipping global options (``-C``, ``-c``, …)."""
+    return _split_git_argv(args)[0]
 
 
 def git_subcommand(argv: Sequence[str]) -> str:
@@ -429,10 +462,86 @@ def git_subcommand(argv: Sequence[str]) -> str:
     return _git_subcommand([str(a) for a in argv if str(a).strip()])
 
 
+def _pathspec_path(token: str) -> str:
+    """The path a pathspec names, with any ``:(magic)`` prefix and stray quotes removed."""
+    text = str(token)
+    if text.startswith(":("):
+        _, _, text = text.partition(")")
+    return text.strip().strip("'\"")
+
+
+def _staging_argv(args: Sequence[str], *, for_commit: bool) -> tuple[str, list[str]]:
+    """``(stage_everything_flag, pathspecs)`` of an ``add``/``commit`` argument list.
+
+    Flags and their values are skipped, so a commit message is never read as a pathspec:
+    ``commit -m "note the .env change"`` names no file and must stay allowed.
+    """
+    all_flags = _COMMIT_ALL_FLAGS if for_commit else _STAGING_ALL_FLAGS
+    value_flags = _COMMIT_VALUE_FLAGS if for_commit else frozenset()
+    blanket_letter = "a" if for_commit else "A"
+    blanket = ""
+    paths: list[str] = []
+    index = 0
+    positional = False
+    while index < len(args):
+        token = str(args[index])
+        index += 1
+        if positional:
+            paths.append(token)
+            continue
+        if token == "--":
+            positional = True
+            continue
+        if token.startswith("-"):
+            name = token.split("=", 1)[0]
+            if name in all_flags or (not token.startswith("--") and blanket_letter in token[1:]):
+                blanket = token
+            if "=" not in token and (
+                name in value_flags
+                or (not token.startswith("--") and bool(set(token[1:]) & {"m", "F"}))
+            ):
+                index += 1
+            continue
+        paths.append(token)
+    return blanket, paths
+
+
+def _check_staging(subcommand: str, args: Sequence[str], *, for_commit: bool) -> Decision | None:
+    """Blanket staging and secret-shaped pathspecs, refused inside the argv itself.
+
+    ``commit_all`` already swaps a blanket pathset for an explicit one; enforcing it here as
+    well puts the rule under a hand-built argv and a shell string, not only under the tool.
+    """
+    blanket, paths = _staging_argv(args, for_commit=for_commit)
+    named = [_pathspec_path(path) for path in paths]
+    verb = f"git {subcommand}"
+    if blanket:
+        return _denied(
+            "denied_blanket_path",
+            f"{verb} {blanket} stages whatever is present, so a path refused by name gets in unexamined",
+            "Name the paths to stage (git add -- <path> …).",
+        )
+    everywhere = sorted({path for path in named if path in BLANKET_PATHS})
+    if everywhere:
+        return _denied(
+            "denied_blanket_path",
+            f"{verb} {', '.join(everywhere)} names every file in the repository, not the changed ones",
+            "Name the paths to stage (git add -- <path> …).",
+        )
+    secrets = secret_paths(named)
+    if secrets:
+        return _denied(
+            "denied_secret_path",
+            f"{verb} would stage secret-shaped path(s): {', '.join(secrets[:5])}",
+            "Keep secrets out of git; stage the rest by name.",
+        )
+    return None
+
+
 def check_git_argv(argv: Sequence[str]) -> Decision:
-    """Floor for git invocations: force-push and hook bypass are never allowed."""
+    """Floor for git invocations: force-push, hook bypass, blanket staging, secret paths."""
     args = [str(a) for a in argv if str(a).strip()]
-    subcommand = _git_subcommand(args)
+    subcommand, rest = _split_git_argv(args)
 
     if subcommand == "push":
         for offset, arg in enumerate(args[1:], start=1):
@@ -471,6 +580,17 @@ def check_git_argv(argv: Sequence[str]) -> Decision:
                     "Sign the commit or let a human handle it.",
                 )
 
+    # Staging after the history rules: ``commit --no-verify -a`` is worth the hook answer, and
+    # inside staging a blanket flag goes first — a pathset that names nothing cannot be screened.
+    if subcommand in _STAGING_SUBCOMMANDS:
+        staging = _check_staging(subcommand, rest, for_commit=False)
+    elif subcommand == "commit":
+        staging = _check_staging(subcommand, rest, for_commit=True)
+    else:
+        staging = None
+    if staging is not None:
+        return staging
+
     return Decision(True, "", "")
 
 
@@ -498,29 +618,66 @@ def check_branch(name: str | None, *, action: str = "commit") -> Decision:
     )
 
 
+#: Chain and redirect characters. Split as punctuation so ``git status;git commit -m x`` is
+#: seen as two git invocations — with ``shlex.split`` the ``;`` hides inside ``--porcelain;``
+#: and everything after it goes unexamined. Quoted text is unaffected.
+_SHELL_SEPARATORS = ";&|<>"
+
+
+def _shell_tokens(command: str) -> list[str]:
+    lexer = shlex.shlex(str(command), posix=True, punctuation_chars=_SHELL_SEPARATORS)
+    lexer.whitespace_split = True
+    return list(lexer)
+
+
+def _is_separator(token: str) -> bool:
+    return bool(token) and not token.strip(_SHELL_SEPARATORS)
+
+
 def check_shell_command(command: str) -> Decision:
-    """Same floor for shell strings — an allowlisted ``git push`` is not a force-push."""
+    """Same floor for shell strings, plus no git writes at all through that path.
+
+    A shell string has no repository context to check: no root to read HEAD from, no grant step,
+    no ``git_action`` audit line. Rather than guess, the capability goes — only the read-only
+    subcommands survive, so an allowlisted ``git commit`` cannot land a write on trunk.
+    """
     try:
-        tokens = shlex.split(str(command))
+        tokens = _shell_tokens(command)
     except ValueError:
         return Decision(True, "", "")
+    invocations: list[list[str]] = []
     index = 0
     while index < len(tokens):
         token = tokens[index]
-        if token in ("&&", ";", "||", "|"):
+        if _is_separator(token):
             index += 1
             continue
         if token.rsplit("/", 1)[-1] == "git":
             rest: list[str] = []
             for follow in tokens[index + 1 :]:
-                if follow in ("&&", ";", "||", "|"):
+                if _is_separator(follow):
                     break
                 rest.append(follow)
-            verdict = check_git_argv(rest)
-            if not verdict.allowed:
-                return verdict
+            invocations.append(rest)
             index += 1 + len(rest)
             continue
         index += 1
+
+    # The specific rules across the whole chain first: in ``git add -- notes.md || git commit
+    # --no-verify -m x`` the escalation is the hook bypass, and that is the code to grep for.
+    for argv in invocations:
+        verdict = check_git_argv(argv)
+        if not verdict.allowed:
+            return verdict
+    for argv in invocations:
+        subcommand, _ = _split_git_argv(argv)
+        if subcommand in _SHELL_FORBIDDEN_GIT_ACTIONS:
+            return _denied(
+                "denied_shell_git_write",
+                f"git {subcommand} writes history through a shell string, which carries no grant,"
+                " no branch floor and no audit line",
+                "Use the workflow verb (ncc ai workflow commit / push / …) — that is where the"
+                " ladder, the ncc/ floor and the git_action audit live.",
+            )
     return Decision(True, "", "")
 

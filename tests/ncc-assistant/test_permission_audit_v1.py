@@ -70,7 +70,9 @@ def test_a_commit_is_audited_with_the_actor_that_made_it(tmp_path):
     root = _repo(tmp_path)
     (root / "notes.md").write_text("work\n", encoding="utf-8")
     with grant_env(repo="commit", actor="schedule:daily-audit"):
-        workflow_execute._git(root, "add", "-A")
+        # Staged by name: ``add -A`` is a floor refusal now, so a fixture that means "the tool
+        # worked" cannot lean on it.
+        workflow_execute._git(root, "add", "--", "notes.md")
         out = workflow_execute._git(root, "commit", "-m", "docs: notes")
     assert out["ok"] is True, out
     actions = _events("git_action")

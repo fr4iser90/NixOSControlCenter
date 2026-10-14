@@ -186,7 +186,7 @@ def test_force_push_and_hook_bypass_are_denied():
 def test_ordinary_git_still_passes_the_floor():
     for argv in (
         ["status", "--porcelain"],
-        ["add", "-A"],
+        ["add", "--", "notes.md"],
         ["commit", "-m", "feat: x"],
         ["push", "-u", "origin", "ncc/x"],
         ["-c", "user.name=x", "commit", "-m", "y"],
@@ -198,7 +198,7 @@ def test_shell_string_is_checked_too():
     verdict = permissions.check_shell_command("cd /tmp && git push --force-with-lease")
     assert verdict.allowed is False and verdict.code == "denied_force_push"
     assert permissions.check_shell_command("git status --porcelain").allowed is True
-    assert permissions.check_shell_command("git add -A; git commit -m x").allowed is True
+    assert permissions.check_shell_command("git add -A; git commit -m x").allowed is False
 
 
 def test_secret_paths_and_renames():

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .config import Settings
-from .permissions import check_shell_command, evaluate_system
+from .permissions import audit_actor, check_shell_command, evaluate_system
 
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
@@ -970,6 +970,17 @@ class ToolRuntime:
         # into an allowlisted template.
         floor = check_shell_command(cmd)
         if not floor.allowed:
+            # A shell refusal is an attempted escalation, so it is logged, not just returned:
+            # this path writes no ``git_action`` line, and an unlogged floor is an unfalsifiable one.
+            from .audit import append_audit
+
+            append_audit(
+                "floor_denied",
+                actor=audit_actor(),
+                tool=f"shell {name}",
+                result="denied",
+                detail=f"{floor.code}: {floor.reason}"[:240],
+            )
             return {"ok": False, **floor.as_dict()}
 
         if not self._shell_allowlisted(cmd):

@@ -15,7 +15,8 @@ from .audit import append_audit
 from . import budgets
 from .paths import workflow_progress_file
 from .permissions import (
-    ENV_ACTOR,
+    BLANKET_PATHS,
+    audit_actor,
     check_branch,
     check_git_argv,
     current_grant,
@@ -98,10 +99,7 @@ _GIT_ACTIONS = frozenset({"commit", "push", "merge", "tag", "rebase", "reset"})
 
 def _actor() -> str:
     """Whose line this is in ``audit.jsonl`` — a schedule id, ``companion``, or ``cli``."""
-    grant = current_grant()
-    if grant is not None:
-        return grant.actor
-    return (os.environ.get(ENV_ACTOR) or "").strip() or "cli"
+    return audit_actor()
 
 
 def _audit_git(action: str, *, ok: bool, detail: str = "") -> None:
@@ -464,9 +462,8 @@ def validate_workspace(workspace_id: str | None = None) -> dict[str, Any]:
     }
 
 
-#: A pathset that covers everything is ``git add -A`` under another name, so it is refused
-#: rather than honoured: the point of naming paths is that a file can be refused by name.
-_BLANKET_PATHS = frozenset({".", "./", "*", "./*", "**"})
+#: A pathset that covers everything is refused rather than honoured; the set itself lives in
+#: ``permissions`` so the same token is blanket at the tool and in a hand-built argv.
 
 
 def _dirty_pathset(status_stdout: str) -> list[str]:
@@ -492,7 +489,7 @@ def _named_pathset(root: Path, requested: Iterable[str]) -> tuple[list[str], lis
         text = str(raw).strip().replace("\\", "/")
         if not text:
             continue
-        if text in _BLANKET_PATHS:
+        if text in BLANKET_PATHS:
             blanket.append(text)
             continue
         relative = os.path.relpath(os.path.abspath(os.path.join(str(root), text)), str(root))
