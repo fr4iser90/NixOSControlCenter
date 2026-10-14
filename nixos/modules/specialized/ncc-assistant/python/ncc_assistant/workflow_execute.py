@@ -16,6 +16,7 @@ from . import budgets
 from .paths import workflow_progress_file
 from .permissions import (
     ENV_ACTOR,
+    check_branch,
     check_git_argv,
     current_grant,
     evaluate_repo,
@@ -167,6 +168,27 @@ def _repo_grant(action: str) -> dict[str, Any] | None:
     """
     verdict = evaluate_repo(action)
     return None if verdict.allowed else verdict.as_dict()
+
+
+def _current_branch(root: Path) -> str:
+    """HEAD's branch name — empty when it has none, ``HEAD`` when it is detached."""
+    cur = _git(root, "rev-parse", "--abbrev-ref", "HEAD")
+    return (cur.get("stdout") or "").strip()
+
+
+def _branch_floor(root: Path, *, action: str) -> tuple[str, dict[str, Any] | None]:
+    """The ``ncc/…`` precondition, checked where the writing happens.
+
+    Returns the branch plus a denial payload (``None`` when the floor is satisfied) so the
+    caller can refuse before touching the index — a commit that got refused after ``git add``
+    would leave this run's pathset staged for whoever runs git next.
+    """
+    branch = _current_branch(root)
+    verdict = check_branch(branch, action=action)
+    if verdict.allowed:
+        return branch, None
+    _audit_floor(verdict.code, verdict.reason, tool=f"git {action}")
+    return branch, verdict.as_dict()
 
 
 def _human_decision(action: str, confirm: str, hint: str) -> dict[str, Any] | None:
@@ -498,6 +520,18 @@ def commit_all(
     wid, root = _repo_root(workspace_id)
     msg = (message or "").strip() or "ncc workflow: workspace updates"
 
+    # Below the ladder: no grant covers this one, and the refusal comes before ``git add`` so
+    # a rejected commit leaves nothing behind in someone else's index.
+    branch, off_floor = _branch_floor(root, action="commit")
+    if off_floor:
+        return {
+            "ok": False,
+            "workspace_id": wid,
+            "branch": branch,
+            "committed": False,
+            **off_floor,
+        }
+
     denied = _repo_grant("commit")
     if denied:
         return {"ok": False, "workspace_id": wid, **denied}
@@ -653,6 +687,13 @@ def push_branch(workspace_id: str | None = None, *, set_upstream: bool = True) -
             "hint": "Push a ncc/… branch and open a PR; getting onto trunk is a human decision.",
         }
 
+    # A branch that no host protects is still not the agent's to push: the ``ncc/`` prefix is
+    # the precondition, so ``feature/wedding-plans`` refuses here instead of going public.
+    on_floor = check_branch(branch, action="push")
+    if not on_floor.allowed:
+        _audit_floor(on_floor.code, on_floor.reason, tool="git push")
+        return {"ok": False, "workspace_id": wid, "branch": branch, **on_floor.as_dict()}
+
     args = ["push"]
     if set_upstream:
         args.extend(["-u", "origin", branch])
@@ -771,6 +812,11 @@ def bump_version(
     if denied:
         return {"ok": False, **denied}
     wid, root = _repo_root(workspace_id)
+    # Checked before the file is written: the bump commits what it just changed, and refusing
+    # that commit afterwards would leave a version number on disk that nothing recorded.
+    branch, off_floor = _branch_floor(root, action="version bump")
+    if off_floor:
+        return {"ok": False, "workspace_id": wid, "branch": branch, **off_floor}
     part = part if part in ("major", "minor", "patch") else "patch"
     pkg_path = root / "package.json"
     if not pkg_path.is_file():

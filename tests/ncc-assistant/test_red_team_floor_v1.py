@@ -26,7 +26,8 @@ from ncc_assistant import permissions, red_team
 
 MODULE_DIR = REPO / "nixos/modules/specialized/ncc-assistant"
 
-#: §4's six refusals. A rule may be added to the floor, never quietly dropped from here.
+#: Every refusal §4 puts below the ladder — seven codes across its four bullets. A rule may be
+#: added to the floor, never quietly dropped from here.
 FLOOR_RULES = {
     "force_push",
     "hook_bypass",
@@ -34,6 +35,7 @@ FLOOR_RULES = {
     "secret_path",
     "blanket_path",
     "path_outside_repo",
+    "non_agent_branch",
 }
 FLOOR_CODES = {
     "denied_force_push",
@@ -42,6 +44,7 @@ FLOOR_CODES = {
     "denied_secret_path",
     "denied_blanket_path",
     "denied_path_outside_repo",
+    "denied_non_agent_branch",
 }
 
 

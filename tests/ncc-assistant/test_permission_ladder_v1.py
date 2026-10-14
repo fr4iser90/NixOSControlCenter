@@ -44,7 +44,13 @@ def _git(root: Path, *args: str) -> None:
     )
 
 
-def _repo(tmp_path: Path, *, branch: str = "main", with_origin: bool = False) -> Path:
+#: A workspace mid-task stands on an agent branch: ``commit``/``push`` refuse anywhere else, so
+#: a fixture that means "the tool may work" has to start there. Tests about trunk say so with
+#: ``branch="main"``.
+AGENT_BRANCH = "ncc/workflow-test"
+
+
+def _repo(tmp_path: Path, *, branch: str = AGENT_BRANCH, with_origin: bool = False) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
     _git(root, "init", "-b", branch)
@@ -242,7 +248,7 @@ def test_commit_all_needs_repo_commit_and_never_stages_secrets(tmp_path):
 
 
 def test_push_is_denied_on_a_protected_branch(tmp_path):
-    root = _repo(tmp_path, with_origin=True)
+    root = _repo(tmp_path, branch="main", with_origin=True)
     with mock.patch.object(workflow_execute, "_repo_root", return_value=("t", root)):
         with grant_env(repo="pr"):
             out = workflow_execute.push_branch("t")

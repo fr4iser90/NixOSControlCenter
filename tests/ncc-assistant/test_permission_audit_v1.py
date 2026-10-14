@@ -19,7 +19,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"))
 
 from ncc_assistant import audit, notifications, paths, permissions, workflow_execute
-from test_permission_ladder_v1 import _repo, grant_env
+from test_permission_ladder_v1 import _git, _repo, grant_env
 
 GIT_ENV = {
     "GIT_AUTHOR_NAME": "test",
@@ -123,6 +123,9 @@ def test_secrets_and_protected_branches_are_audited_floor_denials(tmp_path):
     with mock.patch.object(workflow_execute, "_repo_root", return_value=("t", root)):
         with grant_env(repo="pr", actor="schedule:nightly"):
             assert workflow_execute.commit_all("t", message="x")["error"] == "denied_secret_path"
+            # trunk is the only place ``push`` answers ``denied_protected_branch``: on the agent
+            # branch this fixture stands by default, pushing is the whole point of the tool.
+            _git(root, "checkout", "-b", "main")
             assert workflow_execute.push_branch("t")["error"] == "denied_protected_branch"
 
     denied = {d["tool"]: d for d in _events("floor_denied")}

@@ -474,6 +474,30 @@ def check_git_argv(argv: Sequence[str]) -> Decision:
     return Decision(True, "", "")
 
 
+def check_branch(name: str | None, *, action: str = "commit") -> Decision:
+    """Floor: the two writing git steps happen on ``ncc/…`` only, never on someone's trunk.
+
+    ``ensure_branch`` already refuses to *create* anything outside ``ncc/workflow-…``; this is
+    the same rule on ``commit``/``push`` themselves, because HEAD can land on trunk without
+    going through that door. The prefix is the precondition (``ncc/``), not the full creation
+    pattern — a branch a human renamed by hand is still agent work, not a trunk write.
+    """
+    branch = str(name or "").strip()
+    if is_agent_branch(branch):
+        return Decision(True, "", "")
+    if branch in ("", "HEAD"):
+        return _denied(
+            "denied_non_agent_branch",
+            "detached HEAD — there is no ncc/… branch for this to land on",
+            "Check out a ncc/workflow-… branch (ncc workflow branch) first.",
+        )
+    return _denied(
+        "denied_non_agent_branch",
+        f"{action} is refused on {branch!r}: agent work stays on ncc/…",
+        "Move the work onto a ncc/workflow-… branch, or do it by hand with git.",
+    )
+
+
 def check_shell_command(command: str) -> Decision:
     """Same floor for shell strings — an allowlisted ``git push`` is not a force-push."""
     try:
