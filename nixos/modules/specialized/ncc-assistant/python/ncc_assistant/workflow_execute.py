@@ -763,6 +763,44 @@ def open_pull_request(
     }
 
 
+def _merge_base_floor(root: Path, pr: str | None) -> tuple[str, dict[str, Any] | None]:
+    """Read the base a merge would land commits on and refuse a protected one for a run.
+
+    The base comes from the PR, never from HEAD: the branch under checkout says where the
+    commits are, not where they end up. Only a granted run is refused — outside a grant the
+    CONFIRM token is the human decision the ladder keeps for trunk, and the push hint sends
+    that human to a PR, so refusing them here would leave the promise with nowhere to land.
+    """
+    if current_grant() is None:
+        return "", None
+    cmd = ["gh", "pr", "view"]
+    if pr:
+        cmd.append(str(pr))
+    cmd.extend(["--json", "baseRefName", "--jq", ".baseRefName"])
+    res = _run(cmd, cwd=root, timeout=60.0)
+    base = (res.get("stdout") or "").strip()
+    if not base:
+        # Fail closed: a base that cannot be named is a base that cannot be proven open.
+        reason = "gh reported no base branch, so the merge target is unknown"
+        _audit_floor("merge_base_unknown", reason, tool="gh pr merge")
+        return "", {
+            "error": "merge_base_unknown",
+            "reason": reason,
+            "hint": "Name the PR (ncc ai workflow merge --pr <number>); never merge what cannot be read.",
+            "gh": {"stdout": res.get("stdout"), "stderr": res.get("stderr")},
+        }
+    if protected_branch(base):
+        reason = f"{base} is protected"
+        _audit_floor("denied_protected_branch", reason, tool="gh pr merge")
+        return base, {
+            "error": "denied_protected_branch",
+            "denied": "denied_protected_branch",
+            "reason": reason,
+            "hint": "The merge step lands on an unprotected base only; getting onto trunk stays a human decision.",
+        }
+    return base, None
+
+
 def merge_pull_request(
     workspace_id: str | None = None,
     *,
@@ -777,6 +815,9 @@ def merge_pull_request(
     if not shutil.which("gh"):
         raise ValueError("gh CLI not on PATH")
     wid, root = _repo_root(workspace_id)
+    base, base_denied = _merge_base_floor(root, pr)
+    if base_denied:
+        return {"ok": False, "workspace_id": wid, "pr": pr or "current", **base_denied}
     strat = strategy if strategy in ("squash", "merge", "rebase") else "squash"
     cmd = ["gh", "pr", "merge"]
     if pr:
@@ -787,7 +828,7 @@ def merge_pull_request(
     if res["ok"] and budgets.applies():
         # A PR that lands frees the slot it held in the open-PR budget.
         budgets.record_merge(_repo_key(root))
-    return {
+    result = {
         "ok": bool(res["ok"]),
         "workspace_id": wid,
         "pr": pr or "current",
@@ -796,6 +837,11 @@ def merge_pull_request(
         "stderr": res.get("stderr"),
         "confirmed": True,
     }
+    if base:
+        # Absent rather than empty for a human merge: nothing read the PR there, and a blank
+        # base would read back as "checked and open".
+        result["base"] = base
+    return result
 
 
 def bump_version(

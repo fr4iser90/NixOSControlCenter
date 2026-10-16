@@ -143,15 +143,27 @@ def test_secrets_and_protected_branches_are_audited_floor_denials(tmp_path):
 def test_pr_create_and_merge_are_audited_too(tmp_path):
     root = _repo(tmp_path, with_origin=True)
     ok = {"ok": True, "cmd": ["gh"], "returncode": 0, "stdout": "https://github.com/o/r/pull/9", "stderr": ""}
+
+    def gh(cmd, *args, **kwargs):
+        # The merge floor asks the PR for its base first; answer it with a branch name, or the
+        # fixture would silently mean "the base is a URL" instead of "the base is unprotected".
+        if cmd[:3] == ["gh", "pr", "view"]:
+            return {"ok": True, "cmd": list(cmd), "returncode": 0, "stdout": "ncc/integration\n", "stderr": ""}
+        return dict(ok)
+
     with mock.patch.object(workflow_execute.shutil, "which", return_value="/usr/bin/gh"):
         with mock.patch.object(workflow_execute, "_repo_root", return_value=("t", root)):
-            with mock.patch.object(workflow_execute, "_run", return_value=dict(ok)) as run:
+            with mock.patch.object(workflow_execute, "_run", side_effect=gh) as run:
                 with mock.patch.object(workflow_execute, "push_branch", return_value={"ok": True}):
                     with grant_env(repo="merge", actor="cli"):
                         assert workflow_execute.merge_pull_request("t", pr="9")["ok"] is True
                         assert workflow_execute.open_pull_request("t", title="x")["ok"] is True
     gh_calls = [c.args[0] for c in run.call_args_list if c.args[0][0] == "gh"]
-    assert [c[:3] for c in gh_calls] == [["gh", "pr", "merge"], ["gh", "pr", "create"]]
+    assert [c[:3] for c in gh_calls] == [
+        ["gh", "pr", "view"],
+        ["gh", "pr", "merge"],
+        ["gh", "pr", "create"],
+    ]
     tools = {a["tool"] for a in _events("git_action")}
     assert tools == {"gh pr merge", "gh pr create"}
 
