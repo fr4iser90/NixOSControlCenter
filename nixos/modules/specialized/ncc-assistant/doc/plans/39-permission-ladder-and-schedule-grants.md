@@ -1,6 +1,6 @@
 # Phase 39 — Permission ladder & per-schedule grants
 
-**Status:** proposed
+**Status:** L1–L3, L5–L8, L10 done · L4, L9, L14 partial · L11–L13 open
 **Parent:** [roadmap.md](../roadmap.md)
 **Depends on:** phase 38 (grants are scoped to a repo identity), phase 22 (approvals), schedules
 **Unblocks:** unattended GitHub work (ship/PR flows), idle autonomy without a human watching
@@ -223,6 +223,30 @@ Small, but the ladder is pointless if the agent can only wake at a fixed time:
 | L12 | Scheduled-chain trigger (`after = "nightly-audit"`) | P2 |
 | L13 | Per-repo `permissions.json` that may only lower the ceiling | P2 |
 | L14 | Deprecation warnings where `profile`/`allowWrite` and `permissions` disagree | P2 |
+
+## Delivered (measured against the tree)
+
+| ID | State | Where |
+|----|-------|-------|
+| L1 | done | `agent run --grant repo=… --grant system=…` → `resolve_run_grant` → `set_process_grant` |
+| L2 | done | `mkAgentExec` appends `--grant` to argv; unit sets `NCC_ASSISTANT_GRANT_REPO_CEILING` + `NCC_ASSISTANT_ACTOR`; `package.nix` `narrowBoolExport` defaults instead of verdicts |
+| L3 | done | `Agent.run` refuses before any LLM call and audits `grant_denied`; `grantConflicts`/`budgetConflicts` warn at eval |
+| L4 | partial | `evaluate_repo` gates `workflow_execute`; `evaluate_system` gates `runtime.py:1041,:1303`; direct `writes_enabled`/`allow_rebuild` reads remain in `runtime.py` (`:456`, `:524`, `:762`, `:1029`, `:1240`, `:1508`) |
+| L5 | done | `grants.repoCeiling`/`grants.budget`, per-schedule `permissions.{repo,system,budget}` |
+| L6 | done | `check_git_argv` + `check_branch` + `check_shell_command` + `_merge_base_floor`; eight `denied_*` codes plus fail-closed `merge_base_unknown` |
+| L7 | done (except merge) | `red_team.py` probes every `denied_*` code and fails CI on an uncovered new one; the merge-base floor is covered by `tests/ncc-assistant/test_merge_protected_base_v1.py`, not by `red_team.py` — reading a PR base needs a network, which the probe cannot fake purely |
+| L8 | done | `budgets.py`; counters arrive as `NCC_ASSISTANT_BUDGET_*`, checked before the LLM call |
+| L9 | partial | `git_action` / `budget_exceeded` / `floor_denied` are per-decision; `grant_evaluated` is written once per run (`agent.py:283`), not per axis/action |
+| L10 | done | `PendingDecision.actor` + grant, shown by `approve list` as `asked by <actor> · <grant>` |
+| L11 | open | `OnCalendar` is still the only trigger; `scheduleKind: "poll"` has no consumer |
+| L12 | open | no `after` option on a schedule |
+| L13 | open | no per-repo `permissions.json` |
+| L14 | partial | conflicts warn for above-ceiling grants and `dryRun` vs a write step; nothing yet compares `profile` with `permissions.*` |
+
+Still open from the design, beyond L11–L13: `NCC_ASSISTANT_AGENT_ALLOW_WRITE/_REBUILD/_CONFIRM/_DRY_RUN/_PROFILE`
+are read into `Settings` and used by nobody (§1 said "real consumers or removed" — only
+`NCC_ASSISTANT_AGENT_MAX_STEPS` has consumers), and idle does not inherit the lowest grant of the
+day (§7): `idle.py` still decides on `idleAllowWrite`/`dryRun` alone.
 
 ## Tests
 

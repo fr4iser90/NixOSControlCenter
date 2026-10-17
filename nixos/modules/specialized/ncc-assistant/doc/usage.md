@@ -90,6 +90,73 @@ ncc-assistant probe disk --force --escalate
 ncc-assistant playbook run disk-nix-gc-advisor
 ```
 
+## Permission ladder (ceiling, grants, floor, budgets)
+
+Autonomy is a ladder, not a switch: the **host is the ceiling**, a schedule or a single run
+narrows it. Nothing below may widen it — asking for more than the ceiling **refuses the run**
+instead of quietly doing less.
+
+```nix
+# systemConfig … ncc-assistant
+grants.repoCeiling = "pr";   # observe → propose → commit → push → pr → merge → release
+grants.budget = { maxPrsPerDay = 3; maxOpenAgentPrs = 5; };
+
+agent.schedules.nightly-ship = {
+  enable = true;
+  onCalendar = "*-*-* 02:30:00";
+  playbook = "autonomous-agent-ship";
+  permissions = {
+    repo = "pr";        # may only lower grants.repoCeiling
+    system = "none";    # none | config-write | rebuild — ceiling is allowWrite / allowRebuild
+    budget = { maxRunsPerDay = 1; };
+  };
+};
+```
+
+Left `null`, `permissions.repo` / `.system` derive from `dryRun` / `profile` / `allowWrite`, so a
+host that sets nothing keeps behaving as before. `merge` and `release` still need the `CONFIRM`
+token on top of their step.
+
+```bash
+ncc ai permissions show                              # ceiling, this run, ladder, floor, budget
+ncc ai permissions show --grant repo=merge --json    # preview a run; exits 1 when it breaks the ceiling
+ncc ai agent run --grant repo=pr --grant system=none --playbook autonomous-agent-ship
+```
+
+**Floor** — refused by code with no option that re-enables it. Each hit writes one `floor_denied`
+line to `audit.jsonl`:
+
+| Code | Refused because |
+|------|-----------------|
+| `denied_force_push` | `--force` / `-f`, a `+refspec`, or a `force` push-option |
+| `denied_hook_bypass` | `--no-verify`, `--no-gpg-sign`, `-c commit.gpgsign=…` |
+| `denied_protected_branch` | pushing to, or merging onto, `main` / `master` |
+| `denied_blanket_path` | `git add -A` / `.` / `*` — a commit takes a named pathset |
+| `denied_secret_path` | pathset touches `.env*`, `*.pem`, `*credential*`, `secrets.json` |
+| `denied_path_outside_repo` | pathset leaves the checkout (`../…`, absolute) |
+| `denied_non_agent_branch` | commit / push / PR while not on a `ncc/…` branch |
+| `denied_shell_git_write` | `git commit` / `push` / … inside a shell string — it carries no grant, no branch floor, no audit line, so the write capability is gone; reads survive |
+| `merge_base_unknown` | `gh` returned no `baseRefName`, so the merge target is unknown — not merged |
+
+A merge asks the **PR** where it lands (`gh pr view --json baseRefName`), never HEAD: HEAD says
+where the commits are, the PR says where they end up. Outside a granted run the `CONFIRM` token
+stays the human decision that keeps trunk reachable — the ladder binds agents, not the person
+holding the token.
+
+Budgets are counted **before** the LLM call, so a breach costs nothing. Day is UTC, `0` switches a
+counter off, `null` keeps the default:
+
+| Counter | Default | When exceeded |
+|---------|---------|---------------|
+| `maxRunsPerDay` | no limit | schedule skipped with `budget_runs`, the unit still exits 0 |
+| `maxPrsPerDay` | 3 | work stops at `push` — branch on the remote, PR held for tomorrow |
+| `maxDiffLines` | 800 | commit refused and unstaged, work stays local, task stays open |
+| `maxOpenAgentPrs` | 5 | no new PR until one lands or is closed |
+
+Every decision carries its actor (`schedule:nightly-ship`, `cli`, `companion`), so
+`ncc-assistant approve list` reads back as "nightly-ship asked to merge, allowed 41 s later".
+Not wired yet: `poll` triggers, schedule chains, and idle inheriting the day's lowest grant.
+
 ## GUI
 
 ```bash
