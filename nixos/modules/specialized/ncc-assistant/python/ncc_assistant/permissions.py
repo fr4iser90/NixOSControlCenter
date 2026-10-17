@@ -367,6 +367,64 @@ def evaluate_system(action: str, *, grant: Grant | None = None) -> Decision:
     return evaluate(action, axis="system", grant=grant)
 
 
+def decide_system(
+    action: str,
+    *,
+    writes_enabled: bool,
+    allow_rebuild: bool,
+    client_mode: str = "",
+    grant: Grant | None = None,
+) -> Decision:
+    """The one decision for a host-mutating action: host ceiling first, run grant second.
+
+    ``evaluate`` steps aside when there is no grant, so callers that ask only it would
+    let a plain CLI rebuild. The ceiling is applied here so every route — dispatcher,
+    direct tool entry, catalog listing — reaches the same verdict, and a granted run can
+    only narrow what the host already allows.
+    """
+    need = SYSTEM_ACTIONS.get(action)
+    if need is None:
+        return Decision(False, "unknown_action", f"no system step defined for {action!r}")
+    # One host flag per step, deliberately not a rank: allowRebuild opens rebuild,
+    # allowWrite opens config-write, and neither implies the other.
+    if need == "rebuild":
+        if not allow_rebuild:
+            return Decision(
+                False,
+                "host_rebuild_disabled",
+                "Rebuild disabled. Set allowRebuild = true in "
+                "systemConfig.modules.specialized.ncc-assistant.",
+            )
+    elif not writes_enabled:
+        return Decision(
+            False,
+            "host_writes_disabled",
+            f"Writes disabled for this client (mode={client_mode}). "
+            "Enable allowWrite / mcpAllowWrite in module config.",
+        )
+    return evaluate_system(action, grant=grant)
+
+
+def system_flags(
+    writes_enabled: bool,
+    allow_rebuild: bool,
+    *,
+    grant: Grant | None = None,
+) -> tuple[bool, bool]:
+    """The write/rebuild flags a caller may advertise: host ceiling narrowed by the grant.
+
+    A catalog is a promise about what can be called — a run granted ``system=none`` must
+    not be shown the write tools it will be refused.
+    """
+    allow_write = bool(writes_enabled) and evaluate_system("config_write", grant=grant).allowed
+    rebuild = (
+        bool(allow_rebuild)
+        and allow_write
+        and evaluate_system("rebuild", grant=grant).allowed
+    )
+    return allow_write, rebuild
+
+
 def protected_branch(name: str | None, *, extra: Iterable[str] = ()) -> bool:
     """True for branches that need a human decision (defaults + host additions)."""
     if not name:

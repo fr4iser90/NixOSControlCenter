@@ -12,7 +12,14 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .config import Settings
-from .permissions import audit_actor, check_shell_command, evaluate_system
+from .permissions import (
+    Decision,
+    audit_actor,
+    check_shell_command,
+    decide_system,
+    evaluate_system,
+    system_flags,
+)
 
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
@@ -423,6 +430,20 @@ class ToolRuntime:
             self._mcp_pool = get_mcp_pool()
         return self._mcp_pool
 
+    def _may(self, action: str) -> Decision:
+        """One question, one answer: may this run do ``action`` to this host.
+
+        The host flags are handed to the evaluator rather than branched on here, so the
+        ceiling and the run's grant are weighed in the same place whether the call came
+        through ``call()``, the MCP server, or a diff-apply.
+        """
+        return decide_system(
+            action,
+            writes_enabled=self.settings.writes_enabled,
+            allow_rebuild=bool(self.settings.allow_rebuild),
+            client_mode=self.settings.client_mode,
+        )
+
     # --- facade helpers -------------------------------------------------
 
     def _config_cmd(self, *args: str, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
@@ -453,15 +474,9 @@ class ToolRuntime:
         self, module_path: str, content_nix: str, confirm: bool = False
     ) -> dict[str, Any]:
         path = self._normalize_path(module_path)
-        if not self.settings.writes_enabled:
-            return {
-                "ok": False,
-                "error": (
-                    "Writes disabled for this client "
-                    f"(mode={self.settings.client_mode}). "
-                    "Enable allowWrite / mcpAllowWrite in module config."
-                ),
-            }
+        ladder = self._may("config_write")
+        if not ladder.allowed:
+            return {"ok": False, **ladder.as_dict()}
         if not confirm:
             proposal = self.propose_config_patch(path, content_nix)
             return {
@@ -519,10 +534,13 @@ class ToolRuntime:
 
         registry = get_registry()
         role = invoker_role()
+        allow_write, allow_rebuild = system_flags(
+            self.settings.writes_enabled, bool(self.settings.allow_rebuild)
+        )
         entries = registry.list_for_invoker(
             role=role,
-            allow_write=self.settings.writes_enabled,
-            allow_rebuild=bool(self.settings.allow_rebuild),
+            allow_write=allow_write,
+            allow_rebuild=allow_rebuild,
         )
         want = (kind or "all").strip().lower()
         if want and want != "all":
@@ -759,14 +777,9 @@ class ToolRuntime:
     def apply_system(
         self, confirm: str, hostname: str | None = None
     ) -> dict[str, Any]:
-        if not self.settings.allow_rebuild:
-            return {
-                "ok": False,
-                "error": (
-                    "Rebuild disabled. Set allowRebuild = true in "
-                    "systemConfig.modules.specialized.ncc-assistant."
-                ),
-            }
+        ladder = self._may("rebuild")
+        if not ladder.allowed:
+            return {"ok": False, **ladder.as_dict()}
         if confirm != "CONFIRM":
             return {
                 "ok": False,
@@ -1026,19 +1039,12 @@ class ToolRuntime:
         from .permissions import invoker_role, role_has_permission
 
         risk = getattr(entry, "risk", "read") or "read"
-        if risk in ("write", "rebuild") and not self.settings.writes_enabled:
-            return {
-                "ok": False,
-                "error": (
-                    "Writes disabled for this client "
-                    f"(mode={self.settings.client_mode}). "
-                    "Enable allowWrite / mcpAllowWrite in module config."
-                ),
-            }
-        if risk == "rebuild" and not self.settings.allow_rebuild:
-            return {"ok": False, "error": "Rebuilds disabled (allowRebuild=false)."}
         if risk in ("write", "rebuild"):
-            ladder = evaluate_system("rebuild" if risk == "rebuild" else "config_write")
+            # A rebuild-risk tool has always needed both host flags, so ask for the
+            # write ceiling first and the rebuild step second — same verdict, one place.
+            ladder = self._may("config_write")
+            if ladder.allowed and risk == "rebuild":
+                ladder = self._may("rebuild")
             if not ladder.allowed:
                 return {"ok": False, **ladder.as_dict()}
 
@@ -1237,8 +1243,9 @@ class ToolRuntime:
                 "error": "confirm=true required to restore a backup",
                 "backup_path": backup_path,
             }
-        if not self.settings.writes_enabled:
-            return {"ok": False, "error": "Writes disabled"}
+        ladder = self._may("config_write")
+        if not ladder.allowed:
+            return {"ok": False, **ladder.as_dict()}
         src = Path(backup_path)
         if not src.is_file():
             return {"ok": False, "error": f"Backup not found: {backup_path}"}
@@ -1504,9 +1511,12 @@ class ToolRuntime:
             from .registry import get_registry
 
             registry = get_registry()
+            allow_write, allow_rebuild = system_flags(
+                self.settings.writes_enabled, bool(self.settings.allow_rebuild)
+            )
             return registry.openai_tools(
-                allow_write=self.settings.writes_enabled,
-                allow_rebuild=bool(self.settings.allow_rebuild),
+                allow_write=allow_write,
+                allow_rebuild=allow_rebuild,
             )
         except ImportError:
             pass

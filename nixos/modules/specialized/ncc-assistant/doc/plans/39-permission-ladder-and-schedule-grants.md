@@ -1,6 +1,6 @@
 # Phase 39 — Permission ladder & per-schedule grants
 
-**Status:** L1–L3, L5–L8, L10 done · L4, L9, L14 partial · L11–L13 open
+**Status:** L1–L8, L10 done · L9, L14 partial · L11–L13 open
 **Parent:** [roadmap.md](../roadmap.md)
 **Depends on:** phase 38 (grants are scoped to a repo identity), phase 22 (approvals), schedules
 **Unblocks:** unattended GitHub work (ship/PR flows), idle autonomy without a human watching
@@ -231,7 +231,7 @@ Small, but the ladder is pointless if the agent can only wake at a fixed time:
 | L1 | done | `agent run --grant repo=… --grant system=…` → `resolve_run_grant` → `set_process_grant` |
 | L2 | done | `mkAgentExec` appends `--grant` to argv; unit sets `NCC_ASSISTANT_GRANT_REPO_CEILING` + `NCC_ASSISTANT_ACTOR`; `package.nix` `narrowBoolExport` defaults instead of verdicts |
 | L3 | done | `Agent.run` refuses before any LLM call and audits `grant_denied`; `grantConflicts`/`budgetConflicts` warn at eval |
-| L4 | partial | `evaluate_repo` gates `workflow_execute`; `evaluate_system` gates `runtime.py:1041,:1303`; direct `writes_enabled`/`allow_rebuild` reads remain in `runtime.py` (`:456`, `:524`, `:762`, `:1029`, `:1240`, `:1508`) |
+| L4 | done | `decide_system` weighs the host ceiling first and the run's grant second, so one answer covers every route; `system_flags` narrows the advertised catalog the same way; `runtime._may` is the only reader of `writes_enabled`/`allow_rebuild` (`:442`, `:538`, `:1515` pass them as arguments, none branch). The `call()` dispatcher stays grant-only by measurement: `_tool_is_mutating` also fires on `domain.*` mutating *verbs*, so adding the ceiling there would newly block `risk = "read"` tools under `allowWrite = false` |
 | L5 | done | `grants.repoCeiling`/`grants.budget`, per-schedule `permissions.{repo,system,budget}` |
 | L6 | done | `check_git_argv` + `check_branch` + `check_shell_command` + `_merge_base_floor`; eight `denied_*` codes plus fail-closed `merge_base_unknown` |
 | L7 | done (except merge) | `red_team.py` probes every `denied_*` code and fails CI on an uncovered new one; the merge-base floor is covered by `tests/ncc-assistant/test_merge_protected_base_v1.py`, not by `red_team.py` — reading a PR base needs a network, which the probe cannot fake purely |
@@ -267,6 +267,11 @@ day (§7): `idle.py` still decides on `idleAllowWrite`/`dryRun` alone.
   oversized diff refuses commit and leaves the task open.
 - **audit**: each decision writes exactly one event with actor and reason.
 - **workflow_execute CLI**: `workflow merge` without the grant is denied (closes the bypass).
+- **single decision point**: a write called *without* `call()` — the MCP server and diff-apply route —
+  is still denied when the grant is narrower than the ceiling, and the host's own refusal keeps
+  `host_writes_disabled` / `host_rebuild_disabled` instead of borrowing `grant_insufficient`; with no
+  grant the ceiling answers exactly as before, and a `system=none` run is not shown the write tools.
+  `tests/ncc-assistant/test_single_decision_point_v1.py`
 
 ## Risks
 

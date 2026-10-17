@@ -92,7 +92,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 | 36 | [Feature plugins](./plans/36-feature-plugins.md) | **in progress** (Plugins tab + doomscroll extracted; ≠ MCP/templates/watchdogs) |
 | 37 | [Autonomous workspace workflow](./plans/37-autonomous-workspace-workflow.md) | **done** (per-task PR + resume + CONFIRM) |
 | 38 | [Repo & account fact store](./plans/38-repo-account-fact-store.md) | **proposed** (identity = remote not path; git/github read tools) |
-| 39 | [Permission ladder & per-schedule grants](./plans/39-permission-ladder-and-schedule-grants.md) | **L1–L3, L5–L8, L10 done** (grant transport, steps, floor, budgets, actor); L4/L9/L14 partial, L11–L13 open |
+| 39 | [Permission ladder & per-schedule grants](./plans/39-permission-ladder-and-schedule-grants.md) | **L1–L8, L10 done** (grant transport, steps, floor, budgets, one decision point, actor); L9/L14 partial, L11–L13 open |
 
 ## Feature map (checklist)
 
@@ -206,7 +206,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 - `workspaces rename|move` rewrite every reference (tasks, MCP bindings, progress files) or roll back
 - SSOT: [plans/38-repo-account-fact-store.md](./plans/38-repo-account-fact-store.md)
 
-### Phase 39 (L1–L3, L5–L8, L10 done)
+### Phase 39 (L1–L8, L10 done)
 
 - [x] Transport fixed: the schedule's grant travels in the unit's argv (`--grant repo=… system=…`);
   the wrapper exports defaults, so it no longer overwrites what the unit decided
@@ -223,8 +223,11 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
   breach skips the run for nothing and never blocks a human
 - [x] Decisions audited (`grant_evaluated` / `git_action` / `budget_exceeded` / `floor_denied`) with
   actor; `PendingDecision.actor` + grant shown in `approve list`
-- [ ] `permissions.evaluate()` as the single decision point — `runtime.py` still reads
-  `writes_enabled` / `allow_rebuild` directly at six sites
+- [x] One decision point for host writes: `decide_system` weighs the host ceiling first and the
+  run's grant second, so `apply_module_config` / `apply_system` / `restore_config_backup` answer the
+  same way through `call()`, the MCP server and a diff-apply; `system_flags` hides from a run the
+  write tools it would be refused; the host says no under its own codes (`host_writes_disabled`,
+  `host_rebuild_disabled`), never disguised as `grant_insufficient`
 - [ ] `poll` trigger with change-hash, scheduled chains, per-repo `permissions.json`
 - SSOT: [plans/39-permission-ladder-and-schedule-grants.md](./plans/39-permission-ladder-and-schedule-grants.md)
 
