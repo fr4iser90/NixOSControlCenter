@@ -148,27 +148,27 @@ def test_without_grant_context_nothing_changes():
 
 
 def test_repo_ladder_gates_by_action():
-    with mock.patch.dict(os.environ, {permissions.ENV_REPO: "propose"}, clear=True):
+    with grant_env(repo="propose"):
         assert permissions.evaluate_repo("read").allowed is True
         assert permissions.evaluate_repo("propose").allowed is True
         denied = permissions.evaluate_repo("commit")
         assert denied.allowed is False and denied.code == "grant_insufficient"
         assert "--grant repo=commit" in denied.hint
 
-    with mock.patch.dict(os.environ, {permissions.ENV_REPO: "pr"}, clear=True):
+    with grant_env(repo="pr"):
         assert permissions.evaluate_repo("push").allowed is True
         assert permissions.evaluate_repo("merge").allowed is False
         assert permissions.evaluate_repo("release").allowed is False
 
 
 def test_system_ladder_gates_by_action():
-    with mock.patch.dict(os.environ, {permissions.ENV_SYSTEM: "config-write"}, clear=True):
+    with grant_env(system="config-write"):
         assert permissions.evaluate_system("config_write").allowed is True
         assert permissions.evaluate_system("rebuild").code == "grant_insufficient"
 
 
 def test_unknown_action_is_denied_not_allowed():
-    with mock.patch.dict(os.environ, {permissions.ENV_REPO: "pr"}, clear=True):
+    with grant_env(repo="pr"):
         verdict = permissions.evaluate_repo("rm_rf")
         assert verdict.allowed is False and verdict.code == "unknown_action"
 

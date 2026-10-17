@@ -20,6 +20,7 @@ sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assista
 
 from ncc_assistant import audit, notifications, paths, permissions, workflow_execute
 from test_permission_ladder_v1 import _git, _repo, grant_env
+from test_single_decision_point_v1 import _fake_config, _runtime
 
 GIT_ENV = {
     "GIT_AUTHOR_NAME": "test",
@@ -168,8 +169,108 @@ def test_pr_create_and_merge_are_audited_too(tmp_path):
     assert tools == {"gh pr merge", "gh pr create"}
 
 
-# --- who asked (L10) -----------------------------------------------------------------
+# --- grant_evaluated: one line per answer (L9) ---------------------------------------
 
+
+def _granted_runtime():
+    """A host that would allow everything, so only the grant can say no."""
+    return _runtime()
+
+
+def test_a_host_write_records_the_answer_it_got(tmp_path):
+    runtime = _granted_runtime()
+    with mock.patch.object(runtime, "_config_cmd", side_effect=_fake_config):
+        with grant_env(system="config-write", actor="schedule:nightly-ship"):
+            assert runtime.apply_module_config("services/foo", "{}", True)["ok"] is True
+
+    decided = _events("grant_evaluated")
+    assert len(decided) == 1, "one decision, one line"
+    assert decided[0]["actor"] == "schedule:nightly-ship"
+    assert decided[0]["tool"] == "apply_module_config"
+    assert decided[0]["result"] == "granted"
+    assert "axis=system" in decided[0]["detail"] and "action=config_write" in decided[0]["detail"]
+
+
+def test_a_refusal_says_which_step_was_missing(tmp_path):
+    runtime = _granted_runtime()
+    with grant_env(system="none", actor="schedule:nightly-ship"):
+        out = runtime.apply_module_config("services/foo", "{}", True)
+    assert out["ok"] is False
+
+    decided = _events("grant_evaluated")
+    assert len(decided) == 1
+    assert decided[0]["result"] == "denied"
+    assert "code=grant_insufficient" in decided[0]["detail"]
+    assert "system=none" in decided[0]["detail"] and "need=config-write" in decided[0]["detail"]
+
+
+def test_the_ladder_answers_once_per_call_through_the_dispatcher():
+    """The dispatcher gates and the method answers: the log must not count that twice."""
+    runtime = _granted_runtime()
+    with grant_env(system="config-write", actor="schedule:x"):
+        out = runtime.call("apply_system", {"confirm": "CONFIRM"})
+    assert out["ok"] is False and out["denied"] == "grant_insufficient"
+
+    decided = _events("grant_evaluated")
+    assert [d["tool"] for d in decided] == ["apply_system"]
+    assert _events("deny") == [], "the ladder's refusal is not also a bare deny line"
+
+
+def test_advertising_the_toolbox_is_not_a_decision(tmp_path):
+    """A catalog refresh asks about every tool; recording that would bury the real decisions."""
+    runtime = _granted_runtime()
+    with grant_env(system="none", actor="schedule:x"):
+        runtime.list_available_tools()
+        runtime.openai_tools()
+    assert _events("grant_evaluated") == []
+
+
+def test_a_human_run_is_only_recorded_when_something_refused_it():
+    """No grant and an allowed answer is not a ladder decision; the host saying no still is."""
+    runtime = _granted_runtime()
+    with grant_env():
+        with mock.patch.object(runtime, "_config_cmd", side_effect=_fake_config):
+            assert runtime.apply_module_config("services/foo", "{}", True)["ok"] is True
+    assert _events("grant_evaluated") == []
+
+    locked = _runtime(allow_write=False, mcp_allow_write=False, allow_rebuild=False)
+    with grant_env():
+        assert locked.apply_module_config("services/foo", "{}", True)["error"] == (
+            "host_writes_disabled"
+        )
+    refused = _events("grant_evaluated")
+    assert len(refused) == 1 and "code=host_writes_disabled" in refused[0]["detail"]
+    assert refused[0]["actor"] == "cli", "a refusal without a grant belongs to whoever typed it"
+
+
+def test_the_repo_axis_records_its_own_denials(tmp_path):
+    root = _repo(tmp_path)
+    (root / "notes.md").write_text("work\n", encoding="utf-8")
+    with mock.patch.object(workflow_execute, "_repo_root", return_value=("t", root)):
+        with grant_env(repo="propose", actor="schedule:daily-audit"):
+            out = workflow_execute.commit_all("t", message="docs: notes")
+    assert out["ok"] is False and out["denied"] == "grant_insufficient"
+
+    decided = _events("grant_evaluated")
+    assert len(decided) == 1
+    assert decided[0]["actor"] == "schedule:daily-audit"
+    assert "axis=repo" in decided[0]["detail"] and "action=commit" in decided[0]["detail"]
+    assert _events("git_action") == [], "a refused commit never reached git"
+
+
+def test_the_run_and_its_decisions_do_not_share_one_event_name():
+    """"What was this run handed" and "what did it ask to do" are different questions."""
+    module = REPO / "nixos/modules/specialized/ncc-assistant/python/ncc_assistant"
+    assert '"grant_resolved"' in (module / "agent.py").read_text(encoding="utf-8")
+    writers = {
+        name
+        for name in ("permissions.py", "agent.py", "runtime.py", "workflow_execute.py")
+        if '"grant_evaluated"' in (module / name).read_text(encoding="utf-8")
+    }
+    assert writers == {"permissions.py"}, writers
+
+
+# --- who asked (L10) -----------------------------------------------------------------
 
 def test_pending_decision_records_actor_and_grant(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))

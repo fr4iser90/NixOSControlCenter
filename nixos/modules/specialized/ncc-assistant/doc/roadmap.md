@@ -92,7 +92,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 | 36 | [Feature plugins](./plans/36-feature-plugins.md) | **in progress** (Plugins tab + doomscroll extracted; ≠ MCP/templates/watchdogs) |
 | 37 | [Autonomous workspace workflow](./plans/37-autonomous-workspace-workflow.md) | **done** (per-task PR + resume + CONFIRM) |
 | 38 | [Repo & account fact store](./plans/38-repo-account-fact-store.md) | **proposed** (identity = remote not path; git/github read tools) |
-| 39 | [Permission ladder & per-schedule grants](./plans/39-permission-ladder-and-schedule-grants.md) | **L1–L8, L10 done** (grant transport, steps, floor, budgets, one decision point, actor); L9/L14 partial, L11–L13 open |
+| 39 | [Permission ladder & per-schedule grants](./plans/39-permission-ladder-and-schedule-grants.md) | **L1–L10 done** (grant transport, steps, floor, budgets, one decision point, per-decision audit, actor); L14 partial, L11–L13 open |
 
 ## Feature map (checklist)
 
@@ -206,7 +206,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 - `workspaces rename|move` rewrite every reference (tasks, MCP bindings, progress files) or roll back
 - SSOT: [plans/38-repo-account-fact-store.md](./plans/38-repo-account-fact-store.md)
 
-### Phase 39 (L1–L8, L10 done)
+### Phase 39 (L1–L10 done)
 
 - [x] Transport fixed: the schedule's grant travels in the unit's argv (`--grant repo=… system=…`);
   the wrapper exports defaults, so it no longer overwrites what the unit decided
@@ -221,8 +221,9 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
   refused (`merge_base_unknown`) rather than guessed
 - [x] Budgets (runs/day, PRs/day, diff lines, open agent PRs) checked before the LLM call;
   breach skips the run for nothing and never blocks a human
-- [x] Decisions audited (`grant_evaluated` / `git_action` / `budget_exceeded` / `floor_denied`) with
-  actor; `PendingDecision.actor` + grant shown in `approve list`
+- [x] One audit line per decision (`grant_evaluated` / `git_action` / `budget_exceeded` / `floor_denied`)
+  carrying axis, steps, code and actor — written by the evaluator itself, so no route can skip it; the
+  what-the-run-was-handed line is `grant_resolved`; `PendingDecision.actor` + grant shown in `approve list`
 - [x] One decision point for host writes: `decide_system` weighs the host ceiling first and the
   run's grant second, so `apply_module_config` / `apply_system` / `restore_config_backup` answer the
   same way through `call()`, the MCP server and a diff-apply; `system_flags` hides from a run the

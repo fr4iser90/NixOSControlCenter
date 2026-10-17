@@ -1,6 +1,6 @@
 # Phase 39 — Permission ladder & per-schedule grants
 
-**Status:** L1–L8, L10 done · L9, L14 partial · L11–L13 open
+**Status:** L1–L10 done · L14 partial · L11–L13 open
 **Parent:** [roadmap.md](../roadmap.md)
 **Depends on:** phase 38 (grants are scoped to a repo identity), phase 22 (approvals), schedules
 **Unblocks:** unattended GitHub work (ship/PR flows), idle autonomy without a human watching
@@ -236,7 +236,7 @@ Small, but the ladder is pointless if the agent can only wake at a fixed time:
 | L6 | done | `check_git_argv` + `check_branch` + `check_shell_command` + `_merge_base_floor`; eight `denied_*` codes plus fail-closed `merge_base_unknown` |
 | L7 | done (except merge) | `red_team.py` probes every `denied_*` code and fails CI on an uncovered new one; the merge-base floor is covered by `tests/ncc-assistant/test_merge_protected_base_v1.py`, not by `red_team.py` — reading a PR base needs a network, which the probe cannot fake purely |
 | L8 | done | `budgets.py`; counters arrive as `NCC_ASSISTANT_BUDGET_*`, checked before the LLM call |
-| L9 | partial | `git_action` / `budget_exceeded` / `floor_denied` are per-decision; `grant_evaluated` is written once per run (`agent.py:283`), not per axis/action |
+| L9 | done | `permissions._record` is the ladder's only audit writer and `evaluate`/`decide_system` call it, so no decision route can omit the line: `grant_evaluated` carries the axis, the held and needed step, the refusal code, the actor and the tool. The run-level line was renamed `grant_resolved` — "what the run was handed" and "what it asked to do" are different questions. Two paths deliberately stay silent: `system_flags` asks `_cover` (an unrecorded verdict) so a catalog refresh cannot bury the real decisions, and the `call()` dispatcher pre-checks with `peek_system` then `record_denial`, so a gated call writes one line rather than two. The dispatcher's old bare `deny` line for the ladder is gone; the kill-switch keeps its own |
 | L10 | done | `PendingDecision.actor` + grant, shown by `approve list` as `asked by <actor> · <grant>` |
 | L11 | open | `OnCalendar` is still the only trigger; `scheduleKind: "poll"` has no consumer |
 | L12 | open | no `after` option on a schedule |
@@ -265,7 +265,13 @@ day (§7): `idle.py` still decides on `idleAllowWrite`/`dryRun` alone.
 - **staging**: dirty `.env` + `commit` → nothing staged, `denied_secret_path`.
 - **budget**: second run over `maxRunsPerDay` returns `skipped: budget_runs` and writes no job;
   oversized diff refuses commit and leaves the task open.
-- **audit**: each decision writes exactly one event with actor and reason.
+- **audit**: each decision writes exactly one event with actor and reason — the line names the axis, the
+  held and needed step and the code; a catalog refresh writes none; a dispatcher-gated call writes one
+  line, not two. `tests/ncc-assistant/test_permission_audit_v1.py`
+- **audit stays off the operator**: an emitter inside the evaluator writes wherever the process resolves
+  its config home, and `patch.dict(..., clear=True)` deletes the session's throwaway `XDG_CONFIG_HOME`, so
+  `conftest.py` fails any test whose audit line lands in the real `~/.config/ncc-assistant` — measured by
+  the live log's sha256 being identical across a full suite run.
 - **workflow_execute CLI**: `workflow merge` without the grant is denied (closes the bypass).
 - **single decision point**: a write called *without* `call()` — the MCP server and diff-apply route —
   is still denied when the grant is narrower than the ceiling, and the host's own refusal keeps

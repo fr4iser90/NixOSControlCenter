@@ -17,7 +17,8 @@ from .permissions import (
     audit_actor,
     check_shell_command,
     decide_system,
-    evaluate_system,
+    peek_system,
+    record_denial,
     system_flags,
 )
 
@@ -430,18 +431,20 @@ class ToolRuntime:
             self._mcp_pool = get_mcp_pool()
         return self._mcp_pool
 
-    def _may(self, action: str) -> Decision:
+    def _may(self, action: str, tool: str = "") -> Decision:
         """One question, one answer: may this run do ``action`` to this host.
 
         The host flags are handed to the evaluator rather than branched on here, so the
         ceiling and the run's grant are weighed in the same place whether the call came
-        through ``call()``, the MCP server, or a diff-apply.
+        through ``call()``, the MCP server, or a diff-apply. ``tool`` only labels the
+        audit line — the verdict does not depend on it.
         """
         return decide_system(
             action,
             writes_enabled=self.settings.writes_enabled,
             allow_rebuild=bool(self.settings.allow_rebuild),
             client_mode=self.settings.client_mode,
+            tool=tool,
         )
 
     # --- facade helpers -------------------------------------------------
@@ -474,7 +477,7 @@ class ToolRuntime:
         self, module_path: str, content_nix: str, confirm: bool = False
     ) -> dict[str, Any]:
         path = self._normalize_path(module_path)
-        ladder = self._may("config_write")
+        ladder = self._may("config_write", "apply_module_config")
         if not ladder.allowed:
             return {"ok": False, **ladder.as_dict()}
         if not confirm:
@@ -777,7 +780,7 @@ class ToolRuntime:
     def apply_system(
         self, confirm: str, hostname: str | None = None
     ) -> dict[str, Any]:
-        ladder = self._may("rebuild")
+        ladder = self._may("rebuild", "apply_system")
         if not ladder.allowed:
             return {"ok": False, **ladder.as_dict()}
         if confirm != "CONFIRM":
@@ -1042,9 +1045,9 @@ class ToolRuntime:
         if risk in ("write", "rebuild"):
             # A rebuild-risk tool has always needed both host flags, so ask for the
             # write ceiling first and the rebuild step second — same verdict, one place.
-            ladder = self._may("config_write")
+            ladder = self._may("config_write", entry.name)
             if ladder.allowed and risk == "rebuild":
-                ladder = self._may("rebuild")
+                ladder = self._may("rebuild", entry.name)
             if not ladder.allowed:
                 return {"ok": False, **ladder.as_dict()}
 
@@ -1243,7 +1246,7 @@ class ToolRuntime:
                 "error": "confirm=true required to restore a backup",
                 "backup_path": backup_path,
             }
-        ladder = self._may("config_write")
+        ladder = self._may("config_write", "restore_config_backup")
         if not ladder.allowed:
             return {"ok": False, **ladder.as_dict()}
         src = Path(backup_path)
@@ -1307,11 +1310,12 @@ class ToolRuntime:
                 # context this allows everything, so chat and a human CLI stay unchanged.
                 risk = getattr(tool_entry, "risk", "read") if tool_entry else "read"
                 action = "rebuild" if name == "apply_system" or risk == "rebuild" else "config_write"
-                ladder = evaluate_system(action)
+                # A pre-check, so it peeks: the method it hands over to asks the same question
+                # with the host ceiling too, and records that one. Only a refusal here ends the
+                # call, so only a refusal has to be written down by this layer.
+                ladder = peek_system(action)
                 if not ladder.allowed:
-                    from .audit import append_audit
-
-                    append_audit("deny", tool=name, result="denied", detail=ladder.code)
+                    record_denial(ladder, "system", action, tool=name)
                     return {"ok": False, **ladder.as_dict()}
 
             if self._dry_run and mutating:

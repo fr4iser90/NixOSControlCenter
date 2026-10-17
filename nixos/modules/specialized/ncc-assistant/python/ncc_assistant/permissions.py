@@ -334,21 +334,29 @@ def audit_actor() -> str:
     return (os.environ.get(ENV_ACTOR) or "").strip() or "cli"
 
 
-def evaluate(action: str, *, axis: str, grant: Grant | None = None) -> Decision:
-    """May ``action`` run under the active (or given) grant?
+def _held_step(axis: str, grant: Grant) -> str:
+    return grant.repo if axis == "repo" else grant.system
 
-    No grant context at all means "not an agent run" — the ladder stays out of the
-    way and the caller's own ceiling (profile / allowWrite / confirm) decides.
+
+def _needed_step(axis: str, action: str) -> str | None:
+    return (REPO_ACTIONS if axis == "repo" else SYSTEM_ACTIONS).get(action)
+
+
+def _cover(action: str, *, axis: str, grant: Grant | None = None) -> Decision:
+    """The ladder's answer, unrecorded — the half of ``evaluate`` a catalog may call.
+
+    Kept apart on purpose: ``system_flags`` asks about every tool in the registry to
+    decide what to *advertise*, and a listing of tools nobody ran must not read afterwards
+    like a list of decisions that were made.
     """
     active = grant if grant is not None else current_grant()
     if active is None:
         return Decision(True, "", "")
     steps = REPO_STEPS if axis == "repo" else SYSTEM_STEPS
-    table = REPO_ACTIONS if axis == "repo" else SYSTEM_ACTIONS
-    need = table.get(action)
+    need = _needed_step(axis, action)
     if need is None:
         return Decision(False, "unknown_action", f"no {axis} step defined for {action!r}")
-    have = active.repo if axis == "repo" else active.system
+    have = _held_step(axis, active)
     if _rank(steps, have) >= _rank(steps, need):
         return Decision(True, "", "")
     return Decision(
@@ -359,12 +367,81 @@ def evaluate(action: str, *, axis: str, grant: Grant | None = None) -> Decision:
     )
 
 
-def evaluate_repo(action: str, *, grant: Grant | None = None) -> Decision:
-    return evaluate(action, axis="repo", grant=grant)
+def _record(
+    decision: Decision,
+    axis: str,
+    action: str,
+    *,
+    grant: Grant | None = None,
+    tool: str = "",
+) -> Decision:
+    """Write the line that answers "why did this run merge?" the next morning.
+
+    Silent in exactly one case: no grant and an allowed answer, which is a human at the
+    CLI and not a decision the ladder weighed — a line per read would bury the few lines
+    that matter. Everything the ladder refused is recorded, grant or not.
+    """
+    active = grant if grant is not None else current_grant()
+    if active is None and decision.allowed:
+        return decision
+
+    from .audit import append_audit  # local: importing policy must not pull in state paths
+
+    have = _held_step(axis, active) if active is not None else "?"
+    need = _needed_step(axis, action) or "?"
+    detail = f"axis={axis} {axis}={have} action={action} need={need}"
+    if not decision.allowed:
+        detail = f"code={decision.code} {detail}"
+    append_audit(
+        "grant_evaluated",
+        actor=active.actor if active is not None else audit_actor(),
+        tool=tool or action,
+        result="granted" if decision.allowed else "denied",
+        detail=detail[:240],
+    )
+    return decision
 
 
-def evaluate_system(action: str, *, grant: Grant | None = None) -> Decision:
-    return evaluate(action, axis="system", grant=grant)
+def evaluate(
+    action: str, *, axis: str, grant: Grant | None = None, tool: str = ""
+) -> Decision:
+    """May ``action`` run under the active (or given) grant? One audit line per answer.
+
+    No grant context at all means "not an agent run" — the ladder stays out of the
+    way and the caller's own ceiling (profile / allowWrite / confirm) decides.
+    """
+    decision = _cover(action, axis=axis, grant=grant)
+    return _record(decision, axis, action, grant=grant, tool=tool)
+
+
+def evaluate_repo(action: str, *, grant: Grant | None = None, tool: str = "") -> Decision:
+    return evaluate(action, axis="repo", grant=grant, tool=tool)
+
+
+def evaluate_system(action: str, *, grant: Grant | None = None, tool: str = "") -> Decision:
+    return evaluate(action, axis="system", grant=grant, tool=tool)
+
+
+def peek_system(action: str, *, grant: Grant | None = None) -> Decision:
+    """The system-axis verdict, *without* recording it.
+
+    For a check that sits in front of a route which records its own decision — the
+    ``call()`` dispatcher gates and then hands over to a method that asks again. Callers
+    of this must record a refusal themselves (``record_denial``); one that passes has
+    already been written down by the route it let through.
+    """
+    return _cover(action, axis="system", grant=grant)
+
+
+def record_denial(decision: Decision, axis: str, action: str, *, tool: str = "") -> Decision:
+    """Write the line for a refusal reached outside ``evaluate`` — never for an allow.
+
+    A pre-check that says no has to leave the same trace as the routes that say no, or the
+    log reads as if the run never asked.
+    """
+    if decision.allowed:
+        return decision
+    return _record(decision, axis, action, grant=current_grant(), tool=tool)
 
 
 def decide_system(
@@ -374,6 +451,7 @@ def decide_system(
     allow_rebuild: bool,
     client_mode: str = "",
     grant: Grant | None = None,
+    tool: str = "",
 ) -> Decision:
     """The one decision for a host-mutating action: host ceiling first, run grant second.
 
@@ -381,28 +459,49 @@ def decide_system(
     let a plain CLI rebuild. The ceiling is applied here so every route — dispatcher,
     direct tool entry, catalog listing — reaches the same verdict, and a granted run can
     only narrow what the host already allows.
+
+    Each answer is recorded once, including the host's own refusal: "the operator forbids
+    rebuilds" is a fact the audit trail should hold even when no grant was in play.
     """
     need = SYSTEM_ACTIONS.get(action)
     if need is None:
-        return Decision(False, "unknown_action", f"no system step defined for {action!r}")
+        return _record(
+            Decision(False, "unknown_action", f"no system step defined for {action!r}"),
+            "system",
+            action,
+            grant=grant,
+            tool=tool,
+        )
     # One host flag per step, deliberately not a rank: allowRebuild opens rebuild,
     # allowWrite opens config-write, and neither implies the other.
     if need == "rebuild":
         if not allow_rebuild:
-            return Decision(
-                False,
-                "host_rebuild_disabled",
-                "Rebuild disabled. Set allowRebuild = true in "
-                "systemConfig.modules.specialized.ncc-assistant.",
+            return _record(
+                Decision(
+                    False,
+                    "host_rebuild_disabled",
+                    "Rebuild disabled. Set allowRebuild = true in "
+                    "systemConfig.modules.specialized.ncc-assistant.",
+                ),
+                "system",
+                action,
+                grant=grant,
+                tool=tool,
             )
     elif not writes_enabled:
-        return Decision(
-            False,
-            "host_writes_disabled",
-            f"Writes disabled for this client (mode={client_mode}). "
-            "Enable allowWrite / mcpAllowWrite in module config.",
+        return _record(
+            Decision(
+                False,
+                "host_writes_disabled",
+                f"Writes disabled for this client (mode={client_mode}). "
+                "Enable allowWrite / mcpAllowWrite in module config.",
+            ),
+            "system",
+            action,
+            grant=grant,
+            tool=tool,
         )
-    return evaluate_system(action, grant=grant)
+    return evaluate_system(action, grant=grant, tool=tool)
 
 
 def system_flags(
@@ -414,13 +513,15 @@ def system_flags(
     """The write/rebuild flags a caller may advertise: host ceiling narrowed by the grant.
 
     A catalog is a promise about what can be called — a run granted ``system=none`` must
-    not be shown the write tools it will be refused.
+    not be shown the write tools it will be refused. It asks ``_cover`` rather than
+    ``evaluate_system`` because nothing is being decided here, and a listing of every tool
+    would otherwise write an audit line per catalog refresh.
     """
-    allow_write = bool(writes_enabled) and evaluate_system("config_write", grant=grant).allowed
+    allow_write = bool(writes_enabled) and _cover("config_write", axis="system", grant=grant).allowed
     rebuild = (
         bool(allow_rebuild)
         and allow_write
-        and evaluate_system("rebuild", grant=grant).allowed
+        and _cover("rebuild", axis="system", grant=grant).allowed
     )
     return allow_write, rebuild
 

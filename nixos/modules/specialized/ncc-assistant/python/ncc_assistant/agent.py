@@ -280,7 +280,9 @@ You are running in agent mode to accomplish a specific goal.
             detail=f"Goal: {self.agent_settings.goal}",
         )
         append_audit(
-            "grant_evaluated",
+            # Named apart from the per-decision ``grant_evaluated`` lines the ladder writes:
+            # this one says what the run was handed, those say what it asked to do.
+            "grant_resolved",
             actor=(self.grant.actor if self.grant else "cli"),
             job_id=self._job.id,
             detail=self.grant_summary(),
