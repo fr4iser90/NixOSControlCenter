@@ -92,7 +92,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 | 36 | [Feature plugins](./plans/36-feature-plugins.md) | **in progress** (Plugins tab + doomscroll extracted; ≠ MCP/templates/watchdogs) |
 | 37 | [Autonomous workspace workflow](./plans/37-autonomous-workspace-workflow.md) | **done** (per-task PR + resume + CONFIRM) |
 | 38 | [Repo & account fact store](./plans/38-repo-account-fact-store.md) | **proposed** (identity = remote not path; git/github read tools) |
-| 39 | [Permission ladder & per-schedule grants](./plans/39-permission-ladder-and-schedule-grants.md) | **L1–L10 done** (grant transport, steps, floor, budgets, one decision point, per-decision audit, actor); L14 partial, L11–L13 open |
+| 39 | [Permission ladder & per-schedule grants](./plans/39-permission-ladder-and-schedule-grants.md) | **L1–L10 + L14 done** (grant transport, steps, floor, budgets, one decision point, per-decision audit, actor, eval-time conflict warnings); L11–L13 open |
 
 ## Feature map (checklist)
 
@@ -229,6 +229,10 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
   same way through `call()`, the MCP server and a diff-apply; `system_flags` hides from a run the
   write tools it would be refused; the host says no under its own codes (`host_writes_disabled`,
   `host_rebuild_disabled`), never disguised as `grant_insufficient`
+- [x] Evaluation says so before the timer fires: a grant above its **profile's** reach (the profile
+  opens the write/rebuild tools and a grant may only narrow it), an agent knob that cannot open what
+  the host pair closed, and the ceiling itself — now the lower of host pair and agent pair, the way
+  `resolve_run_grant` computes it. Idle takes the lowest grant of the day, never a schedule's higher one
 - [ ] `poll` trigger with change-hash, scheduled chains, per-repo `permissions.json`
 - SSOT: [plans/39-permission-ladder-and-schedule-grants.md](./plans/39-permission-ladder-and-schedule-grants.md)
 

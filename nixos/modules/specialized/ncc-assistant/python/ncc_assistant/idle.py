@@ -5,14 +5,28 @@ from __future__ import annotations
 import json
 import os
 import time
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator
 
 from .paths import activity_file
+from .permissions import (
+    ENV_ACTOR,
+    ENV_REPO,
+    ENV_SYSTEM,
+    Grant,
+    lowest_grant_today,
+)
 from .preferences import (
     get_idle_after_min,
     get_idle_max_jobs,
     get_idle_mode,
 )
+
+#: The env ``set_process_grant`` writes for one run; a sweep in a long-lived process owns
+#: them only for the duration of the run it started.
+_GRANT_ENV = (ENV_REPO, ENV_SYSTEM, ENV_ACTOR)
+#: An idle sweep is its own actor: idle runs must not spend a human's or a schedule's budget.
+IDLE_ACTOR = "idle"
 
 
 def touch_activity(reason: str = "ui") -> None:
@@ -111,6 +125,31 @@ def list_idle_candidates() -> list[dict[str, Any]]:
     return out
 
 
+def _grant_pairs(grant: Grant) -> tuple[str, str]:
+    return (f"repo={grant.repo}", f"system={grant.system}")
+
+
+@contextmanager
+def _run_scoped_grant() -> Iterator[None]:
+    """Hold one sweep's grant env for exactly as long as the run it started.
+
+    ``set_process_grant`` writes the grant into ``os.environ`` so the run's child git
+    helpers inherit it — right for a one-shot unit, wrong for the companion, which keeps
+    living after the sweep. An unattended ``repo=observe system=none`` left in the process
+    would bind the operator's next chat: the ladder would treat a human as a schedule.
+    """
+    saved = {name: os.environ.get(name) for name in _GRANT_ENV}
+    os.environ[ENV_ACTOR] = IDLE_ACTOR
+    try:
+        yield
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
 def maybe_sweep(*, start: bool = False) -> dict[str, Any]:
     """
     If idle-eligible, return (and optionally start) up to idle_max_jobs work items.
@@ -138,6 +177,11 @@ def maybe_sweep(*, start: bool = False) -> dict[str, Any]:
             "started": [],
             "candidates": picked,
         }
+
+    #: What an unattended run may hold, read off the day once so a sweep cannot walk its own
+    #: floor down as its runs get logged. Computed on the first schedule candidate: an
+    #: instance-only sweep has no grant to inherit and must not read the whole audit log.
+    day_floor: Grant | None = None
 
     for c in picked:
         try:
@@ -182,15 +226,23 @@ def maybe_sweep(*, start: bool = False) -> dict[str, Any]:
                     if not goal:
                         started.append({**c, "status": "skipped", "error": "no goal"})
                         continue
-                    for _ev in run_agent(
-                        str(goal),
-                        settings,
-                        dry_run=bool(c.get("dryRun", True)),
-                        profile=profile,
-                        playbook=str(playbook) if playbook else None,
-                    ):
-                        pass
-                    started.append({**c, "status": "finished"})
+                    # Nobody is here to approve a wider step, so the sweep inherits the
+                    # narrowest grant this host already carried today instead of the
+                    # schedule's own — an idle ship cannot outrank the morning's audit.
+                    if day_floor is None:
+                        day_floor = lowest_grant_today()
+                    grant = _grant_pairs(day_floor)
+                    with _run_scoped_grant():
+                        for _ev in run_agent(
+                            str(goal),
+                            settings,
+                            dry_run=bool(c.get("dryRun", True)),
+                            profile=profile,
+                            playbook=str(playbook) if playbook else None,
+                            grant=grant,
+                        ):
+                            pass
+                    started.append({**c, "status": "finished", "grant": list(grant)})
                 finally:
                     release(token)
         except CapacityError:

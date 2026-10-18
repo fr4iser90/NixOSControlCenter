@@ -125,8 +125,13 @@ def append_audit(
     return entry
 
 
-def read_audit(limit: int = 100, job_id: str | None = None) -> list[AuditEntry]:
-    """Read recent audit entries, optionally filtered by job_id."""
+def read_audit(limit: int | None = 100, job_id: str | None = None) -> list[AuditEntry]:
+    """Read recent audit entries, optionally filtered by job_id.
+
+    ``limit=None`` means the whole log. A reader that bounds a window itself (a day of
+    ``grant_resolved`` lines) has to ask for everything: one agent run writes a line per
+    decision, so a capped read silently drops the older half of the day it is summarising.
+    """
     path = audit_file()
     if not path.is_file():
         return []
@@ -160,7 +165,7 @@ def read_audit(limit: int = 100, job_id: str | None = None) -> list[AuditEntry]:
         pass
 
     entries.reverse()
-    return entries[:limit]
+    return entries if limit is None else entries[:limit]
 
 
 def clear_audit() -> bool:

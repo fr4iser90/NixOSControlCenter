@@ -64,14 +64,39 @@ let
     if (stepRank ranks want) > (stepRank ranks max) then max else want;
   maxStep = ranks: a: b:
     if (stepRank ranks a) >= (stepRank ranks b) then a else b;
+  minStep = ranks: a: b:
+    if (stepRank ranks a) <= (stepRank ranks b) then a else b;
 
+  # Two knobs set the system ceiling and a run is held to the lower of them, exactly as
+  # resolve_run_grant does: the host pair (exported as NCC_ASSISTANT_ALLOW_*) and the agent
+  # pair (exported as NCC_ASSISTANT_AGENT_ALLOW_*). Reading only the agent pair generated a
+  # unit with AGENT_ALLOW_WRITE=1 on a host whose allowWrite=false: eval called that grant
+  # fine and the run refused at the first write.
+  pairStep = allowWrite: allowRebuild:
+    if allowRebuild then "rebuild" else if allowWrite then "config-write" else "none";
   hostCeiling = {
     repo = cfg.grants.repoCeiling or "pr";
-    system =
-      if (cfg.agent.allowRebuild or false) then "rebuild"
-      else if (cfg.agent.allowWrite or false) then "config-write"
-      else "none";
+    system = minStep systemRanks
+      (pairStep (cfg.allowWrite or true) (cfg.allowRebuild or false))
+      (pairStep (cfg.agent.allowWrite or false) (cfg.agent.allowRebuild or false));
   };
+  # A declared true in the agent pair cannot open what the host pair closed — the pair only
+  # narrows, so the knob that was reached for is exactly the one with no effect here.
+  ceilingInversions =
+    optionals (!(cfg.allowWrite or true) && (cfg.agent.allowWrite or false)) [
+      ''
+        ncc-assistant: agent.allowWrite = true cannot open writes that allowWrite = false closed.
+        The agent pair only narrows the host pair, so this host's system ceiling stays
+        ${hostCeiling.system}. Set allowWrite = true as well, or drop agent.allowWrite.
+      ''
+    ]
+    ++ optionals (!(cfg.allowRebuild or false) && (cfg.agent.allowRebuild or false)) [
+      ''
+        ncc-assistant: agent.allowRebuild = true cannot open rebuilds that allowRebuild = false
+        closed. The agent pair only narrows the host pair, so this host's system ceiling stays
+        ${hostCeiling.system}. Set allowRebuild = true as well, or drop agent.allowRebuild.
+      ''
+    ];
 
   # Per-day budgets (phase 39 L8). A schedule may only narrow the host's counters; a
   # counter neither side sets stays out of the environment so budgets.py keeps its own
@@ -153,6 +178,11 @@ let
         if explicitSystem != null then explicitSystem else clampStep systemRanks derivedSystem hostCeiling.system;
     };
 
+  # A submodule option the host never set is null, not missing, and `attrs.x or d` only covers
+  # the missing case — interpolating the null aborts evaluation with "cannot coerce null to a
+  # string", so the config error replaces the very message meant to explain it.
+  shownStep = value: if value == null then "-" else value;
+
   grantConflicts = filterAttrs (_: s:
     let
       perms = s.permissions or {};
@@ -163,6 +193,30 @@ let
       (explicitRepo != null && (stepRank repoRanks explicitRepo) > (stepRank repoRanks hostCeiling.repo))
       || (explicitSystem != null && (stepRank systemRanks explicitSystem) > (stepRank systemRanks hostCeiling.system))
       || (dry && explicitRepo != null && (stepRank repoRanks explicitRepo) > (stepRank repoRanks "propose"))
+  ) enabledSchedules;
+
+  # A profile is not a label: its built-in flags are what open the write and rebuild tools —
+  # resolve_profile keeps them unless the grant lowers them, and nothing raises them (an agent
+  # run hands resolve_profile no override at all). So a schedule whose step sits above its own
+  # profile's reach carries a grant it can never spend: the ladder says yes, the tool catalog
+  # holds no write tool, and the attempt dies in the profile check instead of the audit trail.
+  # The aliases are here because profiles.py resolves them; deliberately not merged into
+  # profileStepMap, which derives steps and must never widen what a unit is handed.
+  profileSystemReach = {
+    chat = "none";
+    "read-only" = "none";
+    "config-writer" = "config-write";
+    cautious = "config-write";
+    ops = "rebuild";
+    autonomous = "rebuild";
+  };
+  scheduleProfile = s:
+    if (s.profile or null) != null then s.profile else (cfg.agent.profile or "read-only");
+  # A name this module does not know reaches nothing: resolve_profile falls back to read-only,
+  # so the typo costs the run its writes rather than passing this check quietly.
+  profileReach = s: profileSystemReach.${scheduleProfile s} or "none";
+  profileConflicts = filterAttrs (_: s:
+    (stepRank systemRanks (effectiveGrant s).system) > (stepRank systemRanks (profileReach s))
   ) enabledSchedules;
 
   mkAgentExec = name: schedule:
@@ -288,11 +342,20 @@ in
           dry = if (s.dryRun or null) != null then s.dryRun else (cfg.agent.dryRun or false);
         in
           ''
-            ncc-assistant: schedule '${name}' asks for repo=${perms.repo or "-"} system=${perms.system or "-"}
+            ncc-assistant: schedule '${name}' asks for repo=${shownStep perms.repo} system=${shownStep perms.system}
             above this host's ceiling repo=${hostCeiling.repo} system=${hostCeiling.system}${optionalString dry " (and dryRun=true)"};
             the run will refuse instead of quietly doing less. Lower permissions.* or raise
-            agent.grants.repoCeiling / agent.allowWrite / agent.allowRebuild.
+            agent.grants.repoCeiling / allowWrite / allowRebuild / agent.allowWrite /
+            agent.allowRebuild — the ceiling is the lower of the host and agent pair.
           '') grantConflicts
+        ++ mapAttrsToList (name: s:
+          ''
+            ncc-assistant: schedule '${name}' runs profile '${scheduleProfile s}', which reaches
+            system=${profileReach s}, but its grant carries system=${(effectiveGrant s).system}.
+            A profile is what opens the write/rebuild tools and a grant may only narrow it, so
+            every write this run attempts dies in the profile check. Set a profile that reaches
+            the step (config-writer / ops) or lower permissions.system / allowWrite / allowRebuild.
+          '') profileConflicts
         ++ mapAttrsToList (name: s:
           ''
             ncc-assistant: schedule '${name}' asks for budget ${concatStringsSep ", "
@@ -300,7 +363,8 @@ in
                 (filter (k: budgetOverreach (scheduleBudget s) k) (attrNames budgetKeys)))}
             above agent.grants.budget; the host value is what the unit gets. Budgets narrow,
             they never widen.
-          '') budgetConflicts;
+          '') budgetConflicts
+        ++ ceilingInversions;
 
       assertions = [
         {

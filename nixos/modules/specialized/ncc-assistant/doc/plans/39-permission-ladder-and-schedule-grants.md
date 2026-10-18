@@ -1,6 +1,6 @@
 # Phase 39 — Permission ladder & per-schedule grants
 
-**Status:** L1–L10 done · L14 partial · L11–L13 open
+**Status:** L1–L10 + L14 done · L11–L13 open
 **Parent:** [roadmap.md](../roadmap.md)
 **Depends on:** phase 38 (grants are scoped to a repo identity), phase 22 (approvals), schedules
 **Unblocks:** unattended GitHub work (ship/PR flows), idle autonomy without a human watching
@@ -202,8 +202,9 @@ Small, but the ladder is pointless if the agent can only wake at a fixed time:
 - **Event**: `onUnitInactiveSec` chaining — schedule B runs only after schedule A ended
   `completed`, so `audit → ship` becomes a declared chain instead of two timers guessed apart.
 - **Idle**: keep `idle.py` as the only opportunistic trigger and let it inherit the *lowest*
-  grant of the day, never a schedule's higher one (today it only forces `dry_run`,
-  `idle.py:197`).
+  grant of the day, never a schedule's higher one. Done: the sweep takes
+  `permissions.lowest_grant_today()` on each axis and exports it for the run it starts, restoring
+  the previous grant afterwards because the companion outlives the sweep.
 
 ## Features
 
@@ -241,12 +242,18 @@ Small, but the ladder is pointless if the agent can only wake at a fixed time:
 | L11 | open | `OnCalendar` is still the only trigger; `scheduleKind: "poll"` has no consumer |
 | L12 | open | no `after` option on a schedule |
 | L13 | open | no per-repo `permissions.json` |
-| L14 | partial | conflicts warn for above-ceiling grants and `dryRun` vs a write step; nothing yet compares `profile` with `permissions.*` |
+| L14 | done | Three disagreements between the old knobs and `permissions.*` now warn at evaluation. **Profile vs grant:** a profile is what *opens* the write/rebuild tools — `resolve_profile` keeps its built-in flags unless the grant lowers them and nothing raises them (an agent run hands it no override), so a schedule whose grant carries `system` above its profile's reach holds a step the ladder approves and the tool catalog cannot perform; every such write dies in the profile check instead of the audit trail. `profileSystemReach` compares the two, aliases included (`cautious`/`autonomous`, because `profiles.py` resolves them — deliberately *not* merged into `profileStepMap`, which derives the steps a unit is handed and must never widen them). An unknown name counts as reaching nothing, matching the read-only fallback, so a typo is loud. **Host pair vs agent pair:** `hostCeiling.system` was the agent pair alone, so evaluation blessed a unit that then refused at the first write; it is now `minStep` of the host pair and the agent pair, mirroring `resolve_run_grant`, and `ceilingInversions` names the case where `agent.allowWrite`/`agent.allowRebuild = true` cannot open what `allowWrite`/`allowRebuild = false` closed. The min only ever narrows *derived* steps — an explicit `permissions.*` stays as asked so the run refuses loudly rather than quietly doing less. **Display:** `perms.repo or "-"` did not cover a present-but-null option (`or` guards a *missing* attribute only), so the above-ceiling message aborted evaluation with "cannot coerce null to a string" — the config error replacing the message meant to explain it. `shownStep` renders both steps. |
 
-Still open from the design, beyond L11–L13: `NCC_ASSISTANT_AGENT_ALLOW_WRITE/_REBUILD/_CONFIRM/_DRY_RUN/_PROFILE`
-are read into `Settings` and used by nobody (§1 said "real consumers or removed" — only
-`NCC_ASSISTANT_AGENT_MAX_STEPS` has consumers), and idle does not inherit the lowest grant of the
-day (§7): `idle.py` still decides on `idleAllowWrite`/`dryRun` alone.
+Still open from the design, beyond L11–L13: `NCC_ASSISTANT_AGENT_CONFIRM/_DRY_RUN/_PROFILE` are
+still read into `Settings` and used by nobody (§1 said "real consumers or removed") — what the
+runtime acts on is the unsuffixed `AGENT_CONFIRM`/`AGENT_DRY_RUN`/`AGENT_PROFILE`
+(`runtime.py:903`, `:1425`), so those three fields are a second, inert copy of the same setting.
+`NCC_ASSISTANT_AGENT_ALLOW_WRITE/_REBUILD` got their consumer: `config` reads them tri-state
+(unset ≠ `0`) and `resolve_run_grant` folds them into the system ceiling through
+`permissions.agent_axis_ceiling`, so the agent pair can only ever lower the host pair — the
+operator wiring decision for this phase. Idle inherits the day's floor (§7): the sweep takes
+`permissions.lowest_grant_today()` per axis over the UTC day's `grant_resolved` lines and runs as
+actor `idle`, so an opportunistic run never outranks the narrowest grant already granted today.
 
 ## Tests
 
@@ -278,6 +285,16 @@ day (§7): `idle.py` still decides on `idleAllowWrite`/`dryRun` alone.
   `host_writes_disabled` / `host_rebuild_disabled` instead of borrowing `grant_insufficient`; with no
   grant the ceiling answers exactly as before, and a `system=none` run is not shown the write tools.
   `tests/ncc-assistant/test_single_decision_point_v1.py`
+- **eval warnings**: `schedules.nix` is evaluated for real (module called with the flake's own
+  argument shape, deferred `mkIf`/`mkMerge` records flattened) — a grant above its profile's reach
+  warns, a profile that reaches it stays silent, `cautious`/`autonomous` resolve instead of reading
+  as unknown, an unknown name warns, both knob inversions warn, and a **derived** grant exports
+  `AGENT_ALLOW_WRITE=0` on a host whose pair is closed while an explicit ask keeps `1` so the run
+  refuses loudly. The stub schedule carries options.nix's submodule defaults, because a bare attrs
+  stub cannot express present-but-null — the shape that made the above-ceiling message abort
+  evaluation. The default host must produce no warnings at all: that assertion is what keeps the new
+  `minStep` from turning every existing host into a wall of text.
+  `tests/ncc-assistant/test_schedule_grant_ceiling_v1.py`
 
 ## Risks
 

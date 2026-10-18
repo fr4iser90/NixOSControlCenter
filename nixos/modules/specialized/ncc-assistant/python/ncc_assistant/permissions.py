@@ -18,6 +18,7 @@ import re
 import shlex
 import subprocess
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -230,6 +231,11 @@ def step_rank(axis: str, name: str) -> int:
     return _rank(REPO_STEPS if axis == "repo" else SYSTEM_STEPS, str(name or "").strip().lower())
 
 
+def lower_step(axis: str, a: str, b: str) -> str:
+    """The narrower of two steps — how every ceiling gets narrowed by another ceiling."""
+    return a if step_rank(axis, a) <= step_rank(axis, b) else b
+
+
 def parse_grant_pairs(values: Iterable[str] | None) -> dict[str, str]:
     """Parse ``repo=pr`` / ``system=none`` pairs; raises ValueError with a hint."""
     out: dict[str, str] = {}
@@ -263,11 +269,32 @@ def system_ceiling(writes_enabled: bool, allow_rebuild: bool) -> str:
     return "none"
 
 
+def agent_axis_ceiling(
+    allow_write: bool | None, allow_rebuild: bool | None
+) -> str | None:
+    """The system step ``agent.allowWrite``/``agent.allowRebuild`` declare, or None.
+
+    ``schedules.nix`` derives a schedule's ceiling from those two options while the run's
+    own ceiling comes from the host-wide ``allowWrite``/``allowRebuild``. Reading the agent
+    pair here too closes the gap where eval said ``system=config-write`` and the runtime
+    answered a different question. ``None`` on both means nothing was declared — a bare
+    shell, a harness — so only the host ceiling applies rather than a default of "no".
+    """
+    if allow_write is None and allow_rebuild is None:
+        return None
+    if allow_rebuild:
+        return "rebuild"
+    if allow_write:
+        return "config-write"
+    return "none"
+
+
 def resolve_grant(
     *,
     requested: Mapping[str, str] | None = None,
     repo_ceiling: str = "observe",
     system_ceiling_step: str = "none",
+    system_ceiling_origin: str | None = None,
     actor: str = "cli",
     env: Mapping[str, str] | None = None,
 ) -> tuple[Grant, list[str]]:
@@ -276,11 +303,20 @@ def resolve_grant(
     ``requested`` (CLI flags) wins over the environment, and both may only *lower*
     the ceiling — a step above it is returned in ``violations`` so the caller can
     refuse loudly instead of silently running with less.
+
+    ``system_ceiling_origin`` names the option that set the system ceiling when more than
+    one knob could have set it, so a refusal points at the option worth raising.
     """
     environ = os.environ if env is None else env
     violations: list[str] = []
 
-    def one(axis: str, steps: tuple[str, ...], ceiling: str, env_var: str) -> str:
+    def one(
+        axis: str,
+        steps: tuple[str, ...],
+        ceiling: str,
+        env_var: str,
+        ceiling_origin: str | None = None,
+    ) -> str:
         want = normalise_step(axis, (requested or {}).get(axis))
         origin = "--grant"
         if want is None:
@@ -292,6 +328,9 @@ def resolve_grant(
             violations.append(
                 f"{axis}={want} exceeds host ceiling {ceiling} (from {origin}); "
                 "raise the host option or lower the grant"
+                + (f" — that ceiling is agent.allowWrite/agent.allowRebuild ({ceiling_origin})"
+                   if ceiling_origin
+                   else "")
             )
             return ceiling
         return want
@@ -302,6 +341,7 @@ def resolve_grant(
         SYSTEM_STEPS,
         normalise_step("system", system_ceiling_step) or "none",
         ENV_SYSTEM,
+        system_ceiling_origin,
     )
     return Grant(repo=repo, system=system, actor=actor), violations
 
@@ -332,6 +372,42 @@ def audit_actor() -> str:
     if grant is not None:
         return grant.actor
     return (os.environ.get(ENV_ACTOR) or "").strip() or "cli"
+
+
+def lowest_grant_today() -> Grant:
+    """The narrowest grant this host already carried today — the floor for an unattended run.
+
+    An idle sweep has nobody to ask, so it inherits this instead of choosing a step: what
+    the machine let run while someone was watching bounds what it may do with nobody there.
+    Each axis takes its own minimum, so the answer sits at or below every run of the day,
+    and a day with no grant-carrying run floors at ``repo=observe system=none``.
+
+    Only ``grant_resolved`` lines count, read whole (``limit=None``): a capped read keeps
+    the newest lines, which is exactly how an afternoon of merges would be mistaken for the
+    whole day. The window is UTC — the day ``budgets`` counts in — so a run near midnight
+    cannot inherit yesterday's rights or hand its own to tomorrow.
+    """
+    from .audit import read_audit  # local: importing policy must not pull in state paths
+
+    day = datetime.now(timezone.utc).date().isoformat()
+    floor: dict[str, str] = {}
+    for entry in read_audit(limit=None):
+        if entry.event != "grant_resolved" or not str(entry.timestamp)[:10] == day:
+            continue
+        steps = entry.args if isinstance(entry.args, dict) else {}
+        for axis in ("repo", "system"):
+            step = normalise_step(axis, steps.get(axis))
+            if step is None:
+                continue
+            held = floor.get(axis)
+            floor[axis] = step if held is None else lower_step(axis, step, held)
+    # The actor is a placeholder for the pair: the run that inherits it is named by its own
+    # NCC_ASSISTANT_ACTOR, and only these two steps are read back here.
+    return Grant(
+        repo=floor.get("repo", REPO_STEPS[0]),
+        system=floor.get("system", SYSTEM_STEPS[0]),
+        actor="idle",
+    )
 
 
 def _held_step(axis: str, grant: Grant) -> str:

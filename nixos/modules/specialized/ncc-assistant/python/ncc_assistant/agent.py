@@ -20,7 +20,9 @@ from .permissions import (
     ENV_ACTOR,
     ENV_REPO_CEILING,
     Grant,
+    agent_axis_ceiling,
     current_grant,
+    lower_step,
     parse_grant_pairs,
     resolve_grant,
     set_process_grant,
@@ -74,6 +76,10 @@ def resolve_run_grant(
     No request anywhere (no ``--grant``, no unit env, no host ceiling) leaves the ladder
     out: chat and a human at the CLI keep exactly the rights they had. A request above
     the ceiling is returned as a violation instead of being clamped silently.
+
+    Two options set a system ceiling: the host-wide ``allowWrite``/``allowRebuild`` and the
+    agent pair the wrapper exports (and ``schedules.nix`` clamps a unit by). The run is held
+    to the lower of the two, so a schedule cannot ask one knob for what the other refuses.
     """
     try:
         requested = parse_grant_pairs(grant_pairs)
@@ -82,10 +88,19 @@ def resolve_run_grant(
     ceiling = (os.environ.get(ENV_REPO_CEILING) or "").strip()
     if not requested and current_grant() is None and not ceiling:
         return None, []
+    host_step = system_ceiling(settings.writes_enabled, settings.allow_rebuild)
+    agent_step = agent_axis_ceiling(settings.agent_allow_write, settings.agent_allow_rebuild)
+    system_step = host_step if agent_step is None else lower_step("system", host_step, agent_step)
     return resolve_grant(
         requested=requested,
         repo_ceiling=ceiling or DEFAULT_REPO_CEILING,
-        system_ceiling_step=system_ceiling(settings.writes_enabled, settings.allow_rebuild),
+        system_ceiling_step=system_step,
+        system_ceiling_origin=(
+            f"narrower than allowWrite={settings.writes_enabled} "
+            f"allowRebuild={settings.allow_rebuild}"
+            if agent_step is not None and system_step != host_step
+            else None
+        ),
         actor=os.environ.get(ENV_ACTOR) or "cli",
     )
 
@@ -281,10 +296,17 @@ You are running in agent mode to accomplish a specific goal.
         )
         append_audit(
             # Named apart from the per-decision ``grant_evaluated`` lines the ladder writes:
-            # this one says what the run was handed, those say what it asked to do.
+            # this one says what the run was handed, those say what it asked to do. The steps
+            # go in as fields too — an idle sweep reads them back as "the lowest grant today",
+            # and that must not depend on parsing a display string.
             "grant_resolved",
             actor=(self.grant.actor if self.grant else "cli"),
             job_id=self._job.id,
+            args=(
+                {"repo": self.grant.repo, "system": self.grant.system}
+                if self.grant
+                else None
+            ),
             detail=self.grant_summary(),
         )
 

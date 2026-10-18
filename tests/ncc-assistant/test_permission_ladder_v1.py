@@ -318,6 +318,75 @@ def test_schedule_grant_narrows_below_the_host():
     assert (grant.repo, grant.system, grant.actor) == ("push", "none", "schedule")
 
 
+# --- two knobs, one ceiling ----------------------------------------------------------
+# schedules.nix clamps a unit by agent.allowWrite/agent.allowRebuild while the runtime read
+# only the host-wide pair, so the same grant meant two different things. The run now holds
+# to the lower of the two, and an unset agent pair declares nothing.
+
+
+def test_the_agent_pair_is_a_ceiling_too():
+    from ncc_assistant.agent import resolve_run_grant
+
+    with mock.patch.dict(
+        os.environ,
+        {
+            "NCC_ASSISTANT_ALLOW_WRITE": "1",
+            "NCC_ASSISTANT_ALLOW_REBUILD": "1",
+            "NCC_ASSISTANT_AGENT_ALLOW_WRITE": "0",
+        },
+        clear=True,
+    ):
+        grant, violations = resolve_run_grant(_settings(), ["system=config-write"])
+
+    assert grant.system == "none", "the agent option closed what the host option opened"
+    assert "system=config-write exceeds host ceiling none" in violations[0]
+    assert "agent.allowWrite" in violations[0], "the refusal must name the knob that clamped"
+
+
+def test_an_undeclared_agent_pair_leaves_the_host_ceiling_alone():
+    from ncc_assistant.agent import resolve_run_grant
+
+    with mock.patch.dict(os.environ, {"NCC_ASSISTANT_ALLOW_WRITE": "1"}, clear=True):
+        grant, violations = resolve_run_grant(_settings(), ["system=config-write"])
+
+    assert violations == [], "a bare shell declares no agent ceiling"
+    assert grant.system == "config-write"
+
+
+def test_the_agent_pair_never_opens_what_the_host_closed():
+    from ncc_assistant.agent import resolve_run_grant
+
+    with mock.patch.dict(
+        os.environ,
+        {
+            "NCC_ASSISTANT_ALLOW_WRITE": "1",
+            "NCC_ASSISTANT_ALLOW_REBUILD": "0",
+            "NCC_ASSISTANT_AGENT_ALLOW_WRITE": "1",
+            "NCC_ASSISTANT_AGENT_ALLOW_REBUILD": "1",
+        },
+        clear=True,
+    ):
+        grant, violations = resolve_run_grant(_settings(), ["system=rebuild"])
+
+    assert grant.system == "config-write" and violations
+    assert "agent.allowWrite" not in violations[0], "here the host was the narrower knob"
+
+
+def test_an_unset_agent_gate_is_not_a_declared_no():
+    with mock.patch.dict(os.environ, {}, clear=True):
+        unset = Settings.from_env()
+        assert (unset.agent_allow_write, unset.agent_allow_rebuild) == (None, None)
+
+    with mock.patch.dict(os.environ, {"NCC_ASSISTANT_AGENT_ALLOW_WRITE": "0"}, clear=True):
+        declared = Settings.from_env()
+        assert declared.agent_allow_write is False
+
+    assert permissions.agent_axis_ceiling(None, None) is None
+    assert permissions.agent_axis_ceiling(True, None) == "config-write"
+    assert permissions.agent_axis_ceiling(True, True) == "rebuild"
+    assert permissions.agent_axis_ceiling(False, False) == "none"
+
+
 # --- CLI surface -------------------------------------------------------------------
 
 

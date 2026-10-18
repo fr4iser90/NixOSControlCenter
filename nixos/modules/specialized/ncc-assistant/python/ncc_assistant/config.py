@@ -25,6 +25,18 @@ def _env_optional_str(name: str) -> str | None:
     return raw
 
 
+def _env_optional_bool(name: str) -> bool | None:
+    """Declared-or-nothing flag: unset stays ``None`` instead of becoming ``False``.
+
+    A ceiling must be able to tell "the host said no" from "nobody said anything" — a
+    plain :func:`_env_bool` would let a bare shell clamp a run it never configured.
+    """
+    raw = _env_optional_str(name)
+    if raw is None:
+        return None
+    return raw.lower() in ("1", "true", "yes", "on")
+
+
 def _env_optional_int(name: str) -> int | None:
     raw = _env_optional_str(name)
     if raw is None:
@@ -121,8 +133,10 @@ class Settings:
     # Agent settings
     allow_shell: bool
     agent_max_steps: int
-    agent_allow_write: bool
-    agent_allow_rebuild: bool
+    #: ``agent.allowWrite`` as declared by the wrapper — ``None`` when nothing declared it.
+    #: Clamps the system axis of a grant (see ``permissions.agent_axis_ceiling``).
+    agent_allow_write: bool | None
+    agent_allow_rebuild: bool | None
     agent_confirm: str  # "writes" | "always" | "never"
     agent_dry_run: bool
     agent_profile: str | None
@@ -225,8 +239,8 @@ class Settings:
             agent_max_steps=_env_int(
                 "NCC_ASSISTANT_AGENT_MAX_STEPS", UNLIMITED
             ),
-            agent_allow_write=_env_bool("NCC_ASSISTANT_AGENT_ALLOW_WRITE", False),
-            agent_allow_rebuild=_env_bool("NCC_ASSISTANT_AGENT_ALLOW_REBUILD", False),
+            agent_allow_write=_env_optional_bool("NCC_ASSISTANT_AGENT_ALLOW_WRITE"),
+            agent_allow_rebuild=_env_optional_bool("NCC_ASSISTANT_AGENT_ALLOW_REBUILD"),
             agent_confirm=os.environ.get("NCC_ASSISTANT_AGENT_CONFIRM", "writes"),
             agent_dry_run=_env_bool("NCC_ASSISTANT_AGENT_DRY_RUN", False),
             agent_profile=_env_optional_str("NCC_ASSISTANT_AGENT_PROFILE"),
