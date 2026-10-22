@@ -123,6 +123,24 @@ ncc ai permissions show --grant repo=merge --json    # preview a run; exits 1 wh
 ncc ai agent run --grant repo=pr --grant system=none --playbook autonomous-agent-ship
 ```
 
+A **repository** may run below that ceiling without waiting for a host rebuild — one committed file:
+
+```json
+{ "version": 1, "repo": "commit" }
+```
+
+`.ncc/permissions.json` narrows the repo axis for every run in that checkout, and nothing else:
+there is no `system` key — the machine is the host's to bound, and a file that claims it is
+refused rather than ignored. It is read out of `HEAD`, never the working tree, because the working
+tree is exactly what a bounded run is allowed to write; deleting, widening or corrupting the file
+on disk moves the ceiling by nothing at all. It only ever lowers: a file naming a step *above* the
+one the run holds is recorded `ceiling_ignored=<step>` and the grant stays the narrower answer.
+A file the ladder cannot parse floors the axis instead of reading as absent — the audit line says
+`ceiling=repo_ceiling_invalid` and `permissions show` prints the same token, so "my repo lowered
+nothing" and "my repo's file is broken" stay two different answers.
+
+The owner commits it by hand. A run may not touch it: see `denied_repo_ceiling_path` below.
+
 **Floor** — refused by code with no option that re-enables it. Each hit writes one `floor_denied`
 line to `audit.jsonl`:
 
@@ -133,6 +151,7 @@ line to `audit.jsonl`:
 | `denied_protected_branch` | pushing to, or merging onto, `main` / `master` |
 | `denied_blanket_path` | `git add -A` / `.` / `*` — a commit takes a named pathset |
 | `denied_secret_path` | pathset touches `.env*`, `*.pem`, `*credential*`, `secrets.json` |
+| `denied_repo_ceiling_path` | the run stages **or untracks** anything under `.ncc/` — the file that lowers its own ladder is the owner's, in either direction of the index |
 | `denied_path_outside_repo` | pathset leaves the checkout (`../…`, absolute) |
 | `denied_non_agent_branch` | commit / push / PR while not on a `ncc/…` branch |
 | `denied_shell_git_write` | `git commit` / `push` / … inside a shell string — it carries no grant, no branch floor, no audit line, so the write capability is gone; reads survive |

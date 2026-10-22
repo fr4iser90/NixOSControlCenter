@@ -92,7 +92,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 | 36 | [Feature plugins](./plans/36-feature-plugins.md) | **in progress** (Plugins tab + doomscroll extracted; ≠ MCP/templates/watchdogs) |
 | 37 | [Autonomous workspace workflow](./plans/37-autonomous-workspace-workflow.md) | **done** (per-task PR + resume + CONFIRM) |
 | 38 | [Repo & account fact store](./plans/38-repo-account-fact-store.md) | **proposed** (identity = remote not path; git/github read tools) |
-| 39 | [Permission ladder & per-schedule grants](./plans/39-permission-ladder-and-schedule-grants.md) | **L1–L10 + L14 done** (grant transport, steps, floor, budgets, one decision point, per-decision audit, actor, eval-time conflict warnings); L11–L13 open |
+| 39 | [Permission ladder & per-schedule grants](./plans/39-permission-ladder-and-schedule-grants.md) | **L1–L11 + L13 + L14 done** (grant transport, steps, floor, budgets, one decision point, per-decision audit, actor, poll trigger, per-repo ladder file, eval-time conflict warnings); L12 open |
 
 ## Feature map (checklist)
 
@@ -206,7 +206,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 - `workspaces rename|move` rewrite every reference (tasks, MCP bindings, progress files) or roll back
 - SSOT: [plans/38-repo-account-fact-store.md](./plans/38-repo-account-fact-store.md)
 
-### Phase 39 (L1–L11 done)
+### Phase 39 (L1–L11 + L13 done)
 
 - [x] Transport fixed: the schedule's grant travels in the unit's argv (`--grant repo=… system=…`);
   the wrapper exports defaults, so it no longer overwrites what the unit decided
@@ -216,7 +216,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
   grant absent ⇒ a human at the CLI keeps the rights the tools always had
 - [x] Non-negotiable floor in code: no force-push (flag, `+refspec`, force push-option), no
   `--no-verify`/signing bypass, no protected-branch push **or merge**, no `git add -A`, no staging of
-  secret-shaped paths, no git writes through a shell string — eight greppable `denied_*` codes
+  secret-shaped paths, no git writes through a shell string — nine greppable `denied_*` codes
 - [x] Merge reads its target from the PR (`baseRefName`), not from HEAD; an unreadable base is
   refused (`merge_base_unknown`) rather than guessed
 - [x] Budgets (runs/day, PRs/day, diff lines, open agent PRs) checked before the LLM call;
@@ -238,7 +238,10 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
   (workspace HEAD+dirty state, or a file's bytes) checked **before** the budget counters, the lock and
   the model; the baseline is spent only by a finished run, and an unresolvable watch refuses
   (`poll_state_unknown`) instead of ever reporting an unknown as "unchanged"
-- [ ] Scheduled chains (`after = "nightly-audit"`), per-repo `permissions.json`
+- [x] A repository may lower its own ladder: `.ncc/permissions.json` read from `HEAD`, repo axis
+  only, and the whole `.ncc/` directory refused in both directions of the index — a run can neither
+  commit a widening nor untrack the file that bounds it (`denied_repo_ceiling_path`)
+- [ ] Scheduled chains (`after = "nightly-audit"`)
 - SSOT: [plans/39-permission-ladder-and-schedule-grants.md](./plans/39-permission-ladder-and-schedule-grants.md)
 
 ## Known follow-ups (not blockers)

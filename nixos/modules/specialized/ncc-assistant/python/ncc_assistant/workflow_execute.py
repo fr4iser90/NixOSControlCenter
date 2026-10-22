@@ -16,6 +16,8 @@ from . import budgets
 from .paths import workflow_progress_file
 from .permissions import (
     BLANKET_PATHS,
+    REPO_CEILING_PATH,
+    RepoCeiling,
     audit_actor,
     check_branch,
     check_git_argv,
@@ -24,6 +26,8 @@ from .permissions import (
     git_subcommand,
     porcelain_path,
     protected_branch,
+    read_repo_ceiling,
+    repo_ceiling_paths,
     secret_paths,
 )
 from .workspace_workflow import (
@@ -158,13 +162,25 @@ def _git(root: Path, *args: str, timeout: float = 60.0) -> dict[str, Any]:
     return result
 
 
-def _repo_grant(action: str) -> dict[str, Any] | None:
-    """Denial payload when this run's grant does not cover ``action``.
+def _repo_ceiling(root: Path) -> RepoCeiling | None:
+    """This repository's own lowering of the ladder, or None when there is no ladder to lower.
+
+    Outside a grant context the ladder steps aside (``_human_decision``), so reading HEAD would
+    cost a git call for an answer the caller throws away — and the floor below it never needs a
+    repository, which is why the ceiling file stays protected for a human too.
+    """
+    if current_grant() is None:
+        return None
+    return read_repo_ceiling(root)
+
+
+def _repo_grant(action: str, root: Path) -> dict[str, Any] | None:
+    """Denial payload when this run's grant does not cover ``action`` in *this* repository.
 
     Returns None outside a grant context (human at the CLI) — those keep the rights the
     tool always had; the floor above still applies to everyone.
     """
-    verdict = evaluate_repo(action)
+    verdict = evaluate_repo(action, ceiling=_repo_ceiling(root))
     return None if verdict.allowed else verdict.as_dict()
 
 
@@ -189,15 +205,18 @@ def _branch_floor(root: Path, *, action: str) -> tuple[str, dict[str, Any] | Non
     return branch, verdict.as_dict()
 
 
-def _human_decision(action: str, confirm: str, hint: str) -> dict[str, Any] | None:
+def _human_decision(
+    action: str, confirm: str, hint: str, root: Path
+) -> dict[str, Any] | None:
     """Denial payload for actions that normally need the ``CONFIRM`` token.
 
     Inside a grant context the token is typed by the model, not by a person, so the
-    ladder alone decides there. Outside one (a human at the CLI) the token keeps
-    working exactly as it did before.
+    ladder alone decides there — including the ceiling this repository lowered for itself,
+    which is why the caller resolves the checkout before asking rather than after.
+    Outside one (a human at the CLI) the token keeps working exactly as it did before.
     """
     if current_grant() is not None:
-        return _repo_grant(action)
+        return _repo_grant(action, root)
     if (confirm or "").strip() != CONFIRM_TOKEN:
         return {"error": "confirm_required", "hint": f"Pass confirm=\"{CONFIRM_TOKEN}\" {hint}"}
     return None
@@ -529,7 +548,7 @@ def commit_all(
             **off_floor,
         }
 
-    denied = _repo_grant("commit")
+    denied = _repo_grant("commit", root)
     if denied:
         return {"ok": False, "workspace_id": wid, **denied}
 
@@ -607,6 +626,26 @@ def commit_all(
             "reason": "the pathset contains files that look like credentials",
             "hint": "Add them to .gitignore, or stage the real changes yourself with git add <path>.",
         }
+    # Same shape as the secret screen, and for the same reason: the file a repository lowers
+    # its own ladder from is the one file a run must never be able to widen by committing.
+    overdrawn = repo_ceiling_paths(pathset)
+    if overdrawn:
+        _audit_floor(
+            "denied_repo_ceiling_path",
+            f"refused to stage {', '.join(overdrawn)}",
+            tool="git commit",
+        )
+        return {
+            "ok": False,
+            "workspace_id": wid,
+            "committed": False,
+            "error": "denied_repo_ceiling_path",
+            "denied": "denied_repo_ceiling_path",
+            "ceilingPaths": overdrawn,
+            "reason": f"the pathset rewrites {REPO_CEILING_PATH}, which bounds this run",
+            "hint": "The repo owner edits that file and commits it by hand; a run may only be "
+            "bounded by it.",
+        }
     if not pathset:
         return {
             "ok": True,
@@ -669,7 +708,7 @@ def push_branch(workspace_id: str | None = None, *, set_upstream: bool = True) -
     if not branch or branch == "HEAD":
         return {"ok": False, "error": "detached HEAD", "workspace_id": wid}
 
-    denied = _repo_grant("push")
+    denied = _repo_grant("push", root)
     if denied:
         return {"ok": False, "workspace_id": wid, "branch": branch, **denied}
     if current_grant() is not None and protected_branch(branch):
@@ -718,7 +757,7 @@ def open_pull_request(
     if not shutil.which("gh"):
         raise ValueError("gh CLI not on PATH")
     wid, root = _repo_root(workspace_id)
-    denied = _repo_grant("pr")
+    denied = _repo_grant("pr", root)
     if denied:
         return {"ok": False, "workspace_id": wid, **denied}
     if require_clean_validate:
@@ -809,12 +848,12 @@ def merge_pull_request(
     strategy: str = "squash",
 ) -> dict[str, Any]:
     """Merge PR only on a human decision — a token counts outside grant context only."""
-    denied = _human_decision("merge", confirm, "to merge.")
+    wid, root = _repo_root(workspace_id)
+    denied = _human_decision("merge", confirm, "to merge.", root)
     if denied:
-        return {"ok": False, **denied}
+        return {"ok": False, "workspace_id": wid, **denied}
     if not shutil.which("gh"):
         raise ValueError("gh CLI not on PATH")
-    wid, root = _repo_root(workspace_id)
     base, base_denied = _merge_base_floor(root, pr)
     if base_denied:
         return {"ok": False, "workspace_id": wid, "pr": pr or "current", **base_denied}
@@ -851,10 +890,10 @@ def bump_version(
     part: str = "patch",
 ) -> dict[str, Any]:
     """Bump package.json version only on a human decision (grant ``release`` or token)."""
-    denied = _human_decision("release", confirm, "to bump version.")
-    if denied:
-        return {"ok": False, **denied}
     wid, root = _repo_root(workspace_id)
+    denied = _human_decision("release", confirm, "to bump version.", root)
+    if denied:
+        return {"ok": False, "workspace_id": wid, **denied}
     # Checked before the file is written: the bump commits what it just changed, and refusing
     # that commit afterwards would leave a version number on disk that nothing recorded.
     branch, off_floor = _branch_floor(root, action="version bump")

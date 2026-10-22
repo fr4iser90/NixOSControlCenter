@@ -21,6 +21,7 @@ from .permissions import (
     check_shell_command,
     protected_branch,
     secret_paths,
+    repo_ceiling_paths,
 )
 from .profiles import resolve_profile, is_mutating_tool, ProfileContext
 
@@ -209,6 +210,32 @@ def _secret_case(name: str, path: str, *, expect_denied: bool = True) -> FloorAt
     )
 
 
+def _ceiling_case(name: str, path: str, *, expect_denied: bool = True) -> FloorAttempt:
+    """A path against the rule that keeps a repository's own ladder file off the index.
+
+    Worth its own family: rewriting ``.ncc/permissions.json`` is the one commit that widens
+    the ceiling back out, so it looks like ordinary work on an ordinary config file.
+    """
+
+    def probe():
+        blocked = repo_ceiling_paths([path])
+        return Decision(
+            allowed=not blocked,
+            code="denied_repo_ceiling_path" if blocked else "",
+            reason=path if blocked else "",
+        )
+
+    expected = "denied_repo_ceiling_path" if expect_denied else ""
+    return FloorAttempt(
+        _rule(expected),
+        name,
+        "denied_repo_ceiling_path",
+        f"git add -- {path}",
+        probe,
+        expect_denied,
+    )
+
+
 #: Never opened: the pathset classifier only walks strings, so the checkout can be imaginary.
 _CHECKOUT = Path("/srv/ncc-red-team-checkout")
 
@@ -288,6 +315,20 @@ FLOOR_ATTEMPTS: tuple[FloorAttempt, ...] = (
     _secret_case("netrc", ".netrc"),
     _secret_case("untracked_entry", "?? .env"),
     _secret_case("staged_rename", "A  notes.md -> .env.local"),
+    # the file a repository lowers its own ladder from (L13): staging it is the one commit that
+    # widens the ceiling back out, so it is refused by directory, not by exact filename.
+    _ceiling_case("permissions_json", ".ncc/permissions.json"),
+    _ceiling_case("the_whole_directory", ".ncc"),
+    _ceiling_case("another_file_beside_it", ".ncc/hooks.json"),
+    _ceiling_case("untracked_entry", "?? .ncc/permissions.json"),
+    _ceiling_case("staged_rename", "A  notes.md -> .ncc/permissions.json"),
+    _ceiling_case("case_variant", ".NCC/Permissions.JSON"),
+    # the other direction through the index: a staged deletion of the ceiling file lifts the
+    # repo back to its host ceiling as soon as anyone commits what this run left staged.
+    _git_case("rm_cached", "denied_repo_ceiling_path", "rm", "--cached", "--", ".ncc/permissions.json"),
+    _git_case("rm_recursive_dir", "denied_repo_ceiling_path", "rm", "-r", "--", ".ncc"),
+    _git_case("mv_away", "denied_repo_ceiling_path", "mv", ".ncc/permissions.json", "old.json"),
+    _git_case("mv_into_place", "denied_repo_ceiling_path", "mv", "notes.md", ".ncc/permissions.json"),
     # a pathset that names the whole tree is ``git add -A`` under another name; one that
     # leaves the checkout stages work this run was never granted.
     _pathset_case("dot", "denied_blanket_path", "."),
@@ -412,6 +453,7 @@ def run_floor_checks() -> list[RedTeamCheckResult]:
             "hook_bypass",
             "protected_branch",
             "secret_path",
+            "repo_ceiling_path",
             "non_agent_branch",
             "shell_git_write",
         ):

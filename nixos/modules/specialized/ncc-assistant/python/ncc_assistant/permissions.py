@@ -20,6 +20,7 @@ import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 # Keep in sync with nixos/core/base/user/api.nix roleCapabilities
@@ -163,6 +164,14 @@ ENV_ACTOR = "NCC_ASSISTANT_ACTOR"
 #: ladder existed (merge still needs the human ``CONFIRM`` token), so a host that sets
 #: nothing keeps behaving as it always did.
 DEFAULT_REPO_CEILING = "pr"
+
+#: Where a repository lowers the ladder for everybody who works in it (L13). Committed, and
+#: read out of ``HEAD`` — the working tree is exactly what the bounded run is allowed to edit.
+REPO_CEILING_PATH = ".ncc/permissions.json"
+#: Nothing else is in the file. A ``system`` key would speak for the machine rather than the
+#: repository, and an unread key would read back as "a rule nobody applied" — both refused.
+REPO_CEILING_KEYS = frozenset({"version", "repo"})
+REPO_CEILING_VERSION = 1
 
 #: Branches an agent may never push to or merge into without a human in the loop.
 PROTECTED_BRANCHES: tuple[str, ...] = ("main", "master")
@@ -410,6 +419,129 @@ def lowest_grant_today() -> Grant:
     )
 
 
+# --------------------------------------------------------------------------
+# Per-repo ceiling (phase 39 L13) — a repository may only narrow the ladder
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class RepoCeiling:
+    """What one repository narrowed its own ladder to.
+
+    Three answers exist and nothing else: no committed file (``step`` None, nothing narrows),
+    a committed file that parses (a step), and a file that cannot be trusted (``code`` set).
+    The last one floors the repo axis at ``observe`` rather than reading as absent — a
+    narrowing nobody can parse is the same guess the ladder refuses everywhere else.
+    """
+
+    step: str | None = None
+    code: str = ""
+    reason: str = ""
+    hint: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "path": REPO_CEILING_PATH,
+            "ceiling": self.step or "",
+            "code": self.code,
+            "reason": self.reason,
+        }
+
+
+def _ceiling_invalid(what: str) -> RepoCeiling:
+    return RepoCeiling(
+        code="repo_ceiling_invalid",
+        reason=f"{REPO_CEILING_PATH} {what}",
+        hint=f"The repo owner fixes or deletes {REPO_CEILING_PATH} and commits it by hand.",
+    )
+
+
+def _ceiling_unknown(what: str) -> RepoCeiling:
+    return RepoCeiling(
+        code="repo_ceiling_unknown",
+        reason=f"{REPO_CEILING_PATH} could not be read ({what})",
+        hint="Read the repository again, or have the owner remove the file.",
+    )
+
+
+def parse_repo_ceiling(raw: str) -> RepoCeiling:
+    """``{"version": 1, "repo": "commit"}`` → the step this repository lowered itself to.
+
+    The repo axis only: a repository can refuse to be merged, never grant itself a rebuild.
+    Anything that is not exactly that — bad JSON, an unknown key, a step that does not exist —
+    is refused, because a file the owner wrote in good faith that nobody applied is the worst
+    of the three answers: it looks like an opt-down and behaves like none.
+    """
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        return _ceiling_invalid(f"is not JSON ({exc.msg})")
+    if not isinstance(data, dict):
+        return _ceiling_invalid("is not a JSON object")
+    unknown = sorted(set(str(key) for key in data) - set(REPO_CEILING_KEYS))
+    if unknown:
+        return _ceiling_invalid(
+            f"names {', '.join(unknown)}, which a repository does not own "
+            f"(only {', '.join(sorted(REPO_CEILING_KEYS))})"
+        )
+    version = data.get("version", REPO_CEILING_VERSION)
+    if str(version) != str(REPO_CEILING_VERSION):
+        return _ceiling_invalid(f"is version {version!r}; this reads version {REPO_CEILING_VERSION}")
+    step = normalise_step("repo", data.get("repo"))
+    if step is None:
+        return _ceiling_invalid(
+            f"repo={data.get('repo')!r} is not a step ({' > '.join(REPO_STEPS)})"
+        )
+    return RepoCeiling(step=step)
+
+
+def _read_git(root: Path, *args: str) -> tuple[int, str] | None:
+    """``(returncode, stdout)`` of a read-only git call, or None when git could not run."""
+    try:
+        proc = subprocess.run(
+            ["git", *args],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return proc.returncode, proc.stdout or ""
+
+
+def read_repo_ceiling(root: Path | str | None) -> RepoCeiling:
+    """The ceiling ``root`` committed for itself, read out of ``HEAD``.
+
+    Not out of the working tree, and that choice is the whole point: the tree is what the run
+    this file bounds may write, so a tree reader would let a run delete its own narrowing — or
+    rewrite it wider — between two tool calls. Committed content is the only thing a human
+    changed, so committed content is what decides.
+    """
+    if root is None:
+        return RepoCeiling()
+    root = Path(root)
+    listed = _read_git(root, "ls-tree", "HEAD", "--", REPO_CEILING_PATH)
+    if listed is None:
+        return _ceiling_unknown("git ls-tree could not run")
+    if listed[0] != 0:
+        head = _read_git(root, "rev-parse", "--verify", "-q", "HEAD")
+        if head is not None and head[0] != 0:
+            return RepoCeiling()  # nothing committed yet, so nothing was ever lowered
+        return _ceiling_unknown("HEAD could not be listed")
+    entry = listed[1].strip()
+    if not entry:
+        return RepoCeiling()
+    fields = entry.split()
+    if len(fields) < 3 or fields[1] != "blob":
+        return _ceiling_invalid("is committed as something other than a file")
+    body = _read_git(root, "show", fields[2])
+    if body is None or body[0] != 0:
+        return _ceiling_unknown("the committed blob would not read back")
+    return parse_repo_ceiling(body[1])
+
+
 def _held_step(axis: str, grant: Grant) -> str:
     return grant.repo if axis == "repo" else grant.system
 
@@ -418,12 +550,23 @@ def _needed_step(axis: str, action: str) -> str | None:
     return (REPO_ACTIONS if axis == "repo" else SYSTEM_ACTIONS).get(action)
 
 
-def _cover(action: str, *, axis: str, grant: Grant | None = None) -> Decision:
+def _cover(
+    action: str,
+    *,
+    axis: str,
+    grant: Grant | None = None,
+    ceiling: RepoCeiling | None = None,
+) -> Decision:
     """The ladder's answer, unrecorded — the half of ``evaluate`` a catalog may call.
 
     Kept apart on purpose: ``system_flags`` asks about every tool in the registry to
     decide what to *advertise*, and a listing of tools nobody ran must not read afterwards
     like a list of decisions that were made.
+
+    ``ceiling`` is the repository's own lowering of the repo axis (L13). It can only narrow
+    what the run holds; a file that could widen it would be a repository granting itself
+    rights its host never gave, so a step above the grant simply never applies — and the audit
+    line says so rather than leaving the owner to guess which of the two ceilings answered.
     """
     active = grant if grant is not None else current_grant()
     if active is None:
@@ -433,14 +576,41 @@ def _cover(action: str, *, axis: str, grant: Grant | None = None) -> Decision:
     if need is None:
         return Decision(False, "unknown_action", f"no {axis} step defined for {action!r}")
     have = _held_step(axis, active)
+    by_repo = ""
+    if axis == "repo" and ceiling is not None:
+        if ceiling.code:
+            return Decision(False, ceiling.code, ceiling.reason, hint=ceiling.hint)
+        if ceiling.step is not None and step_rank("repo", ceiling.step) < step_rank("repo", have):
+            have, by_repo = ceiling.step, REPO_CEILING_PATH
     if _rank(steps, have) >= _rank(steps, need):
         return Decision(True, "", "")
+    if by_repo:
+        return Decision(
+            False,
+            "grant_insufficient",
+            f"grant {axis}={have} does not cover {action} (needs {need})",
+            hint=f"{by_repo} lowers this repository below its host grant — only a human "
+            "commit there raises it again.",
+        )
     return Decision(
         False,
         "grant_insufficient",
         f"grant {axis}={have} does not cover {action} (needs {need})",
         hint=f"Run with --grant {axis}={need} (bounded by the host ceiling).",
     )
+
+
+def _ceiling_note(ceiling: RepoCeiling | None, active: Grant | None) -> str:
+    """How the repo file gets written into the audit line, in whichever of its states it is."""
+    if ceiling is None:
+        return ""
+    if ceiling.code:
+        return f" ceiling={ceiling.code}"
+    if ceiling.step is None or active is None:
+        return ""
+    if step_rank("repo", ceiling.step) > step_rank("repo", active.repo):
+        return f" ceiling_ignored={ceiling.step}"
+    return f" ceiling={ceiling.step}"
 
 
 def _record(
@@ -450,6 +620,7 @@ def _record(
     *,
     grant: Grant | None = None,
     tool: str = "",
+    ceiling: RepoCeiling | None = None,
 ) -> Decision:
     """Write the line that answers "why did this run merge?" the next morning.
 
@@ -466,6 +637,8 @@ def _record(
     have = _held_step(axis, active) if active is not None else "?"
     need = _needed_step(axis, action) or "?"
     detail = f"axis={axis} {axis}={have} action={action} need={need}"
+    if axis == "repo":
+        detail += _ceiling_note(ceiling, active)
     if not decision.allowed:
         detail = f"code={decision.code} {detail}"
     append_audit(
@@ -479,19 +652,30 @@ def _record(
 
 
 def evaluate(
-    action: str, *, axis: str, grant: Grant | None = None, tool: str = ""
+    action: str,
+    *,
+    axis: str,
+    grant: Grant | None = None,
+    tool: str = "",
+    ceiling: RepoCeiling | None = None,
 ) -> Decision:
     """May ``action`` run under the active (or given) grant? One audit line per answer.
 
     No grant context at all means "not an agent run" — the ladder stays out of the
     way and the caller's own ceiling (profile / allowWrite / confirm) decides.
     """
-    decision = _cover(action, axis=axis, grant=grant)
-    return _record(decision, axis, action, grant=grant, tool=tool)
+    decision = _cover(action, axis=axis, grant=grant, ceiling=ceiling)
+    return _record(decision, axis, action, grant=grant, tool=tool, ceiling=ceiling)
 
 
-def evaluate_repo(action: str, *, grant: Grant | None = None, tool: str = "") -> Decision:
-    return evaluate(action, axis="repo", grant=grant, tool=tool)
+def evaluate_repo(
+    action: str,
+    *,
+    grant: Grant | None = None,
+    tool: str = "",
+    ceiling: RepoCeiling | None = None,
+) -> Decision:
+    return evaluate(action, axis="repo", grant=grant, tool=tool, ceiling=ceiling)
 
 
 def evaluate_system(action: str, *, grant: Grant | None = None, tool: str = "") -> Decision:
@@ -643,6 +827,26 @@ def secret_paths(paths: Iterable[str]) -> list[str]:
     return out
 
 
+#: ``.ncc/`` is where a repository lowers the ladder, so everything under it belongs to the
+#: owner: a run allowed to stage or delete the file is a run allowed to widen itself back out.
+_CEILING_PATH_RE = re.compile(r"(^|/)\.ncc(/|$)", re.IGNORECASE)
+
+
+def repo_ceiling_paths(paths: Iterable[str]) -> list[str]:
+    """Paths that would commit over this repository's own ceiling (L13).
+
+    The whole ``.ncc/`` directory, not just the one file: ``git add -- .ncc`` stages the
+    ceiling exactly as precisely as naming it, and a deny list that misses the directory form
+    is a deny list an ordinary command walks past.
+    """
+    out: list[str] = []
+    for raw in paths:
+        candidate = porcelain_path(raw)
+        if candidate and _CEILING_PATH_RE.search(candidate):
+            out.append(candidate)
+    return out
+
+
 def _denied(code: str, reason: str, hint: str) -> Decision:
     return Decision(False, code, reason, hint)
 
@@ -658,6 +862,10 @@ BLANKET_PATHS = frozenset({".", "./", "*", "./*", "**"})
 
 #: The verbs that move work into the index, and the flags that mean "everything there is".
 _STAGING_SUBCOMMANDS = frozenset({"add", "stage"})
+#: Verbs that move work *out* of the index. They get the ceiling screen only: untracking a
+#: secret is the cleanup this project wants, untracking the ceiling file is the run removing
+#: its own bound — the deletion lands in HEAD the moment anyone commits the index.
+_UNTRACKING_SUBCOMMANDS = frozenset({"rm", "remove", "mv"})
 _STAGING_ALL_FLAGS = frozenset({"-A", "--all", "-u", "--update"})
 _COMMIT_ALL_FLAGS = frozenset({"-a", "--all"})
 #: Commit options whose value is free text: a message names no file, and refusing
@@ -770,7 +978,46 @@ def _check_staging(subcommand: str, args: Sequence[str], *, for_commit: bool) ->
             f"{verb} would stage secret-shaped path(s): {', '.join(secrets[:5])}",
             "Keep secrets out of git; stage the rest by name.",
         )
+    ceiling = repo_ceiling_paths(named)
+    if ceiling:
+        return _denied(
+            "denied_repo_ceiling_path",
+            f"{verb} would stage the path this repository lowers its own ladder from: "
+            f"{', '.join(ceiling[:5])}",
+            f"{REPO_CEILING_PATH} belongs to the repo owner; a run may only be bounded by it.",
+        )
     return None
+
+
+def _check_untracking(subcommand: str, args: Sequence[str]) -> Decision | None:
+    """The ceiling screen for ``rm``/``mv``: untracking the file is the other way to widen.
+
+    Only this file's own screen runs here. ``git rm -- .env`` is the cleanup this project asks
+    for, so the secret screen must not follow a removal; the ceiling file is refused because a
+    staged deletion of it lifts the repo back to its host ceiling the moment the index is
+    committed — by whoever happens to be committing. A removal that names everything cannot be
+    screened either, and ``git rm -r .`` takes the ceiling file with it.
+    """
+    _flag, paths = _staging_argv(args, for_commit=False)
+    named = [_pathspec_path(path) for path in paths]
+    verb = f"git {subcommand}"
+    everywhere = sorted({path for path in named if path in BLANKET_PATHS})
+    if everywhere:
+        return _denied(
+            "denied_blanket_path",
+            f"{verb} {', '.join(everywhere)} removes every tracked file, so a path this module "
+            "screens by name goes unexamined",
+            "Name the paths to remove (git rm -- <path> …).",
+        )
+    ceiling = repo_ceiling_paths(named)
+    if not ceiling:
+        return None
+    return _denied(
+        "denied_repo_ceiling_path",
+        f"{verb} would untrack the path this repository lowers its own ladder from: "
+        f"{', '.join(ceiling[:5])}",
+        f"{REPO_CEILING_PATH} belongs to the repo owner; a run may only be bounded by it.",
+    )
 
 
 def check_git_argv(argv: Sequence[str]) -> Decision:
@@ -825,6 +1072,12 @@ def check_git_argv(argv: Sequence[str]) -> Decision:
         staging = None
     if staging is not None:
         return staging
+
+    # Untracking last: it carries no hook or history meaning, only "this file leaves the index".
+    if subcommand in _UNTRACKING_SUBCOMMANDS:
+        removal = _check_untracking(subcommand, rest)
+        if removal is not None:
+            return removal
 
     return Decision(True, "", "")
 

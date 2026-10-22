@@ -355,6 +355,29 @@ def _cmd_maintenance_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _permissions_show_repo_file() -> dict[str, object] | None:
+    """What the active repository lowered its own ladder to, or None when no repo is in scope.
+
+    Read for display, and read the way the ladder reads it — out of ``HEAD``, not out of the
+    working tree — so this line and the refusal a run actually hits cannot disagree.
+    """
+    from .permissions import REPO_CEILING_PATH, read_repo_ceiling
+    from .preferences import get_active_workspace_id
+    from .workspaces import get_workspace
+
+    wid = get_active_workspace_id()
+    ws = get_workspace(wid) if wid else None
+    if ws is None:
+        return None
+    root = Path(str(ws.path)).expanduser()
+    if not (root / ".git").exists():
+        return None
+    payload = read_repo_ceiling(root).as_dict()
+    payload["workspace"] = wid
+    payload["path"] = REPO_CEILING_PATH
+    return payload
+
+
 def _cmd_permissions_show(args: argparse.Namespace) -> int:
     """Show the permission ladder as this host sees it right now."""
     import os
@@ -364,6 +387,7 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
         DEFAULT_REPO_CEILING,
         ENV_REPO_CEILING,
         PROTECTED_BRANCHES,
+        REPO_CEILING_PATH,
         REPO_STEPS,
         SYSTEM_STEPS,
         current_grant,
@@ -376,6 +400,7 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
     system_ceiling_step = system_ceiling(settings.writes_enabled, settings.allow_rebuild)
     grant, violations = resolve_run_grant(settings, getattr(args, "grant", None))
     active = current_grant()
+    repo_file = _permissions_show_repo_file()
     from . import budgets, poll_guard
 
     budget = budgets.summary()
@@ -385,6 +410,7 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
         "ceiling": {"repo": repo_ceiling, "system": system_ceiling_step},
         "effective": grant.as_dict() if grant else {"repo": repo_ceiling, "system": system_ceiling_step},
         "activeRunGrant": active.as_dict() if active else None,
+        "repoFile": repo_file,
         "ladder": {"repo": list(REPO_STEPS), "system": list(SYSTEM_STEPS)},
         "protectedBranches": list(PROTECTED_BRANCHES),
         "floor": [
@@ -392,6 +418,7 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
             "hook bypass (--no-verify, --no-gpg-sign, -c commit.gpgsign=…)",
             "protected branches for direct pushes",
             "secret paths are never staged, and nothing stages blindly: commits take a pathset",
+            f"{REPO_CEILING_PATH} is never staged: a repository may lower its ladder, a run may not raise it",
         ],
         "budget": budget,
         "poll": poll,
@@ -411,6 +438,17 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
             else "no grant requested — host config decides"
         )
     )
+    if repo_file is None:
+        print_info(f"Repo file:     no workspace in scope, so {REPO_CEILING_PATH} was not read")
+    elif repo_file["code"]:
+        print_err(f"Repo file:     {repo_file['code']} — {repo_file['reason']}")
+    elif repo_file["ceiling"]:
+        print_info(
+            f"Repo file:     {repo_file['ceiling']} in {repo_file['workspace']} — "
+            "this repository runs below its host ceiling"
+        )
+    else:
+        print_info(f"Repo file:     {REPO_CEILING_PATH} not committed — the host ceiling decides")
     print_info(f"Ladder repo:   {' > '.join(REPO_STEPS)}")
     print_info(f"Ladder system: {' > '.join(SYSTEM_STEPS)}")
     print_info(f"Protected:     {', '.join(PROTECTED_BRANCHES)}")

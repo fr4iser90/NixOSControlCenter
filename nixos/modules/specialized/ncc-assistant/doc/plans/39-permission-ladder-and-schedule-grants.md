@@ -1,6 +1,6 @@
 # Phase 39 — Permission ladder & per-schedule grants
 
-**Status:** L1–L11 + L14 done · L12–L13 open
+**Status:** L1–L11 + L13 + L14 done · L12 open
 **Parent:** [roadmap.md](../roadmap.md)
 **Depends on:** phase 38 (grants are scoped to a repo identity), phase 22 (approvals), schedules
 **Unblocks:** unattended GitHub work (ship/PR flows), idle autonomy without a human watching
@@ -243,7 +243,7 @@ Small, but the ladder is pointless if the agent can only wake at a fixed time:
 | L3 | done | `Agent.run` refuses before any LLM call and audits `grant_denied`; `grantConflicts`/`budgetConflicts` warn at eval |
 | L4 | done | `decide_system` weighs the host ceiling first and the run's grant second, so one answer covers every route; `system_flags` narrows the advertised catalog the same way; `runtime._may` is the only reader of `writes_enabled`/`allow_rebuild` (`:442`, `:538`, `:1515` pass them as arguments, none branch). The `call()` dispatcher stays grant-only by measurement: `_tool_is_mutating` also fires on `domain.*` mutating *verbs*, so adding the ceiling there would newly block `risk = "read"` tools under `allowWrite = false` |
 | L5 | done | `grants.repoCeiling`/`grants.budget`, per-schedule `permissions.{repo,system,budget}` |
-| L6 | done | `check_git_argv` + `check_branch` + `check_shell_command` + `_merge_base_floor`; eight `denied_*` codes plus fail-closed `merge_base_unknown` |
+| L6 | done | `check_git_argv` + `check_branch` + `check_shell_command` + `_merge_base_floor`; eight `denied_*` codes plus fail-closed `merge_base_unknown` — L13 added the ninth, `denied_repo_ceiling_path` |
 | L7 | done (except merge) | `red_team.py` probes every `denied_*` code and fails CI on an uncovered new one; the merge-base floor is covered by `tests/ncc-assistant/test_merge_protected_base_v1.py`, not by `red_team.py` — reading a PR base needs a network, which the probe cannot fake purely |
 | L8 | done | `budgets.py`; counters arrive as `NCC_ASSISTANT_BUDGET_*`, checked before the LLM call |
 | L9 | done | `permissions._record` is the ladder's only audit writer and `evaluate`/`decide_system` call it, so no decision route can omit the line: `grant_evaluated` carries the axis, the held and needed step, the refusal code, the actor and the tool. The run-level line was renamed `grant_resolved` — "what the run was handed" and "what it asked to do" are different questions. Two paths deliberately stay silent: `system_flags` asks `_cover` (an unrecorded verdict) so a catalog refresh cannot bury the real decisions, and the `call()` dispatcher pre-checks with `peek_system` then `record_denial`, so a gated call writes one line rather than two. The dispatcher's old bare `deny` line for the ladder is gone; the kill-switch keeps its own |
@@ -252,10 +252,10 @@ Small, but the ladder is pointless if the agent can only wake at a fixed time:
 list and when it last acted — a schedule that skips 96 ticks a day looks broken unless the tool says
 otherwise. Evaluation refuses the shapes that could only burn a model every interval — poll without interval or watch, unusable watch entries, a non-agent poll, poll+`onCalendar`, calendar+`pollWatch`, calendar without `onCalendar`. `tests/ncc-assistant/test_poll_trigger_v1.py` |
 | L12 | open | no `after` option on a schedule |
-| L13 | open | no per-repo `permissions.json` |
+| L13 | done | `.ncc/permissions.json` — `{"version": 1, "repo": "<step>"}`, read out of **HEAD** (`ls-tree` + `git show`), never the worktree: the working tree is precisely what a bounded run may write, so deleting, widening or corrupting the file on disk moves nothing. Strict grammar (`repo` only, one version) because the system axis is the host's and a repo that speaks for it is refused, not ignored. Lower-only by construction: `_cover` takes the *lower* of held step and file step, so a file above the run's step cannot widen anything and is audited `ceiling_ignored=<step>` — the owner reads which answer was narrower instead of guessing. Anything unreadable **floors** the axis (`repo_ceiling_invalid`/`repo_ceiling_unknown`, not `denied_`-prefixed: nothing was escalated, the file just cannot be trusted) and the refusal reaches the audit as `ceiling=<code>`. Escalation-by-commit is closed by a floor on the whole `.ncc/` directory — `denied_repo_ceiling_path` on argv (`add`/`commit`, and `rm`/`mv` in either direction, since a staged deletion drops the ceiling the moment anyone commits the index), on the `commit_all` pathset, and on the human CLI path: a repository may lower its ladder, a run may not raise it. `permissions show` reports the narrowing from the same HEAD read (`repoFile` in `--json`). `tests/ncc-assistant/test_repo_permissions_v1.py` |
 | L14 | done | Three disagreements between the old knobs and `permissions.*` now warn at evaluation. **Profile vs grant:** a profile is what *opens* the write/rebuild tools — `resolve_profile` keeps its built-in flags unless the grant lowers them and nothing raises them (an agent run hands it no override), so a schedule whose grant carries `system` above its profile's reach holds a step the ladder approves and the tool catalog cannot perform; every such write dies in the profile check instead of the audit trail. `profileSystemReach` compares the two, aliases included (`cautious`/`autonomous`, because `profiles.py` resolves them — deliberately *not* merged into `profileStepMap`, which derives the steps a unit is handed and must never widen them). An unknown name counts as reaching nothing, matching the read-only fallback, so a typo is loud. **Host pair vs agent pair:** `hostCeiling.system` was the agent pair alone, so evaluation blessed a unit that then refused at the first write; it is now `minStep` of the host pair and the agent pair, mirroring `resolve_run_grant`, and `ceilingInversions` names the case where `agent.allowWrite`/`agent.allowRebuild = true` cannot open what `allowWrite`/`allowRebuild = false` closed. The min only ever narrows *derived* steps — an explicit `permissions.*` stays as asked so the run refuses loudly rather than quietly doing less. **Display:** `perms.repo or "-"` did not cover a present-but-null option (`or` guards a *missing* attribute only), so the above-ceiling message aborted evaluation with "cannot coerce null to a string" — the config error replacing the message meant to explain it. `shownStep` renders both steps. |
 
-Still open from the design, beyond L12–L13:
+Still open from the design, beyond L12:
 `NCC_ASSISTANT_AGENT_CONFIRM/_DRY_RUN/_PROFILE` are
 still read into `Settings` and used by nobody (§1 said "real consumers or removed") — what the
 runtime acts on is the unsuffixed `AGENT_CONFIRM`/`AGENT_DRY_RUN`/`AGENT_PROFILE`
@@ -336,6 +336,11 @@ actor `idle`, so an opportunistic run never outranks the narrowest grant already
 2. Grant lifetime: per run (recommendation) or "valid for the day" — the second is friendlier
    and much harder to reason about after the fact.
 3. Should the ladder live in the repo (`.ncc/permissions.json`, lower-only, L13) so a repo can
-   opt down without a host rebuild?
+   opt down without a host rebuild? **Decided: yes, and only ever down.** It is read from `HEAD`
+   so the file a run is allowed to write cannot be the file that bounds it, the grammar carries
+   the repo axis alone so a repository cannot speak for the machine, and the whole `.ncc/`
+   directory is off-limits to staging in both directions — the commit that would relax a
+   narrowing is refused exactly like the commit that would introduce one. A repo that ships a
+   broken file gets the loud answer (`ceiling=repo_ceiling_invalid`), never the absent one.
 4. Does a PR-merge trigger belong here (webhook/poll of "PR ready") or in a later phase with
    real event sources?
