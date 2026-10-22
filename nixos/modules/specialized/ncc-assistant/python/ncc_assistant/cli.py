@@ -401,10 +401,11 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
     grant, violations = resolve_run_grant(settings, getattr(args, "grant", None))
     active = current_grant()
     repo_file = _permissions_show_repo_file()
-    from . import budgets, poll_guard
+    from . import budgets, chain_guard, poll_guard
 
     budget = budgets.summary()
     poll = poll_guard.display()
+    chain = chain_guard.display()
     payload = {
         "invokerRole": invoker_role(),
         "ceiling": {"repo": repo_ceiling, "system": system_ceiling_step},
@@ -422,6 +423,7 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
         ],
         "budget": budget,
         "poll": poll,
+        "chain": chain,
         "violations": violations,
     }
     if getattr(args, "json", False):
@@ -461,12 +463,45 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
             f"Poll:          {poll['schedule']} watching {', '.join(poll['watch']) or 'nothing'}"
             + (f" — last acted {poll['lastActedAt']}" if poll["lastActedAt"] else " — no baseline yet")
         )
+    if chain["applies"]:
+        print_info(
+            f"Chain:         {chain['schedule']} waits on {chain['after']}"
+            + (
+                f" — last ended {chain['upstreamStatus']} at {chain['upstreamAt']}"
+                if chain["upstreamStatus"]
+                else " — no outcome recorded yet"
+            )
+            + (f", acted on it {chain['actedAt']}" if chain["actedAt"] else "")
+        )
     for line in violations:
         print_err(line)
     if violations:
         print_err("Grant refused — raise the host option or lower the grant.")
         return 1
     return 0
+
+
+def _cmd_chain_release(args: argparse.Namespace) -> int:
+    """Decide whether a schedule that just ended may wake the schedules chained after it.
+
+    Called from the upstream unit's ``ExecStartPost`` — never by the agent, which is why the wake
+    list lives in the unit and not here. Exit 0 means "wake", 1 means "hold": the generated unit
+    script turns that into ``systemctl start`` or a journal line, so the answer is auditable
+    without a shell in the run being able to start anything itself.
+    """
+    from .chain_guard import release_decision
+
+    decision = release_decision(getattr(args, "schedule", ""))
+    if getattr(args, "json", False):
+        print(json.dumps({"wake": decision.allowed, "code": decision.code, "reason": decision.reason}, indent=2))
+        return 0 if decision.allowed else 1
+    if decision.allowed:
+        print_ok(f"Chain release: {decision.reason} — waking what declared after = {args.schedule}")
+        return 0
+    print_info(f"Chain held: {decision.reason}")
+    if decision.hint:
+        print_info(decision.hint)
+    return 1
 
 
 def _cmd_knowledge_sync(args: argparse.Namespace) -> int:
@@ -1384,6 +1419,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     perms_show.add_argument("--json", action="store_true")
 
+    chain_p = sub.add_parser(
+        "chain", help="Scheduled chains: what a completed schedule is allowed to wake"
+    )
+    chain_sub = chain_p.add_subparsers(dest="chain_cmd")
+    chain_release = chain_sub.add_parser(
+        "release", help="Decide whether the schedule that just ended may wake its dependents"
+    )
+    chain_release.add_argument(
+        "--schedule",
+        required=True,
+        metavar="ID",
+        help="The schedule whose unit just ended (its ExecStartPost passes its own name)",
+    )
+    chain_release.add_argument("--json", action="store_true")
+
     playbook_p = sub.add_parser("playbook", help="Playbook management")
     playbook_sub = playbook_p.add_subparsers(dest="playbook_cmd")
     playbook_list = playbook_sub.add_parser("list", help="List playbooks")
@@ -1764,6 +1814,12 @@ def main(argv: list[str] | None = None) -> int:
     if command == "permissions":
         if args.permissions_cmd == "show":
             return _cmd_permissions_show(args)
+        parser.print_help()
+        return 1
+
+    if command == "chain":
+        if args.chain_cmd == "release":
+            return _cmd_chain_release(args)
         parser.print_help()
         return 1
 

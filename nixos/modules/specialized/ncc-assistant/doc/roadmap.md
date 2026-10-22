@@ -92,7 +92,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 | 36 | [Feature plugins](./plans/36-feature-plugins.md) | **in progress** (Plugins tab + doomscroll extracted; ≠ MCP/templates/watchdogs) |
 | 37 | [Autonomous workspace workflow](./plans/37-autonomous-workspace-workflow.md) | **done** (per-task PR + resume + CONFIRM) |
 | 38 | [Repo & account fact store](./plans/38-repo-account-fact-store.md) | **proposed** (identity = remote not path; git/github read tools) |
-| 39 | [Permission ladder & per-schedule grants](./plans/39-permission-ladder-and-schedule-grants.md) | **L1–L11 + L13 + L14 done** (grant transport, steps, floor, budgets, one decision point, per-decision audit, actor, poll trigger, per-repo ladder file, eval-time conflict warnings); L12 open |
+| 39 | [Permission ladder & per-schedule grants](./plans/39-permission-ladder-and-schedule-grants.md) | **L1–L14 done** (grant transport, steps, floor, budgets, one decision point, per-decision audit, actor, poll trigger, scheduled chains, per-repo ladder file, eval-time conflict warnings) |
 
 ## Feature map (checklist)
 
@@ -206,7 +206,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 - `workspaces rename|move` rewrite every reference (tasks, MCP bindings, progress files) or roll back
 - SSOT: [plans/38-repo-account-fact-store.md](./plans/38-repo-account-fact-store.md)
 
-### Phase 39 (L1–L11 + L13 done)
+### Phase 39 (L1–L14 done)
 
 - [x] Transport fixed: the schedule's grant travels in the unit's argv (`--grant repo=… system=…`);
   the wrapper exports defaults, so it no longer overwrites what the unit decided
@@ -241,7 +241,12 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 - [x] A repository may lower its own ladder: `.ncc/permissions.json` read from `HEAD`, repo axis
   only, and the whole `.ncc/` directory refused in both directions of the index — a run can neither
   commit a widening nor untrack the file that bounds it (`denied_repo_ceiling_path`)
-- [ ] Scheduled chains (`after = "nightly-audit"`)
+- [x] Scheduled chains: `after = "nightly-audit"` is an event, not a second timer —
+  `OnUnitInactiveSec=` measures relative to the unit the timer itself activates, so no timer can
+  wait on a sibling schedule. The upstream's `ExecStartPost` asks `ncc-assistant chain release` and
+  may wake only what declared it, proved by systemd's `$INVOCATION_ID` so a skipped run (still
+  exit 0) and an older `completed` left on disk wake nothing; the downstream re-checks before the
+  budget counters and the model, and a completion is spent by a finished run only
 - SSOT: [plans/39-permission-ladder-and-schedule-grants.md](./plans/39-permission-ladder-and-schedule-grants.md)
 
 ## Known follow-ups (not blockers)

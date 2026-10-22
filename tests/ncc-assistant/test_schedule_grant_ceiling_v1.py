@@ -101,6 +101,7 @@ def sched(**over) -> str:
     base = {
         "enable": "true",
         "onCalendar": '"daily"',
+        "after": "null",
         "persistent": "true",
         "goal": "null",
         "playbook": "null",

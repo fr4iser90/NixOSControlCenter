@@ -174,7 +174,7 @@ counter off, `null` keeps the default:
 
 Every decision carries its actor (`schedule:nightly-ship`, `cli`, `companion`), so
 `ncc-assistant approve list` reads back as "nightly-ship asked to merge, allowed 41 s later".
-Not wired yet: schedule chains (`after = "…"`).
+Schedules can also wait on each other — see `after = "…"` below.
 
 ## Poll schedules (change-driven, not clock-driven)
 
@@ -208,6 +208,53 @@ guesses "unchanged" once makes the schedule quietly never run again. Evaluation 
 that could only burn a model (a poll without `pollInterval` or `pollWatch`, an unusable watch entry,
 `trigger = "poll"` on a probe, `pollWatch` on a calendar schedule, a calendar without `onCalendar`).
 Read it back with `ncc ai permissions show` — the poll gate and its watch list are in the payload.
+
+## Chained schedules (after another schedule completed)
+
+`after` makes one schedule's completion the trigger for another, so `audit → ship` is declared
+instead of two timers guessed apart:
+
+```nix
+agent.schedules.nightly-audit = {
+  enable = true;
+  onCalendar = "*-*-* 03:00:00";
+  permissions = { repo = "propose"; system = "none"; };
+  goal = "Audit the config and write the report.";
+};
+agent.schedules.ship-after-audit = {
+  enable = true;
+  after = "nightly-audit";          # no onCalendar: nothing but the completion wakes it
+  permissions = { repo = "pr"; system = "none"; };
+  goal = "Ship what the audit found.";
+};
+```
+
+A chained schedule gets **no timer** unless it also sets `onCalendar` (then the clock runs as
+well, and one completion still starts it only once). systemd cannot express this itself:
+`OnUnitInactiveSec=` is measured relative to *the unit the timer itself activates*, so a timer can
+never wait on a sibling schedule. The upstream unit's `ExecStartPost` asks
+`ncc-assistant chain release --schedule <id>` and starts the dependents only if that answers yes —
+inside a store script built at evaluation time, so the agent's own shell tools never hold
+`systemctl` and finishing a chain grants a run no new capability.
+
+Nothing woke means nothing was claimed. A run the chain, poll or budget gate held still exits 0,
+and a `completed` left on disk by an *earlier* start of the same unit proves nothing about this
+one, so the release checks the outcome recorded by this `$INVOCATION_ID` and refuses otherwise.
+The downstream checks for itself before the budget counters and the first LLM call and skips with
+one of `chain_upstream_unknown` / `chain_upstream_not_completed` / `chain_upstream_acted` —
+`unknown` is never read as `completed`, so "nothing ran" and "it finished" stay different answers.
+
+A completion is spent by a **finished** run only: a downstream that crashed or was cancelled keeps
+its wake-up, one completion starts it exactly once, and the next completion wakes it again. Only a
+schedule's own unit may record an outcome — a human `ncc ai agent run` and the idle sweep write
+nothing, so neither can fake a completion for something waiting on it.
+
+Evaluation refuses a chain that could only sit silent: `after` pointing at itself, at an id no
+schedule on this host declares (the message lists the ids that do), at a schedule that is switched
+off, at a `kind = "probe"` schedule, or around a loop. Read it back with
+`ncc ai permissions show` — the run's `after`, how that upstream last ended and when this schedule
+acted on it are all in the payload; `ncc ai chain release --schedule <id>` exits 0 only when
+waking is allowed.
 
 ## GUI
 

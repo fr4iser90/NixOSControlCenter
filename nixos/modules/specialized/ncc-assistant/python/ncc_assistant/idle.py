@@ -8,6 +8,7 @@ import time
 from contextlib import contextmanager
 from typing import Any, Iterator
 
+from .chain_guard import ENV_CHAIN_AFTER, ENV_CHAIN_SCHEDULE
 from .paths import activity_file
 from .permissions import (
     ENV_ACTOR,
@@ -103,6 +104,7 @@ def list_idle_candidates() -> list[dict[str, Any]]:
                         "dryRun": bool(getattr(s, "dryRun", True)),
                         "trigger": getattr(s, "trigger", "calendar") or "calendar",
                         "pollWatch": list(getattr(s, "pollWatch", []) or []),
+                        "chainAfter": getattr(s, "after", None),
                     }
                 )
         except Exception:
@@ -152,6 +154,36 @@ def _run_scoped_poll(candidate: dict[str, Any]) -> Iterator[None]:
             os.environ[ENV_POLL_WATCH] = ",".join(str(e) for e in (candidate.get("pollWatch") or []))
         else:
             for name in _POLL_ENV:
+                os.environ.pop(name, None)
+        yield
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
+_CHAIN_ENV = (ENV_CHAIN_SCHEDULE, ENV_CHAIN_AFTER)
+
+
+@contextmanager
+def _run_scoped_chain(candidate: dict[str, Any]) -> Iterator[None]:
+    """Give one candidate its own chain identity — or take it away.
+
+    Same reason as the poll identity, opposite risk: a chained schedule left in a companion's
+    environment would make every later run wait on a schedule the operator never asked about,
+    and a chained schedule swept *without* it would run with the gate off — the one path where
+    "ship after audit" could be skipped by picking the idle moment.
+    """
+    saved = {name: os.environ.get(name) for name in _CHAIN_ENV}
+    try:
+        after = str(candidate.get("chainAfter") or "").strip()
+        if after:
+            os.environ[ENV_CHAIN_SCHEDULE] = str(candidate.get("id") or "")
+            os.environ[ENV_CHAIN_AFTER] = after
+        else:
+            for name in _CHAIN_ENV:
                 os.environ.pop(name, None)
         yield
     finally:
@@ -268,7 +300,7 @@ def maybe_sweep(*, start: bool = False) -> dict[str, Any]:
                     # A sweep that swallows every event would report an unchanged poll as
                     # "finished": the operator would read work done where none happened.
                     skipped: dict[str, Any] = {}
-                    with _run_scoped_grant(), _run_scoped_poll(c):
+                    with _run_scoped_grant(), _run_scoped_poll(c), _run_scoped_chain(c):
                         for ev in run_agent(
                             str(goal),
                             settings,

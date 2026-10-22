@@ -242,11 +242,52 @@ let
   # Interpolating them raw aborts evaluation; comparing them raw reads a null watch as "set".
   calendarOf = schedule: if (schedule.onCalendar or null) == null then "" else schedule.onCalendar;
   watchListOf = schedule: if (schedule.pollWatch or null) == null then [ ] else schedule.pollWatch;
+
+  # --- Scheduled chain (phase 39 L12) -------------------------------------------------
+  # `after = "nightly-audit"` says: this schedule runs because that one finished, not because a
+  # wall clock said so. systemd cannot express it — OnUnitInactiveSec= measures the unit the
+  # timer itself activates, never a sibling — so the declaration here is enforced by two things:
+  # a post-start step on the upstream unit (the only thing allowed to start the dependent) and a
+  # gate on the dependent's own run (python/ncc_assistant/chain_guard.py). Every way a chain
+  # could quietly not mean what it says is refused at evaluation: an id nobody declared, an
+  # upstream switched off, a probe that never records an outcome, and a loop nobody can enter.
+  allSchedules = cfg.agent.schedules or { };
+  afterOf = schedule: if (schedule.after or null) == null then "" else schedule.after;
+  isChained = schedule: afterOf schedule != "";
+  # Only enabled schedules get woken: `systemctl start` runs a disabled unit too, so a dependent
+  # the host switched off must not appear on anybody's wake list.
+  chainDependents = name: attrNames (filterAttrs (_: s: afterOf s == name) enabledSchedules);
+  chainAfterOf = id:
+    let upstream = allSchedules.${id} or null; in
+    if upstream == null then "" else afterOf upstream;
+  # The path back to the start, or [ ]. Nobody may be first in a loop, so no run ever records
+  # the completion the next one waits for — the whole chain would sit silent forever.
+  chainCycle = name:
+    let
+      walk = path: current:
+        let next = chainAfterOf current; in
+        if next == "" then [ ]
+        else if builtins.elem next path then path ++ [ next ]
+        else walk (path ++ [ next ]) next;
+    in
+      walk [ name ] name;
+  # A chained schedule with no clock of its own has no timer to build — what wakes it is the
+  # completion above, and an empty OnCalendar= would be an invalid unit. With onCalendar set as
+  # well it keeps the timer as a fallback: whichever comes first runs, the completion is spent
+  # once, and the other wake-up is skipped by the gate rather than doing the job twice.
+  hasClock = schedule: isPoll schedule || calendarOf schedule != "";
+  clockedSchedules = filterAttrs (_: s: hasClock s) enabledSchedules;
+
   triggerProblems = name: schedule:
     let
       poll = isPoll schedule;
       watch = watchListOf schedule;
       badWatch = filter (entry: !watchEntryOk entry) watch;
+      after = afterOf schedule;
+      declaredIds = attrNames allSchedules;
+      # A submodule option the host never set is present as null, and looking an empty string up
+      # in an attrset throws — so the un-chained case has to be null rather than a miss.
+      upstream = if after == "" then null else (allSchedules.${after} or null);
     in
       optionals (poll && (schedule.kind or "agent") != "agent") [
         ''
@@ -276,10 +317,13 @@ let
           other prefix). An entry the guard cannot resolve would make every poll look unchanged.
         ''
       ]
-      ++ optionals (!poll && calendarOf schedule == "") [
+      # A chained schedule has no clock by design — the completion it waits on is its trigger —
+      # so this arm only speaks for a schedule left on its own timer.
+      ++ optionals (!poll && calendarOf schedule == "" && after == "") [
         ''
           trigger = calendar needs onCalendar (e.g. "daily", "*-*-* 03:00:00"), or set
-          trigger = poll with pollInterval + pollWatch. A timer with neither trigger never fires.
+          trigger = poll with pollInterval + pollWatch, or after = "<schedule-id>" so another
+          schedule's completion is what wakes it. A timer with neither trigger never fires.
         ''
       ]
       # Both of these are a schedule that reads one way and behaves another: the operator sees a
@@ -300,6 +344,43 @@ let
       ]
       ++ optionals (poll && name == "") [
         "trigger = poll needs a schedule id (unit name)."
+      ]
+      # A chain that cannot be satisfied is worse than no chain: the dependent would sit silent
+      # forever and read as a schedule that quietly stopped mattering. All four below are the
+      # ways "wait for X" ends up waiting for something that never happens.
+      ++ optionals (after != "" && after == name) [
+        ''
+          after = "${name}" points at this schedule itself: it would have to finish before it
+          starts. Name another schedule, or drop after and let it run on its own clock.
+        ''
+      ]
+      ++ optionals (after != "" && upstream == null) [
+        ''
+          after = "${after}" is not a schedule on this host${
+            optionalString (declaredIds != [ ]) " (declared: ${concatStringsSep ", " declaredIds})"
+          }.
+          Nothing will ever wake this one, and its own gate refuses every run — unknown is never
+          reported as completed.
+        ''
+      ]
+      ++ optionals (upstream != null && ! (upstream.enable or true)) [
+        ''
+          after = "${after}" is switched off (enable = false), so it will never record a
+          completion and this schedule can never run. Enable the upstream or drop the chain.
+        ''
+      ]
+      ++ optionals (upstream != null && (upstream.kind or "agent") != "agent") [
+        ''
+          after = "${after}" is kind = "probe": a probe records no run outcome, so the completion
+          this schedule waits for never arrives. Chain behind an agent schedule instead.
+        ''
+      ]
+      ++ optionals (after != "" && after != name && chainCycle name != [ ]) [
+        ''
+          after forms a loop: ${concatStringsSep " → " (chainCycle name)}
+          Nobody in a loop can be first, so nobody ever ends completed for the next to wait on
+          and the whole chain stays silent. Break it.
+        ''
       ];
   triggerErrors = filterAttrs (name: s: triggerProblems name s != [ ]) enabledSchedules;
 
@@ -311,6 +392,34 @@ let
       NCC_ASSISTANT_POLL_INTERVAL = pollInterval schedule;
       NCC_ASSISTANT_POLL_WATCH = concatStringsSep "," (watchListOf schedule);
     };
+
+  # Both halves of a chained run's identity: who it is, so it can tell a completion it already
+  # acted on from one it has not, and which schedule it owes the run to.
+  chainEnvironment = name: schedule:
+    optionalAttrs (isChained schedule) {
+      NCC_ASSISTANT_CHAIN_SCHEDULE = name;
+      NCC_ASSISTANT_CHAIN_AFTER = afterOf schedule;
+    };
+
+  # ExecStartPost is the only real "this run is over" edge systemd gives a oneshot
+  # (systemd.service(5): it runs only after ExecStart exited successfully) — but a schedule the
+  # chain or poll gate held also exits 0, so unit success is not proof of a completed run. The
+  # wake is therefore asked for, never assumed: ncc-assistant answers from the outcome *this
+  # very unit invocation* recorded, and the unit list below is fixed at evaluation time inside a
+  # read-only store script. That placement is the point — the agent's own shell tools never get
+  # systemctl, so finishing a chain grants a run no capability it did not already have.
+  mkChainWakeScript = name: dependents:
+    pkgs.writeShellScript "ncc-assistant-chain-${name}" ''
+      ${mkHomePreamble}
+      if ${pkg.nccAssistant}/bin/ncc-assistant chain release --schedule ${lib.escapeShellArg name}; then
+      ${concatMapStringsSep "\n" (dep: ''
+        ${pkgs.systemd}/bin/systemctl --no-block start ncc-assistant-schedule-${dep}.service \
+          || ${ui.messages.warning "ncc-assistant: ${name} completed but could not wake ${dep}"}
+      '') dependents}
+      else
+        ${ui.messages.info "ncc-assistant: ${name} did not complete — chain held, nothing woken"}
+      fi
+    '';
 
   mkAgentExec = name: schedule:
     let
@@ -359,6 +468,7 @@ let
       grant = effectiveGrant schedule;
       writes = (stepRank systemRanks grant.system) >= (stepRank systemRanks "config-write");
       rebuilds = grant.system == "rebuild";
+      dependents = chainDependents name;
     in {
     "ncc-assistant-schedule-${name}" = {
       description = "NCC Assistant scheduled job: ${name}";
@@ -373,6 +483,8 @@ let
           else "${mkAgentExec name schedule}";
         StandardOutput = "journal";
         StandardError = "journal";
+      } // optionalAttrs (dependents != [ ]) {
+        ExecStartPost = "${mkChainWakeScript name dependents}";
       };
 
       environment = {
@@ -395,6 +507,7 @@ let
         # anything set in this unit outranks agent.notifications.* — the wrapper keeps the
         # host value unless the narrowest scope declared its own.
       } // budgetEnvironment schedule // pollEnvironment name schedule
+        // chainEnvironment name schedule
         // optionalAttrs (schedule.model != null) {
         NCC_ASSISTANT_MODEL = schedule.model;
       } // optionalAttrs ((cfg.model or null) != null && schedule.model == null) {
@@ -435,7 +548,9 @@ in
   config = mkIf (cfg.enable or false) (mkMerge [
     (mkIf hasSchedules {
       systemd.services = mkMerge (mapAttrsToList mkScheduleService enabledSchedules);
-      systemd.timers = mkMerge (mapAttrsToList mkScheduleTimer enabledSchedules);
+      # Only schedules with a clock get a unit: a chained one is woken by the completion it
+      # waits for, and a timer with an empty OnCalendar= would fail the whole rebuild.
+      systemd.timers = mkMerge (mapAttrsToList mkScheduleTimer clockedSchedules);
     })
 
     {

@@ -41,6 +41,7 @@ in
               "mcp-install"
               "maintenance"
               "permissions"
+              "chain"
             ];
             shortHelp = "ai - AI Assistant";
             longHelp = ''
@@ -83,6 +84,7 @@ in
                 ncc ai mcp-install NAME
                 ncc ai maintenance run [--json]
                 ncc ai permissions show [--grant repo=pr] [--json]
+                ncc ai chain release --schedule ID [--json]
                 ncc ai serve-openapi
                 ncc ai watchdog list|fire EVENT
                 ncc ai probe disk

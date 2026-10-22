@@ -30,15 +30,21 @@ class ScheduleSpec:
     trigger: str = "calendar"  # calendar | poll (phase 39 L11)
     pollInterval: str | None = None
     pollWatch: list[str] = field(default_factory=list)
+    after: str | None = None  # schedule id whose completion wakes this one (phase 39 L12)
     source: str = "user"  # builtin | user | nix
     path: str | None = None
 
     @property
     def frequency(self) -> str:
-        """How often it fires, stated honestly: a poll has no calendar to quote."""
+        """How often it fires, stated honestly: a poll has no calendar to quote, and a chain
+        with no calendar of its own has no time at all — only a predecessor."""
         if (self.trigger or "calendar") == "poll":
             return f"every {self.pollInterval or 'poll interval'}"
-        return self.onCalendar or "daily"
+        if self.onCalendar:
+            return self.onCalendar
+        if self.after:
+            return f"after {self.after} completes"
+        return "daily"
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -57,11 +63,16 @@ class ScheduleSpec:
     ) -> "ScheduleSpec":
         trigger = data.get("trigger") or "calendar"
         watch = data.get("pollWatch", data.get("poll_watch"))
+        after = data.get("after")
         return cls(
             name=name or data.get("name", ""),
             # A poll has no calendar; inventing "daily" here would show a poll as a schedule
-            # that never fires at the times its own timer says it does.
-            onCalendar=data.get("onCalendar") or data.get("on_calendar") or (None if trigger == "poll" else "daily"),
+            # that never fires at the times its own timer says it does. Same for a chained
+            # schedule: what wakes it is another schedule's completion, so a clock it does not
+            # have must not be shown — nor written back by ``nix_snippet``.
+            onCalendar=data.get("onCalendar")
+            or data.get("on_calendar")
+            or (None if (trigger == "poll" or after) else "daily"),
             playbook=data.get("playbook"),
             goal=data.get("goal"),
             profile=data.get("profile") or "read-only",
@@ -76,6 +87,7 @@ class ScheduleSpec:
             trigger=trigger,
             pollInterval=data.get("pollInterval", data.get("poll_interval")),
             pollWatch=[str(entry) for entry in watch] if isinstance(watch, list) else [],
+            after=data.get("after"),
             source=source,
             path=path,
         )
@@ -257,8 +269,12 @@ def nix_snippet(spec: ScheduleSpec) -> str:
             lines.append(f'  pollInterval = "{spec.pollInterval}";')
         if spec.pollWatch:
             lines.append("  pollWatch = [ " + " ".join(f'"{entry}"' for entry in spec.pollWatch) + " ];")
-    else:
+    elif spec.onCalendar or not spec.after:
+        # A chained schedule with no clock of its own must not get one pasted back: the paste
+        # would give it a timer that fires regardless of the run it declares it waits for.
         lines.append(f'  onCalendar = "{spec.onCalendar or "daily"}";')
+    if spec.after:
+        lines.append(f'  after = "{spec.after}";')
     lines.append(f'  kind = "{spec.kind or "agent"}";')
     if (spec.kind or "agent") == "probe":
         if spec.probe:

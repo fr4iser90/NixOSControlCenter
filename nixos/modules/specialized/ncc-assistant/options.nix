@@ -127,6 +127,28 @@ let
         default = true;
         description = "Run missed jobs on next boot (calendar timers only; a poll has no missed slot)";
       };
+      after = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        example = "nightly-audit";
+        description = ''
+          The schedule whose completion wakes this one, turning ``audit → ship`` into a
+          declared chain instead of two timers guessed apart.
+
+          systemd cannot do this on its own: ``systemd.timer(5)`` measures
+          ``OnUnitInactiveSec=`` relative to when the unit *the timer itself activates* last
+          deactivated, so no timer can wait on a sibling. The upstream unit's post-start step
+          asks ``ncc-assistant chain release`` whether this run really ended ``completed`` in
+          this very unit invocation, and only then starts this schedule. The run itself is
+          gated too: without an unconsumed ``completed`` outcome upstream it is skipped before
+          the budget counters, the poll observation and the first LLM call, so a failed or
+          never-run audit cannot push work on to the next stage.
+
+          Omit it and the schedule is on its own clock: it fires whether or not the schedule it
+          depends on did anything. Set it together with onCalendar for "whichever comes first"
+          — a completion is spent once, so the earlier wake-up is the run.
+        '';
+      };
       goal = mkOption {
         type = types.nullOr types.str;
         default = null;

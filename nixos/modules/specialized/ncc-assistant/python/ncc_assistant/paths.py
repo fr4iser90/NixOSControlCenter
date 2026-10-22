@@ -183,6 +183,12 @@ def poll_state_file() -> Path:
     return config_home() / "poll-state.json"
 
 
+def chain_state_file() -> Path:
+    """How each schedule's last run ended, and which completion a chained schedule already
+    acted on (phase 39 L12) — the only proof a downstream has that its upstream finished."""
+    return config_home() / "chain-state.json"
+
+
 def activity_file() -> Path:
     """Last user activity timestamp for idle mode."""
     return config_home() / "last-activity.json"

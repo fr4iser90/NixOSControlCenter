@@ -233,6 +233,23 @@ You are running in agent mode to accomplish a specific goal.
             yield {"kind": "error", "text": error}
             return
 
+        # The chain gate goes ahead of everything that costs: a downstream whose upstream never
+        # completed has no work to do, so it must not spend a budget slot, a poll observation or
+        # a model call. It is also the cheaper answer — one JSON read against the poll's git.
+        from . import chain_guard
+
+        chain = chain_guard.begin()
+        if chain is not None and not chain.decision.allowed:
+            # Recorded so a schedule three deep does not wake on this one's older completion.
+            chain_guard.record_outcome(chain_guard.STATUS_SKIPPED, chain.decision.code)
+            yield {
+                "kind": "skipped",
+                "reason": chain.decision.code,
+                "text": chain.decision.reason,
+                "hint": chain.decision.hint,
+            }
+            return
+
         # The change-hash gate goes first: an unchanged poll should not even be counted
         # against the day's budget — it is not a run, and charging it would let a busy
         # workspace starve the schedule's real work out of its own allowance.
@@ -240,6 +257,7 @@ You are running in agent mode to accomplish a specific goal.
 
         poll = poll_guard.begin()
         if poll is not None and not poll.decision.allowed:
+            chain_guard.record_outcome(chain_guard.STATUS_SKIPPED, poll.decision.code)
             yield {
                 "kind": "skipped",
                 "reason": poll.decision.code,
@@ -255,6 +273,7 @@ You are running in agent mode to accomplish a specific goal.
             if not run_budget.allowed:
                 # A breach must cost nothing: no job, no LLM call, and the unit still
                 # exits clean because there was nothing wrong — only nothing left to do.
+                chain_guard.record_outcome(chain_guard.STATUS_SKIPPED, run_budget.code)
                 yield {
                     "kind": "skipped",
                     "reason": run_budget.code,
@@ -275,11 +294,23 @@ You are running in agent mode to accomplish a specific goal.
                     notify_schedule_start(self.agent_settings.goal)
                 elif kind in JOB_END_LABELS:
                     notify_job_end(str(kind), self.agent_settings.goal, str(event.get("error") or ""))
+                    finished = kind == "job_finished" and bool(event.get("success"))
+                    # How this run ended is what the next schedule in the chain gets to read.
+                    # A skip that never became a job is recorded on its own way out, above.
+                    chain_guard.record_outcome(
+                        chain_guard.STATUS_COMPLETED
+                        if finished
+                        else chain_guard.STATUS_CANCELLED
+                        if kind == "job_cancelled"
+                        else chain_guard.STATUS_FAILED
+                    )
                     # Only a finished run spends the change that woke it. A failure or a
                     # cancellation leaves the baseline alone so the next tick retries the
                     # same state instead of concluding "already handled".
-                    if poll is not None and kind == "job_finished" and event.get("success"):
+                    if finished and poll is not None:
                         poll_guard.record(poll)
+                    if finished and chain is not None:
+                        chain_guard.record(chain)
                 yield event
         finally:
             lock.release()
