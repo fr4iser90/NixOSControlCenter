@@ -1,6 +1,6 @@
 # Phase 39 — Permission ladder & per-schedule grants
 
-**Status:** L1–L10 + L14 done · L11–L13 open
+**Status:** L1–L11 + L14 done · L12–L13 open
 **Parent:** [roadmap.md](../roadmap.md)
 **Depends on:** phase 38 (grants are scoped to a repo identity), phase 22 (approvals), schedules
 **Unblocks:** unattended GitHub work (ship/PR flows), idle autonomy without a human watching
@@ -198,7 +198,16 @@ Small, but the ladder is pointless if the agent can only wake at a fixed time:
 
 - **`poll`**: give `scheduleKind: "poll"` its consumer — `OnUnitActiveSec=`/`OnBootSec=` timer
   plus a state hash so a run only starts when something actually changed (repo fact hash from
-  phase 38). Without a change, exit before the LLM call.
+  phase 38). Without a change, exit before the LLM call. Done: a schedule now declares
+  `trigger = "poll"` with `pollInterval` + `pollWatch`, the timer is monotonic (`OnBootSec` +
+  `OnUnitActiveSec`, no `OnCalendar`, no `Persistent` — a poll has no missed slot to catch up),
+  and `poll_guard.py` answers one question before the budget counters, the lock and the model:
+  *is this state one I already acted on?* A watch entry is `workspace:<id>` (HEAD + branch +
+  porcelain state, so an uncommitted edit counts) or `file:/abs/path`; the baseline is written
+  only by a **finished** run, so a crash retries the same state. Absence is a state (the day a
+  file appears is not skipped); **unknown is never reported as unchanged** — an unresolvable
+  watch denies loudly and records nothing, because a gate that guesses "unchanged" once makes
+  the schedule quietly never run again.
 - **Event**: `onUnitInactiveSec` chaining — schedule B runs only after schedule A ended
   `completed`, so `audit → ship` becomes a declared chain instead of two timers guessed apart.
 - **Idle**: keep `idle.py` as the only opportunistic trigger and let it inherit the *lowest*
@@ -239,12 +248,15 @@ Small, but the ladder is pointless if the agent can only wake at a fixed time:
 | L8 | done | `budgets.py`; counters arrive as `NCC_ASSISTANT_BUDGET_*`, checked before the LLM call |
 | L9 | done | `permissions._record` is the ladder's only audit writer and `evaluate`/`decide_system` call it, so no decision route can omit the line: `grant_evaluated` carries the axis, the held and needed step, the refusal code, the actor and the tool. The run-level line was renamed `grant_resolved` — "what the run was handed" and "what it asked to do" are different questions. Two paths deliberately stay silent: `system_flags` asks `_cover` (an unrecorded verdict) so a catalog refresh cannot bury the real decisions, and the `call()` dispatcher pre-checks with `peek_system` then `record_denial`, so a gated call writes one line rather than two. The dispatcher's old bare `deny` line for the ladder is gone; the kill-switch keeps its own |
 | L10 | done | `PendingDecision.actor` + grant, shown by `approve list` as `asked by <actor> · <grant>` |
-| L11 | open | `OnCalendar` is still the only trigger; `scheduleKind: "poll"` has no consumer |
+| L11 | done | `trigger`/`pollInterval`/`pollWatch` on a schedule; `mkScheduleTimer` emits `OnBootSec`+`OnUnitActiveSec` for a poll and leaves a calendar timer exactly as it was; the unit carries `NCC_ASSISTANT_POLL_SCHEDULE/_INTERVAL/_WATCH` so two polls never share one stored hash. `poll_guard.py` gates before budget/lock/job store/LLM (`poll_unchanged`, `poll_state_unknown`), spends the baseline only on `job_finished`, and the idle sweep hands each candidate its own poll identity (`idle._run_scoped_poll`). Display stopped lying: `onCalendar` is nullable, `ScheduleSpec.frequency` says `every 15min` for a poll, `nix_snippet` emits the poll attrs, and `permissions show` carries the run's poll identity, its watch
+list and when it last acted — a schedule that skips 96 ticks a day looks broken unless the tool says
+otherwise. Evaluation refuses the shapes that could only burn a model every interval — poll without interval or watch, unusable watch entries, a non-agent poll, poll+`onCalendar`, calendar+`pollWatch`, calendar without `onCalendar`. `tests/ncc-assistant/test_poll_trigger_v1.py` |
 | L12 | open | no `after` option on a schedule |
 | L13 | open | no per-repo `permissions.json` |
 | L14 | done | Three disagreements between the old knobs and `permissions.*` now warn at evaluation. **Profile vs grant:** a profile is what *opens* the write/rebuild tools — `resolve_profile` keeps its built-in flags unless the grant lowers them and nothing raises them (an agent run hands it no override), so a schedule whose grant carries `system` above its profile's reach holds a step the ladder approves and the tool catalog cannot perform; every such write dies in the profile check instead of the audit trail. `profileSystemReach` compares the two, aliases included (`cautious`/`autonomous`, because `profiles.py` resolves them — deliberately *not* merged into `profileStepMap`, which derives the steps a unit is handed and must never widen them). An unknown name counts as reaching nothing, matching the read-only fallback, so a typo is loud. **Host pair vs agent pair:** `hostCeiling.system` was the agent pair alone, so evaluation blessed a unit that then refused at the first write; it is now `minStep` of the host pair and the agent pair, mirroring `resolve_run_grant`, and `ceilingInversions` names the case where `agent.allowWrite`/`agent.allowRebuild = true` cannot open what `allowWrite`/`allowRebuild = false` closed. The min only ever narrows *derived* steps — an explicit `permissions.*` stays as asked so the run refuses loudly rather than quietly doing less. **Display:** `perms.repo or "-"` did not cover a present-but-null option (`or` guards a *missing* attribute only), so the above-ceiling message aborted evaluation with "cannot coerce null to a string" — the config error replacing the message meant to explain it. `shownStep` renders both steps. |
 
-Still open from the design, beyond L11–L13: `NCC_ASSISTANT_AGENT_CONFIRM/_DRY_RUN/_PROFILE` are
+Still open from the design, beyond L12–L13:
+`NCC_ASSISTANT_AGENT_CONFIRM/_DRY_RUN/_PROFILE` are
 still read into `Settings` and used by nobody (§1 said "real consumers or removed") — what the
 runtime acts on is the unsuffixed `AGENT_CONFIRM`/`AGENT_DRY_RUN`/`AGENT_PROFILE`
 (`runtime.py:903`, `:1425`), so those three fields are a second, inert copy of the same setting.
@@ -272,6 +284,14 @@ actor `idle`, so an opportunistic run never outranks the narrowest grant already
 - **staging**: dirty `.env` + `commit` → nothing staged, `denied_secret_path`.
 - **budget**: second run over `maxRunsPerDay` returns `skipped: budget_runs` and writes no job;
   oversized diff refuses commit and leaves the task open.
+- **poll**: the gate is inert without a poll unit; first tick acts, the next does not, an edit does;
+  absence is a state; a corrupt baseline is "no baseline" rather than a blank one; an unresolvable
+  watch denies with `poll_state_unknown` and records nothing; an unchanged tick never reaches the
+  budget counters, the lock or the job store; only `job_finished` spends the baseline; the idle sweep
+  hands each candidate its own poll identity and leaves none behind. Nix side: real evaluation of the
+  module — a poll timer is monotonic with no `OnCalendar`/`Persistent`, a calendar timer is unchanged,
+  each poll unit carries its own id, and every trigger shape that could only burn a model fails an
+  assertion. `tests/ncc-assistant/test_poll_trigger_v1.py`
 - **audit**: each decision writes exactly one event with actor and reason — the line names the axis, the
   held and needed step and the code; a catalog refresh writes none; a dispatcher-gated call writes one
   line, not two. `tests/ncc-assistant/test_permission_audit_v1.py`

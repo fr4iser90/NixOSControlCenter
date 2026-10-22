@@ -1516,7 +1516,7 @@ class SchedulesPage(QWidget):
                     label = f"probe={s.probe}≥{s.thresholdPct or 85}%"
                 else:
                     label = s.playbook or (s.goal or "")[:40]
-                self.user_list.addItem(f"[{en}] {s.name}: {s.onCalendar} — {label}")
+                self.user_list.addItem(f"[{en}] {s.name}: {s.frequency} — {label}")
 
         self.nix_list.clear()
         nix = list_nix_schedules()
@@ -1526,7 +1526,7 @@ class SchedulesPage(QWidget):
             for s in nix:
                 en = "on" if s.enable else "off"
                 label = s.playbook or (s.goal or "")[:40]
-                self.nix_list.addItem(f"[{en}] {s.name}: {s.onCalendar} — {label}")
+                self.nix_list.addItem(f"[{en}] {s.name}: {s.frequency} — {label}")
 
         self.wd_list.clear()
         try:

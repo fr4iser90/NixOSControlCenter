@@ -376,9 +376,10 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
     system_ceiling_step = system_ceiling(settings.writes_enabled, settings.allow_rebuild)
     grant, violations = resolve_run_grant(settings, getattr(args, "grant", None))
     active = current_grant()
-    from . import budgets
+    from . import budgets, poll_guard
 
     budget = budgets.summary()
+    poll = poll_guard.display()
     payload = {
         "invokerRole": invoker_role(),
         "ceiling": {"repo": repo_ceiling, "system": system_ceiling_step},
@@ -393,6 +394,7 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
             "secret paths are never staged, and nothing stages blindly: commits take a pathset",
         ],
         "budget": budget,
+        "poll": poll,
         "violations": violations,
     }
     if getattr(args, "json", False):
@@ -416,6 +418,11 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
     limits = ", ".join(f"{name}={cap}" for name, cap in budget["limits"].items()) or "no caps"
     print_info(f"Budget:        {limits}{'' if budget['applies'] else ' (not in force — no grant)'}")
     print_info(f"Budget today:  {json.dumps(budget['today'], sort_keys=True)}")
+    if poll["applies"]:
+        print_info(
+            f"Poll:          {poll['schedule']} watching {', '.join(poll['watch']) or 'nothing'}"
+            + (f" — last acted {poll['lastActedAt']}" if poll["lastActedAt"] else " — no baseline yet")
+        )
     for line in violations:
         print_err(line)
     if violations:

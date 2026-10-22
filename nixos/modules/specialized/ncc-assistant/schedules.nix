@@ -219,6 +219,99 @@ let
     (stepRank systemRanks (effectiveGrant s).system) > (stepRank systemRanks (profileReach s))
   ) enabledSchedules;
 
+  # --- Poll trigger (phase 39 L11) ---------------------------------------------------
+  # A poll earns its keep only by skipping the run when nothing moved: the timer fires every
+  # interval and python/ncc_assistant/poll_guard.py compares a hash of what pollWatch names
+  # against the last run's, exiting before the LLM call. So the watch list is not decoration —
+  # without it the schedule is a calendar timer that pays for a model every 15 minutes, which
+  # is the cost this whole feature exists to avoid. Reject it at evaluation.
+  isPoll = schedule: (schedule.trigger or "calendar") == "poll";
+  pollInterval = schedule:
+    if (schedule.pollInterval or null) != null && schedule.pollInterval != "" then
+      schedule.pollInterval
+    else
+      null;
+  # The same grammar poll_guard.py parses; an unknown prefix here means the author meant
+  # something else, and a watch entry that silently matches nothing is an always-unchanged —
+  # or never-unchanged — schedule discovered at 3am instead of at rebuild.
+  watchEntryOk = entry:
+    builtins.match "workspace:[a-z0-9][a-z0-9._-]*" entry != null
+    || builtins.match "file:/[A-Za-z0-9._/-]+" entry != null;
+  # A submodule option the host never set is present as null, and `attrs.x or d` only covers a
+  # *missing* attribute — so the nullable onCalendar/pollWatch have to be unwrapped by hand.
+  # Interpolating them raw aborts evaluation; comparing them raw reads a null watch as "set".
+  calendarOf = schedule: if (schedule.onCalendar or null) == null then "" else schedule.onCalendar;
+  watchListOf = schedule: if (schedule.pollWatch or null) == null then [ ] else schedule.pollWatch;
+  triggerProblems = name: schedule:
+    let
+      poll = isPoll schedule;
+      watch = watchListOf schedule;
+      badWatch = filter (entry: !watchEntryOk entry) watch;
+    in
+      optionals (poll && (schedule.kind or "agent") != "agent") [
+        ''
+          trigger = poll needs kind = "agent": the change-hash gate lives in the agent run, so a
+          probe with trigger = poll would fire every ${toString (pollInterval schedule)} whether
+          or not anything changed. Use trigger = calendar, or make it an agent schedule.
+        ''
+      ]
+      ++ optionals (poll && pollInterval schedule == null) [
+        ''
+          trigger = poll needs pollInterval (a systemd time span, e.g. "15min"). Without it the
+          timer has no OnBootSec=/OnUnitActiveSec= and never fires — the schedule would look
+          configured and run never.
+        ''
+      ]
+      ++ optionals (poll && watch == [ ]) [
+        ''
+          trigger = poll needs a non-empty pollWatch. Nothing to compare means nothing to skip on,
+          so every interval becomes a full agent run. Name what to hash:
+          pollWatch = [ "workspace:<id>" "file:/abs/path" ].
+        ''
+      ]
+      ++ optionals (poll && badWatch != [ ]) [
+        ''
+          pollWatch entries unusable: ${concatStringsSep ", " badWatch}
+          (expected "workspace:<registered-id>" or "file:/absolute/path" — no "~", no comma, no
+          other prefix). An entry the guard cannot resolve would make every poll look unchanged.
+        ''
+      ]
+      ++ optionals (!poll && calendarOf schedule == "") [
+        ''
+          trigger = calendar needs onCalendar (e.g. "daily", "*-*-* 03:00:00"), or set
+          trigger = poll with pollInterval + pollWatch. A timer with neither trigger never fires.
+        ''
+      ]
+      # Both of these are a schedule that reads one way and behaves another: the operator sees a
+      # change-driven job in their config while the unit runs on the clock, or the reverse.
+      ++ optionals (poll && (schedule.onCalendar or null) != null) [
+        ''
+          trigger = poll ignores onCalendar: a poll is monotonic (OnBootSec/OnUnitActiveSec), so
+          the calendar expression here is never applied. Remove onCalendar, or set
+          trigger = calendar if the wall clock is what you actually want.
+        ''
+      ]
+      ++ optionals (!poll && watch != [ ]) [
+        ''
+          pollWatch is only read by a poll: with trigger = calendar nothing compares it, so the
+          run happens on the clock whatever the tree did. Set trigger = poll with pollInterval,
+          or drop pollWatch.
+        ''
+      ]
+      ++ optionals (poll && name == "") [
+        "trigger = poll needs a schedule id (unit name)."
+      ];
+  triggerErrors = filterAttrs (name: s: triggerProblems name s != [ ]) enabledSchedules;
+
+  # The guard reads these off the unit's own environment: the schedule id keys its stored hash,
+  # so two polls on one host never overwrite each other's idea of "already acted on this".
+  pollEnvironment = name: schedule:
+    optionalAttrs (isPoll schedule) {
+      NCC_ASSISTANT_POLL_SCHEDULE = name;
+      NCC_ASSISTANT_POLL_INTERVAL = pollInterval schedule;
+      NCC_ASSISTANT_POLL_WATCH = concatStringsSep "," (watchListOf schedule);
+    };
+
   mkAgentExec = name: schedule:
     let
       maxSteps = if schedule.maxSteps != null then schedule.maxSteps else (cfg.agent.maxSteps or (-1));
@@ -301,7 +394,8 @@ let
         # No NOTIFY_ON_* here on purpose: schedules have no per-schedule notify option, and
         # anything set in this unit outranks agent.notifications.* — the wrapper keeps the
         # host value unless the narrowest scope declared its own.
-      } // budgetEnvironment schedule // optionalAttrs (schedule.model != null) {
+      } // budgetEnvironment schedule // pollEnvironment name schedule
+        // optionalAttrs (schedule.model != null) {
         NCC_ASSISTANT_MODEL = schedule.model;
       } // optionalAttrs ((cfg.model or null) != null && schedule.model == null) {
         NCC_ASSISTANT_MODEL = cfg.model;
@@ -314,14 +408,23 @@ let
       description = "Timer for NCC Assistant scheduled job: ${name}";
       wantedBy = [ "timers.target" ];
 
-      timerConfig = {
-        OnCalendar = schedule.onCalendar;
-        Persistent = schedule.persistent or true;
-        RandomizedDelaySec =
-          if name == "weekly-module-audit" then "15min"
-          else if name == "daily-disk-probe" then "10min"
-          else "5min";
-      };
+      # A poll is a monotonic timer: OnCalendar would fire it at wall-clock times as well, so
+      # the schedule would do both jobs, and Persistent is about calendar slots the host
+      # missed while powered off — a monotonic timer has none. Both stay on the calendar arm.
+      timerConfig =
+        (if isPoll schedule then {
+          OnBootSec = pollInterval schedule;
+          OnUnitActiveSec = pollInterval schedule;
+        } else {
+          OnCalendar = schedule.onCalendar;
+          Persistent = schedule.persistent or true;
+        })
+        // {
+          RandomizedDelaySec =
+            if name == "weekly-module-audit" then "15min"
+            else if name == "daily-disk-probe" then "10min"
+            else "5min";
+        };
     };
   };
 
@@ -382,6 +485,14 @@ in
           message = ''
             NCC Assistant schedules need goal/playbook (agent) or probe id (probe):
             ${concatStringsSep ", " (attrNames invalidSchedules)}
+          '';
+        }
+        {
+          assertion = triggerErrors == { };
+          message = ''
+            NCC Assistant schedules have a trigger that cannot work:
+            ${concatStringsSep "\n" (mapAttrsToList (name: s:
+              "- ${name}: ${concatStringsSep "\n  " (triggerProblems name s)}") triggerErrors)}
           '';
         }
       ];

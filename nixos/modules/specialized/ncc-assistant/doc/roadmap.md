@@ -206,7 +206,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 - `workspaces rename|move` rewrite every reference (tasks, MCP bindings, progress files) or roll back
 - SSOT: [plans/38-repo-account-fact-store.md](./plans/38-repo-account-fact-store.md)
 
-### Phase 39 (L1–L10 done)
+### Phase 39 (L1–L11 done)
 
 - [x] Transport fixed: the schedule's grant travels in the unit's argv (`--grant repo=… system=…`);
   the wrapper exports defaults, so it no longer overwrites what the unit decided
@@ -233,7 +233,12 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
   opens the write/rebuild tools and a grant may only narrow it), an agent knob that cannot open what
   the host pair closed, and the ceiling itself — now the lower of host pair and agent pair, the way
   `resolve_run_grant` computes it. Idle takes the lowest grant of the day, never a schedule's higher one
-- [ ] `poll` trigger with change-hash, scheduled chains, per-repo `permissions.json`
+- [x] `poll` is a real trigger now: `trigger = "poll"` + `pollInterval` + `pollWatch` give a
+  monotonic timer (`OnBootSec`/`OnUnitActiveSec`, no `OnCalendar`, no `Persistent`) and a change hash
+  (workspace HEAD+dirty state, or a file's bytes) checked **before** the budget counters, the lock and
+  the model; the baseline is spent only by a finished run, and an unresolvable watch refuses
+  (`poll_state_unknown`) instead of ever reporting an unknown as "unchanged"
+- [ ] Scheduled chains (`after = "nightly-audit"`), per-repo `permissions.json`
 - SSOT: [plans/39-permission-ladder-and-schedule-grants.md](./plans/39-permission-ladder-and-schedule-grants.md)
 
 ## Known follow-ups (not blockers)

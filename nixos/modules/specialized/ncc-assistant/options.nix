@@ -85,15 +85,47 @@ let
         default = true;
         description = "Enable this scheduled job";
       };
+      trigger = mkOption {
+        type = types.enum [ "calendar" "poll" ];
+        default = "calendar";
+        description = ''
+          How the timer wakes this schedule.
+
+          calendar = fires on onCalendar, at a wall-clock time.
+          poll     = fires every pollInterval (monotonic: OnBootSec + OnUnitActiveSec)
+                     and the run then checks pollWatch; with nothing changed it exits
+                     before the LLM call, so an idle interval costs no tokens. This is
+                     the consumer for scheduleKind: "poll" in the agent templates.
+        '';
+      };
       onCalendar = mkOption {
-        type = types.str;
+        type = types.nullOr types.str;
+        default = null;
         example = "daily";
-        description = "systemd calendar expression (e.g. daily, weekly, *-*-* 03:00:00)";
+        description = "systemd calendar expression (e.g. daily, weekly, *-*-* 03:00:00). Required when trigger = calendar.";
+      };
+      pollInterval = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        example = "15min";
+        description = "systemd time span between polls. Required when trigger = poll.";
+      };
+      pollWatch = mkOption {
+        type = types.listOf types.str;
+        default = [ ];
+        example = [ "workspace:ncc" "file:/home/me/.config/ncc-assistant/presence.json" ];
+        description = ''
+          What a poll compares against its last run. Each entry is either
+          ``workspace:<id>`` — the registered workspace's HEAD, branch and
+          ``git status --porcelain`` — or ``file:<absolute path>``. Required when
+          trigger = poll: a poll that watches nothing cannot tell changed from
+          unchanged, so it would be a calendar timer that burns a run every interval.
+        '';
       };
       persistent = mkOption {
         type = types.bool;
         default = true;
-        description = "Run missed jobs on next boot";
+        description = "Run missed jobs on next boot (calendar timers only; a poll has no missed slot)";
       };
       goal = mkOption {
         type = types.nullOr types.str;

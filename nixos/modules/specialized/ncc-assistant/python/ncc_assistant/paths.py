@@ -178,6 +178,11 @@ def budget_file() -> Path:
     return config_home() / "budget.json"
 
 
+def poll_state_file() -> Path:
+    """Last run's change-hash per poll schedule (phase 39 L11) — what a poll compares against."""
+    return config_home() / "poll-state.json"
+
+
 def activity_file() -> Path:
     """Last user activity timestamp for idle mode."""
     return config_home() / "last-activity.json"

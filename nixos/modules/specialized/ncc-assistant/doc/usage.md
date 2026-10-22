@@ -155,7 +155,40 @@ counter off, `null` keeps the default:
 
 Every decision carries its actor (`schedule:nightly-ship`, `cli`, `companion`), so
 `ncc-assistant approve list` reads back as "nightly-ship asked to merge, allowed 41 s later".
-Not wired yet: `poll` triggers, schedule chains, and idle inheriting the day's lowest grant.
+Not wired yet: schedule chains (`after = "…"`).
+
+## Poll schedules (change-driven, not clock-driven)
+
+A poll fires on a monotonic interval and **skips the run when nothing changed** — it is the only
+schedule kind that can be cheap enough to run every fifteen minutes:
+
+```nix
+agent.schedules.workspace-drift = {
+  enable = true;
+  trigger = "poll";
+  pollInterval = "15min";
+  pollWatch = [ "workspace:ncc" "file:/var/lib/ncc/facts.json" ];
+  permissions = { repo = "propose"; system = "none"; };
+};
+```
+
+The timer gets `OnBootSec=`/`OnUnitActiveSec=` only: no `OnCalendar`, no `Persistent` — a poll has
+no missed slot to catch up, and a boot would otherwise stack every interval since shutdown into
+one model call. `pollWatch` is what the change hash is computed over: `workspace:<id>` hashes HEAD,
+branch and `git status --porcelain` (an uncommitted edit counts), `file:/abs/path` hashes the bytes;
+a file that does not exist is a state too, so the tick it appears in is not skipped.
+
+The hash is compared **before** the budget counters, the lock and the first LLM call, and it is
+written only when a run *finishes*: an unchanged tick costs nothing and is not charged to
+`maxRunsPerDay`, and a run that crashed or was cancelled retries the same state instead of
+burning it. The unit exits 0 with `poll_unchanged` — systemd must not see 5 000 failed units a day.
+
+Asking for something the guard cannot read is a **refusal**, never an "unchanged": an unregistered
+workspace id or an unreadable file yields `poll_state_unknown`. That is deliberate — a gate that
+guesses "unchanged" once makes the schedule quietly never run again. Evaluation refuses the shapes
+that could only burn a model (a poll without `pollInterval` or `pollWatch`, an unusable watch entry,
+`trigger = "poll"` on a probe, `pollWatch` on a calendar schedule, a calendar without `onCalendar`).
+Read it back with `ncc ai permissions show` — the poll gate and its watch list are in the payload.
 
 ## GUI
 

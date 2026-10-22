@@ -16,6 +16,7 @@ from .permissions import (
     Grant,
     lowest_grant_today,
 )
+from .poll_guard import ENV_POLL_SCHEDULE, ENV_POLL_WATCH
 from .preferences import (
     get_idle_after_min,
     get_idle_max_jobs,
@@ -25,6 +26,9 @@ from .preferences import (
 #: The env ``set_process_grant`` writes for one run; a sweep in a long-lived process owns
 #: them only for the duration of the run it started.
 _GRANT_ENV = (ENV_REPO, ENV_SYSTEM, ENV_ACTOR)
+#: A poll schedule's watch is part of its identity: set it for the run it belongs to, clear
+#: it for every other candidate, or the sweep would answer "unchanged" about the wrong tree.
+_POLL_ENV = (ENV_POLL_SCHEDULE, ENV_POLL_WATCH)
 #: An idle sweep is its own actor: idle runs must not spend a human's or a schedule's budget.
 IDLE_ACTOR = "idle"
 
@@ -97,6 +101,8 @@ def list_idle_candidates() -> list[dict[str, Any]]:
                         "goal": getattr(s, "goal", None),
                         "profile": getattr(s, "profile", None) or "read-only",
                         "dryRun": bool(getattr(s, "dryRun", True)),
+                        "trigger": getattr(s, "trigger", "calendar") or "calendar",
+                        "pollWatch": list(getattr(s, "pollWatch", []) or []),
                     }
                 )
         except Exception:
@@ -127,6 +133,33 @@ def list_idle_candidates() -> list[dict[str, Any]]:
 
 def _grant_pairs(grant: Grant) -> tuple[str, str]:
     return (f"repo={grant.repo}", f"system={grant.system}")
+
+
+@contextmanager
+def _run_scoped_poll(candidate: dict[str, Any]) -> Iterator[None]:
+    """Give one candidate its own poll identity — or take it away.
+
+    A timer unit carries ``NCC_ASSISTANT_POLL_*`` for the whole process because it is a
+    one-shot unit for exactly one schedule. A sweep is the opposite: one process, several
+    candidates back to back. Without this, a poll schedule picked up while the operator is
+    away would run ungated — burning the model on an unchanged tree, which is the whole cost
+    the trigger exists to refuse — and the calendar schedules after it would inherit its env.
+    """
+    saved = {name: os.environ.get(name) for name in _POLL_ENV}
+    try:
+        if str(candidate.get("trigger") or "calendar") == "poll":
+            os.environ[ENV_POLL_SCHEDULE] = str(candidate.get("id") or "")
+            os.environ[ENV_POLL_WATCH] = ",".join(str(e) for e in (candidate.get("pollWatch") or []))
+        else:
+            for name in _POLL_ENV:
+                os.environ.pop(name, None)
+        yield
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
 
 @contextmanager
@@ -232,8 +265,11 @@ def maybe_sweep(*, start: bool = False) -> dict[str, Any]:
                     if day_floor is None:
                         day_floor = lowest_grant_today()
                     grant = _grant_pairs(day_floor)
-                    with _run_scoped_grant():
-                        for _ev in run_agent(
+                    # A sweep that swallows every event would report an unchanged poll as
+                    # "finished": the operator would read work done where none happened.
+                    skipped: dict[str, Any] = {}
+                    with _run_scoped_grant(), _run_scoped_poll(c):
+                        for ev in run_agent(
                             str(goal),
                             settings,
                             dry_run=bool(c.get("dryRun", True)),
@@ -241,8 +277,15 @@ def maybe_sweep(*, start: bool = False) -> dict[str, Any]:
                             playbook=str(playbook) if playbook else None,
                             grant=grant,
                         ):
-                            pass
-                    started.append({**c, "status": "finished", "grant": list(grant)})
+                            if isinstance(ev, dict) and ev.get("kind") == "skipped" and not skipped:
+                                skipped = {
+                                    "reason": str(ev.get("reason") or ""),
+                                    "detail": str(ev.get("text") or ""),
+                                }
+                    if skipped:
+                        started.append({**c, "status": "skipped", **skipped})
+                    else:
+                        started.append({**c, "status": "finished", "grant": list(grant)})
                 finally:
                     release(token)
         except CapacityError:

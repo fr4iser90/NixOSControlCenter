@@ -15,7 +15,7 @@ from .paths import schedules_dir
 class ScheduleSpec:
     """A schedule definition (template or user instance)."""
     name: str
-    onCalendar: str = "daily"
+    onCalendar: str | None = "daily"
     playbook: str | None = None
     goal: str | None = None
     profile: str = "read-only"
@@ -27,8 +27,18 @@ class ScheduleSpec:
     probe: str | None = None
     thresholdPct: float | None = None
     escalatePlaybook: str | None = None
+    trigger: str = "calendar"  # calendar | poll (phase 39 L11)
+    pollInterval: str | None = None
+    pollWatch: list[str] = field(default_factory=list)
     source: str = "user"  # builtin | user | nix
     path: str | None = None
+
+    @property
+    def frequency(self) -> str:
+        """How often it fires, stated honestly: a poll has no calendar to quote."""
+        if (self.trigger or "calendar") == "poll":
+            return f"every {self.pollInterval or 'poll interval'}"
+        return self.onCalendar or "daily"
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -45,9 +55,13 @@ class ScheduleSpec:
         source: str = "user",
         path: str | None = None,
     ) -> "ScheduleSpec":
+        trigger = data.get("trigger") or "calendar"
+        watch = data.get("pollWatch", data.get("poll_watch"))
         return cls(
             name=name or data.get("name", ""),
-            onCalendar=data.get("onCalendar") or data.get("on_calendar") or "daily",
+            # A poll has no calendar; inventing "daily" here would show a poll as a schedule
+            # that never fires at the times its own timer says it does.
+            onCalendar=data.get("onCalendar") or data.get("on_calendar") or (None if trigger == "poll" else "daily"),
             playbook=data.get("playbook"),
             goal=data.get("goal"),
             profile=data.get("profile") or "read-only",
@@ -59,6 +73,9 @@ class ScheduleSpec:
             probe=data.get("probe"),
             thresholdPct=data.get("thresholdPct", data.get("threshold_pct")),
             escalatePlaybook=data.get("escalatePlaybook", data.get("escalate_playbook")),
+            trigger=trigger,
+            pollInterval=data.get("pollInterval", data.get("poll_interval")),
+            pollWatch=[str(entry) for entry in watch] if isinstance(watch, list) else [],
             source=source,
             path=path,
         )
@@ -229,12 +246,20 @@ def list_nix_schedules() -> list[ScheduleSpec]:
 
 def nix_snippet(spec: ScheduleSpec) -> str:
     """Nix attrset fragment to paste into agent.schedules."""
+    poll = (spec.trigger or "calendar") == "poll"
     lines = [
         f"agent.schedules.{spec.name} = {{",
         f"  enable = {'true' if spec.enable else 'false'};",
-        f'  onCalendar = "{spec.onCalendar}";',
-        f'  kind = "{spec.kind or "agent"}";',
     ]
+    if poll:
+        lines.append('  trigger = "poll";')
+        if spec.pollInterval:
+            lines.append(f'  pollInterval = "{spec.pollInterval}";')
+        if spec.pollWatch:
+            lines.append("  pollWatch = [ " + " ".join(f'"{entry}"' for entry in spec.pollWatch) + " ];")
+    else:
+        lines.append(f'  onCalendar = "{spec.onCalendar or "daily"}";')
+    lines.append(f'  kind = "{spec.kind or "agent"}";')
     if (spec.kind or "agent") == "probe":
         if spec.probe:
             lines.append(f'  probe = "{spec.probe}";')

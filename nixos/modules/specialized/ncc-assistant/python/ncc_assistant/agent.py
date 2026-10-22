@@ -233,6 +233,21 @@ You are running in agent mode to accomplish a specific goal.
             yield {"kind": "error", "text": error}
             return
 
+        # The change-hash gate goes first: an unchanged poll should not even be counted
+        # against the day's budget — it is not a run, and charging it would let a busy
+        # workspace starve the schedule's real work out of its own allowance.
+        from . import poll_guard
+
+        poll = poll_guard.begin()
+        if poll is not None and not poll.decision.allowed:
+            yield {
+                "kind": "skipped",
+                "reason": poll.decision.code,
+                "text": poll.decision.reason,
+                "hint": poll.decision.hint,
+            }
+            return
+
         from . import budgets
 
         if budgets.applies():
@@ -260,6 +275,11 @@ You are running in agent mode to accomplish a specific goal.
                     notify_schedule_start(self.agent_settings.goal)
                 elif kind in JOB_END_LABELS:
                     notify_job_end(str(kind), self.agent_settings.goal, str(event.get("error") or ""))
+                    # Only a finished run spends the change that woke it. A failure or a
+                    # cancellation leaves the baseline alone so the next tick retries the
+                    # same state instead of concluding "already handled".
+                    if poll is not None and kind == "job_finished" and event.get("success"):
+                        poll_guard.record(poll)
                 yield event
         finally:
             lock.release()
