@@ -98,6 +98,23 @@ let
       ''
     ];
 
+  # Confirm axis (phase 39 L15). The ladder and confirm narrow in opposite directions: a
+  # higher ladder step is more capability, a higher confirm rank is *less* (always asks for
+  # every tool, never for none), so this gets its own rank table instead of ``clampStep``.
+  # Null inherits the host; anything that would ask less than the host is refused at eval
+  # below, because a timer that skips its prompts skips the grant that answers them.
+  confirmRanks = { always = 0; writes = 1; never = 2; };
+  hostConfirm = cfg.agent.confirm or "writes";
+  effectiveConfirm = schedule:
+    let want = schedule.confirm or null; in
+    if want == null then hostConfirm
+    else if (confirmRanks.${want} or 1) <= (confirmRanks.${hostConfirm} or 1) then want
+    else hostConfirm;
+  confirmConflicts = filterAttrs (_: s:
+    let want = s.confirm or null; in
+      want != null && (confirmRanks.${want} or 1) > (confirmRanks.${hostConfirm} or 1)
+  ) enabledSchedules;
+
   # Per-day budgets (phase 39 L8). A schedule may only narrow the host's counters; a
   # counter neither side sets stays out of the environment so budgets.py keeps its own
   # default. 0 means "no cap here", so it outranks nothing but never lifts a cap.
@@ -434,6 +451,10 @@ let
         "agent" "run"
       ] ++ optionals (maxSteps > 0) [ "--max-steps" (toString maxSteps) ]
         ++ [ "--grant" "repo=${grant.repo}" "--grant" "system=${grant.system}" ]
+        # argv, not just Environment=: the wrapper inlines its exports after systemd applied
+        # the unit's, so only a value carried here cannot be widened by whoever sets up the
+        # environment next. It is the resolved value — the declared one may have been clamped.
+        ++ [ "--confirm" (effectiveConfirm schedule) ]
         ++ optionals (profile != null) [ "--profile" (lib.escapeShellArg profile) ]
         ++ optionals dryRun [ "--dry-run" ]
         ++ optionals (playbook != null) [ "--playbook" (lib.escapeShellArg playbook) ]
@@ -491,7 +512,10 @@ let
         NCC_ASSISTANT_ROOT = "${pkg.appRoot}";
         NCC_KNOWLEDGE_ROOT = "${pkg.appRoot}/knowledge";
         NCC_PROMPTS_ROOT = "${pkg.appRoot}/prompts";
-        AGENT_CONFIRM = "writes";
+        # Resolved, never hardcoded: the schedule may ask more than the host (see
+        # effectiveConfirm). The value is a question about *who answers* — on a timer nobody
+        # clicks Allow, so runtime answers it from the grant below (permissions.grant_confirms).
+        AGENT_CONFIRM = effectiveConfirm schedule;
         # Derived from this schedule's grant — the unit is the narrowest scope, so it
         # writes only what its own step allows (ncc ai permissions show).
         AGENT_ALLOW_WRITE = if writes then "1" else "0";
@@ -566,6 +590,14 @@ in
             agent.grants.repoCeiling / allowWrite / allowRebuild / agent.allowWrite /
             agent.allowRebuild — the ceiling is the lower of the host and agent pair.
           '') grantConflicts
+        ++ mapAttrsToList (name: s:
+          ''
+            ncc-assistant: schedule '${name}' asks confirm=${s.confirm} on a host that declared
+            agent.confirm=${hostConfirm}. confirm narrows toward always (which asks per tool) and
+            this axis only narrows, so the unit gets ${effectiveConfirm s}. Nobody is awake to
+            answer a timer's prompt anyway — its write is approved by its own grant, and a
+            schedule that asks for nothing would skip the very approval that lets it write.
+          '') confirmConflicts
         ++ mapAttrsToList (name: s:
           ''
             ncc-assistant: schedule '${name}' runs profile '${scheduleProfile s}', which reaches

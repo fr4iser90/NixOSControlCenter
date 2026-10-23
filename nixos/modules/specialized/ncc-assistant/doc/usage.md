@@ -176,6 +176,43 @@ Every decision carries its actor (`schedule:nightly-ship`, `cli`, `companion`), 
 `ncc-assistant approve list` reads back as "nightly-ship asked to merge, allowed 41 s later".
 Schedules can also wait on each other — see `after = "…"` below.
 
+## Confirm: who answers the prompt
+
+`agent.confirm` (host default `writes`) decides **which** calls get asked about:
+`always` = every tool, `writes` = write/rebuild levels, `never` = nobody. On a interactive run
+(`ncc ai`, the GUI, MCP) that question goes to a person — notification, approve dialog, 300 s
+before it counts as denied.
+
+On a **schedule there is no person, and the grant answers instead.** The approval for a timer is the
+`permissions.*` you wrote in Nix at deploy time: a granted `system = "config-write"` lets the unit's
+write through immediately, and a refused one names the rule that refused it
+(`grant_insufficient`, `confirm_without_grant`) instead of reporting a click nobody made. One
+`confirm_answered` line per answered prompt, with the grant's actor. So a schedule that needs a
+prompt to proceed was never runnable unattended — that is a config error, and it reads like one:
+`confirm = "always"` on a schedule refuses non-ladder tools with `confirm_needs_human`
+rather than waiting out the timeout.
+
+```nix
+agent.confirm = "writes";                 # the host's declaration
+agent.schedules.nightly-ship.confirm = "always";  # may ask MORE than the host
+agent.schedules.nightly-audit.confirm = "never";  # refused: clamped to "writes" + eval warning
+```
+
+**`confirm` may only ever ask more, never less** — narrowing moves toward `always`, which is the
+opposite direction to a permission-ladder step, so it has its own clamp. The rule holds at
+evaluation (the unit is handed the narrowed value and the disagreement warns), in the wrapper (an
+`AGENT_CONFIRM` set in the environment may not widen it either), and on the command line:
+
+```bash
+ncc ai agent run --goal "…" --confirm always   # ok — asks more than the host
+ncc ai agent run --goal "…" --confirm never    # exit 2: may ask more, never less
+ncc ai permissions show                        # prints the effective confirm mode
+```
+
+An unknown value, an empty one, or a wider ask than the host falls back to the host's mode — the
+narrow stage is always the unit's or the host's, never the caller's. Without a grant on the process
+at all (`ncc ai` typed by hand), nothing changed: the person at the prompt is still the approver.
+
 ## Poll schedules (change-driven, not clock-driven)
 
 A poll fires on a monotonic interval and **skips the run when nothing changed** — it is the only

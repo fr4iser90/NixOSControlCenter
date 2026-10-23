@@ -206,7 +206,7 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
 - `workspaces rename|move` rewrite every reference (tasks, MCP bindings, progress files) or roll back
 - SSOT: [plans/38-repo-account-fact-store.md](./plans/38-repo-account-fact-store.md)
 
-### Phase 39 (L1–L14 done)
+### Phase 39 (L1–L15 done)
 
 - [x] Transport fixed: the schedule's grant travels in the unit's argv (`--grant repo=… system=…`);
   the wrapper exports defaults, so it no longer overwrites what the unit decided
@@ -247,6 +247,17 @@ GUI (Chat | Tools | Agent | Jobs | Schedules | Settings)
   may wake only what declared it, proved by systemd's `$INVOCATION_ID` so a skipped run (still
   exit 0) and an older `completed` left on disk wake nothing; the downstream re-checks before the
   budget counters and the model, and a completion is spent by a finished run only
+- [x] The confirm axis answers what no human is awake for: on a timer the **grant is the approval** —
+  `grant_confirms` answers the prompt from the held step and audits `confirm_answered`, so a granted
+  write no longer waits out `NOTIFY_TIMEOUT_SEC` and reports a refusal nobody clicked; refusals name
+  their code (`grant_insufficient` / `confirm_needs_human` / `confirm_without_grant`) and the
+  interactive path keeps asking a person
+- [x] `confirm` may only ask **more**, never less: its own rank table (narrowing moves toward
+  `always`, the opposite of a ladder step), enforced at eval (`effectiveConfirm` + a warning naming
+  `agent.confirm`), in the wrapper (`narrowConfirmExport` — the inlined `envExports` runs *after*
+  systemd's `Environment=`) and in argv (`--confirm`), so no env value drops the grant that authorises
+  the write. `agent run --confirm` refuses a widening with exit 2; the dead
+  `NCC_ASSISTANT_AGENT_CONFIRM/_DRY_RUN/_PROFILE` fields are gone
 - SSOT: [plans/39-permission-ladder-and-schedule-grants.md](./plans/39-permission-ladder-and-schedule-grants.md)
 
 ## Known follow-ups (not blockers)

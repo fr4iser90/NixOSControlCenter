@@ -35,7 +35,7 @@ WRITE_TOOLS = ("apply_module_config", "restore_config_backup")
 
 def _runtime(**over) -> ToolRuntime:
     """A runtime whose host says "writes allowed" unless a test says otherwise."""
-    base = dict(allow_write=True, mcp_allow_write=True, allow_rebuild=True, agent_dry_run=False)
+    base = dict(allow_write=True, mcp_allow_write=True, allow_rebuild=True)
     base.update(over)
     return ToolRuntime(_settings(**base))
 

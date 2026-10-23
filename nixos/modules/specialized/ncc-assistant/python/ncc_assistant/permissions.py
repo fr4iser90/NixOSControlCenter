@@ -383,6 +383,119 @@ def audit_actor() -> str:
     return (os.environ.get(ENV_ACTOR) or "").strip() or "cli"
 
 
+# --------------------------------------------------------------------------
+# Confirm axis (phase 39 L15) — who answers a prompt, and who may skip it
+# --------------------------------------------------------------------------
+
+#: Ordered by how much a run may do unasked: ``always`` asks for every tool, ``never`` for
+#: none. Narrowing therefore moves *toward* ``always`` — the opposite direction to a ladder
+#: step, which is why confirm gets its own rank instead of riding on ``lower_step``.
+CONFIRM_MODES: tuple[str, ...] = ("always", "writes", "never")
+DEFAULT_CONFIRM = "writes"
+#: The wrapper sets the unsuffixed name and ``Settings`` used to read a prefixed one that
+#: nothing ever wrote; the unsuffixed one is the live variable and stays the single source.
+ENV_CONFIRM = "AGENT_CONFIRM"
+
+#: The prompt for a mutating tool is a question about one ladder step, so the level the
+#: runtime speaks in maps onto ``SYSTEM_ACTIONS`` rather than inventing a third vocabulary.
+CONFIRM_LEVEL_ACTIONS: dict[str, str] = {"write": "config_write", "rebuild": "rebuild"}
+
+
+def normalise_confirm(raw: str | None) -> str | None:
+    mode = str(raw or "").strip().lower()
+    return mode if mode in CONFIRM_MODES else None
+
+
+def confirm_rank(mode: str | None) -> int:
+    """How freely a mode lets a run act: 0 asks for everything, 2 for nothing."""
+    return _rank(CONFIRM_MODES, normalise_confirm(mode) or DEFAULT_CONFIRM)
+
+
+def narrow_confirm(declared: str | None, requested: str | None) -> tuple[str, list[str]]:
+    """This process's confirm mode: the narrower of what was declared and what was asked.
+
+    ``requested`` (``--confirm``) that asks *less* than ``declared`` comes back in
+    ``violations`` instead of quietly loosening a host that declared ``writes`` — the same
+    shape as a ``--grant`` above the ceiling, because the failure mode is the same: the
+    operator believes the tighter rule is in force.
+    """
+    ambient = normalise_confirm(declared) or DEFAULT_CONFIRM
+    want = normalise_confirm(requested)
+    if want is None:
+        return ambient, []
+    if confirm_rank(want) > confirm_rank(ambient):
+        return ambient, [
+            f"confirm={want} asks less than the declared confirm={ambient}; "
+            "--confirm may only narrow a run (always asks more than writes, writes more than never)"
+        ]
+    return want, []
+
+
+def set_process_confirm(mode: str) -> None:
+    """Publish the effective mode so the runtime and any harness child get the same answer."""
+    os.environ[ENV_CONFIRM] = normalise_confirm(mode) or DEFAULT_CONFIRM
+
+
+def current_confirm() -> str:
+    """The mode this process answers prompts in."""
+    return normalise_confirm(os.environ.get(ENV_CONFIRM)) or DEFAULT_CONFIRM
+
+
+def grant_confirms(level: str, *, tool: str = "") -> Decision:
+    """Answer a prompt from the run's grant instead of from a person who is not there.
+
+    A schedule unit has nobody to click Allow. Asking anyway held the unit for
+    ``NOTIFY_TIMEOUT_SEC`` and returned "Cancelled by user / notification timeout" — a human
+    refusal nobody made, which also meant a schedule granted ``system=config-write`` could
+    not actually write. The approval for a timer is the grant the operator wrote in Nix at
+    deploy time, so the verdict is the system step covering that level, and one audit line
+    names the grant as the approver.
+
+    Fails closed both ways: a mutating prompt with no grant is refused (nothing approved it),
+    and a step the prompt asks about that the ladder cannot speak in — ``tool`` under
+    ``confirm=always`` — is refused too rather than waiting out the clock. Interactive runs
+    keep asking a person; this answers only where no person can be reached.
+    """
+    from .audit import append_audit  # local: importing policy must not pull in state paths
+
+    action = CONFIRM_LEVEL_ACTIONS.get(str(level or ""))
+    active = current_grant()
+    if action is None:
+        decision = Decision(
+            False,
+            "confirm_needs_human",
+            f"confirm mode asks about {level or 'tool'} calls and this run has no one to ask",
+            hint="A schedule answers its own prompts from its grant, which covers writes and "
+            "rebuilds only. Lower agent.confirm / --confirm to writes, or run interactively.",
+        )
+    elif active is None:
+        decision = Decision(
+            False,
+            "confirm_without_grant",
+            f"nothing approved this {level}: the run carries no grant",
+            hint="A scheduled unit is approved by its grant — set permissions.system / "
+            "--grant system=… up to the host ceiling, or run interactively.",
+        )
+    else:
+        decision = _cover(action, axis="system", grant=active)
+
+    detail = f"level={level or 'tool'}"
+    if action is not None:
+        detail += f" action={action}"
+    if active is not None:
+        detail += f" system={active.system}"
+    if not decision.allowed:
+        detail = f"code={decision.code} {detail}"
+    append_audit(
+        "confirm_answered",
+        actor=active.actor if active is not None else audit_actor(),
+        tool=tool or str(level or "confirm"),
+        result="granted" if decision.allowed else "denied",
+        detail=detail[:240],
+    )
+    return decision
+
+
 def lowest_grant_today() -> Grant:
     """The narrowest grant this host already carried today — the floor for an unattended run.
 

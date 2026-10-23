@@ -57,6 +57,7 @@ in
               Agent:
                 ncc ai agent run --goal "..."
                 ncc ai agent run --goal "..." --grant repo=pr --grant system=none
+                ncc ai agent run --goal "..." --confirm always|writes|never
                 ncc ai jobs list
                 ncc ai playbook list|run NAME
 

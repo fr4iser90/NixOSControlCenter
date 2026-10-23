@@ -114,6 +114,10 @@ def sched(**over) -> str:
         "allowRebuild": "null",
         "dryRun": "null",
         "profile": "null",
+        # Not read unguarded (schedules.nix asks schedule.confirm or null), but a real
+        # submodule always carries it, so the stub carries it too — present-but-null is the
+        # case a bare attrs stub would skip.
+        "confirm": "null",
         "permissions": "{ repo = null; system = null; budget = { }; }",
         "model": "null",
     }
@@ -136,6 +140,7 @@ def host(schedules: str = "{}", **over) -> str:
         "agentAllowRebuild": "false",
         "agentProfile": '"read-only"',
         "agentDryRun": "false",
+        "agentConfirm": '"writes"',
     }
     o.update(over)
     return f"""{{
@@ -150,7 +155,7 @@ def host(schedules: str = "{}", **over) -> str:
     allowRebuild = {o["agentAllowRebuild"]};
     dryRun = {o["agentDryRun"]};
     profile = {o["agentProfile"]};
-    confirm = "writes";
+    confirm = {o["agentConfirm"]};
     maxSteps = -1;
     schedules = {schedules};
   }};

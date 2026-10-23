@@ -209,6 +209,22 @@ let
         default = null;
         description = "Override agent.profile for this schedule";
       };
+      confirm = mkOption {
+        type = types.nullOr (types.enum [ "always" "writes" "never" ]);
+        default = null;
+        example = "always";
+        description = ''
+          Override agent.confirm for this schedule, which decides what a prompt asks about:
+          always every tool, writes only writes and rebuilds, never nothing. Null inherits
+          {{Option|systemConfig.aiAssistant.agent.confirm}}.
+
+          Only narrows, and narrowing here means asking *more*: confirm sits in the opposite
+          direction to the permission ladder, so a schedule asking a wider mode than the host
+          declared is reported and the host value is what the unit gets. On a timer nobody is
+          there to answer, so a prompt the grant covers is answered by the grant itself — a
+          schedule granted system=none has no approval to give and the write is refused.
+        '';
+      };
       permissions = {
         repo = mkOption {
           type = types.nullOr (types.enum [

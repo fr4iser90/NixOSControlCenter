@@ -16,6 +16,7 @@ from .permissions import (
     Decision,
     audit_actor,
     check_shell_command,
+    current_confirm,
     decide_system,
     peek_system,
     record_denial,
@@ -896,12 +897,30 @@ class ToolRuntime:
         return any(cmd == p or cmd.startswith(p + " ") for p in prefixes)
 
     def _request_confirmation(self, payload: dict[str, Any]) -> bool:
-        """GUI confirm_hook or notification DecisionService for headless/agent."""
+        """GUI confirm_hook, the run's grant on a timer, or a human at the notification."""
         if self.confirm_hook is not None:
             return bool(self.confirm_hook(payload))
 
-        confirm_mode = os.environ.get("AGENT_CONFIRM", "writes").lower()
+        confirm_mode = current_confirm()
         level = payload.get("level", "write")
+
+        from .notifications import is_schedule_actor
+        from .permissions import CONFIRM_LEVEL_ACTIONS, grant_confirms
+
+        if is_schedule_actor():
+            # The mode decides which calls get asked about; on a timer it never decides
+            # whether a write is approved. Honouring "never" for a ladder level would let a
+            # hand-set env drop the grant that authorises the write, and honouring "always"
+            # by asking anyway would hold the unit for NOTIFY_TIMEOUT_SEC to reach the same
+            # "no" a grant refusal says out loud.
+            if level not in CONFIRM_LEVEL_ACTIONS and confirm_mode != "always":
+                return True
+            decision = grant_confirms(str(level), tool=str(payload.get("tool") or ""))
+            self._confirm_refusal = (
+                "" if decision.allowed else f"{decision.code}: {decision.reason}"
+            )
+            return decision.allowed
+
         if confirm_mode == "never":
             return True
         if confirm_mode == "writes" and level not in ("write", "rebuild"):
@@ -920,7 +939,13 @@ class ToolRuntime:
             timeout_sec=timeout,
         )
         result = svc.wait_for_decision(decision.id, timeout_sec=timeout)
-        return result == "allow"
+        allowed = result == "allow"
+        self._confirm_refusal = "" if allowed else "Cancelled by user / notification timeout."
+        return allowed
+
+    def _confirm_refusal_message(self) -> str:
+        """Why the prompt said no — a grant refusal must not read like a human clicked Block."""
+        return getattr(self, "_confirm_refusal", "") or "Cancelled by user / notification timeout."
 
     def _ask_user(self, args: dict[str, Any], ask_id: str | None) -> dict[str, Any]:
         """`ask_user`: one question out, the human's answer back as the tool result."""
@@ -1079,7 +1104,7 @@ class ToolRuntime:
                 }
             )
             if not ok:
-                return {"ok": False, "error": "Cancelled by user / notification timeout."}
+                return {"ok": False, "error": self._confirm_refusal_message()}
 
         try:
             result = subprocess.run(
@@ -1381,7 +1406,7 @@ class ToolRuntime:
                         }
                     )
                     if not ok:
-                        return {"ok": False, "error": "Cancelled by user / notification timeout."}
+                        return {"ok": False, "error": self._confirm_refusal_message()}
                     args["confirm"] = True
 
             if name == "apply_system":
@@ -1403,7 +1428,7 @@ class ToolRuntime:
                         }
                     )
                     if not ok:
-                        return {"ok": False, "error": "Cancelled by user / notification timeout."}
+                        return {"ok": False, "error": self._confirm_refusal_message()}
                     args["confirm"] = "CONFIRM"
 
             if name == "restore_config_backup":
@@ -1419,13 +1444,12 @@ class ToolRuntime:
                         }
                     )
                     if not ok:
-                        return {"ok": False, "error": "Cancelled by user / notification timeout."}
+                        return {"ok": False, "error": self._confirm_refusal_message()}
                     args["confirm"] = True
 
-            confirm_mode = os.environ.get("AGENT_CONFIRM", "writes").lower()
             # Confirm-always is for agent/headless; GUI chat already uses confirm_hook for writes.
             if (
-                confirm_mode == "always"
+                current_confirm() == "always"
                 and self.confirm_hook is None
                 and name not in MUTATING_TOOLS
                 and name != "agent_finish"

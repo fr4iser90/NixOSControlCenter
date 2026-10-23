@@ -137,9 +137,6 @@ class Settings:
     #: Clamps the system axis of a grant (see ``permissions.agent_axis_ceiling``).
     agent_allow_write: bool | None
     agent_allow_rebuild: bool | None
-    agent_confirm: str  # "writes" | "always" | "never"
-    agent_dry_run: bool
-    agent_profile: str | None
     # Harness: native | qwen | dsh  (+ codingHarness: same | auto)
     agent_harness: str
     agent_coding_harness: str
@@ -241,9 +238,6 @@ class Settings:
             ),
             agent_allow_write=_env_optional_bool("NCC_ASSISTANT_AGENT_ALLOW_WRITE"),
             agent_allow_rebuild=_env_optional_bool("NCC_ASSISTANT_AGENT_ALLOW_REBUILD"),
-            agent_confirm=os.environ.get("NCC_ASSISTANT_AGENT_CONFIRM", "writes"),
-            agent_dry_run=_env_bool("NCC_ASSISTANT_AGENT_DRY_RUN", False),
-            agent_profile=_env_optional_str("NCC_ASSISTANT_AGENT_PROFILE"),
             agent_harness=(
                 _env_optional_str("NCC_ASSISTANT_HARNESS") or "native"
             ).lower(),

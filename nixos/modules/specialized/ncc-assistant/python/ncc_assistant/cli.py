@@ -56,10 +56,12 @@ def _cmd_tool(args: argparse.Namespace) -> int:
 
 def _cmd_agent_run(args: argparse.Namespace) -> int:
     """Run agent with a goal."""
+    import os
+
     from .agent import resolve_run_grant, run_agent
     from .capacity import CapacityError, capacity_slot
     from .harness import get_harness, looks_like_coding_goal, resolve_harness_name
-    from .permissions import set_process_grant
+    from .permissions import ENV_CONFIRM, narrow_confirm, set_process_confirm, set_process_grant
 
     settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
 
@@ -97,6 +99,16 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
         # External harnesses do not build an AgentRunner; publish the grant for their children.
         set_process_grant(run_grant)
 
+    confirm_mode, confirm_violations = narrow_confirm(os.environ.get(ENV_CONFIRM), args.confirm)
+    if confirm_violations:
+        for line in confirm_violations:
+            print_err(line)
+        print_err("Confirm refused — --confirm may ask more than the host, never less.")
+        return 2
+    # Publish before anything reads it: the runtime answers a prompt from this, and an
+    # external harness hands the same env to its child.
+    set_process_confirm(confirm_mode)
+
     verbose = bool(getattr(args, "verbose", False))
     print_info(f"Starting agent with goal: {goal}")
     print_info(
@@ -112,6 +124,7 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
             else "host default (none requested)"
         )
     )
+    print_info(f"Confirm: {confirm_mode}")
     print_info("---")
 
     try:
@@ -390,6 +403,7 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
         REPO_CEILING_PATH,
         REPO_STEPS,
         SYSTEM_STEPS,
+        current_confirm,
         current_grant,
         invoker_role,
         system_ceiling,
@@ -398,6 +412,9 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
     settings = Settings.from_env()
     repo_ceiling = (os.environ.get(ENV_REPO_CEILING) or "").strip() or DEFAULT_REPO_CEILING
     system_ceiling_step = system_ceiling(settings.writes_enabled, settings.allow_rebuild)
+    # The wrapper's AGENT_CONFIRM is the host's declaration: what this process would answer a
+    # prompt with, and what a schedule unit's own confirm may only narrow.
+    host_confirm = current_confirm()
     grant, violations = resolve_run_grant(settings, getattr(args, "grant", None))
     active = current_grant()
     repo_file = _permissions_show_repo_file()
@@ -409,6 +426,7 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
     payload = {
         "invokerRole": invoker_role(),
         "ceiling": {"repo": repo_ceiling, "system": system_ceiling_step},
+        "confirm": host_confirm,
         "effective": grant.as_dict() if grant else {"repo": repo_ceiling, "system": system_ceiling_step},
         "activeRunGrant": active.as_dict() if active else None,
         "repoFile": repo_file,
@@ -432,6 +450,7 @@ def _cmd_permissions_show(args: argparse.Namespace) -> int:
 
     print_ok(f"Invoker role: {payload['invokerRole']}")
     print_info(f"Host ceiling:  repo={repo_ceiling} system={system_ceiling_step}")
+    print_info(f"Confirm:       {host_confirm}")
     print_info(
         "This run:      "
         + (
@@ -1374,6 +1393,12 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         metavar="AXIS=STEP",
         help="Narrow this run, e.g. repo=pr or system=none (never widens the host ceiling)",
+    )
+    agent_run.add_argument(
+        "--confirm",
+        choices=["always", "writes", "never"],
+        help="Ask policy for this run (never > writes > always as capability): "
+        "may only ask more than the host, never less",
     )
     agent_run.add_argument(
         "--verbose",

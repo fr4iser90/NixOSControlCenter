@@ -147,6 +147,24 @@ let
   # narrowBoolExport an inherited value is allowed to override the host default here.
   respectUnitExport = name: defaultValue: ''export ${name}="''${${name}:-${defaultValue}}"'';
 
+  # confirm is a gate like the bool pair but it narrows in the *opposite* direction: always
+  # asks for every tool (narrowest), never asks for nothing (widest). So the unit may only
+  # raise how much is asked, and the clamp has to be a rank rather than a boolean — keeping
+  # any inherited value would let a unit pick "never" on a host that said "writes".
+  # Unset, unknown or wider-than-host values fall back to the host; narrower ones survive.
+  narrowConfirmExport = name: hostValue:
+    let
+      askRank = { always = 2; writes = 1; never = 0; };
+      host = if builtins.isString hostValue && askRank ? ${hostValue} then hostValue else "writes";
+      askAtLeast = builtins.filter (mode: askRank.${mode} >= askRank.${host}) (builtins.attrNames askRank);
+    in ''
+      case "''${${name}:-}" in
+        ${lib.concatStringsSep "|" askAtLeast}) : ;;
+        *) ${name}="${host}";;
+      esac
+      export ${name}
+    '';
+
   envExports = ''
     export NCC_ASSISTANT_ROOT="${appRoot}"
     export NCC_KNOWLEDGE_ROOT="${appRoot}/knowledge"
@@ -202,7 +220,7 @@ let
     ${narrowBoolExport "AGENT_ALLOW_REBUILD" (cfg.agent.allowRebuild or false)}
     ${narrowBoolExport "NCC_ASSISTANT_AGENT_ALLOW_WRITE" (cfg.agent.allowWrite or false)}
     ${narrowBoolExport "NCC_ASSISTANT_AGENT_ALLOW_REBUILD" (cfg.agent.allowRebuild or false)}
-    export AGENT_CONFIRM="${cfg.agent.confirm or "writes"}"
+    ${narrowConfirmExport "AGENT_CONFIRM" (cfg.agent.confirm or "writes")}
     export AGENT_DRY_RUN="${if (cfg.agent.dryRun or false) then "1" else "0"}"
     ${lib.optionalString ((cfg.agent.profile or null) != null) ''
       export AGENT_PROFILE="${cfg.agent.profile}"
