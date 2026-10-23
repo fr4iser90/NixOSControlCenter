@@ -47,7 +47,25 @@ isProject: false
 
 Ein Ordner `assistant/` (oder `ncc_assistant/` / `python/`) ist wieder nur ein Mülleimer. Du willst **Companion, Harness, Plugins, Data usw. direkt unter dem Modul** — nicht nochmal eingepackt.
 
-Der Ist-Zustand gibt das her: `python/ncc_assistant/` liegt **70 `.py` auf einer Ebene** — `companion.py` (126 KB), `gui_pages.py` (98 KB), `gui.py` (91 KB), `cli.py` (75 KB) direkt neben `paths.py`, `llm.py`, `session.py`. Oberflächen und Kern sind nicht trennbar, weil sie im selben Ordner wohnen.
+Der Ist-Zustand gibt das her: `python/ncc_assistant/` liegt **69 `.py` auf einer Ebene** — `companion.py` (126 KB), `gui_pages.py` (98 KB), `gui.py` (91 KB), `cli.py` (75 KB) direkt neben `paths.py`, `llm.py`, `session.py`. Oberflächen und Kern sind nicht trennbar, weil sie im selben Ordner wohnen.
+
+Messbarer erster Schnitt: von den **69** `.py` auf Paketebene importieren **9 PySide6**, 60 sind Qt-frei (plus 2 Qt-Dateien in `plugins/doomscroll/` → 11 im ganzen Paket).
+
+**Korrektur an dieser Stelle.** Die erste Fassung behauptete, die Surfaces seien Blätter mit „0 eingehenden Imports". Das war ein kaputtes grep-Muster (`grep -rl "import .*\b$f\b"` — lieferte außerdem `grep: --include=*.nix: No such file or directory`). Gemessen mit `grep -rnE "from \.$f import|import \.$f"`:
+
+| Qt-Datei | KB | IN (eingehende Rel.-Imports) | OUT | wird importiert von |
+|---|---|---|---|---|
+| `companion` | 123 | 2 | 28 | `cli.py:1901`, `tray` |
+| `gui_pages` | 96 | **7** | 30 | `gui`, `companion`, `templates_ui` |
+| `gui` | 89 | **5** | 14 | `cli.py:1957`, `tray`, `companion` |
+| `templates_ui` | 41 | **4** | 9 | `gui`, `companion`, `gui_pages` |
+| `provider_ui` | 9 | 3 | 3 | `gui`, `gui_pages` |
+| `focus_actions` | 9 | 3 | 2 | `focus`, `companion` |
+| `companion_themes` | 6 | 3 | 0 | `companion`, `gui` |
+| `tray` | 4 | 1 | 7 | `cli.py:652` |
+| `morning_brief_settings` | 6 | 0 | 4 | nur Plugins/Tests |
+
+Wahr ist die *schwächere* Aussage: die Surfaces werden **lazy** betreten (aus `cli.py` und Tests). Blätter sind davon nur `companion`, `tray`, `morning_brief_settings`. `gui_pages`, `templates_ui`, `provider_ui`, `companion_themes` sind **gemeinsame Qt-Bausteine von `gui` und `companion`** — ein naives „Qt-Datei → `companion/`" erzeugt eine Kante `gui → companion`. Die Qt-Schicht muss deshalb **gespalten** werden (Surface vs. gemeinsame Widgets), nicht verschoben. Das ist der Grund, warum dieser Plan eine Zuordnungstabelle braucht und keinen Sortier-Befehl.
 
 ## Nix statt Python? — Nein (Non-Goal)
 
@@ -81,15 +99,18 @@ ncc-assistant/                    # Nix-Modul (discovery)
     prompts/skills/*.md           # war prompts/skills (11)
     knowledge/README.md           # erklärt $out/knowledge (built, nicht source)
 
-  companion/                      # Desktop companion surface (war companion.py + themes/store)
-    __init__.py                   # run_companion
-    window.py  themes.py  store.py  feed.py  …
-  harness/                        # coding harness adapters (war python/ncc_assistant/harness)
-  plugins/                        # feature plugins (doomscroll, morning_brief)
-  core/                           # shared runtime (llm, session, paths, agent, mcp, permissions, …)
-  cli/                            # Entrypoint: argparse / verbs
-    __main__.py
+  companion/                      # Surface: Avatar-Overlay (war companion.py + themes/store/skins)
+  window/                         # Surface: Multi-Tab-Fenster (war gui.py, startet `ncc ai gui`)
+  tray/                           # Surface: Tray-Daemon (war tray.py)
+  widgets/                        # GEMEINSAME Qt-Bausteine (gui_pages, templates_ui, provider_ui)
+  harness/                        # coding harness adapters (bleibt, ist schon sauber)
+  plugins/                        # feature plugins: doomscroll (+ focus*), morning_brief
+  core/                           # shared runtime, Qt-frei — in Gruppen, nicht flach (siehe Zuordnung)
+    runtime/  policy/  store/  scheduling/  catalogs/  workflows/  render/
+  cli/                            # Entrypoint: __main__.py + argparse/verbs
 ```
+
+Vier Surfaces, nicht eine: `companion` (Overlay), `window` (Hauptfenster), `tray`, `widgets` (geteilt). Die Aufteilung ist **gemessen erzwungen**, nicht Stil — `gui_pages`/`templates_ui`/`provider_ui` hängen gleichzeitig an `gui` und `companion`; `widgets/` ist der einzige Ort, der keine Kante `gui → companion` erzeugt.
 
 Kein `python/`. Kein `ncc_assistant/`. Kein `assistant/`.
 
@@ -184,7 +205,52 @@ Imports (Richtung): `from core.paths import …`, `from companion import run_com
 
 GUI Control-Center-Seite bleibt `ui/gui/page.py` (NCC-Shell; `validate-module-surfaces.sh` Regel 3/4 prüft genau das). Companion ist absichtlich **nicht** unter `ui/` — die Regel („`ui/` = NCC-Shell-Seite, `companion/` = eigene Surface") gehört in `doc/layout.md`, sonst wächst der Ordner beim nächsten Feature wieder zu.
 
-Was nach `core/` wandert: alles Shared (llm, session, agent, runtime, permissions, marketplace, agent_templates, playbooks-loader, gui*, tray, …). Surface-spezifisch bleibt in `companion/` / `harness/` / `plugins/`.
+## Zuordnung (die 69 Dateien)
+
+Das ist das Artefakt, das der Plan vorher nicht hatte — ohne es rät jeder, der das ausführt, bei 60 Dateien neu. Grundlage: Docstring-Rolle + gemessene Qt-Farbe + Fan-in. **Kein Zyklus in der Qt-Schicht** (gemessen), deshalb ist die Trennung überhaupt möglich.
+
+**Surfaces (Qt, 9 Top-Level-Dateien)**
+
+| Heute | Ziel | Warum genau dort |
+|---|---|---|
+| `companion.py` (123 KB) | `companion/window.py` | IN nur aus `cli.py:1901` + `tray` |
+| `companion_store.py` | `companion/store.py` | IN 1: nur `companion` |
+| `avatar_skins.py` | `companion/skins.py` | IN 1: nur `companion` |
+| `gui.py` (89 KB) | `window/app.py` | Surface `ncc ai gui`; IN aus `cli.py:1957` + `tray` + `companion` |
+| `tray.py` | `tray/daemon.py` | IN 1: `cli.py:652` |
+| `gui_pages.py` (96 KB) | `widgets/pages.py` | **IN 7** aus `gui`, `companion`, `templates_ui` — kein Surface-Blatt |
+| `templates_ui.py` (41 KB) | `widgets/templates.py` | IN 4 aus `gui`, `companion`, `gui_pages`, `morning_brief_settings` |
+| `provider_ui.py` | `widgets/providers.py` | IN 3 aus `gui`, `gui_pages` |
+| `companion_themes.py` | `widgets/themes.py` | Name lügt: IN aus `companion` **und** `gui` |
+
+**Plugins**
+
+| Heute | Ziel | Warum |
+|---|---|---|
+| `focus.py` (28 KB) | `plugins/doomscroll/watchdog.py` | Doomscroll ist schon als `FeaturePlugin` gebaut (`plugins/doomscroll/__init__.py`) |
+| `focus_actions.py` (Qt) | `plugins/doomscroll/actions.py` | **Pflicht mitzunehmen**: `focus.py:727,746` importiert es lazy, `focus_actions` importiert zurück → Zyklus. Getrennte Pakete wären zirkulär. |
+| `focus_netblock.py` | `plugins/doomscroll/netblock.py` | IN 1: nur `focus` |
+| `plugins/doomscroll/{privilege_ui,settings_ui}.py` | bleiben | sind schon richtig |
+| `morning_brief.py` | `plugins/morning_brief/logic.py` | IN 1: nur `morning_brief_settings` |
+| `morning_brief_settings.py` (Qt) | `plugins/morning_brief/settings_ui.py` | ersetzt den existierenden Shim |
+
+**Totcode, vorher entscheiden (nicht mitumbauen):** `plugins/morning_brief/{logic,settings_ui}.py` nennen sich selbst „Compat shim"/„Shim — use `ncc_assistant.morning_brief`"; `plugins/__init__.py::list_plugins()` liefert **nur** `DoomscrollPlugin()`; 0 Code-Referenzen auf `plugins.morning_brief` im ganzen Repo. Einziger Beleg ist `tests/ncc-assistant/test_morning_brief_plugin.py`, und der beweist das Gegenteil (brief ist **kein** Plugin). → Beim Umzug löschen statt verschieben, Test bleibt als Regel-Wächter.
+
+**`core/` — 50 Dateien, in Gruppen. Flach wäre der alte Mülleimer mit neuem Namen.**
+
+| Gruppe | Dateien |
+|---|---|
+| `runtime/` | `runtime` (IN13) · `registry` (IN21) · `llm` · `session` · `agent` · `context` · `capacity` · `mcp_client` · `mcp_server` · `argv_template` · `history` · `memory` |
+| `store/` | `preferences` (**IN57**) · `paths` (IN37) · `config` (IN30) · `workspaces` (IN27) · `presence` (IN18) · `providers` · `jobs` · `secrets` · `host_profiles` · `shortcuts` |
+| `policy/` | `permissions` (49 KB, IN18) · `auth` (IN17) · `audit` (IN12) · `budgets` · `profiles` · `red_team` · `notifications` |
+| `scheduling/` | `idle` (IN14) · `schedule_templates` (IN15) · `schedule_freq` · `watchdogs` · `probes` · `poll_guard` · `chain_guard` |
+| `catalogs/` | `agent_templates` (IN16) · `marketplace` (IN10) · `playbooks` (IN11) · `eval_harness` · `health` · `maintenance` · `diff_review` |
+| `workflows/` | `workflows` (IN14) · `workflow_execute` (42 KB) · `workspace_workflow` · `workspace_lifecycle` |
+| `render/` | `transcript` · `export_transcript` · `trace_format` |
+
+**`cli/`** `cli.py` (74 KB, OUT 38, IN 1) · `__main__.py` · `chat.py` (Terminal-REPL-Fallback) · `cli_print.py` · `__init__.py` (die Public-API-Re-Exports wandern nach `core/__init__.py`, sonst brechen 22 Tests, die `from ncc_assistant import …` schreiben)
+
+Drei Entscheidungen, die **du** treffen musst, nicht der Ausführer: (1) `window/` vs. `gui/` als Name — `gui/` kollidiert im Kopf mit `ui/gui/page.py`; (2) `widgets/` vs. alles Qt nach `companion/` — Letzeres erzeugt die Kante `window → companion`; (3) `chat.py` nach `cli/` (Terminal) oder `core/runtime/` — es ist IN nur aus `cli`, also `cli/`.
 
 ## Tests
 
@@ -225,6 +291,31 @@ Ein Schwung aus Daten-Umzug **und** Python-Aufteilung hat einen beweisbar kaputt
 
 Größerer mechanischer Rename als nur Ordner-hoisten — bewusst, damit der Tree der mentalen Modell-Trennung entspricht. Die zwei Commits sind es auch, damit zwischen den Phasen jeweils ein grüner Gate mit gelaufenen Qt-Tests steht.
 
+## Ausführung: Branch, Agent, und was die Gates eben *nicht* fangen
+
+**Branch: ja — und zwar ein `git worktree`, nicht nur ein Branch.** Zwei gemessene Gründe:
+
+1. `.githooks/pre-commit` ist `exec bash "$ROOT/tests/run-gates.sh"` — die **volle** Kette bei *jedem* Commit. Phase 2 hat einen beweisbar kaputten Zwischenstand, also ist „häppchenweise committen" nicht möglich: der erste Commit nach Beginn von Phase 2 ist schon der komplette. Ein Branch, in dem trotzdem gestückelt wird, ist eine Illusion.
+2. `main` ist der Auslieferungsstand (`ncc system-update --local …/nixos` zeigt auf diesen Checkout). Wer im Haupt-Checkout refactored, deployed zwischenzeitlich den halbfertigen Baum. Ein Worktree hält `main` deploybar, während Phase 2 läuft:
+   ```bash
+   git worktree add ../ncc-tree -b refactor/ncc-assistant-tree
+   ```
+
+**Die Gates validieren dieses Refactor nicht — sie sehen die riskanteste Zone nicht.** Messprotokoll unten; die drei Löcher:
+
+| Lücke | Messwert | Folge |
+|---|---|---|
+| **Kein Gate baut `package.nix`.** | In `tests/gates/*.sh` kommt kein `nix build` vor; `nix eval`/`nix-instantiate --eval` laufen nur auf `#nixosModules`, `#lib` und Modul-Eval. `package.nix` wird in Tests nur als **Text** gelesen (`test_run_length_budgets.py:106,122`). Es gibt **kein Paket-Flake-Output**: `nixos/flake.nix` exportiert nur `nixosModules` + `lib`, `package.nix` wird intern von `schedules.nix:10`, `commands.nix:21`, `api.nix:6`, `focus-block.nix:16` importiert. | Genau das ist die Zone, in der dieser Umbau stirbt: `appRoot`-Staging, `PYTHONPATH`, 5 Entrypoints, Namens-Kollision. Alles grün, `ncc ai` tot. |
+| **Zwei der vier Loader haben 0 Tests.** | `grep -rl playbooks tests/ncc-assistant --include='*.py'` → **0**; `eval_harness` → **0**. (`marketplace` 3, `agent_templates` 8.) | Phase 1 ist an `playbooks.py:58` und `eval_harness.py:123` unbewacht — und das sind die beiden `importlib.resources`-Stellen, die beim Umzug *garantiert* ihre Datei verlieren. |
+| **Der Reload-Wächter ist optional.** | `tests/gui/validate-gui-python.sh:88` (PySide6), sonst `SKIP` auf `:90`. | `reload.py` purgiert nach dem Rename nichts mehr — die GUI läuft still mit stale Modulen. |
+
+**Deshalb die Reihenfolge, nicht die andere:**
+
+1. **Gate zuerst, Umbau danach.** Layout- + Kollisions- + Entrypoint-Check *gegen den Ist-Baum* schreiben: sie sind heute grün (der Ist-Baum erfüllt sie, sobald `data/` gefüllt ist) und werden rot, sobald der Umbau etwas vergisst. Ein Gate, das nach dem Umbau entsteht, kann den Umbau nicht prüfen.
+2. **Die zwei fehlenden Loader-Tests vor Phase 1** (`playbooks`, `eval_harness`) — sonst ist Phase 1 der eine Schritt, den das Repo nicht sieht.
+3. **Erst dann ein Agent.** Delegierbar ist der mechanical Teil: `git mv`, die 4 Loader, `conftest.py`-Bootstrap, die 39 Test-Bootschriften, `schedules.nix`-Kommentare. **Nicht** delegierbar: die Zuordnung oben (60 Entscheidungen, begründet, sie ist die Arbeit — nicht das `mv`), `package.nix`, und `reload.py` in einem *fremden* Modul.
+4. **Retry-Schleife ist nicht kostenlos.** Jeder Agent-Durchlauf ist ein voller `run-gates.sh` auf diesem Host, mit Session-Bus und Wayland — kein CI-Container. Ein Agent, der „solange probiert bis grün" macht, probiert das auf dem Desktop.
+
 ## Pfad-Rot (mitmähen, sonst Lüge im Repo)
 
 - `schedules.nix:53` (`python/ncc_assistant/permissions.py`), `:241` (`poll_guard.py`), `:268` (`chain_guard.py`) — Kommentare, die Invarianten an Dateipfade binden.
@@ -236,9 +327,10 @@ Größerer mechanischer Rename als nur Ordner-hoisten — bewusst, damit der Tre
 
 ```bash
 git ls-files nixos/modules/specialized/ncc-assistant/data        # → leer (data/ ist nicht in git)
-ls nixos/modules/specialized/ncc-assistant/python/ncc_assistant/*.py | wc -l   # 70
+ls nixos/modules/specialized/ncc-assistant/python/ncc_assistant/*.py | wc -l   # 69
 ls tests/ncc-assistant/test_*.py | wc -l                          # 41
 grep -rl ncc_assistant tests/ncc-assistant --include='*.py' | wc -l   # 39
+grep -rl "from ncc_assistant import" tests/ncc-assistant/*.py | wc -l # 22  (Public-API-Importe, keine Submodule)
 grep -rl "ncc-assistant/python" . --include='*.py' --include='*.sh' --include='*.nix' --include='*.md' \
   | grep -v docs/todo | wc -l                                     # 33
 grep -rl ncc_assistant . --include='*.py' --include='*.sh' --include='*.nix' --include='*.md' \
@@ -246,4 +338,22 @@ grep -rl ncc_assistant . --include='*.py' --include='*.sh' --include='*.nix' --i
 grep -n "ncc_assistant" nixos/core/management/gui-engine/python/ncc_gui/reload.py  # :8 :195 :201 :252 :265 :269 :284
 grep -rn -- "-m ncc_assistant" --include='*.nix' --include='*.py' . | grep -v docs/todo   # package.nix :288 :295 :315 :321 :327 + test_reload_generation.py:58
 grep -n 'resources\.files' nixos/modules/specialized/ncc-assistant/python/ncc_assistant/{playbooks,eval_harness}.py
+
+# Qt-Schicht (9 von 69 Top-Level, dazu 2 in plugins/doomscroll) — IN/OUT pro Datei, kein Zyklus:
+python3 - <<'PY'   # läuft in python/ncc_assistant/
+import re, pathlib
+d = pathlib.Path("."); qt = {f.stem for f in d.glob("*.py") if "PySide6" in f.read_text(errors="replace")}
+for f in sorted(d.glob("*.py")):
+    src = f.read_text(errors="replace")
+    inn = sum(len(re.findall(rf"from \.{f.stem} import|import \.{f.stem}\b", g.read_text(errors="replace")))
+              for g in d.glob("*.py") if g != f)
+    print(f.stem, "Qt" if f.stem in qt else "-", inn, len(set(re.findall(r"from \.([a-z_0-9]+) import", src))))
+PY
+
+# Gates sehen Packaging nie:
+grep -rn "nix build\|nix-instantiate" tests/gates/*.sh        # nur --parse / --eval, nie ein Build von package.nix
+grep -n "packages" nixos/flake.nix                            # kein Paket-Output — nur nixosModules + lib
+grep -rn "import ./package.nix" nixos/modules/specialized/ncc-assistant/*.nix   # :10 :21 :6 :16 (intern)
+# Loader ohne Test:
+for m in playbooks eval_harness marketplace agent_templates; do echo -n "$m "; grep -rl "$m" tests/ncc-assistant --include='*.py' | wc -l; done   # 0 / 0 / 3 / 8
 ```
