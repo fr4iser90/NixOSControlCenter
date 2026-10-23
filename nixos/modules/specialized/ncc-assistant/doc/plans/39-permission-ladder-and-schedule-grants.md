@@ -324,6 +324,18 @@ actor `idle`, so an opportunistic run never outranks the narrowest grant already
   evaluation. The default host must produce no warnings at all: that assertion is what keeps the new
   `minStep` from turning every existing host into a wall of text.
   `tests/ncc-assistant/test_schedule_grant_ceiling_v1.py`
+- **confirm**: on a timer the grant answers the prompt — what the held system step covers is granted,
+  the rest is refused **by code** (`grant_insufficient` / `confirm_without_grant` /
+  `confirm_needs_human`), one `confirm_answered` line per answer, and no unit reaches
+  `DecisionService` at all (it is patched to raise), so the old 300 s wait and its
+  `Cancelled by user / notification timeout.` cannot come back. `AGENT_CONFIRM=never` inside a unit
+  still cannot push a write past `system = none`; the interactive path keeps asking a person and keeps
+  that wording. Narrowing is measured in both directions on its own ranks (`always < writes < never`,
+  never the ladder's), on the CLI (`--confirm` asking less ⇒ exit 2 before the run starts) and in
+  Nix: the eval'd unit is handed the narrowed mode, a wider ask warns and names `agent.confirm`,
+  `mkAgentExec` carries `--confirm`, and `narrowConfirmExport` is extracted from `package.nix`,
+  evaluated and then **sourced in bash** — the wrapper clamp is tested as shell, not as a string.
+  `tests/ncc-assistant/test_confirm_axis_v1.py`, `tests/ncc-assistant/test_schedule_confirm_v1.py`
 
 ## Risks
 
