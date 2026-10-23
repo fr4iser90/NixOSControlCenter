@@ -2,11 +2,15 @@
 
 Two side effects a green gate must never have on the machine that runs it:
 
-* **Bubbles.** The run path notifies on every terminal job state and focus.py reminds on
-  doomscroll, so on the desktop where the pre-commit hook runs this suite, a green gate popped
-  a bubble per agent run — and notify_send_actions would have blocked the gate on --wait.
-  Hiding the binary is the guard that also holds for a test that forgets to stub. A test that
-  wants the real notify-send argv patches shutil.which itself; its nested patch wins.
+* **The operator's session.** The run path notifies on every terminal job state and the
+  doomscroll intervene pauses MPRIS players, switches KWin's ``currentDesktop``, focuses the
+  browser and types ``about:blank`` into it. The pre-commit hook runs this suite on that same
+  desktop, so a green gate paused the operator's video, jumped them to Firefox and stole the
+  window they were typing in — proven by capturing the argv of every desktop tool the run
+  spawned (``Player.Pause``, ``kwin.Scripting.loadScript`` from the focus tests). Every one of
+  those paths is guarded by ``shutil.which`` on its tool, so hiding the tool removes the
+  capability for the whole suite instead of trusting each test to stub. A test that wants real
+  argv patches ``shutil.which`` itself; its nested patch wins.
 * **Written state.** audit.jsonl, budget.json, jobs and approvals all resolve through
   ``paths.config_home()`` on every call, so any test that drives the agent or a git helper
   without its own tmp home would append to the operator's real state. Pointing XDG at a
@@ -25,8 +29,22 @@ from pathlib import Path
 
 import pytest
 
-#: Binaries that must never resolve inside a test process.
-NOTIFY_BINARIES = frozenset({"notify-send"})
+#: Binaries that must never resolve inside a test process. Each one is a capability over the
+#: session that runs the gate: a bubble, a paused player, a desktop switch, a focused window,
+#: synthetic keystrokes. Names are matched on the basename so an absolute path is hidden too.
+DESKTOP_BINARIES = frozenset(
+    {
+        "notify-send",
+        "qdbus",
+        "dbus-send",
+        "hyprctl",
+        "swaymsg",
+        "kdotool",
+        "wtype",
+        "xdotool",
+        "ydotool",
+    }
+)
 
 #: Throwaway XDG config home for this session (set in pytest_configure, removed on exit).
 _SESSION_XDG: Path | None = None
@@ -59,11 +77,11 @@ def pytest_unconfigure(config):
 
 
 @pytest.fixture(autouse=True)
-def no_desktop_notifications(monkeypatch):
+def no_desktop_side_effects(monkeypatch):
     real_which = shutil.which
 
     def which(cmd, *args, **kwargs):
-        if str(cmd) in NOTIFY_BINARIES:
+        if os.path.basename(str(cmd)) in DESKTOP_BINARIES:
             return None
         return real_which(cmd, *args, **kwargs)
 

@@ -17,7 +17,10 @@ export PYTHONPATH="${ROOT}/nixos/modules/specialized/ncc-assistant/python${PYTHO
 PYTHONPATH="${ROOT}/tests/gui${PYTHONPATH:+:$PYTHONPATH}"
 # Domain page smoke must not touch live /etc/nixos or open modal dialogs.
 export NIXOS_DIR="${NIXOS_DIR:-$ROOT/nixos}"
-export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}"
+# Forced, not defaulted: the desktop session already exports QT_QPA_PLATFORM=wayland;xcb, so a
+# `:-offscreen` default never applied there and the gate mapped a real window into the
+# compositor running it (measured: 35 → 36 clients on wayland-0).
+export QT_QPA_PLATFORM=offscreen
 
 resolve_python() {
   if [[ -n "${NCC_GUI_PYTHON:-}" && -x "${NCC_GUI_PYTHON}" ]]; then
@@ -61,7 +64,9 @@ fi
 
 run() {
   echo "→ $*"
-  "$PYTHON" "$@"
+  # Every script starts here so the desktop boundary in desktop_quiet_runner.py holds for the
+  # ones that exist today and the ones added below later.
+  "$PYTHON" "${ROOT}/tests/gui/desktop_quiet_runner.py" "$@"
 }
 
 run "${ROOT}/tests/gui/test_settings_import_smoke.py"
