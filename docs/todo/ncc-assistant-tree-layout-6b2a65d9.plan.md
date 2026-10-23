@@ -28,7 +28,7 @@ todos:
     status: pending
   - id: layout-gate
     content: "Layout-Gate auf ncc-assistant gescoped in bestehende gates/ erweitern (kein neues Gate, kein Repo-weites python/-Verbot)"
-    status: pending
+    status: completed
   - id: path-rot
     content: "Pfad-Rot: schedules.nix-Kommentare, doc/plans/*.md, README, knowledge/README.md, data/templates/"
     status: pending
@@ -169,6 +169,17 @@ Außerdem 6 weitere `tests/gui/*.py` mit `ncc_assistant`-Referenz: `test_templat
 
 **3. Generische Top-Level-Namen auf geteiltem Interpreter.** `core` `cli` `data` `plugins` `harness` landen auf dem `sys.path` des `python3.withPackages`-Sets, in dem auch `ncc_gui` liegt. `python -m cli` ist der generischste denkbare Entrypoint. Das ist kein Stil-, sondern ein Kollisionsrisiko → eigenes Gate (unten), nicht Konvention.
 
+**Kollisionsfläche richtig gemessen.** Die erste Fassung hielt `ncc_gui/widgets.py` für einen harten Konflikt gegen das geplante `widgets/`. Ist es nicht: gemessen liegt in `${appRoot}` genau **zwei** importierbare Top-Level-Namen (`ncc_assistant`, `ncc_gui`); `widgets` innerhalb von `ncc_gui` ist ein **Submodul** (`ncc_gui.widgets`) und für `import widgets` nicht sichtbar. Zusätzlich nutzt `ncc_gui` durchgängig paketqualifizierte Selbst-Imports (`from ncc_gui…`, 20+ Dateien, **0** bare-absolute) — ein hoistendes `widgets/` bricht also auch die GUI nicht. Die echte Fläche ist damit:
+
+| Kandidat | Grund | Prüfbar ohne Build? |
+|---|---|---|
+| pythonEnv site-packages (`mcp httpx pyside6` + Transitiv) | dieselbe Interpreter-Wurzel | **nein** — braucht den Build oder eine ausgehandelte Liste |
+| alles Weitere, das nach `${appRoot}` gestaged wird | `runCommand` kann ungeplant名前 liefern | ja — Soll-Menge der `appRoot`-Einträge |
+| Python-Stdlib | `import core` verdeckt nichts, `import types` schon | ja — `sys.stdlib_module_names` |
+| `ncc_gui` Top-Level | nur `ncc_gui` selbst | ja — aus `package.nix`-Staging |
+
+Daraus folgt die Gate-Formulierung unten: **Soll-Menge der Site-Root-Einträge + Stdlib-Freiheit**, nicht „kein Name existiert schon in `ncc_gui`". Der site-packages-Anteil bleibt als Restrisiko dokumentiert und ist nur per Build schließbar.
+
 ## Loader, die `data/` erst kennen müssen
 
 Ein Umzug der JSON aus dem Paket raus ist **kein reiner `git mv`** — vier Stellen leiten die Pfade aus der Paketstruktur ab:
@@ -250,7 +261,7 @@ Das ist das Artefakt, das der Plan vorher nicht hatte — ohne es rät jeder, de
 
 **`cli/`** `cli.py` (74 KB, OUT 38, IN 1) · `__main__.py` · `chat.py` (Terminal-REPL-Fallback) · `cli_print.py` · `__init__.py` (die Public-API-Re-Exports wandern nach `core/__init__.py`, sonst brechen 22 Tests, die `from ncc_assistant import …` schreiben)
 
-Drei Entscheidungen, die **du** treffen musst, nicht der Ausführer: (1) `window/` vs. `gui/` als Name — `gui/` kollidiert im Kopf mit `ui/gui/page.py`; (2) `widgets/` vs. alles Qt nach `companion/` — Letzeres erzeugt die Kante `window → companion`; (3) `chat.py` nach `cli/` (Terminal) oder `core/runtime/` — es ist IN nur aus `cli`, also `cli/`.
+**Entschieden (2026-02, vom Owner):** (1) `window/` — nicht `gui/`, um die Verwechslung mit `ui/gui/page.py` (Shell-Seite) zu vermeiden; (2) eigenes `widgets/` für die geteilten Qt-Bausteine — alles Qt nach `companion/` zu kippen erzeugt die Kante `window → companion`; (3) `chat.py` → `cli/` (IN nur aus `cli`). Damit ist die Zuordnung vollständig, der Ausführer hat keine Namensentscheidung mehr.
 
 ## Tests
 
@@ -271,6 +282,35 @@ Bestehende Gates erweitern statt neue erfinden — `validate-module-shape.sh` (P
 6. **Entrypoint-Check:** die 5 Wrapper zeigen alle auf denselben Modulnamen; `python -m <name>` ist im gebauten Paket löschbar (Smoke).
 
 Punkt 5 und 6 sind die einzigen, die den Fehler *unmöglich* machen statt ihn nur zu melden — 1-4 sind Fänger.
+
+## Schritt 0 — gelandet (2026-10-23)
+
+Gate **vor** dem Umbau, sonst kann es den Umbau nicht prüfen. Ist als heute-grüner Ratchet gebaut, weil
+`pre-commit` das ganze Netz fährt: eine heute rote Prüfung würde jeden Commit bis Phase 2 blockieren.
+
+`tests/gates/validate-assistant-layout.sh` (in `validate-ncc-nix.sh` als 19/19 eingehängt — kein zweites Netz):
+
+| Check | Entfernte Fähigkeit |
+|-------|---------------------|
+| `appRoot`-Soll-Menge `{AI_KNOWLEDGE.md, knowledge, ncc_assistant, ncc_gui, prompts}` | Kein ungeplanter Top-Level-Name landet auf `PYTHONPATH` |
+| Stdlib-Freiheit des importierbaren Top-Levels + `sys.path`-Bann | Ein Hoist darf kein stdlib-Modul verdecken; kein Pfropf macht Submodul-Namen importierbar |
+| `data/` frei von Code | Katalog-Wurzel kann nicht zum Paket werden |
+| Loader-Zeugen `playbooks` + `eval_harness` | Die stille `return []`-Degradation ist rot, nicht „klar, läuft" |
+| Provenanz auf Wegwerf-Kopie | Loader dürfen nicht aus einem installierten/stalen `ncc_assistant` lesen |
+| Ein Entrypoint + `--help`-Smoke über 4 Verbs | Ein Wrapper darf nicht auf einem eigenen Modul landen und nicht schweigend sterben |
+| Ratchet: 69 flache Module | Neuer Code darf nicht in den flachen Haufen |
+
+Bite bewiesen in `tests/ncc-assistant/test_layout_gate_v1.py` (11 Tests: 10 Angriffe + Kontrolle),
+Daten-Contract zusätzlich fixiert in `tests/ncc-assistant/test_catalog_loaders_v1.py` (15). Gemessen:
+`run-gates.sh` exit 0, Assistant-Suite 636 passed, Gate läuft ohne Profilzugriff (`XDG_CONFIG_HOME`
+isoliert, `HOME` real — sonst fehlt httpx aus dem user site-packages).
+
+**Restrisiko, das erst Phase 2 schließt:** Kein Gate baut `package.nix`, also bleibt die Kollision im
+`pythonEnv`-site-packages Anteil (Punkt 5 oben) messbar nur per Build. Das absolute Verbot von
+`python/ncc_assistant/` und die Pflicht-Soll-Menge `companion/ core/ cli/ harness/ plugins/` kommen mit
+Phase 2 in dasselbe Gate — `EXPECTED_STAGED` und `FLAT_CEILING` werden dann **gesenkt**, nicht erhöht.
+Ein beim Gate-Entwurf gefundenes Loch (Wrapper auf `-m ncc_mcp` blieb grün, weil der grep den Namen
+nicht traf) ist geschlossen: verglichen wird jetzt die Menge **aller** `python -m <mod>`-Ziele.
 
 ## Reihenfolge: zwei lieferbare Schritte
 

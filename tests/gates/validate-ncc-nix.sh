@@ -230,11 +230,20 @@ fi
 
 # ── 18) Build-parser syntax (`nix eval`, not legacy nix-instantiate --parse) ──
 echo ""
-echo "== 18/18  Nix syntax with the build parser =="
+echo "== 18/19  Nix syntax with the build parser =="
 if bash "$ROOT/tests/gates/validate-nix-parse.sh"; then
   pass "validate-nix-parse.sh"
 else
   fail "nix build switch would fail: Nix syntax not accepted by the build parser"
+fi
+
+# ── 19) Assistant tree/staging/entrypoint layout (no nix build needed) ────────
+echo ""
+echo "== 19/19  ncc-assistant layout (staging Soll-Menge + entrypoints) =="
+if bash "$ROOT/tests/gates/validate-assistant-layout.sh"; then
+  pass "validate-assistant-layout.sh"
+else
+  fail "ncc-assistant staging/importable layout or entrypoint smoke broken"
 fi
 
 echo ""
@@ -244,5 +253,5 @@ if [[ "$FAIL" -ne 0 ]]; then
   echo "Fix issues above, then re-run: bash tests/gates/validate-ncc-nix.sh"
   exit 1
 fi
-echo "OK — bash + layer + modularity + migrations + wizard + options + import paths + module eval + catalog + docs-layout + store-status + module-shape + ai-packs + surfaces + gui-hotpath + cli-manager-args + flake-exports + nix-parse green."
+echo "OK — bash + layer + modularity + migrations + wizard + options + import paths + module eval + catalog + docs-layout + store-status + module-shape + ai-packs + surfaces + gui-hotpath + cli-manager-args + flake-exports + nix-parse + assistant-layout green."
 exit 0
