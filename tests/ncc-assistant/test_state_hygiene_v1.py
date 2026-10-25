@@ -10,17 +10,17 @@ from pathlib import Path
 from unittest import mock
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"))
+sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"))
 
-from ncc_assistant.audit import append_audit
-from ncc_assistant.jobs import JobStore
-from ncc_assistant.maintenance import prune_approvals, prune_audit, prune_jobs
-from ncc_assistant.marketplace import install_template
-from ncc_assistant.notifications import DecisionService, PendingDecision
-from ncc_assistant.paths import audit_file, workspaces_file
-from ncc_assistant.runtime import ToolRuntime
-from ncc_assistant.secrets import set_secret
-from ncc_assistant.workspaces import upsert_workspace
+from core.policy.audit import append_audit
+from core.store.jobs import JobStore
+from core.catalogs.maintenance import prune_approvals, prune_audit, prune_jobs
+from core.catalogs.marketplace import install_template
+from core.policy.notifications import DecisionService, PendingDecision
+from core.store.paths import audit_file, workspaces_file
+from core.runtime.runtime import ToolRuntime
+from core.store.secrets import set_secret
+from core.store.workspaces import upsert_workspace
 
 
 def _mode(path: Path) -> int:
@@ -74,7 +74,7 @@ def test_audit_file_is_owner_only_after_append(tmp_path):
 
 def test_prune_approvals_keeps_pending_and_recent(tmp_path):
     with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": str(tmp_path)}):
-        import ncc_assistant.notifications as notifications
+        import core.policy.notifications as notifications
 
         notifications._default_service = None
         try:
@@ -138,7 +138,7 @@ def test_prune_jobs_keeps_running_and_newest(tmp_path):
 
 
 def _shell_runtime() -> ToolRuntime:
-    from ncc_assistant.config import Settings
+    from core.store.config import Settings
 
     return ToolRuntime(Settings.from_env())
 

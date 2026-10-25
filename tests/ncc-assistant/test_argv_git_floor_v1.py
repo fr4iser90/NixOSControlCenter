@@ -20,10 +20,12 @@ from unittest import mock
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"))
+sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"))
 
-from ncc_assistant import audit, permissions, runtime as runtime_module, workflow_execute
-from ncc_assistant.config import Settings
+from core.policy import audit, permissions
+from core.runtime import runtime as runtime_module
+from core.workflows import workflow_execute
+from core.store.config import Settings
 from test_permission_ladder_v1 import _repo, grant_env
 
 

@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest import mock
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
 
@@ -49,21 +49,21 @@ class WorkspaceLifecycleTests(unittest.TestCase):
             check=True,
             capture_output=True,
         )
-        from ncc_assistant.preferences import set_active_workspace_id
-        from ncc_assistant.workspaces import upsert_workspace
+        from core.store.preferences import set_active_workspace_id
+        from core.store.workspaces import upsert_workspace
 
         upsert_workspace(workspace_id="proj", path=str(self.repo), label="Proj")
         set_active_workspace_id("proj")
 
     def test_fresh_repo_is_active(self) -> None:
-        from ncc_assistant.workspace_lifecycle import lifecycle_report
+        from core.workflows.workspace_lifecycle import lifecycle_report
 
         r = lifecycle_report("proj")
         self.assertEqual(r["state"], "active")
         self.assertTrue(r["ok"])
 
     def test_classify_archive(self) -> None:
-        from ncc_assistant.workspace_lifecycle import classify_lifecycle
+        from core.workflows.workspace_lifecycle import classify_lifecycle
 
         state, reasons = classify_lifecycle(
             git={
@@ -80,7 +80,7 @@ class WorkspaceLifecycleTests(unittest.TestCase):
         self.assertTrue(reasons)
 
     def test_classify_later_with_todos(self) -> None:
-        from ncc_assistant.workspace_lifecycle import classify_lifecycle
+        from core.workflows.workspace_lifecycle import classify_lifecycle
 
         state, _ = classify_lifecycle(
             git={
@@ -95,7 +95,7 @@ class WorkspaceLifecycleTests(unittest.TestCase):
         self.assertEqual(state, "later")
 
     def test_classify_once(self) -> None:
-        from ncc_assistant.workspace_lifecycle import classify_lifecycle
+        from core.workflows.workspace_lifecycle import classify_lifecycle
 
         state, _ = classify_lifecycle(
             git={
@@ -111,14 +111,14 @@ class WorkspaceLifecycleTests(unittest.TestCase):
         self.assertEqual(state, "once")
 
     def test_fleet_lists_workspace(self) -> None:
-        from ncc_assistant.workspace_lifecycle import fleet_lifecycle
+        from core.workflows.workspace_lifecycle import fleet_lifecycle
 
         f = fleet_lifecycle()
         self.assertEqual(f["count"], 1)
         self.assertTrue(any(r["workspace_id"] == "proj" for r in f["workspaces"]))
 
     def test_new_templates_exist(self) -> None:
-        from ncc_assistant.agent_templates import get_agent_template
+        from core.catalogs.agent_templates import get_agent_template
 
         for tid in (
             "workspace-lifecycle",
@@ -135,7 +135,7 @@ class WorkspaceLifecycleTests(unittest.TestCase):
             self.assertEqual(tmpl.schedule_kind, "once")
 
     def test_audit_sees_new_gaps(self) -> None:
-        from ncc_assistant.workspace_workflow import audit_workspace
+        from core.workflows.workspace_workflow import audit_workspace
 
         missing = {g.id for g in audit_workspace("proj").missing}
         self.assertIn("changelog", missing)
@@ -143,7 +143,7 @@ class WorkspaceLifecycleTests(unittest.TestCase):
         self.assertIn("github-actions", missing)
 
     def test_lifecycle_templates_exist(self) -> None:
-        from ncc_assistant.agent_templates import get_agent_template
+        from core.catalogs.agent_templates import get_agent_template
 
         self.assertIsNotNone(get_agent_template("workspace-lifecycle"))
         self.assertIsNotNone(get_agent_template("workspace-archive-suggest"))

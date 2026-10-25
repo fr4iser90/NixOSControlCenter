@@ -18,9 +18,11 @@ from unittest import mock
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"))
+sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"))
 
-from ncc_assistant import audit, idle, paths, permissions
+from core.policy import audit, permissions
+from core.scheduling import idle
+from core.store import paths
 
 
 @pytest.fixture(autouse=True)
@@ -126,14 +128,14 @@ class _Runs:
 def _sweeping(candidate, ran):
     with mock.patch.object(idle, "is_idle_eligible", return_value=True), mock.patch.object(
         idle, "list_idle_candidates", return_value=[candidate]
-    ), mock.patch("ncc_assistant.capacity.try_acquire", return_value="token"), mock.patch(
-        "ncc_assistant.capacity.release"
+    ), mock.patch("core.runtime.capacity.try_acquire", return_value="token"), mock.patch(
+        "core.runtime.capacity.release"
     ), mock.patch(
-        "ncc_assistant.agent.run_agent", side_effect=ran
+        "core.runtime.agent.run_agent", side_effect=ran
     ), mock.patch(
-        "ncc_assistant.auth.with_cached_credentials", side_effect=lambda s: s
+        "core.policy.auth.with_cached_credentials", side_effect=lambda s: s
     ), mock.patch(
-        "ncc_assistant.agent_templates.run_instance", return_value=()
+        "core.catalogs.agent_templates.run_instance", return_value=()
     ):
         yield
 

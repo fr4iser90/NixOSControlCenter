@@ -20,9 +20,13 @@ from unittest import mock
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"))
+sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"))
 
-from ncc_assistant import audit, budgets, cli, maintenance, paths, workflow_execute
+from core.policy import audit, budgets
+from cli import cli
+from core.catalogs import maintenance
+from core.store import paths
+from core.workflows import workflow_execute
 from test_permission_ladder_v1 import _repo, grant_env
 from test_run_length_budgets import _settings
 
@@ -119,14 +123,14 @@ def test_zero_turns_a_counter_off():
 
 def test_a_run_over_budget_never_reaches_the_job_store_or_the_llm():
     """plan-39 §5: the skip happens before anything is spent."""
-    from ncc_assistant.agent import AgentRunner, AgentSettings
+    from core.runtime.agent import AgentRunner, AgentSettings
 
     os.environ[budgets.ENV_MAX_RUNS_PER_DAY] = "1"
-    with mock.patch("ncc_assistant.agent.get_job_store") as store, mock.patch(
-        "ncc_assistant.runtime.ToolRuntime"
+    with mock.patch("core.runtime.agent.get_job_store") as store, mock.patch(
+        "core.runtime.runtime.ToolRuntime"
     ), mock.patch.object(AgentRunner, "_check_preconditions", return_value=None), mock.patch.object(
         AgentRunner, "_run_with_lock"
-    ) as locked, mock.patch("ncc_assistant.agent.AgentLock") as lock:
+    ) as locked, mock.patch("core.runtime.agent.AgentLock") as lock:
         with grant_env(repo="pr", actor="schedule:daily-audit"):
             budgets.record_run()
             runner = AgentRunner(_settings(), AgentSettings(goal="churn"))
@@ -424,7 +428,7 @@ def test_the_schedule_unit_gets_the_env_and_narrowing_only_warnings():
 
 def test_the_cli_shows_the_budget_and_prints_a_skip(capsys):
     src = (
-        REPO / "nixos/modules/specialized/ncc-assistant/python/ncc_assistant/cli.py"
+        REPO / "nixos/modules/specialized/ncc-assistant/cli/cli.py"
     ).read_text(encoding="utf-8")
     assert '"budget": budget' in src and 'kind == "skipped"' in src
 

@@ -17,6 +17,7 @@ workflow `workspace-brief` + Cron.
 ## Documentation
 
 - Surfaces (definitions): [doc/surfaces.md](./doc/surfaces.md)
+- Tree layout (SSOT for where code lives): [doc/layout.md](./doc/layout.md)
 - Usage: [doc/usage.md](./doc/usage.md)
 - CLI contract: [doc/cli.md](./doc/cli.md)
 - Roadmap: [doc/roadmap.md](./doc/roadmap.md)

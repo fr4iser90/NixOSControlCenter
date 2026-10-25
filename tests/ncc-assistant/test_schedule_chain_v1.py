@@ -30,10 +30,12 @@ from unittest import mock
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"))
+sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"))
 
-from ncc_assistant import audit, chain_guard, idle, paths  # noqa: E402
-from ncc_assistant.schedule_templates import ScheduleSpec, nix_snippet  # noqa: E402
+from core.policy import audit  # noqa: E402
+from core.scheduling import chain_guard, idle
+from core.store import paths
+from core.scheduling.schedule_templates import ScheduleSpec, nix_snippet  # noqa: E402
 from test_permission_ladder_v1 import grant_env  # noqa: E402
 from test_run_length_budgets import _settings  # noqa: E402
 from test_schedule_grant_ceiling_v1 import _eval, host, sched  # noqa: E402
@@ -208,13 +210,13 @@ def test_the_state_is_written_for_the_operator_only(home):
 
 def _run_agent(locked_events):
     """Drive Agent.run() the way the budget tests do: mocked innards, real gates."""
-    from ncc_assistant.agent import AgentRunner, AgentSettings
+    from core.runtime.agent import AgentRunner, AgentSettings
 
-    with mock.patch("ncc_assistant.agent.get_job_store") as store, mock.patch(
-        "ncc_assistant.runtime.ToolRuntime"
+    with mock.patch("core.runtime.agent.get_job_store") as store, mock.patch(
+        "core.runtime.runtime.ToolRuntime"
     ), mock.patch.object(AgentRunner, "_check_preconditions", return_value=None), mock.patch.object(
         AgentRunner, "_run_with_lock", return_value=iter(locked_events)
-    ) as locked, mock.patch("ncc_assistant.agent.AgentLock"):
+    ) as locked, mock.patch("core.runtime.agent.AgentLock"):
         runner = AgentRunner(_settings(), AgentSettings(goal="ship what the audit found"))
         events = list(runner.run())
     return events, locked, store
@@ -240,7 +242,7 @@ def test_a_held_chain_never_reaches_the_job_store_or_the_llm(home):
 
 def test_a_held_chain_is_not_charged_to_the_days_budget(home):
     """The chain gate runs ahead of the budget ones: a held run must not eat its own allowance."""
-    from ncc_assistant import budgets
+    from core.policy import budgets
 
     with mock.patch.object(budgets, "record_run") as counted, mock.patch.object(
         budgets, "check_run"
@@ -342,7 +344,7 @@ def test_every_release_decision_reaches_the_audit(home):
 
 
 def test_chain_release_exits_zero_only_when_waking_is_allowed(home, capsys):
-    from ncc_assistant import cli
+    from cli import cli
 
     with chain_env(schedule=None, after=None, invocation="inv-upstream"):
         assert cli.main(["chain", "release", "--schedule", UPSTREAM, "--json"]) == 1
@@ -360,7 +362,7 @@ def test_chain_release_exits_zero_only_when_waking_is_allowed(home, capsys):
 
 
 def test_the_operator_reads_the_chain_back_from_permissions_show(home, capsys):
-    from ncc_assistant import cli
+    from cli import cli
 
     finish(chain_guard.STATUS_COMPLETED)
     with chain_env(schedule=DOWNSTREAM, after=UPSTREAM):

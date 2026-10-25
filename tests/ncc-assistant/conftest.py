@@ -24,10 +24,17 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
 import pytest
+
+# Every assistant module here is imported out of the module directory itself, and `package.nix`
+# stages those directories verbatim (`cp -r ${./core} …`), so a bytecode file written by a local
+# test run is content that ships — a different store path depending on who ran the suite last.
+# Measured: 76 .pyc under the module after one green run.
+sys.dont_write_bytecode = True
 
 #: Binaries that must never resolve inside a test process. Each one is a capability over the
 #: session that runs the gate: a bubble, a paused player, a desktop switch, a focused window,

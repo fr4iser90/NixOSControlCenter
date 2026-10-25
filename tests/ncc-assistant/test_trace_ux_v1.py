@@ -9,10 +9,10 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
-from ncc_assistant.trace_format import (  # noqa: E402
+from core.render.trace_format import (  # noqa: E402
     format_thinking_header,
     format_tool_header,
 )
@@ -33,14 +33,14 @@ class TraceHeaderTests(unittest.TestCase):
 
 class TraceAstTests(unittest.TestCase):
     def test_gui_pages_exports_thinking_block(self) -> None:
-        path = ROOT / "ncc_assistant" / "gui_pages.py"
+        path = ROOT / "widgets" / "pages.py"
         text = path.read_text(encoding="utf-8")
         self.assertIn("class ThinkingBlock", text)
         self.assertIn("format_tool_header", text)
         self.assertIn("compact", text)
 
     def test_companion_uses_thinking_and_tools(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn("ThinkingBlock", text)
         self.assertIn("ToolTraceWidget", text)
         self.assertIn("harness_combo", text)
@@ -52,18 +52,18 @@ class TraceAstTests(unittest.TestCase):
         self.assertNotIn("[tool]", text)
 
     def test_gui_uses_thinking_block(self) -> None:
-        text = (ROOT / "ncc_assistant" / "gui.py").read_text(encoding="utf-8")
+        text = (ROOT / "window" / "app.py").read_text(encoding="utf-8")
         self.assertIn("ThinkingBlock", text)
         self.assertIn("harness_combo", text)
         self.assertIn("_finish_think_block", text)
 
     def test_cli_verbose_flag(self) -> None:
-        text = (ROOT / "ncc_assistant" / "cli.py").read_text(encoding="utf-8")
+        text = (ROOT / "cli" / "cli.py").read_text(encoding="utf-8")
         self.assertIn('"--verbose"', text)
         self.assertIn("Thinking…", text)
 
     def test_preferences_trace_keys(self) -> None:
-        path = ROOT / "ncc_assistant" / "preferences.py"
+        path = ROOT / "core" / "store" / "preferences.py"
         tree = ast.parse(path.read_text(encoding="utf-8"))
         names = {
             n.name

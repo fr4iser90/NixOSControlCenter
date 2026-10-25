@@ -11,7 +11,7 @@ from pathlib import Path
 from unittest import mock
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
 
@@ -27,19 +27,19 @@ class WorkspaceWorkflowTests(unittest.TestCase):
         self.repo.mkdir()
         (self.repo / ".git").mkdir()
         (self.repo / "README.md").write_text("# hi\n", encoding="utf-8")
-        from ncc_assistant.workspaces import upsert_workspace
+        from core.store.workspaces import upsert_workspace
 
         upsert_workspace(
             workspace_id="proj",
             path=str(self.repo),
             label="Proj",
         )
-        from ncc_assistant.preferences import set_active_workspace_id
+        from core.store.preferences import set_active_workspace_id
 
         set_active_workspace_id("proj")
 
     def test_audit_finds_gaps(self) -> None:
-        from ncc_assistant.workspace_workflow import audit_workspace
+        from core.workflows.workspace_workflow import audit_workspace
 
         report = audit_workspace("proj")
         missing = {g.id for g in report.missing}
@@ -50,8 +50,8 @@ class WorkspaceWorkflowTests(unittest.TestCase):
         self.assertNotIn("readme", missing)
 
     def test_plan_uses_gap_links_idempotent(self) -> None:
-        from ncc_assistant.workspace_workflow import gap_link, plan_from_audit
-        from ncc_assistant.workflows import list_tasks
+        from core.workflows.workspace_workflow import gap_link, plan_from_audit
+        from core.workflows.workflows import list_tasks
 
         r1 = plan_from_audit("proj")
         self.assertTrue(r1["ok"])
@@ -64,7 +64,7 @@ class WorkspaceWorkflowTests(unittest.TestCase):
         self.assertEqual(len(r2["created_tasks"]), 0)
         self.assertEqual(len(list_tasks()), n1)
         # renaming title must not create duplicate gap task
-        from ncc_assistant.workflows import update_task
+        from core.workflows.workflows import update_task
 
         t0 = r1["created_tasks"][0]
         gap = next(x[4:] for x in t0["links"] if str(x).startswith("gap:"))
@@ -74,8 +74,8 @@ class WorkspaceWorkflowTests(unittest.TestCase):
         self.assertEqual(gap_link("agents-md"), "gap:agents-md")
 
     def test_next_prefers_doing(self) -> None:
-        from ncc_assistant.workspace_workflow import next_open_task, plan_from_audit
-        from ncc_assistant.workflows import update_task
+        from core.workflows.workspace_workflow import next_open_task, plan_from_audit
+        from core.workflows.workflows import update_task
 
         plan_from_audit("proj")
         nxt = next_open_task("proj")
@@ -87,7 +87,7 @@ class WorkspaceWorkflowTests(unittest.TestCase):
         self.assertEqual(again["status"], "doing")
 
     def test_templates_exist(self) -> None:
-        from ncc_assistant.agent_templates import get_agent_template
+        from core.catalogs.agent_templates import get_agent_template
 
         for tid in (
             "workspace-audit",
@@ -111,7 +111,7 @@ class WorkspaceWorkflowTests(unittest.TestCase):
         self.assertIn("task-finish", run.goal_template)
 
     def test_companion_workflow_templates_surface(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn("Workflows (once / cron)", text)
         self.assertIn("workspace-brief", text)
         self.assertIn("PANEL_CRON", text)

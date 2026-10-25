@@ -8,10 +8,10 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
-from ncc_assistant.schedule_freq import (  # noqa: E402
+from core.scheduling.schedule_freq import (  # noqa: E402
     SCHEDULE_MODES,
     cron_fields_to_on_calendar,
     describe_schedule_human,
@@ -74,7 +74,7 @@ class ScheduleFreqTests(unittest.TestCase):
 
 class TemplatesUiAstTests(unittest.TestCase):
     def test_run_once_and_modes(self) -> None:
-        text = (ROOT / "ncc_assistant" / "templates_ui.py").read_text(encoding="utf-8")
+        text = (ROOT / "widgets" / "templates.py").read_text(encoding="utf-8")
         self.assertIn("run_once_mode", text)
         self.assertIn('"Run once"', text)
         self.assertIn('"OK"', text)
@@ -85,12 +85,12 @@ class TemplatesUiAstTests(unittest.TestCase):
         self.assertIn("seed_params", text)
 
     def test_companion_uses_full_configure_dialog(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn("TemplateConfigureDialog", text)
         self.assertNotIn("def _template_param_dialog", text)
 
     def test_configure_dialog_exposes_prompt_transparency(self) -> None:
-        text = (ROOT / "ncc_assistant" / "templates_ui.py").read_text(encoding="utf-8")
+        text = (ROOT / "widgets" / "templates.py").read_text(encoding="utf-8")
         self.assertIn("What will run (transparent", text)
         self.assertIn("_refresh_prompt_preview", text)
         self.assertIn("Rendered prompt", text)
@@ -100,7 +100,7 @@ class TemplatesUiAstTests(unittest.TestCase):
         self.assertIn("render_goal", text)
 
     def test_skill_and_goal_compose(self) -> None:
-        from ncc_assistant.agent_templates import (
+        from core.catalogs.agent_templates import (
             get_agent_template,
             load_skill_text,
             render_goal,
@@ -127,7 +127,7 @@ class TemplatesUiAstTests(unittest.TestCase):
         self.assertEqual(resolve_goal(tmpl, params), rendered)
 
     def test_schedules_use_picker(self) -> None:
-        text = (ROOT / "ncc_assistant" / "gui_pages.py").read_text(encoding="utf-8")
+        text = (ROOT / "widgets" / "pages.py").read_text(encoding="utf-8")
         self.assertIn("FrequencyPicker", text)
         self.assertIn("cal_picker", text)
         self.assertNotIn("self.cal_edit", text)

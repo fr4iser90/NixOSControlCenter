@@ -50,7 +50,7 @@ let
 
   # --- Permission ladder (phase 39) -------------------------------------------------
   # Host config is the ceiling; a schedule only names the step it needs. Steps must stay
-  # in sync with python/ncc_assistant/permissions.py (REPO_STEPS / SYSTEM_STEPS).
+  # in sync with python/core/policy/permissions.py (REPO_STEPS / SYSTEM_STEPS).
   repoSteps = [ "observe" "propose" "commit" "push" "pr" "merge" "release" ];
   systemSteps = [ "none" "config-write" "rebuild" ];
   # Nix has no builtins.elemIndex: rank every step once, then look the rank up.
@@ -238,7 +238,7 @@ let
 
   # --- Poll trigger (phase 39 L11) ---------------------------------------------------
   # A poll earns its keep only by skipping the run when nothing moved: the timer fires every
-  # interval and python/ncc_assistant/poll_guard.py compares a hash of what pollWatch names
+  # interval and python/core/scheduling/poll_guard.py compares a hash of what pollWatch names
   # against the last run's, exiting before the LLM call. So the watch list is not decoration —
   # without it the schedule is a calendar timer that pays for a model every 15 minutes, which
   # is the cost this whole feature exists to avoid. Reject it at evaluation.
@@ -265,7 +265,7 @@ let
   # wall clock said so. systemd cannot express it — OnUnitInactiveSec= measures the unit the
   # timer itself activates, never a sibling — so the declaration here is enforced by two things:
   # a post-start step on the upstream unit (the only thing allowed to start the dependent) and a
-  # gate on the dependent's own run (python/ncc_assistant/chain_guard.py). Every way a chain
+  # gate on the dependent's own run (python/core/scheduling/chain_guard.py). Every way a chain
   # could quietly not mean what it says is refused at evaluation: an id nobody declared, an
   # upstream switched off, a probe that never records an outcome, and a loop nobody can enter.
   allSchedules = cfg.agent.schedules or { };

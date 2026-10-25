@@ -9,13 +9,13 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
 
 class CompanionWiringTests(unittest.TestCase):
     def test_companion_module_exports_run(self) -> None:
-        path = ROOT / "ncc_assistant" / "companion.py"
+        path = ROOT / "companion" / "window.py"
         tree = ast.parse(path.read_text(encoding="utf-8"))
         names = {
             n.name
@@ -33,14 +33,14 @@ class CompanionWiringTests(unittest.TestCase):
         self.assertIn("harness_combo", text)
 
     def test_cli_has_companion_command(self) -> None:
-        path = ROOT / "ncc_assistant" / "cli.py"
+        path = ROOT / "cli" / "cli.py"
         text = path.read_text(encoding="utf-8")
         self.assertIn('"companion"', text)
         self.assertIn('if command == "companion":', text)
         self.assertIn("run_companion", text)
 
     def test_avatar_states_defined(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         for name in (
             "STATE_IDLE",
             "STATE_THINKING",
@@ -52,7 +52,7 @@ class CompanionWiringTests(unittest.TestCase):
 
     def test_slots_initialized_before_empty_check(self) -> None:
         """Empty companion-chats.json must not AttributeError on _slots."""
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         init_at = text.index("class CompanionWindow")
         chunk = text[init_at : init_at + 2500]
         self.assertLess(
@@ -61,7 +61,7 @@ class CompanionWiringTests(unittest.TestCase):
         )
 
     def test_v11_ux_hooks(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn("startSystemMove", text)
         self.assertIn("WA_TranslucentBackground", text)
         self.assertIn("PANEL_HISTORY", text)

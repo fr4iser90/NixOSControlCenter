@@ -37,8 +37,8 @@ def _write(path: Path, text: str) -> None:
 
 
 def _pkg_tree(root: Path, *, marker: str) -> None:
-    """Minimal ncc_gui + ncc_assistant package dirs with distinct content."""
-    for name in ("ncc_gui", "ncc_assistant"):
+    """Minimal ncc_gui + core package dirs with distinct content."""
+    for name in ("ncc_gui", "core"):
         d = root / name
         d.mkdir(parents=True, exist_ok=True)
         (d / "__init__.py").write_text(f"# {name} {marker}\n", encoding="utf-8")
@@ -55,7 +55,7 @@ def _assistant_wrapper(bin_dir: Path, src_root: Path, *, domain_tools: str | Non
 export NCC_ASSISTANT_ROOT="{src_root}"
 export NCC_ASSISTANT_DOMAIN_TOOLS_FILE="{dt}"
 export PYTHONPATH="{src_root}${{PYTHONPATH:+:$PYTHONPATH}}"
-exec /nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-python3-env/bin/python -m ncc_assistant "$@"
+exec /nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-python3-env/bin/python -m core "$@"
 ''',
     )
     path.chmod(0o755)
@@ -158,7 +158,7 @@ class FingerprintTests(unittest.TestCase):
             self.assertTrue(fp_a, "fingerprint A empty")
             self.assertTrue(fp_b, "fingerprint B empty")
             self.assertNotEqual(fp_a, fp_b)
-            self.assertIn("ncc_assistant", fp_a)
+            self.assertIn("core", fp_a)
             self.assertIn("ncc_gui", fp_a)
 
     def test_same_content_same_fingerprint(self) -> None:
@@ -208,7 +208,7 @@ class StaleProcessTests(unittest.TestCase):
 
             fake_modules = {
                 "ncc_gui": FakeMod(old / "ncc_gui"),
-                "ncc_assistant": FakeMod(old / "ncc_assistant"),
+                "core": FakeMod(old / "core"),
             }
             with mock.patch.object(reload, "_clean_store_path", clean_tmp):
                 with mock.patch.object(reload, "SW_BIN", bin_dir):
@@ -218,7 +218,7 @@ class StaleProcessTests(unittest.TestCase):
             # Point loaded modules at new → not stale
             fake_new = {
                 "ncc_gui": FakeMod(new / "ncc_gui"),
-                "ncc_assistant": FakeMod(new / "ncc_assistant"),
+                "core": FakeMod(new / "core"),
             }
             with mock.patch.object(reload, "_clean_store_path", clean_tmp):
                 with mock.patch.object(reload, "SW_BIN", bin_dir):
@@ -348,7 +348,7 @@ class WatcherEvaluateTests(unittest.TestCase):
 
             fake = {
                 "ncc_gui": FakeMod(src / "ncc_gui"),
-                "ncc_assistant": FakeMod(src / "ncc_assistant"),
+                "core": FakeMod(src / "core"),
             }
             hard: list[str] = []
             soft: list[str] = []
@@ -434,7 +434,7 @@ class WatcherEvaluateTests(unittest.TestCase):
 
             fake = {
                 "ncc_gui": FakeMod(old_src / "ncc_gui"),
-                "ncc_assistant": FakeMod(old_src / "ncc_assistant"),
+                "core": FakeMod(old_src / "core"),
             }
             hard: list[str] = []
 

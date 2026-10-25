@@ -23,10 +23,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
-PKG = ROOT / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"
+PKG = ROOT / "nixos" / "modules" / "specialized" / "ncc-assistant"
 sys.path.insert(0, str(PKG))
 
-from ncc_assistant import focus_actions, notifications  # noqa: E402
+from plugins.doomscroll import actions as focus_actions  # noqa: E402
+from core.policy import notifications
 
 #: Each name is a capability over the session that runs the gate: a bubble, a paused player, a
 #: desktop switch, a focused window, synthetic keystrokes. Spelled out here instead of imported

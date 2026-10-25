@@ -15,11 +15,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
-from ncc_assistant import agent_templates as at  # noqa: E402
-from ncc_assistant import workspaces as ws_mod  # noqa: E402
+from core.catalogs import agent_templates as at  # noqa: E402
+from core.store import workspaces as ws_mod  # noqa: E402
 
 PARAM_ID = "outputLanguage"
 OPTIONS = ["English", "Deutsch", "Auto (keep file)"]

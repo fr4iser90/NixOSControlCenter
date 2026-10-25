@@ -13,7 +13,7 @@ Module: `nixos/modules/specialized/ncc-assistant/`
 |------|----------|----------|
 | Nix options | `options.nix`, `template-config.nix` | `enable`, `endpoint`, `api`, `model`, guards, optional key file |
 | Package | `package.nix` | `ncc-assistant`, `ncc-assistant-mcp`, desktop entry, PySide6 + httpx + mcp |
-| CLI | `python/ncc_assistant/cli.py` | `gui` (default), `chat`/`cli`, `mcp`, `tool`, `tools` |
+| CLI | `python/cli/cli.py` | `gui` (default), `chat`/`cli`, `mcp`, `tool`, `tools` |
 | GUI | `gui.py` | Qt chat, sessions, streaming, stop, model picker, vision Img, confirms |
 | Session | `session.py` | tool loop, stream events, cancel, persist |
 | History | `history.py` | `~/.config/ncc-assistant/sessions/` |

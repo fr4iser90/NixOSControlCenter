@@ -16,14 +16,14 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
-from ncc_assistant.config import Settings, compact_threshold_for  # noqa: E402
-from ncc_assistant import context as ctx  # noqa: E402
-from ncc_assistant.context import ContextMeter  # noqa: E402
-from ncc_assistant.history import title_from_messages  # noqa: E402
-from ncc_assistant.llm import (  # noqa: E402
+from core.store.config import Settings, compact_threshold_for  # noqa: E402
+from core.runtime import context as ctx  # noqa: E402
+from core.runtime.context import ContextMeter  # noqa: E402
+from core.runtime.history import title_from_messages  # noqa: E402
+from core.runtime.llm import (  # noqa: E402
     LLMError,
     _openai_payload,
     _rejects_stream_options,
@@ -31,7 +31,7 @@ from ncc_assistant.llm import (  # noqa: E402
     is_context_length_error,
     normalize_usage,
 )
-from ncc_assistant.session import ChatSession  # noqa: E402
+from core.runtime.session import ChatSession  # noqa: E402
 
 
 def _settings(**over) -> Settings:
@@ -171,7 +171,7 @@ class ThresholdTests(unittest.TestCase):
 class WindowProbeTests(unittest.TestCase):
     def test_llamacpp_props_wins(self) -> None:
         client = FakeClient({"http://127.0.0.1:9/props": {"n_ctx": 16384}})
-        with patch("ncc_assistant.llm.httpx.Client", return_value=client):
+        with patch("core.runtime.llm.httpx.Client", return_value=client):
             found = detect_context_window(_settings(), use_cache=False)
         self.assertEqual(found, {"tokens": 16384, "source": "/props n_ctx"})
 
@@ -184,7 +184,7 @@ class WindowProbeTests(unittest.TestCase):
                 }
             }
         )
-        with patch("ncc_assistant.llm.httpx.Client", return_value=client):
+        with patch("core.runtime.llm.httpx.Client", return_value=client):
             found = detect_context_window(_settings(), use_cache=False)
         self.assertEqual(found, {"tokens": 4096, "source": "ollama num_ctx"})
 
@@ -192,7 +192,7 @@ class WindowProbeTests(unittest.TestCase):
         client = FakeClient(
             {"http://127.0.0.1:9/api/show": {"model_info": {"llama.context_length": 131072}}}
         )
-        with patch("ncc_assistant.llm.httpx.Client", return_value=client):
+        with patch("core.runtime.llm.httpx.Client", return_value=client):
             found = detect_context_window(_settings(), use_cache=False)
         self.assertEqual(found, {"tokens": 131072, "source": "ollama context_length"})
 
@@ -204,7 +204,7 @@ class WindowProbeTests(unittest.TestCase):
                 }
             }
         )
-        with patch("ncc_assistant.llm.httpx.Client", return_value=client):
+        with patch("core.runtime.llm.httpx.Client", return_value=client):
             found = detect_context_window(_settings(), use_cache=False)
         self.assertEqual(found, {"tokens": 32768, "source": "/models metadata"})
 
@@ -215,34 +215,34 @@ class WindowProbeTests(unittest.TestCase):
             "http://127.0.0.1:9/api/show",
             "http://127.0.0.1:9/v1/models",
         })
-        with patch("ncc_assistant.llm.httpx.Client", return_value=client):
+        with patch("core.runtime.llm.httpx.Client", return_value=client):
             self.assertIsNone(detect_context_window(_settings(), use_cache=False))
 
     def test_anthropic_is_not_probed(self) -> None:
         client = FakeClient({})
-        with patch("ncc_assistant.llm.httpx.Client", return_value=client):
+        with patch("core.runtime.llm.httpx.Client", return_value=client):
             self.assertIsNone(detect_context_window(_settings(api="anthropic"), use_cache=False))
         self.assertEqual(client.calls, [])
 
     def test_cache_skips_second_probe(self) -> None:
         routes = {"http://127.0.0.1:9/props": {"n_ctx": 8192}}
-        with patch("ncc_assistant.llm.httpx.Client", return_value=FakeClient(routes)):
+        with patch("core.runtime.llm.httpx.Client", return_value=FakeClient(routes)):
             detect_context_window(_settings(), use_cache=True)
         client = FakeClient(routes)
-        with patch("ncc_assistant.llm.httpx.Client", return_value=client):
+        with patch("core.runtime.llm.httpx.Client", return_value=client):
             found = detect_context_window(_settings(), use_cache=True)
         self.assertEqual(found, {"tokens": 8192, "source": "/props n_ctx"})
         self.assertEqual(client.calls, [])
 
     def test_meter_prefers_nix_override_then_probe_then_default(self) -> None:
-        with patch("ncc_assistant.llm.detect_context_window", return_value=None):
+        with patch("core.runtime.llm.detect_context_window", return_value=None):
             meter = ContextMeter.for_settings(_settings())
         self.assertEqual(meter.window, 8192)
         self.assertEqual(meter.window_source, "default")
         meter = ContextMeter.for_settings(_settings(context_window=65536))
         self.assertEqual((meter.window, meter.window_source), (65536, "config"))
         with patch(
-            "ncc_assistant.llm.detect_context_window",
+            "core.runtime.llm.detect_context_window",
             return_value={"tokens": 4096, "source": "/props n_ctx"},
         ):
             meter = ContextMeter.for_settings(_settings())
@@ -278,7 +278,7 @@ class StreamOptionsTests(unittest.TestCase):
         )
 
     def test_rejecting_gateway_is_not_asked_twice(self) -> None:
-        from ncc_assistant import llm
+        from core.runtime import llm
 
         llm._STREAM_OPTIONS_REJECTORS.add("grumpy-model")
         try:
@@ -412,7 +412,7 @@ class CompactionTests(unittest.TestCase):
 
     def test_summary_replaces_older_turns(self) -> None:
         msgs = self._long_history()
-        with patch("ncc_assistant.context.chat_completion", return_value={"content": "SUMMARY BODY"}):
+        with patch("core.runtime.context.chat_completion", return_value={"content": "SUMMARY BODY"}):
             merged, summary = ctx.compact_messages(_settings(), msgs, 200_000, keep=4)
         self.assertEqual(summary, "SUMMARY BODY")
         self.assertEqual(merged[0]["role"], "system")
@@ -424,14 +424,14 @@ class CompactionTests(unittest.TestCase):
     def test_no_extra_message_keys(self) -> None:
         # Strict gateways 400 on unknown message fields — recognising a summary
         # must stay a content-prefix check.
-        with patch("ncc_assistant.context.chat_completion", return_value={"content": "S"}):
+        with patch("core.runtime.context.chat_completion", return_value={"content": "S"}):
             merged, _ = ctx.compact_messages(_settings(), self._long_history(), 200_000, keep=4)
         self.assertEqual(set(merged[1]), {"role", "content"})
         self.assertTrue(ctx.is_summary_message(merged[1]))
 
     def test_summary_never_becomes_the_title(self) -> None:
         msgs = self._long_history()
-        with patch("ncc_assistant.context.chat_completion", return_value={"content": "S"}):
+        with patch("core.runtime.context.chat_completion", return_value={"content": "S"}):
             merged, _ = ctx.compact_messages(_settings(), msgs, 200_000, keep=4)
         derived = title_from_messages(merged)
         self.assertTrue(ctx.is_summary_message(merged[1]))
@@ -445,11 +445,11 @@ class CompactionTests(unittest.TestCase):
         runtime = MagicMock()
         runtime.openai_tools.return_value = []
         session = ChatSession(settings=_settings(), runtime=runtime, messages=msgs)
-        with patch("ncc_assistant.session.save_session"):
+        with patch("core.runtime.session.save_session"):
             session.persist()
             self.assertTrue(session.title.startswith("question 0"))
             self.assertTrue(session.title_locked)
-            with patch("ncc_assistant.context.chat_completion", return_value={"content": "S"}):
+            with patch("core.runtime.context.chat_completion", return_value={"content": "S"}):
                 list(session.compact_now())
             saved_title = session.title
             self.assertTrue(ctx.is_summary_message(session.messages[1]))
@@ -463,7 +463,7 @@ class CompactionTests(unittest.TestCase):
             sent["text"] = messages[1]["content"]
             return {"content": "S"}
 
-        with patch("ncc_assistant.context.chat_completion", side_effect=capture):
+        with patch("core.runtime.context.chat_completion", side_effect=capture):
             ctx.compact_messages(_settings(), huge, 8192, keep=2)
         self.assertLess(len(sent["text"]), ctx._transcript_budget_chars(8192) + 40)
         self.assertTrue(sent["text"].startswith("[older turns omitted]"))
@@ -472,7 +472,7 @@ class CompactionTests(unittest.TestCase):
         msgs = self._long_history()
         meter = ContextMeter(settings=_settings(), window=200_000)
         before = meter.report(msgs)["used"]
-        with patch("ncc_assistant.context.chat_completion", return_value={"content": "S"}):
+        with patch("core.runtime.context.chat_completion", return_value={"content": "S"}):
             events = list(ctx.compact_stream(_settings(), msgs, meter))
         kinds = [e.get("kind") for e in events]
         self.assertEqual(kinds[0], "status")
@@ -487,7 +487,7 @@ class CompactionTests(unittest.TestCase):
         msgs = self._long_history()
         snapshot = [dict(m) for m in msgs]
         meter = ContextMeter(settings=_settings(), window=200_000)
-        with patch("ncc_assistant.context.chat_completion", return_value={"content": "  "}):
+        with patch("core.runtime.context.chat_completion", return_value={"content": "  "}):
             events = list(ctx.compact_stream(_settings(), msgs, meter))
         self.assertEqual(msgs, snapshot)
         self.assertFalse(events[-1]["compacted"])
@@ -498,7 +498,7 @@ class CompactionTests(unittest.TestCase):
         snapshot = [dict(m) for m in msgs]
         meter = ContextMeter(settings=_settings(), window=200_000)
         with patch(
-            "ncc_assistant.context.chat_completion",
+            "core.runtime.context.chat_completion",
             side_effect=LLMError("HTTP 503: summariser down"),
         ):
             events = list(ctx.compact_stream(_settings(), msgs, meter))
@@ -536,8 +536,8 @@ class SessionIntegrationTests(unittest.TestCase):
             seen["sizes"].append(len(messages))
             yield {"type": "done", "message": {"content": "ok", "tool_calls": []}}
 
-        with patch("ncc_assistant.session.iter_chat_completion", side_effect=fake_stream), patch(
-            "ncc_assistant.context.chat_completion", return_value={"content": "S"}
+        with patch("core.runtime.session.iter_chat_completion", side_effect=fake_stream), patch(
+            "core.runtime.context.chat_completion", return_value={"content": "S"}
         ):
             events = list(session._run_turn([]))
 
@@ -558,8 +558,8 @@ class SessionIntegrationTests(unittest.TestCase):
             seen["size"] = len(messages)
             yield {"type": "done", "message": {"content": "ok", "tool_calls": []}}
 
-        with patch("ncc_assistant.session.iter_chat_completion", side_effect=fake_stream), patch(
-            "ncc_assistant.context.chat_completion", return_value={"content": "S"}
+        with patch("core.runtime.session.iter_chat_completion", side_effect=fake_stream), patch(
+            "core.runtime.context.chat_completion", return_value={"content": "S"}
         ):
             list(session._run_turn([]))
 
@@ -580,7 +580,7 @@ class SessionIntegrationTests(unittest.TestCase):
                 },
             }
 
-        with patch("ncc_assistant.session.iter_chat_completion", side_effect=fake_stream):
+        with patch("core.runtime.session.iter_chat_completion", side_effect=fake_stream):
             events = list(session._run_turn([]))
 
         self.assertEqual(session.model_label, "m-2")
@@ -592,8 +592,8 @@ class SessionIntegrationTests(unittest.TestCase):
 
     def test_compact_now_is_manual_and_persists(self) -> None:
         session = self._session(auto_compact=False)
-        with patch("ncc_assistant.context.chat_completion", return_value={"content": "S"}), patch(
-            "ncc_assistant.session.save_session"
+        with patch("core.runtime.context.chat_completion", return_value={"content": "S"}), patch(
+            "core.runtime.session.save_session"
         ) as save:
             events = list(session.compact_now())
         self.assertTrue(events[-1]["compacted"])
@@ -613,8 +613,8 @@ class SessionIntegrationTests(unittest.TestCase):
                 )
             yield {"type": "done", "message": {"content": "recovered", "tool_calls": []}}
 
-        with patch("ncc_assistant.session.iter_chat_completion", side_effect=fake_stream), patch(
-            "ncc_assistant.context.chat_completion", return_value={"content": "S"}
+        with patch("core.runtime.session.iter_chat_completion", side_effect=fake_stream), patch(
+            "core.runtime.context.chat_completion", return_value={"content": "S"}
         ), patch.object(session, "persist"):
             events = list(session.send("hello"))
 

@@ -16,9 +16,11 @@ from unittest import mock
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"))
+sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"))
 
-from ncc_assistant import audit, notifications, paths, permissions, workflow_execute
+from core.policy import audit, notifications, permissions
+from core.store import paths
+from core.workflows import workflow_execute
 from test_permission_ladder_v1 import _git, _repo, grant_env
 from test_single_decision_point_v1 import _fake_config, _runtime
 
@@ -260,14 +262,15 @@ def test_the_repo_axis_records_its_own_denials(tmp_path):
 
 def test_the_run_and_its_decisions_do_not_share_one_event_name():
     """"What was this run handed" and "what did it ask to do" are different questions."""
-    module = REPO / "nixos/modules/specialized/ncc-assistant/python/ncc_assistant"
-    assert '"grant_resolved"' in (module / "agent.py").read_text(encoding="utf-8")
+    module = REPO / "nixos/modules/specialized/ncc-assistant"
+    assert '"grant_resolved"' in (module / "core/runtime/agent.py").read_text(encoding="utf-8")
     writers = {
         name
-        for name in ("permissions.py", "agent.py", "runtime.py", "workflow_execute.py")
+        for name in ("core/policy/permissions.py", "core/runtime/agent.py",
+                     "core/runtime/runtime.py", "core/workflows/workflow_execute.py")
         if '"grant_evaluated"' in (module / name).read_text(encoding="utf-8")
     }
-    assert writers == {"permissions.py"}, writers
+    assert writers == {"core/policy/permissions.py"}, writers
 
 
 # --- who asked (L10) -----------------------------------------------------------------
@@ -298,7 +301,7 @@ def test_a_human_run_records_no_grant(tmp_path, monkeypatch):
 
 def test_approve_list_shows_the_actor_and_the_ladder():
     src = (
-        REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python" / "ncc_assistant" / "cli.py"
+        REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "cli" / "cli.py"
     ).read_text(encoding="utf-8")
     assert "asked by {d.actor}" in src and "d.grant_label()" in src
 

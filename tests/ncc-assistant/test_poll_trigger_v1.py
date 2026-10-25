@@ -27,10 +27,11 @@ from unittest import mock
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"))
+sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"))
 
-from ncc_assistant import idle, paths, poll_guard, workspaces  # noqa: E402
-from ncc_assistant.schedule_templates import ScheduleSpec, nix_snippet  # noqa: E402
+from core.scheduling import idle, poll_guard  # noqa: E402
+from core.store import paths, workspaces
+from core.scheduling.schedule_templates import ScheduleSpec, nix_snippet  # noqa: E402
 from test_permission_ladder_v1 import _repo, grant_env  # noqa: E402
 from test_run_length_budgets import _settings  # noqa: E402
 from test_schedule_grant_ceiling_v1 import _eval, host, sched  # noqa: E402
@@ -186,13 +187,13 @@ def test_the_baseline_is_written_for_the_operator_only(tmp_path, home):
 
 def _run_agent(locked_events):
     """Drive Agent.run() the way the budget tests do: mocked innards, real gates."""
-    from ncc_assistant.agent import AgentRunner, AgentSettings
+    from core.runtime.agent import AgentRunner, AgentSettings
 
-    with mock.patch("ncc_assistant.agent.get_job_store") as store, mock.patch(
-        "ncc_assistant.runtime.ToolRuntime"
+    with mock.patch("core.runtime.agent.get_job_store") as store, mock.patch(
+        "core.runtime.runtime.ToolRuntime"
     ), mock.patch.object(AgentRunner, "_check_preconditions", return_value=None), mock.patch.object(
         AgentRunner, "_run_with_lock", return_value=iter(locked_events)
-    ) as locked, mock.patch("ncc_assistant.agent.AgentLock"):
+    ) as locked, mock.patch("core.runtime.agent.AgentLock"):
         runner = AgentRunner(_settings(), AgentSettings(goal="sweep the tree"))
         events = list(runner.run())
     return events, locked, store
@@ -218,7 +219,7 @@ def test_an_unchanged_poll_never_reaches_the_job_store_or_the_llm(tmp_path, home
 
 def test_an_unchanged_tick_is_not_charged_to_the_days_budget(tmp_path, home):
     """The poll gate runs before the budget one: a busy tree must not eat its own allowance."""
-    from ncc_assistant import budgets
+    from core.policy import budgets
 
     path = watched_file(tmp_path)
     watch = f"file:{path}"
@@ -314,12 +315,12 @@ def test_the_sweep_reports_an_unchanged_poll_as_skipped_not_finished(tmp_path, h
 
     with mock.patch.object(idle, "is_idle_eligible", return_value=True), mock.patch.object(
         idle, "list_idle_candidates", return_value=[candidate]
-    ), mock.patch("ncc_assistant.capacity.try_acquire", return_value="token"), mock.patch(
-        "ncc_assistant.capacity.release"
+    ), mock.patch("core.runtime.capacity.try_acquire", return_value="token"), mock.patch(
+        "core.runtime.capacity.release"
     ), mock.patch(
-        "ncc_assistant.agent.run_agent", side_effect=fake_run_agent
+        "core.runtime.agent.run_agent", side_effect=fake_run_agent
     ), mock.patch(
-        "ncc_assistant.auth.with_cached_credentials", side_effect=lambda s: s
+        "core.policy.auth.with_cached_credentials", side_effect=lambda s: s
     ):
         report = idle.maybe_sweep(start=True)
 
@@ -333,7 +334,7 @@ def test_the_sweep_reports_an_unchanged_poll_as_skipped_not_finished(tmp_path, h
 
 def test_the_operator_reads_the_poll_back_from_permissions_show(tmp_path, home, capsys):
     """A schedule that skips most ticks looks broken unless the tool says what it is doing."""
-    from ncc_assistant import cli
+    from cli import cli
 
     path = watched_file(tmp_path)
     watch = f"file:{path}"
@@ -501,7 +502,7 @@ def test_the_poll_options_are_documented_where_the_operator_reads_them():
 
 
 def test_a_poll_schedule_is_not_displayed_as_a_calendar_one():
-    from ncc_assistant.schedule_templates import ScheduleSpec
+    from core.scheduling.schedule_templates import ScheduleSpec
 
     spec = ScheduleSpec.from_dict(
         {"trigger": "poll", "pollInterval": "15min", "pollWatch": ["workspace:ncc"], "goal": "g"},
@@ -511,6 +512,6 @@ def test_a_poll_schedule_is_not_displayed_as_a_calendar_one():
     assert spec.onCalendar is None, "from_dict's 'daily' fallback would show a poll as daily"
     assert spec.frequency == "every 15min", spec.frequency
     assert 'trigger = "poll";' in __import__(
-        "ncc_assistant.schedule_templates", fromlist=["nix_snippet"]
+        "core.scheduling.schedule_templates", fromlist=["nix_snippet"]
     ).nix_snippet(spec)
     assert ScheduleSpec(name="nightly").frequency == "daily"

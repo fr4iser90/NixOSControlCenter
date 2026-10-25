@@ -20,14 +20,14 @@ from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[2]
 MODULE = REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"
-ROOT = MODULE / "python"
+ROOT = MODULE
 sys.path.insert(0, str(ROOT))
 
-from ncc_assistant import agent as agent_module  # noqa: E402
-from ncc_assistant import notifications  # noqa: E402
-from ncc_assistant.config import Settings  # noqa: E402
-from ncc_assistant.llm import LLMError  # noqa: E402
-from ncc_assistant.permissions import ENV_ACTOR  # noqa: E402
+from core.runtime import agent as agent_module  # noqa: E402
+from core.policy import notifications  # noqa: E402
+from core.store.config import Settings  # noqa: E402
+from core.runtime.llm import LLMError  # noqa: E402
+from core.policy.permissions import ENV_ACTOR  # noqa: E402
 
 CONFIG_KEYS = ("NOTIFY_ENABLE", "NOTIFY_TIMEOUT_SEC", "NOTIFY_ON_TIMEOUT")
 
@@ -233,7 +233,7 @@ class WiringTests(unittest.TestCase):
 
     def test_the_probe_path_announces_too(self) -> None:
         """daily-disk-probe runs no AgentRunner, so it needs its own start call."""
-        cli = (ROOT / "ncc_assistant" / "cli.py").read_text(encoding="utf-8")
+        cli = (ROOT / "cli" / "cli.py").read_text(encoding="utf-8")
         probe = cli.split("def _cmd_probe_disk", 1)[1].split("\ndef ", 1)[0]
         self.assertIn("notify_schedule_start(", probe)
 

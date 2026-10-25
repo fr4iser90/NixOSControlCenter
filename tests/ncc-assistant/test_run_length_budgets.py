@@ -15,12 +15,12 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
-from ncc_assistant.config import Settings, UNLIMITED, is_unlimited  # noqa: E402
-from ncc_assistant.agent import AgentRunner, AgentSettings, run_agent  # noqa: E402
-from ncc_assistant.session import ChatSession  # noqa: E402
+from core.store.config import Settings, UNLIMITED, is_unlimited  # noqa: E402
+from core.runtime.agent import AgentRunner, AgentSettings, run_agent  # noqa: E402
+from core.runtime.session import ChatSession  # noqa: E402
 
 
 def _settings(**over) -> Settings:
@@ -146,7 +146,7 @@ class ChatRoundBudgetTests(unittest.TestCase):
         self.assertTrue(is_unlimited(session.max_rounds))
 
         with (
-            patch("ncc_assistant.session.iter_chat_completion", side_effect=fake_iter),
+            patch("core.runtime.session.iter_chat_completion", side_effect=fake_iter),
             patch.object(ChatSession, "persist", lambda self: None),
             patch.object(ChatSession, "refresh_system_prompt", lambda self: None),
         ):
@@ -168,7 +168,7 @@ class ChatRoundBudgetTests(unittest.TestCase):
         session.max_rounds = 2
 
         with (
-            patch("ncc_assistant.session.iter_chat_completion", side_effect=fake_iter),
+            patch("core.runtime.session.iter_chat_completion", side_effect=fake_iter),
             patch.object(ChatSession, "persist", lambda self: None),
             patch.object(ChatSession, "refresh_system_prompt", lambda self: None),
         ):
@@ -182,9 +182,9 @@ class ChatRoundBudgetTests(unittest.TestCase):
 
     def test_settings_budget_reaches_new_session(self) -> None:
         with (
-            patch("ncc_assistant.session.list_models", return_value=[]),
-            patch("ncc_assistant.session.with_cached_credentials", side_effect=lambda s: s),
-            patch("ncc_assistant.session.ToolRuntime") as runtime,
+            patch("core.runtime.session.list_models", return_value=[]),
+            patch("core.runtime.session.with_cached_credentials", side_effect=lambda s: s),
+            patch("core.runtime.session.ToolRuntime") as runtime,
         ):
             runtime.return_value = MagicMock()
             session = ChatSession.create(
@@ -199,8 +199,8 @@ class ChatRoundBudgetTests(unittest.TestCase):
         import ast
 
         for rel, needles in (
-            ("ncc_assistant/cli.py", ('"--max-rounds"', "max_rounds=getattr(args")),
-            ("ncc_assistant/chat.py", ("max_rounds=max_rounds",)),
+            ("cli/cli.py", ('"--max-rounds"', "max_rounds=getattr(args")),
+            ("cli/chat.py", ("max_rounds=max_rounds",)),
         ):
             text = (ROOT / rel).read_text(encoding="utf-8")
             for needle in needles:
@@ -211,8 +211,8 @@ class ChatRoundBudgetTests(unittest.TestCase):
 class AgentStepBudgetTests(unittest.TestCase):
     def _runner(self, max_steps: int) -> AgentRunner:
         with (
-            patch("ncc_assistant.agent.get_job_store", return_value=MagicMock()),
-            patch("ncc_assistant.runtime.ToolRuntime", return_value=MagicMock()),
+            patch("core.runtime.agent.get_job_store", return_value=MagicMock()),
+            patch("core.runtime.runtime.ToolRuntime", return_value=MagicMock()),
         ):
             return AgentRunner(
                 _settings(),
@@ -235,8 +235,8 @@ class AgentStepBudgetTests(unittest.TestCase):
             patch.object(AgentRunner, "_get_tools", return_value=[]),
             patch.object(AgentRunner, "_run_step", side_effect=fake_step),
             patch.object(AgentRunner, "_log_event", lambda self, event: None),
-            patch("ncc_assistant.agent.AgentLock", return_value=MagicMock()),
-            patch("ncc_assistant.agent.append_audit"),
+            patch("core.runtime.agent.AgentLock", return_value=MagicMock()),
+            patch("core.runtime.agent.append_audit"),
         ):
             events = list(runner.run())
         return events, seen["n"]

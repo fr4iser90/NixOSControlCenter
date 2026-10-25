@@ -16,17 +16,17 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
-from ncc_assistant.config import Settings  # noqa: E402
-from ncc_assistant.runtime import (  # noqa: E402
+from core.store.config import Settings  # noqa: E402
+from core.runtime.runtime import (  # noqa: E402
     TOOL_DEFINITIONS,
     ToolRuntime,
     ask_payload,
     normalize_ask_options,
 )
-from ncc_assistant.session import ChatSession  # noqa: E402
+from core.runtime.session import ChatSession  # noqa: E402
 
 
 def _settings(**over) -> Settings:
@@ -171,7 +171,7 @@ class ToolDefinitionTests(unittest.TestCase):
         self.assertIn("not to confirm", spec["description"].lower())
 
     def test_it_reaches_the_model_catalog(self) -> None:
-        from ncc_assistant.registry import get_registry, reload_registry
+        from core.runtime.registry import get_registry, reload_registry
 
         reload_registry()
         entry = get_registry().get("ask_user")
@@ -264,8 +264,8 @@ class SessionTests(unittest.TestCase):
             {"content": "Compacting this chat only.", "tool_calls": []},
         )
         surface = _Surface(session, "This chat")
-        with patch("ncc_assistant.session.iter_chat_completion", side_effect=stream), patch(
-            "ncc_assistant.session.save_session"
+        with patch("core.runtime.session.iter_chat_completion", side_effect=stream), patch(
+            "core.runtime.session.save_session"
         ):
             surface.run()
 
@@ -290,8 +290,8 @@ class SessionTests(unittest.TestCase):
         )
         # Driven like a surface: an unanswered question holds the worker until timeout.
         surface = _Surface(session, "This chat")
-        with patch("ncc_assistant.session.iter_chat_completion", side_effect=stream), patch(
-            "ncc_assistant.session.save_session"
+        with patch("core.runtime.session.iter_chat_completion", side_effect=stream), patch(
+            "core.runtime.session.save_session"
         ):
             surface.run()
 
@@ -312,8 +312,8 @@ class SessionTests(unittest.TestCase):
             session.abandon_asks()
 
         events = []
-        with patch("ncc_assistant.session.iter_chat_completion", side_effect=stream), patch(
-            "ncc_assistant.session.save_session"
+        with patch("core.runtime.session.iter_chat_completion", side_effect=stream), patch(
+            "core.runtime.session.save_session"
         ):
             for event in session.send("go"):
                 events.append(event)
@@ -333,8 +333,8 @@ class SessionTests(unittest.TestCase):
             {"content": "ok", "tool_calls": []},
         )
         surface = _Surface(session, "picked it")
-        with patch("ncc_assistant.session.iter_chat_completion", side_effect=stream), patch(
-            "ncc_assistant.session.save_session"
+        with patch("core.runtime.session.iter_chat_completion", side_effect=stream), patch(
+            "core.runtime.session.save_session"
         ):
             surface.run()
         self.assertTrue(surface.asks[0]["ask_id"].startswith("ask-"))
@@ -346,8 +346,8 @@ class SessionTests(unittest.TestCase):
             {"content": "", "tool_calls": [_tool_call("list_modules", {})]},
             {"content": "ok", "tool_calls": []},
         )
-        with patch("ncc_assistant.session.iter_chat_completion", side_effect=stream), patch(
-            "ncc_assistant.session.save_session"
+        with patch("core.runtime.session.iter_chat_completion", side_effect=stream), patch(
+            "core.runtime.session.save_session"
         ):
             kinds = [e.get("kind") for e in session.send("go")]
         self.assertNotIn("ask", kinds)
@@ -366,8 +366,8 @@ class SessionTests(unittest.TestCase):
         collected: list[dict] = []
 
         def worker():
-            with patch("ncc_assistant.session.iter_chat_completion", side_effect=stream), patch(
-                "ncc_assistant.session.save_session"
+            with patch("core.runtime.session.iter_chat_completion", side_effect=stream), patch(
+                "core.runtime.session.save_session"
             ):
                 for event in session.send("go"):
                     collected.append(event)
@@ -392,7 +392,7 @@ class SessionTests(unittest.TestCase):
 
     def test_rebuilt_runtime_keeps_the_hook(self) -> None:
         session = _session(ToolRuntime(_settings()))
-        with patch("ncc_assistant.session.list_models", return_value=[]):
+        with patch("core.runtime.session.list_models", return_value=[]):
             session.set_model("other-model")
         self.assertEqual(session.runtime.ask_hook, session._wait_ask)
 
@@ -423,7 +423,7 @@ class GuiRuntimeSwapTests(unittest.TestCase):
     """Rebuilding the runtime without the hook would silently kill ask_user."""
 
     def test_the_gui_swaps_runtimes_through_the_session(self) -> None:
-        text = (ROOT / "ncc_assistant" / "gui.py").read_text(encoding="utf-8")
+        text = (ROOT / "window" / "app.py").read_text(encoding="utf-8")
         self.assertNotIn(
             "session.runtime = ToolRuntime(",
             text,
@@ -436,7 +436,7 @@ class ReplTests(unittest.TestCase):
     """`ncc ai` without Qt: the question still has to become an answer."""
 
     def _ask(self, typed: str | None, **over) -> str | None:
-        from ncc_assistant.chat import _ask_answer
+        from cli.chat import _ask_answer
 
         event = {
             "ask_id": "a1",
@@ -465,7 +465,7 @@ class ReplTests(unittest.TestCase):
         self.assertEqual(self._ask("1,2", multi=True), "This chat, All chats")
 
     def test_eof_is_a_skip_not_a_crash(self) -> None:
-        from ncc_assistant.chat import _ask_answer
+        from cli.chat import _ask_answer
 
         with patch("builtins.input", side_effect=EOFError):
             self.assertIsNone(_ask_answer({"ask_id": "a1", "question": "q"}))
@@ -475,7 +475,7 @@ class StoreTests(unittest.TestCase):
     """A reloaded companion chat must show the question and what was answered."""
 
     def test_ask_item_survives_the_store(self) -> None:
-        from ncc_assistant.companion_store import transcript_for_store
+        from companion.store import transcript_for_store
 
         kept = transcript_for_store(
             [
@@ -508,9 +508,8 @@ class SurfaceWiringTests(unittest.TestCase):
     """Every surface that streams chat must be able to answer the question."""
 
     def test_surfaces_call_answer_ask(self) -> None:
-        pkg = ROOT / "ncc_assistant"
-        for name in ("chat.py", "gui.py", "companion.py"):
-            text = (pkg / name).read_text(encoding="utf-8")
+        for name in ("cli/chat.py", "window/app.py", "companion/window.py"):
+            text = (ROOT / name).read_text(encoding="utf-8")
             self.assertIn("answer_ask", text, f"{name} cannot answer ask_user")
             self.assertIn('"ask"', text, f"{name} never looks at the ask event")
 

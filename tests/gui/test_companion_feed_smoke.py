@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-ASSISTANT_PY = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ASSISTANT_PY = REPO / "nixos/modules/specialized/ncc-assistant"
 
 
 class _FakeSignal:
@@ -55,7 +55,7 @@ class CompanionFeedSmoke(unittest.TestCase):
         os.environ["XDG_CONFIG_HOME"] = tempfile.mkdtemp(prefix="ncc-companion-feed-")
         self.app = QApplication.instance() or QApplication([])
 
-        import ncc_assistant.companion as companion
+        import companion.window as companion
 
         self.companion = companion
         self._real_worker = companion._CompanionChatWorker
@@ -329,7 +329,7 @@ class CompanionFeedSmoke(unittest.TestCase):
         slot.session_id = "sess-42"
         self.win._persist_chats()
 
-        from ncc_assistant.companion_store import load_companion_chats
+        from companion.store import load_companion_chats
 
         restored = self.companion.ChatSlot.from_record(load_companion_chats()[0])
         self.assertEqual(restored.id, slot.id)

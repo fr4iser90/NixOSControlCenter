@@ -23,7 +23,7 @@ another gets **identical** behaviour for both — and no error saying so.
 Third: the git write chain (`ensure_branch` → `commit_all` → `push_branch` → `open_pull_request`
 → `merge_pull_request`) has no branch rules. Nothing stops a push to `main`, and `commit_all`
 stages everything with `git add -A`
-([workflow_execute.py:326](../../python/ncc_assistant/workflow_execute.py)).
+([workflow_execute.py:326](../../python/core/workflows/workflow_execute.py)).
 
 ## Measured today
 
@@ -86,9 +86,9 @@ CLI flag  >  unit env  >  host config (ceiling)  >  code default
 - `agent run` gains `--grant repo=<step>` / `--grant system=<step>` (and the inverse
   `--deny repo=merge`) plus `--dry-run` staying as-is. Flags map onto `AgentSettings`, which
   already feeds `resolve_profile(...)` overrides
-  ([profiles.py:87-114](../../python/ncc_assistant/profiles.py)) — the override parameters
+  ([profiles.py:87-114](../../python/core/policy/profiles.py)) — the override parameters
   exist, they are just never passed anything but `None` outside the GUI
-  ([agent.py:416-426](../../python/ncc_assistant/agent.py)).
+  ([agent.py:416-426](../../python/core/runtime/agent.py)).
 - Unit: `mkAgentExec` ([schedules.nix:52-70](../../schedules.nix)) appends the grant flags to
   `agentArgs`; the hardcoded `environment` block (`:107-116`) becomes derived from the schedule
   values with today's values as default.

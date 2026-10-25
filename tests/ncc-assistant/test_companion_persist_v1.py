@@ -12,10 +12,10 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
-from ncc_assistant.companion_store import (  # noqa: E402
+from companion.store import (  # noqa: E402
     ARGS_MAX,
     RESULT_MAX,
     STORE_VERSION,
@@ -27,10 +27,10 @@ from ncc_assistant.companion_store import (  # noqa: E402
     slot_to_record,
     transcript_for_store,
 )
-from ncc_assistant.harness.mcp_inject import ncc_mcp_entry  # noqa: E402
-from ncc_assistant.harness.native import seed_history  # noqa: E402
-from ncc_assistant.harness.qwen import map_qwen_line  # noqa: E402
-from ncc_assistant.trace_format import format_thinking_header  # noqa: E402
+from harness.mcp_inject import ncc_mcp_entry  # noqa: E402
+from harness.native import seed_history  # noqa: E402
+from harness.qwen import map_qwen_line  # noqa: E402
+from core.render.trace_format import format_thinking_header  # noqa: E402
 
 
 class CompanionStoreTests(unittest.TestCase):
@@ -38,7 +38,7 @@ class CompanionStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "companion-chats.json"
             with patch(
-                "ncc_assistant.companion_store.companion_store_file",
+                "companion.store.companion_store_file",
                 return_value=path,
             ):
                 save_companion_chats(
@@ -70,7 +70,7 @@ class CompanionStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "companion-chats.json"
             with patch(
-                "ncc_assistant.companion_store.companion_store_file",
+                "companion.store.companion_store_file",
                 return_value=path,
             ):
                 save_companion_chats(
@@ -155,7 +155,7 @@ class CompanionStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "companion-chats.json"
             with patch(
-                "ncc_assistant.companion_store.companion_store_file",
+                "companion.store.companion_store_file",
                 return_value=path,
             ):
                 save_companion_chats([slot_to_record(slot)])
@@ -239,7 +239,7 @@ class RunSpawnMapTests(unittest.TestCase):
 
 class AvatarSkinsAstTests(unittest.TestCase):
     def test_module_exists(self) -> None:
-        text = (ROOT / "ncc_assistant" / "avatar_skins.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "skins.py").read_text(encoding="utf-8")
         self.assertIn("list_skins", text)
         self.assertIn("live2d_export", text)
         self.assertIn(format_thinking_header(), "Thinking")

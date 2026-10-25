@@ -19,10 +19,15 @@ let
     inherit lib pkgs getModuleMetadata;
   };
 
-    appRoot = pkgs.runCommand "ncc-assistant-src" { } ''
-    mkdir -p $out
-    cp -r ${./python/ncc_assistant} $out/ncc_assistant
-    cp -r ${./prompts} $out/prompts
+  # Staging root holds ONLY importable packages under lib/ncc-assistant, so PYTHONPATH never
+  # exposes doc/, lib/*.nix or the module source itself. Catalogs go to $out/data (data, not
+  # code — the loaders reach them through NCC_DATA_ROOT, not importlib.resources).
+  appRoot = pkgs.runCommand "ncc-assistant-src" { } ''
+    mkdir -p $out/lib/ncc-assistant
+    cp -r ${./companion} ${./window} ${./tray} ${./widgets} ${./core} ${./cli} \
+          ${./harness} ${./plugins} $out/lib/ncc-assistant/
+    cp -r ${guiEngine.src}/ncc_gui $out/lib/ncc-assistant/ncc_gui
+    cp -r ${./data} $out/data
     # Knowledge = ONLY discovered <module>/ai/ packs. Module inventory is live via ncc.
     mkdir -p $out/knowledge
     cp -a ${domainAi.knowledgeRoot}/. $out/knowledge/
@@ -34,7 +39,6 @@ let
       echo
       cat ${modulesIndex.inventoryFile}
     } > $out/AI_KNOWLEDGE.md
-    cp -r ${guiEngine.src}/ncc_gui $out/ncc_gui
   '';
 
   pythonEnv = pkgs.python3.withPackages (ps: with ps; [
@@ -168,7 +172,8 @@ let
   envExports = ''
     export NCC_ASSISTANT_ROOT="${appRoot}"
     export NCC_KNOWLEDGE_ROOT="${appRoot}/knowledge"
-    export NCC_PROMPTS_ROOT="${appRoot}/prompts"
+    export NCC_DATA_ROOT="${appRoot}/data"
+    export NCC_PROMPTS_ROOT="${appRoot}/data/prompts"
     export NCC_ASSISTANT_CONFIG_BIN="${configHelper}/bin/ncc-assistant-config"
     export NCC_ASSISTANT_API="${resolvedApi}"
     export NCC_ASSISTANT_ENDPOINT="${cfg.endpoint or "http://localhost:11434/v1"}"
@@ -249,7 +254,7 @@ let
     export NCC_ASSISTANT_SCHEDULES_JSON='${schedulesJson}'
     export NCC_ASSISTANT_HOST_PROFILES_JSON='${hostProfilesJson}'
 
-    export PYTHONPATH="${appRoot}''${PYTHONPATH:+:$PYTHONPATH}"
+    export PYTHONPATH="${appRoot}/lib/ncc-assistant''${PYTHONPATH:+:$PYTHONPATH}"
     # wtype: leave-feed tab (about:blank) on Plasma Wayland after net-block
     export PATH="${configHelper}/bin:${nccFocusNetblock}/bin:${pkgs.wtype}/bin:${pkgs.jq}/bin:${pkgs.nix}/bin:$PATH"
     # Qt/Plasma: use system platform theme when available
@@ -285,14 +290,14 @@ let
           serve-openapi) ${ui.messages.loading "Starting OpenAPI server…"} ;;
         esac
       fi
-      exec ${pythonEnv}/bin/python -m ncc_assistant "$@"
+      exec ${pythonEnv}/bin/python -m cli "$@"
     fi
 
     if [ -z "''${NCC_CLI_NESTED:-}" ]; then
       ${ui.messages.loading "Running command…"}
     fi
     set +e
-    ${pythonEnv}/bin/python -m ncc_assistant "$@"
+    ${pythonEnv}/bin/python -m cli "$@"
     rc=$?
     set -e
     if [ "$rc" -eq 0 ]; then
@@ -312,19 +317,19 @@ let
   nccAssistantMcp = pkgs.writeShellScriptBin "ncc-assistant-mcp" ''
     set -euo pipefail
     ${envExports}
-    exec ${pythonEnv}/bin/python -m ncc_assistant mcp
+    exec ${pythonEnv}/bin/python -m cli mcp
   '';
 
   nccAssistantTray = pkgs.writeShellScriptBin "ncc-assistant-tray" ''
     set -euo pipefail
     ${envExports}
-    exec ${pythonEnv}/bin/python -m ncc_assistant tray
+    exec ${pythonEnv}/bin/python -m cli tray
   '';
 
   nccAssistantCompanion = pkgs.writeShellScriptBin "ncc-assistant-companion" ''
     set -euo pipefail
     ${envExports}
-    exec ${pythonEnv}/bin/python -m ncc_assistant companion
+    exec ${pythonEnv}/bin/python -m cli companion
   '';
 
   # Timed domain sinkhole (nft). Needs root (pkexec/sudo). Domains only — not /shorts/ paths.

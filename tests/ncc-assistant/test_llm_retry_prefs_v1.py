@@ -10,11 +10,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
-from ncc_assistant import preferences as prefs  # noqa: E402
-from ncc_assistant.llm import (  # noqa: E402
+from core.store import preferences as prefs  # noqa: E402
+from core.runtime.llm import (  # noqa: E402
     LLMError,
     _is_transient_llm_error,
     _max_attempts,
@@ -56,16 +56,16 @@ class LlmPrefsTests(unittest.TestCase):
 
 class RetryUiAstTests(unittest.TestCase):
     def test_companion_has_retry(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn("self.retry_btn", text)
         self.assertIn("def _retry", text)
         self.assertIn("if not slot.last_error:", text)
 
     def test_gui_has_retry_and_settings(self) -> None:
-        gui = (ROOT / "ncc_assistant" / "gui.py").read_text(encoding="utf-8")
+        gui = (ROOT / "window" / "app.py").read_text(encoding="utf-8")
         self.assertIn("def on_retry", gui)
         self.assertIn("self.retry_btn", gui)
-        settings = (ROOT / "ncc_assistant" / "gui_pages.py").read_text(encoding="utf-8")
+        settings = (ROOT / "widgets" / "pages.py").read_text(encoding="utf-8")
         self.assertIn("4c · LLM request", settings)
         self.assertIn("set_llm_timeout_sec", settings)
         self.assertIn("set_llm_retries", settings)

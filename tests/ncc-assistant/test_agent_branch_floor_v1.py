@@ -19,9 +19,11 @@ from unittest import mock
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"))
+sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"))
 
-from ncc_assistant import audit, paths, permissions, workflow_execute
+from core.policy import audit, permissions
+from core.store import paths
+from core.workflows import workflow_execute
 from test_permission_ladder_v1 import AGENT_BRANCH, _git, _repo, grant_env
 
 CODE = "denied_non_agent_branch"
@@ -266,7 +268,7 @@ def test_the_branch_floor_reads_no_configuration():
 
 
 def test_the_red_team_pack_attacks_the_prefix_on_both_steps():
-    from ncc_assistant import red_team
+    from core.policy import red_team
 
     attempts = [a for a in red_team.FLOOR_ATTEMPTS if a.code == CODE]
     assert attempts, "the floor grew a rule the pack never asks about"

@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"))
+sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"))
 
 SCHEDULES_NIX = REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "schedules.nix"
 MODULE_MANAGER = REPO / "nixos" / "core" / "management" / "module-manager"

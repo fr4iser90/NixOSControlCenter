@@ -5,7 +5,7 @@ After ``nixos-rebuild switch`` / activation:
 * ``/run/current-system`` moves (SSOT) and activation atomically updates
   ``/run/ncc/generation`` → ``QFileSystemWatcher`` (+ focus fallback) fires.
 * **Hard re-exec** when GUI app digests changed **or** this process still
-  loads ``ncc_gui`` / ``ncc_assistant`` from an old store path.
+  loads a package of :data:`GUI_PACKAGES` from an old store path.
 * **Soft refresh** only when generation moved, digests match, and modules
   are already the new paths (catalog / domain pages / module toggles).
 
@@ -53,6 +53,30 @@ _SOFT_ONLY_MARKERS = (
     "ncc-gui-catalog",
     "ncc-domain-ai-tools",
 )
+
+# Importable NCC packages whose code decides hard re-exec vs soft refresh. ncc-assistant ships
+# several top-level packages (see its doc/layout.md) instead of one ``ncc_assistant``, so this
+# is a list, not a literal pair. Catalogs (``data/``) are deliberately absent: a catalog change
+# must never re-exec the GUI.
+GUI_PACKAGES = (
+    "ncc_gui",
+    "core",
+    "companion",
+    "window",
+    "tray",
+    "widgets",
+    "harness",
+    "plugins",
+    "cli",
+)
+
+
+def _package_dirs(root: Path) -> list[Path]:
+    """Package dirs under a staging root, including the assistant's ``lib/ncc-assistant``."""
+    found: list[Path] = []
+    for base in (root, root / "lib" / "ncc-assistant"):
+        found.extend(base / pkg for pkg in GUI_PACKAGES if (base / pkg).is_dir())
+    return found
 
 
 class GenerationBus(QObject):
@@ -190,23 +214,12 @@ def _iter_gui_wrappers() -> list[Path]:
 
 def _payload_digests_from_root(root: Path) -> list[str]:
     """Hash known GUI packages under a PYTHONPATH / app root (skip soft-only)."""
-    if _soft_only_path(root):
-        lines: list[str] = []
-        for pkg in ("ncc_gui", "ncc_assistant"):
-            d = root / pkg
-            if d.is_dir():
-                lines.append(f"{pkg}@{root.name}={_hash_tree(d)}")
-        return lines
-    lines = []
-    for pkg in ("ncc_gui", "ncc_assistant"):
-        d = root / pkg
-        if d.is_dir():
-            lines.append(f"{pkg}@{root.name}={_hash_tree(d)}")
-    if lines:
-        return lines
-    if root.is_dir():
-        return [f"tree@{root.name}={_hash_tree(root)}"]
-    return []
+    found = _package_dirs(root)
+    if found:
+        return [f"{d.name}@{root.name}={_hash_tree(d)}" for d in sorted(set(found))]
+    if _soft_only_path(root) or not root.is_dir():
+        return []
+    return [f"tree@{root.name}={_hash_tree(root)}"]
 
 
 def _roots_from_wrapper(wrapper: Path) -> list[Path]:
@@ -249,7 +262,7 @@ def profile_gui_fingerprint() -> str:
             lines.append(f"domain_tools@{wrapper.name}={tm.group(1)}")
 
     if not lines:
-        for mod_name in ("ncc_gui", "ncc_assistant"):
+        for mod_name in GUI_PACKAGES:
             try:
                 mod = __import__(mod_name)
                 root = Path(mod.__file__).resolve().parent  # type: ignore[arg-type]
@@ -262,17 +275,15 @@ def profile_gui_fingerprint() -> str:
 
 
 def profile_gui_package_dirs() -> set[str]:
-    """Absolute package dirs (``…/ncc_gui``, ``…/ncc_assistant``) on the profile."""
+    """Absolute package dirs (``…/ncc_gui``, ``…/core``, ``…/companion``, …) on the profile."""
     out: set[str] = set()
     for wrapper in _iter_gui_wrappers():
         for root in _roots_from_wrapper(wrapper):
-            for pkg in ("ncc_gui", "ncc_assistant"):
-                d = root / pkg
-                if d.is_dir():
-                    try:
-                        out.add(str(d.resolve()))
-                    except OSError:
-                        out.add(str(d))
+            for d in _package_dirs(root):
+                try:
+                    out.add(str(d.resolve()))
+                except OSError:
+                    out.add(str(d))
     return out
 
 
@@ -281,7 +292,7 @@ def process_gui_stale() -> bool:
     advertised = profile_gui_package_dirs()
     if not advertised:
         return False
-    for name in ("ncc_gui", "ncc_assistant"):
+    for name in GUI_PACKAGES:
         mod = sys.modules.get(name)
         if mod is None:
             continue

@@ -8,10 +8,10 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
-from ncc_assistant.companion_themes import (  # noqa: E402
+from widgets.themes import (  # noqa: E402
     DEFAULT_THEME,
     THEMES,
     get_theme,
@@ -47,7 +47,7 @@ class CompanionThemesTests(unittest.TestCase):
         self.assertEqual(set(ids), set(THEMES))
 
     def test_companion_wires_theme_switcher(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn("_apply_theme", text)
         self.assertIn('_set_theme', text)
         # 12875545 dropped the overflow menu: theme rows are built in the Settings panel
@@ -56,7 +56,7 @@ class CompanionThemesTests(unittest.TestCase):
         self.assertIn('("theme", tid)', text)
         self.assertIn('if kind == "theme" and ref', text)
         self.assertNotIn('addMenu("Theme")', text)
-        self.assertIn("companion_themes", text)
+        self.assertIn("widgets.themes", text)
         self.assertIn('setObjectName("nccMuted")', text)
         self.assertNotIn("rgba(244, 246, 248", text)
 

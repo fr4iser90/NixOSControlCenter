@@ -20,12 +20,12 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
-from ncc_assistant import permissions  # noqa: E402
-from ncc_assistant.permissions import Decision, Grant, decide_system, system_flags  # noqa: E402
-from ncc_assistant.runtime import ToolRuntime  # noqa: E402
+from core.policy import permissions  # noqa: E402
+from core.policy.permissions import Decision, Grant, decide_system, system_flags  # noqa: E402
+from core.runtime.runtime import ToolRuntime  # noqa: E402
 
 from test_permission_ladder_v1 import grant_env  # noqa: E402
 from test_run_length_budgets import _settings  # noqa: E402

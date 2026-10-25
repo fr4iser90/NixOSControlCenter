@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest import mock
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
 
@@ -25,7 +25,7 @@ class FocusWatchdogTests(unittest.TestCase):
         self._patch = mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": str(home)})
         self._patch.start()
         self.addCleanup(self._patch.stop)
-        from ncc_assistant.preferences import (
+        from core.store.preferences import (
             set_doomscroll_after_min,
             set_doomscroll_apps,
             set_doomscroll_cooldown_min,
@@ -44,8 +44,8 @@ class FocusWatchdogTests(unittest.TestCase):
         set_doomscroll_site_pack("social+video")
 
     def test_match_youtube_shorts(self) -> None:
-        from ncc_assistant.focus import is_doomscroll_window
-        from ncc_assistant.preferences import set_doomscroll_site_pack
+        from plugins.doomscroll.watchdog import is_doomscroll_window
+        from core.store.preferences import set_doomscroll_site_pack
 
         set_doomscroll_site_pack("youtube-shorts")
         self.assertTrue(
@@ -70,7 +70,7 @@ class FocusWatchdogTests(unittest.TestCase):
         )
 
     def test_detect_desktop_exclusive(self) -> None:
-        from ncc_assistant import focus
+        from plugins.doomscroll import watchdog as focus
 
         with mock.patch.dict(
             os.environ,
@@ -100,7 +100,7 @@ class FocusWatchdogTests(unittest.TestCase):
                 self.assertEqual(focus.detect_desktop(), "plasma-wayland")
 
     def test_get_active_window_uses_only_plasma_adapter(self) -> None:
-        from ncc_assistant import focus
+        from plugins.doomscroll import watchdog as focus
 
         plasma_win = {
             "class": "firefox",
@@ -124,7 +124,7 @@ class FocusWatchdogTests(unittest.TestCase):
         x11.assert_not_called()
 
     def test_get_active_window_uses_only_hyprland_adapter(self) -> None:
-        from ncc_assistant import focus
+        from plugins.doomscroll import watchdog as focus
 
         hypr_win = {
             "class": "firefox",
@@ -145,9 +145,9 @@ class FocusWatchdogTests(unittest.TestCase):
         x11.assert_not_called()
 
     def test_video_count_by_url(self) -> None:
-        from ncc_assistant.focus import tick
-        from ncc_assistant.paths import focus_state_file
-        from ncc_assistant.preferences import set_doomscroll_max_videos, set_doomscroll_site_pack
+        from plugins.doomscroll.watchdog import tick
+        from core.store.paths import focus_state_file
+        from core.store.preferences import set_doomscroll_max_videos, set_doomscroll_site_pack
 
         set_doomscroll_site_pack("youtube-shorts")
         set_doomscroll_max_videos(10)
@@ -174,20 +174,20 @@ class FocusWatchdogTests(unittest.TestCase):
             "source": "kwin",
         }
         with mock.patch(
-            "ncc_assistant.presence.get_presence",
+            "core.store.presence.get_presence",
             return_value=mock.Mock(state="available"),
         ):
             with mock.patch(
-                "ncc_assistant.notifications.notify_send", return_value=True
+                "core.policy.notifications.notify_send", return_value=True
             ):
                 result = tick(force_window=win)
         self.assertTrue(result.get("intervened"))
         self.assertEqual(result.get("reason"), "videos")
 
     def test_video_count_intervened(self) -> None:
-        from ncc_assistant.focus import tick
-        from ncc_assistant.paths import focus_state_file
-        from ncc_assistant.preferences import set_doomscroll_max_videos, set_doomscroll_site_pack
+        from plugins.doomscroll.watchdog import tick
+        from core.store.paths import focus_state_file
+        from core.store.preferences import set_doomscroll_max_videos, set_doomscroll_site_pack
 
         set_doomscroll_site_pack("youtube-shorts")
         set_doomscroll_max_videos(10)
@@ -209,18 +209,18 @@ class FocusWatchdogTests(unittest.TestCase):
         )
         win = {"class": "firefox", "title": "Short B #Shorts - YouTube", "source": "test"}
         with mock.patch(
-            "ncc_assistant.presence.get_presence",
+            "core.store.presence.get_presence",
             return_value=mock.Mock(state="available"),
         ):
             with mock.patch(
-                "ncc_assistant.notifications.notify_send", return_value=True
+                "core.policy.notifications.notify_send", return_value=True
             ):
                 result = tick(force_window=win)
         self.assertTrue(result.get("intervened"))
         self.assertEqual(result.get("reason"), "videos")
 
     def test_match_firefox_reddit(self) -> None:
-        from ncc_assistant.focus import is_doomscroll_window
+        from plugins.doomscroll.watchdog import is_doomscroll_window
 
         self.assertTrue(
             is_doomscroll_window(
@@ -239,8 +239,8 @@ class FocusWatchdogTests(unittest.TestCase):
         )
 
     def test_listed_apps_mode(self) -> None:
-        from ncc_assistant.focus import is_doomscroll_window
-        from ncc_assistant.preferences import set_doomscroll_match_mode
+        from plugins.doomscroll.watchdog import is_doomscroll_window
+        from core.store.preferences import set_doomscroll_match_mode
 
         set_doomscroll_match_mode("listed-apps")
         self.assertTrue(
@@ -248,8 +248,8 @@ class FocusWatchdogTests(unittest.TestCase):
         )
 
     def test_tick_intervened(self) -> None:
-        from ncc_assistant.focus import peek_pending_nudge, tick
-        from ncc_assistant.paths import focus_state_file
+        from plugins.doomscroll.watchdog import peek_pending_nudge, tick
+        from core.store.paths import focus_state_file
 
         win = {"class": "firefox", "title": "YouTube - Home", "source": "test"}
         # Seed streak near threshold
@@ -268,23 +268,23 @@ class FocusWatchdogTests(unittest.TestCase):
             encoding="utf-8",
         )
         with mock.patch(
-            "ncc_assistant.presence.get_presence",
+            "core.store.presence.get_presence",
             return_value=mock.Mock(state="available"),
         ):
             with mock.patch(
-                "ncc_assistant.notifications.notify_send", return_value=True
+                "core.policy.notifications.notify_send", return_value=True
             ):
                 result = tick(force_window=win)
         self.assertTrue(result.get("intervened"))
         self.assertIsNotNone(peek_pending_nudge())
 
     def test_snooze_blocks(self) -> None:
-        from ncc_assistant.focus import snooze, tick
+        from plugins.doomscroll.watchdog import snooze, tick
 
         snooze(30)
         win = {"class": "firefox", "title": "Reddit"}
         with mock.patch(
-            "ncc_assistant.presence.get_presence",
+            "core.store.presence.get_presence",
             return_value=mock.Mock(state="available"),
         ):
             result = tick(force_window=win)
@@ -292,7 +292,7 @@ class FocusWatchdogTests(unittest.TestCase):
         self.assertEqual(result.get("reason"), "snoozed")
 
     def test_intervene_action_prefs(self) -> None:
-        from ncc_assistant.preferences import (
+        from core.store.preferences import (
             get_doomscroll_block_input,
             get_doomscroll_follow_target,
             get_doomscroll_inject_chat,
@@ -317,8 +317,8 @@ class FocusWatchdogTests(unittest.TestCase):
         self.assertTrue(get_doomscroll_inject_chat())
 
     def test_site_tags_enums_drive_match_and_block(self) -> None:
-        from ncc_assistant.focus import is_doomscroll_window
-        from ncc_assistant.preferences import (
+        from plugins.doomscroll.watchdog import is_doomscroll_window
+        from core.store.preferences import (
             get_doomscroll_block_domains,
             set_doomscroll_apps,
             set_doomscroll_site_tags,
@@ -355,9 +355,9 @@ class FocusWatchdogTests(unittest.TestCase):
         )
 
     def test_lockout_applies_net_block(self) -> None:
-        from ncc_assistant.focus import tick
-        from ncc_assistant.paths import focus_state_file
-        from ncc_assistant.preferences import (
+        from plugins.doomscroll.watchdog import tick
+        from core.store.paths import focus_state_file
+        from core.store.preferences import (
             set_doomscroll_lockout_min,
             set_doomscroll_max_videos,
             set_doomscroll_site_tags,
@@ -390,22 +390,22 @@ class FocusWatchdogTests(unittest.TestCase):
             "source": "mpris",
         }
         with mock.patch(
-            "ncc_assistant.presence.get_presence",
+            "core.store.presence.get_presence",
             return_value=mock.Mock(state="available"),
         ):
             with mock.patch(
-                "ncc_assistant.notifications.notify_send", return_value=True
+                "core.policy.notifications.notify_send", return_value=True
             ):
                 with mock.patch(
-                    "ncc_assistant.focus_netblock.apply_net_block",
+                    "plugins.doomscroll.netblock.apply_net_block",
                     return_value={"ok": True, "method": "nft", "minutes": 10},
                 ) as net:
                     with mock.patch(
-                        "ncc_assistant.focus_actions.apply_intervene_side_effects",
+                        "plugins.doomscroll.actions.apply_intervene_side_effects",
                         return_value={},
                     ):
                         with mock.patch(
-                            "ncc_assistant.focus_actions.leave_feed_tab",
+                            "plugins.doomscroll.actions.leave_feed_tab",
                             return_value={
                                 "ok": True,
                                 "method": "wtype",
@@ -413,7 +413,7 @@ class FocusWatchdogTests(unittest.TestCase):
                             },
                         ) as leave:
                             with mock.patch(
-                                "ncc_assistant.focus_actions.follow_target_desktop",
+                                "plugins.doomscroll.actions.follow_target_desktop",
                                 return_value=True,
                             ):
                                 result = tick(force_window=win)
@@ -426,15 +426,14 @@ class FocusWatchdogTests(unittest.TestCase):
         )
 
     def test_settings_ui_enums_only(self) -> None:
-        gui = (ROOT / "ncc_assistant" / "gui_pages.py").read_text(encoding="utf-8")
+        gui = (ROOT / "widgets" / "pages.py").read_text(encoding="utf-8")
         settings_ui = (
             ROOT
-            / "ncc_assistant"
             / "plugins"
             / "doomscroll"
             / "settings_ui.py"
         ).read_text(encoding="utf-8")
-        companion = (ROOT / "ncc_assistant" / "companion.py").read_text(
+        companion = (ROOT / "companion" / "window.py").read_text(
             encoding="utf-8"
         )
         self.assertIn("class PluginsPage", gui)
@@ -447,15 +446,15 @@ class FocusWatchdogTests(unittest.TestCase):
         self.assertIn("plugin_configure", companion)
         self.assertIn("tick_all", companion)
         self.assertIn("present_interrupt_dialog", companion)
-        plugins_init = (ROOT / "ncc_assistant" / "plugins" / "__init__.py").read_text(
+        plugins_init = (ROOT / "plugins" / "__init__.py").read_text(
             encoding="utf-8"
         )
         self.assertIn("FeaturePlugin", plugins_init)
         self.assertIn("tick_all", plugins_init)
 
     def test_netblock_requires_privilege_grant(self) -> None:
-        from ncc_assistant.focus_netblock import apply_net_block
-        from ncc_assistant.preferences import (
+        from plugins.doomscroll.netblock import apply_net_block
+        from core.store.preferences import (
             set_doomscroll_netblock_granted,
             set_doomscroll_site_tags,
         )
@@ -467,8 +466,8 @@ class FocusWatchdogTests(unittest.TestCase):
         self.assertEqual(result.get("error"), "privilege_not_granted")
 
     def test_plugin_registry_lists_doomscroll(self) -> None:
-        from ncc_assistant.plugins import get_plugin, list_plugins
-        from ncc_assistant.preferences import set_doomscroll_enable
+        from plugins import get_plugin, list_plugins
+        from core.store.preferences import set_doomscroll_enable
 
         ids = [p.id for p in list_plugins()]
         self.assertIn("doomscroll", ids)
@@ -481,7 +480,7 @@ class FocusWatchdogTests(unittest.TestCase):
         self.assertTrue(p.is_enabled())
 
     def test_pause_media_calls_mpris(self) -> None:
-        from ncc_assistant import focus_actions
+        from plugins.doomscroll import actions as focus_actions
 
         tracks = [
             {
@@ -492,9 +491,9 @@ class FocusWatchdogTests(unittest.TestCase):
             }
         ]
         with mock.patch(
-            "ncc_assistant.focus._firefox_mpris_tracks", return_value=tracks
+            "plugins.doomscroll.watchdog._firefox_mpris_tracks", return_value=tracks
         ):
-            with mock.patch("ncc_assistant.focus._run", return_value="") as run:
+            with mock.patch("plugins.doomscroll.watchdog._run", return_value="") as run:
                 with mock.patch("shutil.which", return_value="/bin/qdbus"):
                     ok = focus_actions.pause_browser_media()
         self.assertTrue(ok)

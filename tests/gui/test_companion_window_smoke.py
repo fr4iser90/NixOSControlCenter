@@ -18,8 +18,8 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-ASSISTANT_PY = REPO / "nixos/modules/specialized/ncc-assistant/python"
-COMPANION = ASSISTANT_PY / "ncc_assistant" / "companion.py"
+ASSISTANT_PY = REPO / "nixos/modules/specialized/ncc-assistant"
+COMPANION = ASSISTANT_PY / "companion" / "window.py"
 
 
 def _companion_init_undefined_names() -> list[str]:
@@ -142,7 +142,7 @@ class CompanionWindowSmoke(unittest.TestCase):
         os.environ["XDG_CONFIG_HOME"] = tmp
 
         app = QApplication.instance() or QApplication([])
-        from ncc_assistant.companion import AvatarCanvas, CompanionWindow
+        from companion.window import AvatarCanvas, CompanionWindow
 
         win = CompanionWindow()
         try:

@@ -12,7 +12,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 NIXOS = REPO / "nixos"
 GUI_PY = NIXOS / "core/management/gui-engine/python"
-ASSISTANT_PY = NIXOS / "modules/specialized/ncc-assistant/python"
+ASSISTANT_PY = NIXOS / "modules/specialized/ncc-assistant"
 
 
 def soak_enabled() -> bool:

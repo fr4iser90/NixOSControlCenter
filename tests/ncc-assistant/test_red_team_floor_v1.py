@@ -20,9 +20,9 @@ from unittest import mock
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"))
+sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"))
 
-from ncc_assistant import permissions, red_team
+from core.policy import permissions, red_team
 
 MODULE_DIR = REPO / "nixos/modules/specialized/ncc-assistant"
 
@@ -95,8 +95,8 @@ def test_the_code_that_answers_a_rule_is_the_one_the_plan_names():
 def test_a_new_floor_code_without_a_case_is_a_failing_test():
     """The completeness gate: adding ``denied_*`` to the floor means adding a red-team case."""
     claimed = {attempt.code for attempt in red_team.FLOOR_ATTEMPTS}
-    for name in ("permissions.py", "workflow_execute.py"):
-        source = (MODULE_DIR / "python/ncc_assistant" / name).read_text(encoding="utf-8")
+    for name in ("core/policy/permissions.py", "core/workflows/workflow_execute.py"):
+        source = (MODULE_DIR / name).read_text(encoding="utf-8")
         found = set(re.findall(r'"(denied_[a-z_]+)"', source))
         assert found, name
         assert found - claimed == set(), f"{name} refuses with {found - claimed} and red_team never asks"
@@ -209,8 +209,8 @@ def test_the_report_carries_the_floor_for_both_entry_points():
     assert payload["ok"] is True and len(floor) == len(red_team.run_floor_checks())
     assert runtime.calls, "the guard half still runs against the runtime"
 
-    for source in ("cli.py", "gui_pages.py"):
-        text = (MODULE_DIR / "python/ncc_assistant" / source).read_text(encoding="utf-8")
+    for source in ("cli/cli.py", "widgets/pages.py"):
+        text = (MODULE_DIR / source).read_text(encoding="utf-8")
         assert "run_red_team_checks" in text, source
 
 

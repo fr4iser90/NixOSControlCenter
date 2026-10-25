@@ -11,10 +11,12 @@ from pathlib import Path
 from unittest import mock
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"))
+sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"))
 
-from ncc_assistant import cli, permissions, workflow_execute
-from ncc_assistant.config import Settings
+from cli import cli
+from core.policy import permissions
+from core.workflows import workflow_execute
+from core.store.config import Settings
 
 FLOOR_COMMANDS = (
     ["push", "--force"],
@@ -284,7 +286,7 @@ def _settings() -> Settings:
 
 
 def test_no_grant_requested_leaves_the_ladder_out():
-    from ncc_assistant.agent import resolve_run_grant
+    from core.runtime.agent import resolve_run_grant
 
     with mock.patch.dict(os.environ, {}, clear=True):
         grant, violations = resolve_run_grant(_settings(), ())
@@ -292,7 +294,7 @@ def test_no_grant_requested_leaves_the_ladder_out():
 
 
 def test_grant_above_the_host_ceiling_is_a_violation_not_a_run():
-    from ncc_assistant.agent import resolve_run_grant
+    from core.runtime.agent import resolve_run_grant
 
     with mock.patch.dict(os.environ, {permissions.ENV_REPO_CEILING: "push"}, clear=True):
         grant, violations = resolve_run_grant(_settings(), ["repo=merge"])
@@ -301,7 +303,7 @@ def test_grant_above_the_host_ceiling_is_a_violation_not_a_run():
 
 
 def test_schedule_grant_narrows_below_the_host():
-    from ncc_assistant.agent import resolve_run_grant
+    from core.runtime.agent import resolve_run_grant
 
     with mock.patch.dict(
         os.environ,
@@ -325,7 +327,7 @@ def test_schedule_grant_narrows_below_the_host():
 
 
 def test_the_agent_pair_is_a_ceiling_too():
-    from ncc_assistant.agent import resolve_run_grant
+    from core.runtime.agent import resolve_run_grant
 
     with mock.patch.dict(
         os.environ,
@@ -344,7 +346,7 @@ def test_the_agent_pair_is_a_ceiling_too():
 
 
 def test_an_undeclared_agent_pair_leaves_the_host_ceiling_alone():
-    from ncc_assistant.agent import resolve_run_grant
+    from core.runtime.agent import resolve_run_grant
 
     with mock.patch.dict(os.environ, {"NCC_ASSISTANT_ALLOW_WRITE": "1"}, clear=True):
         grant, violations = resolve_run_grant(_settings(), ["system=config-write"])
@@ -354,7 +356,7 @@ def test_an_undeclared_agent_pair_leaves_the_host_ceiling_alone():
 
 
 def test_the_agent_pair_never_opens_what_the_host_closed():
-    from ncc_assistant.agent import resolve_run_grant
+    from core.runtime.agent import resolve_run_grant
 
     with mock.patch.dict(
         os.environ,

@@ -6,15 +6,17 @@ one injected violation here and must go red on it. The control case (`test_contr
 makes the attacks meaningful: it proves the fixture is faithful, so a red run can only come
 from the injected violation and not from the fixture being broken.
 
-Attacks aim at the failure modes the tree plan actually creates:
+Attacks aim at the failure modes the hoisted tree actually creates:
 
-  staging    a package hoisted to the staging root, i.e. a new PYTHONPATH importable
-  stdlib     a hoisted name that shadows a stdlib module
-  sys.path   the mechanism that would make every submodule name importable
-  data/      catalog dirs growing into a package
-  loaders    the silent `return []` when a catalog leaves the importable package
+  legacy     a `python/ncc_assistant/` root re-appearing and shadowing the packages
+  tree       an unplanned module-level package
+  staging    a package hoisted to the `$out` top level / dropped from the site root
+  stdlib     a staged name that shadows a stdlib module
+  sys.path   the mechanism that would make every submodule name importable again
+  data/      catalog dirs removed, or code added to the data root
+  loaders    the silent `return []` when a catalog leaves `data/`, and a loader reading
+             from an installed copy instead of this tree
   entrypoint a wrapper renamed away from the one target, and an import that breaks at startup
-  ratchet    a new module dropped into the flat pile
 
 The gate takes `NCC_ASSISTANT_MODULE_DIR`, so each case copies the module and attacks the copy:
 no test here mutates the checkout.
@@ -34,8 +36,10 @@ REPO = Path(__file__).resolve().parents[2]
 GATE = REPO / "tests/gates/validate-assistant-layout.sh"
 MODULE = REPO / "nixos/modules/specialized/ncc-assistant"
 
-PKG_ANCHOR_STAGING = "    cp -r ${./python/ncc_assistant} $out/ncc_assistant"
-PKG_ANCHOR_MCP = "    exec ${pythonEnv}/bin/python -m ncc_assistant mcp"
+PACKAGES = ("cli", "companion", "core", "harness", "plugins", "tray", "widgets", "window")
+
+PKG_ANCHOR_SITE = "cp -r ${guiEngine.src}/ncc_gui $out/lib/ncc-assistant/ncc_gui"
+PKG_ANCHOR_MCP = "    exec ${pythonEnv}/bin/python -m cli mcp"
 
 
 class LayoutGateBiteTests(unittest.TestCase):
@@ -47,11 +51,12 @@ class LayoutGateBiteTests(unittest.TestCase):
         self.fixture = tmp / "module"
         self.fixture.mkdir()
         shutil.copy2(MODULE / "package.nix", self.fixture / "package.nix")
-        shutil.copytree(
-            MODULE / "python",
-            self.fixture / "python",
-            ignore=shutil.ignore_patterns("__pycache__"),
-        )
+        for pkg in PACKAGES:
+            shutil.copytree(
+                MODULE / pkg,
+                self.fixture / pkg,
+                ignore=shutil.ignore_patterns("__pycache__"),
+            )
         shutil.copytree(MODULE / "data", self.fixture / "data")
         self.pkg = self.fixture / "package.nix"
         self.pkg_text = self.pkg.read_text(encoding="utf-8")
@@ -65,6 +70,8 @@ class LayoutGateBiteTests(unittest.TestCase):
         # The gate must judge the fixture only; an inherited path could make it import the
         # real checkout and pass for the wrong reason.
         env.pop("PYTHONPATH", None)
+        env.pop("NCC_DATA_ROOT", None)
+        env.pop("NCC_PROMPTS_ROOT", None)
         return subprocess.run(
             ["bash", str(GATE)],
             capture_output=True,
@@ -78,8 +85,8 @@ class LayoutGateBiteTests(unittest.TestCase):
         self.assertIn(old, self.pkg_text, "attack anchor moved in package.nix")
         self.pkg.write_text(self.pkg_text.replace(old, new), encoding="utf-8")
 
-    def attack_python(self, rel: str, old: str, new: str) -> None:
-        path = self.fixture / "python" / "ncc_assistant" / rel
+    def attack_source(self, rel: str, old: str, new: str) -> None:
+        path = self.fixture / rel
         text = path.read_text(encoding="utf-8")
         self.assertIn(old, text, f"attack anchor moved in {rel}")
         path.write_text(text.replace(old, new), encoding="utf-8")
@@ -108,88 +115,108 @@ class LayoutGateBiteTests(unittest.TestCase):
             f"indistinguishable from fixture noise.\n{proc.stdout}{proc.stderr}",
         )
 
-    # ── 1) staging Soll-Menge ─────────────────────────────────────────────────
+    # ── 1) the old layout stays dead ─────────────────────────────────────────
+
+    def test_a_reintroduced_python_root_is_caught(self) -> None:
+        """The one regression that would be invisible everywhere else: a package under
+        `python/` is not on PYTHONPATH, so it silently rots instead of breaking."""
+        (self.fixture / "python" / "ncc_assistant").mkdir(parents=True)
+        self.assert_red("legacy import root re-appeared")
+
+    # ── 2) the module package set ────────────────────────────────────────────
+
+    def test_an_unplanned_module_package_is_caught(self) -> None:
+        (self.fixture / "assistant_extras").mkdir()
+        (self.fixture / "assistant_extras" / "__init__.py").write_text(
+            "# noqa\n", encoding="utf-8"
+        )
+        self.assert_red("module-level package set changed")
+
+    # ── 3) staging Soll-Menge ────────────────────────────────────────────────
 
     def test_hoisting_a_package_to_the_staging_root_is_caught(self) -> None:
         self.attack_package(
-            PKG_ANCHOR_STAGING,
-            PKG_ANCHOR_STAGING + "\n    cp -r $out/ncc_assistant/plugins $out/plugins",
+            PKG_ANCHOR_SITE,
+            PKG_ANCHOR_SITE + "\n    cp -r $out/lib/ncc-assistant/plugins $out/plugins",
         )
         self.assert_red("appRoot top level changed")
 
-    # ── 2) stdlib shadowing / sys.path ────────────────────────────────────────
+    def test_a_package_missing_from_the_site_root_is_caught(self) -> None:
+        """The opposite half: a copy line narrowed during a move stages a package nobody
+        imports at build time, and every wrapper dies at runtime."""
+        self.attack_package(
+            "cp -r ${./companion} ${./window}",
+            "cp -r ${./window}",
+        )
+        self.assert_red("site root payload changed")
+
+    # ── 4) stdlib shadowing / sys.path ───────────────────────────────────────
 
     def test_a_stdlib_shadowing_top_level_name_is_caught(self) -> None:
         self.attack_package(
-            PKG_ANCHOR_STAGING,
-            PKG_ANCHOR_STAGING + "\n    cp -r $out/ncc_assistant/plugins $out/types",
+            PKG_ANCHOR_SITE,
+            PKG_ANCHOR_SITE + "\n    cp -r ${./plugins} $out/lib/ncc-assistant/types",
         )
         self.assert_red("shadowing stdlib at importable top level: types")
 
     def test_editing_sys_path_is_caught(self) -> None:
         """Not decoration: this is the one mechanism that turns an ordinary submodule name
-        into an importable one, which is what would silently void check 2."""
-        self.attack_python(
-            "paths.py",
-            "def config_home() -> Path:",
-            "def config_home() -> Path:\n    import sys as _sys\n    _sys.path.insert(0, str(__package__ and '.'))",
+        into an importable one, which is what would silently void check 4."""
+        self.attack_source(
+            "core/store/paths.py",
+            "def data_root() -> Path:",
+            "def data_root() -> Path:\n    import sys as _sys\n    _sys.path.insert(0, '.')",
         )
         self.assert_red("sys.path was edited")
 
-    # ── 3) data/ stays code-free ──────────────────────────────────────────────
+    # ── 5) data/ stays code-free and complete ────────────────────────────────
 
     def test_python_under_data_is_caught(self) -> None:
         (self.fixture / "data" / "playbooks" / "loader.py").write_text("# noqa\n", encoding="utf-8")
         self.assert_red("data/ must stay catalog-only")
 
-    # ── 4) loader degradation + provenance ────────────────────────────────────
+    def test_a_missing_catalog_dir_is_caught(self) -> None:
+        shutil.rmtree(self.fixture / "data" / "agents")
+        self.assert_red("data/ catalog set changed")
 
-    def test_catalog_moved_out_of_the_package_is_caught(self) -> None:
-        """The plan's central risk, in one move: `playbooks/` relocates and the loader starts
+    # ── 6) loader degradation + provenance ────────────────────────────────────
+
+    def test_playbooks_moved_out_of_the_data_root_is_caught(self) -> None:
+        """The plan's central risk, in one move: the dir relocates and the loader starts
         answering `[]`. Nothing prints an error, so only the gate notices."""
-        shutil.rmtree(self.fixture / "python" / "ncc_assistant" / "playbooks")
+        shutil.rmtree(self.fixture / "data" / "playbooks")
         self.assert_red("playbooks: loader returned 0 playbooks")
 
-    def test_cases_moved_out_of_the_package_is_caught(self) -> None:
-        (self.fixture / "python" / "ncc_assistant" / "eval" / "cases.json").write_text(
-            "[]", encoding="utf-8"
-        )
+    def test_cases_moved_out_of_the_data_root_is_caught(self) -> None:
+        (self.fixture / "data" / "eval" / "cases.json").write_text("[]", encoding="utf-8")
         self.assert_red("eval: loader returned 0 cases")
 
     def test_a_loader_reading_outside_the_tree_is_caught(self) -> None:
         """Provenance, not just non-emptiness: the loader here reads the *real* checkout, so a
         check that only counted cases would call this fine."""
-        real_cases = (MODULE / "python" / "ncc_assistant" / "eval" / "cases.json").resolve()
-        self.attack_python(
-            "eval_harness.py",
-            '    packaged = Path(__file__).resolve().parent / "eval" / "cases.json"',
-            f'    packaged = Path({str(real_cases)!r})',
+        real_cases = (MODULE / "data" / "eval" / "cases.json").resolve()
+        self.attack_source(
+            "core/catalogs/eval_harness.py",
+            '    for case_file in sorted((data_root() / "eval").glob("*.json")):',
+            f'    for case_file in [Path({str(real_cases)!r})]:',
         )
-        self.assert_red("source outside the tree")
+        self.assert_red("read from somewhere else")
 
-    # ── 5) entrypoints ────────────────────────────────────────────────────────
+    # ── 7) entrypoints ────────────────────────────────────────────────────────
 
     def test_a_wrapper_on_its_own_target_is_caught(self) -> None:
-        self.attack_package(PKG_ANCHOR_MCP, PKG_ANCHOR_MCP.replace("ncc_assistant mcp", "ncc_mcp"))
+        self.attack_package(PKG_ANCHOR_MCP, PKG_ANCHOR_MCP.replace("-m cli mcp", "-m ncc_mcp"))
         self.assert_red("wrappers bind more than one module")
 
     def test_an_entrypoint_that_fails_to_start_is_caught(self) -> None:
         """Renaming alone is not enough — a wrapper can point at the right module and still
         die on import. That is what the smoke is for, so it is attacked directly."""
-        self.attack_python(
-            "__main__.py",
-            "from .cli import main",
-            "import ncc_assistant.module_deleted_by_the_refactor  # noqa\nfrom .cli import main",
+        self.attack_source(
+            "cli/__main__.py",
+            "from cli.cli import main",
+            "import cli.module_deleted_by_the_refactor  # noqa\nfrom cli.cli import main",
         )
         self.assert_red("entrypoint smoke")
-
-    # ── 6) ratchet ────────────────────────────────────────────────────────────
-
-    def test_a_new_top_level_module_is_caught(self) -> None:
-        (self.fixture / "python" / "ncc_assistant" / "another_flat_module.py").write_text(
-            "# noqa\n", encoding="utf-8"
-        )
-        self.assert_red("package top level grew to")
 
 
 if __name__ == "__main__":

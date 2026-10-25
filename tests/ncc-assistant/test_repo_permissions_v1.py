@@ -19,9 +19,12 @@ from unittest import mock
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"))
+sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"))
 
-from ncc_assistant import audit, cli, paths, permissions, workflow_execute
+from core.policy import audit, permissions
+from cli import cli
+from core.store import paths
+from core.workflows import workflow_execute
 from test_permission_ladder_v1 import _git, _repo, grant_env
 
 CEILING_PATH = permissions.REPO_CEILING_PATH
@@ -344,8 +347,8 @@ def test_the_argv_floor_refuses_the_ceiling_path_by_name():
 def test_permissions_show_reports_the_repositorys_own_narrowing(tmp_path, capsys):
     root = _repo(tmp_path)
     _commit_ceiling(root, '{"version": 1, "repo": "commit"}')
-    from ncc_assistant.preferences import set_active_workspace_id
-    from ncc_assistant.workspaces import upsert_workspace
+    from core.store.preferences import set_active_workspace_id
+    from core.store.workspaces import upsert_workspace
 
     upsert_workspace(workspace_id="lowered", path=str(root), label="Lowered")
     set_active_workspace_id("lowered")
@@ -361,8 +364,8 @@ def test_permissions_show_reports_the_repositorys_own_narrowing(tmp_path, capsys
 def test_permissions_show_says_so_when_the_file_cannot_be_trusted(tmp_path, capsys):
     root = _repo(tmp_path)
     _commit_ceiling(root, '{"repo": "deploy"}')
-    from ncc_assistant.preferences import set_active_workspace_id
-    from ncc_assistant.workspaces import upsert_workspace
+    from core.store.preferences import set_active_workspace_id
+    from core.store.workspaces import upsert_workspace
 
     upsert_workspace(workspace_id="broken", path=str(root), label="Broken")
     set_active_workspace_id("broken")

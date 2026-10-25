@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest import mock
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
 
@@ -58,14 +58,14 @@ class WorkflowExecuteTests(unittest.TestCase):
             check=True,
             capture_output=True,
         )
-        from ncc_assistant.preferences import set_active_workspace_id
-        from ncc_assistant.workspaces import upsert_workspace
+        from core.store.preferences import set_active_workspace_id
+        from core.store.workspaces import upsert_workspace
 
         upsert_workspace(workspace_id="proj", path=str(self.repo), label="Proj")
         set_active_workspace_id("proj")
 
     def test_ensure_branch_task_slug(self) -> None:
-        from ncc_assistant.workflow_execute import ensure_branch
+        from core.workflows.workflow_execute import ensure_branch
 
         r = ensure_branch("proj", prefix="agents-md", task_id="abc123dead")
         self.assertTrue(r["ok"])
@@ -73,9 +73,9 @@ class WorkflowExecuteTests(unittest.TestCase):
         self.assertIn("abc123dead", str(r["branch"]))
 
     def test_task_start_marks_doing_and_progress(self) -> None:
-        from ncc_assistant.workspace_workflow import plan_from_audit
-        from ncc_assistant.workflow_execute import load_progress, task_start
-        from ncc_assistant.workflows import get_task
+        from core.workflows.workspace_workflow import plan_from_audit
+        from core.workflows.workflow_execute import load_progress, task_start
+        from core.workflows.workflows import get_task
 
         plan = plan_from_audit("proj")
         tid = plan["created_tasks"][0]["id"]
@@ -91,8 +91,8 @@ class WorkflowExecuteTests(unittest.TestCase):
         self.assertEqual(prog["current_branch"], r["branch"])
 
     def test_task_finish_refuses_on_validate_fail(self) -> None:
-        from ncc_assistant.workspace_workflow import plan_from_audit
-        from ncc_assistant.workflow_execute import task_finish, task_start
+        from core.workflows.workspace_workflow import plan_from_audit
+        from core.workflows.workflow_execute import task_finish, task_start
 
         plan = plan_from_audit("proj")
         tid = plan["created_tasks"][0]["id"]
@@ -107,21 +107,21 @@ class WorkflowExecuteTests(unittest.TestCase):
         self.assertEqual(r.get("error"), "validate_failed")
 
     def test_merge_requires_confirm(self) -> None:
-        from ncc_assistant.workflow_execute import merge_pull_request
+        from core.workflows.workflow_execute import merge_pull_request
 
         r = merge_pull_request("proj", confirm="nope")
         self.assertFalse(r["ok"])
         self.assertEqual(r.get("error"), "confirm_required")
 
     def test_bump_requires_confirm(self) -> None:
-        from ncc_assistant.workflow_execute import bump_version
+        from core.workflows.workflow_execute import bump_version
 
         r = bump_version("proj", confirm="")
         self.assertFalse(r["ok"])
         self.assertEqual(r.get("error"), "confirm_required")
 
     def test_bump_package_json(self) -> None:
-        from ncc_assistant.workflow_execute import bump_version, ensure_branch
+        from core.workflows.workflow_execute import bump_version, ensure_branch
 
         ensure_branch("proj", prefix="bump", allow_dirty=True)
         (self.repo / "package.json").write_text(
@@ -135,8 +135,8 @@ class WorkflowExecuteTests(unittest.TestCase):
         self.assertEqual(data["version"], "1.2.4")
 
     def test_resume_status(self) -> None:
-        from ncc_assistant.workspace_workflow import plan_from_audit
-        from ncc_assistant.workflow_execute import resume_status, task_start
+        from core.workflows.workspace_workflow import plan_from_audit
+        from core.workflows.workflow_execute import resume_status, task_start
 
         plan_from_audit("proj")
         before = resume_status("proj")
@@ -149,7 +149,7 @@ class WorkflowExecuteTests(unittest.TestCase):
         self.assertIn("task-start", after["hint"])
 
     def test_templates(self) -> None:
-        from ncc_assistant.agent_templates import get_agent_template
+        from core.catalogs.agent_templates import get_agent_template
 
         ex = get_agent_template("autonomous-agent-run")
         ship = get_agent_template("autonomous-agent-ship")
@@ -165,7 +165,7 @@ class WorkflowExecuteTests(unittest.TestCase):
         self.assertIn("2", max_tasks.options)
 
     def test_companion_exposes_workflow_templates(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn("Workflows", text)
         self.assertIn('("template", t.id)', text)
 

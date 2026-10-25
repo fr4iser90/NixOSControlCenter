@@ -14,17 +14,17 @@ bindings, workflow progress and memory notes all hang off that path-shaped id, s
 silently orphans all of it.
 
 Second problem: there is no Git or GitHub **tool**. `TOOL_DEFINITIONS`
-([runtime.py:16](../../python/ncc_assistant/runtime.py)) ships 20 tools, none of them Git-aware.
-The only GitHub access in the package is `_gh_json` ([workflows.py:193](../../python/ncc_assistant/workflows.py)),
+([runtime.py:16](../../python/core/runtime/runtime.py)) ships 20 tools, none of them Git-aware.
+The only GitHub access in the package is `_gh_json` ([workflows.py:193](../../python/core/workflows/workflows.py)),
 a `gh` subprocess used to build a digest that is overwritten each refresh and never becomes a
 task. So "check whether my repos are up to date" cannot be an agent step today; it is a report.
 
 Third: installing an MCP server buys **zero tools**. The registry only registers tools declared
 inline in `mcp-servers.json` — `tools = server_def.get("tools") or []`
-([registry.py:221](../../python/ncc_assistant/registry.py)) — while `install_template` writes
+([registry.py:221](../../python/core/runtime/registry.py)) — while `install_template` writes
 `command/args/env/workspaceId` and no `tools`
-([marketplace.py](../../python/ncc_assistant/marketplace.py)). `McpClientPool.list_tools`
-([mcp_client.py:147](../../python/ncc_assistant/mcp_client.py)) has no caller at all. Templates
+([marketplace.py](../../python/core/catalogs/marketplace.py)). `McpClientPool.list_tools`
+([mcp_client.py:147](../../python/core/runtime/mcp_client.py)) has no caller at all. Templates
 asking for `mcp: [git, github]` therefore get nothing.
 
 ## Measured today
@@ -130,7 +130,7 @@ Freshness rules:
 ### Entity scoping for memory
 
 Add optional `repo: str | None` and `workspace: str | None` to `MemoryNote`
-([memory.py:20](../../python/ncc_assistant/memory.py)). Notes without a repo stay global.
+([memory.py:20](../../python/core/runtime/memory.py)). Notes without a repo stay global.
 `memory.search` and `for_prompt` gain a `repo=` filter so a run about repo A stops injecting
 advice about repo B. Existing `memory.jsonl` lines stay valid (missing field = global).
 

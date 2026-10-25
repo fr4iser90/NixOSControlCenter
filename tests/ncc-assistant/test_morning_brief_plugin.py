@@ -13,7 +13,7 @@ from unittest import mock
 from zoneinfo import ZoneInfo
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
 
@@ -27,7 +27,7 @@ class WorkspaceBriefArchitectureTests(unittest.TestCase):
         self.addCleanup(self._patch.stop)
 
     def test_brief_is_not_a_plugin(self) -> None:
-        from ncc_assistant.plugins import get_plugin, list_plugins
+        from plugins import get_plugin, list_plugins
 
         ids = [p.id for p in list_plugins()]
         self.assertNotIn("morning-brief", ids)
@@ -35,7 +35,7 @@ class WorkspaceBriefArchitectureTests(unittest.TestCase):
         self.assertIsNone(get_plugin("morning-brief"))
 
     def test_workspace_brief_template_exists(self) -> None:
-        from ncc_assistant.agent_templates import get_agent_template
+        from core.catalogs.agent_templates import get_agent_template
 
         tmpl = get_agent_template("workspace-brief")
         self.assertIsNotNone(tmpl)
@@ -45,7 +45,7 @@ class WorkspaceBriefArchitectureTests(unittest.TestCase):
         self.assertIn("repositories", [p.id for p in tmpl.params])
 
     def test_companion_has_no_daily_toolbar(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn("Workflows (once / cron)", text)
         self.assertIn("PANEL_CRON", text)
         # The rail replaced the icon toolbar (12875545) and must not advertise a Daily board
@@ -54,19 +54,19 @@ class WorkspaceBriefArchitectureTests(unittest.TestCase):
         self.assertNotIn("maybe_fire_brief", text)
 
     def test_gui_tabs_no_workflows_board(self) -> None:
-        gui = (ROOT / "ncc_assistant" / "gui.py").read_text(encoding="utf-8")
+        gui = (ROOT / "window" / "app.py").read_text(encoding="utf-8")
         self.assertIn('addTab(self.templates_page, "Workflows")', gui)
         self.assertIn('addTab(self.schedules_page, "Cron")', gui)
         self.assertNotIn('addTab(self.workflows_page', gui)
 
     def test_parse_digest_hhmm_still_works(self) -> None:
-        from ncc_assistant.morning_brief import parse_digest_hhmm
+        from plugins.morning_brief.logic import parse_digest_hhmm
 
         self.assertEqual(parse_digest_hhmm("*-*-* 08:30:00"), (8, 30))
 
     def test_due_respects_enable(self) -> None:
-        from ncc_assistant.morning_brief import due_for_brief
-        from ncc_assistant.preferences import (
+        from plugins.morning_brief.logic import due_for_brief
+        from core.store.preferences import (
             set_daily_digest_enable,
             set_daily_digest_on_calendar,
             set_morning_brief_last_fired,

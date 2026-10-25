@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-ASSISTANT_PY = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ASSISTANT_PY = REPO / "nixos/modules/specialized/ncc-assistant"
 
 QUESTION = {
     "kind": "ask",
@@ -95,7 +95,7 @@ class AskWidgetTests(_QtCase):
 
     def setUp(self) -> None:
         self.setUpQt()
-        from ncc_assistant.gui_pages import AskWidget
+        from widgets.pages import AskWidget
 
         self.AskWidget = AskWidget
 
@@ -152,7 +152,7 @@ class AskWidgetTests(_QtCase):
 class CompanionAskCardTests(_QtCase):
     def setUp(self) -> None:
         self.setUpQt()
-        import ncc_assistant.companion as companion
+        import companion.window as companion
 
         self.companion = companion
         self._real_worker = companion._CompanionChatWorker
@@ -245,9 +245,9 @@ class CompanionAskCardTests(_QtCase):
 class ChatPageAskCardTests(_QtCase):
     def setUp(self) -> None:
         self.setUpQt()
-        from ncc_assistant.config import Settings
-        from ncc_assistant.gui import ChatPage, ConfirmBridge
-        from ncc_assistant.session import ChatSession
+        from core.store.config import Settings
+        from window.app import ChatPage, ConfirmBridge
+        from core.runtime.session import ChatSession
 
         session = ChatSession.create(
             Settings.from_env(client_mode="chat"),

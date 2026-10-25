@@ -24,11 +24,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python"))
+sys.path.insert(0, str(REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"))
 
-from ncc_assistant import audit, cli, config, notifications, permissions  # noqa: E402
-from ncc_assistant.config import Settings  # noqa: E402
-from ncc_assistant.permissions import (  # noqa: E402
+from core.policy import audit, notifications, permissions  # noqa: E402
+from cli import cli
+from core.store import config
+from core.store.config import Settings  # noqa: E402
+from core.policy.permissions import (  # noqa: E402
     CONFIRM_MODES,
     ENV_CONFIRM,
     confirm_rank,
@@ -36,7 +38,7 @@ from ncc_assistant.permissions import (  # noqa: E402
     narrow_confirm,
     normalise_confirm,
 )
-from ncc_assistant.runtime import ToolRuntime  # noqa: E402
+from core.runtime.runtime import ToolRuntime  # noqa: E402
 
 from test_permission_ladder_v1 import grant_env  # noqa: E402
 from test_run_length_budgets import _settings  # noqa: E402
@@ -258,7 +260,7 @@ def test_a_cli_run_in_never_mode_asks_nobody():
 
 def _agent_run(*argv: str):
     """``agent run`` without an LLM: the run itself is not under test here."""
-    return patch("ncc_assistant.agent.run_agent", return_value=iter([]))
+    return patch("core.runtime.agent.run_agent", return_value=iter([]))
 
 
 def test_confirm_asking_less_than_the_host_exits_two(capsys):

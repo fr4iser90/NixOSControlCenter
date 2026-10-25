@@ -1,0 +1,276 @@
+"""Runtime settings from environment (injected by Nix wrappers)."""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+from urllib.parse import urlparse
+
+from core.store.paths import data_root
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _env_optional_str(name: str) -> str | None:
+    raw = os.environ.get(name)
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw or raw.lower() in ("null", "none", ""):
+        return None
+    return raw
+
+
+def _env_optional_bool(name: str) -> bool | None:
+    """Declared-or-nothing flag: unset stays ``None`` instead of becoming ``False``.
+
+    A ceiling must be able to tell "the host said no" from "nobody said anything" — a
+    plain :func:`_env_bool` would let a bare shell clamp a run it never configured.
+    """
+    raw = _env_optional_str(name)
+    if raw is None:
+        return None
+    return raw.lower() in ("1", "true", "yes", "on")
+
+
+def _env_optional_int(name: str) -> int | None:
+    raw = _env_optional_str(name)
+    if raw is None:
+        return None
+    return int(raw)
+
+
+def _env_optional_float(name: str) -> float | None:
+    raw = _env_optional_str(name)
+    if raw is None:
+        return None
+    return float(raw)
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = _env_optional_int(name)
+    return default if raw is None else raw
+
+
+# Run-length budgets are opt-in: the sentinel below means "no limit", mirroring
+# qwen-code's model.maxSessionTurns / maxToolCalls / maxWallTimeSeconds (all -1).
+UNLIMITED = -1
+
+
+def is_unlimited(limit: int | None) -> bool:
+    """True when a run-length budget is unset — any value <= 0 disables it."""
+    return limit is None or int(limit) <= 0
+
+
+# qwen-code's compaction budget, read out of the 0.23.4 bundle
+# (chunks/chunk-AT4T4DRH.js: computeThresholds + DEFAULT_PCT / SUMMARY_RESERVE /
+# AUTOCOMPACT_BUFFER). Tokens, not seconds.
+COMPACT_SUMMARY_RESERVE_TOKENS = 20_000
+COMPACT_BUFFER_TOKENS = 13_000
+DEFAULT_AUTO_COMPACT_FRACTION = 0.85
+# Used until the gateway answers with real usage; also the fallback window when
+# nothing advertises one (Ollama's own num_ctx default is 4096, so this is generous).
+DEFAULT_CONTEXT_WINDOW_TOKENS = 8192
+CHARS_PER_TOKEN = 4
+
+
+def compact_threshold_for(window: int, override: int | None = None) -> int:
+    """Token count at which compaction fires — qwen-code's computeThresholds().
+
+    ``min(0.85 * window, window - 20000 - 13000)``, the absolute ceiling only
+    applying while it is positive. So a 4k/8k local context compacts at 85% of
+    the window and a 200k gateway at ~167k rather than 170k.
+    """
+    if override is not None and int(override) > 0:
+        return int(override)
+    window = max(1024, int(window))
+    proportional = int(DEFAULT_AUTO_COMPACT_FRACTION * window)
+    ceiling = window - COMPACT_SUMMARY_RESERVE_TOKENS - COMPACT_BUFFER_TOKENS
+    return min(proportional, ceiling) if ceiling > 0 else proportional
+
+
+def normalize_endpoint(url: str) -> str:
+    """Ensure OpenAI-compatible base ends with /v1 when only a host was given."""
+    u = url.strip().rstrip("/")
+    parsed = urlparse(u)
+    if parsed.path in ("", "/"):
+        return f"{u}/v1"
+    return u
+
+
+def resolve_api(api: str | None, provider: str | None) -> str:
+    """Map api / legacy provider → openai-compatible | anthropic."""
+    raw = (api or provider or "openai-compatible").strip().lower()
+    if raw in ("ollama", "openai", "openai-compatible", "compatible"):
+        return "openai-compatible"
+    if raw == "anthropic":
+        return "anthropic"
+    return raw
+
+
+@dataclass(frozen=True)
+class Settings:
+    root: Path
+    knowledge_root: Path
+    prompts_root: Path
+    config_bin: str
+    api: str
+    model: str | None
+    endpoint: str
+    api_key: str | None
+    api_header_name: str | None
+    max_tokens: int | None
+    temperature: float | None
+    allow_write: bool
+    mcp_allow_write: bool
+    allow_rebuild: bool
+    client_mode: str  # "chat" | "mcp"
+    nixos_dir: str
+    # Agent settings
+    allow_shell: bool
+    agent_max_steps: int
+    #: ``agent.allowWrite`` as declared by the wrapper — ``None`` when nothing declared it.
+    #: Clamps the system axis of a grant (see ``permissions.agent_axis_ceiling``).
+    agent_allow_write: bool | None
+    agent_allow_rebuild: bool | None
+    # Harness: native | qwen | dsh  (+ codingHarness: same | auto)
+    agent_harness: str
+    agent_coding_harness: str
+    # Notification settings
+    notify_enable: bool
+    notify_timeout_sec: int
+    notify_on_timeout: str  # "block" | "queue" | "pause"
+    # MCP settings
+    mcp_servers_json: str | None
+    # Extra HTTP headers (org, x-ai-*, …); primary API key stays in api_key
+    extra_headers: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+    # Tool rounds per chat message; UNLIMITED (-1) = keep going until the model stops
+    chat_max_rounds: int = UNLIMITED
+    # Context window in tokens; None → auto-detect from the gateway
+    context_window: int | None = None
+    # Compact when the prompt nears this many tokens; None/-1 → derived per window
+    compact_threshold: int = UNLIMITED
+    auto_compact: bool = True
+
+    @property
+    def provider(self) -> str:
+        """Backward-compatible alias used in UI strings."""
+        return self.api
+
+    @property
+    def writes_enabled(self) -> bool:
+        if self.client_mode == "mcp":
+            return self.mcp_allow_write
+        return self.allow_write
+
+    @staticmethod
+    def _load_api_key() -> str | None:
+        # Env overrides file (local debugging). Never store keys in systemConfig.
+        for name in (
+            "NCC_ASSISTANT_API_KEY",
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+        ):
+            raw = os.environ.get(name)
+            if raw and raw.strip():
+                return raw.strip().strip('"').strip("'")
+
+        key_file = os.environ.get("NCC_ASSISTANT_API_KEY_FILE")
+        if key_file and Path(key_file).is_file():
+            return (
+                Path(key_file)
+                .read_text(encoding="utf-8")
+                .strip()
+                .strip('"')
+                .strip("'")
+            )
+        return None
+
+    @classmethod
+    def from_env(cls, client_mode: str = "chat") -> "Settings":
+        root = Path(os.environ.get("NCC_ASSISTANT_ROOT", ".")).resolve()
+        knowledge = Path(
+            os.environ.get("NCC_KNOWLEDGE_ROOT", str(root / "knowledge"))
+        ).resolve()
+        prompts = Path(
+            os.environ.get("NCC_PROMPTS_ROOT", str(data_root() / "prompts"))
+        ).resolve()
+
+        header = os.environ.get("NCC_ASSISTANT_API_HEADER_NAME")
+        if header is not None:
+            header = header.strip() or None
+
+        api = resolve_api(
+            _env_optional_str("NCC_ASSISTANT_API"),
+            _env_optional_str("NCC_ASSISTANT_PROVIDER"),
+        )
+        endpoint = normalize_endpoint(
+            os.environ.get("NCC_ASSISTANT_ENDPOINT", "http://localhost:11434/v1")
+        )
+
+        return cls(
+            root=root,
+            knowledge_root=knowledge,
+            prompts_root=prompts,
+            config_bin=os.environ.get(
+                "NCC_ASSISTANT_CONFIG_BIN", "ncc-assistant-config"
+            ),
+            api=api,
+            model=_env_optional_str("NCC_ASSISTANT_MODEL"),
+            endpoint=endpoint,
+            api_key=cls._load_api_key(),
+            api_header_name=header,
+            max_tokens=_env_optional_int("NCC_ASSISTANT_MAX_TOKENS"),
+            temperature=_env_optional_float("NCC_ASSISTANT_TEMPERATURE"),
+            allow_write=_env_bool("NCC_ASSISTANT_ALLOW_WRITE", True),
+            mcp_allow_write=_env_bool("NCC_ASSISTANT_MCP_ALLOW_WRITE", False),
+            allow_rebuild=_env_bool("NCC_ASSISTANT_ALLOW_REBUILD", False),
+            client_mode=client_mode,
+            nixos_dir=os.environ.get("NIXOS_DIR", "/etc/nixos"),
+            # Agent settings
+            allow_shell=_env_bool("NCC_ASSISTANT_ALLOW_SHELL", False),
+            agent_max_steps=_env_int(
+                "NCC_ASSISTANT_AGENT_MAX_STEPS", UNLIMITED
+            ),
+            agent_allow_write=_env_optional_bool("NCC_ASSISTANT_AGENT_ALLOW_WRITE"),
+            agent_allow_rebuild=_env_optional_bool("NCC_ASSISTANT_AGENT_ALLOW_REBUILD"),
+            agent_harness=(
+                _env_optional_str("NCC_ASSISTANT_HARNESS") or "native"
+            ).lower(),
+            agent_coding_harness=(
+                _env_optional_str("NCC_ASSISTANT_CODING_HARNESS") or "auto"
+            ).lower(),
+            # Notification settings
+            notify_enable=_env_bool("NCC_ASSISTANT_NOTIFY_ENABLE", True),
+            notify_timeout_sec=int(os.environ.get("NCC_ASSISTANT_NOTIFY_TIMEOUT_SEC", "300")),
+            notify_on_timeout=os.environ.get("NCC_ASSISTANT_NOTIFY_ON_TIMEOUT", "block"),
+            # MCP settings
+            mcp_servers_json=_env_optional_str("NCC_ASSISTANT_MCP_SERVERS_JSON"),
+            extra_headers=(),
+            chat_max_rounds=_env_int("NCC_ASSISTANT_CHAT_MAX_ROUNDS", UNLIMITED),
+            context_window=(
+                cw
+                if (cw := _env_optional_int("NCC_ASSISTANT_CONTEXT_WINDOW"))
+                and cw > 0
+                else None
+            ),
+            compact_threshold=_env_int(
+                "NCC_ASSISTANT_COMPACT_THRESHOLD", UNLIMITED
+            ),
+            auto_compact=_env_bool("NCC_ASSISTANT_AUTO_COMPACT", True),
+        )
+
+    def load_system_prompt(self) -> str:
+        path = self.prompts_root / "system.md"
+        if path.is_file():
+            return path.read_text(encoding="utf-8")
+        return (
+            "You are the NCC assistant. Use tools to read config and knowledge "
+            "before changing anything."
+        )

@@ -38,12 +38,12 @@ warns: list[str] = []
 
 cli_py = (
     nixos
-    / "modules/specialized/ncc-assistant/python/ncc_assistant/cli.py"
+    / "modules/specialized/ncc-assistant/cli/cli.py"
 )
 commands_nix = nixos / "modules/specialized/ncc-assistant/commands.nix"
 
 if not cli_py.is_file():
-    errors.append("ncc-assistant: missing python/ncc_assistant/cli.py")
+    errors.append("ncc-assistant: missing cli/cli.py")
 elif not commands_nix.is_file():
     errors.append("ncc-assistant: missing commands.nix")
 else:

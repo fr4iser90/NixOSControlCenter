@@ -17,10 +17,12 @@ from unittest import mock
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-MODULE = REPO / "nixos" / "modules" / "specialized" / "ncc-assistant" / "python" / "ncc_assistant"
-sys.path.insert(0, str(MODULE.parent))
+MODULE = REPO / "nixos" / "modules" / "specialized" / "ncc-assistant"
+sys.path.insert(0, str(MODULE))
 
-from ncc_assistant import audit, paths, workflow_execute
+from core.policy import audit
+from core.store import paths
+from core.workflows import workflow_execute
 from test_permission_ladder_v1 import _git, _repo, grant_env
 
 
@@ -207,9 +209,9 @@ def test_bump_stages_only_the_manifest(workspace):
 
 
 def test_no_blanket_stage_is_left_in_the_workflow():
-    src = (MODULE / "workflow_execute.py").read_text(encoding="utf-8")
+    src = (MODULE / "core" / "workflows" / "workflow_execute.py").read_text(encoding="utf-8")
     assert '"add", "-A"' not in src and '"add", "-A",' not in src
     assert '"add", "--"' in src, "staging must name its paths to git"
-    cli_src = (MODULE / "cli.py").read_text(encoding="utf-8")
+    cli_src = (MODULE / "cli" / "cli.py").read_text(encoding="utf-8")
     assert 'dest="paths"' in cli_src and 'paths=getattr(args, "paths", None)' in cli_src
     assert "git add -A && commit" not in cli_src, "the help must not promise what the code no longer does"

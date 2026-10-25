@@ -18,8 +18,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 NIXOS = REPO / "nixos"
 GUI_PY = NIXOS / "core/management/gui-engine/python"
-ASSISTANT_PY = NIXOS / "modules/specialized/ncc-assistant/python"
-ASSISTANT_GUI = ASSISTANT_PY / "ncc_assistant/gui.py"
+ASSISTANT_PY = NIXOS / "modules/specialized/ncc-assistant"
+ASSISTANT_GUI = ASSISTANT_PY / "window" / "app.py"
 
 
 def _discover_page_files() -> list[Path]:
@@ -107,9 +107,9 @@ class DomainPagesSmoke(unittest.TestCase):
         except ImportError:
             self.skipTest("PySide6 not installed")
         app = QApplication.instance() or QApplication([])  # noqa: F841
-        from ncc_assistant.config import Settings
-        from ncc_assistant.gui import ChatPage, ConfirmBridge
-        from ncc_assistant.session import ChatSession
+        from core.store.config import Settings
+        from window.app import ChatPage, ConfirmBridge
+        from core.runtime.session import ChatSession
 
         confirm = ConfirmBridge()
         session = ChatSession.create(

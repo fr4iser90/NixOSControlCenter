@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """Witnesses for the two catalog loaders — the files that break first on a data move.
 
-``playbooks`` and ``eval_harness`` both resolve their JSON through the **package**
-(``importlib.resources.files("ncc_assistant")`` and ``Path(__file__).parent``). Neither one
-degrades loudly when the JSON stops living inside the importable package: the resources call
-raises ``TypeError``/``AttributeError``, both are swallowed, and the loader returns an empty
-list. A plan that moves ``playbooks/`` and ``eval/`` out of the package into ``data/`` is
-therefore green on every existing check while the feature silently answers "no playbooks".
+``playbooks`` and ``eval_harness`` both resolve their JSON through ``data_root()``: the module
+``data/`` in a checkout, ``NCC_DATA_ROOT`` in a packaged build. Neither one degrades loudly
+when the JSON stops resolving — the loader swallows the failure and answers an empty list, so
+a plan that moves a catalog (or renames its root env var) is green on every existing check
+while the feature silently answers "no playbooks".
 
-These tests pin the observable contract (names, sources, precedence) so the move has to keep
-loading them, and they pin the packaged placement itself (`test_data_lives_inside_the_*`) —
-that pair is what a loader rewrite cannot pass by accident.
+These tests pin the observable contract (names, sources, precedence) and the data-root
+placement itself (``test_*_come_from_the_data_root``) — that pair is what a loader rewrite
+cannot pass by accident: ``data/`` holds the catalogs and no importable package does.
 
 No network, no Nix, no PySide6.
 """
@@ -21,16 +20,15 @@ import json
 import sys
 import tempfile
 import unittest
-from importlib import resources
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
-from ncc_assistant.eval_harness import EvalCase, load_eval_cases  # noqa: E402
-from ncc_assistant.paths import playbooks_dir  # noqa: E402
-from ncc_assistant.playbooks import (  # noqa: E402
+from core.catalogs.eval_harness import EvalCase, load_eval_cases  # noqa: E402
+from core.store.paths import data_root, playbooks_dir  # noqa: E402
+from core.catalogs.playbooks import (  # noqa: E402
     Playbook,
     delete_user_playbook,
     get_playbook,
@@ -61,7 +59,7 @@ class PlaybookLoaderTests(unittest.TestCase):
     def test_every_shipped_json_file_actually_loaded(self) -> None:
         """A JSON file the loader cannot read is invisible, not an error — so compare sets."""
         shipped = {
-            path.stem for path in (ROOT / "ncc_assistant" / "playbooks").glob("*.json")
+            path.stem for path in (ROOT / "data" / "playbooks").glob("*.json")
         }
         self.assertEqual({pb.name for pb in list_playbooks()}, shipped)
         self.assertTrue(shipped, "no builtin playbooks shipped at all")
@@ -107,16 +105,21 @@ class PlaybookLoaderTests(unittest.TestCase):
         finally:
             delete_user_playbook("probe-only")
 
-    def test_data_lives_inside_the_importable_package(self) -> None:
-        """`importlib.resources` only reaches files inside a package — the reason `data/`
-        needs its own root env var instead of a second resources call. Red by design the
-        moment the catalogs move out; that is the point, not a regression."""
-        pkg_dir = resources.files("ncc_assistant") / "playbooks"
-        self.assertTrue(pkg_dir.is_dir())
+    def test_builtin_playbooks_come_from_the_data_root(self) -> None:
+        """The catalogs left the importable package on purpose — ``data/`` is data, not code.
+        That is only safe because the loader answers for it: it resolves through
+        ``data_root()`` (the module ``data/`` in a checkout, ``NCC_DATA_ROOT`` when packaged)
+        and every builtin it reports names the file it really read. Pinning that provenance is
+        what keeps a silent ``return []`` from passing as "no playbooks shipped"."""
+        shipped = (data_root() / "playbooks").resolve()
+        self.assertEqual(shipped, (ROOT / "data" / "playbooks").resolve())
         self.assertEqual(
-            {item.name for item in pkg_dir.iterdir() if item.name.endswith(".json")},
+            {item.name for item in shipped.iterdir() if item.name.endswith(".json")},
             {f"{name}.json" for name in BUILTIN_PLAYBOOKS},
         )
+        for pb in list_playbooks():
+            if pb.source == "builtin":
+                self.assertEqual(Path(pb.path).resolve().parent, shipped, pb.name)
 
 
 class EvalCaseLoaderTests(unittest.TestCase):
@@ -126,7 +129,7 @@ class EvalCaseLoaderTests(unittest.TestCase):
 
     def test_shipped_cases_all_parse(self) -> None:
         raw = json.loads(
-            (ROOT / "ncc_assistant" / "eval" / "cases.json").read_text(encoding="utf-8")
+            (ROOT / "data" / "eval" / "cases.json").read_text(encoding="utf-8")
         )
         self.assertEqual(len(load_eval_cases()), len(raw))
 
@@ -172,13 +175,13 @@ class EvalCaseLoaderTests(unittest.TestCase):
         self.assertEqual(load_eval_cases(broken), [])
         self.assertEqual({c.name for c in load_eval_cases(Path(tmp) / "absent.json")}, EVAL_CASE_NAMES)
 
-    def test_data_lives_inside_the_importable_package(self) -> None:
-        """Same coupling as playbooks: the default path is ``<package>/eval/cases.json``,
-        derived from the module file — not from an env var. Red by design once `data/`
-        owns the catalog; the loader has to answer for it then."""
-        module_file = Path(sys.modules["ncc_assistant.eval_harness"].__file__).resolve()
-        packaged = module_file.parent / "eval" / "cases.json"
-        self.assertTrue(packaged.is_file())
+    def test_shipped_cases_come_from_the_data_root(self) -> None:
+        """Same coupling as playbooks: the default path is ``<data root>/eval/*.json``, never a
+        package-relative one. Proven by emptying that directory — a loader reading anywhere
+        else would still answer the shipped set here and nowhere in production."""
+        shipped = (data_root() / "eval").resolve()
+        self.assertEqual(shipped, (ROOT / "data" / "eval").resolve())
+        self.assertTrue((shipped / "cases.json").is_file())
         self.assertEqual({c.name for c in load_eval_cases()}, EVAL_CASE_NAMES)
 
     def test_case_defaults_when_optional_keys_absent(self) -> None:

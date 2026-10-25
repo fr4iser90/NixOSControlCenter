@@ -8,10 +8,10 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-PKG = ROOT / "nixos/modules/specialized/ncc-assistant/python"
+PKG = ROOT / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(PKG))
 
-from ncc_assistant.transcript import (  # noqa: E402
+from core.render.transcript import (  # noqa: E402
     format_from_index_plaintext,
     format_messages_markdown,
     format_messages_plaintext,

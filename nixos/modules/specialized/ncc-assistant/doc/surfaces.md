@@ -283,11 +283,12 @@ Skills / prompt injections are **not** dumped as chrome tips. They appear inside
 
 | Path | Role |
 |------|------|
-| `python/ncc_assistant/templates/agents/*.json` | Workflow catalog (blueprints) |
-| `prompts/skills/*.md` | Skill scripts |
+| `data/agents/*.json` | Workflow catalog (blueprints) |
+| `data/prompts/skills/*.md` | Skill scripts |
 | `~/.config/ncc-assistant/` instances / schedules | User instances + Cron |
-| `python/ncc_assistant/plugins/` | Feature plugins |
+| `plugins/` | Feature plugins |
 | `doc/usage.md` | Human how-to |
+| `doc/layout.md` | Where the code for each surface lives |
 | `doc/roadmap.md` | Phased plans |
 
 Human entry: [usage.md](./usage.md). Module stub: [../README.md](../README.md).

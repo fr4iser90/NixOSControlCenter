@@ -210,7 +210,7 @@ def test_an_unknown_value_falls_back_instead_of_trusting_the_caller():
 
 def test_the_shell_rank_is_not_the_ladder_rank():
     """confirm narrows toward always; a ladder step narrows toward none. Opposite tables."""
-    from ncc_assistant.permissions import SYSTEM_STEPS, confirm_rank
+    from core.policy.permissions import SYSTEM_STEPS, confirm_rank
 
     assert confirm_rank("always") < confirm_rank("never")
     assert SYSTEM_STEPS[0] == "none" and SYSTEM_STEPS[-1] == "rebuild"

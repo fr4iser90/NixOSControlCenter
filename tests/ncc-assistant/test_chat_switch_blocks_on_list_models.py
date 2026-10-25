@@ -21,13 +21,13 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
-from ncc_assistant.config import Settings  # noqa: E402
-from ncc_assistant import history  # noqa: E402
-from ncc_assistant import llm as llm_mod  # noqa: E402
-from ncc_assistant.session import ChatSession  # noqa: E402
+from core.store.config import Settings  # noqa: E402
+from core.runtime import history  # noqa: E402
+from core.runtime import llm as llm_mod  # noqa: E402
+from core.runtime.session import ChatSession  # noqa: E402
 
 
 def _settings(*, api: str = "openai-compatible", endpoint: str = "http://127.0.0.1:9/v1") -> Settings:
@@ -136,9 +136,9 @@ class ChatSessionCreateTests(unittest.TestCase):
             return [{"id": "m1", "vision": False}]
 
         with (
-            patch("ncc_assistant.session.list_models", side_effect=fake_list_models),
-            patch("ncc_assistant.session.with_cached_credentials", side_effect=lambda s: s),
-            patch("ncc_assistant.session.ToolRuntime") as TR,
+            patch("core.runtime.session.list_models", side_effect=fake_list_models),
+            patch("core.runtime.session.with_cached_credentials", side_effect=lambda s: s),
+            patch("core.runtime.session.ToolRuntime") as TR,
         ):
             TR.return_value = MagicMock()
             ChatSession.create(settings, interactive_auth=False, session_id="a")
@@ -157,9 +157,9 @@ class ChatSessionCreateTests(unittest.TestCase):
 
         prev = [{"id": "cached", "vision": False}]
         with (
-            patch("ncc_assistant.session.list_models", side_effect=fake_list_models),
-            patch("ncc_assistant.session.with_cached_credentials", side_effect=lambda s: s),
-            patch("ncc_assistant.session.ToolRuntime") as TR,
+            patch("core.runtime.session.list_models", side_effect=fake_list_models),
+            patch("core.runtime.session.with_cached_credentials", side_effect=lambda s: s),
+            patch("core.runtime.session.ToolRuntime") as TR,
         ):
             TR.return_value = MagicMock()
             t0 = time.perf_counter()
@@ -181,7 +181,7 @@ class ChatSessionCreateTests(unittest.TestCase):
 
 class GuiChatSwitchPathTests(unittest.TestCase):
     def test_load_session_id_skips_model_refresh(self) -> None:
-        gui_path = ROOT / "ncc_assistant" / "gui.py"
+        gui_path = ROOT / "window" / "app.py"
         text = gui_path.read_text(encoding="utf-8")
         tree = ast.parse(text)
         found = False
@@ -200,7 +200,7 @@ class GuiChatSwitchPathTests(unittest.TestCase):
 
     def test_populate_models_fetch_false_skips_refresh(self) -> None:
         """PERFORMANCE.md: catalog reuse must not call refresh_models/list_models."""
-        gui_path = ROOT / "ncc_assistant" / "gui.py"
+        gui_path = ROOT / "window" / "app.py"
         text = gui_path.read_text(encoding="utf-8")
         tree = ast.parse(text)
         found = False
@@ -240,12 +240,12 @@ class GuiChatSwitchPathTests(unittest.TestCase):
                     return [{"id": "test-model", "vision": False}]
 
                 with (
-                    patch("ncc_assistant.session.list_models", side_effect=slow_list),
+                    patch("core.runtime.session.list_models", side_effect=slow_list),
                     patch(
-                        "ncc_assistant.session.with_cached_credentials",
+                        "core.runtime.session.with_cached_credentials",
                         side_effect=lambda s: s,
                     ),
-                    patch("ncc_assistant.session.ToolRuntime") as TR,
+                    patch("core.runtime.session.ToolRuntime") as TR,
                 ):
                     TR.return_value = MagicMock()
                     data = history.load_session(sid)

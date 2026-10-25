@@ -13,10 +13,13 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 export PYTHONPATH="${ROOT}/nixos/core/management/gui-engine/python${PYTHONPATH:+:$PYTHONPATH}"
-export PYTHONPATH="${ROOT}/nixos/modules/specialized/ncc-assistant/python${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="${ROOT}/nixos/modules/specialized/ncc-assistant${PYTHONPATH:+:$PYTHONPATH}"
 PYTHONPATH="${ROOT}/tests/gui${PYTHONPATH:+:$PYTHONPATH}"
 # Domain page smoke must not touch live /etc/nixos or open modal dialogs.
 export NIXOS_DIR="${NIXOS_DIR:-$ROOT/nixos}"
+# The smokes import the assistant packages straight out of the module tree, which package.nix
+# stages verbatim — bytecode written here would change the store path of the shipped package.
+export PYTHONDONTWRITEBYTECODE=1
 # Forced, not defaulted: the desktop session already exports QT_QPA_PLATFORM=wayland;xcb, so a
 # `:-offscreen` default never applied there and the gate mapped a real window into the
 # compositor running it (measured: 35 → 36 clients on wayland-0).

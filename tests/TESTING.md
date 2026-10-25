@@ -43,7 +43,7 @@ bash tests/gui/validate-gui-python.sh             # GUI Python (required in run-
 ### ncc-assistant Python suite
 
 Plain `unittest` + bare pytest functions over
-[`nixos/modules/specialized/ncc-assistant/python`](nixos/modules/specialized/ncc-assistant/python)
+[`nixos/modules/specialized/ncc-assistant`](nixos/modules/specialized/ncc-assistant)
 — permission ladder, wrapper env semantics, notifications, companion source probes. No
 PySide6 (Qt surfaces are gated by `gui/validate-gui-python.sh`). Interpreter:
 `NCC_ASSISTANT_PYTHON` (explicit) or `python3`; **pytest is required** — with unittest alone
@@ -73,7 +73,7 @@ Skip nix-build: `NCC_GUI_SKIP_NIX_PYTHON=1` (Qt tests skip; AST/smokes still run
 | `gates/validate-ncc-nix.sh` | bash-in-nix, layer, migrations, wizard packaging, options SSOT, imports, prebuild + **imported config.nix** eval, **GUI catalog**, **module shape**, **AI packs**, **CLI/GUI surfaces** |
 | `gui/validate-gui-python.sh` | page smoke, argv, fs_status, session_ux, hot-path; optional soak |
 | `gates/validate-ncc-assistant-python.sh` | grant ladder, wrapper env (narrow-only, defaults not verdicts), notify wiring, companion probes |
-| `gates/validate-assistant-layout.sh` | assistant `$out` staging Soll-Menge, stdlib shadow + `sys.path` ban, `data/` catalog-only, catalog loaders still load **from the package**, one entrypoint + `--help` smoke, flat-module ratchet |
+| `gates/validate-assistant-layout.sh` | assistant tree: no `python/`/`ncc_assistant/`/`assistant/`, exact module package set, `$out` + site-root staging Soll-Menge, stdlib shadow + `sys.path` ban, `data/` catalog-only and complete, catalog loaders still load **from this tree's `data/`**, one entrypoint + `--help` smoke |
 | `cli-formatter/validate-cli.sh` | Soft / optional — formatter/ANSI extras (`doc/cli.md` already hard-gated) |
 
 `gates/validate-assistant-layout.sh` exists because **no other gate ever builds
@@ -82,10 +82,11 @@ entrypoints were unvalidated: a file could move, every wrapper break, and the ga
 It checks what is provable *without* a Nix build (the staging targets are read out of the
 `runCommand` text, the entrypoints are actually executed) and pins the two silent-failure
 loaders (`playbooks`, `eval_harness`) by running them and reading back where the JSON came
-from. The planned absolute ban on `python/ncc_assistant/` is deliberately **not** in here —
-pre-commit runs the whole net, so a check that is red today would block every commit until
-Phase 2 of the tree plan lands. See
-[`docs/todo/ncc-assistant-tree-layout-6b2a65d9.plan.md`](../docs/todo/ncc-assistant-tree-layout-6b2a65d9.plan.md).
+from — including a throwaway `NCC_DATA_ROOT` proving the loaders follow *this* tree. The ban
+on `python/` / `ncc_assistant/` / `assistant/` is absolute since the hoist landed; the tree
+itself is specified in
+[`doc/layout.md`](../nixos/modules/specialized/ncc-assistant/doc/layout.md) and the plan that
+produced it, [`docs/todo/ncc-assistant-tree-layout-6b2a65d9.plan.md`](../docs/todo/ncc-assistant-tree-layout-6b2a65d9.plan.md).
 Bite is proven per check in `ncc-assistant/test_layout_gate_v1.py`, which attacks a fixture
 copy and requires each violation to turn the gate red.
 

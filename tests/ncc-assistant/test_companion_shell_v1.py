@@ -9,13 +9,13 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
 
 class CompanionShellAstTests(unittest.TestCase):
     def test_session_picker_not_tab_strip(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn("session_btn", text)
         self.assertIn("_rebuild_session_menu", text)
         self.assertIn("_rename_session", text)
@@ -24,7 +24,7 @@ class CompanionShellAstTests(unittest.TestCase):
         self.assertNotIn("_rebuild_tabs", text)
 
     def test_geometry_persist(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn("_restore_geometry", text)
         self.assertIn("_save_geometry", text)
         self.assertIn("class ResizeCorner", text)
@@ -32,7 +32,7 @@ class CompanionShellAstTests(unittest.TestCase):
         self.assertIn("saveGeometry", text)
 
     def test_mcp_panel_layers_copy(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn("Installed (NCC client)", text)
         self.assertIn("Catalog (templates/mcp)", text)
         self.assertIn("Inject NCC MCP into qwen/dsh", text)
@@ -40,7 +40,7 @@ class CompanionShellAstTests(unittest.TestCase):
         self.assertNotIn("Sidebar = navigate", text)
 
     def test_workspace_and_panels(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn("PANEL_TOOLS", text)
         self.assertIn("PANEL_MCP", text)
         self.assertIn("PANEL_WORKSPACES", text)
@@ -51,7 +51,7 @@ class CompanionShellAstTests(unittest.TestCase):
         self.assertIn("workspace_id", text)
 
     def test_chat_grows_and_cron_inspect(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertNotIn("bubble.setMaximumHeight(120)", text)
         self.assertIn("chat_l.addWidget(self.feed_scroll, stretch=1)", text)
         self.assertIn("main.addWidget(self.stack, stretch=1)", text)
@@ -61,7 +61,7 @@ class CompanionShellAstTests(unittest.TestCase):
 
     def test_tool_traces_render_in_the_feed(self) -> None:
         """Tool cards live in the chat feed — no fixed-height band, no reply widget."""
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         for gone in ("tools_scroll", "tools_host", "_rebuild_tool_widgets", "self.bubble"):
             self.assertNotIn(gone, text)
         self.assertIn("self._feed_tool_widget(item)", text)
@@ -69,7 +69,7 @@ class CompanionShellAstTests(unittest.TestCase):
         self.assertIn("get_trace_density", text)
 
     def test_sidebar_nav_rail(self) -> None:
-        text = (ROOT / "ncc_assistant" / "companion.py").read_text(encoding="utf-8")
+        text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn('setObjectName("nccSidebar")', text)
         self.assertIn("_chat_nav_btn", text)
         self.assertIn("setFixedWidth(52)", text)
@@ -95,7 +95,7 @@ class CompanionShellAstTests(unittest.TestCase):
         self.assertNotIn("tools.addStretch()", text)
 
     def test_marketplace_mcp_helpers(self) -> None:
-        path = ROOT / "ncc_assistant" / "marketplace.py"
+        path = ROOT / "core" / "catalogs" / "marketplace.py"
         tree = ast.parse(path.read_text(encoding="utf-8"))
         names = {
             n.name
@@ -107,7 +107,7 @@ class CompanionShellAstTests(unittest.TestCase):
         self.assertIn("remove_mcp_server", names)
 
     def test_preferences_workspace(self) -> None:
-        path = ROOT / "ncc_assistant" / "preferences.py"
+        path = ROOT / "core" / "store" / "preferences.py"
         text = path.read_text(encoding="utf-8")
         self.assertIn("get_active_workspace_id", text)
         self.assertIn("set_active_workspace_id", text)

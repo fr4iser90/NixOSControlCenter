@@ -13,7 +13,7 @@ from ncc_gui.scaffold import DomainPage
 
 def create_page(parent=None):
     try:
-        from ncc_assistant.gui import create_assistant_panel
+        from window.app import create_assistant_panel
 
         return create_assistant_panel(parent=parent, skip_session_picker=True)
     except Exception as exc:  # noqa: BLE001

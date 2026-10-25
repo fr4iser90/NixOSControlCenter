@@ -13,23 +13,23 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[2]
-ROOT = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ROOT = REPO / "nixos/modules/specialized/ncc-assistant"
 sys.path.insert(0, str(ROOT))
 
-from ncc_assistant.harness import qwen as qwen_mod  # noqa: E402
-from ncc_assistant.harness.qwen import (  # noqa: E402
+from harness import qwen as qwen_mod  # noqa: E402
+from harness.qwen import (  # noqa: E402
     TOOL_ECHO_MARKERS,
     QwenHarness,
     map_qwen_line,
     tool_echo_in_text,
     tool_echo_notice,
 )
-from ncc_assistant.harness.resolve import (  # noqa: E402
+from harness.resolve import (  # noqa: E402
     CODING_TAGS,
     looks_like_coding_goal,
     resolve_harness_name,
 )
-from ncc_assistant.harness.types import HarnessInfo  # noqa: E402
+from harness.types import HarnessInfo  # noqa: E402
 
 
 class HarnessResolveTests(unittest.TestCase):
@@ -127,7 +127,7 @@ def _drive_qwen(objs: list[dict]) -> list[dict]:
     with (
         patch.object(QwenHarness, "probe", lambda self: info),
         patch(
-            "ncc_assistant.harness.mcp_inject.ensure_qwen_ncc_mcp",
+            "harness.mcp_inject.ensure_qwen_ncc_mcp",
             lambda: {"status": "unchanged", "detail": ""},
         ),
         patch.object(qwen_mod.subprocess, "Popen", lambda *a, **kw: _FakeProc(lines)),
@@ -215,7 +215,7 @@ class QwenToolEchoGuardTests(unittest.TestCase):
 
 class HarnessModuleAstTests(unittest.TestCase):
     def test_package_exports(self) -> None:
-        path = ROOT / "ncc_assistant" / "harness" / "__init__.py"
+        path = ROOT / "harness" / "__init__.py"
         tree = ast.parse(path.read_text(encoding="utf-8"))
         text = path.read_text(encoding="utf-8")
         self.assertIn("get_harness", text)
@@ -223,7 +223,7 @@ class HarnessModuleAstTests(unittest.TestCase):
         self.assertIn("looks_like_coding_goal", text)
         self.assertTrue(any(isinstance(n, ast.ImportFrom) for n in tree.body))
         # Regression: cli/companion import from package root, not resolve.py
-        from ncc_assistant.harness import looks_like_coding_goal as exported  # noqa: PLC0415
+        from harness import looks_like_coding_goal as exported  # noqa: PLC0415
 
         self.assertTrue(callable(exported))
 

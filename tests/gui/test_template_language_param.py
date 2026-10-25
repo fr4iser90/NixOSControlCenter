@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-ASSISTANT_PY = REPO / "nixos/modules/specialized/ncc-assistant/python"
+ASSISTANT_PY = REPO / "nixos/modules/specialized/ncc-assistant"
 
 OPTIONS = ["English", "Deutsch", "Auto (keep file)"]
 # One from each doc-writing family: maintainer, creator, legal stub, scheduled job.
@@ -37,7 +37,7 @@ class TemplateLanguageDropdownSmoke(unittest.TestCase):
         os.environ["XDG_CONFIG_HOME"] = tempfile.mkdtemp(prefix="ncc-tmpl-lang-")
         self.app = QApplication.instance() or QApplication([])
 
-        from ncc_assistant.agent_templates import get_agent_template, render_goal
+        from core.catalogs.agent_templates import get_agent_template, render_goal
 
         self.render_goal = render_goal
 
@@ -50,7 +50,7 @@ class TemplateLanguageDropdownSmoke(unittest.TestCase):
         self.get = tmpl
 
     def _dialog(self, tid: str):
-        from ncc_assistant.templates_ui import TemplateConfigureDialog
+        from widgets.templates import TemplateConfigureDialog
 
         dlg = TemplateConfigureDialog(tid)
         self.addCleanup(dlg.deleteLater)
@@ -85,7 +85,7 @@ class TemplateLanguageDropdownSmoke(unittest.TestCase):
         self.assertIn("Write and summarise in Deutsch.", self.render_goal(tmpl, params))
 
     def test_editing_a_saved_instance_restores_its_language(self) -> None:
-        from ncc_assistant.templates_ui import TemplateConfigureDialog
+        from widgets.templates import TemplateConfigureDialog
 
         class _Inst:
             params = {"outputLanguage": "Deutsch", "checkFrequency": "weekly", "timezone": "UTC"}

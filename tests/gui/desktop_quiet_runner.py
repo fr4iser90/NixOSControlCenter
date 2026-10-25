@@ -6,7 +6,7 @@ conftest boundary in tests/ncc-assistant/ never applies to it. Measured on the o
 desktop before this runner existed: the gui gate connected to the live Wayland session — one
 extra client on the compositor socket, 35 → 36 — because the gate only defaulted
 ``QT_QPA_PLATFORM`` with ``:-offscreen`` and the session already exported ``wayland;xcb``. The
-pages construct, and a construct can reach the bus: ``ncc_assistant.focus`` probes KWin and the
+pages construct, and a construct can reach the bus: ``plugins.doomscroll.watchdog`` probes KWin and the
 MPRIS players on the session bus just to decide what to render.
 
 Two removals, not two warnings:
