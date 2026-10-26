@@ -22,10 +22,20 @@ let
   # Staging root holds ONLY importable packages under lib/ncc-assistant, so PYTHONPATH never
   # exposes doc/, lib/*.nix or the module source itself. Catalogs go to $out/data (data, not
   # code — the loaders reach them through NCC_DATA_ROOT, not importlib.resources).
+  #
+  # Every package names its destination. A path literal is /nix/store/<hash>-<dir>, and
+  # `cp -r SRC… DEST/` keeps that basename when DEST exists — the package would land as
+  # <hash>-window and nothing could import it.
   appRoot = pkgs.runCommand "ncc-assistant-src" { } ''
     mkdir -p $out/lib/ncc-assistant
-    cp -r ${./companion} ${./window} ${./tray} ${./widgets} ${./core} ${./cli} \
-          ${./harness} ${./plugins} $out/lib/ncc-assistant/
+    cp -r ${./cli} $out/lib/ncc-assistant/cli
+    cp -r ${./companion} $out/lib/ncc-assistant/companion
+    cp -r ${./core} $out/lib/ncc-assistant/core
+    cp -r ${./harness} $out/lib/ncc-assistant/harness
+    cp -r ${./plugins} $out/lib/ncc-assistant/plugins
+    cp -r ${./tray} $out/lib/ncc-assistant/tray
+    cp -r ${./widgets} $out/lib/ncc-assistant/widgets
+    cp -r ${./window} $out/lib/ncc-assistant/window
     cp -r ${guiEngine.src}/ncc_gui $out/lib/ncc-assistant/ncc_gui
     cp -r ${./data} $out/data
     # Knowledge = ONLY discovered <module>/ai/ packs. Module inventory is live via ncc.

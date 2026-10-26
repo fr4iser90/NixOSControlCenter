@@ -6,6 +6,12 @@ let
 
   ccLib = {
     types = import ./lib/types.nix { inherit lib; };
+
+    # A store location handed over either way — interpolated ("${appRoot}/data") or a bare
+    # path value (a derivation). Both arrive as strings. types.str alone aborted the whole
+    # system build on `fingerprint = [ domainAi.indexFile ]`, because a derivation is not a
+    # string and the module system type-checks every registration.
+    storeString = lib.types.coercedTo lib.types.path (p: "${p}") lib.types.str;
   };
 in {
   # Everything under discovery configPath (dotted key) — never options.core.management.…
@@ -112,16 +118,16 @@ in {
       type = lib.types.attrsOf (lib.types.submodule {
         options = {
           root = lib.mkOption {
-            type = lib.types.str;
+            type = ccLib.storeString;
             description = "Store dir whose children are the page's importable packages";
           };
           env = lib.mkOption {
-            type = lib.types.attrsOf lib.types.str;
+            type = lib.types.attrsOf ccLib.storeString;
             default = {};
             description = "Env those packages read at runtime (data roots, generated indexes)";
           };
           fingerprint = lib.mkOption {
-            type = lib.types.listOf lib.types.str;
+            type = lib.types.listOf ccLib.storeString;
             default = [];
             description = ''
               Store paths whose change must hard-restart the GUI. For generated files the

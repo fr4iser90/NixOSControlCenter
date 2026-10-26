@@ -40,6 +40,10 @@ PACKAGES = ("cli", "companion", "core", "harness", "plugins", "tray", "widgets",
 
 PKG_ANCHOR_SITE = "cp -r ${guiEngine.src}/ncc_gui $out/lib/ncc-assistant/ncc_gui"
 PKG_ANCHOR_MCP = "    exec ${pythonEnv}/bin/python -m cli mcp"
+# One stage line per package, each naming its destination: a path literal is
+# /nix/store/<hash>-<dir>, so a line without a destination would ship the package under its
+# hash and every import of it dies at runtime (see validate-module-layer.sh 1d).
+PKG_ANCHOR_STAGE = "cp -r ${./companion} $out/lib/ncc-assistant/companion"
 
 
 class LayoutGateBiteTests(unittest.TestCase):
@@ -144,10 +148,7 @@ class LayoutGateBiteTests(unittest.TestCase):
     def test_a_package_missing_from_the_site_root_is_caught(self) -> None:
         """The opposite half: a copy line narrowed during a move stages a package nobody
         imports at build time, and every wrapper dies at runtime."""
-        self.attack_package(
-            "cp -r ${./companion} ${./window}",
-            "cp -r ${./window}",
-        )
+        self.attack_package(PKG_ANCHOR_STAGE + "\n", "")
         self.assert_red("site root payload changed")
 
     # ── 4) stdlib shadowing / sys.path ───────────────────────────────────────

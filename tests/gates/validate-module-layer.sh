@@ -83,12 +83,20 @@ else
   pass "gui-engine resolves only plumbing peers"
 fi
 
-# The decoupled channel itself: engine stages whatever root a module declares. Pinned because
-# reverting to a package list per module would be silent otherwise.
+# The decoupled channel itself: a module hands over its own store root and the engine only
+# makes it importable. Peer code is NEVER copied — the store is read-only and a peer that
+# ships its own ncc_gui would collide with the engine's. Pinned because reverting to a
+# package list, or back to copying, would otherwise be silent.
 if ! rg -q 'registerGuiPython' "$NIXOS/core/management/cli-registry/api.nix"; then
   fail "cli-registry lost registerGuiPython — pages would ship without their Python"
-elif ! rg -q 'cp -r \$\{p\.root\}/\. \$out/' "$GUI_ENG/domain-gui.nix"; then
-  fail "domain-gui.nix must stage each registered payload root, not a hardcoded package list"
+elif rg -q 'cp[^\n]*p\.root' "$GUI_ENG/domain-gui.nix"; then
+  fail "domain-gui.nix copies a peer payload again — it stays read-only in the store, on PYTHONPATH"
+elif ! rg -q 'payloadRoots = lib\.unique \(map \(p: p\.root\) payloads\);' "$GUI_ENG/domain-gui.nix"; then
+  fail "domain-gui.nix must build the payload PYTHONPATH from every registered root"
+elif ! rg -q '\[ "\$\{src\}" \] \+\+ payloadRoots' "$GUI_ENG/domain-gui.nix"; then
+  fail "engine root must come FIRST on PYTHONPATH — a peer copying ncc_gui must not shadow it"
+elif ! rg -q 'PYTHONPATH="\$\{shared\.pythonPath\}' "$GUI_ENG/root-gui.nix"; then
+  fail "root-gui.nix must reuse the composed PYTHONPATH or ncc-gui loses the page's Python"
 elif rg -q 'GUI_PACKAGES' "$GUI_ENG/python/ncc_gui/reload.py"; then
   fail "reload.py lists GUI packages again — it must find them by __init__.py"
 elif ! rg -q '\(d / "__init__\.py"\)\.is_file\(\)' "$GUI_ENG/python/ncc_gui/reload.py"; then
@@ -96,6 +104,61 @@ elif ! rg -q '\(d / "__init__\.py"\)\.is_file\(\)' "$GUI_ENG/python/ncc_gui/relo
 else
   pass "GUI Python payload is discovered end to end"
 fi
+
+# ── 1d) staged Python keeps an importable directory name ─────────────────────
+echo "== 1d) staged Python dirs keep importable names =="
+# A path literal IS /nix/store/<hash>-<dir>. `cp -r ${./window} DEST/` into a directory that
+# already exists keeps the SOURCE basename, so the package lands as <hash>-window and nobody
+# can import it. Each package copied into a staging dir must name its destination.
+#
+# Tokenised, not regex-matched: destinations are `$out/…`, so a pattern anchored on a literal
+# `/` after the whitespace never fires and the gate stays green while the build ships
+# unimportable names (measured: the original regex scored 0 hits on the real breakage).
+STAGE_HITS=$(mktemp)
+set +e
+python3 - "$NIXOS" "$STAGE_HITS" <<'PY'
+import os, re, sys
+
+root, out = sys.argv[1], sys.argv[2]
+LITERAL = re.compile(r"^\$\{[^}]+\}$")
+CP_R = re.compile(r"\bcp\s+-[A-Za-z]*r")
+issues = []
+for dirpath, _, files in os.walk(root):
+    for name in files:
+        if not name.endswith(".nix"):
+            continue
+        path = os.path.join(dirpath, name)
+        rel = os.path.relpath(path, os.path.dirname(root))
+        text = open(path, encoding="utf-8", errors="replace").read()
+        for i, line in enumerate(text.splitlines(), 1):
+            stripped = line.strip()
+            if stripped.startswith("#") or not CP_R.search(stripped):
+                continue
+            tokens = stripped.split()
+            if len(tokens) < 3:
+                continue
+            dest = tokens[-1]
+            literals = [t for t in tokens[1:-1] if LITERAL.match(t)]
+            if not literals:
+                continue
+            where = f"{rel}:{i}: {' '.join(literals)} -> {dest}"
+            if len(literals) >= 2:
+                issues.append(where + "   (several sources: cp keeps every store basename)")
+            elif dest.endswith("/"):
+                issues.append(where + "   (destination is a directory: cp keeps the store basename)")
+open(out, "w", encoding="utf-8").write("\n".join(issues))
+sys.exit(1 if issues else 0)
+PY
+STAGE_RC=$?
+set -e
+if [[ "$STAGE_RC" -ne 0 ]]; then
+  sed 's/^/    /' "$STAGE_HITS"
+  fail "a package would be staged under its store hash — spell out every destination or import fails at runtime"
+else
+  pass "no path literal is staged where its store basename would become the package name"
+fi
+rm -f "$STAGE_HITS"
+
 
 # ── 2) module-manager must not hardwire install-wizard script paths ─────────
 echo "== 2) module-manager no install-wizard script paths =="

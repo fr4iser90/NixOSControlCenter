@@ -130,7 +130,13 @@ def _read_text(path: Path) -> str:
 
 
 def _clean_store_path(raw: str) -> Path | None:
-    """Strip bash ``${…}`` expansions glued into wrapper PYTHONPATH values."""
+    """Strip bash ``${…}`` expansions glued into wrapper PYTHONPATH values.
+
+    A payload root is a store path **plus** a subdirectory
+    (``…-ncc-assistant-src/lib/ncc-assistant``). Cutting it back to the store directory would
+    hash the module's ``data/`` and ``knowledge/`` beside it, and a catalog refresh must never
+    re-exec the GUI — so the declared path is kept whole and a vanished one stays vanished.
+    """
     part = raw.strip()
     if not part:
         return None
@@ -138,14 +144,15 @@ def _clean_store_path(raw: str) -> Path | None:
         part = part.split("${", 1)[0]
     part = part.rstrip(":").strip()
     m = _STORE_PATH_RE.match(part)
-    if m:
-        part = m.group(0)
-    if not part.startswith("/nix/store/"):
+    if not m:
         return None
     path = Path(part)
-    if path.exists():
+    if path.is_dir():
         return path
-    return None
+    if part != m.group(0):
+        return None
+    root = Path(m.group(0))
+    return root if root.is_dir() else None
 
 
 def _ncc_gui_bin() -> Path | None:
