@@ -8,7 +8,6 @@
 
 let
   packagesRoot = (getModuleMetadata "packages").path;
-  assistantRoot = (getModuleMetadata "ncc-assistant").path;
   cliMeta = getModuleMetadata "cli-registry";
   cliApi = import "${cliMeta.path}/api.nix" {
     inherit lib getModuleMetadata getModuleApi;
@@ -32,12 +31,13 @@ in
       else if desktopEnable == null then false
       else desktopEnable;
 
-  # domainGui pkgs config — includes every registerGuiPage + registerGuiEnv
+  # domainGui pkgs config — includes every registerGuiPage + registerGuiEnv + registerGuiPython
   domainGui = pkgs: config:
     (import ./domain-gui.nix {
-      inherit pkgs lib getModuleMetadata getModuleApi packagesRoot assistantRoot;
+      inherit pkgs lib getModuleMetadata getModuleApi packagesRoot;
       guiPages = cliApi.guiPages config;
       guiEnvs = cliApi.flatGuiEnvs config;
+      guiPython = cliApi.guiPython config;
     }).nccDomainGui;
 
   rootGui = pkgs: config:
@@ -45,12 +45,14 @@ in
       inherit pkgs lib getModuleMetadata getModuleApi packagesRoot;
       guiPages = cliApi.guiPages config;
       guiEnvs = cliApi.flatGuiEnvs config;
+      guiPython = cliApi.guiPython config;
     }).nccGui;
 
   domainGuiBundle = pkgs: config:
     import ./domain-gui.nix {
-      inherit pkgs lib getModuleMetadata getModuleApi packagesRoot assistantRoot;
+      inherit pkgs lib getModuleMetadata getModuleApi packagesRoot;
       guiPages = cliApi.guiPages config;
       guiEnvs = cliApi.flatGuiEnvs config;
+      guiPython = cliApi.guiPython config;
     };
 }

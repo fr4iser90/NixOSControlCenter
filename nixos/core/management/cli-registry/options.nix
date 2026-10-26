@@ -104,5 +104,35 @@ in {
       internal = true;
       description = "Per-domain env exports for ncc-gui / ncc-domain-gui (NCC_*_CATALOG, …)";
     };
+
+    # Python a rich page needs beyond ncc_gui + ncc_domain_page. The engine stages
+    # `root`'s children and exports `env` — it never learns what those packages are
+    # called, which is what kept the assistant's package list inside gui-engine.
+    guiPython = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.submodule {
+        options = {
+          root = lib.mkOption {
+            type = lib.types.str;
+            description = "Store dir whose children are the page's importable packages";
+          };
+          env = lib.mkOption {
+            type = lib.types.attrsOf lib.types.str;
+            default = {};
+            description = "Env those packages read at runtime (data roots, generated indexes)";
+          };
+          fingerprint = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = [];
+            description = ''
+              Store paths whose change must hard-restart the GUI. For generated files the
+              payload reads by path. A catalog that may refresh in place stays out of here.
+            '';
+          };
+        };
+      });
+      default = {};
+      internal = true;
+      description = "Per-domain Python payload for ncc-gui / ncc-domain-gui";
+    };
   };
 }

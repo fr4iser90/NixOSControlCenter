@@ -41,6 +41,13 @@ rec {
   registerGuiEnv = id: attrs:
     lib.setAttrByPath [ selfPath "guiEnvs" id ] attrs;
 
+  # Python payload for a registerGuiPage domain: { root, env ?, fingerprint ? }.
+  # `root` is a built store dir whose children are importable packages; the engine
+  # stages them and exports env without naming any of them. Register it in the same
+  # condition as registerGuiPage, or the page falls back when its imports are absent.
+  registerGuiPython = id: attrs:
+    lib.setAttrByPath [ selfPath "guiPython" id ] attrs;
+
   getRegisteredCommands = config:
     let
       commandSets = (fromConfig config).commandSets or {};

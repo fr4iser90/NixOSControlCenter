@@ -81,9 +81,9 @@ else               →  <module>/data            # dev checkout
 ```
 
 `NCC_PROMPTS_ROOT` works the same way and defaults to `NCC_DATA_ROOT/prompts`. Both are
-exported by the wrapper (`package.nix` → `envExports`) **and** by the domain-GUI staging
-(`nixos/core/management/gui-engine/domain-gui.nix`); an assistant process without them is
-running from a source tree, not from a store path.
+exported by this module's own wrappers (`package.nix` → `envExports`) and handed to the GUI
+through `guiEnv` below — gui-engine forwards them, it never derives them. An assistant process
+without them is running from a source tree, not from a store path.
 
 Loaders must not swallow a missing root into an empty list — that is the failure mode the
 witness tests exist for (`tests/ncc-assistant/test_catalog_loaders_v1.py`).
@@ -110,13 +110,32 @@ time from the discovered `ai/` packs of every module
 Every wrapper binds the same entrypoint — `python -m cli` (+ `mcp` / `tray` / `companion` for
 the dedicated binaries).
 
+### GUI payload contract
+
+The `ai` page (`ui/gui/page.py`) imports these packages, so it needs them staged. It asks for
+them through cli-registry rather than being listed inside gui-engine:
+
+```nix
+guiPythonRoot = "${appRoot}/lib/ncc-assistant";   # children = importable packages
+guiEnv        = { NCC_DATA_ROOT; NCC_PROMPTS_ROOT; };
+guiFingerprint = [ domainAi.indexFile ];           # read by path → path change is hard
+```
+
+`commands.nix` registers all three with `registerGuiPython "ai"` **inside the same
+`mkIf (cfg.enable or false)`** that ships the packages. gui-engine copies `guiPythonRoot`'s
+children and exports `guiEnv` — the list above is the only place the package names exist
+outside this module.
+
 ---
 
 ## Reload coupling
 
-`ncc_gui/reload.py` decides hard re-exec vs soft refresh from a digest of the GUI packages on
-the profile — `GUI_PACKAGES`, which lists the packages above. `data/` is deliberately **not**
-digested: a catalog edit must never restart a running GUI.
+`ncc_gui/reload.py` digests what the GUI wrappers on the profile actually stage: any directory
+with an `__init__.py` under their PYTHONPATH root. It never names this module's packages, so a
+new surface package is digested without touching the engine. `data/` has no `__init__.py` and is
+therefore **not** digested — a catalog edit must never restart a running GUI. Files a payload
+reads by path (not tree-hashable) go through `guiFingerprint` → `NCC_GUI_FINGERPRINT`, where a
+changed store path is a hard restart.
 
 ---
 

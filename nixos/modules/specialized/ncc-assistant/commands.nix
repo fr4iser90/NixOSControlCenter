@@ -99,6 +99,14 @@ in
       in
       mkMerge [
         registrationResult
+        # Payload travels with the package that provides it, never with the page: an enabled
+        # assistant always stages its Python, a disabled one ships none and ui/gui/page.py
+        # falls back to its stub instead of importing from a source tree that isn't there.
+        (cliRegistry.registerGuiPython "ai" {
+          root = pkg.guiPythonRoot;
+          env = pkg.guiEnv;
+          fingerprint = pkg.guiFingerprint;
+        })
         {
           environment.systemPackages = pkg.packages;
         }

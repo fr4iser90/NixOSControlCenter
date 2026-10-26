@@ -551,4 +551,18 @@ in
 {
   inherit appRoot configHelper nccAssistant nccAssistantMcp nccAssistantTray nccAssistantCompanion nccFocusNetblock nccFocusNetblockPolkitPolicy pythonEnv desktopItem envExports envFile;
   packages = [ nccAssistant nccAssistantMcp nccAssistantTray nccAssistantCompanion nccFocusNetblock configHelper desktopItem ];
+
+  # Python payload the `ai` GUI page needs (cli-registry registerGuiPython). gui-engine
+  # stages this directory's children and exports guiEnv — it must never learn that the
+  # children are core/window/tray/…, so this is the only place that list exists (doc/layout.md).
+  guiPythonRoot = "${appRoot}/lib/ncc-assistant";
+  guiEnv = {
+    # Catalogs left the package, so the loader root has to be named here; unset would make
+    # every catalog read return [] silently instead of failing.
+    NCC_DATA_ROOT = "${appRoot}/data";
+    NCC_PROMPTS_ROOT = "${appRoot}/data/prompts";
+  };
+  # Generated tool index is read by path, so a new path means the embedded panel would keep
+  # serving the old list — hard-restart the GUI on it (ncc_gui.reload).
+  guiFingerprint = [ domainAi.indexFile ];
 }

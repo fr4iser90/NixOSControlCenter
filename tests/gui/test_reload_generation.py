@@ -45,17 +45,25 @@ def _pkg_tree(root: Path, *, marker: str) -> None:
         (d / "probe.py").write_text(f"MARKER = {marker!r}\n", encoding="utf-8")
 
 
-def _assistant_wrapper(bin_dir: Path, src_root: Path, *, domain_tools: str | None = None) -> Path:
-    """Realistic ncc-assistant wrapper including bash PYTHONPATH expansion."""
-    path = bin_dir / "ncc-assistant"
-    dt = domain_tools or "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-ncc-domain-ai-tools.json"
+def _payload_wrapper(
+    bin_dir: Path,
+    src_root: Path,
+    *,
+    fingerprint: str | None = None,
+    name: str = "ncc-domain-gui",
+) -> Path:
+    """Realistic domain-GUI wrapper: staged payload on PYTHONPATH, bash expansion included.
+
+    Named like production (``ncc-*-gui``) on purpose — reload discovers GUI entrypoints by
+    that rule, so a wrapper named after some peer module must stay unscanned.
+    """
+    path = bin_dir / name
+    fp = f'\nexport NCC_GUI_FINGERPRINT="{fingerprint}"' if fingerprint else ""
     _write(
         path,
         f'''#!/bin/bash
-export NCC_ASSISTANT_ROOT="{src_root}"
-export NCC_ASSISTANT_DOMAIN_TOOLS_FILE="{dt}"
-export PYTHONPATH="{src_root}${{PYTHONPATH:+:$PYTHONPATH}}"
-exec /nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-python3-env/bin/python -m core "$@"
+export PYTHONPATH="{src_root}${{PYTHONPATH:+:$PYTHONPATH}}"{fp}
+exec /nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-python3-env/bin/python -m ncc_gui.domain_gui "$@"
 ''',
     )
     path.chmod(0o755)
@@ -118,7 +126,7 @@ class CleanPathTests(unittest.TestCase):
                 return real_clean(raw)
 
             bin_dir = td_path / "bin"
-            wrapper = _assistant_wrapper(bin_dir, src)
+            wrapper = _payload_wrapper(bin_dir, src)
             with mock.patch.object(reload, "_clean_store_path", clean_tmp):
                 roots = reload._roots_from_wrapper(wrapper)
             self.assertEqual(roots, [src])
@@ -136,8 +144,8 @@ class FingerprintTests(unittest.TestCase):
             _pkg_tree(src_b, marker="bbb")
             bin_a = sys_a / "sw" / "bin"
             bin_b = sys_b / "sw" / "bin"
-            _assistant_wrapper(bin_a, src_a)
-            _assistant_wrapper(bin_b, src_b)
+            _payload_wrapper(bin_a, src_a)
+            _payload_wrapper(bin_b, src_b)
             _gui_wrapper(bin_a, src_a)
             _gui_wrapper(bin_b, src_b)
 
@@ -167,7 +175,7 @@ class FingerprintTests(unittest.TestCase):
             src = td_path / "src"
             _pkg_tree(src, marker="same")
             bin_dir = td_path / "sw" / "bin"
-            _assistant_wrapper(bin_dir, src)
+            _payload_wrapper(bin_dir, src)
 
             def clean_tmp(raw: str) -> Path | None:
                 part = raw.strip()
@@ -192,7 +200,7 @@ class StaleProcessTests(unittest.TestCase):
             _pkg_tree(old, marker="old")
             _pkg_tree(new, marker="new")
             bin_dir = td_path / "sw" / "bin"
-            _assistant_wrapper(bin_dir, new)
+            _payload_wrapper(bin_dir, new)
 
             def clean_tmp(raw: str) -> Path | None:
                 part = raw.strip()
@@ -262,8 +270,8 @@ class WatcherEvaluateTests(unittest.TestCase):
             _pkg_tree(src_b, marker="b")
             bin_a = sys_a / "sw" / "bin"
             bin_b = sys_b / "sw" / "bin"
-            _assistant_wrapper(bin_a, src_a)
-            _assistant_wrapper(bin_b, src_b)
+            _payload_wrapper(bin_a, src_a)
+            _payload_wrapper(bin_b, src_b)
 
             link = td_path / "current-system"
             link.symlink_to(sys_a)
@@ -325,8 +333,8 @@ class WatcherEvaluateTests(unittest.TestCase):
             _pkg_tree(src, marker="shared")
             bin_a = sys_a / "sw" / "bin"
             bin_b = sys_b / "sw" / "bin"
-            _assistant_wrapper(bin_a, src)
-            _assistant_wrapper(bin_b, src)
+            _payload_wrapper(bin_a, src)
+            _payload_wrapper(bin_b, src)
 
             link = td_path / "current-system"
             link.symlink_to(sys_a)
@@ -411,8 +419,8 @@ class WatcherEvaluateTests(unittest.TestCase):
             _pkg_tree(old_src, marker="x")
             bin_a = sys_a / "sw" / "bin"
             bin_b = sys_b / "sw" / "bin"
-            _assistant_wrapper(bin_a, shared)
-            _assistant_wrapper(bin_b, shared)
+            _payload_wrapper(bin_a, shared)
+            _payload_wrapper(bin_b, shared)
 
             link = td_path / "current-system"
             link.symlink_to(sys_a)
@@ -476,8 +484,8 @@ class WatcherEvaluateTests(unittest.TestCase):
             _pkg_tree(src_b, marker="b")
             bin_a = sys_a / "sw" / "bin"
             bin_b = sys_b / "sw" / "bin"
-            _assistant_wrapper(bin_a, src_a)
-            _assistant_wrapper(bin_b, src_b)
+            _payload_wrapper(bin_a, src_a)
+            _payload_wrapper(bin_b, src_b)
 
             link = td_path / "current-system"
             link.symlink_to(sys_a)
@@ -526,27 +534,190 @@ class WatcherEvaluateTests(unittest.TestCase):
             )
 
 
+class PayloadChannelTests(unittest.TestCase):
+    """registerGuiPython contract: declared payload files are hard, staged data is not."""
+
+    def test_payload_file_path_change_is_hard_restart(self) -> None:
+        """A generated index the payload reads by path can't be tree-hashed.
+
+        Same staged tree, same generation names — only the baked fingerprint value moves.
+        Without the NCC_GUI_FINGERPRINT channel this would soft-refresh and keep serving the
+        old tool list from the old store path.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            sys_a = td_path / "a"
+            sys_b = td_path / "b"
+            src = td_path / "shared-src"
+            _pkg_tree(src, marker="shared")
+            bin_a = sys_a / "sw" / "bin"
+            bin_b = sys_b / "sw" / "bin"
+            _payload_wrapper(
+                bin_a, src, fingerprint="/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-tools.json"
+            )
+            _payload_wrapper(
+                bin_b, src, fingerprint="/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-tools.json"
+            )
+
+            link = td_path / "current-system"
+            link.symlink_to(sys_a)
+            notify_dir = td_path / "run-ncc"
+            notify_dir.mkdir()
+            notify = notify_dir / "generation"
+            _write(notify, str(sys_a.resolve()))
+
+            def clean_tmp(raw: str) -> Path | None:
+                part = raw.strip()
+                if "${" in part:
+                    part = part.split("${", 1)[0]
+                p = Path(part.rstrip(":").strip())
+                return p if p.exists() else None
+
+            hard: list[str] = []
+            soft: list[str] = []
+            with mock.patch.object(reload, "_clean_store_path", clean_tmp):
+                with mock.patch.object(reload, "SYSTEM_LINK", link):
+                    with mock.patch.object(reload, "SW_BIN", bin_a):
+                        with mock.patch.object(reload, "NOTIFY_DIR", notify_dir):
+                            with mock.patch.object(reload, "NOTIFY_FILE", notify):
+                                with mock.patch.object(
+                                    reload.GenerationWatcher, "_arm_watches", lambda self: None
+                                ):
+                                    w = reload.GenerationWatcher(
+                                        relaunch_argv=["/bin/true"], parent=_app()
+                                    )
+                                    w._schedule_hard_restart = (  # type: ignore[method-assign]
+                                        lambda: hard.append("hard")
+                                    )
+                                    reload.generation_bus().soft_switched.connect(
+                                        lambda: soft.append("soft")
+                                    )
+                                    link.unlink()
+                                    link.symlink_to(sys_b)
+                                    _write(notify, str(sys_b.resolve()))
+                                    with mock.patch.object(reload, "SW_BIN", bin_b):
+                                        w._evaluate()
+
+            self.assertEqual(hard, ["hard"], f"payload file change must be hard, soft={soft}")
+
+    def test_staged_data_dir_is_never_digested(self) -> None:
+        """Catalogs ship next to the packages; their content may never re-exec the GUI."""
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            sys_a = td_path / "a"
+            sys_b = td_path / "b"
+            # Same root basename on purpose: root.name is part of every digest line.
+            src_a = sys_a / "share" / "src"
+            src_b = sys_b / "share" / "src"
+            for src, case in ((src_a, "one"), (src_b, "two")):
+                _pkg_tree(src, marker="same")
+                (src / "data").mkdir()
+                (src / "data" / "cases.json").write_text(f'{{"case": {case!r}}}\n', "utf-8")
+            bin_a = sys_a / "sw" / "bin"
+            bin_b = sys_b / "sw" / "bin"
+            _payload_wrapper(bin_a, src_a)
+            _payload_wrapper(bin_b, src_b)
+
+            def clean_tmp(raw: str) -> Path | None:
+                part = raw.strip()
+                if "${" in part:
+                    part = part.split("${", 1)[0]
+                p = Path(part.rstrip(":").strip())
+                return p if p.exists() else None
+
+            with mock.patch.object(reload, "_clean_store_path", clean_tmp):
+                with mock.patch.object(reload, "SW_BIN", bin_a):
+                    fp_a = reload.profile_gui_fingerprint()
+                    dirs_a = reload.profile_gui_package_dirs()
+                with mock.patch.object(reload, "SW_BIN", bin_b):
+                    fp_b = reload.profile_gui_fingerprint()
+                with mock.patch.object(reload, "SW_BIN", bin_a):
+                    dirs_b = reload.profile_gui_package_dirs()
+
+            self.assertTrue(fp_a, "fingerprint empty — packages not discovered")
+            self.assertEqual(fp_a, fp_b, "catalog content changed the GUI fingerprint")
+            for advertised in dirs_a | dirs_b:
+                self.assertFalse(advertised.endswith("/data"), advertised)
+
+    def test_generated_page_package_stays_soft(self) -> None:
+        """Module toggles add or drop a page — that may never re-exec the GUI.
+
+        Root is named like production (``ncc-domain-gui-src``) because that name is itself a
+        soft-only marker: matching markers against the full path would blank the digest of
+        every package below it, and a soft-only fixture name would hide exactly that.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            roots = {}
+            for tag, page_src in (("a", "old page"), ("b", "new page")):
+                sys_dir = td_path / tag
+                src = sys_dir / "ncc-domain-gui-src"
+                _pkg_tree(src, marker="same")
+                page = src / "ncc_domain_page"
+                page.mkdir()
+                (page / "__init__.py").write_text('"""pkg"""\n', encoding="utf-8")
+                (page / "ai.py").write_text(f"SRC = {page_src!r}\n", encoding="utf-8")
+                bin_dir = sys_dir / "sw" / "bin"
+                _payload_wrapper(bin_dir, src)
+                roots[tag] = (bin_dir, src)
+
+            def clean_tmp(raw: str) -> Path | None:
+                part = raw.strip()
+                if "${" in part:
+                    part = part.split("${", 1)[0]
+                p = Path(part.rstrip(":").strip())
+                return p if p.exists() else None
+
+            with mock.patch.object(reload, "_clean_store_path", clean_tmp):
+                bin_a, _ = roots["a"]
+                bin_b, _ = roots["b"]
+                with mock.patch.object(reload, "SW_BIN", bin_a):
+                    fp_a = reload.profile_gui_fingerprint()
+                    dirs_a = reload.profile_gui_package_dirs()
+                with mock.patch.object(reload, "SW_BIN", bin_b):
+                    fp_b = reload.profile_gui_fingerprint()
+
+            # Digest not blanked by the root's own soft-only name.
+            self.assertIn("ncc_gui@", fp_a, fp_a)
+            self.assertIn("core@", fp_a, fp_a)
+            self.assertNotIn("ncc_domain_page", fp_a, fp_a)
+            self.assertEqual(fp_a, fp_b, "page code change must stay soft")
+            for advertised in dirs_a:
+                self.assertFalse(advertised.endswith("/ncc_domain_page"), advertised)
+
+    def test_wrapper_named_after_a_peer_module_is_not_scanned(self) -> None:
+        """The engine watches its own launchers; a peer's CLI is not GUI state."""
+        with tempfile.TemporaryDirectory() as td:
+            bin_dir = Path(td) / "sw" / "bin"
+            _payload_wrapper(bin_dir, Path(td) / "src", name="ncc-assistant")
+            with mock.patch.object(reload, "SW_BIN", bin_dir):
+                self.assertEqual(reload._iter_gui_wrappers(), [])
+
+
 class LiveProfileSmokeTests(unittest.TestCase):
     """Smoke against the real system profile (informational if paths missing)."""
 
     def test_live_fingerprint_nonempty_if_ncc_present(self) -> None:
-        if not Path("/run/current-system/sw/bin/ncc-assistant").is_file():
-            self.skipTest("no live ncc-assistant")
+        wrapper = next(
+            (
+                Path(f"/run/current-system/sw/bin/{name}")
+                for name in ("ncc-domain-gui", "ncc-gui")
+                if Path(f"/run/current-system/sw/bin/{name}").is_file()
+            ),
+            None,
+        )
+        if wrapper is None:
+            self.skipTest("no live ncc GUI")
         fp = reload.profile_gui_fingerprint()
         self.assertTrue(fp)
         # Must not contain bash junk
         self.assertNotIn("${", fp)
-        roots_ok = False
-        text = Path("/run/current-system/sw/bin/ncc-assistant").read_text()
-        roots = reload._roots_from_wrapper(
-            Path("/run/current-system/sw/bin/ncc-assistant")
-        )
+        text = wrapper.read_text()
+        roots = reload._roots_from_wrapper(wrapper)
         self.assertTrue(roots, f"failed to parse roots from wrapper:\n{text[:400]}")
         for r in roots:
             self.assertTrue(r.is_dir(), r)
             self.assertNotIn("${", str(r))
-            roots_ok = True
-        self.assertTrue(roots_ok)
 
 
 def main() -> int:

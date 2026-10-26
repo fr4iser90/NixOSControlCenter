@@ -5,7 +5,7 @@ After ``nixos-rebuild switch`` / activation:
 * ``/run/current-system`` moves (SSOT) and activation atomically updates
   ``/run/ncc/generation`` → ``QFileSystemWatcher`` (+ focus fallback) fires.
 * **Hard re-exec** when GUI app digests changed **or** this process still
-  loads a package of :data:`GUI_PACKAGES` from an old store path.
+  loads a staged package from an old store path.
 * **Soft refresh** only when generation moved, digests match, and modules
   are already the new paths (catalog / domain pages / module toggles).
 
@@ -42,10 +42,9 @@ _NCC_GUI_EXEC_RE = re.compile(
 _PYTHONPATH_RE = re.compile(r'(?:export\s+)?PYTHONPATH="([^"]+)"')
 _PYTHON_EXEC_RE = re.compile(r"exec\s+(/nix/store/[^/\s\"']+/bin/python[^\s\"']*)")
 _CATALOG_RE = re.compile(r"(/nix/store/[^/\s\"\)]+-ncc-gui-catalog\.json)")
-_ASSISTANT_ROOT_RE = re.compile(r'export\s+NCC_ASSISTANT_ROOT="([^"]+)"')
-_DOMAIN_TOOLS_RE = re.compile(
-    r'export\s+NCC_ASSISTANT_DOMAIN_TOOLS_FILE="([^"]+)"'
-)
+# Engine-owned bake-time channel: paths a payload reads by path and cannot tree-hash
+# (cli-registry registerGuiPython ``fingerprint``). Values change on every rebuild.
+_PAYLOAD_FILES_RE = re.compile(r'export\s+NCC_GUI_FINGERPRINT="([^"]*)"')
 
 # Domain page dumps / catalogs change on module toggles → soft only.
 _SOFT_ONLY_MARKERS = (
@@ -54,29 +53,33 @@ _SOFT_ONLY_MARKERS = (
     "ncc-domain-ai-tools",
 )
 
-# Importable NCC packages whose code decides hard re-exec vs soft refresh. ncc-assistant ships
-# several top-level packages (see its doc/layout.md) instead of one ``ncc_assistant``, so this
-# is a list, not a literal pair. Catalogs (``data/``) are deliberately absent: a catalog change
-# must never re-exec the GUI.
-GUI_PACKAGES = (
-    "ncc_gui",
-    "core",
-    "companion",
-    "window",
-    "tray",
-    "widgets",
-    "harness",
-    "plugins",
-    "cli",
-)
+# Staged packages that are generated per generation rather than authored: matching is on the
+# directory name ONLY. A substring test against the full path would match every package under
+# ``…-ncc-domain-gui-src/`` and silently blank the whole digest.
+_SOFT_ONLY_PACKAGES = ("ncc_domain_page",)
 
 
 def _package_dirs(root: Path) -> list[Path]:
-    """Package dirs under a staging root, including the assistant's ``lib/ncc-assistant``."""
-    found: list[Path] = []
-    for base in (root, root / "lib" / "ncc-assistant"):
-        found.extend(base / pkg for pkg in GUI_PACKAGES if (base / pkg).is_dir())
-    return found
+    """Hard-payload packages staged directly under a PYTHONPATH root.
+
+    Found, not listed: modules contribute GUI Python through cli-registry
+    ``registerGuiPython`` and gui-engine stages it here, so naming their packages would put
+    a peer's layout back into the engine. ``__init__.py`` is what makes a directory
+    importable, which also keeps a module's ``data/`` out of the digest — a catalog change
+    must never re-exec the GUI. ``_SOFT_ONLY_PACKAGES`` stay out entirely: they must neither
+    change the fingerprint nor make this process look stale.
+    """
+    try:
+        entries = sorted(root.iterdir())
+    except OSError:
+        return []
+    return [
+        d
+        for d in entries
+        if d.is_dir()
+        and (d / "__init__.py").is_file()
+        and d.name not in _SOFT_ONLY_PACKAGES
+    ]
 
 
 class GenerationBus(QObject):
@@ -197,7 +200,11 @@ def _soft_only_path(path: Path) -> bool:
 
 
 def _iter_gui_wrappers() -> list[Path]:
-    """All NCC GUI entrypoints on the active profile (generic discovery)."""
+    """All NCC GUI entrypoints on the active profile (generic discovery).
+
+    Only the GUI's own launchers: a peer module's CLI wrapper is not GUI state — anything it
+    would contribute arrives staged inside the GUI's own PYTHONPATH root.
+    """
     if not SW_BIN.is_dir():
         return []
     out: list[Path] = []
@@ -205,7 +212,7 @@ def _iter_gui_wrappers() -> list[Path]:
         if not p.is_file() and not p.is_symlink():
             continue
         name = p.name
-        if name in ("ncc-gui", "ncc-assistant", "ncc-domain-gui"):
+        if name in ("ncc-gui", "ncc-domain-gui"):
             out.append(p)
         elif name.startswith("ncc-") and name.endswith("-gui"):
             out.append(p)
@@ -225,11 +232,6 @@ def _payload_digests_from_root(root: Path) -> list[str]:
 def _roots_from_wrapper(wrapper: Path) -> list[Path]:
     text = _read_text(wrapper)
     roots: list[Path] = []
-    m = _ASSISTANT_ROOT_RE.search(text)
-    if m:
-        cleaned = _clean_store_path(m.group(1))
-        if cleaned is not None:
-            roots.append(cleaned)
     for m in _PYTHONPATH_RE.finditer(text):
         for part in m.group(1).split(":"):
             cleaned = _clean_store_path(part)
@@ -256,26 +258,25 @@ def profile_gui_fingerprint() -> str:
             pythons.append(f"python@{wrapper.name}={py}")
         for root in _roots_from_wrapper(wrapper):
             lines.extend(_payload_digests_from_root(root))
-        text = _read_text(wrapper)
-        tm = _DOMAIN_TOOLS_RE.search(text)
-        if tm:
-            lines.append(f"domain_tools@{wrapper.name}={tm.group(1)}")
+        for value in _PAYLOAD_FILES_RE.findall(_read_text(wrapper)):
+            lines.extend(f"payload_file={path}" for path in value.split())
 
     if not lines:
-        for mod_name in GUI_PACKAGES:
-            try:
-                mod = __import__(mod_name)
-                root = Path(mod.__file__).resolve().parent  # type: ignore[arg-type]
-                lines.append(f"{mod_name}@runtime={_hash_tree(root)}")
-            except Exception:
-                pass
+        # Wrappers unreadable (mid-switch): this process' own PYTHONPATH lists the same roots.
+        for part in os.environ.get("PYTHONPATH", "").split(":"):
+            cleaned = _clean_store_path(part)
+            if cleaned is None:
+                continue
+            lines.extend(
+                f"{d.name}@{cleaned.name}={_hash_tree(d)}" for d in _package_dirs(cleaned)
+            )
 
     lines.extend(sorted(set(pythons)))
     return "\n".join(sorted(set(lines)))
 
 
 def profile_gui_package_dirs() -> set[str]:
-    """Absolute package dirs (``…/ncc_gui``, ``…/core``, ``…/companion``, …) on the profile."""
+    """Absolute package dirs the active profile advertises to its GUI wrappers."""
     out: set[str] = set()
     for wrapper in _iter_gui_wrappers():
         for root in _roots_from_wrapper(wrapper):
@@ -292,7 +293,8 @@ def process_gui_stale() -> bool:
     advertised = profile_gui_package_dirs()
     if not advertised:
         return False
-    for name in GUI_PACKAGES:
+    for package_dir in advertised:
+        name = Path(package_dir).name
         mod = sys.modules.get(name)
         if mod is None:
             continue

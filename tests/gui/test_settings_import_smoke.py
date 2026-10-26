@@ -5,7 +5,7 @@ Catches mistakes like SettingsTabSpec field order (dataclass TypeError at
 import) *before* system-update lands a broken GUI.
 
 No display needed. PySide6 import is optional (skipped if missing); AST +
-compileall always run.
+parse checks always run — in memory, nothing lands next to the sources.
 
   python3 tests/gui/test_settings_import_smoke.py
   bash tests/gui/validate-gui-python.sh
@@ -14,8 +14,6 @@ compileall always run.
 from __future__ import annotations
 
 import ast
-import compileall
-import py_compile
 import sys
 import unittest
 from pathlib import Path
@@ -24,6 +22,17 @@ REPO = Path(__file__).resolve().parents[2]
 GUI_PY = REPO / "nixos/core/management/gui-engine/python"
 NCC_GUI = GUI_PY / "ncc_gui"
 NIXOS = REPO / "nixos"
+
+
+def _assert_parses(path: Path) -> None:
+    """Parse a source file without writing anything.
+
+    ``compileall``/``py_compile`` are deliberately not used: they drop ``.pyc`` next to the
+    sources and ignore ``PYTHONDONTWRITEBYTECODE``, and a Nix path copy of ``nixos/`` ships
+    whatever is in the tree — ``.gitignore`` does not apply there. Measured: one green gui
+    gate wrote 43 ``.pyc`` into ``gui-engine/python/ncc_gui/``.
+    """
+    compile(path.read_bytes(), str(path), "exec", dont_inherit=True)
 
 
 def _dataclass_fields(class_node: ast.ClassDef) -> list[ast.AnnAssign]:
@@ -80,16 +89,17 @@ class GuiPythonSmoke(unittest.TestCase):
         self.assertTrue(proto.is_file(), f"missing {proto}")
         _check_dataclass_field_order(proto, "SettingsTabSpec")
 
-    def test_compileall_ncc_gui(self) -> None:
-        self.assertTrue(NCC_GUI.is_dir(), f"missing {NCC_GUI}")
-        ok = compileall.compile_dir(str(NCC_GUI), quiet=1, force=True)
-        self.assertTrue(ok, "compileall failed under ncc_gui/")
+    def test_ncc_gui_sources_parse(self) -> None:
+        sources = sorted(NCC_GUI.rglob("*.py"))
+        self.assertTrue(sources, f"no sources under {NCC_GUI}")
+        for path in sources:
+            _assert_parses(path)
 
-    def test_compile_domain_settings_py(self) -> None:
+    def test_domain_settings_py_parse(self) -> None:
         paths = sorted(NIXOS.rglob("ui/gui/settings.py"))
         self.assertTrue(paths, "expected at least one ui/gui/settings.py")
         for p in paths:
-            py_compile.compile(str(p), doraise=True)
+            _assert_parses(p)
 
     def test_import_settings_if_pyside(self) -> None:
         """Full import catches dataclass/runtime errors when Qt is available."""

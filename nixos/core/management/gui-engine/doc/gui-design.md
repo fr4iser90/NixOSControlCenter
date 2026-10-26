@@ -569,11 +569,12 @@ Multi-domain shell is **Chrome + Document**:
 | New generation, **same** digests **and** loaded modules already match profile | Soft: refresh catalog → rebuild nav → recreate current document; Activity restored from disk on construct |
 | New generation, digest changed **or** process still imports old store paths | Hard: persist Activity → `exec` current app |
 
-**Hard fingerprint** (generic discovery under `/run/current-system/sw/bin`):
-`ncc-gui`, `ncc-assistant`, `ncc-*-gui` wrappers → hash `ncc_gui` / `ncc_assistant`
-trees (+ assistant domain-tools file path). **Not** domain-page dumps / catalogs
-(those soft-refresh on module toggle). Wrapper `PYTHONPATH` values strip bash
-`${…}` expansions so store roots resolve correctly.
+**Hard fingerprint** (generic discovery under `/run/current-system/sw/bin`): `ncc-gui` and
+`ncc-*-gui` wrappers → hash every staged package under their `PYTHONPATH` roots (a directory is
+a package when it has `__init__.py`), plus the `NCC_GUI_FINGERPRINT` paths each module declares
+with `registerGuiPython`. **Not** domain-page dumps / catalogs (those soft-refresh on module
+toggle), and **not** a peer module's own CLI wrapper — its Python arrives staged in the GUI's
+root. Wrapper `PYTHONPATH` values strip bash `${…}` expansions so store roots resolve correctly.
 
 Debug: `NCC_GUI_RELOAD_DEBUG=1` logs evaluate/restart decisions to stderr.
 

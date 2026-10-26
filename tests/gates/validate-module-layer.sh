@@ -65,6 +65,38 @@ else
   pass "gui-engine has no hyprland hardwire"
 fi
 
+# gui-engine may only resolve plumbing peers. Domain content arrives through cli-registry
+# (registerGuiPage / registerGuiEnv / registerGuiPython), so a new getModuleMetadata name here
+# means someone re-coupled the engine to one module — ncc-assistant lived here until 2026-08.
+echo "== 1c) gui-engine peer roots allow-list =="
+ALLOWED_PEERS=$'cli-registry\npackages\nsystem-manager'
+SEEN_PEERS=$(rg -o -N 'getModuleMetadata "[a-z0-9-]+"' "$GUI_ENG" --glob '*.nix' \
+  | rg -o '"[a-z0-9-]+"' | tr -d '"' | sort -u || true)
+BAD_PEERS=""
+for peer in $SEEN_PEERS; do
+  grep -qxF "$peer" <<<"$ALLOWED_PEERS" || BAD_PEERS="$BAD_PEERS $peer"
+done
+if [[ -n "$BAD_PEERS" ]]; then
+  echo "    off-list:$BAD_PEERS"
+  fail "gui-engine resolves a peer module it should discover — register it in cli-registry"
+else
+  pass "gui-engine resolves only plumbing peers"
+fi
+
+# The decoupled channel itself: engine stages whatever root a module declares. Pinned because
+# reverting to a package list per module would be silent otherwise.
+if ! rg -q 'registerGuiPython' "$NIXOS/core/management/cli-registry/api.nix"; then
+  fail "cli-registry lost registerGuiPython — pages would ship without their Python"
+elif ! rg -q 'cp -r \$\{p\.root\}/\. \$out/' "$GUI_ENG/domain-gui.nix"; then
+  fail "domain-gui.nix must stage each registered payload root, not a hardcoded package list"
+elif rg -q 'GUI_PACKAGES' "$GUI_ENG/python/ncc_gui/reload.py"; then
+  fail "reload.py lists GUI packages again — it must find them by __init__.py"
+elif ! rg -q '\(d / "__init__\.py"\)\.is_file\(\)' "$GUI_ENG/python/ncc_gui/reload.py"; then
+  fail "reload.py must discover staged packages via __init__.py (data/ stays undigested)"
+else
+  pass "GUI Python payload is discovered end to end"
+fi
+
 # ── 2) module-manager must not hardwire install-wizard script paths ─────────
 echo "== 2) module-manager no install-wizard script paths =="
 HITS=$(rg -n 'install-wizard/scripts' "$MM_MIG" --glob '*.nix' 2>/dev/null || true)
