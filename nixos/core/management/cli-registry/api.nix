@@ -78,6 +78,10 @@ rec {
 
   guiEnvs = config: (fromConfig config).guiEnvs or {};
 
+  # Per-domain { root, env, fingerprint } from registerGuiPython — gui-engine stages the
+  # root and exports env without ever naming a peer's packages.
+  guiPython = config: (fromConfig config).guiPython or {};
+
   # Flatten { domain = { VAR = "…"; }; … } → { VAR = "…"; } for launcher export.
   flatGuiEnvs = config:
     lib.foldlAttrs (acc: _: vars: acc // vars) {} (guiEnvs config);
