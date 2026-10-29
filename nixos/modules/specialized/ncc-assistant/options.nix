@@ -573,6 +573,29 @@ in
         description = "Default agent profile (read-only, config-writer, ops; aliases: cautious, autonomous)";
       };
 
+      runAsUser = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        example = "alice";
+        description = ''
+          The account scheduled agent runs execute as. null (default) keeps the unit root, and
+          mkHomePreamble then borrows the first normal user's HOME — which is a read of that
+          person's files by a process holding root credentials, not a run as them.
+
+          Set it (your own account on a personal host) and three things close at once: a timer
+          can no longer read a home it was not granted with root credentials; the audit line in
+          audit.jsonl names the actor whose files were touched, since actor and file owner become
+          one uid; and the agent's git invocations stop being "dubious ownership" refusals,
+          because git compares the process uid against the repository owner and a root process
+          never matches a repository owned by you.
+
+          This is not covered by safe.directory — that only hushes the git complaint, and it would
+          hush it for a process that still holds root. A run that writes this host is unaffected:
+          /etc/nixos and nixos-rebuild both need root, so a schedule whose resolved grant reaches
+          system=config-write or system=rebuild keeps running as root and says so at evaluation.
+        '';
+      };
+
       requirePreflightBeforeRebuild = mkOption {
         type = types.bool;
         default = false;

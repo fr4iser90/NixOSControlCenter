@@ -24,19 +24,7 @@ let
 
   invalidSchedules = filterAttrs (_: s: !(scheduleHasWork _ s)) enabledSchedules;
 
-  mkHomePreamble = ''
-    set -euo pipefail
-    if [[ "$(id -u)" -eq 0 ]]; then
-      for u in ${lib.concatStringsSep " " (attrNames (filterAttrs (_: u: u.isNormalUser or false) config.users.users))}; do
-        home=$(getent passwd "$u" | cut -d: -f6 || true)
-        if [[ -n "$home" && -d "$home/.config/ncc-assistant" ]]; then
-          export HOME="$home"
-          export XDG_CONFIG_HOME="$home/.config"
-          export USER="$u"
-          break
-        fi
-      done
-    fi
+  killSwitchBlock = ''
     cfg="''${XDG_CONFIG_HOME:-$HOME/.config}/ncc-assistant"
     if [[ -f "$cfg/DISABLE" ]]; then
       ${ui.messages.warning "ncc-assistant: kill-switch DISABLE present — skipping"}
@@ -47,6 +35,31 @@ let
       exit 0
     fi
   '';
+
+  # null is the historical shape: the unit is root and has to guess whose home this is by looking
+  # for a config directory. A declared account knows its own home, and guessing here would read a
+  # different person's DISABLE file than the one gating the run it belongs to.
+  mkHomePreambleFor = home:
+    if home == null then ''
+      set -euo pipefail
+      if [[ "$(id -u)" -eq 0 ]]; then
+        for u in ${lib.concatStringsSep " " (attrNames (filterAttrs (_: u: u.isNormalUser or false) config.users.users))}; do
+          home=$(getent passwd "$u" | cut -d: -f6 || true)
+          if [[ -n "$home" && -d "$home/.config/ncc-assistant" ]]; then
+            export HOME="$home"
+            export XDG_CONFIG_HOME="$home/.config"
+            export USER="$u"
+            break
+          fi
+        done
+      fi
+      ${killSwitchBlock}
+    '' else ''
+      set -euo pipefail
+      export HOME=${lib.escapeShellArg home}
+      export XDG_CONFIG_HOME="$HOME/.config"
+      ${killSwitchBlock}
+    '';
 
   # --- Permission ladder (phase 39) -------------------------------------------------
   # Host config is the ceiling; a schedule only names the step it needs. Steps must stay
@@ -418,6 +431,37 @@ let
       NCC_ASSISTANT_CHAIN_AFTER = afterOf schedule;
     };
 
+  # Whose credentials a schedule's commands carry, and which home their config resolves to.
+  # A declared account that cannot write this host is the one case where root is kept: /etc/nixos
+  # and nixos-rebuild both need it, and a run denied at the write its own grant authorised would
+  # read as a broken agent rather than as what it is — see rootKeptSchedules below.
+  unitIdentity = schedule:
+    let
+      declared = cfg.agent.runAsUser or null;
+      reachesSystemWrite =
+        (stepRank systemRanks (effectiveGrant schedule).system)
+        >= (stepRank systemRanks "config-write");
+      user = if declared == null || reachesSystemWrite then null else declared;
+      known = user != null && builtins.hasAttr user config.users.users;
+    in {
+      inherit user;
+      home = if known then (config.users.users.${user}.home or null) else null;
+    };
+
+  # The account a run executed as, published to the run itself. audit.jsonl records an actor, and
+  # "declared alice, ran as root" is precisely the drift an operator has to be able to see from
+  # inside the run.
+  declaredRunAs =
+    let declared = cfg.agent.runAsUser or null;
+    in if declared == null then "null (units run as root)" else declared;
+
+  # The one case a declared runAsUser does not apply, named instead of left as a silent exception.
+  # Without this the host reads "every run is unprivileged" while a write-capable schedule quietly
+  # keeps root credentials.
+  rootKeptSchedules = filterAttrs (_: s:
+    (cfg.agent.runAsUser or null) != null && (unitIdentity s).user == null
+  ) enabledSchedules;
+
   # ExecStartPost is the only real "this run is over" edge systemd gives a oneshot
   # (systemd.service(5): it runs only after ExecStart exited successfully) — but a schedule the
   # chain or poll gate held also exits 0, so unit success is not proof of a completed run. The
@@ -425,10 +469,22 @@ let
   # very unit invocation* recorded, and the unit list below is fixed at evaluation time inside a
   # read-only store script. That placement is the point — the agent's own shell tools never get
   # systemctl, so finishing a chain grants a run no capability it did not already have.
-  mkChainWakeScript = name: dependents:
+  mkChainWakeScript = name: dependents: identity:
+    let
+      # "+" hands this whole line root (systemd.service(5)), because waking a sibling is a
+      # systemctl call a plain account may not make. The decision itself is still asked of the
+      # account the run belongs to: ncc-assistant appends it to audit.jsonl, and a root-owned
+      # audit file inside the operator's home would lock the GUI out of the history this run made.
+      releaseCall =
+        if identity.user == null
+        then "${pkg.nccAssistant}/bin/ncc-assistant chain release --schedule ${lib.escapeShellArg name}"
+        else
+          "${pkgs.util-linux}/bin/runuser -u ${lib.escapeShellArg identity.user} -- "
+          + "${pkg.nccAssistant}/bin/ncc-assistant chain release --schedule ${lib.escapeShellArg name}";
+    in
     pkgs.writeShellScript "ncc-assistant-chain-${name}" ''
-      ${mkHomePreamble}
-      if ${pkg.nccAssistant}/bin/ncc-assistant chain release --schedule ${lib.escapeShellArg name}; then
+      ${mkHomePreambleFor identity.home}
+      if ${releaseCall}; then
       ${concatMapStringsSep "\n" (dep: ''
         ${pkgs.systemd}/bin/systemctl --no-block start ncc-assistant-schedule-${dep}.service \
           || ${ui.messages.warning "ncc-assistant: ${name} completed but could not wake ${dep}"}
@@ -438,7 +494,7 @@ let
       fi
     '';
 
-  mkAgentExec = name: schedule:
+  mkAgentExec = name: schedule: identity:
     let
       maxSteps = if schedule.maxSteps != null then schedule.maxSteps else (cfg.agent.maxSteps or (-1));
       dryRun = if schedule.dryRun != null then schedule.dryRun else (cfg.agent.dryRun or false);
@@ -461,11 +517,11 @@ let
         ++ optionals (goal != null && goal != "") [ "--goal" (lib.escapeShellArg goal) ];
     in
     pkgs.writeShellScript "ncc-assistant-schedule-${name}" ''
-      ${mkHomePreamble}
+      ${mkHomePreambleFor identity.home}
       exec ${concatStringsSep " " agentArgs}
     '';
 
-  mkProbeExec = name: schedule:
+  mkProbeExec = name: schedule: identity:
     let
       probe = schedule.probe or "disk-nix";
       thr = toString (schedule.thresholdPct or 85);
@@ -479,7 +535,7 @@ let
       ];
     in
     pkgs.writeShellScript "ncc-assistant-schedule-${name}" ''
-      ${mkHomePreamble}
+      ${mkHomePreambleFor identity.home}
       ${ui.messages.loading "ncc-assistant: running probe ${probe} (threshold=${thr})"}
       exec ${concatStringsSep " " probeArgs}
     '';
@@ -490,6 +546,7 @@ let
       writes = (stepRank systemRanks grant.system) >= (stepRank systemRanks "config-write");
       rebuilds = grant.system == "rebuild";
       dependents = chainDependents name;
+      identity = unitIdentity schedule;
     in {
     "ncc-assistant-schedule-${name}" = {
       description = "NCC Assistant scheduled job: ${name}";
@@ -500,12 +557,21 @@ let
         Type = "oneshot";
         ExecStart =
           if (schedule.kind or "agent") == "probe"
-          then "${mkProbeExec name schedule}"
-          else "${mkAgentExec name schedule}";
+          then "${mkProbeExec name schedule identity}"
+          else "${mkAgentExec name schedule identity}";
         StandardOutput = "journal";
         StandardError = "journal";
+      } // optionalAttrs (identity.user != null) {
+        # The run carries the account it read and wrote as, so a timer is no longer a root process
+        # wearing somebody else's HOME. The wake step below answers for itself.
+        User = identity.user;
       } // optionalAttrs (dependents != [ ]) {
-        ExecStartPost = "${mkChainWakeScript name dependents}";
+        # "+" (systemd.service(5)) lifts only this line back to root: a plain account may not ask
+        # systemd to start a sibling unit, and the wake has to stay possible once the run itself
+        # is unprivileged. ExecStart= keeps every restriction, so the agent still never gets
+        # systemctl — the capability lives in this fixed store script and nowhere else.
+        ExecStartPost =
+          "${optionalString (identity.user != null) "+"}${mkChainWakeScript name dependents identity}";
       };
 
       environment = {
@@ -614,6 +680,15 @@ in
             above agent.grants.budget; the host value is what the unit gets. Budgets narrow,
             they never widen.
           '') budgetConflicts
+        ++ mapAttrsToList (name: s:
+          ''
+            ncc-assistant: schedule '${name}' keeps running as root although agent.runAsUser =
+            "${cfg.agent.runAsUser}" is declared — its grant reaches
+            system=${shownStep (effectiveGrant s).system}, and writing this host needs root for
+            both /etc/nixos and nixos-rebuild. Every other schedule on this host drops to the
+            declared account; this one does not, so read the audit trail accordingly. Lower
+            permissions.system, allowWrite or allowRebuild on it to run it unprivileged too.
+          '') rootKeptSchedules
         ++ ceilingInversions;
 
       assertions = [
@@ -625,6 +700,20 @@ in
 
             Scheduled rebuilds are dangerous without human supervision.
             Set ncc-assistant.forceDangerous = true to acknowledge this risk.
+          '';
+        }
+        {
+          # A name systemd cannot resolve gives every schedule unit a User= it refuses to start,
+          # so the failure lands on the timer at 04:00 instead of on the line that named the
+          # account. Home would come back null here too, silently handing the unit the guessing
+          # preamble while it claims to run as somebody specific.
+          assertion =
+            (cfg.agent.runAsUser or null) == null
+            || builtins.hasAttr (cfg.agent.runAsUser or "") config.users.users;
+          message = ''
+            NCC Assistant agent.runAsUser = "${declaredRunAs}" is not an account on this host
+            (no users.users entry), so no schedule unit would start at all. Declare the account,
+            or leave agent.runAsUser = null and the units keep running as root.
           '';
         }
         {

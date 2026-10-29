@@ -266,7 +266,11 @@ let
 
     export PYTHONPATH="${appRoot}/lib/ncc-assistant''${PYTHONPATH:+:$PYTHONPATH}"
     # wtype: leave-feed tab (about:blank) on Plasma Wayland after net-block
-    export PATH="${configHelper}/bin:${nccFocusNetblock}/bin:${pkgs.wtype}/bin:${pkgs.jq}/bin:${pkgs.nix}/bin:$PATH"
+    # gh/git are declared, not inherited. workflows.py and cli/workspace_lifecycle.py call gh, and
+    # poll_guard/permissions/workspaces call git; a host whose environment happens to carry git
+    # hides that the dependency was never stated, and on one that does not, every GitHub verb died
+    # with "gh CLI not on PATH" in a run that otherwise looked correctly configured.
+    export PATH="${configHelper}/bin:${nccFocusNetblock}/bin:${pkgs.wtype}/bin:${pkgs.jq}/bin:${pkgs.nix}/bin:${pkgs.gh}/bin:${pkgs.git}/bin:$PATH"
     # Qt/Plasma: use system platform theme when available
     export QT_QPA_PLATFORM="''${QT_QPA_PLATFORM:-xcb}"
   '';
