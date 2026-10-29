@@ -34,6 +34,19 @@ class Phase28Tests(unittest.TestCase):
         self.env_patch.stop()
         self._tmp.cleanup()
 
+    def _launcher_on_path(self, name: str = "uvx") -> None:
+        """Provide the launcher a packaged template needs to start.
+
+        ``install_template`` refuses a server whose command is missing, so the test declares
+        that dependency instead of depending on what the machine running the gate installed.
+        """
+        bindir = self.cfg / "bin"
+        bindir.mkdir(exist_ok=True)
+        stub = bindir / name
+        stub.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        stub.chmod(0o755)
+        os.environ["PATH"] = f"{bindir}{os.pathsep}{os.environ['PATH']}"
+
     def test_secret_roundtrip_chmod(self) -> None:
         meta = secrets_mod.set_secret("github_token", "s3cret-value", label="GitHub PAT")
         self.assertEqual(meta.name, "github_token")
@@ -74,6 +87,7 @@ class Phase28Tests(unittest.TestCase):
         path.mkdir()
         ws_mod.upsert_workspace("ncc", str(path))
         secrets_mod.set_secret("github_token", "tok")
+        self._launcher_on_path()
         # Expand only — install writes mcp-servers.json
         ctx = mp.build_placeholder_context(workspace_id="ncc")
         self.assertEqual(ctx["workspace.path"], str(path.resolve()))

@@ -270,7 +270,13 @@ let
     # poll_guard/permissions/workspaces call git; a host whose environment happens to carry git
     # hides that the dependency was never stated, and on one that does not, every GitHub verb died
     # with "gh CLI not on PATH" in a run that otherwise looked correctly configured.
-    export PATH="${configHelper}/bin:${nccFocusNetblock}/bin:${pkgs.wtype}/bin:${pkgs.jq}/bin:${pkgs.nix}/bin:${pkgs.gh}/bin:${pkgs.git}/bin:$PATH"
+    #
+    # uv ships uvx, which three of the four packaged MCP templates (github, git, fetch) name as
+    # their command. marketplace.install never asked whether that command existed: it wrote the
+    # server entry, reported success, and the spawn failed later in whichever run first reached
+    # for the tool. Same process, same PATH as that spawn, so declaring it here is what makes
+    # install_template's launchability check mean the same thing to the operator as to the run.
+    export PATH="${configHelper}/bin:${nccFocusNetblock}/bin:${pkgs.wtype}/bin:${pkgs.jq}/bin:${pkgs.nix}/bin:${pkgs.gh}/bin:${pkgs.git}/bin:${pkgs.uv}/bin:$PATH"
     # Qt/Plasma: use system platform theme when available
     export QT_QPA_PLATFORM="''${QT_QPA_PLATFORM:-xcb}"
   '';

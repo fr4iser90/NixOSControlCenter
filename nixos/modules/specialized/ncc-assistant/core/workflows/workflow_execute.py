@@ -14,6 +14,7 @@ from typing import Any, Iterable, Sequence
 from core.policy.audit import append_audit
 from core.policy import budgets
 from core.store.paths import workflow_progress_file
+from core.workflows.gh_env import gh_env
 from core.policy.permissions import (
     BLANKET_PATHS,
     REPO_CEILING_PATH,
@@ -63,7 +64,10 @@ def _run(
     cwd: Path,
     timeout: float = 120.0,
     check: bool = False,
+    env: dict[str, str] | None = None,
 ) -> dict[str, Any]:
+    # ``env`` stays opt-in: the credential built for ``gh`` must not ride along into a git
+    # invocation, whose hooks and remotes are a capability the run was never granted.
     try:
         proc = subprocess.run(
             cmd,
@@ -72,6 +76,7 @@ def _run(
             text=True,
             timeout=timeout,
             check=False,
+            env=env,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {
@@ -787,7 +792,7 @@ def open_pull_request(
     ]
     if draft:
         cmd.append("--draft")
-    res = _run(cmd, cwd=root, timeout=120.0)
+    res = _run(cmd, cwd=root, timeout=120.0, env=gh_env())
     _audit_publish("create", ok=bool(res["ok"]), detail=res.get("stderr") or res.get("stdout") or "")
     if res["ok"] and budgets.applies():
         budgets.record_pr(_repo_key(root))
@@ -816,7 +821,7 @@ def _merge_base_floor(root: Path, pr: str | None) -> tuple[str, dict[str, Any] |
     if pr:
         cmd.append(str(pr))
     cmd.extend(["--json", "baseRefName", "--jq", ".baseRefName"])
-    res = _run(cmd, cwd=root, timeout=60.0)
+    res = _run(cmd, cwd=root, timeout=60.0, env=gh_env())
     base = (res.get("stdout") or "").strip()
     if not base:
         # Fail closed: a base that cannot be named is a base that cannot be proven open.
@@ -862,7 +867,7 @@ def merge_pull_request(
     if pr:
         cmd.append(str(pr))
     cmd.extend([f"--{strat}", "--delete-branch"])
-    res = _run(cmd, cwd=root, timeout=180.0)
+    res = _run(cmd, cwd=root, timeout=180.0, env=gh_env())
     _audit_publish("merge", ok=bool(res["ok"]), detail=res.get("stderr") or res.get("stdout") or "")
     if res["ok"] and budgets.applies():
         # A PR that lands frees the slot it held in the open-PR budget.
@@ -1209,6 +1214,7 @@ def execute_status(workspace_id: str | None = None) -> dict[str, Any]:
             ["gh", "pr", "view", "--json", "url,number,state,title"],
             cwd=root,
             timeout=30.0,
+            env=gh_env(),
         )
         if view.get("ok") and view.get("stdout"):
             try:

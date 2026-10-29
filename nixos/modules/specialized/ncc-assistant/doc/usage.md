@@ -432,6 +432,32 @@ ncc-assistant mcp-install git --workspace ncc
 ncc-assistant mcp-install github --secret GITHUB_PERSONAL_ACCESS_TOKEN=github_token
 ```
 
+### What a server needs to start
+
+A marketplace template launches through a launcher the host owns: `uvx` (from `uv`) for the
+git / github / fetch servers, `npx` (from node) for filesystem. `mcp-install` therefore refuses
+a template whose `command` is not on PATH and writes nothing — the alternative was reporting
+success, storing the resolved token, and letting a later unattended run discover that the server
+could never start. The wrapper's PATH declares `uv`, `gh` and `git`; anything else is the host's
+to install.
+
+### The credential a GitHub verb carries
+
+`workflow pr` / `merge` and the Daily digest shell out to `gh`, and a schedule has no terminal to
+run `gh auth login` in. Resolution, narrowest first:
+
+1. an ambient `GH_TOKEN` / `GITHUB_TOKEN` — the unit said so out loud (`Environment=`, or the
+   account `agent.runAsUser` names); left exactly as it is;
+2. the `github_token` secret (`ncc-assistant secrets set github_token`) — the same credential the
+   `github` MCP template already requires;
+3. neither → `gh` falls back to the login state of the account the run carries, which is the
+   documented path for a run a human set up by hand.
+
+The credential is built for one `gh` invocation and never merged into the run's own environment,
+so an allowlisted shell command, the external harness or a git hook cannot inherit a GitHub
+credential it was never granted. The run's audit actor names *who* the run carried; it is not a
+GitHub identity — the credential above is what authenticates.
+
 If the model list fails with **Auth failed**, update the LLM provider key (Chat
 auth dialog or Settings → providers). Stale keys no longer keep an old model
 selected as if the gateway still served it.

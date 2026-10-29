@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -194,6 +195,23 @@ def install_template(
         return {"ok": False, "error": f"Unknown MCP template: {name}"}
     if not tmpl.command:
         return {"ok": False, "error": f"Template '{name}' has no command"}
+    # A server whose command does not exist cannot spawn, and the spawn is a later run's problem:
+    # the install reported success, wrote a resolved token into mcp-servers.json, and the failure
+    # surfaced as "MCP call failed" inside an agent run nobody was watching. Three of the four
+    # packaged templates launch through uvx, which a host was never told it owed them.
+    if shutil.which(tmpl.command) is None:
+        return {
+            "ok": False,
+            "error": (
+                f"{tmpl.command} is not on PATH, so '{tmpl.name}' could never start — "
+                "nothing was installed"
+            ),
+            "hint": (
+                f"Provide {tmpl.command} for this host (uv ships uvx, node ships npx). "
+                "ncc-assistant's wrapper PATH declares uv, gh and git; anything else is "
+                "the host's to install."
+            ),
+        }
 
     try:
         ctx = build_placeholder_context(

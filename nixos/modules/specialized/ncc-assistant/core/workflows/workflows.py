@@ -12,6 +12,7 @@ from typing import Any
 
 from core.store.paths import workflows_daily_file, workflows_dir
 from core.store.preferences import get_active_workspace_id, get_workflow_providers
+from core.workflows.gh_env import gh_env
 
 TASK_STATUSES = ("todo", "doing", "done")
 TASK_PRIORITIES = ("p0", "p1", "p2")
@@ -201,6 +202,7 @@ def _gh_json(args: list[str], *, cwd: str | None = None) -> Any | None:
             timeout=45,
             cwd=cwd,
             check=False,
+            env=gh_env(),
         )
     except (OSError, subprocess.TimeoutExpired):
         return None

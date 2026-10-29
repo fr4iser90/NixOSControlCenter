@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from core.store.preferences import get_active_workspace_id
+from core.workflows.gh_env import gh_env
 from core.workflows.workspace_workflow import open_tasks_ordered, resolve_workspace_id
 from core.store.workspaces import get_workspace, list_workspaces
 
@@ -76,6 +77,7 @@ def _gh_open_pr_count(root: Path) -> int | None:
             text=True,
             timeout=20,
             check=False,
+            env=gh_env(),
         )
     except (OSError, subprocess.TimeoutExpired):
         return None

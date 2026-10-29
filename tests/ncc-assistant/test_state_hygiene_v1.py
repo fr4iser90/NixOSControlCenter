@@ -32,6 +32,21 @@ def _age(path: Path, *, days: float) -> None:
     os.utime(path, (stamp, stamp))
 
 
+def _put_on_path(tmp_path: Path, name: str) -> None:
+    """Make ``name`` resolve on PATH for the surrounding patched environment.
+
+    ``install_template`` refuses a server whose command is missing, so an install test has to
+    provide the launcher the packaged wrapper declares (uv ships uvx) rather than inherit
+    whatever the machine running the gate happens to have installed.
+    """
+    bindir = tmp_path / "bin"
+    bindir.mkdir(exist_ok=True)
+    stub = bindir / name
+    stub.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    stub.chmod(0o755)
+    os.environ["PATH"] = f"{bindir}{os.pathsep}{os.environ['PATH']}"
+
+
 def test_workspaces_file_is_owner_only(tmp_path):
     with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": str(tmp_path)}):
         repo = tmp_path / "repo"
@@ -45,6 +60,10 @@ def test_workspaces_file_is_owner_only(tmp_path):
 
 def test_mcp_install_keeps_resolved_token_owner_only(tmp_path):
     with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": str(tmp_path)}):
+        # The install refuses a server whose launcher is not on PATH, so the test states that
+        # dependency instead of assuming whatever the machine running the gate happens to ship.
+        # /bin/echo answers for uvx: install only asks whether the command exists.
+        _put_on_path(tmp_path, "uvx")
         set_secret("github_token", "ghp_test-value-not-real")
         result = install_template("github")
         assert result["ok"] is True, result
@@ -54,6 +73,34 @@ def test_mcp_install_keeps_resolved_token_owner_only(tmp_path):
         # Proves the file really holds the PAT, which is why the mode matters.
         assert installed["github"]["env"]["GITHUB_PERSONAL_ACCESS_TOKEN"] == "ghp_test-value-not-real"
         assert _mode(path) == 0o600
+
+
+def test_an_unlaunchable_server_is_refused_before_its_token_is_written(tmp_path):
+    """Install must not hand a PAT to a server that can never start.
+
+    The spawn happens in a later run, so a missing launcher used to surface as success here and
+    as "MCP call failed" inside an unattended agent run. An empty PATH is the real absence —
+    nothing is mocked, so the refusal itself is what gets tested.
+    """
+    empty_path = tmp_path / "empty-bin"
+    empty_path.mkdir()
+    with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": str(tmp_path), "PATH": str(empty_path)}):
+        set_secret("github_token", "ghp_test-value-not-real")
+        result = install_template("github")
+
+        assert result["ok"] is False, result
+        assert "uvx" in result["error"], result
+        servers = tmp_path / "ncc-assistant" / "mcp-servers.json"
+        assert not servers.exists(), "a refused install wrote state anyway"
+        # The PAT stays where it was stored: no other file under the config home holds it.
+        carriers = [
+            p
+            for p in tmp_path.rglob("*")
+            if p.is_file()
+            and p.name != "secrets.json"
+            and "ghp_test-value-not-real" in p.read_text(errors="ignore")
+        ]
+        assert not carriers, f"the token escaped the store: {[str(p) for p in carriers]}"
 
 
 def test_approval_write_is_owner_only(tmp_path):
