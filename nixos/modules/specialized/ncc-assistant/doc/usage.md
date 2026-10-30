@@ -213,6 +213,52 @@ An unknown value, an empty one, or a wider ask than the host falls back to the h
 narrow stage is always the unit's or the host's, never the caller's. Without a grant on the process
 at all (`ncc ai` typed by hand), nothing changed: the person at the prompt is still the approver.
 
+## Which account a schedule runs as
+
+`agent.runAsUser` names the account every scheduled run executes as. It is a **host-wide** choice:
+one account for all schedules, never one per schedule — what differs per schedule is only whether it
+keeps root (below).
+
+**Default (`null`) — root, borrowing a home.** The unit stays root and the run preamble *guesses* a
+home: it walks the normal users in `users.users` and takes the first one owning a
+`~/.config/ncc-assistant`. That is a root process reading that person's files — secrets, sessions,
+workspaces — while the audit line says only `schedule:<id>`. It is also why agent git verbs died as
+`dubious ownership` refusals: git compares the process uid against the repository owner, and a root
+process never matches a repository owned by you. `safe.directory` does not fix this; it only hushes
+git's complaint for a process that still holds root.
+
+```nix
+agent.runAsUser = "alice";   # must be a key in users.users, else evaluation refuses
+```
+
+Three things change at once: the unit gets `User=alice`; `HOME` and `XDG_CONFIG_HOME` come from
+`users.users.alice.home` instead of being guessed, so a timer can no longer read a home it was not
+granted; and actor and file owner become the same uid, which is what lets an operator read
+`~/.config/ncc-assistant/audit.jsonl` and know whose files each line actually touched. Check what a
+live unit carries:
+
+```bash
+systemctl show -p User ncc-assistant-schedule-<id>.service
+ncc ai permissions show                        # the grant this run resolved, not the declared one
+```
+
+**The one exception, named at evaluation.** A schedule whose *resolved* grant reaches
+`system = "config-write"` or `"rebuild"` keeps root even when `runAsUser` is declared — `/etc/nixos`
+and `nixos-rebuild` both need it, and a run denied at the write its own grant authorised would read
+as a broken agent rather than as a wrong expectation. Nix prints which schedules those are
+(`keeps running as root although agent.runAsUser = …`) so nobody reads the host as "all runs
+unprivileged"; lower `permissions.system`, `allowWrite` or `allowRebuild` on that schedule to drop it
+to the declared account too.
+
+**Chained schedules.** The wake step (`ExecStartPost=`) is prefixed `+`, so that one line keeps root
+— a plain account may not ask systemd to start a sibling unit. The *decision* to wake is still asked
+of the run's own account through `runuser`, because `ncc-assistant` appends it to `audit.jsonl` and a
+root-owned audit file inside the operator's home would lock the GUI out of the history this run made.
+`ExecStart=` keeps its restrictions, so the agent itself still never gets `systemctl`.
+
+A declared account that is not a key in `users.users` fails evaluation by name rather than producing
+a unit whose `User=` systemd would refuse at start.
+
 ## Poll schedules (change-driven, not clock-driven)
 
 A poll fires on a monotonic interval and **skips the run when nothing changed** — it is the only
