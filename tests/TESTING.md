@@ -57,6 +57,42 @@ for a test that forgets to stub, and it stops `notify_send_actions` from freezin
 `--wait`. A test that needs the real argv patches `shutil.which` itself — its nested patch
 wins. `test_desktop_quiet_gate_v1.py` fails if the guard disappears.
 
+### What the session conftest isolates — and what it deliberately does not
+
+Four capabilities are removed for the whole of `tests/ncc-assistant`:
+
+| Guard | Capability removed | Why |
+|-------|--------------------|-----|
+| `pytest_configure` XDG throwaway | the operator's real config home | jobs, approvals, workspaces and audit resolve through `paths.config_home()` **on every call**, so one test driving the agent without its own tmp home appends to live state |
+| `no_desktop_side_effects` (autouse) | `notify-send`, `qdbus`, `dbus-send`, `hyprctl`, `swaymsg`, `kdotool`, `wtype`, `xdotool`, `ydotool` from `shutil.which` | the gate runs on the desktop it would otherwise pause, switch workspace on, or type into |
+| `operator_state_stays_writable_only_by_itself` (autouse tripwire) | nothing — it **fails the test** | `patch.dict(..., clear=True)` deletes the throwaway too, after which paths resolve to `~/.config`; the tripwire names the offending test instead of quietly editing the operator's history |
+| `sys.dont_write_bytecode` | `.pyc` under the module tree | `package.nix` stages `core/ companion cli …` verbatim, so bytecode written by a local run is **content that ships** — a different store path per machine that ran the suite last |
+
+**Not isolated: git's repository-location variables.** Measured inside a real `pre-commit` hook
+(git 2.54.0), the environment the suite inherits is:
+
+```
+GIT_INDEX_FILE=.git/index   GIT_PREFIX=   GIT_AUTHOR_{NAME,EMAIL,DATE}
+GIT_CONFIG_PARAMETERS=      GIT_EXEC_PATH= GIT_EDITOR=:
+```
+
+`GIT_DIR` / `GIT_WORK_TREE` are **not** exported, and a relative `GIT_INDEX_FILE` resolves against
+the process cwd — so a fixture's `git add` / `commit` lands inside its own tmp repository, which is
+why the current suites are safe. That is a property of *this git build behind this hook*, not a
+guard we own: give the same command an absolute `GIT_DIR` (another git, a GUI commit tool, a wrapper
+re-execing the hook) and it operates on the checkout running the gate — `GIT_DIR` beats both `-C` and
+the working directory, verified directly by initialising a repository into a `GIT_DIR` target from an
+unrelated cwd.
+
+So a new test must not spawn real git unless it actually needs git. `_repo()` in
+`test_permission_ladder_v1.py` does spawn it and inherits the variables above. Most cases that look
+repository-shaped — *is this path inside a repo*, *what does the floor refuse*, *what environment did
+the child get* — are served by a plain directory plus a stub executable on `PATH`, which is what
+`test_gh_credential_v1.py` does for both `gh` and `git`. A strip guard for the nine location
+variables exists on `refactor/ncc-assistant-tree` (`5a00bb35`: `conftest.py::GIT_REPO_ENV` +
+`test_git_env_isolation_v1.py`); it is **deliberately not on `main`** — the exposure above is
+accepted, not removed, and this section is where that choice is written down.
+
 ### PySide6 / Qt tests
 
 NCC does **not** install PySide6 on system `python3`. The GUI uses a dedicated
