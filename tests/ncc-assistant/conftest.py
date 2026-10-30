@@ -18,6 +18,14 @@ Two side effects a green gate must never have on the machine that runs it:
   that sets XDG_CONFIG_HOME itself still wins for its own body. The fallback is still one
   call away — ``patch.dict(..., clear=True)`` deletes the throwaway too — so a tripwire
   fails any test whose writes land in the real ``~/.config/ncc-assistant``.
+* **The checkout that runs the gate.** ``git`` prefers ``GIT_DIR``/``GIT_INDEX_FILE``/
+  ``GIT_WORK_TREE`` over the directory it was spawned in, and the pre-commit hook exports all
+  three. A fixture that then runs ``git init`` / ``add -A`` / ``commit`` in a tmp dir operates on
+  the operator's repository instead of its own: the branch ref moves to the fixture's seed
+  commit, the index is replaced, ``git config user.*`` lands in ``.git/config`` — and a fixture
+  that reaches for ``push --force`` pushes that repository to its remote. Removing those
+  variables for the session makes every fixture repo its own repository; the suite still runs
+  real git.
 """
 
 from __future__ import annotations
@@ -53,6 +61,21 @@ DESKTOP_BINARIES = frozenset(
     }
 )
 
+#: Environment variables that tell ``git`` which repository to act on regardless of its working
+#: directory. A git command that means "this tmp fixture" follows these instead, so leaving the
+#: hook's copies in place points ``init``/``add``/``commit``/``push`` at the operator's checkout.
+GIT_REPO_ENV = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+    "GIT_QUARANTINE_PATH",
+    "GIT_PREFIX",
+)
+
 #: Throwaway XDG config home for this session (set in pytest_configure, removed on exit).
 _SESSION_XDG: Path | None = None
 
@@ -76,6 +99,8 @@ def pytest_configure(config):
     _SESSION_XDG = Path(tempfile.mkdtemp(prefix="ncc-assistant-tests-"))
     _OPERATOR_AUDIT = Path(os.path.expanduser("~")) / ".config" / "ncc-assistant" / "audit.jsonl"
     os.environ["XDG_CONFIG_HOME"] = str(_SESSION_XDG)
+    for name in GIT_REPO_ENV:
+        os.environ.pop(name, None)
 
 
 def pytest_unconfigure(config):
