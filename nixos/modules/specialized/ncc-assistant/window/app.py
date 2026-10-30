@@ -85,6 +85,11 @@ except ImportError:  # pragma: no cover
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 
+#: How long closing the window waits for a worker it owns. A QThread destroyed mid-run is fatal in
+#: Qt, so the wait is what turns "quit during a fetch" from a SIGABRT into a closed window; the
+#: bound is what keeps a wedged gateway from holding the close forever.
+THREAD_STOP_WAIT_MS = 2000
+
 
 class ConfirmBridge(QObject):
     """Ask the GUI thread for write/rebuild confirmation from a worker thread."""
@@ -1275,6 +1280,20 @@ class ChatPage(QWidget):
                 self.session.set_model(str(mid))
                 set_last_model(str(mid))
         self._model_guard = False
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        # A QThread destroyed while it is still running is fatal in Qt, and every worker here is a
+        # child of this page — so closing the window during a model fetch, a chat send or a context
+        # probe used to end the process with "QThread: Destroyed while thread is still running"
+        # (seen as SIGABRT at interpreter exit). Ask each one to stop and wait, bounded: a worker
+        # still running after the bound is left alone rather than destroyed, which costs a thread
+        # and not the run's audit trail.
+        for worker in self.findChildren(QThread):
+            worker.requestInterruption()
+            worker.quit()
+            if not worker.wait(THREAD_STOP_WAIT_MS):
+                worker.setParent(None)
+        super().closeEvent(event)
 
     def _start_models_fetch(self) -> None:
         self._models_fetch_gen += 1

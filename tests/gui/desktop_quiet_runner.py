@@ -54,10 +54,67 @@ SESSION_ENV_VARS = (
 )
 
 
+#: The model gateway is part of the operator's session too. A ChatPage probes ``{endpoint}/models``
+#: the moment it opens, with the operator's own key, and ``Settings.from_env`` defaults it to
+#: localhost:11434 — so every GUI smoke dialled a real gateway and left a QThread in flight. An
+#: unreadable port answers in microseconds, which is what makes the teardown below deterministic
+#: instead of racing the interpreter on ~1 run in 100.
+MODEL_ENDPOINT_ENV = "NCC_ASSISTANT_ENDPOINT"
+UNREACHABLE_ENDPOINT = "http://127.0.0.1:1/v1"
+
+#: Every QThread this process started. PySide destroys a running QThread at interpreter exit and
+#: Qt makes that fatal ("QThread: Destroyed while thread is still running"), which is how a smoke
+#: prints OK and aborts anyway — after its own assertions, so nothing in the output explains it.
+STARTED_THREADS: list = []
+
+
+def _track_thread_starts() -> None:
+    try:
+        from PySide6.QtCore import QThread
+    except ImportError:
+        return
+
+    real_start = QThread.start
+
+    def start(self, *args, **kwargs):
+        STARTED_THREADS.append(self)
+        return real_start(self, *args, **kwargs)
+
+    QThread.start = start  # type: ignore[assignment]
+
+
+def drain_qthreads(timeout_ms: int = 5000) -> list[str]:
+    """Stop and wait for every worker the script started; name the ones that would not stop.
+
+    Waiting is the whole point. A worker that outlives its script is not merely untidy — Qt aborts
+    the process when it is destroyed mid-run, so the run dies after printing its result. A
+    straggler is reported by name rather than waited away in silence.
+    """
+    stragglers: list[str] = []
+    for thread in list(STARTED_THREADS):
+        try:
+            if not thread.isRunning():
+                continue
+            thread.requestInterruption()
+            thread.quit()
+            if not thread.wait(timeout_ms):
+                stragglers.append(type(thread).__name__)
+        except RuntimeError:
+            continue  # Qt already destroyed it — nothing here can destroy it wrongly
+    return stragglers
+
+
 def install_desktop_boundary() -> None:
     for name in SESSION_ENV_VARS:
         os.environ.pop(name, None)
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
+    os.environ[MODEL_ENDPOINT_ENV] = UNREACHABLE_ENDPOINT
+    # The smokes import the assistant packages straight out of the module tree, and package.nix
+    # stages that tree verbatim — bytecode written here would change the store path of the shipped
+    # package. validate-gui-python.sh exports this, but the runner is also invoked bare, and .gitignore
+    # hides __pycache__ from git while `ncc system-update --local` copies it by path anyway.
+    os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+    sys.dont_write_bytecode = True
 
     real_which = shutil.which
 
@@ -67,6 +124,7 @@ def install_desktop_boundary() -> None:
         return real_which(cmd, *args, **kwargs)
 
     shutil.which = which  # type: ignore[assignment]
+    _track_thread_starts()
 
 
 def main() -> int:
@@ -76,7 +134,16 @@ def main() -> int:
     target = sys.argv[1]
     sys.argv = sys.argv[1:]
     install_desktop_boundary()
-    runpy.run_path(target, run_name="__main__")
+    try:
+        runpy.run_path(target, run_name="__main__")
+    finally:
+        stuck = drain_qthreads()
+        if stuck:
+            print(
+                f"desktop_quiet_runner: {', '.join(stuck)} still running at exit — the script "
+                "started a worker it never stopped",
+                file=sys.stderr,
+            )
     return 0
 
 
