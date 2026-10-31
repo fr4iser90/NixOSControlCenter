@@ -39,6 +39,7 @@ from core.catalogs.playbooks import (  # noqa: E402
 BUILTIN_PLAYBOOKS = {
     "disk-nix-gc-advisor",
     "health-report",
+    "project-drift-audit",
     "red-team-guards",
     "unused-modules-dry-run",
 }

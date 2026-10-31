@@ -1,0 +1,8 @@
+{
+  "name": "project-drift-audit",
+  "description": "Read-only audit of the local project portfolio: where folder names, git remotes, the workspace registry and the READMEs disagree, and what each project turns out to do.",
+  "goal": "Call portfolio_drift_report once to inventory the portfolio, then report and record it. Read the counts first and go through them kind by kind, quoting the projects under each: folder_vs_origin_name, registry_vs_origin, registry_github_missing, repo_not_registered, registered_path_missing, no_origin_remote, not_a_repo, dirty_worktree. Then list every project with the one line its README gives as its purpose, so it is visible which project does what and which folders carry no such statement at all. Quote the report's github field verbatim, including its reason, so an unchecked upstream half is never read as a clean one. When the run is asked to record the result, store exactly what the report said with memory_add, tagged project-drift, naming the root and the counts; do not paraphrase a drift away. This run must not rename a folder, change a remote, edit the registry, commit, push or touch any file: every drift is a line in the report for a human to decide on.",
+  "profile": "read-only",
+  "dry_run": true,
+  "tags": ["git", "portfolio", "drift", "inventory", "read-only"]
+}

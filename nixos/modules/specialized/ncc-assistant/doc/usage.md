@@ -585,6 +585,7 @@ ncc-assistant jobs log <id>
 
 ncc-assistant playbook list
 ncc-assistant playbook run health-report --dry-run
+ncc-assistant playbook run project-drift-audit
 
 ncc-assistant presence status
 ncc-assistant presence pause --reason "gaming"
@@ -666,6 +667,7 @@ ncc-assistant-mcp
 | `apply_system` | Rebuild (guarded + optional preflight) |
 | `run_preflight` | Prebuild script |
 | `config_health_report` | Drift / health |
+| `portfolio_drift_report` | Local project portfolio: folder vs remote vs registry |
 | `list_config_backups` / `list_boot_generations` | Rollback guidance |
 | `ask_user` | Ask the human a question (options → chips) |
 | `memory_*` | Durable notes |

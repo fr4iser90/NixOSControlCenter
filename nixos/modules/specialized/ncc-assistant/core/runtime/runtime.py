@@ -200,6 +200,28 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "portfolio_drift_report",
+        "description": (
+            "Inventory every project folder under one portfolio root and report where its names "
+            "disagree: the folder against its origin repository, workspaces.json against that "
+            "origin, repositories that were never registered, registered paths that no longer "
+            "exist, plain folders that are not repositories, and the README line that says what "
+            "each project does. Read-only; it also states why upstream GitHub was not compared."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "root": {
+                    "type": "string",
+                    "description": (
+                        "Portfolio directory. Default: the folder holding the registered "
+                        "workspace paths."
+                    ),
+                },
+            },
+        },
+    },
+    {
         "name": "memory_list",
         "description": "List persistent memory notes for context.",
         "inputSchema": {
@@ -1171,6 +1193,16 @@ class ToolRuntime:
         report = config_health_report(self.settings)
         return {"ok": True, **report.to_dict()}
 
+    def portfolio_drift_report(self, root: str | None = None) -> dict[str, Any]:
+        """Inventory the project portfolio and report where its names disagree.
+
+        Imports the module, not the function: this method carries the function's name, and a
+        function-local ``from … import <same name>`` would shadow it without any linter here
+        objecting.
+        """
+        from core.catalogs import portfolio
+        return {"ok": True, **portfolio.portfolio_drift_report(root)}
+
     def memory_list(self, tag: str | None = None, limit: int = 20) -> dict[str, Any]:
         """List memory notes."""
         from core.runtime.memory import list_notes
@@ -1500,6 +1532,8 @@ class ToolRuntime:
                 return self.run_preflight()
             if name == "config_health_report":
                 return self.config_health_report()
+            if name == "portfolio_drift_report":
+                return self.portfolio_drift_report(args.get("root"))
             if name == "memory_list":
                 return self.memory_list(args.get("tag"), int(args.get("limit", 20)))
             if name == "memory_add":
