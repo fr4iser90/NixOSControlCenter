@@ -377,6 +377,13 @@ templates when armed; presence `paused` disables idle.
 **Workspaces** · **Cron**. There is **no Daily board**.
 See [surfaces.md](./surfaces.md).
 
+**Playbooks (Companion rail, in the Work group):** one row per playbook, printed with the
+scope it runs at (`profile`, `dry run`). Click = run now in the current chat — no parameter
+dialog, that is the difference to **Workflows**. The run is native and ignores the slot's
+harness chip: `profile` and `dry_run` are enforced by `AgentRunner`, and an external backend
+takes the goal alone, so a chip could otherwise hand out a scope the row just promised it
+would not exceed. `project-drift-audit` is the shipped portfolio audit.
+
 **Briefing:** workflow `workspace-brief` — run Once or schedule under
 **Cron**. Not a plugin.
 

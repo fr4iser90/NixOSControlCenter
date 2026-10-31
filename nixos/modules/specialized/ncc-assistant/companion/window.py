@@ -71,6 +71,7 @@ STATE_ERROR = "error"
 PANEL_NONE = "none"
 PANEL_HISTORY = "history"
 PANEL_TEMPLATES = "templates"
+PANEL_PLAYBOOKS = "playbooks"
 PANEL_WORKFLOWS = "workflows"
 PANEL_PLUGINS = "plugins"
 PANEL_TOOLS = "tools"
@@ -300,6 +301,57 @@ class _CompanionTemplateWorker(QThread):
                         profile=tmpl.profile,
                     ):
                         self.event.emit(self.slot_id, ev)
+        except Exception as exc:  # noqa: BLE001
+            self.failed.emit(self.slot_id, f"{exc}\n{traceback.format_exc()}")
+
+
+class _CompanionPlaybookWorker(QThread):
+    """Run one playbook into a companion slot.
+
+    No harness branch, deliberately. ``profile`` and ``dry_run`` are enforced inside
+    ``AgentRunner``, and a ``HarnessBackend.send()`` takes a goal string and nothing else —
+    so a ``read-only`` playbook handed to qwen would be a label with nothing behind it, and
+    an external run never reaches ``create_job`` either. The scope the playbook declares is
+    the thing being promised here, so this path cannot leave the runner that implements it.
+    """
+
+    event = Signal(str, object)
+    failed = Signal(str, str)
+
+    def __init__(self, slot_id: str, playbook: str, *, parent=None) -> None:
+        super().__init__(parent)
+        self.slot_id = slot_id
+        self._playbook = playbook
+
+    def run(self) -> None:
+        try:
+            from core.catalogs.playbooks import get_playbook
+            from core.policy.auth import with_cached_credentials
+            from core.runtime.agent import run_agent
+            from core.runtime.capacity import capacity_slot
+            from core.store.config import Settings
+
+            pb = get_playbook(self._playbook)
+            if pb is None or not pb.goal.strip():
+                raise ValueError(f"Playbook has no goal to run: {self._playbook}")
+            settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
+            scope = pb.profile or "host profile"
+            if pb.dry_run:
+                scope += " · dry run"
+            self.event.emit(
+                self.slot_id,
+                {"kind": "status", "text": f"Playbook {pb.name} · native · {scope}"},
+            )
+            with capacity_slot(f"playbook:{pb.name}"):
+                for ev in run_agent(
+                    pb.goal,
+                    settings,
+                    max_steps=pb.max_steps or settings.agent_max_steps,
+                    dry_run=pb.dry_run,
+                    profile=pb.profile,
+                    playbook=pb.name,
+                ):
+                    self.event.emit(self.slot_id, ev)
         except Exception as exc:  # noqa: BLE001
             self.failed.emit(self.slot_id, f"{exc}\n{traceback.format_exc()}")
 
@@ -855,6 +907,12 @@ class CompanionWindow(QWidget):
                 "folder-templates",
                 "▶",
                 "Workflows — click a row to configure / run",
+            ),
+            (
+                PANEL_PLAYBOOKS,
+                "system-run",
+                "📋",
+                "Playbooks — click a row to run it now, on the scope the playbook declares",
             ),
             (
                 PANEL_CRON,
@@ -2479,6 +2537,33 @@ class CompanionWindow(QWidget):
                 row.setToolTip(t.description or t.id)
                 row.setData(Qt.ItemDataRole.UserRole, ("template", t.id))
                 self.panel_list.addItem(row)
+        elif key == PANEL_PLAYBOOKS:
+            self.panel_title.setText("Playbooks")
+            try:
+                from core.catalogs.playbooks import list_playbooks
+
+                pbs = list_playbooks()
+            except Exception as exc:  # noqa: BLE001
+                self.panel_list.addItem(f"(error: {exc})")
+                return
+            if not pbs:
+                self.panel_list.addItem("(no playbooks)")
+                return
+            # The scope is printed on the row because it is what the run cannot exceed: a name
+            # alone invites clicking without knowing whether writes are on the table.
+            self.panel_hint.setText("Click a row to run it now — natively, at the printed scope.")
+            self.panel_hint.show()
+            for pb in pbs:
+                scope = pb.profile or "host profile"
+                if pb.dry_run:
+                    scope += " · dry run"
+                row = QListWidgetItem(f"{pb.name}  ·  {scope}")
+                row.setToolTip(
+                    (pb.description or pb.name)
+                    + f"\n\nRuns natively: {scope}. No parameters — the click is the go."
+                )
+                row.setData(Qt.ItemDataRole.UserRole, ("playbook", pb.name))
+                self.panel_list.addItem(row)
         elif key == PANEL_WORKFLOWS:
             # Legacy panel id — board removed; Workflows + Cron only.
             self.panel_title.setText("Use Workflows")
@@ -2731,6 +2816,9 @@ class CompanionWindow(QWidget):
             return
         if kind == "template" and ref:
             self._run_template(str(ref))
+            return
+        if kind == "playbook" and ref:
+            self._run_playbook(str(ref))
             return
         if kind == "daily_refresh":
             try:
@@ -3007,6 +3095,53 @@ class CompanionWindow(QWidget):
                 elif p.type == "workspace":
                     seed[p.id] = ws
         return seed
+
+    def _run_playbook(self, name: str) -> None:
+        """Start a playbook in the current slot. No dialog: a playbook carries its goal already.
+
+        The slot's harness chip is deliberately not consulted. It chooses a chat backend, and a
+        backend other than native would receive the goal without the profile that bounds it —
+        so the chip does not get a vote on a run whose scope came from the playbook itself.
+        """
+        slot = self._slot()
+        if slot.busy:
+            QMessageBox.information(self, "Playbooks", "Current chat is busy.")
+            return
+        from core.catalogs.playbooks import get_playbook
+
+        pb = get_playbook(name)
+        if pb is None:
+            QMessageBox.warning(self, "Playbooks", f"Unknown: {name}")
+            return
+        if not pb.goal.strip():
+            QMessageBox.warning(
+                self, "Playbooks", f"{name} declares no goal, so there is nothing to run."
+            )
+            return
+        try:
+            from core.scheduling.idle import touch_activity
+
+            touch_activity("companion-playbook")
+        except Exception:
+            pass
+        self._toggle_panel(PANEL_NONE)
+        slot.last_error = ""
+        slot.user_prompt = f"[playbook] {name}"
+        transcript_append(slot, {"kind": "user", "text": slot.user_prompt})
+        slot.turn_start = len(slot.transcript or []) - 1
+        slot.busy = True
+        slot.avatar_state = STATE_THINKING
+        slot.activity = f"Playbook ({name})"
+        if not slot.title_locked:
+            slot.title = name[:24]
+            slot.title_locked = True
+        self._apply_slot_ui()
+        worker = _CompanionPlaybookWorker(slot.id, name, parent=self)
+        slot.worker = worker
+        worker.event.connect(self._on_event)
+        worker.failed.connect(self._on_fail)
+        worker.finished.connect(lambda sid=slot.id: self._on_worker_done(sid))
+        worker.start()
 
     def _run_template(self, template_id: str) -> None:
         slot = self._slot()
