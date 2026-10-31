@@ -285,12 +285,19 @@ def _cmd_playbook_run(args: argparse.Namespace) -> int:
         print_err(f"Playbook not found: {args.name}")
         return 1
 
+    # Every field _cmd_agent_run reads off the namespace has to be here: it is built by hand, so
+    # an attribute the "agent run" parser would have supplied defaults to argparse instead of
+    # arriving as None, and a missing one raises AttributeError deep inside that function.
     run_args = argparse.Namespace(
         goal=pb.goal,
         max_steps=pb.max_steps,
         dry_run=args.dry_run if hasattr(args, "dry_run") else pb.dry_run,
         profile=pb.profile,
         playbook=args.name,
+        harness=getattr(args, "harness", None),
+        grant=list(getattr(args, "grant", None) or []),
+        confirm=getattr(args, "confirm", None),
+        verbose=bool(getattr(args, "verbose", False)),
     )
     return _cmd_agent_run(run_args)
 
@@ -1467,6 +1474,30 @@ def main(argv: list[str] | None = None) -> int:
     playbook_run = playbook_sub.add_parser("run", help="Run a playbook")
     playbook_run.add_argument("name", help="Playbook name")
     playbook_run.add_argument("--dry-run", "-n", action="store_true")
+    playbook_run.add_argument(
+        "--harness",
+        choices=["native", "qwen", "dsh"],
+        help="Force agent harness (default: settings / coding auto)",
+    )
+    playbook_run.add_argument(
+        "--grant",
+        action="append",
+        default=[],
+        metavar="AXIS=STEP",
+        help="Narrow this run, e.g. repo=pr or system=none (never widens the host ceiling)",
+    )
+    playbook_run.add_argument(
+        "--confirm",
+        choices=["always", "writes", "never"],
+        help="Ask policy for this run (never > writes > always as capability): "
+        "may only ask more than the host, never less",
+    )
+    playbook_run.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Full thinking/tool dumps (default: compact one-liners)",
+    )
 
     presence_p = sub.add_parser("presence", help="Presence management")
     presence_sub = presence_p.add_subparsers(dest="presence_cmd")
