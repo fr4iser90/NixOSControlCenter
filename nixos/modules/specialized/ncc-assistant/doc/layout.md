@@ -46,12 +46,12 @@ moment it was, and `lib/` holds nothing but `.nix`.
 | `core/store/` | settings, paths, jobs, presence, preferences (state on disk) |
 | `core/policy/` | permission ladder, floor rules, audit, red-team pack |
 | `core/scheduling/` | schedules, grants per scope, frequency parsing |
-| `core/catalogs/` | agent templates, playbooks, eval cases, marketplace, MCP catalog |
+| `core/catalogs/` | agent templates (workflows), eval cases, marketplace, MCP catalog |
 | `core/workflows/` | workflow execution incl. the git pathset rules |
 | `core/render/` | transcript / text rendering (Qt-free) |
 
 `core/__init__.py` re-exports the public API; import from the group you mean
-(`from core.catalogs.playbooks import list_playbooks`), because the façade imports everything
+(`from core.catalogs.agent_templates import list_agent_templates`), because the façade imports everything
 including the heavy halves.
 
 ---

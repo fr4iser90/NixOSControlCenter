@@ -152,20 +152,26 @@ let
       goal = mkOption {
         type = types.nullOr types.str;
         default = null;
-        description = "Natural language goal for the agent (optional if playbook is set)";
+        description = "Natural language goal for the agent (optional if workflow is set)";
+      };
+      workflow = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        example = "health-report";
+        description = "Catalog workflow id under data/agents (e.g. health-report)";
       };
       playbook = mkOption {
         type = types.nullOr types.str;
         default = null;
         example = "health-report";
-        description = "Builtin/user playbook name (e.g. health-report, unused-modules-dry-run)";
+        description = "Deprecated alias for workflow (existing host schedules keep evaluating)";
       };
       kind = mkOption {
         type = types.enum [ "agent" "probe" ];
         default = "agent";
         description = ''
-          agent = LLM playbook/goal.
-          probe = tool-only check (e.g. disk-nix); escalate to playbook only over threshold.
+          agent = LLM workflow/goal.
+          probe = tool-only check (e.g. disk-nix); escalate to workflow only over threshold.
         '';
       };
       probe = mkOption {
@@ -179,10 +185,15 @@ let
         default = 85;
         description = "For disk-nix probe: root usage %% that triggers agent escalation";
       };
-      escalatePlaybook = mkOption {
+      escalateWorkflow = mkOption {
         type = types.nullOr types.str;
         default = "disk-nix-gc-advisor";
-        description = "Playbook to run when probe exceeds threshold";
+        description = "Workflow to run when probe exceeds threshold";
+      };
+      escalatePlaybook = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Deprecated alias for escalateWorkflow";
       };
       maxSteps = mkOption {
         type = types.nullOr types.int;
@@ -485,7 +496,7 @@ in
         description = ''
           Maximum tool steps per agent run. -1 (default) means unlimited, like
           qwen-code's model.maxSessionTurns; set a positive integer to opt in to a
-          budget. Schedules and playbooks that set maxSteps keep their own value.
+          budget. Schedules and workflows that set maxSteps keep their own value.
         '';
       };
 
@@ -706,7 +717,7 @@ in
           daily-health = {
             enable = true;
             onCalendar = "*-*-* 03:15:00";
-            playbook = "health-report";
+            workflow = "health-report";
             profile = "read-only";
             dryRun = true;
             maxSteps = 15;
@@ -714,14 +725,14 @@ in
           weekly-module-audit = {
             enable = true;
             onCalendar = "Sun *-*-* 04:00:00";
-            playbook = "unused-modules-dry-run";
+            workflow = "unused-modules-dry-run";
             profile = "read-only";
             dryRun = true;
             maxSteps = 30;
           };
         };
         description = ''
-          Scheduled agent jobs (systemd timers). Prefer playbook + read-only + dryRun.
+          Scheduled agent jobs (systemd timers). Prefer workflow + read-only + dryRun.
           Leave empty by default — copy examples from template-config.nix to opt in.
         '';
       };

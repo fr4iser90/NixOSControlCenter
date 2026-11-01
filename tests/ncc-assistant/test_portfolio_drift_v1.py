@@ -245,22 +245,23 @@ class PortfolioDriftTests(unittest.TestCase):
         self.assertIn("not a directory", report["error"])
 
 
-class PortfolioPlaybookTests(unittest.TestCase):
-    """The playbook is the thing the operator starts; a broken reference here fails only at run time."""
+class PortfolioWorkflowTests(unittest.TestCase):
+    """The workflow is the thing the operator starts; a broken reference here fails only at run time."""
 
-    def test_playbook_names_the_tool_and_stays_read_only(self) -> None:
+    def test_workflow_names_the_tool_and_stays_read_only(self) -> None:
         import json
 
-        path = ROOT / "data" / "playbooks" / "project-drift-audit.json"
+        path = ROOT / "data" / "agents" / "project-drift-audit.json"
         self.assertTrue(path.is_file(), f"{path} missing — the operator has nothing to start")
         data = json.loads(path.read_text(encoding="utf-8"))
 
-        self.assertEqual(data["name"], "project-drift-audit")
+        self.assertEqual(data["id"], "project-drift-audit")
         self.assertEqual(data["profile"], "read-only")
-        self.assertTrue(data["dry_run"])
-        self.assertIn("portfolio_drift_report", data["goal"])
+        self.assertTrue(data["dryRun"])
+        goal = data["goalTemplate"]
+        self.assertIn("portfolio_drift_report", goal)
         for kind in ("folder_vs_origin_name", "registered_path_missing", "not_a_repo"):
-            self.assertIn(kind, data["goal"], f"goal must name the drift {kind}")
+            self.assertIn(kind, goal, f"goal must name the drift {kind}")
 
     def test_the_tool_is_registered_and_read_only(self) -> None:
         from core.runtime.registry import ToolRegistry
@@ -275,7 +276,7 @@ class PortfolioPlaybookTests(unittest.TestCase):
         self.assertEqual(entry.risk, "read", "an inventory that can write is not an inventory")
 
     def test_a_run_reaches_the_report_through_the_dispatch(self) -> None:
-        """A schema without its dispatch branch is a tool the playbook can name and never get.
+        """A schema without its dispatch branch is a tool the workflow can name and never get.
 
         The mutation that this catches is one line in ``ToolRuntime.call`` — invisible to every
         check above, because the schema and the registry entry both stay intact without it.

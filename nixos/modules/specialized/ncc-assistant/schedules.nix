@@ -20,6 +20,7 @@ let
       ((s.probe or null) != null && s.probe != "")
     else
       ((s.goal or null) != null && s.goal != "")
+      || ((s.workflow or null) != null && s.workflow != "")
       || ((s.playbook or null) != null && s.playbook != "");
 
   invalidSchedules = filterAttrs (_: s: !(scheduleHasWork _ s)) enabledSchedules;
@@ -499,7 +500,7 @@ let
       maxSteps = if schedule.maxSteps != null then schedule.maxSteps else (cfg.agent.maxSteps or (-1));
       dryRun = if schedule.dryRun != null then schedule.dryRun else (cfg.agent.dryRun or false);
       profile = if schedule.profile != null then schedule.profile else (cfg.agent.profile or "read-only");
-      playbook = schedule.playbook or null;
+      workflow = schedule.workflow or schedule.playbook or null;
       goal = schedule.goal or null;
       grant = effectiveGrant schedule;
       agentArgs = [
@@ -513,7 +514,7 @@ let
         ++ [ "--confirm" (effectiveConfirm schedule) ]
         ++ optionals (profile != null) [ "--profile" (lib.escapeShellArg profile) ]
         ++ optionals dryRun [ "--dry-run" ]
-        ++ optionals (playbook != null) [ "--playbook" (lib.escapeShellArg playbook) ]
+        ++ optionals (workflow != null) [ "--workflow" (lib.escapeShellArg workflow) ]
         ++ optionals (goal != null && goal != "") [ "--goal" (lib.escapeShellArg goal) ];
     in
     pkgs.writeShellScript "ncc-assistant-schedule-${name}" ''
@@ -525,13 +526,13 @@ let
     let
       probe = schedule.probe or "disk-nix";
       thr = toString (schedule.thresholdPct or 85);
-      pb = schedule.escalatePlaybook or "disk-nix-gc-advisor";
+      pb = schedule.escalateWorkflow or schedule.escalatePlaybook or "disk-nix-gc-advisor";
       probeArgs = [
         "${pkg.nccAssistant}/bin/ncc-assistant"
         "probe" "disk"
         "--threshold" thr
         "--escalate"
-        "--playbook" (lib.escapeShellArg pb)
+        "--workflow" (lib.escapeShellArg pb)
       ];
     in
     pkgs.writeShellScript "ncc-assistant-schedule-${name}" ''
@@ -719,7 +720,7 @@ in
         {
           assertion = invalidSchedules == { };
           message = ''
-            NCC Assistant schedules need goal/playbook (agent) or probe id (probe):
+            NCC Assistant schedules need goal/workflow (agent) or probe id (probe):
             ${concatStringsSep ", " (attrNames invalidSchedules)}
           '';
         }

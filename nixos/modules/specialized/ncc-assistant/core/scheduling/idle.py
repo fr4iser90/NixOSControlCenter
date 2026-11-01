@@ -279,15 +279,15 @@ def maybe_sweep(*, start: bool = False) -> dict[str, Any]:
                     from core.store.config import Settings
 
                     goal = c.get("goal")
-                    playbook = c.get("playbook")
+                    workflow = c.get("workflow") or c.get("playbook")
                     settings = with_cached_credentials(
                         Settings.from_env(client_mode="chat")
                     )
-                    if playbook and not goal:
-                        from core.catalogs.playbooks import get_playbook
+                    if workflow and not goal:
+                        from core.catalogs.agent_templates import resolve_workflow_run
 
-                        pb = get_playbook(str(playbook))
-                        goal = pb.goal if pb else None
+                        wf = resolve_workflow_run(str(workflow))
+                        goal = wf["goal"] if wf else None
                     if not goal:
                         started.append({**c, "status": "skipped", "error": "no goal"})
                         continue
@@ -306,7 +306,7 @@ def maybe_sweep(*, start: bool = False) -> dict[str, Any]:
                             settings,
                             dry_run=bool(c.get("dryRun", True)),
                             profile=profile,
-                            playbook=str(playbook) if playbook else None,
+                            workflow=str(workflow) if workflow else None,
                             grant=grant,
                         ):
                             if isinstance(ev, dict) and ev.get("kind") == "skipped" and not skipped:

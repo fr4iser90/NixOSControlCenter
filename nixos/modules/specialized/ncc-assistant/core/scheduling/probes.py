@@ -171,15 +171,19 @@ def run_disk_nix_probe(
 def escalate_disk_probe(
     probe: DiskNixProbeResult,
     *,
-    playbook: str = "disk-nix-gc-advisor",
+    workflow: str = "disk-nix-gc-advisor",
+    playbook: str | None = None,  # deprecated alias
     force: bool = False,
 ) -> dict[str, Any]:
     """
-    If over threshold (or force), run the advisor playbook via agent.
+    If over threshold (or force), run the advisor workflow via agent.
     Otherwise only notify a short OK summary.
+
+    Callers: ``cli._cmd_probe_disk``, ``schedules.nix`` probe units.
     """
     from core.policy.notifications import notify_agent_event
 
+    workflow = workflow or playbook or "disk-nix-gc-advisor"
     summary = (
         f"root={probe.root_pct}% "
         f"nix_store={probe.nix_store_gb}GiB "
@@ -204,11 +208,11 @@ def escalate_disk_probe(
     from core.runtime.agent import run_agent
     from core.policy.auth import with_cached_credentials
     from core.store.config import Settings
-    from core.catalogs.playbooks import get_playbook
+    from core.catalogs.agent_templates import resolve_workflow_run
 
-    pb = get_playbook(playbook)
+    wf = resolve_workflow_run(workflow)
     settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
-    goal = pb.goal if pb else (
+    goal = wf["goal"] if wf else (
         "Disk/Nix usage is high. Use disk_nix_report and list_boot_generations. "
         "Summarize safe cleanup options. Do NOT delete or run GC. dry-run only."
     )
@@ -216,10 +220,10 @@ def escalate_disk_probe(
     for ev in run_agent(
         goal,
         settings,
-        max_steps=(pb.max_steps if pb and pb.max_steps else 16),
-        dry_run=True if pb is None else pb.dry_run,
-        profile=(pb.profile if pb else "read-only") or "read-only",
-        playbook=playbook if pb else None,
+        max_steps=(wf["max_steps"] if wf and wf.get("max_steps") else 16),
+        dry_run=True if wf is None else bool(wf.get("dry_run")),
+        profile=(wf["profile"] if wf else "read-only") or "read-only",
+        workflow=workflow if wf else None,
     ):
         events.append(ev)
 
@@ -228,7 +232,7 @@ def escalate_disk_probe(
         "ok": True,
         "escalated": True,
         "probe": probe.to_dict(),
-        "playbook": playbook,
+        "workflow": workflow,
         "event_count": len(events),
         "last_kind": last.get("kind"),
     }
@@ -239,7 +243,8 @@ def run_disk_probe_and_maybe_escalate(
     threshold_pct: float = 85.0,
     escalate: bool = True,
     force: bool = False,
-    playbook: str = "disk-nix-gc-advisor",
+    workflow: str = "disk-nix-gc-advisor",
+    playbook: str | None = None,  # deprecated alias
 ) -> dict[str, Any]:
     probe = run_disk_nix_probe(threshold_pct=threshold_pct)
     out: dict[str, Any] = {"ok": probe.ok, "probe": probe.to_dict()}
@@ -247,4 +252,6 @@ def run_disk_probe_and_maybe_escalate(
         return out
     if not escalate:
         return out
-    return escalate_disk_probe(probe, playbook=playbook, force=force)
+    return escalate_disk_probe(
+        probe, workflow=workflow or playbook or "disk-nix-gc-advisor", force=force
+    )

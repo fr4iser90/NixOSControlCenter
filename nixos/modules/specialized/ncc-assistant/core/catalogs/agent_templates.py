@@ -255,6 +255,38 @@ def get_agent_template(template_id: str) -> AgentTemplate | None:
     return None
 
 
+def resolve_workflow_run(
+    workflow_id: str,
+    params: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Resolve a catalog workflow into a runnable goal + policy.
+
+    Callers: ``cli.cli`` agent run, companion, probes, idle, AgentPage.
+    Replaces the removed ``core.catalogs.playbooks`` loader — same ids now live
+    under ``data/agents/*.json`` (id, title, goalTemplate, profile, dryRun,
+    maxSteps, params[]). Param defaults fill missing keys; required params
+    without defaults keep ``{{placeholders}}`` until Configure supplies them.
+    """
+    tmpl = get_agent_template(workflow_id)
+    if tmpl is None:
+        return None
+    merged = {p.id: p.default for p in tmpl.params if p.default is not None}
+    if params:
+        merged.update(params)
+    goal = resolve_goal(tmpl, merged)
+    if not goal.strip():
+        return None
+    return {
+        "id": tmpl.id,
+        "title": tmpl.title,
+        "goal": goal,
+        "profile": tmpl.profile,
+        "dry_run": tmpl.dry_run,
+        "max_steps": tmpl.max_steps,
+        "template": tmpl,
+    }
+
+
 def load_skill_text(skill_ref: str | None) -> str:
     if not skill_ref:
         return ""
@@ -462,7 +494,6 @@ def instantiate(
     instance_id: str | None = None,
     title: str | None = None,
     enable_schedule: bool = False,
-    save_playbook: bool = True,
     provider_id: str | None = None,
     model: str | None = None,
     update_existing: bool = False,
@@ -470,7 +501,7 @@ def instantiate(
     save_prompt_override: bool | None = None,
 ) -> dict[str, Any]:
     """
-    Validate params, persist instance, optionally write a user playbook + schedule.
+    Validate params, persist instance, optionally write a user schedule.
 
     ``prompt_override`` is the full agent prompt text. When ``save_prompt_override``
     is True it is stored on the instance; when False the stored override is left
@@ -524,30 +555,13 @@ def instantiate(
     if model is not None:
         inst.model = model.strip() or None
     path = save_instance(inst)
-    # Playbook / schedule: prefer ephemeral override for this save if provided,
+    # Schedule: prefer ephemeral override for this save if provided,
     # else stored instance override, else catalog render.
     goal = resolve_goal(
         tmpl,
         merged,
         prompt_override=prompt_override if (prompt_override or "").strip() else stored_override,
     )
-
-    playbook_name = None
-    if save_playbook:
-        from core.catalogs.playbooks import Playbook, save_user_playbook
-
-        playbook_name = f"tmpl-{iid}"
-        save_user_playbook(
-            Playbook(
-                name=playbook_name,
-                description=f"From template {tmpl.id}",
-                goal=goal,
-                profile=tmpl.profile,
-                dry_run=tmpl.dry_run,
-                max_steps=tmpl.max_steps,
-                tags=["agent-template", tmpl.id, *tmpl.tags],
-            )
-        )
 
     schedule_name = None
     if enable_schedule:
@@ -562,12 +576,14 @@ def instantiate(
         inst.params = merged
         save_instance(inst)
         schedule_name = f"tmpl-{iid}"
+        # Store the rendered goal so the timer does not need to re-resolve params;
+        # workflow id is attribution for jobs / cron UI.
         save_user_schedule(
             ScheduleSpec(
                 name=schedule_name,
                 onCalendar=freq,
-                playbook=playbook_name,
-                goal=goal if not playbook_name else None,
+                workflow=template_id,
+                goal=goal,
                 profile=tmpl.profile,
                 dryRun=tmpl.dry_run,
                 maxSteps=tmpl.max_steps,
@@ -608,7 +624,7 @@ def instantiate(
         "instance": inst.to_dict(),
         "path": str(path),
         "goal": goal,
-        "playbook": playbook_name,
+        "workflow": template_id,
         "schedule": schedule_name,
         "mcp": mcp_results,
     }
@@ -680,6 +696,6 @@ def run_instance(
             max_steps=tmpl.max_steps or settings.agent_max_steps,
             dry_run=tmpl.dry_run if dry_run is None else dry_run,
             profile=tmpl.profile,
-            playbook=f"tmpl-{inst.id}",
+            workflow=tmpl.id,
         )
     )

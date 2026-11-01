@@ -173,7 +173,7 @@ class LayoutGateBiteTests(unittest.TestCase):
     # ── 5) data/ stays code-free and complete ────────────────────────────────
 
     def test_python_under_data_is_caught(self) -> None:
-        (self.fixture / "data" / "playbooks" / "loader.py").write_text("# noqa\n", encoding="utf-8")
+        (self.fixture / "data" / "agents" / "loader.py").write_text("# noqa\n", encoding="utf-8")
         self.assert_red("data/ must stay catalog-only")
 
     def test_a_missing_catalog_dir_is_caught(self) -> None:
@@ -182,11 +182,11 @@ class LayoutGateBiteTests(unittest.TestCase):
 
     # ── 6) loader degradation + provenance ────────────────────────────────────
 
-    def test_playbooks_moved_out_of_the_data_root_is_caught(self) -> None:
+    def test_agents_moved_out_of_the_data_root_is_caught(self) -> None:
         """The plan's central risk, in one move: the dir relocates and the loader starts
         answering `[]`. Nothing prints an error, so only the gate notices."""
-        shutil.rmtree(self.fixture / "data" / "playbooks")
-        self.assert_red("playbooks: loader returned 0 playbooks")
+        shutil.rmtree(self.fixture / "data" / "agents")
+        self.assert_red("agents: loader returned 0 templates")
 
     def test_cases_moved_out_of_the_data_root_is_caught(self) -> None:
         (self.fixture / "data" / "eval" / "cases.json").write_text("[]", encoding="utf-8")

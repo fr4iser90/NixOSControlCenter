@@ -286,7 +286,7 @@ def test_the_sweep_reports_an_unchanged_poll_as_skipped_not_finished(tmp_path, h
         "kind": "schedule",
         "id": "tree",
         "title": "tree",
-        "playbook": None,
+        "workflow": None,
         "goal": "check the tree",
         "profile": "read-only",
         "dryRun": True,
@@ -456,7 +456,7 @@ def test_a_calendar_unit_carries_no_poll_identity():
         ({"pollWatch": '[ "workspace:/nope" ]'}, "pollWatch entries unusable"),
         ({"kind": '"probe"', "probe": '"disk"'}, 'trigger = poll needs kind = "agent"'),
         ({"onCalendar": '"daily"'}, "ignores onCalendar"),
-        ({"goal": "null", "probe": "null"}, "need goal/playbook"),
+        ({"goal": "null", "probe": "null"}, "need goal/workflow"),
     ],
 )
 def test_a_trigger_that_could_only_burn_a_model_is_refused_at_evaluation(stub, needle):

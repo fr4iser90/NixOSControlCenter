@@ -20,11 +20,11 @@ Feature map: [roadmap.md](./roadmap.md).
     profile = "read-only";
     confirm = "writes";
 
-    # Opt-in schedules (uncomment / copy). Safe: playbook + dryRun + read-only.
+    # Opt-in schedules (uncomment / copy). Safe: workflow + dryRun + read-only.
     # schedules.daily-health = {
     #   enable = true;
     #   onCalendar = "*-*-* 03:15:00";
-    #   playbook = "health-report";
+    #   workflow = "health-report";
     #   profile = "read-only";
     #   dryRun = true;
     #   maxSteps = 15;
@@ -32,7 +32,7 @@ Feature map: [roadmap.md](./roadmap.md).
     # schedules.weekly-module-audit = {
     #   enable = true;
     #   onCalendar = "Sun *-*-* 04:00:00";
-    #   playbook = "unused-modules-dry-run";
+    #   workflow = "unused-modules-dry-run";
     #   profile = "read-only";
     #   dryRun = true;
     #   maxSteps = 30;
@@ -87,7 +87,7 @@ ncc-assistant probe disk --threshold 85 --escalate
 
 # Force advisor even when OK
 ncc-assistant probe disk --force --escalate
-ncc-assistant playbook run disk-nix-gc-advisor
+ncc-assistant agent run --workflow disk-nix-gc-advisor
 ```
 
 ## Permission ladder (ceiling, grants, floor, budgets)
@@ -104,7 +104,7 @@ grants.budget = { maxPrsPerDay = 3; maxOpenAgentPrs = 5; };
 agent.schedules.nightly-ship = {
   enable = true;
   onCalendar = "*-*-* 02:30:00";
-  playbook = "autonomous-agent-ship";
+  workflow = "autonomous-agent-ship";
   permissions = {
     repo = "pr";        # may only lower grants.repoCeiling
     system = "none";    # none | config-write | rebuild — ceiling is allowWrite / allowRebuild
@@ -120,7 +120,7 @@ token on top of their step.
 ```bash
 ncc ai permissions show                              # ceiling, this run, ladder, floor, budget
 ncc ai permissions show --grant repo=merge --json    # preview a run; exits 1 when it breaks the ceiling
-ncc ai agent run --grant repo=pr --grant system=none --playbook autonomous-agent-ship
+ncc ai agent run --grant repo=pr --grant system=none --workflow autonomous-agent-ship
 ```
 
 A **repository** may run below that ceiling without waiting for a host rebuild — one committed file:
@@ -377,12 +377,10 @@ templates when armed; presence `paused` disables idle.
 **Workspaces** · **Cron**. There is **no Daily board**.
 See [surfaces.md](./surfaces.md).
 
-**Playbooks (Companion rail, in the Work group):** one row per playbook, printed with the
-scope it runs at (`profile`, `dry run`). Click = run now in the current chat — no parameter
-dialog, that is the difference to **Workflows**. The run is native and ignores the slot's
-harness chip: `profile` and `dry_run` are enforced by `AgentRunner`, and an external backend
-takes the goal alone, so a chip could otherwise hand out a scope the row just promised it
-would not exceed. `project-drift-audit` is the shipped portfolio audit.
+**Playbooks removed:** former playbook ids are Workflow catalog entries under
+`data/agents/*.json` (Companion ▶ Workflows). Start `project-drift-audit`,
+`workspace-audit`, `workspace-brief`, `github-code-review`, etc. from Workflows
+(configure / run once) or Cron.
 
 **Briefing:** workflow `workspace-brief` — run Once or schedule under
 **Cron**. Not a plugin.
@@ -424,7 +422,7 @@ sweep is armed.
 
 ```bash
 ncc-assistant agent run --goal "Check system health" --dry-run
-ncc-assistant agent run --playbook health-report
+ncc-assistant agent run --workflow health-report
 ```
 
 Profiles: `read-only` (default), `config-writer`, `ops`  
@@ -433,7 +431,10 @@ Aliases: `cautious` → config-writer, `autonomous` → ops
 ## Templates / secrets / workspaces
 
 Workflow cards (AGENTS.md maintainer, skills maintainer, GitHub code review, …)
-live under the **Templates** tab. **Run once** = params + immediate run (no timer).
+live under **▶ Workflows** (Companion) / Templates (full GUI). Companion runs a
+**readiness** checklist first (workspaces, secrets, MCP, `git`/`uvx`/`gh`) and can
+scan ~/Git, store a token, and install MCP before Configure opens.
+**Run once** = params + immediate run (no timer).
 **⚙ Configure** = save instance + optional recurring schedule. Frequency uses
 enums: Simple / Daily at time / Weekly / Cron field pickers (Advanced raw
 OnCalendar only when needed). Cards that write prose also have **Language**
@@ -583,16 +584,15 @@ re-reads the window; `--keep N` overrides how many newest turns survive.
 External harness sessions (`agent.harness = "qwen" | "dsh"`) compact inside that
 tool, not here.
 
-## Jobs / playbooks / presence
+## Jobs / workflows / presence
 
 ```bash
 ncc-assistant jobs list
 ncc-assistant jobs show <id>
 ncc-assistant jobs log <id>
 
-ncc-assistant playbook list
-ncc-assistant playbook run health-report --dry-run
-ncc-assistant playbook run project-drift-audit
+ncc-assistant agent run --workflow health-report --dry-run
+ncc-assistant agent run --workflow project-drift-audit
 
 ncc-assistant presence status
 ncc-assistant presence pause --reason "gaming"

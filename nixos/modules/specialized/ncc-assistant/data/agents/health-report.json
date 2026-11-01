@@ -1,0 +1,21 @@
+{
+  "id": "health-report",
+  "title": "Config health report",
+  "category": "Diagnostics",
+  "description": "Generate a comprehensive NCC configuration health report",
+  "profile": "read-only",
+  "mcp": [],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": false,
+  "maxSteps": 15,
+  "tags": [
+    "health",
+    "diagnostics",
+    "report",
+    "migrated-from-playbook"
+  ],
+  "goalTemplate": "Run config_health_report to check the NCC configuration health. Review findings and provide recommendations for any warnings or errors found. Check knowledge pack status and module registry completeness.",
+  "params": []
+}

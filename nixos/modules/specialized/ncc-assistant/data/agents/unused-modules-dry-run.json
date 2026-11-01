@@ -1,0 +1,21 @@
+{
+  "id": "unused-modules-dry-run",
+  "title": "Unused modules (dry-run)",
+  "category": "Diagnostics",
+  "description": "Find and report unused or unconfigured NixOS modules (dry run)",
+  "profile": "read-only",
+  "mcp": [],
+  "requiresSecrets": [],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 30,
+  "tags": [
+    "cleanup",
+    "audit",
+    "modules",
+    "migrated-from-playbook"
+  ],
+  "goalTemplate": "Search the NixOS configuration for modules that are enabled but appear to have no meaningful configuration, or modules that are imported but never used. List findings without making changes.",
+  "params": []
+}

@@ -54,7 +54,7 @@ class AgentSettings:
     allow_shell: bool | None = None
     dry_run: bool = False
     profile: str | None = None
-    playbook: str | None = None
+    workflow: str | None = None  # catalog workflow id (ex-playbook)
     confirm_mode: str = "writes"  # writes | always | never
     #: ``repo=pr`` / ``system=none`` pairs — narrows the host ceiling for this run only.
     grant: tuple[str, ...] = ()
@@ -333,7 +333,7 @@ You are running in agent mode to accomplish a specific goal.
             self.agent_settings.goal,
             profile=self.agent_settings.profile,
             dry_run=self.agent_settings.dry_run,
-            playbook=self.agent_settings.playbook,
+            workflow=self.agent_settings.workflow,
         )
         self._store.start(self._job.id)
 
@@ -598,7 +598,8 @@ def run_agent(
     max_steps: int = UNLIMITED,
     dry_run: bool = False,
     profile: str | None = None,
-    playbook: str | None = None,
+    workflow: str | None = None,
+    playbook: str | None = None,  # deprecated alias for workflow
     grant: Sequence[str] | None = None,
 ) -> Iterator[Event]:
     """Convenience function to run an agent."""
@@ -610,7 +611,7 @@ def run_agent(
         max_steps=max_steps,
         dry_run=dry_run,
         profile=profile,
-        playbook=playbook,
+        workflow=workflow or playbook,
         grant=tuple(grant or ()),
     )
 

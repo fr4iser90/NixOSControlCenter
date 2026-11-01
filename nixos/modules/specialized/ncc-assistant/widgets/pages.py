@@ -643,7 +643,7 @@ class AgentWorker(QThread):
         max_steps: int,
         dry_run: bool,
         profile: str,
-        playbook: str | None = None,
+        workflow: str | None = None,
         harness: str | None = None,
         parent=None,
     ) -> None:
@@ -652,7 +652,7 @@ class AgentWorker(QThread):
         self._max_steps = max_steps
         self._dry_run = dry_run
         self._profile = profile
-        self._playbook = playbook
+        self._workflow = workflow
         self._harness = harness
         self._cancelled = False
         self._runner = None
@@ -692,7 +692,7 @@ class AgentWorker(QThread):
                     max_steps=self._max_steps,
                     dry_run=self._dry_run,
                     profile=self._profile,
-                    playbook=self._playbook,
+                    workflow=self._workflow,
                 )
                 self._runner = AgentRunner(settings, agent_settings)
                 for ev in self._runner.run():
@@ -723,16 +723,16 @@ class AgentPage(QWidget):
         self.goal_edit.setFixedHeight(80)
         form.addRow("Goal", self.goal_edit)
 
-        self.playbook_combo = QComboBox()
-        self.playbook_combo.addItem("(none)", None)
+        self.workflow_combo = QComboBox()
+        self.workflow_combo.addItem("(none)", None)
         try:
-            from core.catalogs.playbooks import list_playbooks
+            from core.catalogs.agent_templates import list_agent_templates
 
-            for pb in list_playbooks():
-                self.playbook_combo.addItem(pb.name, pb.name)
+            for tmpl in list_agent_templates():
+                self.workflow_combo.addItem(tmpl.title or tmpl.id, tmpl.id)
         except Exception:
             pass
-        form.addRow("Playbook", self.playbook_combo)
+        form.addRow("Workflow", self.workflow_combo)
 
         self.profile_combo = QComboBox()
         self.profile_combo.addItems(["read-only", "config-writer", "ops", "cautious", "autonomous"])
@@ -806,22 +806,29 @@ class AgentPage(QWidget):
 
     @Slot()
     def on_run(self) -> None:
-        playbook = self.playbook_combo.currentData()
+        workflow = self.workflow_combo.currentData()
         goal = self.goal_edit.toPlainText().strip()
-        if playbook and not goal:
-            from core.catalogs.playbooks import get_playbook
+        profile = self.profile_combo.currentText()
+        dry_run = self.dry_run_check.isChecked()
+        max_s = self.max_steps_spin.value()
+        if workflow and not goal:
+            from core.catalogs.agent_templates import resolve_workflow_run
 
-            pb = get_playbook(playbook)
-            goal = pb.goal if pb else ""
+            resolved = resolve_workflow_run(workflow)
+            if resolved:
+                goal = resolved["goal"]
+                profile = resolved.get("profile") or profile
+                dry_run = bool(resolved.get("dry_run")) if resolved.get("dry_run") is not None else dry_run
+                if resolved.get("max_steps") is not None:
+                    max_s = int(resolved["max_steps"])
         if not goal:
-            QMessageBox.warning(self, "Agent", "Enter a goal or pick a playbook.")
+            QMessageBox.warning(self, "Agent", "Enter a goal or pick a workflow.")
             return
 
         self.run_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
         self.log.clear()
         self._think_logged = False
-        max_s = self.max_steps_spin.value()
         self.budget_label.setText(f"Steps: 0 / {max_s} · tokens: —")
         self.log.append(f"Starting agent: {goal}\n")
 
@@ -835,9 +842,9 @@ class AgentPage(QWidget):
         self._worker = AgentWorker(
             goal,
             max_steps=max_s,
-            dry_run=self.dry_run_check.isChecked(),
-            profile=self.profile_combo.currentText(),
-            playbook=playbook,
+            dry_run=dry_run,
+            profile=profile,
+            workflow=workflow,
             harness=harness,
             parent=self,
         )
@@ -1329,28 +1336,35 @@ class ScheduleEditDialog(QDialog):
         self.threshold_spin.setValue(int(thr) if thr is not None else 85)
         form.addRow("Threshold %", self.threshold_spin)
 
-        self.playbook_combo = QComboBox()
-        self.playbook_combo.setEditable(True)
-        self.playbook_combo.addItem("(none)", "")
+        self.workflow_combo = QComboBox()
+        self.workflow_combo.setEditable(True)
+        self.workflow_combo.addItem("(none)", "")
         try:
-            from core.catalogs.playbooks import list_playbooks
+            from core.catalogs.agent_templates import list_agent_templates
 
-            for pb in list_playbooks():
-                self.playbook_combo.addItem(pb.name, pb.name)
+            for tmpl in list_agent_templates():
+                self.workflow_combo.addItem(tmpl.title or tmpl.id, tmpl.id)
         except Exception:
             pass
-        if spec and spec.playbook:
-            idx = self.playbook_combo.findData(spec.playbook)
+        wf = None
+        if spec:
+            wf = getattr(spec, "workflow", None) or getattr(spec, "playbook", None)
+            if (getattr(spec, "kind", None) or "agent") == "probe":
+                wf = (
+                    getattr(spec, "escalateWorkflow", None)
+                    or getattr(spec, "escalatePlaybook", None)
+                    or wf
+                )
+        if wf:
+            idx = self.workflow_combo.findData(wf)
             if idx >= 0:
-                self.playbook_combo.setCurrentIndex(idx)
+                self.workflow_combo.setCurrentIndex(idx)
             else:
-                self.playbook_combo.setEditText(spec.playbook)
-        elif spec and getattr(spec, "escalatePlaybook", None):
-            self.playbook_combo.setEditText(spec.escalatePlaybook)
-        form.addRow("Playbook / escalate", self.playbook_combo)
+                self.workflow_combo.setEditText(wf)
+        form.addRow("Workflow / escalate", self.workflow_combo)
 
         self.goal_edit = QTextEdit()
-        self.goal_edit.setPlaceholderText("Optional goal (if no playbook)")
+        self.goal_edit.setPlaceholderText("Optional goal (if no workflow)")
         self.goal_edit.setFixedHeight(60)
         if spec and spec.goal:
             self.goal_edit.setPlainText(spec.goal)
@@ -1390,16 +1404,16 @@ class ScheduleEditDialog(QDialog):
     def to_spec(self):
         from core.scheduling.schedule_templates import ScheduleSpec
 
-        pb = self.playbook_combo.currentData()
-        if pb is None or pb == "":
-            pb = self.playbook_combo.currentText().strip() or None
+        wf = self.workflow_combo.currentData()
+        if wf is None or wf == "":
+            wf = self.workflow_combo.currentText().strip() or None
         goal = self.goal_edit.toPlainText().strip() or None
         kind = self.kind_combo.currentText()
         return ScheduleSpec(
             name=self.name_edit.text().strip(),
             description=self.desc_edit.text().strip(),
             onCalendar=self.cal_picker.on_calendar() or "daily",
-            playbook=pb if kind == "agent" else None,
+            workflow=wf if kind == "agent" else None,
             goal=goal if kind == "agent" else None,
             profile=self.profile_combo.currentText(),
             dryRun=self.dry_run.isChecked(),
@@ -1408,7 +1422,7 @@ class ScheduleEditDialog(QDialog):
             kind=kind,
             probe=(self.probe_edit.text().strip() or "disk-nix") if kind == "probe" else None,
             thresholdPct=float(self.threshold_spin.value()) if kind == "probe" else None,
-            escalatePlaybook=pb if kind == "probe" else None,
+            escalateWorkflow=wf if kind == "probe" else None,
             source="user",
         )
 
@@ -1501,7 +1515,9 @@ class SchedulesPage(QWidget):
         self._template_names = []
         for t in list_templates():
             self._template_names.append(t.name)
-            self.template_list.addItem(f"{t.name} — {t.description or t.playbook or ''}")
+            self.template_list.addItem(
+                f"{t.name} — {t.description or getattr(t, 'workflow', None) or ''}"
+            )
 
         self.user_list.clear()
         self._user_names = []
@@ -1515,7 +1531,11 @@ class SchedulesPage(QWidget):
                 if (s.kind or "agent") == "probe":
                     label = f"probe={s.probe}≥{s.thresholdPct or 85}%"
                 else:
-                    label = s.playbook or (s.goal or "")[:40]
+                    label = (
+                        getattr(s, "workflow", None)
+                        or getattr(s, "playbook", None)
+                        or (s.goal or "")[:40]
+                    )
                 self.user_list.addItem(f"[{en}] {s.name}: {s.frequency} — {label}")
 
         self.nix_list.clear()
@@ -1525,7 +1545,11 @@ class SchedulesPage(QWidget):
         else:
             for s in nix:
                 en = "on" if s.enable else "off"
-                label = s.playbook or (s.goal or "")[:40]
+                label = (
+                    getattr(s, "workflow", None)
+                    or getattr(s, "playbook", None)
+                    or (s.goal or "")[:40]
+                )
                 self.nix_list.addItem(f"[{en}] {s.name}: {s.frequency} — {label}")
 
         self.wd_list.clear()
@@ -1601,8 +1625,8 @@ class SchedulesPage(QWidget):
             if not spec.probe:
                 QMessageBox.warning(self, "Schedules", "Probe id required for kind=probe.")
                 return
-        elif not spec.playbook and not spec.goal:
-            QMessageBox.warning(self, "Schedules", "Playbook or goal required.")
+        elif not (getattr(spec, "workflow", None) or getattr(spec, "playbook", None)) and not spec.goal:
+            QMessageBox.warning(self, "Schedules", "Workflow or goal required.")
             return
         save_user_schedule(spec)
         self._load()
@@ -1660,10 +1684,15 @@ class SchedulesPage(QWidget):
             if (spec.kind or "agent") == "probe":
                 from core.scheduling.probes import run_disk_probe_and_maybe_escalate
 
+                escalate_wf = (
+                    getattr(spec, "escalateWorkflow", None)
+                    or getattr(spec, "escalatePlaybook", None)
+                    or "disk-nix-gc-advisor"
+                )
                 result = run_disk_probe_and_maybe_escalate(
                     threshold_pct=float(spec.thresholdPct or 85),
                     escalate=True,
-                    playbook=spec.escalatePlaybook or "disk-nix-gc-advisor",
+                    workflow=escalate_wf,
                 )
                 self.detail.setPlainText(json.dumps(result, indent=2)[:4000])
                 msg = (
@@ -1683,13 +1712,14 @@ class SchedulesPage(QWidget):
             touch_activity("schedule-run")
             settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
             goal = spec.goal
-            if spec.playbook and not goal:
-                from core.catalogs.playbooks import get_playbook
+            workflow = getattr(spec, "workflow", None) or getattr(spec, "playbook", None)
+            if workflow and not goal:
+                from core.catalogs.agent_templates import resolve_workflow_run
 
-                pb = get_playbook(spec.playbook)
-                goal = pb.goal if pb else None
+                resolved = resolve_workflow_run(workflow)
+                goal = resolved["goal"] if resolved else None
             if not goal:
-                QMessageBox.warning(self, "Schedules", "No goal/playbook to run.")
+                QMessageBox.warning(self, "Schedules", "No goal/workflow to run.")
                 return
             lines = [f"Running {spec.name}…"]
             with capacity_slot(f"schedule:{spec.name}"):
@@ -1699,7 +1729,7 @@ class SchedulesPage(QWidget):
                     max_steps=spec.maxSteps or settings.agent_max_steps,
                     dry_run=spec.dryRun,
                     profile=spec.profile,
-                    playbook=spec.playbook,
+                    workflow=workflow,
                 ):
                     kind = ev.get("kind")
                     if kind in (

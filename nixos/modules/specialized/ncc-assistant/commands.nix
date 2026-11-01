@@ -31,7 +31,7 @@ in
               "gui" "chat" "cli" "mcp"
               "tool" "tools"
               "agent" "jobs"
-              "playbook" "presence"
+              "presence"
               "approve" "knowledge"
               "export" "eval"
               "serve-openapi" "tray" "companion" "harness"
@@ -59,7 +59,7 @@ in
                 ncc ai agent run --goal "..." --grant repo=pr --grant system=none
                 ncc ai agent run --goal "..." --confirm always|writes|never
                 ncc ai jobs list
-                ncc ai playbook list|run NAME
+                ncc ai agent run --workflow NAME
 
               Tools:
                 ncc ai tools

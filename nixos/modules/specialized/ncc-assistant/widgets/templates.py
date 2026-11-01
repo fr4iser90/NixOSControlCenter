@@ -964,7 +964,7 @@ class TemplatesPage(QWidget):
             f"Provider: {llm.get('providerId') or '(default)'}  "
             f"Model: {llm.get('model') or '(auto)'}\n"
             f"Prompt override: {ov}\n"
-            f"Playbook: {result.get('playbook')}\n"
+            f"Workflow: {result.get('workflow')}\n"
             f"Schedule: {result.get('schedule') or '(none)'}",
         )
         self.reload()

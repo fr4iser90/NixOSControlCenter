@@ -120,7 +120,7 @@ Skip nix-build: `NCC_GUI_SKIP_NIX_PYTHON=1` (Qt tests skip; AST/smokes still run
 entrypoints were unvalidated: a file could move, every wrapper break, and the gate stay green.
 It checks what is provable *without* a Nix build (the staging targets are read out of the
 `runCommand` text, the entrypoints are actually executed) and pins the two silent-failure
-loaders (`playbooks`, `eval_harness`) by running them and reading back where the JSON came
+loaders (`agent_templates`, `eval_harness`) by running them and reading back where the JSON came
 from — including a throwaway `NCC_DATA_ROOT` proving the loaders follow *this* tree. The ban
 on `python/` / `ncc_assistant/` / `assistant/` is absolute since the hoist landed; the tree
 itself is specified in

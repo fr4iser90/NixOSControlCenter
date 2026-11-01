@@ -9,7 +9,7 @@ If a label conflicts with this file, **this file wins**.
 |---------|------------|-------------|
 | **Workflow** | Reusable agent automation (catalog blueprint → instance) | **Once** now, or attached to **Cron** |
 | **Skill** | Markdown instructions bundled into a workflow’s prompt | Never runs alone — only via a workflow |
-| **Cron** | Timer / OnCalendar that starts a saved workflow instance (or playbook) | Systemd-style schedule, local time |
+| **Cron** | Timer / OnCalendar that starts a saved workflow instance | Systemd-style schedule, local time |
 | **Tool** | Callable capability the agent may invoke mid-run | LLM tool-call / registry entry |
 | **MCP** | External tool server (git, GitHub, …) wired into the agent | Install + enable; secrets/workspaces bind |
 | **Plugin** | Desktop host feature (not an agent job) | Companion/GUI tick, e.g. Doomscroll |
@@ -43,9 +43,10 @@ Internally, code may still say `agent_templates` / `TemplateConfigureDialog`; th
 
 1. **Catalog** — builtin JSON (`templates/agents/<id>.json`) + optional `prompts/skills/<name>.md`.
 2. **Configure** — fill params, see transparent prompt (rendered goal + skill), optionally edit prompt.
-3. **Run once** — execute with current params/prompt (edit is ephemeral unless saved).
-4. **Save instance** — persist params / provider / optional **prompt override**.
-5. **Cron** — optional: enable schedule on that instance (frequency from Check frequency / Cron tab).
+3. **Readiness (Companion)** — before Configure: checklist for workspaces, secrets, MCP, host bins (`git`/`uvx`/`gh`). Fix-in-dialog (scan ~/Git, paste secret, install MCP); host packages stay a system install. Skipped when already green. Linked from Companion ▶ Workflows; SSOT remains this file.
+4. **Run once** — execute with current params/prompt (edit is ephemeral unless saved).
+5. **Save instance** — persist params / provider / optional **prompt override**.
+6. **Cron** — optional: enable schedule on that instance (frequency from Check frequency / Cron tab).
 
 **Transparency:** Configure dialog shows Profile, MCP, Secrets, dryRun, maxSteps, harness, skill path, and tabs:
 
@@ -77,13 +78,15 @@ Repo-root `.agents/skills/` (NCC coding agents) is a **different** layer for hum
 
 ## Cron
 
-**Definition:** Recurring (or one-shot calendar) triggers that start a **saved** workflow instance / playbook. UI tab: **Cron**. Companion: clock icon.
+**Definition:** Recurring (or one-shot calendar) triggers that start a **saved** workflow instance. UI tab: **Cron**. Companion: clock icon.
+
+Pinned **playbooks** were removed — the same ids now live under Workflow (`data/agents/*.json`).
 
 | Cron owns | Cron does not own |
 |-----------|-------------------|
 | OnCalendar / daily-at / weekly / cron fields | The agent prompt text |
 | Enable / last-run style schedule records | Workspace ★ selection |
-| Binding schedule → playbook / instance | Desktop plugins |
+| Binding schedule → workflow / instance | Desktop plugins |
 
 **Briefing:** schedule `workspace-brief` under Cron — do **not** invent a Morning/Daily plugin for that.
 

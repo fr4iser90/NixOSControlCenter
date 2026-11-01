@@ -71,7 +71,6 @@ STATE_ERROR = "error"
 PANEL_NONE = "none"
 PANEL_HISTORY = "history"
 PANEL_TEMPLATES = "templates"
-PANEL_PLAYBOOKS = "playbooks"
 PANEL_WORKFLOWS = "workflows"
 PANEL_PLUGINS = "plugins"
 PANEL_TOOLS = "tools"
@@ -301,57 +300,6 @@ class _CompanionTemplateWorker(QThread):
                         profile=tmpl.profile,
                     ):
                         self.event.emit(self.slot_id, ev)
-        except Exception as exc:  # noqa: BLE001
-            self.failed.emit(self.slot_id, f"{exc}\n{traceback.format_exc()}")
-
-
-class _CompanionPlaybookWorker(QThread):
-    """Run one playbook into a companion slot.
-
-    No harness branch, deliberately. ``profile`` and ``dry_run`` are enforced inside
-    ``AgentRunner``, and a ``HarnessBackend.send()`` takes a goal string and nothing else —
-    so a ``read-only`` playbook handed to qwen would be a label with nothing behind it, and
-    an external run never reaches ``create_job`` either. The scope the playbook declares is
-    the thing being promised here, so this path cannot leave the runner that implements it.
-    """
-
-    event = Signal(str, object)
-    failed = Signal(str, str)
-
-    def __init__(self, slot_id: str, playbook: str, *, parent=None) -> None:
-        super().__init__(parent)
-        self.slot_id = slot_id
-        self._playbook = playbook
-
-    def run(self) -> None:
-        try:
-            from core.catalogs.playbooks import get_playbook
-            from core.policy.auth import with_cached_credentials
-            from core.runtime.agent import run_agent
-            from core.runtime.capacity import capacity_slot
-            from core.store.config import Settings
-
-            pb = get_playbook(self._playbook)
-            if pb is None or not pb.goal.strip():
-                raise ValueError(f"Playbook has no goal to run: {self._playbook}")
-            settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
-            scope = pb.profile or "host profile"
-            if pb.dry_run:
-                scope += " · dry run"
-            self.event.emit(
-                self.slot_id,
-                {"kind": "status", "text": f"Playbook {pb.name} · native · {scope}"},
-            )
-            with capacity_slot(f"playbook:{pb.name}"):
-                for ev in run_agent(
-                    pb.goal,
-                    settings,
-                    max_steps=pb.max_steps or settings.agent_max_steps,
-                    dry_run=pb.dry_run,
-                    profile=pb.profile,
-                    playbook=pb.name,
-                ):
-                    self.event.emit(self.slot_id, ev)
         except Exception as exc:  # noqa: BLE001
             self.failed.emit(self.slot_id, f"{exc}\n{traceback.format_exc()}")
 
@@ -907,12 +855,6 @@ class CompanionWindow(QWidget):
                 "folder-templates",
                 "▶",
                 "Workflows — click a row to configure / run",
-            ),
-            (
-                PANEL_PLAYBOOKS,
-                "system-run",
-                "📋",
-                "Playbooks — click a row to run it now, on the scope the playbook declares",
             ),
             (
                 PANEL_CRON,
@@ -2537,33 +2479,6 @@ class CompanionWindow(QWidget):
                 row.setToolTip(t.description or t.id)
                 row.setData(Qt.ItemDataRole.UserRole, ("template", t.id))
                 self.panel_list.addItem(row)
-        elif key == PANEL_PLAYBOOKS:
-            self.panel_title.setText("Playbooks")
-            try:
-                from core.catalogs.playbooks import list_playbooks
-
-                pbs = list_playbooks()
-            except Exception as exc:  # noqa: BLE001
-                self.panel_list.addItem(f"(error: {exc})")
-                return
-            if not pbs:
-                self.panel_list.addItem("(no playbooks)")
-                return
-            # The scope is printed on the row because it is what the run cannot exceed: a name
-            # alone invites clicking without knowing whether writes are on the table.
-            self.panel_hint.setText("Click a row to run it now — natively, at the printed scope.")
-            self.panel_hint.show()
-            for pb in pbs:
-                scope = pb.profile or "host profile"
-                if pb.dry_run:
-                    scope += " · dry run"
-                row = QListWidgetItem(f"{pb.name}  ·  {scope}")
-                row.setToolTip(
-                    (pb.description or pb.name)
-                    + f"\n\nRuns natively: {scope}. No parameters — the click is the go."
-                )
-                row.setData(Qt.ItemDataRole.UserRole, ("playbook", pb.name))
-                self.panel_list.addItem(row)
         elif key == PANEL_WORKFLOWS:
             # Legacy panel id — board removed; Workflows + Cron only.
             self.panel_title.setText("Use Workflows")
@@ -2742,9 +2657,9 @@ class CompanionWindow(QWidget):
                 en = "on" if getattr(spec, "enable", True) else "off"
                 row = QListWidgetItem(f"[{src}] {name}  ·  {cal}  ·  {en}")
                 tip = getattr(spec, "description", "") or ""
-                pb = getattr(spec, "playbook", None) or ""
-                if pb:
-                    tip = (tip + f"\nplaybook: {pb}").strip()
+                wf = getattr(spec, "workflow", None) or getattr(spec, "playbook", None) or ""
+                if wf:
+                    tip = (tip + f"\nworkflow: {wf}").strip()
                 row.setToolTip(tip or name)
                 kind = "cron_user" if src == "user" else "cron_nix"
                 row.setData(Qt.ItemDataRole.UserRole, (kind, name))
@@ -2816,9 +2731,6 @@ class CompanionWindow(QWidget):
             return
         if kind == "template" and ref:
             self._run_template(str(ref))
-            return
-        if kind == "playbook" and ref:
-            self._run_playbook(str(ref))
             return
         if kind == "daily_refresh":
             try:
@@ -3038,7 +2950,7 @@ class CompanionWindow(QWidget):
             f"Kind: {getattr(spec, 'kind', 'agent')}",
             f"Profile: {getattr(spec, 'profile', '')}",
             f"dryRun: {getattr(spec, 'dryRun', True)}",
-            f"Playbook: {getattr(spec, 'playbook', None) or '—'}",
+            f"Workflow: {getattr(spec, 'workflow', None) or getattr(spec, 'playbook', None) or '—'}",
             f"Goal: {(getattr(spec, 'goal', None) or '—')[:200]}",
             f"Source: {'user' if editable else 'nix (read-only)'}",
         ]
@@ -3077,7 +2989,9 @@ class CompanionWindow(QWidget):
                     QMessageBox.warning(self, "Cron", str(exc))
                 self._fill_panel(PANEL_CRON)
 
-    def _template_seed_params(self, template_id: str) -> dict[str, Any]:
+    def _template_seed_params(
+        self, template_id: str, *, use_all_workspaces: bool = False
+    ) -> dict[str, Any]:
         from core.catalogs.agent_templates import get_agent_template
 
         tmpl = get_agent_template(template_id)
@@ -3088,7 +3002,21 @@ class CompanionWindow(QWidget):
             if p.default is not None:
                 seed[p.id] = p.default
         ws = self._active_workspace_id or self._slot().workspace_id
-        if ws:
+        all_ids: list[str] = []
+        if use_all_workspaces:
+            try:
+                from core.store.workspaces import list_workspaces
+
+                all_ids = [w.id for w in list_workspaces()]
+            except Exception:
+                all_ids = []
+        if all_ids:
+            for p in tmpl.params:
+                if p.type == "workspaceList":
+                    seed[p.id] = list(all_ids)
+                elif p.type == "workspace":
+                    seed[p.id] = all_ids[0]
+        elif ws:
             for p in tmpl.params:
                 if p.type == "workspaceList":
                     seed[p.id] = [ws]
@@ -3096,52 +3024,27 @@ class CompanionWindow(QWidget):
                     seed[p.id] = ws
         return seed
 
-    def _run_playbook(self, name: str) -> None:
-        """Start a playbook in the current slot. No dialog: a playbook carries its goal already.
+    def _ensure_workflow_readiness(self, template_id: str) -> bool | dict[str, Any]:
+        """Preflight: return False if cancelled, else options dict (may be empty).
 
-        The slot's harness chip is deliberately not consulted. It chooses a chat backend, and a
-        backend other than native would receive the goal without the profile that bounds it —
-        so the chip does not get a vote on a run whose scope came from the playbook itself.
+        Opens the readiness dialog whenever something blocks (or warns with fixes).
+        When everything is already green, skip the dialog.
         """
-        slot = self._slot()
-        if slot.busy:
-            QMessageBox.information(self, "Playbooks", "Current chat is busy.")
-            return
-        from core.catalogs.playbooks import get_playbook
+        from core.catalogs.workflow_readiness import assess_workflow_readiness
 
-        pb = get_playbook(name)
-        if pb is None:
-            QMessageBox.warning(self, "Playbooks", f"Unknown: {name}")
-            return
-        if not pb.goal.strip():
-            QMessageBox.warning(
-                self, "Playbooks", f"{name} declares no goal, so there is nothing to run."
-            )
-            return
-        try:
-            from core.scheduling.idle import touch_activity
+        report = assess_workflow_readiness(template_id)
+        if report.ready and not report.actionable:
+            return {"use_all_workspaces": False}
+        from widgets.readiness import WorkflowReadinessDialog
 
-            touch_activity("companion-playbook")
-        except Exception:
-            pass
-        self._toggle_panel(PANEL_NONE)
-        slot.last_error = ""
-        slot.user_prompt = f"[playbook] {name}"
-        transcript_append(slot, {"kind": "user", "text": slot.user_prompt})
-        slot.turn_start = len(slot.transcript or []) - 1
-        slot.busy = True
-        slot.avatar_state = STATE_THINKING
-        slot.activity = f"Playbook ({name})"
-        if not slot.title_locked:
-            slot.title = name[:24]
-            slot.title_locked = True
-        self._apply_slot_ui()
-        worker = _CompanionPlaybookWorker(slot.id, name, parent=self)
-        slot.worker = worker
-        worker.event.connect(self._on_event)
-        worker.failed.connect(self._on_fail)
-        worker.finished.connect(lambda sid=slot.id: self._on_worker_done(sid))
-        worker.start()
+        dlg = WorkflowReadinessDialog(
+            template_id,
+            self,
+            active_workspace_id=self._active_workspace_id or self._slot().workspace_id,
+        )
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return False
+        return {"use_all_workspaces": dlg.use_all_workspaces()}
 
     def _run_template(self, template_id: str) -> None:
         slot = self._slot()
@@ -3155,21 +3058,19 @@ class CompanionWindow(QWidget):
         if tmpl is None:
             QMessageBox.warning(self, "Templates", f"Unknown: {template_id}")
             return
-        ws = self._active_workspace_id or slot.workspace_id
-        if any(
-            p.type in ("workspaceList", "workspace") and p.required for p in tmpl.params
-        ) and not ws:
-            QMessageBox.information(
-                self,
-                "Templates",
-                "Select or add a workspace first (📁), then retry.",
-            )
+
+        ready = self._ensure_workflow_readiness(template_id)
+        if ready is False:
             return
+        use_all = bool((ready or {}).get("use_all_workspaces"))
+
         try:
             dlg = TemplateConfigureDialog(
                 template_id,
                 self,
-                seed_params=self._template_seed_params(template_id),
+                seed_params=self._template_seed_params(
+                    template_id, use_all_workspaces=use_all
+                ),
             )
         except ValueError as exc:
             QMessageBox.warning(self, "Templates", str(exc))

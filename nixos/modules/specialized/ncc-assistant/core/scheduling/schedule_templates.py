@@ -13,10 +13,16 @@ from core.store.paths import schedules_dir
 
 @dataclass
 class ScheduleSpec:
-    """A schedule definition (template or user instance)."""
+    """A schedule definition (template or user instance).
+
+    Callers: ``agent_templates.instantiate``, idle sweep, companion Cron,
+    ``schedules.nix`` builtins, CLI schedule helpers. Same file as before —
+    playbook field renamed to workflow (JSON still accepts ``playbook`` /
+    ``escalatePlaybook`` aliases). User files: ``~/.config/ncc-assistant/schedules/*.json``.
+    """
     name: str
     onCalendar: str | None = "daily"
-    playbook: str | None = None
+    workflow: str | None = None  # catalog workflow id (ex-playbook)
     goal: str | None = None
     profile: str = "read-only"
     dryRun: bool = True
@@ -26,13 +32,21 @@ class ScheduleSpec:
     kind: str = "agent"  # agent | probe
     probe: str | None = None
     thresholdPct: float | None = None
-    escalatePlaybook: str | None = None
+    escalateWorkflow: str | None = None
     trigger: str = "calendar"  # calendar | poll (phase 39 L11)
     pollInterval: str | None = None
     pollWatch: list[str] = field(default_factory=list)
     after: str | None = None  # schedule id whose completion wakes this one (phase 39 L12)
     source: str = "user"  # builtin | user | nix
     path: str | None = None
+
+    @property
+    def playbook(self) -> str | None:
+        return self.workflow
+
+    @property
+    def escalatePlaybook(self) -> str | None:
+        return self.escalateWorkflow
 
     @property
     def frequency(self) -> str:
@@ -73,7 +87,7 @@ class ScheduleSpec:
             onCalendar=data.get("onCalendar")
             or data.get("on_calendar")
             or (None if (trigger == "poll" or after) else "daily"),
-            playbook=data.get("playbook"),
+            workflow=data.get("workflow") or data.get("playbook"),
             goal=data.get("goal"),
             profile=data.get("profile") or "read-only",
             dryRun=bool(data.get("dryRun", data.get("dry_run", True))),
@@ -83,7 +97,12 @@ class ScheduleSpec:
             kind=data.get("kind") or "agent",
             probe=data.get("probe"),
             thresholdPct=data.get("thresholdPct", data.get("threshold_pct")),
-            escalatePlaybook=data.get("escalatePlaybook", data.get("escalate_playbook")),
+            escalateWorkflow=(
+                data.get("escalateWorkflow")
+                or data.get("escalate_workflow")
+                or data.get("escalatePlaybook")
+                or data.get("escalate_playbook")
+            ),
             trigger=trigger,
             pollInterval=data.get("pollInterval", data.get("poll_interval")),
             pollWatch=[str(entry) for entry in watch] if isinstance(watch, list) else [],
@@ -98,7 +117,7 @@ BUILTIN_TEMPLATES: list[ScheduleSpec] = [
         name="daily-health",
         description="Nightly config health via agent (LLM). Prefer probe schedules when no narrative needed.",
         onCalendar="*-*-* 03:15:00",
-        playbook="health-report",
+        workflow="health-report",
         profile="read-only",
         dryRun=True,
         maxSteps=15,
@@ -110,7 +129,7 @@ BUILTIN_TEMPLATES: list[ScheduleSpec] = [
         name="weekly-module-audit",
         description="Weekly unused/unconfigured modules audit (agent, read-only)",
         onCalendar="Sun *-*-* 04:00:00",
-        playbook="unused-modules-dry-run",
+        workflow="unused-modules-dry-run",
         profile="read-only",
         dryRun=True,
         maxSteps=30,
@@ -125,7 +144,7 @@ BUILTIN_TEMPLATES: list[ScheduleSpec] = [
         kind="probe",
         probe="disk-nix",
         thresholdPct=85,
-        escalatePlaybook="disk-nix-gc-advisor",
+        escalateWorkflow="disk-nix-gc-advisor",
         profile="read-only",
         dryRun=True,
         enable=True,
@@ -220,7 +239,7 @@ def load_template_as_user(template_name: str, *, rename: str | None = None) -> S
     spec = ScheduleSpec(
         name=name,
         onCalendar=tmpl.onCalendar,
-        playbook=tmpl.playbook,
+        workflow=tmpl.workflow,
         goal=tmpl.goal,
         profile=tmpl.profile,
         dryRun=tmpl.dryRun,
@@ -230,7 +249,7 @@ def load_template_as_user(template_name: str, *, rename: str | None = None) -> S
         kind=tmpl.kind,
         probe=tmpl.probe,
         thresholdPct=tmpl.thresholdPct,
-        escalatePlaybook=tmpl.escalatePlaybook,
+        escalateWorkflow=tmpl.escalateWorkflow,
         source="user",
     )
     save_user_schedule(spec)
@@ -281,11 +300,11 @@ def nix_snippet(spec: ScheduleSpec) -> str:
             lines.append(f'  probe = "{spec.probe}";')
         if spec.thresholdPct is not None:
             lines.append(f"  thresholdPct = {spec.thresholdPct};")
-        if spec.escalatePlaybook:
-            lines.append(f'  escalatePlaybook = "{spec.escalatePlaybook}";')
+        if spec.escalateWorkflow:
+            lines.append(f'  escalateWorkflow = "{spec.escalateWorkflow}";')
     else:
-        if spec.playbook:
-            lines.append(f'  playbook = "{spec.playbook}";')
+        if spec.workflow:
+            lines.append(f'  workflow = "{spec.workflow}";')
         if spec.goal:
             goal = spec.goal.replace("\\", "\\\\").replace('"', '\\"')
             lines.append(f'  goal = "{goal}";')

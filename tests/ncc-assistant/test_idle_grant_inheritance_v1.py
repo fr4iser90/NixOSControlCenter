@@ -102,7 +102,7 @@ def _candidate(**over):
         "kind": "schedule",
         "id": "nightly-audit",
         "title": "nightly-audit",
-        "playbook": None,
+        "workflow": None,
         "goal": "audit the tree",
         "profile": "read-only",
         "dryRun": True,

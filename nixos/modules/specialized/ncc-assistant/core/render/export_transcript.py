@@ -112,8 +112,9 @@ def export_job_markdown(
     lines.append(f"**Status:** {meta.status}")
     if meta.profile:
         lines.append(f"**Profile:** {meta.profile}")
-    if meta.playbook:
-        lines.append(f"**Playbook:** {meta.playbook}")
+    workflow = getattr(meta, "workflow", None) or getattr(meta, "playbook", None)
+    if workflow:
+        lines.append(f"**Workflow:** {workflow}")
     lines.append(f"**Dry Run:** {meta.dry_run}")
     lines.append(f"**Steps:** {meta.step_count}")
     lines.append(f"**Created:** {_format_timestamp(meta.created_at)}")

@@ -1,4 +1,4 @@
-"""CLI entry: ncc-assistant [gui|chat|mcp|agent|jobs|playbook|presence|approve|knowledge|export|eval|tools|secrets|workspaces|templates|workflows|focus|workflow|serve-openapi|tray]."""
+"""CLI entry: ncc-assistant [gui|chat|mcp|agent|jobs|presence|approve|knowledge|export|eval|tools|secrets|workspaces|templates|workflows|focus|workflow|serve-openapi|tray]."""
 
 from __future__ import annotations
 
@@ -65,25 +65,29 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
 
     settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
 
-    playbook_goal = None
-    if args.playbook:
-        from core.catalogs.playbooks import get_playbook
-        pb = get_playbook(args.playbook)
-        if not pb:
-            print_err(f"Playbook not found: {args.playbook}")
-            return 1
-        playbook_goal = pb.goal
-        if not args.profile and pb.profile:
-            args.profile = pb.profile
-        if pb.dry_run:
-            args.dry_run = True
+    workflow_id = getattr(args, "workflow", None) or getattr(args, "playbook", None)
+    workflow_goal = None
+    workflow_max_steps = None
+    if workflow_id:
+        from core.catalogs.agent_templates import resolve_workflow_run
 
-    goal = args.goal or playbook_goal
+        wf = resolve_workflow_run(workflow_id)
+        if not wf:
+            print_err(f"Workflow not found: {workflow_id}")
+            return 1
+        workflow_goal = wf["goal"]
+        if not args.profile and wf.get("profile"):
+            args.profile = wf["profile"]
+        if wf.get("dry_run"):
+            args.dry_run = True
+        workflow_max_steps = wf.get("max_steps")
+
+    goal = args.goal or workflow_goal
     if not goal:
-        print_err("--goal or --playbook required")
+        print_err("--goal or --workflow required")
         return 1
 
-    max_steps = args.max_steps or settings.agent_max_steps
+    max_steps = args.max_steps or workflow_max_steps or settings.agent_max_steps
     force = getattr(args, "harness", None)
     tags = ["coding"] if looks_like_coding_goal(goal) else []
     hname = resolve_harness_name(tags=tags, force=force)
@@ -138,7 +142,7 @@ def _cmd_agent_run(args: argparse.Namespace) -> int:
                     max_steps=max_steps,
                     dry_run=args.dry_run,
                     profile=args.profile,
-                    playbook=args.playbook,
+                    workflow=workflow_id,
                     grant=grants,
                 )
 
@@ -260,46 +264,6 @@ def _cmd_jobs_log(args: argparse.Namespace) -> int:
     for event in store.get_events(args.job_id):
         print(f"[{event.timestamp}] {event.kind}: {json.dumps(event.data)[:200]}")
     return 0
-
-
-def _cmd_playbook_list(args: argparse.Namespace) -> int:
-    """List playbooks."""
-    from core.catalogs.playbooks import list_playbooks
-    playbooks = list_playbooks()
-
-    if getattr(args, "json", False):
-        print(json.dumps([p.to_dict() for p in playbooks], indent=2))
-    else:
-        for pb in playbooks:
-            source = "builtin" if pb.source == "builtin" else "user"
-            print(f"[{source:7}] {pb.name:30} {pb.description[:40]}")
-    return 0
-
-
-def _cmd_playbook_run(args: argparse.Namespace) -> int:
-    """Run a playbook."""
-    from core.catalogs.playbooks import get_playbook
-
-    pb = get_playbook(args.name)
-    if not pb:
-        print_err(f"Playbook not found: {args.name}")
-        return 1
-
-    # Every field _cmd_agent_run reads off the namespace has to be here: it is built by hand, so
-    # an attribute the "agent run" parser would have supplied defaults to argparse instead of
-    # arriving as None, and a missing one raises AttributeError deep inside that function.
-    run_args = argparse.Namespace(
-        goal=pb.goal,
-        max_steps=pb.max_steps,
-        dry_run=args.dry_run if hasattr(args, "dry_run") else pb.dry_run,
-        profile=pb.profile,
-        playbook=args.name,
-        harness=getattr(args, "harness", None),
-        grant=list(getattr(args, "grant", None) or []),
-        confirm=getattr(args, "confirm", None),
-        verbose=bool(getattr(args, "verbose", False)),
-    )
-    return _cmd_agent_run(run_args)
 
 
 def _cmd_presence_status(args: argparse.Namespace) -> int:
@@ -687,7 +651,7 @@ def _cmd_probe_disk(args: argparse.Namespace) -> int:
             threshold_pct=float(args.threshold),
             escalate=True,
             force=bool(args.force),
-            playbook=args.playbook,
+            workflow=getattr(args, "workflow", None) or getattr(args, "playbook", None),
         )
     else:
         probe = run_disk_nix_probe(threshold_pct=float(args.threshold))
@@ -1389,7 +1353,12 @@ def main(argv: list[str] | None = None) -> int:
     agent_run.add_argument("--max-steps", "-s", type=int, help="Maximum steps")
     agent_run.add_argument("--dry-run", "-n", action="store_true", help="Dry run mode")
     agent_run.add_argument("--profile", "-p", help="Security profile")
-    agent_run.add_argument("--playbook", help="Run from playbook")
+    agent_run.add_argument(
+        "--workflow",
+        "--playbook",
+        dest="workflow",
+        help="Run from catalog workflow id (former --playbook)",
+    )
     agent_run.add_argument(
         "--harness",
         choices=["native", "qwen", "dsh"],
@@ -1467,37 +1436,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     chain_release.add_argument("--json", action="store_true")
 
-    playbook_p = sub.add_parser("playbook", help="Playbook management")
-    playbook_sub = playbook_p.add_subparsers(dest="playbook_cmd")
-    playbook_list = playbook_sub.add_parser("list", help="List playbooks")
-    playbook_list.add_argument("--json", action="store_true")
-    playbook_run = playbook_sub.add_parser("run", help="Run a playbook")
-    playbook_run.add_argument("name", help="Playbook name")
-    playbook_run.add_argument("--dry-run", "-n", action="store_true")
-    playbook_run.add_argument(
-        "--harness",
-        choices=["native", "qwen", "dsh"],
-        help="Force agent harness (default: settings / coding auto)",
-    )
-    playbook_run.add_argument(
-        "--grant",
-        action="append",
-        default=[],
-        metavar="AXIS=STEP",
-        help="Narrow this run, e.g. repo=pr or system=none (never widens the host ceiling)",
-    )
-    playbook_run.add_argument(
-        "--confirm",
-        choices=["always", "writes", "never"],
-        help="Ask policy for this run (never > writes > always as capability): "
-        "may only ask more than the host, never less",
-    )
-    playbook_run.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Full thinking/tool dumps (default: compact one-liners)",
-    )
 
     presence_p = sub.add_parser("presence", help="Presence management")
     presence_sub = presence_p.add_subparsers(dest="presence_cmd")
@@ -1559,7 +1497,7 @@ def main(argv: list[str] | None = None) -> int:
     probe_disk.add_argument(
         "--escalate",
         action="store_true",
-        help="Run GC advisor playbook when over threshold",
+        help="Run GC advisor workflow when over threshold",
     )
     probe_disk.add_argument(
         "--force",
@@ -1567,9 +1505,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Escalate even when under threshold",
     )
     probe_disk.add_argument(
+        "--workflow",
         "--playbook",
+        dest="workflow",
         default="disk-nix-gc-advisor",
-        help="Playbook used on escalation",
+        help="Workflow used on escalation",
     )
 
     rollback_p = sub.add_parser("rollback", help="List backups and boot generations")
@@ -1877,14 +1817,6 @@ def main(argv: list[str] | None = None) -> int:
     if command == "chain":
         if args.chain_cmd == "release":
             return _cmd_chain_release(args)
-        parser.print_help()
-        return 1
-
-    if command == "playbook":
-        if args.playbook_cmd == "list":
-            return _cmd_playbook_list(args)
-        if args.playbook_cmd == "run":
-            return _cmd_playbook_run(args)
         parser.print_help()
         return 1
 

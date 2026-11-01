@@ -19,7 +19,7 @@
 #      sys.path — that insert is the mechanism which would turn an ordinary submodule file
 #      into an importable top-level name again.
 #   4. `data/` carries catalogs only, never code, and the planned catalog dirs must exist.
-#   5. Loader witnesses: playbooks/eval cases must LOAD and must load from `$MOD/data`.
+#   5. Loader witnesses: agents/eval cases must LOAD and must load from `$MOD/data`.
 #      (This is what a silent `return []` degradation would otherwise hide.)
 #   6. Entrypoints: every wrapper uses ONE target and the CLI verbs answer `--help`.
 #
@@ -38,7 +38,7 @@ SITE_SUBPATH="lib/ncc-assistant"
 # `$out` top level: the site root plus the three data/doc payloads.
 EXPECTED_STAGED=$'AI_KNOWLEDGE.md\ndata\nknowledge\nlib'
 EXPECTED_SITE=$'cli\ncompanion\ncore\nharness\nncc_gui\nplugins\ntray\nwidgets\nwindow'
-EXPECTED_DATA=$'agents\neval\nmcp\nplaybooks\nprompts'
+EXPECTED_DATA=$'agents\neval\nmcp\nprompts'
 
 pass() { echo "  PASS: $*"; }
 fail() { echo "  FAIL: $*"; FAIL=1; }
@@ -47,8 +47,8 @@ echo "=== validate-assistant-layout (HARD GATE) ==="
 
 # Session isolation for every Python call below: `paths.config_home()` mkdirs under
 # XDG_CONFIG_HOME the moment a package is imported, so an unguarded run would create
-# directories in the operator's real ~/.config/ncc-assistant AND read any user playbook
-# installed there — making the loader checks depend on the machine instead of the tree.
+# directories in the operator's real ~/.config/ncc-assistant AND read any user agent
+# template installed there — making the loader checks depend on the machine instead of the tree.
 # HOME deliberately stays real: overriding it drops the user site-packages that provide
 # httpx, and the run then dies with ModuleNotFoundError for reasons that look like a code bug.
 GATE_XDG="$(mktemp -d)"
@@ -207,23 +207,40 @@ from pathlib import Path
 mod = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(mod))
 from core.catalogs.eval_harness import load_eval_cases  # noqa: E402
-from core.catalogs.playbooks import list_playbooks  # noqa: E402
+from core.catalogs.agent_templates import (  # noqa: E402
+    list_agent_templates,
+    resolve_workflow_run,
+)
 from core.store.paths import data_root  # noqa: E402
+
+MIGRATED = (
+    "health-report",
+    "project-drift-audit",
+    "disk-nix-gc-advisor",
+    "unused-modules-dry-run",
+    "red-team-guards",
+)
 
 problems: list[str] = []
 
 if data_root() != mod / "data":
     problems.append(f"data root resolves outside the module: {data_root()}")
 
-pbs = list_playbooks()
-if not pbs:
-    problems.append("playbooks: loader returned 0 playbooks (silent [] degradation)")
-for pb in pbs:
-    origin = Path(pb.path or "")
-    if pb.source == "builtin" and (mod / "data") not in origin.parents:
-        problems.append(f"playbooks: builtin '{pb.name}' loads from outside data/: {origin}")
-    if pb.source == "builtin" and not pb.goal.strip():
-        problems.append(f"playbooks: builtin '{pb.name}' has no goal to run")
+tmpls = list_agent_templates()
+if not tmpls:
+    problems.append("agents: loader returned 0 templates (silent [] degradation)")
+for tmpl in tmpls:
+    if tmpl.source != "builtin":
+        continue
+    origin = Path(tmpl.path or "")
+    if (mod / "data") not in origin.parents:
+        problems.append(f"agents: builtin '{tmpl.id}' loads from outside data/: {origin}")
+for wid in MIGRATED:
+    resolved = resolve_workflow_run(wid)
+    if not resolved:
+        problems.append(f"agents: resolve_workflow_run('{wid}') returned None")
+    elif not str(resolved.get("goal") or "").strip():
+        problems.append(f"agents: workflow '{wid}' has no goal to run")
 
 cases = load_eval_cases()
 if not cases:
@@ -239,32 +256,33 @@ for p in problems:
 sys.exit(1 if problems else 0)
 PY
 then
-  pass "playbooks + eval cases load, from the module's data/"
+  pass "agents + eval cases load, from the module's data/"
 else
   fail "catalog loaders degraded (see above) — the tree move broke data resolution"
 fi
 
 # ── 6b) Provenance: that data/ IS the loaders' source ───────────────────────
 # A green loader check could still be reading an installed copy. Probe on a THROWAWAY data
-# root: empty the cases file and remove the playbooks dir there, and both loaders must go
+# root: empty the cases file and empty the agents dir there, and both loaders must go
 # empty. Never the working tree — the gate must not mutate the checkout it guards.
 PROBE="$(mktemp -d)"
 trap 'rm -rf "$GATE_XDG" "$PROBE"' EXIT
 cp -r "$MOD/data" "$PROBE/data"
 printf '[]' > "$PROBE/data/eval/cases.json"
-rm -rf "$PROBE/data/playbooks"
+rm -rf "$PROBE/data/agents"
+mkdir -p "$PROBE/data/agents"
 if NCC_DATA_ROOT="$PROBE/data" NCC_PROMPTS_ROOT="$PROBE/data/prompts" \
    PYTHONPATH="$MOD" "$PYTHON" - <<'PY'
 import sys
 
 from core.catalogs.eval_harness import load_eval_cases  # noqa: E402
-from core.catalogs.playbooks import list_playbooks  # noqa: E402
+from core.catalogs.agent_templates import list_agent_templates  # noqa: E402
 
 problems = []
 if load_eval_cases():
     problems.append("eval: cases survived an emptied cases.json — read from somewhere else")
-if list_playbooks():
-    problems.append("playbooks: builtins survived a removed playbooks/ dir — read from elsewhere")
+if list_agent_templates():
+    problems.append("agents: builtins survived an emptied agents/ dir — read from elsewhere")
 for p in problems:
     print("    " + p)
 sys.exit(1 if problems else 0)

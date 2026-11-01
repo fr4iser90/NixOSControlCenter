@@ -34,13 +34,13 @@
   # ];
 
   # --- Recommended schedules (opt-in: uncomment to enable) ---
-  # Safe defaults: playbook + read-only + dryRun. Only one agent runs at a time.
+  # Safe defaults: workflow + read-only + dryRun. Only one agent runs at a time.
   # Staggered nights so they don't compete for LLM slots.
   #
   # agent.schedules.daily-health = {
   #   enable = true;
   #   onCalendar = "*-*-* 03:15:00";
-  #   playbook = "health-report";
+  #   workflow = "health-report";
   #   profile = "read-only";
   #   dryRun = true;
   #   maxSteps = 15;
@@ -49,7 +49,7 @@
   # agent.schedules.weekly-module-audit = {
   #   enable = true;
   #   onCalendar = "Sun *-*-* 04:00:00";
-  #   playbook = "unused-modules-dry-run";
+  #   workflow = "unused-modules-dry-run";
   #   profile = "read-only";
   #   dryRun = true;
   #   maxSteps = 30;
@@ -62,6 +62,6 @@
   #   kind = "probe";
   #   probe = "disk-nix";
   #   thresholdPct = 85;
-  #   escalatePlaybook = "disk-nix-gc-advisor";
+  #   escalateWorkflow = "disk-nix-gc-advisor";
   # };
 }

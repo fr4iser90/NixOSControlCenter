@@ -104,7 +104,7 @@ def sched(**over) -> str:
         "after": "null",
         "persistent": "true",
         "goal": "null",
-        "playbook": "null",
+        "workflow": "null",
         "kind": '"agent"',
         "probe": "null",
         "thresholdPct": "85",

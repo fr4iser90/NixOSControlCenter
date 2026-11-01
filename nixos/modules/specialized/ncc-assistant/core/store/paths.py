@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def data_root() -> Path:
-    """Root of the shipped catalogs (agents/mcp/playbooks/eval/prompts).
+    """Root of the shipped catalogs (agents/mcp/eval/prompts).
 
     Packaged builds get ``NCC_DATA_ROOT`` from the wrapper. In a dev checkout the catalogs sit
     in ``<module>/data`` — two levels above this file in both the old ``python/core/``
@@ -45,13 +45,6 @@ def tools_dir() -> Path:
 def jobs_dir() -> Path:
     """Directory for agent job state."""
     path = config_home() / "jobs"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def playbooks_dir() -> Path:
-    """Directory for user playbook definitions."""
-    path = config_home() / "playbooks"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -228,7 +221,6 @@ def ensure_all_dirs() -> None:
     sessions_dir()
     tools_dir()
     jobs_dir()
-    playbooks_dir()
     schedules_dir()
     approvals_dir()
     knowledge_overlay_dir()

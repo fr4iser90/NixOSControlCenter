@@ -31,7 +31,7 @@ class JobMeta:
     status: str = "pending"  # pending | running | completed | failed | cancelled
     profile: str | None = None
     dry_run: bool = False
-    playbook: str | None = None
+    workflow: str | None = None  # catalog workflow id (ex-playbook)
     created_at: str = field(default_factory=_now_iso)
     started_at: str | None = None
     finished_at: str | None = None
@@ -49,7 +49,7 @@ class JobMeta:
             status=data.get("status", "pending"),
             profile=data.get("profile"),
             dry_run=data.get("dry_run", False),
-            playbook=data.get("playbook"),
+            workflow=data.get("workflow") or data.get("playbook"),
             created_at=data.get("created_at", _now_iso()),
             started_at=data.get("started_at"),
             finished_at=data.get("finished_at"),
@@ -102,7 +102,8 @@ class JobStore:
         *,
         profile: str | None = None,
         dry_run: bool = False,
-        playbook: str | None = None,
+        workflow: str | None = None,
+        playbook: str | None = None,  # deprecated alias
     ) -> JobMeta:
         """Create a new job and return its metadata."""
         job_id = _generate_job_id()
@@ -114,7 +115,7 @@ class JobStore:
             goal=goal,
             profile=profile,
             dry_run=dry_run,
-            playbook=playbook,
+            workflow=workflow or playbook,
         )
         self._write_meta(meta)
         return meta

@@ -135,7 +135,7 @@ class Phase28Tests(unittest.TestCase):
             enable_schedule=True,
         )
         self.assertTrue(result["ok"], result)
-        self.assertEqual(result["playbook"], "tmpl-test-agents")
+        self.assertEqual(result["workflow"], "agents-md-maintainer")
         self.assertEqual(result["schedule"], "tmpl-test-agents")
         goal = result["goal"]
         self.assertIn(str(path.resolve()), goal)
