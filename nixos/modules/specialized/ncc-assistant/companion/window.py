@@ -72,6 +72,7 @@ PANEL_NONE = "none"
 PANEL_HISTORY = "history"
 PANEL_TEMPLATES = "templates"
 PANEL_WORKFLOWS = "workflows"
+PANEL_GITHUB = "github"
 PANEL_PLUGINS = "plugins"
 PANEL_TOOLS = "tools"
 PANEL_MCP = "mcp"
@@ -226,6 +227,136 @@ class _CompanionContextWorker(QThread):
                 self.event.emit(self.slot_id, {"kind": "context", **report})
         except Exception as exc:  # noqa: BLE001
             self.event.emit(self.slot_id, {"kind": "context", "error": str(exc)})
+
+
+class _CompanionGithubAgentWorker(QThread):
+    """Fleet analyze (deterministic) then LLM narrate into the chat slot.
+
+    Same event contract as ``_CompanionTemplateWorker`` so the Companion chat
+    stream / avatar / tool traces light up. Analyze alone used to only refresh
+    the board — operators saw projects but no working session.
+    """
+
+    event = Signal(str, object)
+    failed = Signal(str, str)
+
+    def __init__(
+        self,
+        slot_id: str,
+        *,
+        extract_tasks: bool = True,
+        include_archived: bool | None = None,
+        harness_force: str | None = None,
+        parent=None,
+    ) -> None:
+        super().__init__(parent)
+        self.slot_id = slot_id
+        self._extract_tasks = extract_tasks
+        self._include_archived = include_archived
+        self._harness_force = harness_force
+
+    def run(self) -> None:
+        try:
+            from core.catalogs.agent_templates import get_agent_template
+            from core.policy.auth import with_cached_credentials
+            from core.runtime.agent import run_agent
+            from core.runtime.capacity import capacity_slot
+            from core.store.config import Settings
+            from core.workflows.github_agent import (
+                format_github_agent_chat_brief,
+                run_github_agent,
+            )
+            from harness import get_harness, resolve_harness_name
+
+            self.event.emit(
+                self.slot_id,
+                {"kind": "status", "text": "GitHub Agent · scanning fleet…", "phase": "tool"},
+            )
+            result = run_github_agent(
+                extract_tasks=self._extract_tasks,
+                include_archived=self._include_archived,
+            )
+            snap = result.get("snapshot") if isinstance(result, dict) else None
+            brief = format_github_agent_chat_brief(
+                snap if isinstance(snap, dict) else None
+            )
+            self.event.emit(
+                self.slot_id,
+                {
+                    "kind": "status",
+                    "text": (
+                        f"Scan done · job {result.get('job_id') if isinstance(result, dict) else '—'} "
+                        f"· ok={result.get('ok') if isinstance(result, dict) else False}"
+                    ),
+                    "phase": "tool",
+                },
+            )
+            # Deterministic board facts as a tool result (not assistant) so the
+            # following LLM stream owns reply_buf / the live answer bubble.
+            self.event.emit(
+                self.slot_id,
+                {
+                    "kind": "tool",
+                    "name": "github_agent_analyze",
+                    "args": {"extract_tasks": self._extract_tasks},
+                },
+            )
+            self.event.emit(
+                self.slot_id,
+                {
+                    "kind": "tool_result",
+                    "name": "github_agent_analyze",
+                    "text": brief,
+                },
+            )
+
+            tmpl = get_agent_template("github-agent")
+            settings = with_cached_credentials(Settings.from_env(client_mode="chat"))
+            hname = resolve_harness_name(
+                template_harness=(tmpl.harness if tmpl else None),
+                tags=(tmpl.tags if tmpl else ["github"]),
+                force=self._harness_force,
+            )
+            goal = (
+                "You are the GitHub Agent in the NCC Companion chat.\n"
+                "A deterministic fleet analyze just finished. The board snapshot is below.\n"
+                "Respond in the operator's language (default German if country=DE).\n\n"
+                "Do:\n"
+                "1) Summarize the fleet: active vs archive-candidate.\n"
+                "2) Call out p0 gaps first (impressum/privacy when DACH).\n"
+                "3) For each active project with gaps: the next job and why.\n"
+                "4) Suggest concrete next clicks (which creator / workflow) — do not write files now.\n"
+                "5) Do not invent remotes, PRs, or gap fixes that are not in the brief.\n\n"
+                f"JOB_ID: {(result.get('job_id') if isinstance(result, dict) else '') or '—'}\n"
+                f"ERRORS: {(result.get('errors') if isinstance(result, dict) else []) or []}\n\n"
+                "SNAPSHOT BRIEF:\n"
+                f"{brief}\n"
+            )
+            max_steps = (
+                (tmpl.max_steps if tmpl and tmpl.max_steps else None)
+                or settings.agent_max_steps
+            )
+            profile = (tmpl.profile if tmpl else None) or "read-only"
+            dry_run = True if tmpl is None else bool(tmpl.dry_run)
+            self.event.emit(
+                self.slot_id,
+                {"kind": "status", "text": f"GitHub Agent · LLM ({hname})…", "phase": "llm"},
+            )
+            with capacity_slot("github-agent:companion"):
+                if hname != "native":
+                    for ev in get_harness(hname).send(goal):
+                        self.event.emit(self.slot_id, ev)
+                else:
+                    for ev in run_agent(
+                        goal,
+                        settings,
+                        max_steps=max_steps,
+                        dry_run=dry_run,
+                        profile=profile,
+                    ):
+                        self.event.emit(self.slot_id, ev)
+        except Exception as exc:  # noqa: BLE001
+            self.failed.emit(self.slot_id, f"{exc}\n{traceback.format_exc()}")
 
 
 class _CompanionTemplateWorker(QThread):
@@ -855,6 +986,12 @@ class CompanionWindow(QWidget):
                 "folder-templates",
                 "▶",
                 "Workflows — click a row to configure / run",
+            ),
+            (
+                PANEL_GITHUB,
+                "folder-remote",
+                "GH",
+                "GitHub Agent — board + Start",
             ),
             (
                 PANEL_CRON,
@@ -2492,6 +2629,49 @@ class CompanionWindow(QWidget):
             row.setData(Qt.ItemDataRole.UserRole, ("template", "workspace-brief"))
             self.panel_list.addItem(row)
 
+        elif key == PANEL_GITHUB:
+            self.panel_title.setText("GitHub Agent")
+            for label, data in (
+                ("▶ Start agent (analyze)", ("github", "analyze")),
+                ("Rights…", ("github", "rights")),
+                ("Operator facts (country)…", ("github", "facts")),
+            ):
+                act = QListWidgetItem(label)
+                act.setData(Qt.ItemDataRole.UserRole, data)
+                self.panel_list.addItem(act)
+            try:
+                from core.store.github_agent_snapshot import load_github_agent_snapshot
+
+                snap = load_github_agent_snapshot()
+            except Exception as exc:  # noqa: BLE001
+                self.panel_list.addItem(f"(error: {exc})")
+                return
+            if snap is None:
+                self.panel_list.addItem("No snapshot — Start agent")
+                return
+            projects = snap.get("projects") or []
+            if not projects:
+                self.panel_list.addItem("(no projects in snapshot)")
+                return
+            for p in projects:
+                if not isinstance(p, dict):
+                    continue
+                wid = str(p.get("workspaceId") or "")
+                state = str(p.get("state") or "?")
+                gaps = [g for g in (p.get("gaps") or []) if not g.get("present")]
+                nxt = p.get("nextTask") or {}
+                nxt_title = str(nxt.get("title") or "—")[:36]
+                mark = "★" if wid and wid == self._active_workspace_id else "·"
+                row = QListWidgetItem(
+                    f"{mark} {wid} · {state} · gaps {len(gaps)} · next: {nxt_title}"
+                )
+                tip = str(p.get("path") or "")
+                if p.get("github"):
+                    tip = f"{tip}\n{p.get('github')}"
+                row.setToolTip(tip or wid)
+                row.setData(Qt.ItemDataRole.UserRole, ("github_project", wid))
+                self.panel_list.addItem(row)
+
         elif key == PANEL_PLUGINS:
             self.panel_title.setText("Plugins")
             try:
@@ -2731,6 +2911,26 @@ class CompanionWindow(QWidget):
             return
         if kind == "template" and ref:
             self._run_template(str(ref))
+            return
+        if kind == "github":
+            action = str(ref)
+            if action == "analyze":
+                self._github_agent_analyze()
+            elif action == "rights":
+                self._github_agent_rights_dialog()
+            elif action == "facts":
+                self._github_agent_facts_dialog()
+            return
+        if kind == "github_project" and ref:
+            try:
+                from core.store.preferences import set_active_workspace_id
+
+                self._active_workspace_id = str(ref)
+                set_active_workspace_id(str(ref))
+                self._reload_workspace_chip()
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(self, "GitHub Agent", str(exc))
+            self._fill_panel(PANEL_GITHUB)
             return
         if kind == "daily_refresh":
             try:
@@ -3045,6 +3245,138 @@ class CompanionWindow(QWidget):
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return False
         return {"use_all_workspaces": dlg.use_all_workspaces()}
+
+    def _github_agent_analyze(self) -> None:
+        """Open chat, run fleet analyze + LLM narrate (same slot contract as templates)."""
+        slot = self._slot()
+        if slot.busy:
+            QMessageBox.information(self, "GitHub Agent", "Current chat is busy.")
+            return
+        ready = self._ensure_workflow_readiness("github-agent")
+        if ready is False:
+            return
+        try:
+            from core.scheduling.idle import touch_activity
+
+            touch_activity("companion-github-agent")
+        except Exception:
+            pass
+        force = None
+        mode = (slot.harness_mode or "auto").strip().lower()
+        if mode in ("native", "qwen", "dsh"):
+            force = mode
+        # Leave the board; chat session must be visible while the agent works.
+        self._toggle_panel(PANEL_NONE)
+        slot.reply_buf = ""
+        slot.thinking_buf = ""
+        slot.tool_traces = []
+        slot.last_error = ""
+        slot.user_prompt = "[github-agent] Start"
+        transcript_append(slot, {"kind": "user", "text": slot.user_prompt})
+        slot.turn_start = len(slot.transcript or []) - 1
+        slot.busy = True
+        slot.avatar_state = STATE_THINKING
+        slot.activity = "GitHub Agent"
+        if not slot.title_locked:
+            slot.title = "GitHub Agent"
+            slot.title_locked = True
+        self._apply_slot_ui()
+        worker = _CompanionGithubAgentWorker(
+            slot.id,
+            extract_tasks=True,
+            harness_force=force,
+            parent=self,
+        )
+        slot.worker = worker
+
+        def _on_done(sid: str = slot.id) -> None:
+            self._on_worker_done(sid)
+            # Snapshot is on disk; refresh board only if still viewing it.
+            if self._panel == PANEL_GITHUB:
+                try:
+                    self._fill_panel(PANEL_GITHUB)
+                except Exception:
+                    pass
+
+        worker.event.connect(self._on_event)
+        worker.failed.connect(self._on_fail)
+        worker.finished.connect(_on_done)
+        worker.start()
+
+    def _github_agent_rights_dialog(self) -> None:
+        from core.store.preferences import (
+            get_github_agent_rights,
+            set_github_agent_allow_write,
+            set_github_agent_confirm,
+            set_github_agent_include_archived,
+        )
+
+        rights = get_github_agent_rights()
+        confirm, ok = QInputDialog.getItem(
+            self,
+            "GitHub Agent rights",
+            "Confirm mode:",
+            ["writes", "always", "never"],
+            max(0, ["writes", "always", "never"].index(rights["confirm"]))
+            if rights["confirm"] in ("writes", "always", "never")
+            else 0,
+            False,
+        )
+        if not ok:
+            return
+        set_github_agent_confirm(confirm)
+        write_ans = QMessageBox.question(
+            self,
+            "GitHub Agent rights",
+            "Allow repo writes on later runs?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+            if rights["allowWrite"]
+            else QMessageBox.StandardButton.No,
+        )
+        set_github_agent_allow_write(write_ans == QMessageBox.StandardButton.Yes)
+        arch_ans = QMessageBox.question(
+            self,
+            "GitHub Agent rights",
+            "Include archive-candidates when planning tasks?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+            if rights["includeArchived"]
+            else QMessageBox.StandardButton.No,
+        )
+        set_github_agent_include_archived(arch_ans == QMessageBox.StandardButton.Yes)
+        updated = get_github_agent_rights()
+        QMessageBox.information(
+            self,
+            "GitHub Agent rights",
+            f"confirm={updated['confirm']}\n"
+            f"allowWrite={updated['allowWrite']}\n"
+            f"allowProcesses={updated['allowProcesses']}\n"
+            f"includeArchived={updated['includeArchived']}",
+        )
+        self._fill_panel(PANEL_GITHUB)
+
+    def _github_agent_facts_dialog(self) -> None:
+        from core.store.operator_facts import (
+            get_operator_country,
+            set_operator_country,
+        )
+
+        country, ok = QInputDialog.getText(
+            self,
+            "Operator facts",
+            "Country (ISO, e.g. DE / AT / CH / US):",
+            text=get_operator_country(),
+        )
+        if not ok:
+            return
+        facts = set_operator_country(country)
+        QMessageBox.information(
+            self,
+            "Operator facts",
+            f"country={facts.get('country')} locale={facts.get('locale')}",
+        )
+        self._fill_panel(PANEL_GITHUB)
 
     def _run_template(self, template_id: str) -> None:
         slot = self._slot()

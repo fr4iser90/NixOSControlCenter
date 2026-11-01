@@ -15,8 +15,10 @@ If a label conflicts with this file, **this file wins**.
 | **Plugin** | Desktop host feature (not an agent job) | Companion/GUI tick, e.g. Doomscroll |
 | **Workspace** | Local git root (★ active scopes digests / defaults) | Registry under Settings / Companion |
 | **Secret** | Named credential (token) | Bound into MCP / params — never into prompts |
+| **GitHub Agent** | Fleet board: lifecycle, gaps, drift, Daily tasks (not “Portfolio Agent”) | Companion rail **GitHub** → Start; CLI `ncc ai github-agent` |
 
-There is **no Daily board**. Status briefing is the workflow **`workspace-brief`**, run once or via Cron.
+There is **no Daily board**. Status briefing is the workflow **`workspace-brief`**, run once or via Cron.  
+**GitHub Agent** is a separate rail board (`github-agent/snapshot.json`), not a Daily board.
 
 ---
 

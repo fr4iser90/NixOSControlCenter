@@ -37,6 +37,7 @@ in
               "serve-openapi" "tray" "companion" "harness"
               "watchdog" "probe" "rollback" "red-team"
               "secrets" "workspaces" "templates" "workflows" "focus" "workflow"
+              "github-agent"
               "context"
               "mcp-install"
               "maintenance"
@@ -82,6 +83,7 @@ in
                 ncc ai focus status|tick|snooze
                 ncc ai context show|compact [--session ID] [--json]
                 ncc ai workflow audit|lifecycle|fleet|plan|status|next|resume|task-start|task-finish|branch|validate|commit|pr|merge|bump
+                ncc ai github-agent analyze|show|rights
                 ncc ai mcp-install NAME
                 ncc ai maintenance run [--json]
                 ncc ai permissions show [--grant repo=pr] [--json]

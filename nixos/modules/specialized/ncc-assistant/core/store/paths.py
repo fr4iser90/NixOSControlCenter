@@ -200,6 +200,23 @@ def activity_file() -> Path:
     return config_home() / "last-activity.json"
 
 
+def operator_facts_file() -> Path:
+    """Operator country / locale / notes (legal-gap elevation for GitHub Agent)."""
+    return config_home() / "operator-facts.json"
+
+
+def github_agent_dir() -> Path:
+    """GitHub Agent board snapshot directory."""
+    path = config_home() / "github-agent"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def github_agent_snapshot_file() -> Path:
+    """Board SSOT written by ``run_github_agent``."""
+    return github_agent_dir() / "snapshot.json"
+
+
 def focus_state_file() -> Path:
     """Doomscroll / focus watchdog streak state."""
     return config_home() / "focus-state.json"

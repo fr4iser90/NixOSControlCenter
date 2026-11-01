@@ -87,7 +87,12 @@ class CompanionShellAstTests(unittest.TestCase):
         self.assertIn("Grouped rail", text)
         # Work before Caps: Jobs before Tools; Plugins after MCP. Probed inside the rail —
         # the PANEL_* constant block above it is unordered and says nothing about the rail.
+        # Behaviour: GitHub Agent rail sits after Workflows, before Jobs (plan 40).
+        # Existing: this file. User: Companion PANEL_GITHUB near Work.
         rail = text.split("# Grouped rail", 1)[1].split("side.addStretch(1)", 1)[0]
+        self.assertIn("PANEL_GITHUB", rail)
+        self.assertLess(rail.index("PANEL_TEMPLATES"), rail.index("PANEL_GITHUB"))
+        self.assertLess(rail.index("PANEL_GITHUB"), rail.index("PANEL_JOBS"))
         self.assertLess(rail.index("PANEL_JOBS"), rail.index("PANEL_TOOLS"))
         self.assertLess(rail.index("PANEL_MCP"), rail.index("PANEL_PLUGINS"))
         self.assertIn('QPushButton("Rename")', text)

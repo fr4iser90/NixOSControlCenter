@@ -373,8 +373,8 @@ when full). Idle sweep (Companion timer) may start due schedules / `idle-ok`
 templates when armed; presence `paused` disables idle.
 
 **Surfaces (Companion / GUI):** **Workflows** (once or Cron) ·
-**Plugins** (desktop extras, e.g. Doomscroll) · **Tools** · **MCP** ·
-**Workspaces** · **Cron**. There is **no Daily board**.
+**GitHub Agent** (fleet board) · **Plugins** (desktop extras, e.g. Doomscroll) ·
+**Tools** · **MCP** · **Workspaces** · **Cron**. There is **no Daily board**.
 See [surfaces.md](./surfaces.md).
 
 **Playbooks removed:** former playbook ids are Workflow catalog entries under
@@ -384,6 +384,21 @@ See [surfaces.md](./surfaces.md).
 
 **Briefing:** workflow `workspace-brief` — run Once or schedule under
 **Cron**. Not a plugin.
+
+### GitHub Agent
+
+Companion rail **GitHub** → **Start agent**: readiness (token/MCP/bins) then a
+deterministic fleet run (`run_github_agent`) that audits every registered
+workspace, classifies lifecycle, optionally extracts Daily `gap:<id>` tasks,
+writes `~/.config/ncc-assistant/github-agent/snapshot.json`, and records a job +
+audit. Board rows: `{id} · {state} · gaps N · next: …`. Click a row to set ★
+active workspace. **Rights** / **Operator facts** (country) live on the same
+panel. DE/AT/CH elevate missing impressum/privacy to **p0**. Archive-candidates
+stay on the board; task planning skips them unless rights/CLI include archived.
+
+CLI: `ncc ai github-agent analyze|show|rights`  
+Catalog workflow id: `github-agent` (narrates the snapshot; not a second
+orchestrator). Plan SSOT: [plans/40-github-agent.md](./plans/40-github-agent.md).
 
 **Repo automation:** register a git root under Workspaces (★ active), then run
 workflows (`autonomous-agent-run`, creators, `workspace-brief`, …)
@@ -411,7 +426,7 @@ list often needs root). Needs `wtype` on Plasma Wayland for leave-tab.
 CLI: `ncc ai focus status|tick|snooze`.
 
 **Companion:** frameless overlay — drag avatar to move, resize via corner grip,
-session picker (grouped by workspace), Workflows / Cron / Plugins / Tools / MCP / Workspaces.
+session picker (grouped by workspace), Workflows / GitHub Agent / Cron / Plugins / Tools / MCP / Workspaces.
 Plugins panel: toggle enable, Configure dialog, Grant net-block (Doomscroll opt-in;
 Polkit allows `ncc-focus-netblock` without password for active sessions).
 Default chrome theme is **Dark** (More → Theme; also Midnight / Light).

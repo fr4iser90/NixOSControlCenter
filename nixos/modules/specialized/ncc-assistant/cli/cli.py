@@ -1,4 +1,4 @@
-"""CLI entry: ncc-assistant [gui|chat|mcp|agent|jobs|presence|approve|knowledge|export|eval|tools|secrets|workspaces|templates|workflows|focus|workflow|serve-openapi|tray]."""
+"""CLI entry: ncc-assistant [gui|chat|mcp|agent|jobs|presence|approve|knowledge|export|eval|tools|secrets|workspaces|templates|workflows|focus|workflow|github-agent|serve-openapi|tray]."""
 
 from __future__ import annotations
 
@@ -1294,6 +1294,96 @@ def _cmd_workflow(args: argparse.Namespace) -> int:
     return 1
 
 
+def _cmd_github_agent(args: argparse.Namespace) -> int:
+    """GitHub Agent: analyze fleet / show snapshot / rights."""
+    import json
+
+    cmd = getattr(args, "github_agent_cmd", None)
+    if cmd == "analyze":
+        from core.workflows.github_agent import run_github_agent
+
+        extract = not bool(getattr(args, "no_tasks", False))
+        include = True if getattr(args, "include_archived", False) else None
+        result = run_github_agent(extract_tasks=extract, include_archived=include)
+        if getattr(args, "json", False):
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+        else:
+            snap = result.get("snapshot") or {}
+            projects = snap.get("projects") or []
+            print_ok(
+                f"GitHub Agent job={result.get('job_id')} "
+                f"projects={len(projects)} ok={result.get('ok')}"
+            )
+            for p in projects:
+                gaps = [g for g in (p.get("gaps") or []) if not g.get("present")]
+                nxt = p.get("nextTask") or {}
+                nxt_title = (nxt.get("title") or "—")[:40]
+                print(
+                    f"  {p.get('workspaceId')} · {p.get('state')} · "
+                    f"gaps {len(gaps)} · next: {nxt_title}"
+                )
+            for err in result.get("errors") or []:
+                print_err(str(err))
+        return 0 if result.get("ok") else 1
+
+    if cmd == "show":
+        from core.store.github_agent_snapshot import load_github_agent_snapshot
+
+        snap = load_github_agent_snapshot()
+        if snap is None:
+            print_err("No snapshot — run: ncc ai github-agent analyze")
+            return 1
+        if getattr(args, "json", False):
+            print(json.dumps(snap, indent=2, ensure_ascii=False))
+        else:
+            projects = snap.get("projects") or []
+            print_info(
+                f"GitHub Agent snapshot · updated {snap.get('updatedAt')} · "
+                f"job {snap.get('jobId')} · {len(projects)} project(s)"
+            )
+            for p in projects:
+                gaps = [g for g in (p.get("gaps") or []) if not g.get("present")]
+                nxt = p.get("nextTask") or {}
+                print(
+                    f"  {p.get('workspaceId')} · {p.get('state')} · "
+                    f"gaps {len(gaps)} · next: {(nxt.get('title') or '—')[:40]}"
+                )
+        return 0
+
+    if cmd == "rights":
+        from core.store.preferences import (
+            get_github_agent_rights,
+            set_github_agent_allow_processes,
+            set_github_agent_allow_write,
+            set_github_agent_confirm,
+            set_github_agent_include_archived,
+        )
+
+        rights_cmd = getattr(args, "github_agent_rights_cmd", None) or "show"
+        if rights_cmd == "set":
+            if getattr(args, "confirm", None):
+                set_github_agent_confirm(str(args.confirm))
+            if getattr(args, "allow_write", None) is not None:
+                set_github_agent_allow_write(bool(args.allow_write))
+            if getattr(args, "allow_processes", None) is not None:
+                set_github_agent_allow_processes(bool(args.allow_processes))
+            if getattr(args, "include_archived", None) is not None:
+                set_github_agent_include_archived(bool(args.include_archived))
+        rights = get_github_agent_rights()
+        if getattr(args, "json", False):
+            print(json.dumps(rights, indent=2, ensure_ascii=False))
+        else:
+            print_info(
+                f"confirm={rights['confirm']} allowWrite={rights['allowWrite']} "
+                f"allowProcesses={rights['allowProcesses']} "
+                f"includeArchived={rights['includeArchived']}"
+            )
+        return 0
+
+    print_err("Usage: ncc ai github-agent analyze|show|rights")
+    return 1
+
+
 def resolve_wid(workspace_id: str | None) -> str:
     from core.workflows.workspace_workflow import resolve_workspace_id
 
@@ -1754,6 +1844,57 @@ def main(argv: list[str] | None = None) -> int:
         "--part", choices=["major", "minor", "patch"], default="patch"
     )
 
+    gha_p = sub.add_parser(
+        "github-agent",
+        help="GitHub Agent: fleet board (lifecycle / gaps / drift / tasks)",
+    )
+    gha_sub = gha_p.add_subparsers(dest="github_agent_cmd")
+    gha_an = gha_sub.add_parser("analyze", help="Run GitHub Agent and write snapshot")
+    gha_an.add_argument("--json", action="store_true")
+    gha_an.add_argument(
+        "--no-tasks",
+        action="store_true",
+        help="Do not create Daily tasks from gaps",
+    )
+    gha_an.add_argument(
+        "--include-archived",
+        action="store_true",
+        help="Also plan tasks for archive-candidate workspaces",
+    )
+    gha_show = gha_sub.add_parser("show", help="Show last GitHub Agent snapshot")
+    gha_show.add_argument("--json", action="store_true")
+    gha_rights = gha_sub.add_parser("rights", help="Show or set GitHub Agent rights")
+    gha_rights_sub = gha_rights.add_subparsers(dest="github_agent_rights_cmd")
+    gha_rights_show = gha_rights_sub.add_parser("show", help="Show rights (default)")
+    gha_rights_show.add_argument("--json", action="store_true")
+    gha_rights_set = gha_rights_sub.add_parser("set", help="Update rights prefs")
+    gha_rights_set.add_argument(
+        "--confirm", choices=["always", "writes", "never"], help="Confirm mode"
+    )
+    gha_rights_set.add_argument(
+        "--allow-write",
+        dest="allow_write",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Allow repo writes on later runs",
+    )
+    gha_rights_set.add_argument(
+        "--allow-processes",
+        dest="allow_processes",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Allow spawning git/gh processes",
+    )
+    gha_rights_set.add_argument(
+        "--include-archived",
+        dest="include_archived",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Default: plan tasks for archive-candidates",
+    )
+    gha_rights_set.add_argument("--json", action="store_true")
+    gha_rights.add_argument("--json", action="store_true")
+
     mcp_p = sub.add_parser("mcp-install", help="Install an MCP marketplace template")
     mcp_p.add_argument("name", help="MCP template name (git, github, …)")
     mcp_p.add_argument("--workspace", help="Workspace id for {{workspace.path}}")
@@ -1914,6 +2055,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if command == "workflow":
         return _cmd_workflow(args)
+
+    if command == "github-agent":
+        return _cmd_github_agent(args)
 
     if command == "mcp-install":
         return _cmd_mcp_install(args)

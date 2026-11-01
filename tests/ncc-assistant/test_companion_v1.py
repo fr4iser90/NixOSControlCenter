@@ -64,8 +64,11 @@ class CompanionWiringTests(unittest.TestCase):
         text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn("startSystemMove", text)
         self.assertIn("WA_TranslucentBackground", text)
+        # Behaviour: Companion exposes PANEL_GITHUB constant. Existing: this file.
+        # User: Companion PANEL_GITHUB board + Start.
         self.assertIn("PANEL_HISTORY", text)
         self.assertIn("PANEL_TEMPLATES", text)
+        self.assertIn("PANEL_GITHUB", text)
         self.assertIn("PANEL_TOOLS", text)
         self.assertIn("PANEL_MCP", text)
         self.assertIn("PANEL_WORKSPACES", text)

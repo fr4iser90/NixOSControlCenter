@@ -730,6 +730,75 @@ def set_doomscroll_inject_chat(enabled: bool) -> None:
     save_preferences({"doomscroll_inject_chat": bool(enabled)})
 
 
+# --- GitHub Agent rights / board prefs ---
+# Callers: github_agent.run_github_agent, cli github-agent rights, Companion PANEL_GITHUB.
+# Schema in preferences.json: githubAgent.{confirm,allowWrite,allowProcesses,includeArchived}
+
+GITHUB_AGENT_CONFIRM = ("always", "writes", "never")
+DEFAULT_GITHUB_AGENT_CONFIRM = "writes"
+
+
+def _github_agent_block() -> dict[str, Any]:
+    raw = load_preferences().get("githubAgent")
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _save_github_agent_block(updates: dict[str, Any]) -> dict[str, Any]:
+    block = _github_agent_block()
+    block.update({k: v for k, v in updates.items() if v is not None})
+    save_preferences({"githubAgent": block})
+    return block
+
+
+def get_github_agent_confirm() -> str:
+    raw = _github_agent_block().get("confirm", DEFAULT_GITHUB_AGENT_CONFIRM)
+    if isinstance(raw, str) and raw.strip().lower() in GITHUB_AGENT_CONFIRM:
+        return raw.strip().lower()
+    return DEFAULT_GITHUB_AGENT_CONFIRM
+
+
+def set_github_agent_confirm(mode: str) -> None:
+    m = (mode or "").strip().lower()
+    if m in GITHUB_AGENT_CONFIRM:
+        _save_github_agent_block({"confirm": m})
+
+
+def get_github_agent_allow_write() -> bool:
+    return bool(_github_agent_block().get("allowWrite", False))
+
+
+def set_github_agent_allow_write(enabled: bool) -> None:
+    _save_github_agent_block({"allowWrite": bool(enabled)})
+
+
+def get_github_agent_allow_processes() -> bool:
+    raw = _github_agent_block().get("allowProcesses", True)
+    if raw is None:
+        return True
+    return bool(raw)
+
+
+def set_github_agent_allow_processes(enabled: bool) -> None:
+    _save_github_agent_block({"allowProcesses": bool(enabled)})
+
+
+def get_github_agent_include_archived() -> bool:
+    return bool(_github_agent_block().get("includeArchived", False))
+
+
+def set_github_agent_include_archived(enabled: bool) -> None:
+    _save_github_agent_block({"includeArchived": bool(enabled)})
+
+
+def get_github_agent_rights() -> dict[str, Any]:
+    return {
+        "confirm": get_github_agent_confirm(),
+        "allowWrite": get_github_agent_allow_write(),
+        "allowProcesses": get_github_agent_allow_processes(),
+        "includeArchived": get_github_agent_include_archived(),
+    }
+
+
 def apply_startup_preferences(settings: Any) -> Any:
     """Apply last provider / model from preferences (Nix model env wins if set)."""
     from dataclasses import replace

@@ -1,0 +1,33 @@
+{
+  "id": "github-agent",
+  "title": "GitHub Agent",
+  "category": "GitHub",
+  "description": "Deterministic fleet board: lifecycle, structural gaps, Daily tasks, portfolio drift. Prefer CLI github-agent analyze; this template narrates the snapshot.",
+  "profile": "read-only",
+  "mcp": ["git", "github"],
+  "requiresSecrets": ["github_token"],
+  "tier": "catalog",
+  "scheduleKind": "once",
+  "dryRun": true,
+  "maxSteps": 12,
+  "tags": ["github", "idle-ok", "workflow", "fleet"],
+  "goalTemplate": "Call or narrate the deterministic GitHub Agent run results.\\n\\n1) Prefer: `ncc ai github-agent analyze --json` (extractTasks={{extractTasks}}, includeArchived={{includeArchived}}).\\n2) If a snapshot already exists, also `ncc ai github-agent show --json`.\\n3) Report each project: workspaceId, lifecycle state, missing gaps (with priority), nextTask, driftFlags.\\n4) Call out DACH legal gaps (impressum/privacy) when operator country is DE/AT/CH.\\n5) Archived projects stay on the board; do not invent writes. Respect rights (confirm / allowWrite).\\n6) Do not rename remotes, edit registries, commit, or push — only narrate the snapshot and job id.",
+  "params": [
+    {
+      "id": "extractTasks",
+      "label": "Extract Daily tasks from gaps",
+      "type": "enum",
+      "options": ["yes", "no"],
+      "default": "yes",
+      "required": true
+    },
+    {
+      "id": "includeArchived",
+      "label": "Plan tasks for archive-candidates",
+      "type": "enum",
+      "options": ["no", "yes"],
+      "default": "no",
+      "required": true
+    }
+  ]
+}
