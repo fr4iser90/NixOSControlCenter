@@ -243,6 +243,31 @@ def maybe_sweep(*, start: bool = False) -> dict[str, Any]:
             "candidates": picked,
         }
 
+    # GitHub Agent multi-day campaign: one analyze/tick while idle (plan 41).
+    try:
+        from core.workflows.github_agent_act import idle_autopilot_step
+
+        gha = idle_autopilot_step()
+        if not gha.get("skipped"):
+            started.append(
+                {
+                    "kind": "github-agent",
+                    "id": "github-agent-autopilot",
+                    "title": "GitHub Agent autopilot",
+                    "status": "finished",
+                    "detail": gha,
+                }
+            )
+    except Exception as exc:  # noqa: BLE001
+        started.append(
+            {
+                "kind": "github-agent",
+                "id": "github-agent-autopilot",
+                "status": "error",
+                "error": str(exc),
+            }
+        )
+
     #: What an unattended run may hold, read off the day once so a sweep cannot walk its own
     #: floor down as its runs get logged. Computed on the first schedule candidate: an
     #: instance-only sweep has no grant to inherit and must not read the whole audit log.

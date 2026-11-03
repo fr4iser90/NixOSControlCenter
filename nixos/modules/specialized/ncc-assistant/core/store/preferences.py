@@ -731,11 +731,20 @@ def set_doomscroll_inject_chat(enabled: bool) -> None:
 
 
 # --- GitHub Agent rights / board prefs ---
-# Callers: github_agent.run_github_agent, cli github-agent rights, Companion PANEL_GITHUB.
-# Schema in preferences.json: githubAgent.{confirm,allowWrite,allowProcesses,includeArchived}
+# Callers: github_agent, github_agent_act/policy, cli rights, Companion PANEL_GITHUB.
+# Schema: githubAgent.{confirm,allowWrite,allowlist,denylist,writeClasses,
+# dirtyPolicy,maxPerTick,autopilot,analyzeStaleHours,…}
+# User: "rechte geben … repos untouched … autonmm mehre tage"
 
 GITHUB_AGENT_CONFIRM = ("always", "writes", "never")
 DEFAULT_GITHUB_AGENT_CONFIRM = "writes"
+GITHUB_AGENT_AUTOPILOT = ("off", "analyze", "act-safe")
+DEFAULT_GITHUB_AGENT_AUTOPILOT = "off"
+GITHUB_AGENT_DIRTY = ("skip", "abort")
+DEFAULT_GITHUB_AGENT_DIRTY = "skip"
+DEFAULT_GITHUB_AGENT_WRITE_CLASSES = ("docs",)
+DEFAULT_GITHUB_AGENT_MAX_PER_TICK = 6
+DEFAULT_GITHUB_AGENT_ANALYZE_STALE_HOURS = 24
 
 
 def _github_agent_block() -> dict[str, Any]:
@@ -790,12 +799,123 @@ def set_github_agent_include_archived(enabled: bool) -> None:
     _save_github_agent_block({"includeArchived": bool(enabled)})
 
 
+def _str_list(raw: object) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        s = str(item or "").strip()
+        if not s or s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return out
+
+
+def get_github_agent_allowlist() -> list[str]:
+    return _str_list(_github_agent_block().get("allowlist"))
+
+
+def set_github_agent_allowlist(ids: list[str] | None) -> None:
+    _save_github_agent_block({"allowlist": _str_list(ids or [])})
+
+
+def get_github_agent_denylist() -> list[str]:
+    return _str_list(_github_agent_block().get("denylist"))
+
+
+def set_github_agent_denylist(ids: list[str] | None) -> None:
+    _save_github_agent_block({"denylist": _str_list(ids or [])})
+
+
+def get_github_agent_write_classes() -> list[str]:
+    raw = _str_list(_github_agent_block().get("writeClasses"))
+    return raw or list(DEFAULT_GITHUB_AGENT_WRITE_CLASSES)
+
+
+def set_github_agent_write_classes(classes: list[str] | None) -> None:
+    cleaned = [c for c in _str_list(classes or []) if c]
+    _save_github_agent_block(
+        {"writeClasses": cleaned or list(DEFAULT_GITHUB_AGENT_WRITE_CLASSES)}
+    )
+
+
+def get_github_agent_dirty_policy() -> str:
+    raw = _github_agent_block().get("dirtyPolicy", DEFAULT_GITHUB_AGENT_DIRTY)
+    if isinstance(raw, str) and raw.strip().lower() in GITHUB_AGENT_DIRTY:
+        return raw.strip().lower()
+    return DEFAULT_GITHUB_AGENT_DIRTY
+
+
+def set_github_agent_dirty_policy(policy: str) -> None:
+    p = (policy or "").strip().lower()
+    if p in GITHUB_AGENT_DIRTY:
+        _save_github_agent_block({"dirtyPolicy": p})
+
+
+def get_github_agent_max_per_tick() -> int:
+    raw = _github_agent_block().get("maxPerTick", DEFAULT_GITHUB_AGENT_MAX_PER_TICK)
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_GITHUB_AGENT_MAX_PER_TICK
+    return max(1, min(n, 20))
+
+
+def set_github_agent_max_per_tick(n: int) -> None:
+    try:
+        v = int(n)
+    except (TypeError, ValueError):
+        return
+    _save_github_agent_block({"maxPerTick": max(1, min(v, 20))})
+
+
+def get_github_agent_autopilot() -> str:
+    raw = _github_agent_block().get("autopilot", DEFAULT_GITHUB_AGENT_AUTOPILOT)
+    if isinstance(raw, str) and raw.strip().lower() in GITHUB_AGENT_AUTOPILOT:
+        return raw.strip().lower()
+    return DEFAULT_GITHUB_AGENT_AUTOPILOT
+
+
+def set_github_agent_autopilot(mode: str) -> None:
+    m = (mode or "").strip().lower()
+    if m in GITHUB_AGENT_AUTOPILOT:
+        _save_github_agent_block({"autopilot": m})
+
+
+def get_github_agent_analyze_stale_hours() -> int:
+    raw = _github_agent_block().get(
+        "analyzeStaleHours", DEFAULT_GITHUB_AGENT_ANALYZE_STALE_HOURS
+    )
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_GITHUB_AGENT_ANALYZE_STALE_HOURS
+    return max(1, min(n, 168))
+
+
+def set_github_agent_analyze_stale_hours(n: int) -> None:
+    try:
+        v = int(n)
+    except (TypeError, ValueError):
+        return
+    _save_github_agent_block({"analyzeStaleHours": max(1, min(v, 168))})
+
+
 def get_github_agent_rights() -> dict[str, Any]:
     return {
         "confirm": get_github_agent_confirm(),
         "allowWrite": get_github_agent_allow_write(),
         "allowProcesses": get_github_agent_allow_processes(),
         "includeArchived": get_github_agent_include_archived(),
+        "allowlist": get_github_agent_allowlist(),
+        "denylist": get_github_agent_denylist(),
+        "writeClasses": get_github_agent_write_classes(),
+        "dirtyPolicy": get_github_agent_dirty_policy(),
+        "maxPerTick": get_github_agent_max_per_tick(),
+        "autopilot": get_github_agent_autopilot(),
+        "analyzeStaleHours": get_github_agent_analyze_stale_hours(),
     }
 
 

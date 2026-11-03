@@ -2,7 +2,8 @@
 
 **Status: done.** All checklist items exist; `tests/run-gates.sh` exited 0
 with Companion **GitHub** rail live. Name remains **GitHub Agent** (not
-“Portfolio Agent”).
+“Portfolio Agent”). **Autonomy / multi-day act:** see
+[41-github-agent-autonomy.md](./41-github-agent-autonomy.md).
 
 **Name:** GitHub Agent (not “Portfolio Agent”).  
 **Scope:** one plan for this goal. 28/34/37/38/39 are libraries this wires.

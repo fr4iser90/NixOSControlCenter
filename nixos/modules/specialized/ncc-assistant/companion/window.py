@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import (
+    QEvent,
     QPoint,
     QRectF,
     QSize,
@@ -55,6 +56,7 @@ from PySide6.QtWidgets import (
     QSizeGrip,
     QSizePolicy,
     QStackedWidget,
+    QSystemTrayIcon,
     QTextEdit,
     QToolButton,
     QVBoxLayout,
@@ -936,6 +938,9 @@ class CompanionWindow(QWidget):
         self._persist_timer.setInterval(2000)
         self._persist_timer.setSingleShot(True)
         self._persist_timer.timeout.connect(self._persist_chats)
+        self._tray: QSystemTrayIcon | None = None
+        self._force_quit = False
+        self._tray_hint_shown = False
 
         # Left rail = nav icons only (no menus). Avatar under NCC header.
         root = QHBoxLayout(self)
@@ -1078,7 +1083,7 @@ class CompanionWindow(QWidget):
         )
 
         side.addStretch(1)
-        # Window chrome — always at bottom
+        # Window chrome — always at bottom (hide-to-tray; Quit lives in tray menu)
         _add_rail_btn(
             None,
             tip="Open full AI window (settings, deep Cron edit)",
@@ -1089,10 +1094,18 @@ class CompanionWindow(QWidget):
         )
         _add_rail_btn(
             None,
-            tip="Quit companion",
+            tip="Minimize to tray (keeps campaign / idle running)",
+            theme="window-minimize",
+            fallback="_",
+            on_click=self._hide_to_tray,
+            checkable=False,
+        )
+        _add_rail_btn(
+            None,
+            tip="Hide to tray (×). Quit only from the tray menu.",
             theme="window-close",
             fallback="×",
-            on_click=QApplication.instance().quit,
+            on_click=self._hide_to_tray,
             checkable=False,
         )
 
@@ -1333,6 +1346,7 @@ class CompanionWindow(QWidget):
         self._sync_presence()
         self._apply_slot_ui()
         self._restore_geometry()
+        self._setup_tray()
         QTimer.singleShot(800, self._focus_tick)
 
     def showEvent(self, event) -> None:  # noqa: N802
@@ -1345,10 +1359,99 @@ class CompanionWindow(QWidget):
         if self._panel == PANEL_NONE:
             self.input.setFocus(Qt.FocusReason.ActiveWindowFocusReason)
 
-    def closeEvent(self, event) -> None:  # noqa: N802
+    def _setup_tray(self) -> None:
+        """Companion-owned tray: hide/show while process (+ campaigns) keep running.
+
+        Separate from ``ncc ai tray`` (presence daemon when Companion is not open).
+        Two icons only if both processes run — prefer Companion *or* tray daemon.
+        """
+        if self._tray is not None:
+            return
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            return
+        tray = QSystemTrayIcon(self)
+        tray.setIcon(
+            QIcon.fromTheme("help-about", QIcon.fromTheme("application-x-executable"))
+        )
+        tray.setToolTip("NCC Companion")
+        menu = QMenu()
+        act_show = menu.addAction("Show companion")
+        act_hide = menu.addAction("Hide to tray")
+        menu.addSeparator()
+        act_quit = menu.addAction("Quit companion")
+        act_show.triggered.connect(self._show_from_tray)
+        act_hide.triggered.connect(self._hide_to_tray)
+        act_quit.triggered.connect(self._quit_companion)
+        tray.setContextMenu(menu)
+        tray.activated.connect(self._on_tray_activated)
+        tray.show()
+        self._tray = tray
+
+    def _can_hide_to_tray(self) -> bool:
+        return bool(
+            self._tray is not None
+            and QSystemTrayIcon.isSystemTrayAvailable()
+            and self._tray.isVisible()
+        )
+
+    def _hide_to_tray(self) -> None:
         self._persist_chats()
         self._save_geometry()
-        super().closeEvent(event)
+        if not self._can_hide_to_tray():
+            self._quit_companion()
+            return
+        self.hide()
+        if not self._tray_hint_shown and self._tray is not None:
+            self._tray_hint_shown = True
+            self._tray.showMessage(
+                "NCC Companion",
+                "Running in tray — click the icon to show again. Quit from the menu.",
+                QSystemTrayIcon.MessageIcon.Information,
+                4000,
+            )
+
+    def _show_from_tray(self) -> None:
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        QTimer.singleShot(0, self._focus_input)
+
+    def _on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
+        if reason in (
+            QSystemTrayIcon.ActivationReason.Trigger,
+            QSystemTrayIcon.ActivationReason.DoubleClick,
+        ):
+            if self.isVisible():
+                self._hide_to_tray()
+            else:
+                self._show_from_tray()
+
+    def _quit_companion(self) -> None:
+        self._force_quit = True
+        self._persist_chats()
+        self._save_geometry()
+        if self._tray is not None:
+            self._tray.hide()
+        app = QApplication.instance()
+        if app is not None:
+            app.quit()
+
+    def changeEvent(self, event) -> None:  # noqa: N802
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.WindowStateChange and self.isMinimized():
+            # Frameless rarely gets WM minimize; still map it to tray when it happens.
+            QTimer.singleShot(0, self._hide_to_tray)
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        if self._force_quit or not self._can_hide_to_tray():
+            self._persist_chats()
+            self._save_geometry()
+            if self._tray is not None:
+                self._tray.hide()
+            super().closeEvent(event)
+            return
+        event.ignore()
+        self._hide_to_tray()
 
     def _schedule_persist(self) -> None:
         if hasattr(self, "_persist_timer"):
@@ -2632,13 +2735,32 @@ class CompanionWindow(QWidget):
         elif key == PANEL_GITHUB:
             self.panel_title.setText("GitHub Agent")
             for label, data in (
-                ("▶ Start agent (analyze)", ("github", "analyze")),
-                ("Rights…", ("github", "rights")),
+                ("▶ Start agent (analyze + chat)", ("github", "analyze")),
+                ("⚡ Act wave (arm + tick stubs)", ("github", "act")),
+                ("⏱ Tick once (resume campaign)", ("github", "tick")),
+                ("⏸ Pause campaign", ("github", "pause")),
+                ("▶ Resume campaign", ("github", "resume")),
+                ("Rights / Autopilot…", ("github", "rights")),
                 ("Operator facts (country)…", ("github", "facts")),
             ):
                 act = QListWidgetItem(label)
                 act.setData(Qt.ItemDataRole.UserRole, data)
                 self.panel_list.addItem(act)
+            try:
+                from core.store.github_agent_campaign import load_github_agent_campaign
+                from core.store.preferences import get_github_agent_autopilot
+
+                camp = load_github_agent_campaign()
+                ap = get_github_agent_autopilot()
+                qn = len(camp.get("queue") or [])
+                st = camp.get("status") or "idle"
+                stats = camp.get("stats") or {}
+                self.panel_list.addItem(
+                    f"Campaign · {st} · queue {qn} · "
+                    f"applied {stats.get('applied', 0)} · autopilot={ap}"
+                )
+            except Exception as exc:  # noqa: BLE001
+                self.panel_list.addItem(f"(campaign: {exc})")
             try:
                 from core.store.github_agent_snapshot import load_github_agent_snapshot
 
@@ -2916,6 +3038,14 @@ class CompanionWindow(QWidget):
             action = str(ref)
             if action == "analyze":
                 self._github_agent_analyze()
+            elif action == "act":
+                self._github_agent_act()
+            elif action == "tick":
+                self._github_agent_tick()
+            elif action == "pause":
+                self._github_agent_pause()
+            elif action == "resume":
+                self._github_agent_resume()
             elif action == "rights":
                 self._github_agent_rights_dialog()
             elif action == "facts":
@@ -3303,12 +3433,86 @@ class CompanionWindow(QWidget):
         worker.finished.connect(_on_done)
         worker.start()
 
+    def _github_agent_act(self) -> None:
+        """Arm campaign from snapshot + one tick (docs stubs under policy)."""
+        try:
+            from core.workflows.github_agent_act import act_campaign
+
+            touch_activity = None
+            try:
+                from core.scheduling.idle import touch_activity as _touch
+
+                touch_activity = _touch
+            except Exception:
+                pass
+            if touch_activity:
+                touch_activity("companion-github-act")
+            result = act_campaign(analyze_first=False, unattended=False)
+            tick = result.get("tick") or {}
+            camp = tick.get("campaign") or (result.get("arm") or {}).get("campaign") or {}
+            n = len(tick.get("applied") or [])
+            QMessageBox.information(
+                self,
+                "GitHub Agent",
+                f"Act wave · applied {n} · status={camp.get('status')} · "
+                f"queue={len(camp.get('queue') or [])}\n"
+                f"(needs allowWrite + clean worktree; dirty skipped)",
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "GitHub Agent", str(exc)[:800])
+        self._fill_panel(PANEL_GITHUB)
+
+    def _github_agent_tick(self) -> None:
+        try:
+            from core.workflows.github_agent_act import tick_campaign
+
+            result = tick_campaign(unattended=False)
+            camp = result.get("campaign") or {}
+            QMessageBox.information(
+                self,
+                "GitHub Agent",
+                f"Tick · applied {len(result.get('applied') or [])} · "
+                f"status={camp.get('status')} · queue={len(camp.get('queue') or [])}",
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "GitHub Agent", str(exc)[:800])
+        self._fill_panel(PANEL_GITHUB)
+
+    def _github_agent_pause(self) -> None:
+        try:
+            from core.workflows.github_agent_act import pause_campaign
+
+            st = pause_campaign()
+            QMessageBox.information(
+                self, "GitHub Agent", f"Campaign paused · status={st.get('status')}"
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "GitHub Agent", str(exc)[:800])
+        self._fill_panel(PANEL_GITHUB)
+
+    def _github_agent_resume(self) -> None:
+        try:
+            from core.workflows.github_agent_act import resume_campaign
+
+            st = resume_campaign()
+            QMessageBox.information(
+                self, "GitHub Agent", f"Campaign resumed · status={st.get('status')}"
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "GitHub Agent", str(exc)[:800])
+        self._fill_panel(PANEL_GITHUB)
+
     def _github_agent_rights_dialog(self) -> None:
         from core.store.preferences import (
             get_github_agent_rights,
             set_github_agent_allow_write,
+            set_github_agent_allowlist,
+            set_github_agent_autopilot,
             set_github_agent_confirm,
+            set_github_agent_denylist,
+            set_github_agent_dirty_policy,
             set_github_agent_include_archived,
+            set_github_agent_max_per_tick,
         )
 
         rights = get_github_agent_rights()
@@ -3328,13 +3532,66 @@ class CompanionWindow(QWidget):
         write_ans = QMessageBox.question(
             self,
             "GitHub Agent rights",
-            "Allow repo writes on later runs?",
+            "Allow docs stub writes (AGENTS.md / impressum / privacy / skills)?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes
             if rights["allowWrite"]
             else QMessageBox.StandardButton.No,
         )
         set_github_agent_allow_write(write_ans == QMessageBox.StandardButton.Yes)
+        ap, ok = QInputDialog.getItem(
+            self,
+            "GitHub Agent rights",
+            "Autopilot (idle multi-day):",
+            ["off", "analyze", "act-safe"],
+            max(0, ["off", "analyze", "act-safe"].index(rights.get("autopilot") or "off"))
+            if (rights.get("autopilot") or "off") in ("off", "analyze", "act-safe")
+            else 0,
+            False,
+        )
+        if not ok:
+            return
+        set_github_agent_autopilot(ap)
+        dirty, ok = QInputDialog.getItem(
+            self,
+            "GitHub Agent rights",
+            "Dirty worktree policy:",
+            ["skip", "abort"],
+            0 if (rights.get("dirtyPolicy") or "skip") == "skip" else 1,
+            False,
+        )
+        if not ok:
+            return
+        set_github_agent_dirty_policy(dirty)
+        max_n, ok = QInputDialog.getInt(
+            self,
+            "GitHub Agent rights",
+            "Max applies per tick:",
+            int(rights.get("maxPerTick") or 6),
+            1,
+            20,
+        )
+        if not ok:
+            return
+        set_github_agent_max_per_tick(max_n)
+        deny, ok = QInputDialog.getText(
+            self,
+            "GitHub Agent rights",
+            "Denylist (untouched workspace ids, comma-separated):",
+            text=",".join(rights.get("denylist") or []),
+        )
+        if not ok:
+            return
+        set_github_agent_denylist([x.strip() for x in deny.split(",") if x.strip()])
+        allow, ok = QInputDialog.getText(
+            self,
+            "GitHub Agent rights",
+            "Allowlist (empty = all except deny):",
+            text=",".join(rights.get("allowlist") or []),
+        )
+        if not ok:
+            return
+        set_github_agent_allowlist([x.strip() for x in allow.split(",") if x.strip()])
         arch_ans = QMessageBox.question(
             self,
             "GitHub Agent rights",
@@ -3351,7 +3608,10 @@ class CompanionWindow(QWidget):
             "GitHub Agent rights",
             f"confirm={updated['confirm']}\n"
             f"allowWrite={updated['allowWrite']}\n"
-            f"allowProcesses={updated['allowProcesses']}\n"
+            f"autopilot={updated['autopilot']}\n"
+            f"dirty={updated['dirtyPolicy']} maxPerTick={updated['maxPerTick']}\n"
+            f"allow={updated['allowlist'] or 'ALL'}\n"
+            f"deny={updated['denylist']}\n"
             f"includeArchived={updated['includeArchived']}",
         )
         self._fill_panel(PANEL_GITHUB)
@@ -3633,7 +3893,8 @@ class CompanionWindow(QWidget):
 def run_companion() -> int:
     # Prefer xcb only if user already chose it; otherwise let Qt/Wayland work.
     app = QApplication.instance() or QApplication(sys.argv)
-    app.setQuitOnLastWindowClosed(True)
+    # Hide-to-tray must not quit when the window disappears.
+    app.setQuitOnLastWindowClosed(False)
     app.setApplicationName("NCC Companion")
     win = CompanionWindow()
     # Place near bottom-right if no saved pos

@@ -217,6 +217,16 @@ def github_agent_snapshot_file() -> Path:
     return github_agent_dir() / "snapshot.json"
 
 
+def github_agent_campaign_file() -> Path:
+    """Multi-day autonomy campaign (queue / cursor / resume SSOT).
+
+    Callers: ``core.store.github_agent_campaign``, ``github_agent_act`` tick/arm.
+    No other campaign path exists. Schema: campaign.json under github-agent/.
+    User: "autonmm mehre tage läuft … disconnected … weitermacht".
+    """
+    return github_agent_dir() / "campaign.json"
+
+
 def focus_state_file() -> Path:
     """Doomscroll / focus watchdog streak state."""
     return config_home() / "focus-state.json"

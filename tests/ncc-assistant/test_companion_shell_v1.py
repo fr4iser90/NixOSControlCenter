@@ -98,6 +98,15 @@ class CompanionShellAstTests(unittest.TestCase):
         self.assertIn('QPushButton("Rename")', text)
         self.assertIn('QPushButton("New")', text)
         self.assertNotIn("tools.addStretch()", text)
+        # Behaviour: Companion ×/minimize hide to tray; Quit via tray menu.
+        # Module: companion/window.py (_hide_to_tray, _quit_companion, run_companion).
+        # Existing: this file (shell rail). User: "ja bitte" (minimize/close → tray).
+        self.assertIn("QSystemTrayIcon", text)
+        self.assertIn("def _hide_to_tray(self)", text)
+        self.assertIn("def _quit_companion(self)", text)
+        self.assertIn("setQuitOnLastWindowClosed(False)", text)
+        self.assertIn("Hide to tray", text)
+        self.assertIn("window-minimize", text)
 
     def test_marketplace_mcp_helpers(self) -> None:
         path = ROOT / "core" / "catalogs" / "marketplace.py"

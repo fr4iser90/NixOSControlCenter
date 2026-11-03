@@ -83,7 +83,7 @@ in
                 ncc ai focus status|tick|snooze
                 ncc ai context show|compact [--session ID] [--json]
                 ncc ai workflow audit|lifecycle|fleet|plan|status|next|resume|task-start|task-finish|branch|validate|commit|pr|merge|bump
-                ncc ai github-agent analyze|show|rights
+                ncc ai github-agent analyze|show|rights|arm|tick|status|pause|resume|act
                 ncc ai mcp-install NAME
                 ncc ai maintenance run [--json]
                 ncc ai permissions show [--grant repo=pr] [--json]

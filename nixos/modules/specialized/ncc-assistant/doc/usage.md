@@ -347,6 +347,9 @@ ncc ai gui
 ncc ai chat     # terminal fallback
 ncc ai companion   # desktop avatar + multi-chat (always-on-top)
 # or: ncc-assistant-companion
+# Companion owns a tray icon: × / minimize → hide to tray (campaigns keep running);
+# Quit only from the tray menu. Separate ``ncc ai tray`` is the presence daemon when
+# Companion is not open — avoid running both (two icons).
 # Sessions ▾ (F2 rename, Move to workspace) → companion-chats.json (empty 0-msg chats skipped)
 # Resize · workspace/harness chips · MCP marketplace · templates with param dialog
 # More → Theme (Dark/Midnight/Light) · avatar skin · inject NCC MCP into qwen/dsh
@@ -396,9 +399,18 @@ active workspace. **Rights** / **Operator facts** (country) live on the same
 panel. DE/AT/CH elevate missing impressum/privacy to **p0**. Archive-candidates
 stay on the board; task planning skips them unless rights/CLI include archived.
 
-CLI: `ncc ai github-agent analyze|show|rights`  
+CLI: `ncc ai github-agent analyze|show|rights|arm|tick|status|pause|resume|act`  
 Catalog workflow id: `github-agent` (narrates the snapshot; not a second
 orchestrator). Plan SSOT: [plans/40-github-agent.md](./plans/40-github-agent.md).
+Autonomy (multi-day campaign + docs stubs + autopilot):
+[plans/41-github-agent-autonomy.md](./plans/41-github-agent-autonomy.md).
+
+**Act / Autopilot:** After analyze, **Act wave** arms `github-agent/campaign.json`
+and applies up to `maxPerTick` deterministic docs stubs (`AGENTS.md`,
+`doc/impressum.md`, `doc/privacy.md`, skills scaffold) under Rights
+(`allowWrite`, allow/deny lists, dirty=skip). Campaign survives Companion
+restart — **Tick** / idle autopilot `act-safe` continues the queue. Never
+auto-commits or pushes.
 
 **Repo automation:** register a git root under Workspaces (★ active), then run
 workflows (`autonomous-agent-run`, creators, `workspace-brief`, …)
@@ -624,7 +636,7 @@ ncc-assistant approve list
 ncc-assistant approve allow <id>
 ncc-assistant approve block <id>
 
-ncc-assistant tray                 # or ncc-assistant-tray
+ncc-assistant tray                 # or ncc-assistant-tray (presence when Companion closed)
 ncc-assistant watchdog list
 ncc-assistant watchdog fire rebuild-failed --force
 ncc-assistant rollback

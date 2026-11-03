@@ -1295,7 +1295,7 @@ def _cmd_workflow(args: argparse.Namespace) -> int:
 
 
 def _cmd_github_agent(args: argparse.Namespace) -> int:
-    """GitHub Agent: analyze fleet / show snapshot / rights."""
+    """GitHub Agent: analyze / show / rights / arm|tick|status|pause|resume|act."""
     import json
 
     cmd = getattr(args, "github_agent_cmd", None)
@@ -1355,8 +1355,13 @@ def _cmd_github_agent(args: argparse.Namespace) -> int:
             get_github_agent_rights,
             set_github_agent_allow_processes,
             set_github_agent_allow_write,
+            set_github_agent_allowlist,
+            set_github_agent_autopilot,
             set_github_agent_confirm,
+            set_github_agent_denylist,
+            set_github_agent_dirty_policy,
             set_github_agent_include_archived,
+            set_github_agent_max_per_tick,
         )
 
         rights_cmd = getattr(args, "github_agent_rights_cmd", None) or "show"
@@ -1369,18 +1374,78 @@ def _cmd_github_agent(args: argparse.Namespace) -> int:
                 set_github_agent_allow_processes(bool(args.allow_processes))
             if getattr(args, "include_archived", None) is not None:
                 set_github_agent_include_archived(bool(args.include_archived))
+            if getattr(args, "autopilot", None):
+                set_github_agent_autopilot(str(args.autopilot))
+            if getattr(args, "dirty_policy", None):
+                set_github_agent_dirty_policy(str(args.dirty_policy))
+            if getattr(args, "max_per_tick", None) is not None:
+                set_github_agent_max_per_tick(int(args.max_per_tick))
+            if getattr(args, "allowlist", None) is not None:
+                set_github_agent_allowlist(
+                    [x.strip() for x in str(args.allowlist).split(",") if x.strip()]
+                )
+            if getattr(args, "denylist", None) is not None:
+                set_github_agent_denylist(
+                    [x.strip() for x in str(args.denylist).split(",") if x.strip()]
+                )
         rights = get_github_agent_rights()
         if getattr(args, "json", False):
             print(json.dumps(rights, indent=2, ensure_ascii=False))
         else:
             print_info(
                 f"confirm={rights['confirm']} allowWrite={rights['allowWrite']} "
-                f"allowProcesses={rights['allowProcesses']} "
-                f"includeArchived={rights['includeArchived']}"
+                f"autopilot={rights['autopilot']} dirty={rights['dirtyPolicy']} "
+                f"maxPerTick={rights['maxPerTick']} "
+                f"allow={rights['allowlist'] or 'ALL'} deny={rights['denylist']}"
             )
         return 0
 
-    print_err("Usage: ncc ai github-agent analyze|show|rights")
+    if cmd in ("arm", "tick", "status", "pause", "resume", "act"):
+        from core.workflows.github_agent_act import (
+            act_campaign,
+            arm_campaign,
+            campaign_status,
+            pause_campaign,
+            resume_campaign,
+            tick_campaign,
+        )
+
+        if cmd == "status":
+            result = campaign_status()
+        elif cmd == "arm":
+            result = arm_campaign()
+        elif cmd == "tick":
+            max_n = getattr(args, "max", None)
+            result = tick_campaign(
+                max_items=int(max_n) if max_n is not None else None,
+                unattended=not bool(getattr(args, "interactive", False)),
+            )
+        elif cmd == "pause":
+            result = pause_campaign()
+        elif cmd == "resume":
+            result = resume_campaign()
+        else:
+            result = act_campaign(
+                analyze_first=bool(getattr(args, "analyze", False)),
+                unattended=not bool(getattr(args, "interactive", False)),
+            )
+        if getattr(args, "json", False):
+            print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+        else:
+            camp = result.get("campaign") or (result.get("tick") or {}).get("campaign")
+            if camp is None and isinstance(result.get("arm"), dict):
+                camp = (result.get("arm") or {}).get("campaign")
+            st = (camp or {}).get("status") if isinstance(camp, dict) else result.get("status")
+            q = len((camp or {}).get("queue") or []) if isinstance(camp, dict) else result.get("queueLen")
+            print_ok(f"GitHub Agent campaign status={st} queue={q}")
+            if not result.get("ok", True) and result.get("error"):
+                print_err(str(result.get("error")))
+                return 1
+        return 0 if result.get("ok", True) else 1
+
+    print_err(
+        "Usage: ncc ai github-agent analyze|show|rights|arm|tick|status|pause|resume|act"
+    )
     return 1
 
 
@@ -1892,8 +1957,62 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Default: plan tasks for archive-candidates",
     )
+    gha_rights_set.add_argument(
+        "--autopilot",
+        choices=["off", "analyze", "act-safe"],
+        help="Idle/autopilot mode",
+    )
+    gha_rights_set.add_argument(
+        "--dirty-policy",
+        dest="dirty_policy",
+        choices=["skip", "abort"],
+        help="Dirty worktree policy",
+    )
+    gha_rights_set.add_argument(
+        "--max-per-tick",
+        dest="max_per_tick",
+        type=int,
+        help="Max stub applies per tick (1-20)",
+    )
+    gha_rights_set.add_argument(
+        "--allowlist",
+        help="Comma-separated workspace ids (empty=all except deny)",
+    )
+    gha_rights_set.add_argument(
+        "--denylist",
+        help="Comma-separated untouched workspace ids",
+    )
     gha_rights_set.add_argument("--json", action="store_true")
     gha_rights.add_argument("--json", action="store_true")
+
+    for name, help_txt in (
+        ("arm", "Build campaign queue from latest snapshot"),
+        ("tick", "Apply up to N docs stubs from campaign queue"),
+        ("status", "Show campaign / autopilot status"),
+        ("pause", "Pause running campaign (resume later)"),
+        ("resume", "Resume paused campaign"),
+        ("act", "Arm + one tick (optional --analyze)"),
+    ):
+        p = gha_sub.add_parser(name, help=help_txt)
+        p.add_argument("--json", action="store_true")
+        if name == "tick":
+            p.add_argument("--max", type=int, help="Override maxPerTick")
+            p.add_argument(
+                "--interactive",
+                action="store_true",
+                help="Treat as attended (confirm=always still blocks writes)",
+            )
+        if name == "act":
+            p.add_argument(
+                "--analyze",
+                action="store_true",
+                help="Run analyze before arming",
+            )
+            p.add_argument(
+                "--interactive",
+                action="store_true",
+                help="Attended act (same policy, for UI parity)",
+            )
 
     mcp_p = sub.add_parser("mcp-install", help="Install an MCP marketplace template")
     mcp_p.add_argument("name", help="MCP template name (git, github, …)")
