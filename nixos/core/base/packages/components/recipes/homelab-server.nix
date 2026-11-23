@@ -1,6 +1,6 @@
 {
   description = "Homelab Server (Docker + PostgreSQL + nginx)";
-  systemTypes = [ "server" ];
+  systemTypes = [ "server" "homelab" ];
   scope = "system";
   modules = [
     "docker"

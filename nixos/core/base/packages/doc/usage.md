@@ -169,6 +169,16 @@ Selecting `docker` in packageModules enables Docker with smart mode (`lib/docker
 - **Root**: when Homelab Swarm or AI-Workspace is active
 - **Manual Override**: `docker.root = true|false`
 
+### Homelab + Docker
+
+`systemType = "homelab"` does **not** silently enable Docker by itself. Expectation:
+
+- **Empty packages** (`packageModules = []` and `docker.enable = false`): `prebuild-check-packages` offers to seed `docker` (auto-seed when `NCC_REMOTE_NONINTERACTIVE=1`).
+- **Packages set but no docker**: rebuild **warning** only — add `packageModules = [ "docker" ]` or `docker.enable = true` deliberately.
+- Install-base / recipe `homelab-server` still writes the full set (`docker`, `database`, `web-server`) at install time.
+
+`systemType = "homelab"` is treated as **server-class** for package-set compatibility (same as `server` for docker/database/…).
+
 ### User packages
 
 User-specific packages live only under `users.<name>.userPackages` (not under `core.base.packages`).

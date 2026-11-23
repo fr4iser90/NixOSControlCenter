@@ -11,6 +11,7 @@ let
   memoryCheck = import ../components/system-checks/prebuild/checks/hardware/memory.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   platformCheck = import ../components/system-checks/prebuild/checks/hardware/platform.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   usersCheck = import ../components/system-checks/prebuild/checks/system/users.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
+  packagesCheck = import ../components/system-checks/prebuild/checks/system/packages.nix { inherit config lib pkgs systemConfig getModuleConfig getModuleApi; };
   flakeExtras = import ../components/system-checks/prebuild/checks/system/flake-extras.nix { inherit pkgs getModuleApi; };
   remoteInstallGateMod = import ../components/system-checks/scripts/remote-install-gate.nix { inherit pkgs getModuleApi; };
 
@@ -22,6 +23,7 @@ in {
     gpuCheck  
     memoryCheck
     usersCheck
+    packagesCheck
     flakeExtras.nixosModule
   ];
 

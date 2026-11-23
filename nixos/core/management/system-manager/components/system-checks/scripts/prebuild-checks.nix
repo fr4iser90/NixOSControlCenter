@@ -75,6 +75,7 @@ in
     run_check gpu prebuild-check-gpu
     run_check memory prebuild-check-memory
     run_check users prebuild-check-users
+    run_check packages prebuild-check-packages
     rm -f "$preflight_log"
 
     if [ "$checks_failed" -eq 1 ]; then

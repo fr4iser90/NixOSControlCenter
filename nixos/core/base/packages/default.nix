@@ -36,11 +36,12 @@ let
   moduleModules = map (mod: ./components/sets/${mod}.nix) featureModules;
 
   systemType = systemManagerCfg.systemType or "desktop";
-  # core = every machine; desktop/server = profile extras only (never both)
+  # core = every machine; desktop/server = profile extras only (never both).
+  # homelab uses the server ops profile (tmux, git, …).
   baseProfileModules =
     [ ./components/base/core.nix ]
     ++ lib.optional (systemType == "desktop") ./components/base/desktop.nix
-    ++ lib.optional (systemType == "server") ./components/base/server.nix;
+    ++ lib.optional (systemType == "server" || systemType == "homelab") ./components/base/server.nix;
 
 in {
   _module.metadata = {

@@ -27,6 +27,7 @@ let
 
     export NCC_PREFLIGHT_VERBOSE="''${NCC_PREFLIGHT_VERBOSE:-0}"
     _run prebuild-check-users
+    _run prebuild-check-packages
 
     export NCC_PREFLIGHT_MODE=compare
     _run prebuild-check-platform

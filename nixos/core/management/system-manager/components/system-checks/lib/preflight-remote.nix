@@ -32,6 +32,7 @@
   # Step manifest for remote install (Host pipes each script to Target via SSH).
   remoteInstallSteps = [
     { cmd = "prebuild-check-users"; env = { }; }
+    { cmd = "prebuild-check-packages"; env = { }; }
     { cmd = "prebuild-check-platform"; env = { NCC_PREFLIGHT_MODE = "compare"; }; }
     { cmd = "prebuild-check-cpu"; env = { NCC_PREFLIGHT_MODE = "compare"; }; }
     { cmd = "prebuild-check-gpu"; env = { NCC_PREFLIGHT_MODE = "compare"; }; }
