@@ -394,10 +394,15 @@ Companion rail **GitHub** → **Start agent**: readiness (token/MCP/bins) then a
 deterministic fleet run (`run_github_agent`) that audits every registered
 workspace, classifies lifecycle, optionally extracts Daily `gap:<id>` tasks,
 writes `~/.config/ncc-assistant/github-agent/snapshot.json`, and records a job +
-audit. Board rows: `{id} · {state} · gaps N · next: …`. Click a row to set ★
-active workspace. **Rights** / **Operator facts** (country) live on the same
-panel. DE/AT/CH elevate missing impressum/privacy to **p0**. Archive-candidates
-stay on the board; task planning skips them unless rights/CLI include archived.
+audit. The GitHub rail is zoned: action buttons, campaign strip, workspace board
+(only). Click a board row to set ★ active workspace. **Rights** / **Campaign** /
+**Facts** sit on the strip. DE/AT/CH elevate missing impressum/privacy to **p0**
+for every registered workspace — the analyzer does **not** know public vs private
+or “is a website”; NixOS modules and harnesses look the same as web apps. Treat
+legal stubs as optional docs scaffolding unless the repo actually ships a public
+surface; use wave filter, allowlist, or **Skip forever** for the rest.
+Archive-candidates stay on the board; task planning skips them unless rights/CLI
+include archived.
 
 CLI: `ncc ai github-agent analyze|show|rights|arm|tick|status|pause|resume|act`  
 Catalog workflow id: `github-agent` (narrates the snapshot; not a second
@@ -406,11 +411,18 @@ Autonomy (multi-day campaign + docs stubs + autopilot):
 [plans/41-github-agent-autonomy.md](./plans/41-github-agent-autonomy.md).
 
 **Act / Autopilot:** After analyze, **Act wave** arms `github-agent/campaign.json`
-and applies up to `maxPerTick` deterministic docs stubs (`AGENTS.md`,
-`doc/impressum.md`, `doc/privacy.md`, skills scaffold) under Rights
-(`allowWrite`, allow/deny lists, dirty=skip). Campaign survives Companion
-restart — **Tick** / idle autopilot `act-safe` continues the queue. Never
-auto-commits or pushes.
+and applies up to `maxPerTick` deterministic docs stubs under Rights page
+(allowWrite, workspace allow/deny pickers, dirty=skip, wave filter, clean-only).
+**Campaign dashboard** = queue/done/skipped + skip-forever. Header chip shows
+autopilot/status/queue. First Act after enabling writes confirms. Companion and
+`ncc ai tray` share one tray owner. Never auto-commits or pushes.
+
+**Site-check wave:** Attach public domains to a workspace (**Domains…** or
+`ncc ai workspaces domains --id WS --set scan.fr4iser.com,fr4iser.com`), then
+**Site-check wave** / `ncc ai site-check run`. Local static check (no myline API):
+TLS expiry, HTTP→HTTPS, 6 security headers, basic SEO, first-paint external
+`src`/`href`. Private/localhost targets refused. Results:
+`~/.config/ncc-assistant/site-checks/latest.json`.
 
 **Repo automation:** register a git root under Workspaces (★ active), then run
 workflows (`autonomous-agent-run`, creators, `workspace-brief`, …)

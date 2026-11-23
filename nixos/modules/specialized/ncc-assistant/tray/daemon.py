@@ -27,6 +27,22 @@ def run_tray() -> int:
         print("System tray is not available on this desktop.", file=sys.stderr)
         return 1
 
+    # Mutual exclusion with Companion tray (tray-owner.json).
+    # User: "Kein Doppel-Tray: Companion und ncc ai tray gegenseitig erkennen."
+    try:
+        from core.store.tray_owner import claim_tray_owner
+
+        claim = claim_tray_owner("tray")
+        if not claim.get("ok"):
+            print(
+                claim.get("hint")
+                or "Tray already owned (Companion running?). Quit it first.",
+                file=sys.stderr,
+            )
+            return 1
+    except Exception as exc:  # noqa: BLE001
+        print(f"Tray owner check failed: {exc}", file=sys.stderr)
+
     tray = QSystemTrayIcon()
     tray.setIcon(QIcon.fromTheme("help-about", QIcon.fromTheme("application-x-executable")))
     tray.setToolTip("NCC AI Assistant")
@@ -145,7 +161,16 @@ def run_tray() -> int:
     act_snooze.triggered.connect(on_snooze)
     act_open.triggered.connect(on_open)
     act_companion.triggered.connect(on_companion)
-    act_quit.triggered.connect(app.quit)
+    def on_quit() -> None:
+        try:
+            from core.store.tray_owner import release_tray_owner as _rel
+
+            _rel("tray")
+        except Exception:
+            pass
+        app.quit()
+
+    act_quit.triggered.connect(on_quit)
 
     menu.addAction(act_pause)
     menu.addAction(act_resume)

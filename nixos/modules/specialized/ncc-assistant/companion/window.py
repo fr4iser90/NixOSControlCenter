@@ -1131,6 +1131,13 @@ class CompanionWindow(QWidget):
             "Agent presence — only shown when paused, autonomous, or busy"
         )
         header.addWidget(self.presence_lbl)
+        # GitHub Agent campaign chip (UX: always visible status)
+        self.gha_chip = QLabel("")
+        self.gha_chip.setObjectName("nccMuted")
+        self.gha_chip.setToolTip(
+            "GitHub Agent — autopilot · status · queue · last tick"
+        )
+        header.addWidget(self.gha_chip)
         header.addStretch()
         ws_lab = QLabel("Workspace")
         ws_lab.setObjectName("nccMuted")
@@ -1299,10 +1306,23 @@ class CompanionWindow(QWidget):
         self.panel_hint.setWordWrap(True)
         self.panel_hint.hide()
         list_l.addWidget(self.panel_hint)
+        # Generic list panels vs dedicated GitHub Agent zoned page.
+        self.panel_stack = QStackedWidget()
+        self.generic_list_page = QWidget()
+        generic_l = QVBoxLayout(self.generic_list_page)
+        generic_l.setContentsMargins(0, 0, 0, 0)
         self.panel_list = QListWidget()
         self.panel_list.itemActivated.connect(self._on_panel_item)
         self.panel_list.itemClicked.connect(self._on_panel_item)
-        list_l.addWidget(self.panel_list, stretch=1)
+        generic_l.addWidget(self.panel_list)
+        from widgets.github_agent_panel import GithubAgentPanel
+
+        self.github_panel = GithubAgentPanel()
+        self.github_panel.actionRequested.connect(self._on_github_panel_action)
+        self.github_panel.projectSelected.connect(self._on_github_panel_project)
+        self.panel_stack.addWidget(self.generic_list_page)
+        self.panel_stack.addWidget(self.github_panel)
+        list_l.addWidget(self.panel_stack, stretch=1)
         back = QPushButton("← Back to chat")
         back.setToolTip("Same as sidebar Chat button")
         back.clicked.connect(lambda: self._toggle_panel(PANEL_NONE))
@@ -1362,12 +1382,21 @@ class CompanionWindow(QWidget):
     def _setup_tray(self) -> None:
         """Companion-owned tray: hide/show while process (+ campaigns) keep running.
 
-        Separate from ``ncc ai tray`` (presence daemon when Companion is not open).
-        Two icons only if both processes run — prefer Companion *or* tray daemon.
+        Mutually exclusive with ``ncc ai tray`` via ``tray_owner`` claim.
         """
         if self._tray is not None:
             return
         if not QSystemTrayIcon.isSystemTrayAvailable():
+            return
+        try:
+            from core.store.tray_owner import claim_tray_owner
+
+            claim = claim_tray_owner("companion")
+        except Exception:
+            claim = {"ok": True}
+        if not claim.get("ok"):
+            # Presence daemon already owns the icon — hide-to-tray still works as hide().
+            self._tray_hint_shown = True
             return
         tray = QSystemTrayIcon(self)
         tray.setIcon(
@@ -1397,11 +1426,10 @@ class CompanionWindow(QWidget):
     def _hide_to_tray(self) -> None:
         self._persist_chats()
         self._save_geometry()
-        if not self._can_hide_to_tray():
-            self._quit_companion()
-            return
+        # Always hide (keeps campaigns alive). Quit only via tray menu / force.
+        # If tray daemon owns the icon, restore via its "Open companion" or relaunch.
         self.hide()
-        if not self._tray_hint_shown and self._tray is not None:
+        if self._can_hide_to_tray() and not self._tray_hint_shown and self._tray is not None:
             self._tray_hint_shown = True
             self._tray.showMessage(
                 "NCC Companion",
@@ -1432,6 +1460,12 @@ class CompanionWindow(QWidget):
         self._save_geometry()
         if self._tray is not None:
             self._tray.hide()
+        try:
+            from core.store.tray_owner import release_tray_owner
+
+            release_tray_owner("companion")
+        except Exception:
+            pass
         app = QApplication.instance()
         if app is not None:
             app.quit()
@@ -1443,13 +1477,20 @@ class CompanionWindow(QWidget):
             QTimer.singleShot(0, self._hide_to_tray)
 
     def closeEvent(self, event) -> None:  # noqa: N802
-        if self._force_quit or not self._can_hide_to_tray():
+        if self._force_quit:
             self._persist_chats()
             self._save_geometry()
             if self._tray is not None:
                 self._tray.hide()
+            try:
+                from core.store.tray_owner import release_tray_owner
+
+                release_tray_owner("companion")
+            except Exception:
+                pass
             super().closeEvent(event)
             return
+        # Prefer hide (with or without our tray icon) so autonomy keeps running.
         event.ignore()
         self._hide_to_tray()
 
@@ -2209,6 +2250,28 @@ class CompanionWindow(QWidget):
         if idle_mark:
             parts.append(idle_mark.strip(" ·"))
         self.presence_lbl.setText(" · ".join(parts))
+        if hasattr(self, "gha_chip"):
+            try:
+                from core.store.github_agent_campaign import load_github_agent_campaign
+                from core.store.preferences import get_github_agent_autopilot
+                from widgets.github_agent import format_github_agent_header_chip
+
+                self.gha_chip.setText(
+                    format_github_agent_header_chip(
+                        load_github_agent_campaign(), get_github_agent_autopilot()
+                    )
+                )
+            except Exception:
+                self.gha_chip.setText("")
+        # Keep open GitHub panel strip/Pause/Resume in sync with autopilot ticks.
+        if (
+            getattr(self, "_panel", None) == PANEL_GITHUB
+            and hasattr(self, "github_panel")
+        ):
+            try:
+                self.github_panel.refresh_live()
+            except Exception:
+                pass
         if hasattr(self, "avatar"):
             tip = self.avatar.toolTip() or ""
             base = tip.split(" · idle")[0] if " · idle" in tip else tip
@@ -2683,6 +2746,12 @@ class CompanionWindow(QWidget):
         self.panel_list.clear()
         self.panel_hint.hide()
         self.panel_hint.setText("")
+        if key == PANEL_GITHUB:
+            self.panel_title.setText("GitHub Agent")
+            self.panel_stack.setCurrentWidget(self.github_panel)
+            self.github_panel.refresh(active_workspace_id=self._active_workspace_id)
+            return
+        self.panel_stack.setCurrentWidget(self.generic_list_page)
         if key == PANEL_HISTORY:
             self.panel_title.setText("Session history")
             try:
@@ -2731,68 +2800,6 @@ class CompanionWindow(QWidget):
             row = QListWidgetItem("→ Open workspace-brief workflow")
             row.setData(Qt.ItemDataRole.UserRole, ("template", "workspace-brief"))
             self.panel_list.addItem(row)
-
-        elif key == PANEL_GITHUB:
-            self.panel_title.setText("GitHub Agent")
-            for label, data in (
-                ("▶ Start agent (analyze + chat)", ("github", "analyze")),
-                ("⚡ Act wave (arm + tick stubs)", ("github", "act")),
-                ("⏱ Tick once (resume campaign)", ("github", "tick")),
-                ("⏸ Pause campaign", ("github", "pause")),
-                ("▶ Resume campaign", ("github", "resume")),
-                ("Rights / Autopilot…", ("github", "rights")),
-                ("Operator facts (country)…", ("github", "facts")),
-            ):
-                act = QListWidgetItem(label)
-                act.setData(Qt.ItemDataRole.UserRole, data)
-                self.panel_list.addItem(act)
-            try:
-                from core.store.github_agent_campaign import load_github_agent_campaign
-                from core.store.preferences import get_github_agent_autopilot
-
-                camp = load_github_agent_campaign()
-                ap = get_github_agent_autopilot()
-                qn = len(camp.get("queue") or [])
-                st = camp.get("status") or "idle"
-                stats = camp.get("stats") or {}
-                self.panel_list.addItem(
-                    f"Campaign · {st} · queue {qn} · "
-                    f"applied {stats.get('applied', 0)} · autopilot={ap}"
-                )
-            except Exception as exc:  # noqa: BLE001
-                self.panel_list.addItem(f"(campaign: {exc})")
-            try:
-                from core.store.github_agent_snapshot import load_github_agent_snapshot
-
-                snap = load_github_agent_snapshot()
-            except Exception as exc:  # noqa: BLE001
-                self.panel_list.addItem(f"(error: {exc})")
-                return
-            if snap is None:
-                self.panel_list.addItem("No snapshot — Start agent")
-                return
-            projects = snap.get("projects") or []
-            if not projects:
-                self.panel_list.addItem("(no projects in snapshot)")
-                return
-            for p in projects:
-                if not isinstance(p, dict):
-                    continue
-                wid = str(p.get("workspaceId") or "")
-                state = str(p.get("state") or "?")
-                gaps = [g for g in (p.get("gaps") or []) if not g.get("present")]
-                nxt = p.get("nextTask") or {}
-                nxt_title = str(nxt.get("title") or "—")[:36]
-                mark = "★" if wid and wid == self._active_workspace_id else "·"
-                row = QListWidgetItem(
-                    f"{mark} {wid} · {state} · gaps {len(gaps)} · next: {nxt_title}"
-                )
-                tip = str(p.get("path") or "")
-                if p.get("github"):
-                    tip = f"{tip}\n{p.get('github')}"
-                row.setToolTip(tip or wid)
-                row.setData(Qt.ItemDataRole.UserRole, ("github_project", wid))
-                self.panel_list.addItem(row)
 
         elif key == PANEL_PLUGINS:
             self.panel_title.setText("Plugins")
@@ -3035,32 +3042,10 @@ class CompanionWindow(QWidget):
             self._run_template(str(ref))
             return
         if kind == "github":
-            action = str(ref)
-            if action == "analyze":
-                self._github_agent_analyze()
-            elif action == "act":
-                self._github_agent_act()
-            elif action == "tick":
-                self._github_agent_tick()
-            elif action == "pause":
-                self._github_agent_pause()
-            elif action == "resume":
-                self._github_agent_resume()
-            elif action == "rights":
-                self._github_agent_rights_dialog()
-            elif action == "facts":
-                self._github_agent_facts_dialog()
+            self._on_github_panel_action(str(ref))
             return
         if kind == "github_project" and ref:
-            try:
-                from core.store.preferences import set_active_workspace_id
-
-                self._active_workspace_id = str(ref)
-                set_active_workspace_id(str(ref))
-                self._reload_workspace_chip()
-            except Exception as exc:  # noqa: BLE001
-                QMessageBox.warning(self, "GitHub Agent", str(exc))
-            self._fill_panel(PANEL_GITHUB)
+            self._on_github_panel_project(str(ref))
             return
         if kind == "daily_refresh":
             try:
@@ -3376,6 +3361,41 @@ class CompanionWindow(QWidget):
             return False
         return {"use_all_workspaces": dlg.use_all_workspaces()}
 
+    def _on_github_panel_action(self, action: str) -> None:
+        """Dispatch from GithubAgentPanel toolbar / strip buttons."""
+        if action == "analyze":
+            self._github_agent_analyze()
+        elif action == "act":
+            self._github_agent_act()
+        elif action == "tick":
+            self._github_agent_tick()
+        elif action == "pause":
+            self._github_agent_pause()
+        elif action == "resume":
+            self._github_agent_resume()
+        elif action == "campaign":
+            self._github_agent_campaign_dialog()
+        elif action == "rights":
+            self._github_agent_rights_dialog()
+        elif action == "facts":
+            self._github_agent_facts_dialog()
+        elif action == "domains":
+            self._github_agent_domains_dialog()
+        elif action == "site_check":
+            self._github_agent_site_check()
+
+    def _on_github_panel_project(self, workspace_id: str) -> None:
+        """Select workspace from the zoned board list."""
+        try:
+            from core.store.preferences import set_active_workspace_id
+
+            self._active_workspace_id = str(workspace_id)
+            set_active_workspace_id(str(workspace_id))
+            self._reload_workspace_chip()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "GitHub Agent", str(exc))
+        self._fill_panel(PANEL_GITHUB)
+
     def _github_agent_analyze(self) -> None:
         """Open chat, run fleet analyze + LLM narrate (same slot contract as templates)."""
         slot = self._slot()
@@ -3395,7 +3415,7 @@ class CompanionWindow(QWidget):
         mode = (slot.harness_mode or "auto").strip().lower()
         if mode in ("native", "qwen", "dsh"):
             force = mode
-        # Leave the board; chat session must be visible while the agent works.
+        # Leave the zoned GitHub panel; chat session must be visible while the agent works.
         self._toggle_panel(PANEL_NONE)
         slot.reply_buf = ""
         slot.thinking_buf = ""
@@ -3436,18 +3456,33 @@ class CompanionWindow(QWidget):
     def _github_agent_act(self) -> None:
         """Arm campaign from snapshot + one tick (docs stubs under policy)."""
         try:
+            from core.store.preferences import (
+                clear_github_agent_allow_write_needs_confirm,
+                get_github_agent_allow_write,
+                get_github_agent_allow_write_needs_confirm,
+            )
             from core.workflows.github_agent_act import act_campaign
 
-            touch_activity = None
+            if get_github_agent_allow_write() and get_github_agent_allow_write_needs_confirm():
+                ans = QMessageBox.question(
+                    self,
+                    "Confirm writes",
+                    "allowWrite was just enabled. Apply docs stubs to matching "
+                    "repos now (dirty skipped; respect allow/deny + wave filter)?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                if ans != QMessageBox.StandardButton.Yes:
+                    return
+                clear_github_agent_allow_write_needs_confirm()
             try:
-                from core.scheduling.idle import touch_activity as _touch
+                from core.scheduling.idle import touch_activity
 
-                touch_activity = _touch
+                touch_activity("companion-github-act")
             except Exception:
                 pass
-            if touch_activity:
-                touch_activity("companion-github-act")
             result = act_campaign(analyze_first=False, unattended=False)
+            clear_github_agent_allow_write_needs_confirm()
             tick = result.get("tick") or {}
             camp = tick.get("campaign") or (result.get("arm") or {}).get("campaign") or {}
             n = len(tick.get("applied") or [])
@@ -3461,6 +3496,7 @@ class CompanionWindow(QWidget):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "GitHub Agent", str(exc)[:800])
         self._fill_panel(PANEL_GITHUB)
+        self._sync_presence()
 
     def _github_agent_tick(self) -> None:
         try:
@@ -3502,119 +3538,19 @@ class CompanionWindow(QWidget):
             QMessageBox.warning(self, "GitHub Agent", str(exc)[:800])
         self._fill_panel(PANEL_GITHUB)
 
-    def _github_agent_rights_dialog(self) -> None:
-        from core.store.preferences import (
-            get_github_agent_rights,
-            set_github_agent_allow_write,
-            set_github_agent_allowlist,
-            set_github_agent_autopilot,
-            set_github_agent_confirm,
-            set_github_agent_denylist,
-            set_github_agent_dirty_policy,
-            set_github_agent_include_archived,
-            set_github_agent_max_per_tick,
-        )
+    def _github_agent_campaign_dialog(self) -> None:
+        from widgets.github_agent import GithubAgentCampaignDialog
 
-        rights = get_github_agent_rights()
-        confirm, ok = QInputDialog.getItem(
-            self,
-            "GitHub Agent rights",
-            "Confirm mode:",
-            ["writes", "always", "never"],
-            max(0, ["writes", "always", "never"].index(rights["confirm"]))
-            if rights["confirm"] in ("writes", "always", "never")
-            else 0,
-            False,
-        )
-        if not ok:
-            return
-        set_github_agent_confirm(confirm)
-        write_ans = QMessageBox.question(
-            self,
-            "GitHub Agent rights",
-            "Allow docs stub writes (AGENTS.md / impressum / privacy / skills)?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes
-            if rights["allowWrite"]
-            else QMessageBox.StandardButton.No,
-        )
-        set_github_agent_allow_write(write_ans == QMessageBox.StandardButton.Yes)
-        ap, ok = QInputDialog.getItem(
-            self,
-            "GitHub Agent rights",
-            "Autopilot (idle multi-day):",
-            ["off", "analyze", "act-safe"],
-            max(0, ["off", "analyze", "act-safe"].index(rights.get("autopilot") or "off"))
-            if (rights.get("autopilot") or "off") in ("off", "analyze", "act-safe")
-            else 0,
-            False,
-        )
-        if not ok:
-            return
-        set_github_agent_autopilot(ap)
-        dirty, ok = QInputDialog.getItem(
-            self,
-            "GitHub Agent rights",
-            "Dirty worktree policy:",
-            ["skip", "abort"],
-            0 if (rights.get("dirtyPolicy") or "skip") == "skip" else 1,
-            False,
-        )
-        if not ok:
-            return
-        set_github_agent_dirty_policy(dirty)
-        max_n, ok = QInputDialog.getInt(
-            self,
-            "GitHub Agent rights",
-            "Max applies per tick:",
-            int(rights.get("maxPerTick") or 6),
-            1,
-            20,
-        )
-        if not ok:
-            return
-        set_github_agent_max_per_tick(max_n)
-        deny, ok = QInputDialog.getText(
-            self,
-            "GitHub Agent rights",
-            "Denylist (untouched workspace ids, comma-separated):",
-            text=",".join(rights.get("denylist") or []),
-        )
-        if not ok:
-            return
-        set_github_agent_denylist([x.strip() for x in deny.split(",") if x.strip()])
-        allow, ok = QInputDialog.getText(
-            self,
-            "GitHub Agent rights",
-            "Allowlist (empty = all except deny):",
-            text=",".join(rights.get("allowlist") or []),
-        )
-        if not ok:
-            return
-        set_github_agent_allowlist([x.strip() for x in allow.split(",") if x.strip()])
-        arch_ans = QMessageBox.question(
-            self,
-            "GitHub Agent rights",
-            "Include archive-candidates when planning tasks?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes
-            if rights["includeArchived"]
-            else QMessageBox.StandardButton.No,
-        )
-        set_github_agent_include_archived(arch_ans == QMessageBox.StandardButton.Yes)
-        updated = get_github_agent_rights()
-        QMessageBox.information(
-            self,
-            "GitHub Agent rights",
-            f"confirm={updated['confirm']}\n"
-            f"allowWrite={updated['allowWrite']}\n"
-            f"autopilot={updated['autopilot']}\n"
-            f"dirty={updated['dirtyPolicy']} maxPerTick={updated['maxPerTick']}\n"
-            f"allow={updated['allowlist'] or 'ALL'}\n"
-            f"deny={updated['denylist']}\n"
-            f"includeArchived={updated['includeArchived']}",
-        )
+        GithubAgentCampaignDialog(self).exec()
         self._fill_panel(PANEL_GITHUB)
+        self._sync_presence()
+
+    def _github_agent_rights_dialog(self) -> None:
+        from widgets.github_agent import GithubAgentRightsDialog
+
+        if GithubAgentRightsDialog(self).exec() == QDialog.DialogCode.Accepted:
+            self._fill_panel(PANEL_GITHUB)
+            self._sync_presence()
 
     def _github_agent_facts_dialog(self) -> None:
         from core.store.operator_facts import (
@@ -3636,6 +3572,29 @@ class CompanionWindow(QWidget):
             "Operator facts",
             f"country={facts.get('country')} locale={facts.get('locale')}",
         )
+        self._fill_panel(PANEL_GITHUB)
+
+    def _github_agent_domains_dialog(self) -> None:
+        from widgets.github_agent import GithubAgentDomainsDialog
+
+        if GithubAgentDomainsDialog(
+            self, initial_workspace_id=self._active_workspace_id
+        ).exec() == QDialog.DialogCode.Accepted:
+            self._fill_panel(PANEL_GITHUB)
+
+    def _github_agent_site_check(self) -> None:
+        try:
+            from core.workflows.site_check import (
+                format_site_check_brief,
+                run_site_check_wave,
+            )
+
+            result = run_site_check_wave()
+            QMessageBox.information(
+                self, "Site-check wave", format_site_check_brief(result)
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Site-check wave", str(exc)[:800])
         self._fill_panel(PANEL_GITHUB)
 
     def _run_template(self, template_id: str) -> None:

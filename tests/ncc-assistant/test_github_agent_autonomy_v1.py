@@ -181,6 +181,10 @@ class GithubAgentAutonomyV1Tests(unittest.TestCase):
         self.assertEqual(len(camp2["queue"]), left - 1)
 
     def test_plan_and_surface_strings(self) -> None:
+        # Behaviour: UX surfaces for rights page / campaign / chip / dirty + zoned panel.
+        # Modules: companion/window.py, widgets/github_agent.py, github_agent_panel.py.
+        # Existing: this file. User: Rights page + Campaign-Dashboard + … /
+        # "GitHub Agent Panel Zoned UX" (actions ≠ board).
         plan = (ROOT / "doc" / "plans" / "41-github-agent-autonomy.md").read_text(
             encoding="utf-8"
         )
@@ -188,7 +192,75 @@ class GithubAgentAutonomyV1Tests(unittest.TestCase):
         self.assertIn("act-safe", plan)
         text = (ROOT / "companion" / "window.py").read_text(encoding="utf-8")
         self.assertIn("_github_agent_act", text)
-        self.assertIn("Act wave", text)
+        self.assertIn("GithubAgentPanel", text)
+        self.assertIn("github_panel", text)
+        self.assertIn("_on_github_panel_action", text)
+        self.assertIn("GithubAgentRightsDialog", text)
+        self.assertIn("gha_chip", text)
+        self.assertIn("panel_stack", text)
+        widgets = (ROOT / "widgets" / "github_agent.py").read_text(encoding="utf-8")
+        self.assertIn("class GithubAgentRightsDialog", widgets)
+        self.assertIn("class GithubAgentCampaignDialog", widgets)
+        self.assertIn("Allowlist", widgets)
+        self.assertIn("Wave filter", widgets)
+        # Regression: self.done = QListWidget shadows QDialog.done() → TypeError on close.
+        # Existing: this file. User: companion crash "'QListWidget' object is not callable".
+        self.assertNotIn("self.done =", widgets)
+        self.assertIn("self.done_list", widgets)
+        panel = (ROOT / "widgets" / "github_agent_panel.py").read_text(encoding="utf-8")
+        self.assertIn("class GithubAgentPanel", panel)
+        self.assertIn("Act wave", panel)
+        self.assertIn("Campaign…", panel)
+        self.assertIn("github_agent_board", panel)
+        self.assertIn("dirty_worktree", panel)
+        self.assertIn("Clean only", panel)
+        board = (ROOT / "core" / "workflows" / "github_agent_board.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("def format_github_board_row", board)
+
+    def test_wave_filter_legal_and_skip_forever(self) -> None:
+        # Behaviour: waveFilter=legal + skipForever shrinks arm queue.
+        # Module: github_agent_act.arm_campaign. Existing: this file.
+        # User: Wave-Filter / Skip forever.
+        from core.store.preferences import (
+            add_github_agent_skip_forever,
+            set_github_agent_wave_clean_only,
+            set_github_agent_wave_filter,
+        )
+        from core.workflows.github_agent_act import arm_campaign
+
+        set_github_agent_wave_filter("legal")
+        set_github_agent_wave_clean_only(False)
+        snap = self._snap()
+        armed = arm_campaign(snapshot=snap)
+        self.assertTrue(armed["ok"])
+        gaps = {i["gapId"] for i in armed["campaign"]["queue"]}
+        self.assertEqual(gaps, {"impressum", "privacy"})
+        add_github_agent_skip_forever("demo", "impressum")
+        armed2 = arm_campaign(snapshot=snap)
+        gaps2 = {i["gapId"] for i in armed2["campaign"]["queue"]}
+        self.assertEqual(gaps2, {"privacy"})
+
+    def test_board_row_format_scanable(self) -> None:
+        # Behaviour: board rows expose name/state/gaps/dirty as columns.
+        # Module: core.workflows.github_agent_board (no Qt — gate-safe).
+        # Existing: this file. User: Zoned UX workspace board.
+        from core.workflows.github_agent_board import format_github_board_row
+
+        row = format_github_board_row(
+            workspace_id="aboutME",
+            state="active",
+            gaps=10,
+            next_title="Add or refresh AGENTS.md",
+            dirty=True,
+            active=True,
+        )
+        self.assertIn("aboutME", row)
+        self.assertIn("active", row)
+        self.assertIn("gaps 10", row)
+        self.assertIn("dirty", row)
+        self.assertTrue(row.startswith("★"))
 
 
 if __name__ == "__main__":

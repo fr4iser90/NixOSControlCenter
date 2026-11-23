@@ -31,6 +31,9 @@ from core.store.preferences import (
     get_github_agent_analyze_stale_hours,
     get_github_agent_autopilot,
     get_github_agent_max_per_tick,
+    get_github_agent_skip_forever,
+    get_github_agent_wave_clean_only,
+    get_github_agent_wave_filter,
 )
 from core.store.workspaces import get_workspace
 from core.workflows.github_agent_policy import (
@@ -81,6 +84,15 @@ def resume_campaign() -> dict[str, Any]:
     return campaign_status()
 
 
+def _gap_allowed_by_wave_filter(gap_id: str) -> bool:
+    mode = get_github_agent_wave_filter()
+    if mode == "all":
+        return True
+    if mode == "legal":
+        return gap_id in ("impressum", "privacy")
+    return gap_id == mode
+
+
 def _build_queue(
     snapshot: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -89,6 +101,8 @@ def _build_queue(
     skipped: list[dict[str, Any]] = []
     projects = [p for p in (snapshot.get("projects") or []) if isinstance(p, dict)]
     rows: list[tuple[int, int, str, dict[str, Any]]] = []
+    skip_forever = set(get_github_agent_skip_forever())
+    clean_only = get_github_agent_wave_clean_only()
     for p in projects:
         wid = str(p.get("workspaceId") or "")
         state = str(p.get("state") or "")
@@ -107,11 +121,33 @@ def _build_queue(
             )
             continue
         dirty = 1 if is_worktree_dirty(root) else 0
+        if clean_only and dirty:
+            skipped.append(
+                {
+                    "workspaceId": wid,
+                    "gapId": "*",
+                    "reason": "wave_clean_only",
+                    "at": _now(),
+                }
+            )
+            continue
         for g in p.get("gaps") or []:
             if not isinstance(g, dict) or g.get("present"):
                 continue
             gid = str(g.get("id") or "")
             if gid not in DOCS_GAPS:
+                continue
+            if not _gap_allowed_by_wave_filter(gid):
+                continue
+            if f"{wid}::{gid}" in skip_forever:
+                skipped.append(
+                    {
+                        "workspaceId": wid,
+                        "gapId": gid,
+                        "reason": "skip_forever",
+                        "at": _now(),
+                    }
+                )
                 continue
             prio = str(g.get("priority") or "p1")
             item = {
@@ -121,6 +157,7 @@ def _build_queue(
                 "writeClass": "docs",
                 "path": str(root),
                 "state": state,
+                "dirty": bool(dirty),
             }
             rows.append((_PRIO.get(prio, 9), dirty, wid, item))
     rows.sort(key=lambda r: (r[1], r[0], r[2], r[3]["gapId"]))

@@ -745,6 +745,9 @@ DEFAULT_GITHUB_AGENT_DIRTY = "skip"
 DEFAULT_GITHUB_AGENT_WRITE_CLASSES = ("docs",)
 DEFAULT_GITHUB_AGENT_MAX_PER_TICK = 6
 DEFAULT_GITHUB_AGENT_ANALYZE_STALE_HOURS = 24
+# Wave UI filters (arm/tick). Callers: github_agent_act, widgets/github_agent Rights.
+GITHUB_AGENT_WAVE_FILTER = ("all", "legal", "agents-md", "skills")
+DEFAULT_GITHUB_AGENT_WAVE_FILTER = "all"
 
 
 def _github_agent_block() -> dict[str, Any]:
@@ -777,7 +780,22 @@ def get_github_agent_allow_write() -> bool:
 
 
 def set_github_agent_allow_write(enabled: bool) -> None:
-    _save_github_agent_block({"allowWrite": bool(enabled)})
+    on = bool(enabled)
+    updates: dict[str, Any] = {"allowWrite": on}
+    # First Act after enabling writes must confirm in Companion UX.
+    if on and not get_github_agent_allow_write():
+        updates["allowWriteNeedsConfirm"] = True
+    if not on:
+        updates["allowWriteNeedsConfirm"] = False
+    _save_github_agent_block(updates)
+
+
+def get_github_agent_allow_write_needs_confirm() -> bool:
+    return bool(_github_agent_block().get("allowWriteNeedsConfirm", False))
+
+
+def clear_github_agent_allow_write_needs_confirm() -> None:
+    _save_github_agent_block({"allowWriteNeedsConfirm": False})
 
 
 def get_github_agent_allow_processes() -> bool:
@@ -903,10 +921,49 @@ def set_github_agent_analyze_stale_hours(n: int) -> None:
     _save_github_agent_block({"analyzeStaleHours": max(1, min(v, 168))})
 
 
+def get_github_agent_wave_filter() -> str:
+    raw = _github_agent_block().get("waveFilter", DEFAULT_GITHUB_AGENT_WAVE_FILTER)
+    if isinstance(raw, str) and raw.strip().lower() in GITHUB_AGENT_WAVE_FILTER:
+        return raw.strip().lower()
+    return DEFAULT_GITHUB_AGENT_WAVE_FILTER
+
+
+def set_github_agent_wave_filter(mode: str) -> None:
+    m = (mode or "").strip().lower()
+    if m in GITHUB_AGENT_WAVE_FILTER:
+        _save_github_agent_block({"waveFilter": m})
+
+
+def get_github_agent_wave_clean_only() -> bool:
+    return bool(_github_agent_block().get("waveCleanOnly", False))
+
+
+def set_github_agent_wave_clean_only(enabled: bool) -> None:
+    _save_github_agent_block({"waveCleanOnly": bool(enabled)})
+
+
+def get_github_agent_skip_forever() -> list[str]:
+    """Keys ``workspaceId::gapId`` never re-queued."""
+    return _str_list(_github_agent_block().get("skipForever"))
+
+
+def set_github_agent_skip_forever(keys: list[str] | None) -> None:
+    _save_github_agent_block({"skipForever": _str_list(keys or [])})
+
+
+def add_github_agent_skip_forever(workspace_id: str, gap_id: str) -> None:
+    key = f"{workspace_id}::{gap_id}"
+    cur = get_github_agent_skip_forever()
+    if key not in cur:
+        cur.append(key)
+        set_github_agent_skip_forever(cur)
+
+
 def get_github_agent_rights() -> dict[str, Any]:
     return {
         "confirm": get_github_agent_confirm(),
         "allowWrite": get_github_agent_allow_write(),
+        "allowWriteNeedsConfirm": get_github_agent_allow_write_needs_confirm(),
         "allowProcesses": get_github_agent_allow_processes(),
         "includeArchived": get_github_agent_include_archived(),
         "allowlist": get_github_agent_allowlist(),
@@ -916,6 +973,9 @@ def get_github_agent_rights() -> dict[str, Any]:
         "maxPerTick": get_github_agent_max_per_tick(),
         "autopilot": get_github_agent_autopilot(),
         "analyzeStaleHours": get_github_agent_analyze_stale_hours(),
+        "waveFilter": get_github_agent_wave_filter(),
+        "waveCleanOnly": get_github_agent_wave_clean_only(),
+        "skipForever": get_github_agent_skip_forever(),
     }
 
 

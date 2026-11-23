@@ -730,7 +730,13 @@ def _cmd_secrets(args: argparse.Namespace) -> int:
 
 
 def _cmd_workspaces(args: argparse.Namespace) -> int:
-    from core.store.workspaces import delete_workspace, list_workspaces, upsert_workspace
+    from core.store.workspaces import (
+        delete_workspace,
+        get_workspace,
+        list_workspaces,
+        set_workspace_domains,
+        upsert_workspace,
+    )
 
     cmd = args.workspaces_cmd
     if cmd == "list":
@@ -742,7 +748,9 @@ def _cmd_workspaces(args: argparse.Namespace) -> int:
                 print_info("(no workspaces)")
             for w in items:
                 gh = f"  github:{w['github']}" if w.get("github") else ""
-                print(f"{w['id']:16} {w['path']}{gh}")
+                doms = w.get("domains") or []
+                dd = f"  domains:{','.join(doms)}" if doms else ""
+                print(f"{w['id']:16} {w['path']}{gh}{dd}")
         return 0
     if cmd == "add":
         try:
@@ -763,7 +771,87 @@ def _cmd_workspaces(args: argparse.Namespace) -> int:
             return 0
         print_err(f"Workspace not found: {args.id}")
         return 1
-    print_err("Usage: ncc ai workspaces list|add|delete")
+    if cmd == "domains":
+        wid = getattr(args, "id", None)
+        if not wid:
+            print_err("Usage: ncc ai workspaces domains --id WS [--set a.com,b.com]")
+            return 1
+        set_raw = getattr(args, "set", None)
+        if set_raw is not None:
+            try:
+                domains = [x.strip() for x in str(set_raw).split(",") if x.strip()]
+                ws = set_workspace_domains(str(wid), domains)
+            except ValueError as exc:
+                print_err(str(exc))
+                return 2
+            print_ok(f"{ws.id} domains={ws.domains or '(none)'}")
+            return 0
+        ws = get_workspace(str(wid))
+        if ws is None:
+            print_err(f"Workspace not found: {wid}")
+            return 1
+        if getattr(args, "json", False):
+            print(json.dumps({"id": ws.id, "domains": ws.domains}, indent=2))
+        else:
+            print_info(f"{ws.id} domains={ws.domains or '(none)'}")
+        return 0
+    print_err("Usage: ncc ai workspaces list|add|delete|domains")
+    return 1
+
+
+def _cmd_site_check(args: argparse.Namespace) -> int:
+    """Website-check wave (TLS/headers/SEO/externals). Called from main() site-check."""
+    from core.workflows.site_check import (
+        check_url,
+        format_site_check_brief,
+        load_site_check_latest,
+        run_site_check_wave,
+    )
+
+    cmd = getattr(args, "site_check_cmd", None)
+    if cmd == "run":
+        wid = getattr(args, "workspace", None)
+        result = run_site_check_wave(
+            workspace_ids=[str(wid)] if wid else None,
+        )
+        if getattr(args, "json", False):
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+        else:
+            print(format_site_check_brief(result))
+        return 0 if result.get("ok") else 1
+    if cmd == "show":
+        payload = load_site_check_latest()
+        if payload is None:
+            print_err("No site-check results — run: ncc ai site-check run")
+            return 1
+        if getattr(args, "json", False):
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            print(format_site_check_brief(payload))
+        return 0
+    if cmd == "check":
+        url = getattr(args, "url", None)
+        if not url:
+            print_err("Usage: ncc ai site-check check URL")
+            return 1
+        try:
+            result = check_url(str(url))
+        except ValueError as exc:
+            print_err(str(exc))
+            return 2
+        if getattr(args, "json", False):
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+        else:
+            findings = result.get("findings") or []
+            print_ok(
+                f"{result.get('host')} · {result.get('status')} · "
+                f"headers {((result.get('securityHeaders') or {}).get('score'))} · "
+                f"{'ok' if not findings else str(len(findings)) + ' issue(s)'}"
+            )
+            for f in findings:
+                print(f"  - {f}")
+        return 0 if result.get("ok") else 1
+    print_err("Usage: ncc ai site-check run|show|check URL")
     return 1
 
 
@@ -1697,6 +1785,15 @@ def main(argv: list[str] | None = None) -> int:
     ws_add.add_argument("--github", help="owner/repo")
     ws_del = ws_sub.add_parser("delete", help="Remove a workspace")
     ws_del.add_argument("id", help="Workspace id")
+    ws_dom = ws_sub.add_parser(
+        "domains", help="Show/set public site domains for a workspace"
+    )
+    ws_dom.add_argument("--id", required=True, help="Workspace id")
+    ws_dom.add_argument(
+        "--set",
+        help="Comma-separated domains/URLs (empty string clears)",
+    )
+    ws_dom.add_argument("--json", action="store_true")
 
     tmpl_p = sub.add_parser("templates", help="Agent workflow templates")
     tmpl_sub = tmpl_p.add_subparsers(dest="templates_cmd")
@@ -2014,6 +2111,20 @@ def main(argv: list[str] | None = None) -> int:
                 help="Attended act (same policy, for UI parity)",
             )
 
+    sc_p = sub.add_parser(
+        "site-check",
+        help="Website-check wave (TLS, security headers, SEO, externals)",
+    )
+    sc_sub = sc_p.add_subparsers(dest="site_check_cmd")
+    sc_run = sc_sub.add_parser("run", help="Check all workspace domains")
+    sc_run.add_argument("--workspace", help="Limit to one workspace id")
+    sc_run.add_argument("--json", action="store_true")
+    sc_show = sc_sub.add_parser("show", help="Show latest site-check snapshot")
+    sc_show.add_argument("--json", action="store_true")
+    sc_one = sc_sub.add_parser("check", help="Check one URL/domain now")
+    sc_one.add_argument("url", help="Domain or URL (e.g. scan.fr4iser.com)")
+    sc_one.add_argument("--json", action="store_true")
+
     mcp_p = sub.add_parser("mcp-install", help="Install an MCP marketplace template")
     mcp_p.add_argument("name", help="MCP template name (git, github, …)")
     mcp_p.add_argument("--workspace", help="Workspace id for {{workspace.path}}")
@@ -2177,6 +2288,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if command == "github-agent":
         return _cmd_github_agent(args)
+
+    if command == "site-check":
+        return _cmd_site_check(args)
 
     if command == "mcp-install":
         return _cmd_mcp_install(args)

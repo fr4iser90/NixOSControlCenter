@@ -6,15 +6,58 @@ import json
 import os
 import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from core.store.paths import workspaces_file
 
 _ID_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]{0,47}$")
 _GITHUB_SSH = re.compile(r"git@github\.com:([^/]+)/([^/]+?)(?:\.git)?$")
 _GITHUB_HTTPS = re.compile(r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$")
+_DOMAIN_HOST = re.compile(
+    r"^(?=.{1,253}$)(?!-)[a-z0-9-]+(?:\.[a-z0-9-]+)+\.?$",
+    re.IGNORECASE,
+)
+
+
+def normalize_domain(raw: str) -> str:
+    """Normalize domain/URL for site-check attachment."""
+    text = (raw or "").strip()
+    if not text:
+        raise ValueError("empty domain")
+    if "://" not in text:
+        host = text.split("/")[0].strip().lower().rstrip(".")
+        if not _DOMAIN_HOST.match(host):
+            raise ValueError(f"invalid domain: {raw!r}")
+        return host
+    parsed = urlparse(text)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"unsupported URL scheme: {raw!r}")
+    host = (parsed.hostname or "").strip().lower().rstrip(".")
+    if not host or not _DOMAIN_HOST.match(host):
+        raise ValueError(f"invalid domain in URL: {raw!r}")
+    path = parsed.path or "/"
+    if path != "/" and path.endswith("/"):
+        path = path.rstrip("/")
+    if parsed.scheme == "https" and path in ("", "/"):
+        return host
+    return f"{parsed.scheme}://{host}{path}"
+
+
+def normalize_domains(raw: list[str] | None) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw or []:
+        try:
+            d = normalize_domain(str(item))
+        except ValueError:
+            continue
+        if d not in seen:
+            seen.add(d)
+            out.append(d)
+    return out
 
 
 @dataclass
@@ -23,6 +66,7 @@ class Workspace:
     label: str
     path: str
     github: str | None = None
+    domains: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -32,6 +76,8 @@ class Workspace:
         }
         if self.github:
             d["github"] = self.github
+        if self.domains:
+            d["domains"] = list(self.domains)
         return d
 
     @classmethod
@@ -42,7 +88,10 @@ class Workspace:
             return None
         label = str(raw.get("label") or wid).strip() or wid
         gh = str(raw.get("github") or "").strip() or None
-        return cls(id=wid, label=label, path=path, github=gh)
+        domains = normalize_domains(
+            [str(x) for x in (raw.get("domains") or []) if str(x).strip()]
+        )
+        return cls(id=wid, label=label, path=path, github=gh, domains=domains)
 
 
 def slug_from_path(path: Path) -> str:
@@ -166,6 +215,7 @@ def upsert_workspace(
     *,
     label: str | None = None,
     github: str | None = None,
+    domains: list[str] | None = None,
 ) -> Workspace:
     wid = validate_workspace_id(workspace_id)
     p = Path(path).expanduser().resolve()
@@ -176,11 +226,17 @@ def upsert_workspace(
     gh = (github or "").strip() or None
     if gh and "/" not in gh:
         raise ValueError("github must look like owner/repo")
+    existing = get_workspace(wid)
+    if domains is None:
+        doms = list(existing.domains) if existing else []
+    else:
+        doms = normalize_domains(domains)
     ws = Workspace(
         id=wid,
         label=(label or "").strip() or p.name or wid,
         path=str(p),
         github=gh,
+        domains=doms,
     )
     data = _load_raw()
     items = [x for x in (data.get("workspaces") or []) if isinstance(x, dict)]
@@ -195,6 +251,24 @@ def upsert_workspace(
     data["workspaces"] = items
     _save_raw(data)
     return ws
+
+
+def set_workspace_domains(workspace_id: str, domains: list[str]) -> Workspace:
+    """Replace public site URLs/hosts attached to a workspace."""
+    ws = get_workspace(workspace_id)
+    if ws is None:
+        raise ValueError(f"Unknown workspace id: {workspace_id}")
+    return upsert_workspace(
+        ws.id,
+        ws.path,
+        label=ws.label,
+        github=ws.github,
+        domains=normalize_domains(domains),
+    )
+
+
+def workspaces_with_domains() -> list[Workspace]:
+    return [w for w in list_workspaces() if w.domains]
 
 
 def delete_workspace(workspace_id: str) -> bool:

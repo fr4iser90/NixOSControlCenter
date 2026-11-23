@@ -227,6 +227,32 @@ def github_agent_campaign_file() -> Path:
     return github_agent_dir() / "campaign.json"
 
 
+def site_checks_dir() -> Path:
+    """Static website-check wave results (TLS / headers / SEO / externals).
+
+    Callers: ``core.workflows.site_check``, CLI ``site-check``, companion GitHub panel.
+    No prior site-check store. Schema dir under config_home/site-checks/.
+    User: domains adden und Website-Checks (myline-ähnlich) laufen lassen.
+    """
+    path = config_home() / "site-checks"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def site_check_latest_file() -> Path:
+    """Latest fleet site-check wave snapshot (ISO updatedAt)."""
+    return site_checks_dir() / "latest.json"
+
+
+def tray_owner_file() -> Path:
+    """Which process owns the desktop tray icon (companion | tray).
+
+    Callers: ``core.store.tray_owner``. Schema: {pid, role, updatedAt}.
+    User: "Kein Doppel-Tray: Companion und ncc ai tray gegenseitig erkennen."
+    """
+    return config_home() / "tray-owner.json"
+
+
 def focus_state_file() -> Path:
     """Doomscroll / focus watchdog streak state."""
     return config_home() / "focus-state.json"

@@ -37,7 +37,7 @@ in
               "serve-openapi" "tray" "companion" "harness"
               "watchdog" "probe" "rollback" "red-team"
               "secrets" "workspaces" "templates" "workflows" "focus" "workflow"
-              "github-agent"
+              "github-agent" "site-check"
               "context"
               "mcp-install"
               "maintenance"
@@ -77,13 +77,14 @@ in
                 ncc ai harness status|probe NAME
                 ncc ai agent run --harness qwen|dsh|native --goal "…"
                 ncc ai secrets list|set|delete
-                ncc ai workspaces list|add|delete
+                ncc ai workspaces list|add|delete|domains
                 ncc ai templates list|show|instantiate|run|instances
                 ncc ai workflows show|refresh|tasks|roadmap
                 ncc ai focus status|tick|snooze
                 ncc ai context show|compact [--session ID] [--json]
                 ncc ai workflow audit|lifecycle|fleet|plan|status|next|resume|task-start|task-finish|branch|validate|commit|pr|merge|bump
                 ncc ai github-agent analyze|show|rights|arm|tick|status|pause|resume|act
+                ncc ai site-check run|show|check URL [--workspace ID] [--json]
                 ncc ai mcp-install NAME
                 ncc ai maintenance run [--json]
                 ncc ai permissions show [--grant repo=pr] [--json]
