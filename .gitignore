@@ -62,8 +62,9 @@ build/
 *.egg-info/
 
 # Debugging files
-# Core dumps or debugging output files should not be tracked.
-core.*
+# Core dumps only at repo root / numbered dumps — never ignore nixos/core/ or **/core.nix
+/core
+core.[0-9]*
 *.stackdump
 
 # NixOS Control Center specific
