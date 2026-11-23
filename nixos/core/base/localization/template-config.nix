@@ -3,4 +3,6 @@
   keyboardLayout = "us";
   keyboardOptions = "";
   timeZone = "Europe/Berlin";
+  email = "";
+  domain = "";
 }

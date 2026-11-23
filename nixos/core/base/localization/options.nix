@@ -36,6 +36,19 @@ in {
       default = "Europe/Berlin";
       description = "System timezone (e.g., 'Europe/Berlin', 'America/New_York', 'UTC')";
     };
+
+    # Host identity for stacks / virtualization session env (from flat system-config.nix)
+    email = lib.mkOption {
+      type = lib.types.str;
+      default = "";
+      description = "Operator / contact email (e.g. ACME, notifications)";
+    };
+
+    domain = lib.mkOption {
+      type = lib.types.str;
+      default = "";
+      description = "Primary domain for this host (e.g. reverse proxy / stacks)";
+    };
   };
 }
 

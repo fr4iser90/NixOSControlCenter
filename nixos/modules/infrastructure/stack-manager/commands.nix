@@ -25,8 +25,9 @@ let
     else if (hasAdminUsers && !isSwarmMode) then (head (attrNames adminUsers))
     else "";
 
-  hostDomain = systemConfig.domain or "";
-  hostEmail = systemConfig.email or "";
+  locCfg = getModuleConfig "localization";
+  hostDomain = locCfg.domain or systemConfig.domain or "";
+  hostEmail = locCfg.email or systemConfig.email or "";
   swarmRole = if cfg.swarm == null then "" else toString cfg.swarm;
   profilesStr = concatStringsSep "," (cfg.profiles or []);
   installRoot = cfg.catalog.installRoot or "";

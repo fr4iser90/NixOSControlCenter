@@ -84,8 +84,8 @@ let
     USER_UID=$(id -u)
     USER_GID=$(id -g)
     export USER_UID USER_GID
-    export DOMAIN=${lib.escapeShellArg (systemConfig.domain or "")}
-    export EMAIL=${lib.escapeShellArg (systemConfig.email or "")}
+    export DOMAIN=${lib.escapeShellArg ((getModuleConfig "localization").domain or systemConfig.domain or "")}
+    export EMAIL=${lib.escapeShellArg ((getModuleConfig "localization").email or systemConfig.email or "")}
 
     DNS_ENV_FILE="$BASE/catalog/gateway/ddns-updater/ddns-updater.env"
     DNS_CFG_ENABLE=${if dnsEnabled then "true" else "false"}
