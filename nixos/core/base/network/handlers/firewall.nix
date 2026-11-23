@@ -3,8 +3,7 @@
 let
   recommendations = import ../processors/services.nix;
   rules = import ../lib/rules.nix { inherit lib; };
-  
-  # Service-Konfigurationen aus systemConfig.nix
+
   networkCfg = getModuleConfig "network";
   configuredServices = lib.attrByPath ["services"] {} networkCfg;
 
@@ -16,21 +15,39 @@ let
       ssh = { exposure = "public"; };
     };
 
-  # Firewall-Config lesen
   firewallEnabled = lib.attrByPath ["firewall" "enable"] true networkCfg;
 
-  # Helper für sicheres Prüfen der Exposure
-  isPubliclyExposed = cfg:
-    (cfg.exposure or "local") == "public";
+  # Only services explicitly listed in network.services (plus ssh anti-lockout),
+  # and only if we have a recommendation entry — never apply the whole catalog.
+  activeServiceNames = builtins.filter (name: recommendations ? ${name}) (builtins.attrNames services);
+
+  exposureOf = name:
+    let
+      userCfg = services.${name};
+      svcRec = recommendations.${name};
+    in userCfg.exposure or svcRec.recommended or "local";
+
+  publicNames = builtins.filter (n: exposureOf n == "public") activeServiceNames;
+  localNames = builtins.filter (n: exposureOf n != "public") activeServiceNames;
+
+  publicTcpPorts = lib.unique (lib.concatLists (map (n: recommendations.${n}.ports.tcp or []) publicNames));
+  publicUdpPorts = lib.unique (lib.concatLists (map (n: recommendations.${n}.ports.udp or []) publicNames));
+
+  # Local rules must not DROP ports already opened publicly (e.g. pihole:80 vs nginx:80).
+  localRecFiltered = name:
+    let
+      svcRec = recommendations.${name};
+      tcp = builtins.filter (p: !(lib.elem p publicTcpPorts)) (svcRec.ports.tcp or []);
+      udp = builtins.filter (p: !(lib.elem p publicUdpPorts)) (svcRec.ports.udp or []);
+    in svcRec // { ports = { inherit tcp udp; }; };
+
+  isPubliclyExposed = cfg: (cfg.exposure or "local") == "public";
 
 in {
-  # Firewall-Konfiguration mit explizitem enable-Status
   networking.firewall = lib.mkMerge [
-    # Firewall-Status IMMER explizit setzen (auch wenn false)
     {
       enable = firewallEnabled;
     }
-    # Rest der Firewall-Konfiguration nur wenn aktiviert
     (lib.mkIf firewallEnabled {
       allowPing = true;
 
@@ -51,9 +68,14 @@ in {
         iptables -A INPUT -p icmp --icmp-type echo-request -j ACCEPT
         iptables -A INPUT -p icmp --icmp-type echo-reply -j ACCEPT
 
+        # Public first, then local (local skips ports already public).
         ${lib.concatMapStrings (service:
           rules.generateServiceRules service recommendations.${service} (services.${service} or {})
-        ) (builtins.attrNames recommendations)}
+        ) publicNames}
+
+        ${lib.concatMapStrings (service:
+          rules.generateServiceRules service (localRecFiltered service) (services.${service} or {})
+        ) localNames}
 
         ${lib.concatMapStrings (net: ''
           iptables -A INPUT -s ${net} -j ACCEPT
@@ -62,14 +84,13 @@ in {
     })
   ];
 
-  # Warnungen für unsichere Konfigurationen
   warnings = lib.flatten (lib.filter (w: w != null) (map (service:
     let
-      cfg = recommendations.${service};
+      svcRec = recommendations.${service};
       userCfg = services.${service} or {};
     in
-    if isPubliclyExposed userCfg && (cfg.recommended or "local") == "local"
-    then "Warning: ${service} is exposed publicly but recommended to be local only (${cfg.reason or "security risk"})"
+    if isPubliclyExposed userCfg && (svcRec.recommended or "local") == "local"
+    then "Warning: ${service} is exposed publicly but recommended to be local only (${svcRec.reason or "security risk"})"
     else null
-  ) (builtins.attrNames recommendations)));
+  ) activeServiceNames));
 }
