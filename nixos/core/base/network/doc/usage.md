@@ -34,9 +34,28 @@ As a core module, the network system provides essential networking functionality
 }
 ```
 
+## Homelab / Docker (80/443)
+
+Firewall rules are **not** hard-coded for ports. They come from `network.services.*`
+(see `processors/services.nix`). Catalog entry `nginx` owns TCP **80/443** with
+`recommended = "public"`.
+
+When **Docker** is enabled (`packages.docker` / `packageModules`) and
+`network.services.nginx` is unset, the firewall handler auto-opens **nginx**
+publicly (Traefik/compose reverse proxy). Override:
+
+```nix
+network.services.nginx.exposure = "local";  # or omit Docker
+```
+
+Only services listed under `network.services` (plus SSH/Docker anti-lockouts) get
+rules — the full catalog is never applied. Local rules skip ports already opened
+publicly (e.g. Pi-hole vs nginx on :80).
+
 ## Common Use Cases
 
 ### Use Case 1: Basic Desktop Network
+
 
 **Scenario**: Desktop system with NetworkManager
 **Configuration**:

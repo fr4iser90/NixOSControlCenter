@@ -5,14 +5,25 @@ let
   rules = import ../lib/rules.nix { inherit lib; };
 
   networkCfg = getModuleConfig "network";
+  pkgCfg = getModuleConfig "packages";
   configuredServices = lib.attrByPath ["services"] {} networkCfg;
+
+  dockerOn =
+    (pkgCfg.docker.enable or false)
+    || lib.elem "docker" (pkgCfg.packageModules or [])
+    || lib.elem "docker-rootless" (pkgCfg.packageModules or []);
 
   # Anti-lockout: if OpenSSH is on but network.services.ssh is unset, open
   # port 22 publicly (VPS). Override with network.services.ssh.exposure = "local".
+  # Homelab/Traefik: Docker hosts need 80/443 public for the reverse proxy.
+  # Catalog key is `nginx` (same ports). Override with network.services.nginx.exposure = "local".
   services =
     configuredServices
     // lib.optionalAttrs ((config.services.openssh.enable or false) && !(configuredServices ? ssh)) {
       ssh = { exposure = "public"; };
+    }
+    // lib.optionalAttrs (dockerOn && !(configuredServices ? nginx)) {
+      nginx = { exposure = "public"; };
     };
 
   firewallEnabled = lib.attrByPath ["firewall" "enable"] true networkCfg;
